@@ -43,6 +43,9 @@ Example:
 
 __version__ = "0.12.0"
 
+from typing import Any, Callable
+
+from . import app_registry as _app_registry
 from .alerts import Alert
 from .animated import Animated, AnimatedValue
 from .components import (
@@ -102,6 +105,48 @@ from .page import create_page
 from .platform import Platform
 from .style import StyleSheet, ThemeContext
 
+
+def run(component: Callable[..., Any]) -> Callable[..., Any]:
+    """Register the App component as the root of the application.
+
+    Mirrors React Native's
+    [`AppRegistry.registerComponent`](https://reactnative.dev/docs/appregistry):
+    the user's module declares an ``App`` function once and registers
+    it at import time. Native templates then load the app by importing
+    its module — they do not need to know the App component's name.
+
+    Args:
+        component: A zero-argument ``@component`` function. Typically
+            returns a [`Stack.Navigator`][pythonnative.create_stack_navigator]
+            wrapped in a
+            [`NavigationContainer`][pythonnative.NavigationContainer].
+
+    Returns:
+        The same ``component`` (so ``run`` can be used as a decorator
+        in a pinch, though calling it directly is the conventional
+        form).
+
+    Example:
+        ```python
+        import pythonnative as pn
+
+        Stack = pn.create_stack_navigator()
+
+        @pn.component
+        def App():
+            return pn.NavigationContainer(
+                Stack.Navigator(
+                    Stack.Screen("Home", component=HomeScreen),
+                )
+            )
+
+        pn.run(App)
+        ```
+    """
+    _app_registry.register(component)
+    return component
+
+
 __all__ = [
     # Components
     "ActivityIndicator",
@@ -131,6 +176,7 @@ __all__ = [
     # Core
     "Element",
     "create_page",
+    "run",
     # Hooks
     "batch_updates",
     "component",

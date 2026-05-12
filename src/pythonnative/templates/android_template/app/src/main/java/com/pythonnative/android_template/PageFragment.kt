@@ -37,7 +37,11 @@ class PageFragment : Fragment() {
         }
         try {
             val py = Python.getInstance()
-            val pagePath = arguments?.getString("page_path") ?: "app.main_page.MainPage"
+            // Default to app.main_page.App — the new Stack-rooted entry
+            // point registered via pn.run(App). The legacy
+            // "app.main_page.MainPage" still resolves because the demo
+            // exports a backwards-compatible alias.
+            val pagePath = arguments?.getString("page_path") ?: "app.main_page.App"
             val argsJson = arguments?.getString("args_json")
             val filesRoot = requireContext().filesDir.absolutePath
             val devRoot = "$filesRoot/pythonnative_dev"

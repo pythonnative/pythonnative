@@ -23,26 +23,51 @@ A minimal `app/main_page.py` looks like:
 ```python
 import pythonnative as pn
 
+Stack = pn.create_stack_navigator()
+
 
 @pn.component
-def App():
+def HomeScreen():
+    nav = pn.use_navigation()
     count, set_count = pn.use_state(0)
     return pn.Column(
         pn.Text(f"Count: {count}", style={"font_size": 24}),
-        pn.Button(
-            "Tap me",
-            on_click=lambda: set_count(count + 1),
-        ),
+        pn.Button("Tap me", on_click=lambda: set_count(count + 1)),
+        pn.Button("Open details", on_click=lambda: nav.navigate("Detail", {"count": count})),
         style={"spacing": 12, "padding": 16},
     )
+
+
+@pn.component
+def DetailScreen():
+    route = pn.use_route()
+    return pn.Text(f"Count was {route.params.get('count', 0)}", style={"padding": 16})
+
+
+@pn.component
+def App():
+    return pn.NavigationContainer(
+        Stack.Navigator(
+            Stack.Screen("Home", HomeScreen, options={"title": "Home"}),
+            Stack.Screen("Detail", DetailScreen, options={"title": "Detail"}),
+            initial_route="Home",
+        )
+    )
+
+
+pn.run(App)
 ```
 
 Key ideas:
 
 - **`@pn.component`** marks a function as a PythonNative component. The function returns an element tree describing the UI. PythonNative creates and updates native views automatically.
 - **`pn.use_state(initial)`** creates local component state. Call the setter to update it — the UI re-renders automatically.
+- **`pn.create_stack_navigator()`** returns a `Stack` with `.Navigator` and `.Screen` factories. Wrap them in `pn.NavigationContainer` to enable [`pn.use_navigation()`][pythonnative.use_navigation] and [`pn.use_route()`][pythonnative.use_route] anywhere below.
+- **`pn.run(App)`** registers `App` as the entry point for this Python process — analogous to `AppRegistry.registerComponent` in React Native. The Android and iOS templates load it automatically.
 - **`style={...}`** passes visual and layout properties as a dict (or list of dicts) to any component.
 - Element functions like `pn.Text(...)`, `pn.Button(...)`, `pn.Column(...)` create lightweight descriptions, not native objects.
+
+When the root `Stack.Navigator` is rendered inside the host's first screen, `navigate(...)` and `go_back()` drive the **native** navigation controller (UINavigationController on iOS, AndroidX Navigation Component on Android). Each pushed screen runs in its own reconciler host, so state on the previous screen is preserved by the platform stack.
 
 ## Run on a platform
 
@@ -75,9 +100,20 @@ pn run ios --hot-reload
 
 The first run still builds and launches the native app. After that,
 edits under `app/` are copied into the running app's writable source
-overlay and the active page is remounted without a full rebuild. This is
-best for Python UI changes; native template changes still require a
-normal rebuild.
+overlay and the active page refreshes without a full rebuild.
+
+PythonNative prefers a **Fast Refresh** path: each
+[`@pn.component`][pythonnative.component] function is matched by
+qualified name across the reloaded module, the live VNode tree's
+function references are swapped in place, and the next render reuses
+the existing hook state. So edits to the body of a component preserve
+in-memory state (counters, scroll positions, etc.). When Fast Refresh
+cannot find a clean swap — for example, after deeper structural
+edits — PythonNative falls back to a full remount of the active page
+so you never get stuck with a stale tree.
+
+This works best for Python UI changes; native template changes
+(Kotlin, Swift, manifests) still require a normal rebuild.
 
 ## Viewing logs
 
@@ -90,13 +126,16 @@ import pythonnative as pn
 
 
 @pn.component
-def MainPage():
+def App():
     count, set_count = pn.use_state(0)
-    print(f"[MainPage] render count={count}")
+    print(f"[App] render count={count}")
     return pn.Column(
         pn.Text(f"Count: {count}"),
         pn.Button("Tap me", on_click=lambda: set_count(count + 1)),
     )
+
+
+pn.run(App)
 ```
 
 - On Android, logs are streamed via `adb logcat` filtered to the

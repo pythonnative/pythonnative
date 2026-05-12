@@ -39,8 +39,14 @@ produce identical frames on both platforms.
 - **No JS bridge, no transpiler.** The reconciler runs synchronously
   in Python on the platform's main thread; native API calls are
   direct method calls.
-- **Hot reload built in.** `pn run --hot-reload` watches `app/` and
-  patches changes into the running app.
+- **Native-backed navigation.** The root `Stack.Navigator` drives
+  the platform's real navigation controller — Android Navigation
+  Component fragments on Android, `UINavigationController` on iOS —
+  so transitions, back gestures, and state preservation are exactly
+  what users expect from a first-class native app.
+- **Fast Refresh hot reload.** `pn run --hot-reload` watches `app/`
+  and patches the running app in place, preserving component state
+  across most edits.
 - **A small surface.** A handful of element factories, a handful of
   hooks, and one navigation primitive.
 

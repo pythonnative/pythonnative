@@ -209,6 +209,121 @@ def test_declarative_handle_navigate_unknown_raises() -> None:
         handle.navigate("Missing")
 
 
+# ======================================================================
+# Native-backed delegation via host._push / host._pop
+# ======================================================================
+
+
+class _FakeHost:
+    """Stub `_AppHost` used to assert native-push delegation."""
+
+    def __init__(self, component_path: str = "app.demo.App") -> None:
+        self._component_path = component_path
+        self.pushed: list = []
+        self.popped = 0
+        self.reset_count = 0
+
+    def _push(self, page: Any, args: Any) -> None:
+        self.pushed.append((page, args))
+
+    def _pop(self) -> None:
+        self.popped += 1
+
+    def _reset_to_root(self) -> None:
+        self.reset_count += 1
+
+
+class _FakeHostHandle:
+    """Mimics `NavigationHandle`: declarative navigators look for `_host`."""
+
+    def __init__(self, host: Any) -> None:
+        self._host = host
+
+    def navigate(self, route_name: str, params: Any = None) -> None:
+        # Forwarding fallback (should not be called for host-routed pushes).
+        raise AssertionError("host handle navigate() invoked unexpectedly")
+
+    def go_back(self) -> None:
+        raise AssertionError("host handle go_back() invoked unexpectedly")
+
+
+def test_declarative_handle_native_push_when_parent_is_host() -> None:
+    """A root Stack whose parent has `_host` should push via the host."""
+    host = _FakeHost("app.demo.App")
+    parent = _FakeHostHandle(host)
+    screens = {"Detail": _ScreenDef("Detail", lambda: None)}
+
+    set_stack_calls: list = []
+
+    def set_stack(val: Any) -> None:
+        set_stack_calls.append(val)
+
+    handle = _DeclarativeNavHandle(screens, lambda: [_RouteEntry("Home")], set_stack, parent=parent)
+    handle.navigate("Detail", {"id": 7})
+
+    assert len(host.pushed) == 1
+    page_path, push_args = host.pushed[0]
+    assert page_path == "app.demo.App"
+    assert push_args["__pn_initial_route__"] == "Detail"
+    assert push_args["__pn_initial_params__"] == {"id": 7}
+    assert set_stack_calls == []  # in-Python stack is NOT touched
+
+
+def test_declarative_handle_native_pop_at_root_when_parent_is_host() -> None:
+    """`go_back` on a single-entry root stack pops the host nav controller."""
+    host = _FakeHost()
+    parent = _FakeHostHandle(host)
+    handle = _DeclarativeNavHandle(
+        {"A": _ScreenDef("A", lambda: None)},
+        lambda: [_RouteEntry("A")],
+        lambda _: None,
+        parent=parent,
+    )
+
+    handle.go_back()
+    assert host.popped == 1
+
+
+def test_declarative_handle_native_pop_falls_through_to_in_python_first() -> None:
+    """In-Python pop wins when the stack has multiple entries, even on native."""
+    host = _FakeHost()
+    parent = _FakeHostHandle(host)
+    stack: list = [_RouteEntry("A"), _RouteEntry("B")]
+    set_stack_calls: list = []
+
+    def set_stack(val: Any) -> None:
+        if callable(val):
+            new = val(stack)
+            stack.clear()
+            stack.extend(new)
+        else:
+            stack.clear()
+            stack.extend(val)
+        set_stack_calls.append(list(stack))
+
+    handle = _DeclarativeNavHandle({}, lambda: stack, set_stack, parent=parent)
+    handle.go_back()
+    assert host.popped == 0  # didn't escalate to native pop
+    assert set_stack_calls[-1] == [_RouteEntry("A")] or set_stack_calls[-1][0].name == "A"
+
+
+def test_declarative_handle_native_reset_calls_host_helpers() -> None:
+    """`reset` on a root stack invokes both pop-to-root and push."""
+    host = _FakeHost("app.demo.App")
+    parent = _FakeHostHandle(host)
+    handle = _DeclarativeNavHandle(
+        {"Home": _ScreenDef("Home", lambda: None)},
+        lambda: [_RouteEntry("Home")],
+        lambda _: None,
+        parent=parent,
+    )
+
+    handle.reset("Home", {"fresh": True})
+    assert host.reset_count == 1
+    assert host.pushed[0][0] == "app.demo.App"
+    assert host.pushed[0][1]["__pn_initial_route__"] == "Home"
+
+
 def test_declarative_handle_reset_unknown_raises() -> None:
     handle = _DeclarativeNavHandle({"Home": _ScreenDef("Home", lambda: None)}, lambda: [], lambda _: None)
     with pytest.raises(ValueError, match="Unknown route"):
@@ -844,3 +959,143 @@ def test_navigation_exports_from_package() -> None:
     assert hasattr(pn, "create_drawer_navigator")
     assert hasattr(pn, "use_route")
     assert hasattr(pn, "use_focus_effect")
+    assert hasattr(pn, "run")
+
+
+# ======================================================================
+# Initial route propagated through host args (native-push pickup)
+# ======================================================================
+
+
+class _ArgsHostHandle:
+    """Host nav handle that exposes args via `get_params`."""
+
+    def __init__(self, host_args: Dict[str, Any]) -> None:
+        self._host = type("HostStub", (), {"_component_path": "app.demo.App"})()
+        self._host_args = host_args
+
+    def get_params(self) -> Dict[str, Any]:
+        return self._host_args
+
+    def navigate(self, route_name: str, params: Any = None) -> None:
+        return None
+
+    def go_back(self) -> None:
+        return None
+
+
+def test_stack_navigator_initial_route_from_host_args() -> None:
+    """When the host's args carry __pn_initial_route__, the Stack starts there."""
+    Stack = create_stack_navigator()
+
+    @component
+    def HomeScreen() -> Element:
+        return Element("Text", {"text": "home"}, [])
+
+    @component
+    def DetailScreen() -> Element:
+        params = use_route()
+        return Element("Text", {"text": f"detail:{params.get('id')}"}, [])
+
+    parent = _ArgsHostHandle(
+        {
+            "__pn_initial_route__": "Detail",
+            "__pn_initial_params__": {"id": 99},
+        }
+    )
+
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    rec._page_re_render = lambda: None
+
+    el = Stack.Navigator(
+        Stack.Screen("Home", component=HomeScreen),
+        Stack.Screen("Detail", component=DetailScreen),
+    )
+    from pythonnative.hooks import Provider as _Provider
+
+    root = rec.mount(_Provider(_NavigationContext, parent, el))
+
+    def find_text(view: MockView) -> Any:
+        if view.type_name == "Text":
+            return view.props.get("text")
+        for c in view.children:
+            r = find_text(c)
+            if r:
+                return r
+        return None
+
+    assert find_text(root) == "detail:99"
+
+
+def test_stack_navigator_falls_back_when_host_route_unknown() -> None:
+    """An unknown route in host args is ignored and the navigator picks its default."""
+    Stack = create_stack_navigator()
+
+    @component
+    def HomeScreen() -> Element:
+        return Element("Text", {"text": "home"}, [])
+
+    parent = _ArgsHostHandle({"__pn_initial_route__": "MysteryScreen"})
+
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    rec._page_re_render = lambda: None
+
+    el = Stack.Navigator(Stack.Screen("Home", component=HomeScreen))
+    from pythonnative.hooks import Provider as _Provider
+
+    root = rec.mount(_Provider(_NavigationContext, parent, el))
+
+    def find_text(view: MockView) -> Any:
+        if view.type_name == "Text":
+            return view.props.get("text")
+        for c in view.children:
+            r = find_text(c)
+            if r:
+                return r
+        return None
+
+    assert find_text(root) == "home"
+
+
+def test_stack_navigator_calls_set_screen_options() -> None:
+    """The active screen's options['title'] is forwarded to the host."""
+    Stack = create_stack_navigator()
+    seen_options: list = []
+
+    class _OptionRecorder:
+        _component_path = "app.demo.App"
+
+        def _set_screen_options(self, opts: Dict[str, Any]) -> None:
+            seen_options.append(opts)
+
+    class _Parent:
+        def __init__(self, host: Any) -> None:
+            self._host = host
+
+        def get_params(self) -> Dict[str, Any]:
+            return {}
+
+        def navigate(self, route_name: str, params: Any = None) -> None:
+            return None
+
+        def go_back(self) -> None:
+            return None
+
+    @component
+    def HomeScreen() -> Element:
+        return Element("Text", {"text": "home"}, [])
+
+    parent = _Parent(_OptionRecorder())
+
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    rec._page_re_render = lambda: None
+
+    el = Stack.Navigator(Stack.Screen("Home", component=HomeScreen, options={"title": "Hello"}))
+    from pythonnative.hooks import Provider as _Provider
+
+    rec.mount(_Provider(_NavigationContext, parent, el))
+
+    assert seen_options == [{"title": "Hello"}]

@@ -1,39 +1,49 @@
 """Declarative navigation for PythonNative.
 
 Provides a component-based navigation system inspired by React
-Navigation. Navigators manage screen state in Python and render the
-active screen's component through the standard reconciler pipeline, so
-hooks ([`use_state`][pythonnative.use_state],
-[`use_effect`][pythonnative.use_effect], etc.) and providers continue
-to work inside navigated screens.
+Navigation. Navigators manage screen state in Python and the
+[`Stack`][pythonnative.create_stack_navigator] navigator pushes real
+native screen containers (``UIViewController`` on iOS,
+``Fragment`` on Android) so users get system-grade transitions and
+swipe-back gestures for free.
 
 Three navigator factories are provided out of the box:
 
 - [`create_stack_navigator`][pythonnative.create_stack_navigator]: push
-  and pop screens.
+  and pop screens with native transitions when the navigator is mounted
+  at the root of an app host.
 - [`create_tab_navigator`][pythonnative.create_tab_navigator]: switch
   between sibling tabs (with a tab bar).
 - [`create_drawer_navigator`][pythonnative.create_drawer_navigator]:
   switch between sibling screens via a side drawer menu.
 
 Navigators may be nested arbitrarily; nested handles forward unknown
-routes and root-level `go_back` calls to their parent.
+routes and root-level ``go_back`` calls to their parent.
+
+Stack navigators rendered as the root of an app host (i.e. the parent
+[`use_navigation`][pythonnative.use_navigation] handle is the host's
+own handle) talk to the platform via that host's ``_push`` / ``_pop``
+methods, so the back stack matches what UIKit / AndroidX maintain.
+Nested stacks (e.g. a stack inside a tab) fall back to in-Python
+state — there is no second native navigation controller to push
+onto in that case.
 
 Example:
     ```python
     import pythonnative as pn
-    from pythonnative.navigation import NavigationContainer, create_stack_navigator
 
-    Stack = create_stack_navigator()
+    Stack = pn.create_stack_navigator()
 
     @pn.component
     def App():
-        return NavigationContainer(
+        return pn.NavigationContainer(
             Stack.Navigator(
-                Stack.Screen("Home", component=HomeScreen),
-                Stack.Screen("Detail", component=DetailScreen),
+                Stack.Screen("Home", component=HomeScreen, options={"title": "Home"}),
+                Stack.Screen("Detail", component=DetailScreen, options={"title": "Detail"}),
             )
         )
+
+    pn.run(App)
     ```
 """
 
@@ -109,19 +119,40 @@ class _RouteEntry:
 # ======================================================================
 
 
+_INITIAL_ROUTE_KEY = "__pn_initial_route__"
+_INITIAL_PARAMS_KEY = "__pn_initial_params__"
+
+
+def _parent_is_app_host(parent: Any) -> bool:
+    """Return True when ``parent`` is the host's own NavigationHandle.
+
+    The host's
+    [`NavigationHandle`][pythonnative.hooks.NavigationHandle] sets a
+    ``_host`` attribute pointing at the owning app host. Declarative
+    navigators check for that marker to decide whether they should
+    push real native screens (root navigator) or fall back to
+    in-Python state (nested navigator).
+    """
+    return parent is not None and hasattr(parent, "_host") and getattr(parent, "_host", None) is not None
+
+
 class _DeclarativeNavHandle:
     """Navigation handle provided by declarative navigators.
 
     Implements the same interface as
-    [`NavigationHandle`][pythonnative.NavigationHandle] so
+    [`NavigationHandle`][pythonnative.hooks.NavigationHandle] so
     [`use_navigation`][pythonnative.use_navigation] returns a
     compatible object regardless of whether the app uses page-based
     navigation or declarative navigators.
 
-    When `parent` is provided, unknown routes and root-level `go_back`
-    calls are forwarded to the parent handle. This enables nested
-    navigators (e.g., a stack inside a tab) to delegate navigation
-    actions that they cannot handle locally.
+    When ``parent`` is the host's own ``NavigationHandle`` (root
+    Stack), ``navigate`` / ``go_back`` / ``reset`` drive the native
+    navigation controller and the in-Python stack is bypassed — the
+    OS owns the back-stack source of truth.
+
+    When ``parent`` is another declarative handle (nested navigator),
+    unknown routes and root-level ``go_back`` calls are forwarded to
+    the parent so a stack inside a tab still pops correctly.
     """
 
     def __init__(
@@ -135,22 +166,65 @@ class _DeclarativeNavHandle:
         self._get_stack = get_stack
         self._set_stack = set_stack
         self._parent = parent
+        self._host_component_path: Optional[str] = None
+
+    def _push_via_host(self, route_name: str, params: Optional[Dict[str, Any]]) -> bool:
+        """Try to push via the underlying app host. Returns True if it ran."""
+        if not _parent_is_app_host(self._parent):
+            return False
+        host = self._parent._host
+        component_path = self._host_component_path or getattr(host, "_component_path", None)
+        if not component_path:
+            return False
+        push_args = {
+            _INITIAL_ROUTE_KEY: route_name,
+            _INITIAL_PARAMS_KEY: params or {},
+        }
+        try:
+            host._push(component_path, push_args)
+            return True
+        except Exception:
+            return False
+
+    def _pop_via_host(self) -> bool:
+        """Try to pop via the underlying app host. Returns True if it ran."""
+        if not _parent_is_app_host(self._parent):
+            return False
+        try:
+            self._parent._host._pop()
+            return True
+        except Exception:
+            return False
 
     def navigate(self, route_name: str, params: Optional[Dict[str, Any]] = None) -> None:
-        """Navigate to a named route, pushing it onto the stack.
+        """Navigate to a named route.
+
+        Behaviour depends on the kind of navigator:
+
+        - **Root stack** (parent is the host's NavigationHandle): the
+          host's native ``_push`` is invoked so the user sees a real
+          UIKit / AndroidX transition; the in-Python stack is left
+          untouched because the native controller is the source of
+          truth.
+        - **Nested stack / tab / drawer**: ``set_stack`` is called with
+          the new route — the parent reconciler re-renders the active
+          screen subtree in place.
+        - **Unknown route**: forwarded to ``parent`` if one exists,
+          otherwise raises ``ValueError``.
 
         Args:
-            route_name: A route registered on this navigator. If unknown
-                and a parent handle exists, the call is forwarded.
+            route_name: A route registered on this navigator.
             params: Optional dict made available to the destination
                 screen via [`use_route`][pythonnative.use_route] or
-                `nav.get_params()`.
+                ``nav.get_params()``.
 
         Raises:
-            ValueError: If `route_name` is unknown and no parent handle
-                exists.
+            ValueError: If ``route_name`` is unknown and no parent
+                handle exists.
         """
         if route_name in self._screen_map:
+            if self._push_via_host(route_name, params):
+                return
             entry = _RouteEntry(route_name, params)
             self._set_stack(lambda s: list(s) + [entry])
         elif self._parent is not None:
@@ -161,21 +235,29 @@ class _DeclarativeNavHandle:
     def go_back(self) -> None:
         """Pop the current screen from the stack.
 
-        If the stack is at its root and a parent handle exists, the call
-        is forwarded to the parent navigator (so a nested stack inside
-        a tab still pops back through the tab's host).
+        Resolution order:
+
+        1. If the current stack has more than one entry (a real
+           in-Python push), pop the top.
+        2. If the parent is the host's NavigationHandle, pop the
+           native navigation controller.
+        3. If the parent is another declarative handle, forward.
+        4. Otherwise no-op.
         """
         stack = self._get_stack()
         if len(stack) > 1:
             self._set_stack(lambda s: list(s[:-1]))
-        elif self._parent is not None:
+            return
+        if self._pop_via_host():
+            return
+        if self._parent is not None:
             self._parent.go_back()
 
     def get_params(self) -> Dict[str, Any]:
         """Return the params dict for the current route.
 
         Returns:
-            The dict supplied to the most recent matching `navigate(...)`
+            The dict supplied to the most recent matching ``navigate(...)``
             call, or an empty dict if none was supplied.
         """
         stack = self._get_stack()
@@ -184,18 +266,30 @@ class _DeclarativeNavHandle:
     def reset(self, route_name: str, params: Optional[Dict[str, Any]] = None) -> None:
         """Reset the stack to a single route.
 
-        Useful for "log out" or "deep link entry" flows where you want
-        to discard the existing back stack.
+        For a root stack this pops every screen above the original
+        root (the screen the user landed on when the app launched)
+        and then pushes ``route_name`` on top. For nested navigators
+        the in-Python stack is replaced wholesale.
 
         Args:
             route_name: Route to install as the new root.
             params: Optional params for that route.
 
         Raises:
-            ValueError: If `route_name` is unknown.
+            ValueError: If ``route_name`` is unknown.
         """
         if route_name not in self._screen_map:
             raise ValueError(f"Unknown route: {route_name!r}. Known routes: {list(self._screen_map)}")
+        if _parent_is_app_host(self._parent):
+            host = self._parent._host
+            reset_fn = getattr(host, "_reset_to_root", None)
+            if callable(reset_fn):
+                try:
+                    reset_fn()
+                except Exception:
+                    pass
+            if self._push_via_host(route_name, params):
+                return
         self._set_stack([_RouteEntry(route_name, params)])
 
 
@@ -290,6 +384,48 @@ def _build_screen_map(screens: Any) -> Dict[str, "_ScreenDef"]:
     return result
 
 
+def _read_host_initial_route(parent_nav: Any) -> "tuple[Optional[str], Dict[str, Any]]":
+    """Extract a host-provided initial route from a parent NavigationHandle.
+
+    When a pushed VC/Fragment boots, the host's ``_args`` carry the
+    requested route name and params (set by
+    [`_DeclarativeNavHandle._push_via_host`][pythonnative.navigation._DeclarativeNavHandle._push_via_host]).
+    The root Stack navigator reads them so the new screen renders on
+    the right entry rather than the navigator's first registered
+    screen.
+
+    Returns:
+        ``(route_name, params)``. Both are ``None`` / ``{}`` when no
+        host args are present.
+    """
+    if not _parent_is_app_host(parent_nav):
+        return None, {}
+    args = parent_nav.get_params() if parent_nav is not None else {}
+    if not isinstance(args, dict):
+        return None, {}
+    route = args.get(_INITIAL_ROUTE_KEY)
+    params = args.get(_INITIAL_PARAMS_KEY) or {}
+    if not isinstance(route, str) or not route:
+        return None, {}
+    if not isinstance(params, dict):
+        params = {}
+    return route, params
+
+
+def _apply_screen_options(parent_nav: Any, screen_def: "_ScreenDef") -> None:
+    """Push the active screen's options into the host (title, etc.)."""
+    if not _parent_is_app_host(parent_nav):
+        return
+    host = parent_nav._host
+    title = screen_def.options.get("title") if screen_def is not None else None
+    setter = getattr(host, "_set_screen_options", None)
+    if callable(setter):
+        try:
+            setter({"title": title} if title is not None else {})
+        except Exception:
+            pass
+
+
 @component
 def _stack_navigator_impl(screens: Any = None, initial_route: Optional[str] = None) -> Element:
     screen_map = _build_screen_map(screens)
@@ -298,8 +434,15 @@ def _stack_navigator_impl(screens: Any = None, initial_route: Optional[str] = No
 
     parent_nav = use_context(_NavigationContext)
 
-    first_route = initial_route or next(iter(screen_map))
-    stack, set_stack = use_state(lambda: [_RouteEntry(first_route)])
+    requested_route, requested_params = _read_host_initial_route(parent_nav)
+    if requested_route is not None and requested_route in screen_map:
+        first_route = requested_route
+        first_params: Dict[str, Any] = dict(requested_params)
+    else:
+        first_route = initial_route or next(iter(screen_map))
+        first_params = {}
+
+    stack, set_stack = use_state(lambda: [_RouteEntry(first_route, first_params)])
 
     stack_ref = use_ref(None)
     stack_ref["current"] = stack
@@ -314,6 +457,8 @@ def _stack_navigator_impl(screens: Any = None, initial_route: Optional[str] = No
     screen_def = screen_map.get(current.name)
     if screen_def is None:
         return Element("Text", {"text": f"Unknown route: {current.name}"}, [])
+
+    _apply_screen_options(parent_nav, screen_def)
 
     screen_el = screen_def.component()
     return Provider(_NavigationContext, handle, Provider(_FocusContext, True, screen_el))

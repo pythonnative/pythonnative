@@ -110,8 +110,14 @@ class ViewController: UIViewController {
                 NSLog("[PN] Hot reload setup skipped: \(error)")
             }
         }
-        // Determine which Python page to load
-        let pagePath: String = requestedPagePath ?? "app.main_page.MainPage"
+        // Determine which Python page to load.
+        //
+        // The new entry-point convention is "app.main_page.App" — the
+        // user's module calls pn.run(App) at import time so the host
+        // simply loads the registered component. The demo also
+        // exports MainPage as an alias for backwards compatibility,
+        // so either path still resolves.
+        let pagePath: String = requestedPagePath ?? "app.main_page.App"
         do {
             let pnPage = try Python.attemptImport("pythonnative.page")
             let ptr = Unmanaged.passUnretained(self).toOpaque()

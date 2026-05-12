@@ -50,6 +50,13 @@ platform APIs synchronously from Python.
    [`create_page`][pythonnative.create_page] internally to bootstrap
    your Python component, and the reconciler drives the UI from
    there.
+10. **`pn.run(App)` entry point.** The user's app module exports a
+    root component and registers it with `pn.run(App)` — mirroring
+    React Native's `AppRegistry.registerComponent`. The native
+    templates load the app by **module path** (e.g.
+    `"app.main_page"`) and pick up whichever component was
+    registered, so a refactor that renames the root component never
+    requires touching the Kotlin/Swift templates.
 
 ## How it works
 
@@ -269,11 +276,25 @@ See [Mental model](mental-model.md) for a wider comparison table.
 - State changes trigger re-render; the reconciler patches Android
   views in place.
 
-## Hot reload
+## Hot reload (Fast Refresh)
 
 During development, `pn run --hot-reload` watches `app/` for file
 changes and pushes updated Python files to the running app, enabling
-near-instant UI updates without full rebuilds. See
+near-instant UI updates without full rebuilds.
+
+PythonNative uses a **Fast Refresh** strategy:
+
+1. Reload the changed module(s) on the device.
+2. For every active page host, walk the VNode tree and collect every
+   component function defined in a reloaded module.
+3. Match each one to its replacement by `__module__` +
+   `__qualname__` and rewrite `Element.type` in place.
+4. Trigger one reconcile pass. Because the VNode and its `HookState`
+   are reused, component state (`use_state`, `use_reducer`, refs) is
+   preserved across the edit.
+
+If Fast Refresh can't produce a clean swap, the host falls back to a
+**full remount** of its root component. See
 [Hot reload guide](../guides/hot-reload.md).
 
 ## Native API modules
@@ -293,28 +314,34 @@ See [Native modules guide](../guides/native-modules.md).
 
 ## Navigation
 
-PythonNative provides two navigation approaches:
+PythonNative navigation is **declarative** and **native-backed**:
 
-- **Declarative navigators** (recommended):
-  [`NavigationContainer`][pythonnative.NavigationContainer] with
-  [`create_stack_navigator`][pythonnative.create_stack_navigator],
-  [`create_tab_navigator`][pythonnative.create_tab_navigator], and
-  [`create_drawer_navigator`][pythonnative.create_drawer_navigator].
-  Navigation state is managed in Python as component state, and
-  navigators are composable; you can nest tabs inside stacks, and so
-  on.
-- **Page-level navigation**:
-  [`use_navigation`][pythonnative.use_navigation] returns a
-  navigation handle with `.navigate()`, `.go_back()`, and
-  `.get_params()`, delegating to native platform navigation when
-  running on device.
+- The user describes their app as a tree of navigators
+  ([`create_stack_navigator`][pythonnative.create_stack_navigator],
+  [`create_tab_navigator`][pythonnative.create_tab_navigator],
+  [`create_drawer_navigator`][pythonnative.create_drawer_navigator])
+  wrapped in
+  [`NavigationContainer`][pythonnative.NavigationContainer], then
+  registers the root with `pn.run(App)`.
+- The outermost `Stack.Navigator` delegates `navigate(...)`,
+  `go_back()`, and `reset(...)` to the platform's native navigation
+  controller — `UINavigationController` on iOS and the AndroidX
+  Navigation Component on Android. Nested navigators (tabs inside a
+  stack, stacks inside tabs) stay in Python and reuse the existing
+  reconciler.
+- Each pushed native screen is a fresh host with its own reconciler
+  and `_AppHost`. Initial routes are forwarded via host arguments
+  (`__pn_initial_route__` / `__pn_initial_params__`), so a pushed
+  screen knows which `Stack.Screen` to render on its first frame.
+- Inside any screen, [`use_navigation`][pythonnative.use_navigation]
+  returns a `NavigationHandle`; [`use_route`][pythonnative.use_route]
+  returns the current route name and params. Both are the same
+  hooks regardless of whether the active navigator is native-backed
+  or pure-Python.
 
-Both approaches are supported. The declarative system uses the
-existing reconciler pipeline; navigators are function components that
-render the active screen via `use_state`, and navigation context is
-provided via [`Provider`][pythonnative.Provider].
-
-See the [Navigation guide](../guides/navigation.md) for full details.
+See the [Navigation guide](../guides/navigation.md) for the full
+walkthrough, including how `options={"title": ...}` flows into the
+native navigation bar.
 
 - iOS: one host `UIViewController` class, many instances pushed on a
   `UINavigationController`.

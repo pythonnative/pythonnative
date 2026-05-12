@@ -717,8 +717,13 @@ _NavigationContext: Context = create_context(None)
 class NavigationHandle:
     """Handle returned by [`use_navigation`][pythonnative.use_navigation].
 
-    Wraps the host's push/pop primitives so screens can navigate without
-    knowing the underlying native navigation stack.
+    Wraps the host's push/pop primitives so screens can navigate
+    without knowing the underlying native navigation stack. The
+    typical user-facing surface is the declarative handle returned by
+    a [`Stack`][pythonnative.create_stack_navigator] — this class is
+    the lower-level fallback used when no navigator is rendered (and
+    as the bridge that declarative navigators delegate to when they
+    need to push real native screens).
 
     Example:
         ```python
@@ -729,7 +734,7 @@ class NavigationHandle:
             nav = pn.use_navigation()
             return pn.Button(
                 "Open Detail",
-                on_click=lambda: nav.navigate(DetailScreen, params={"id": 42}),
+                on_click=lambda: nav.navigate("Detail", {"id": 42}),
             )
         ```
     """
@@ -738,11 +743,15 @@ class NavigationHandle:
         self._host = host
 
     def navigate(self, page: Any, params: Optional[Dict[str, Any]] = None) -> None:
-        """Push `page` onto the navigation stack.
+        """Push ``page`` onto the navigation stack.
 
         Args:
-            page: Either a `@component` function or a dotted Python
-                path (e.g., `"app.detail.DetailScreen"`).
+            page: A ``@component`` function or a dotted Python path
+                (e.g. ``"app.detail.DetailScreen"``). When a Stack
+                navigator is the root of the app, prefer the
+                declarative ``nav.navigate("Detail", params)`` form
+                returned by ``use_navigation()`` — it pushes by route
+                name and the host re-uses its own ``App`` component.
             params: Optional dict of arguments serialized into the
                 target screen.
         """

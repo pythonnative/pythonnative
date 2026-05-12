@@ -1,15 +1,32 @@
+"""Hello-world demo with native-backed stack navigation.
+
+The app's root is an [`App`][app.main_page.App] component that returns
+a [`Stack`][pythonnative.create_stack_navigator] navigator wrapping a
+[`Tab`][pythonnative.create_tab_navigator] navigator. ``pn.run(App)`` at
+module level registers the component so the templates can boot the app
+just by importing this module.
+
+When the user taps "Go to Second Page" from inside a tab, the stack
+navigator pushes a real ``UIViewController`` / ``Fragment`` so they get
+system-grade slide transitions and swipe-back. Each push reuses this
+Python interpreter — only the reconciler tree for the new screen is
+created.
+"""
+
 from typing import Callable
 
 import emoji
 
 import pythonnative as pn
-from pythonnative.navigation import NavigationContainer, create_tab_navigator
+from app.second_page import SecondPage
+from app.third_page import ThirdPage
 
 print("[hello-world] main_page module imported")
 
 MEDALS = [":1st_place_medal:", ":2nd_place_medal:", ":3rd_place_medal:"]
 
-Tab = create_tab_navigator()
+Stack = pn.create_stack_navigator()
+Tab = pn.create_tab_navigator()
 
 styles = pn.StyleSheet.create(
     title={"font_size": 24, "bold": True},
@@ -50,7 +67,12 @@ styles = pn.StyleSheet.create(
 
 @pn.component
 def counter_badge(initial: int = 0) -> pn.Element:
-    """Reusable counter component with its own hook-based state."""
+    """Reusable counter component with its own hook-based state.
+
+    State is preserved across Fast Refresh: edit the medal list or
+    tweak this component, save, and the on-screen tap count stays
+    where you left it.
+    """
     count, set_count = pn.use_state(initial)
     medal = emoji.emojize(MEDALS[count] if count < len(MEDALS) else ":star:")
 
@@ -78,7 +100,12 @@ def counter_badge(initial: int = 0) -> pn.Element:
 
 @pn.component
 def HomeTab() -> pn.Element:
-    """Home tab — counter demo and push-navigation to other pages."""
+    """Home tab — counter demo and push-navigation to other pages.
+
+    ``nav.navigate("Second", ...)`` goes through the inner Tab handle,
+    forwards to the outer Stack handle (root navigator), and pushes a
+    real native screen via the host's ``_push`` API.
+    """
     nav = pn.use_navigation()
 
     def _on_mount() -> Callable[[], None]:
@@ -88,18 +115,16 @@ def HomeTab() -> pn.Element:
     pn.use_effect(_on_mount, [])
 
     def go_to_second() -> None:
-        print("[HomeTab] navigating to SecondPage")
-        nav.navigate(
-            "app.second_page.SecondPage",
-            params={"message": "Greetings from MainPage"},
-        )
+        print("[HomeTab] navigating to Second")
+        nav.navigate("Second", {"message": "Greetings from MainPage"})
 
     return pn.ScrollView(
         pn.Column(
             pn.Text("Hello from PythonNative Demo!", style=styles["title"]),
             pn.Text(
                 "Try `pn run android --hot-reload`, edit this text, and save. "
-                "The running app should update without a rebuild.",
+                "The running app should update without a rebuild, and the counter "
+                "below should preserve its value across the refresh.",
                 style=styles["hint"],
             ),
             counter_badge(),
@@ -113,10 +138,9 @@ def HomeTab() -> pn.Element:
 def LayoutTab() -> pn.Element:
     """Demonstrates the pure-Python flex layout engine.
 
-    Showcases features that only became possible after the layout
-    rewrite: ``flex: 1`` distribution between siblings, fixed-aspect
-    boxes, and ``position: "absolute"`` overlays anchored to all
-    four edges.
+    Showcases ``flex: 1`` distribution between siblings, fixed-aspect
+    boxes, and ``position: "absolute"`` overlays anchored to all four
+    edges.
     """
     return pn.ScrollView(
         pn.Column(
@@ -201,7 +225,7 @@ def LayoutTab() -> pn.Element:
 
 @pn.component
 def SettingsTab() -> pn.Element:
-    """Settings tab — Platform info, alerts, and a virtualized FlatList."""
+    """Settings tab — Platform info, alerts, and a quick push to the showcase."""
     nav = pn.use_navigation()
     dims = pn.use_window_dimensions()
 
@@ -225,7 +249,7 @@ def SettingsTab() -> pn.Element:
         )
 
     def _go_to_showcase() -> None:
-        nav.navigate("app.second_page.SecondPage", params={"message": "Visual showcase"})
+        nav.navigate("Second", {"message": "Visual showcase"})
 
     return pn.ScrollView(
         pn.Column(
@@ -287,12 +311,44 @@ def ListTab() -> pn.Element:
 
 
 @pn.component
-def MainPage() -> pn.Element:
-    return NavigationContainer(
-        Tab.Navigator(
-            Tab.Screen("Home", component=HomeTab, options={"title": "Home"}),
-            Tab.Screen("Layout", component=LayoutTab, options={"title": "Layout"}),
-            Tab.Screen("List", component=ListTab, options={"title": "List"}),
-            Tab.Screen("Settings", component=SettingsTab, options={"title": "Settings"}),
+def MainTabs() -> pn.Element:
+    """Root screen of the Stack: a four-tab home, layout, list, settings UI."""
+    return Tab.Navigator(
+        Tab.Screen("Home", component=HomeTab, options={"title": "Home"}),
+        Tab.Screen("Layout", component=LayoutTab, options={"title": "Layout"}),
+        Tab.Screen("List", component=ListTab, options={"title": "List"}),
+        Tab.Screen("Settings", component=SettingsTab, options={"title": "Settings"}),
+    )
+
+
+@pn.component
+def App() -> pn.Element:
+    """Root component registered with ``pn.run``.
+
+    A [`Stack`][pythonnative.create_stack_navigator] wraps the tabbed
+    home screen so the demo can push the showcase / forms pages onto
+    the native navigation stack. ``options["title"]`` is mirrored to
+    the platform navigation bar.
+    """
+    return pn.NavigationContainer(
+        Stack.Navigator(
+            Stack.Screen("Main", component=MainTabs, options={"title": "Hello World"}),
+            Stack.Screen("Second", component=SecondPage, options={"title": "Second Page"}),
+            Stack.Screen("Third", component=ThirdPage, options={"title": "Third Page"}),
         )
     )
+
+
+pn.run(App)
+
+
+@pn.component
+def MainPage() -> pn.Element:
+    """Backwards-compatible alias for templates that import ``MainPage``.
+
+    The bundled iOS/Android templates default to ``app.main_page.App``
+    after the navigation overhaul, but a few earlier templates
+    referenced ``MainPage`` directly. This shim keeps them working
+    until they are regenerated with the latest ``pn init`` output.
+    """
+    return App()

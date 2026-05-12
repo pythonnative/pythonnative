@@ -122,7 +122,7 @@ def SecondPage() -> pn.Element:
         set_pressed_color("#10B981" if pressed_color == "#0EA5E9" else "#0EA5E9")
 
     def go_to_third() -> None:
-        nav.navigate("app.third_page.ThirdPage")
+        nav.navigate("Third")
 
     def go_back() -> None:
         nav.go_back()

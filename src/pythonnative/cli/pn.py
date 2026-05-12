@@ -73,18 +73,46 @@ def init_project(args: argparse.Namespace) -> None:
         with open(main_page_py, "w", encoding="utf-8") as f:
             f.write("""import pythonnative as pn
 
+Stack = pn.create_stack_navigator()
+
 
 @pn.component
-def MainPage():
+def HomeScreen():
     count, set_count = pn.use_state(0)
+    nav = pn.use_navigation()
     return pn.ScrollView(
         pn.Column(
             pn.Text("Hello from PythonNative!", style={"font_size": 24, "bold": True}),
             pn.Text(f"Tapped {count} times"),
             pn.Button("Tap me", on_click=lambda: set_count(count + 1)),
+            pn.Button("Open detail", on_click=lambda: nav.navigate("Detail", {"count": count})),
             style={"spacing": 12, "padding": 16, "align_items": "stretch"},
         )
     )
+
+
+@pn.component
+def DetailScreen():
+    nav = pn.use_navigation()
+    params = pn.use_route()
+    return pn.Column(
+        pn.Text(f"Detail: count was {params.get('count', 0)}", style={"font_size": 20}),
+        pn.Button("Back", on_click=nav.go_back),
+        style={"spacing": 12, "padding": 16},
+    )
+
+
+@pn.component
+def App():
+    return pn.NavigationContainer(
+        Stack.Navigator(
+            Stack.Screen("Home", component=HomeScreen, options={"title": "Home"}),
+            Stack.Screen("Detail", component=DetailScreen, options={"title": "Detail"}),
+        )
+    )
+
+
+pn.run(App)
 """)
 
     # Create config

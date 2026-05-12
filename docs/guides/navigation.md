@@ -1,39 +1,76 @@
 # Navigation
 
-PythonNative offers two approaches to navigation:
+PythonNative navigation is **declarative** and **native-backed**:
 
-1. **Declarative navigators** (recommended): component-based,
-   inspired by React Navigation.
-2. **Page-level push/pop**: imperative navigation via
-   [`use_navigation`][pythonnative.use_navigation] (for native page
-   transitions).
+- You describe your screens once as a `Stack.Navigator` (or `Tab` /
+  `Drawer`) tree.
+- At the root of your app, the stack delegates to the platform's
+  native navigation controller — `UINavigationController` on iOS and
+  the AndroidX Navigation Component on Android.
+- Each pushed screen runs in its own reconciler host, so the screen
+  you came from is preserved by the platform (including scroll
+  offsets, animations, gesture-driven back transitions).
+
+Nested navigators (tabs inside a stack, or stacks inside tabs) are
+managed entirely in Python — only the outermost stack delegates to
+the host. The same `pn.use_navigation()` and `pn.use_route()` hooks
+work everywhere.
 
 ## Declarative navigation
 
-Declarative navigators manage screen state as components. Define your
-screens once, and the navigator handles rendering, transitions, and
-state.
-
-### Stack navigator
-
-A stack navigator manages a stack of screens; push to go forward,
-pop to go back.
+Define a root component that wraps a navigator in
+[`NavigationContainer`][pythonnative.NavigationContainer], then
+register it with `pn.run`:
 
 ```python
 import pythonnative as pn
-from pythonnative.navigation import NavigationContainer, create_stack_navigator
 
-Stack = create_stack_navigator()
+Stack = pn.create_stack_navigator()
+
 
 @pn.component
 def App():
-    return NavigationContainer(
+    return pn.NavigationContainer(
         Stack.Navigator(
-            Stack.Screen("Home", component=HomeScreen),
-            Stack.Screen("Detail", component=DetailScreen),
+            Stack.Screen("Home", HomeScreen, options={"title": "Home"}),
+            Stack.Screen("Detail", DetailScreen, options={"title": "Detail"}),
             initial_route="Home",
         )
     )
+
+
+pn.run(App)
+```
+
+The native templates (Android `PageFragment`, iOS `ViewController`)
+look up the component registered via `pn.run`, so no other wiring is
+required. `options={"title": ...}` propagates to the native
+navigation bar.
+
+### Stack navigator
+
+A stack navigator manages a stack of screens; push to go forward, pop
+to go back. At the root, push/pop run on the **native** navigation
+controller; nested stacks manage their own state in Python.
+
+```python
+import pythonnative as pn
+
+Stack = pn.create_stack_navigator()
+
+
+@pn.component
+def App():
+    return pn.NavigationContainer(
+        Stack.Navigator(
+            Stack.Screen("Home", HomeScreen, options={"title": "Home"}),
+            Stack.Screen("Detail", DetailScreen, options={"title": "Detail"}),
+            initial_route="Home",
+        )
+    )
+
+
+pn.run(App)
 
 @pn.component
 def HomeScreen():
@@ -65,18 +102,20 @@ screens. On Android the tab bar is a `BottomNavigationView` from
 Material Components; on iOS it is a `UITabBar`.
 
 ```python
-from pythonnative.navigation import create_tab_navigator
+Tab = pn.create_tab_navigator()
 
-Tab = create_tab_navigator()
 
 @pn.component
 def App():
-    return NavigationContainer(
+    return pn.NavigationContainer(
         Tab.Navigator(
-            Tab.Screen("Home", component=HomeScreen, options={"title": "Home"}),
-            Tab.Screen("Settings", component=SettingsScreen, options={"title": "Settings"}),
+            Tab.Screen("Home", HomeScreen, options={"title": "Home"}),
+            Tab.Screen("Settings", SettingsScreen, options={"title": "Settings"}),
         )
     )
+
+
+pn.run(App)
 ```
 
 The tab bar emits a `TabBar` element that maps to platform-native views:
@@ -91,18 +130,20 @@ The tab bar emits a `TabBar` element that maps to platform-native views:
 A drawer navigator provides a side menu for switching screens.
 
 ```python
-from pythonnative.navigation import create_drawer_navigator
+Drawer = pn.create_drawer_navigator()
 
-Drawer = create_drawer_navigator()
 
 @pn.component
 def App():
-    return NavigationContainer(
+    return pn.NavigationContainer(
         Drawer.Navigator(
-            Drawer.Screen("Home", component=HomeScreen, options={"title": "Home"}),
-            Drawer.Screen("Profile", component=ProfileScreen, options={"title": "Profile"}),
+            Drawer.Screen("Home", HomeScreen, options={"title": "Home"}),
+            Drawer.Screen("Profile", ProfileScreen, options={"title": "Profile"}),
         )
     )
+
+
+pn.run(App)
 
 @pn.component
 def HomeScreen():
@@ -121,29 +162,42 @@ automatically **forwards** the request to its parent navigator.
 Similarly, `go_back()` at the root of a child stack forwards to the
 parent.
 
+Nested navigators stay in Python — only the outermost stack delegates
+to the native navigation controller. This is the right default: tab
+switches should be cheap, in-process, and reuse already-mounted
+screens, while top-level pushes deserve a native navigation
+controller, swipe-to-go-back, and proper state restoration.
+
 ```python
-Stack = create_stack_navigator()
-Tab = create_tab_navigator()
+Stack = pn.create_stack_navigator()
+Tab = pn.create_tab_navigator()
+
 
 @pn.component
-def HomeStack():
-    return Stack.Navigator(
-        Stack.Screen("Feed", component=FeedScreen),
-        Stack.Screen("Post", component=PostScreen),
+def MainTabs():
+    return Tab.Navigator(
+        Tab.Screen("Home", HomeScreen, options={"title": "Home"}),
+        Tab.Screen("Settings", SettingsScreen, options={"title": "Settings"}),
     )
+
 
 @pn.component
 def App():
-    return NavigationContainer(
-        Tab.Navigator(
-            Tab.Screen("Home", component=HomeStack, options={"title": "Home"}),
-            Tab.Screen("Settings", component=SettingsScreen, options={"title": "Settings"}),
+    return pn.NavigationContainer(
+        Stack.Navigator(
+            Stack.Screen("Tabs", MainTabs, options={"title": "Home"}),
+            Stack.Screen("Detail", DetailScreen, options={"title": "Detail"}),
         )
     )
+
+
+pn.run(App)
 ```
 
-Inside `FeedScreen`, calling `nav.navigate("Settings")` will forward to the
-parent tab navigator and switch to the Settings tab.
+Inside `HomeScreen`, calling `nav.navigate("Detail")` walks up to the
+root `Stack.Navigator`, which pushes a fresh native screen.
+`nav.navigate("Settings")` from inside `DetailScreen` walks up to the
+`Tab.Navigator` (after popping back) and switches tabs.
 
 ## NavigationHandle API
 
@@ -209,16 +263,45 @@ PythonNative forwards lifecycle events from the host:
 
 ## Platform specifics
 
-### iOS (UIViewController per page)
-- Each PythonNative screen is hosted by a Swift `ViewController` instance.
-- Screens are pushed and popped on a root `UINavigationController`.
-- Lifecycle is forwarded from Swift to the registered Python component.
+### iOS (UIViewController per screen)
+- Each pushed screen is a Swift `ViewController` instance with its
+  own Python `_AppHost` and reconciler.
+- Screens are pushed and popped on a root `UINavigationController`
+  set up by the template's `SceneDelegate`.
+- The declarative `Stack.Navigator` delegates to
+  `nav.pushViewController_animated_` / `popViewControllerAnimated_`
+  and the initial-route name is forwarded via the host's
+  `requestedPagePath` / `requestedPageArgsJSON` properties.
+- Screen `options.title` is applied via `UIViewController.title`,
+  which the surrounding `UINavigationController` picks up.
 
 ### Android (single Activity, Fragment stack)
-- Single host `MainActivity` sets a `NavHostFragment` containing a navigation graph.
-- Each PythonNative screen is represented by a generic `PageFragment` which instantiates the Python component and attaches its root view.
-- `push`/`pop` delegate to `NavController` (via a small `Navigator` helper).
-- Arguments live in Fragment arguments and restore across configuration changes.
+- The host `MainActivity` embeds a `NavHostFragment` containing a
+  navigation graph with a single generic `PageFragment` destination.
+- Each pushed screen is a fresh `PageFragment` instance with its own
+  Python `_AppHost` and reconciler; arguments live in Fragment
+  arguments (`page_path` / `args_json`) and restore across
+  configuration changes.
+- Push/pop delegate to `NavController` through a small `Navigator`
+  Kotlin helper, including `popToRoot` for `Stack.reset(...)`.
+- Screen `options.title` is forwarded to `Activity.setTitle`.
+
+### Why per-screen hosts?
+
+Pushing onto a native stack is most useful when the new screen does
+not have to re-bootstrap Python or re-run the whole tree. Each
+pushed view-controller / fragment owns its own Python `_AppHost`,
+so:
+
+- The previous screen's reconciler stays alive in memory; its hook
+  state and native views are preserved by the platform stack.
+- The new screen's `_AppHost` resolves its initial route from the
+  arguments passed by the parent's `navigate(...)` call, so the
+  declarative `Stack.Navigator` always renders the right screen on
+  the first frame.
+- Hot reload runs **per host**: each active screen swaps its
+  function references in place ("Fast Refresh") and only the screens
+  that cannot be refreshed cleanly fall back to a full remount.
 
 ## Comparison to other frameworks
 

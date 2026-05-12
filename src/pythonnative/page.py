@@ -88,10 +88,60 @@ def _resolve_component_path(page_ref: Any) -> str:
 
 
 def _import_component(component_path: str) -> Any:
-    """Import and return the component function from a dotted path."""
-    module_path, component_name = component_path.rsplit(".", 1)
-    module = importlib.import_module(module_path)
-    return getattr(module, component_name)
+    """Import a component, supporting both dotted paths and registered apps.
+
+    Resolution order:
+
+    1. If ``component_path`` contains a ``.`` and the dotted suffix
+       names an attribute on the parent module, return that attribute
+       directly (legacy behaviour — e.g. ``"app.main_page.App"``).
+    2. Otherwise treat ``component_path`` as a module path: import
+       it and return the component registered via
+       [`pn.run`][pythonnative.run]. If nothing has been registered,
+       fall back to a top-level ``App`` attribute on the module.
+
+    Args:
+        component_path: Either ``"app.main_page.App"`` (dotted path to
+            a specific component) or ``"app.main_page"`` (module path
+            that calls ``pn.run(App)`` at import time).
+
+    Returns:
+        The resolved component callable.
+
+    Raises:
+        ImportError: If neither resolution path succeeds.
+    """
+    from . import app_registry
+
+    if "." in component_path:
+        module_path, attr = component_path.rsplit(".", 1)
+        try:
+            module = importlib.import_module(module_path)
+        except ModuleNotFoundError:
+            module = None
+        if module is not None:
+            component = getattr(module, attr, None)
+            if component is not None:
+                return component
+
+    importlib.import_module(component_path)
+    registered = app_registry.get_registered_app()
+    if registered is not None:
+        return registered
+
+    try:
+        module = importlib.import_module(component_path)
+        component = getattr(module, "App", None)
+        if component is not None:
+            return component
+    except ModuleNotFoundError:
+        pass
+
+    raise ImportError(
+        f"Could not resolve component {component_path!r}. "
+        "Pass a dotted path like 'app.main_page.App' or call pn.run(App) "
+        "inside the module so it can be auto-discovered."
+    )
 
 
 # ======================================================================
@@ -304,19 +354,96 @@ def _hot_reload_tick(host: Any) -> bool:
 
 
 def _reload_host(host: Any, changed_modules: Optional[Sequence[str]] = None) -> None:
-    from .hooks import NavigationHandle, Provider, _NavigationContext
+    """Reload modules and refresh the host's reconciler tree.
+
+    Tries **Fast Refresh** first: the changed modules are reloaded
+    and every ``element.type`` reference in the current ``VNode``
+    tree is rewritten to point at the new module's functions. The
+    next render then runs the new bodies through the existing hook
+    slots, so component state survives.
+
+    If Fast Refresh fails (the new module raised at import time, no
+    replacements could be located, or the next render itself
+    threw), the host falls back to a full remount: a brand-new
+    reconciler tree is mounted into the same native root. State is
+    lost but the app keeps running so the developer can fix the
+    error and try again.
+    """
     from .hot_reload import ModuleReloader
 
     modules = list(changed_modules or [])
-    root_module = host._component_path.rsplit(".", 1)[0]
+    root_module = host._component_path.rsplit(".", 1)[0] if "." in host._component_path else host._component_path
     if root_module not in modules:
         modules.append(root_module)
 
-    ModuleReloader.reload_modules(modules)
-    host._component = _import_component(host._component_path)
+    reloaded = ModuleReloader.reload_modules(modules)
+    if not reloaded:
+        _log_pn(f"_reload_host: no modules could be reloaded from {modules!r}; aborting")
+        return
+
+    try:
+        new_component = _import_component(host._component_path)
+    except Exception as e:
+        _log_pn(f"_reload_host: re-import failed: {e!r}; aborting reload")
+        return
+    host._component = new_component
 
     if host._reconciler is None:
         return
+
+    if _try_fast_refresh(host, reloaded):
+        print(f"[hot-reload] Fast Refresh: {', '.join(reloaded)}", file=sys.stderr)
+        return
+
+    _full_remount(host, reloaded)
+
+
+def _try_fast_refresh(host: Any, reloaded_modules: Sequence[str]) -> bool:
+    """Attempt an in-place component swap + re-render.
+
+    Returns ``True`` only if the swap happened and the subsequent
+    render completed without raising. On exception we restore the
+    pre-render reconciler state so the caller can fall back to a
+    full remount.
+    """
+    from .hooks import Provider, _NavigationContext
+    from .hot_reload import ModuleReloader
+
+    reconciler = host._reconciler
+    if reconciler is None or reconciler._tree is None:
+        return False
+
+    rewrote = ModuleReloader.refresh_in_place(reconciler, reloaded_modules)
+    if not rewrote:
+        return False
+
+    host._is_rendering = True
+    try:
+        app_element = _render_app(host)
+        provider_element = Provider(_NavigationContext, host._nav_handle, app_element)
+        new_root = reconciler.reconcile(provider_element)
+        if new_root is not host._root_native_view:
+            host._detach_root(host._root_native_view)
+            host._root_native_view = new_root
+            host._attach_root(new_root)
+    except Exception as e:
+        _log_pn(f"_try_fast_refresh: render failed after swap: {e!r}; falling back to remount")
+        return False
+    finally:
+        host._is_rendering = False
+
+    _drain_renders(host)
+    return True
+
+
+def _full_remount(host: Any, reloaded_modules: Sequence[str]) -> None:
+    """Destroy the existing tree and mount a fresh one.
+
+    Used by [`_reload_host`][pythonnative.page._reload_host] as the
+    fallback path when Fast Refresh cannot apply (e.g. the user
+    deleted a component that was on screen).
+    """
+    from .hooks import NavigationHandle, Provider, _NavigationContext
 
     old_reconciler = host._reconciler
     old_root = host._root_native_view
@@ -345,7 +472,7 @@ def _reload_host(host: Any, changed_modules: Optional[Sequence[str]] = None) -> 
     host._root_native_view = new_root
     host._attach_root(new_root)
     _drain_renders(host)
-    print(f"[hot-reload] Reloaded {', '.join(modules)}", file=sys.stderr)
+    print(f"[hot-reload] Remounted: {', '.join(reloaded_modules)}", file=sys.stderr)
 
 
 # ======================================================================
@@ -600,6 +727,26 @@ if IS_ANDROID:
                 Navigator.pop(self.native_instance)
             except Exception:
                 self.native_instance.finish()
+
+        def _reset_to_root(self) -> None:
+            """Pop everything above the root view-controller (best-effort)."""
+            try:
+                Navigator = jclass(f"{self.native_instance.getPackageName()}.Navigator")
+                reset_fn = getattr(Navigator, "popToRoot", None)
+                if reset_fn is not None:
+                    reset_fn(self.native_instance)
+            except Exception:
+                pass
+
+        def _set_screen_options(self, options: Dict[str, Any]) -> None:
+            """Bind screen options (title, etc.) to the native action bar."""
+            title = options.get("title") if isinstance(options, dict) else None
+            try:
+                activity = self.native_instance
+                if hasattr(activity, "setTitle") and title:
+                    activity.setTitle(title)
+            except Exception:
+                pass
 
         def _attach_root(self, native_view: Any) -> None:
             container = None
@@ -939,6 +1086,31 @@ else:
                 if nav is not None:
                     nav.popViewControllerAnimated_(True)
 
+            def _reset_to_root(self) -> None:
+                """Pop everything above the root view-controller."""
+                nav = getattr(self.native_instance, "navigationController", None)
+                if nav is not None:
+                    try:
+                        nav.popToRootViewControllerAnimated_(True)
+                    except Exception:
+                        pass
+
+            def _set_screen_options(self, options: Dict[str, Any]) -> None:
+                """Bind screen options (e.g. title) to the native nav bar.
+
+                Setting ``UIViewController.title`` propagates to the
+                view controller's ``navigationItem.title`` so the
+                surrounding ``UINavigationController`` picks up the
+                new title on its next layout pass.
+                """
+                title = options.get("title") if isinstance(options, dict) else None
+                if title is None or self.native_instance is None:
+                    return
+                try:
+                    self.native_instance.setTitle_(str(title))
+                except Exception as e:
+                    _log_pn(f"_set_screen_options: setTitle failed: {e!r}")
+
             def _attach_root(self, native_view: Any) -> None:
                 root_view = self.native_instance.view
                 root_view.addSubview_(native_view)
@@ -1139,6 +1311,13 @@ else:
 
             def _pop(self) -> None:
                 raise RuntimeError("go_back() requires a native runtime (iOS or Android)")
+
+            def _reset_to_root(self) -> None:
+                pass
+
+            def _set_screen_options(self, options: Dict[str, Any]) -> None:
+                """No-op on desktop; native hosts override this."""
+                return
 
             def _attach_root(self, native_view: Any) -> None:
                 pass

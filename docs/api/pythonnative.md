@@ -5,6 +5,28 @@ PythonNative re-exports a small public surface from
 in this overview; deeper internals (`reconciler`, `native_views`,
 `page`) are documented for contributors and integrators.
 
+## Entry point
+
+Your app module exports a root component and registers it with
+`pn.run`:
+
+```python
+import pythonnative as pn
+
+@pn.component
+def App():
+    return pn.NavigationContainer(...)
+
+pn.run(App)
+```
+
+`pn.run` mirrors React Native's `AppRegistry.registerComponent`:
+it stores the component for the native host to look up. The bundled
+Android `PageFragment` and iOS `ViewController` load your app by
+**module path** (`"app.main_page"`) and pick up the registered
+component, so renaming your root component never requires touching
+the native templates.
+
 ::: pythonnative
     options:
       show_root_heading: false

@@ -12,7 +12,7 @@
         <argument
             android:name="page_path"
             app:argType="string"
-            android:defaultValue="app.main_page.MainPage" />
+            android:defaultValue="app.main_page.App" />
         <argument
             android:name="args_json"
             app:argType="string"
