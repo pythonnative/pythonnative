@@ -1,11 +1,14 @@
+"""Showcase screen: visual primitives — Animated, typography, borders, chips.
+
+Pushed onto the native stack by tapping "View Showcase" on the Home
+tab. Receives a ``message`` param via ``nav.get_params()`` to
+demonstrate route parameters.
+"""
+
 import pythonnative as pn
+from app.theme import styles
 
-print("[hello-world] second_page module imported")
-
-styles = pn.StyleSheet.create(
-    title={"font_size": 24, "bold": True},
-    section_title={"font_size": 18, "font_weight": "600", "color": "#0F172A"},
-    hint={"font_size": 13, "color": "#6B7280"},
+local_styles = pn.StyleSheet.create(
     card={
         "padding": 20,
         "background_color": "#FFFFFF",
@@ -24,13 +27,12 @@ styles = pn.StyleSheet.create(
         "background_color": "#0EA5E9",
     },
     chip_label={"color": "#FFFFFF", "font_weight": "600", "font_size": 13},
-    section={"spacing": 16, "padding": 20},
 )
 
 
 @pn.component
 def AnimatedCard() -> pn.Element:
-    """Demonstrates Animated.View driven by AnimatedValue + use_memo."""
+    """Demonstrates ``Animated.View`` driven by ``AnimatedValue`` + ``use_memo``."""
     opacity = pn.use_memo(lambda: pn.Animated.Value(0.0), [])
     scale = pn.use_memo(lambda: pn.Animated.Value(0.9), [])
 
@@ -90,39 +92,39 @@ def BordersAndShadows() -> pn.Element:
             "border_radius, border_width, shadow_*, elevation all in style.",
             style=styles["hint"],
         ),
-        style=styles["card"],
+        style=local_styles["card"],
     )
 
 
 @pn.component
 def Chips() -> pn.Element:
     return pn.Row(
-        pn.View(pn.Text("New", style=styles["chip_label"]), style=styles["chip"]),
+        pn.View(pn.Text("New", style=local_styles["chip_label"]), style=local_styles["chip"]),
         pn.View(
-            pn.Text("Trending", style=styles["chip_label"]),
-            style={**styles["chip"], "background_color": "#22C55E"},
+            pn.Text("Trending", style=local_styles["chip_label"]),
+            style={**local_styles["chip"], "background_color": "#22C55E"},
         ),
         pn.View(
-            pn.Text("Sale", style=styles["chip_label"]),
-            style={**styles["chip"], "background_color": "#EF4444"},
+            pn.Text("Sale", style=local_styles["chip_label"]),
+            style={**local_styles["chip"], "background_color": "#EF4444"},
         ),
         style={"spacing": 8},
     )
 
 
 @pn.component
-def SecondPage() -> pn.Element:
+def ShowcaseScreen() -> pn.Element:
     nav = pn.use_navigation()
     message = nav.get_params().get("message", "Visual showcase")
-    print(f"[SecondPage] render message={message!r}")
+    print(f"[ShowcaseScreen] render message={message!r}")
 
     pressed_color, set_pressed_color = pn.use_state("#0EA5E9")
 
     def _toggle_color() -> None:
         set_pressed_color("#10B981" if pressed_color == "#0EA5E9" else "#0EA5E9")
 
-    def go_to_third() -> None:
-        nav.navigate("Third")
+    def view_forms() -> None:
+        nav.navigate("Forms")
 
     def go_back() -> None:
         nav.go_back()
@@ -152,7 +154,7 @@ def SecondPage() -> pn.Element:
                 on_press=_toggle_color,
                 pressed_opacity=0.7,
             ),
-            pn.Button("Go to Third Page", on_click=go_to_third),
+            pn.Button("View Forms", on_click=view_forms),
             pn.Button("Back", on_click=go_back),
             style=styles["section"],
         )

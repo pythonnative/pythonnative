@@ -7,7 +7,7 @@ appId: ${APP_ID}
     timeout: 30000
 - assertVisible: "Tapped 0 times"
 - assertVisible: "Tap me"
-- assertVisible: "Go to Second Page"
+- assertVisible: "View Showcase"
 - tapOn: "Tap me"
 - assertVisible: "Tapped 1 times"
 - tapOn: "Tap me"

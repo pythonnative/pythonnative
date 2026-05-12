@@ -1,6 +1,6 @@
 appId: ${APP_ID}
 ---
-# Switch to the List tab and verify the virtualized FlatList renders rows.
+# Switch to the List screen and verify the virtualized FlatList renders rows.
 - launchApp
 - extendedWaitUntil:
     visible: "Hello from PythonNative Demo!"

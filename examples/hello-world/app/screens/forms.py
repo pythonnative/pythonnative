@@ -1,11 +1,17 @@
+"""Forms screen: TextInput, Picker, RefreshControl, and KeyboardAvoidingView.
+
+Two levels deep on the native stack; demonstrates that
+``KeyboardAvoidingView`` properly lifts content above the keyboard
+on both platforms and that ``RefreshControl`` integrates with the
+underlying ``UIRefreshControl`` / ``SwipeRefreshLayout``.
+"""
+
+import threading
+
 import pythonnative as pn
+from app.theme import styles
 
-print("[hello-world] third_page module imported")
-
-styles = pn.StyleSheet.create(
-    title={"font_size": 24, "bold": True},
-    section_title={"font_size": 18, "font_weight": "600", "color": "#0F172A"},
-    hint={"font_size": 13, "color": "#6B7280"},
+local_styles = pn.StyleSheet.create(
     field={
         "padding": 12,
         "border_radius": 8,
@@ -14,7 +20,6 @@ styles = pn.StyleSheet.create(
         "background_color": "#FFFFFF",
         "font_size": 16,
     },
-    section={"spacing": 16, "padding": 20},
 )
 
 FRUIT_OPTIONS = [
@@ -26,8 +31,7 @@ FRUIT_OPTIONS = [
 
 
 @pn.component
-def ThirdPage() -> pn.Element:
-    """Showcase TextInput, Picker, RefreshControl, and KeyboardAvoidingView."""
+def FormsScreen() -> pn.Element:
     nav = pn.use_navigation()
     name, set_name = pn.use_state("")
     notes, set_notes = pn.use_state("")
@@ -43,18 +47,15 @@ def ThirdPage() -> pn.Element:
         def _done() -> None:
             set_refreshing(False)
 
-        # Pretend a network call completes after 800ms.
-        import threading
-
         threading.Timer(0.8, _done).start()
 
     return pn.KeyboardAvoidingView(
         pn.ScrollView(
             pn.Column(
-                pn.Text("Third Page", style=styles["title"]),
+                pn.Text("Forms", style=styles["title"]),
                 pn.Text("You navigated two levels deep.", style=styles["hint"]),
                 pn.Text(
-                    "Forms demo: single-line input, multiline TextInput, Picker, and pull-to-refresh.",
+                    "Single-line input, multiline TextInput, Picker, and pull-to-refresh.",
                     style=styles["hint"],
                 ),
                 pn.Text("Name", style=styles["section_title"]),
@@ -64,7 +65,7 @@ def ThirdPage() -> pn.Element:
                     on_change=set_name,
                     auto_capitalize="words",
                     return_key_type="next",
-                    style=styles["field"],
+                    style=local_styles["field"],
                 ),
                 pn.Text("Notes (multiline)", style=styles["section_title"]),
                 pn.TextInput(
@@ -73,7 +74,7 @@ def ThirdPage() -> pn.Element:
                     on_change=set_notes,
                     multiline=True,
                     max_length=500,
-                    style={**styles["field"], "height": 120},
+                    style={**local_styles["field"], "height": 120},
                 ),
                 pn.Text("Favorite fruit", style=styles["section_title"]),
                 pn.Picker(
@@ -81,7 +82,7 @@ def ThirdPage() -> pn.Element:
                     items=FRUIT_OPTIONS,
                     on_change=set_fruit,
                     placeholder="Pick a fruit…",
-                    style=styles["field"],
+                    style=local_styles["field"],
                 ),
                 pn.Text(f"You picked: {fruit}", style=styles["hint"]),
                 pn.Button("Refresh", on_click=fake_refresh),
@@ -89,7 +90,7 @@ def ThirdPage() -> pn.Element:
                     "Refreshing…" if refreshing else "Idle.",
                     style=styles["hint"],
                 ),
-                pn.Button("Back to Second", on_click=go_back),
+                pn.Button("Back to Showcase", on_click=go_back),
                 style=styles["section"],
             ),
             refresh_control=pn.RefreshControl(refreshing=refreshing, on_refresh=fake_refresh),

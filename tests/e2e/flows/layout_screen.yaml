@@ -1,6 +1,6 @@
 appId: ${APP_ID}
 ---
-# Switch to the Layout tab and verify the flex / aspect-ratio /
+# Switch to the Layout screen and verify the flex / aspect-ratio /
 # absolute-positioning demos all render after the layout pass.
 - launchApp
 - extendedWaitUntil:

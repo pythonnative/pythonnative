@@ -4,6 +4,6 @@ env:
 ---
 - runFlow: flows/main.yaml
 - runFlow: flows/navigation.yaml
-- runFlow: flows/layout_tab.yaml
-- runFlow: flows/list_tab.yaml
-- runFlow: flows/settings_tab.yaml
+- runFlow: flows/layout_screen.yaml
+- runFlow: flows/list_screen.yaml
+- runFlow: flows/settings_screen.yaml

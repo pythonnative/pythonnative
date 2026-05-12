@@ -1,6 +1,6 @@
 appId: ${APP_ID}
 ---
-# Switch to the Settings tab and verify Platform info + Alert API.
+# Switch to the Settings screen and verify Platform info + Alert API.
 - launchApp
 - extendedWaitUntil:
     visible: "Hello from PythonNative Demo!"
