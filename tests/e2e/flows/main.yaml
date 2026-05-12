@@ -1,6 +1,6 @@
 appId: ${APP_ID}
 ---
-# Verify main page renders correctly and the counter works.
+# Verify the home screen renders correctly and the counter works.
 - launchApp
 - extendedWaitUntil:
     visible: "Hello from PythonNative Demo!"

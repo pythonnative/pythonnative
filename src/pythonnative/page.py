@@ -17,13 +17,13 @@ The page host owns:
   per user gesture.
 
 Example:
-    User code defines a top-level component:
+    User code defines a top-level component named ``App``:
 
     ```python
     import pythonnative as pn
 
     @pn.component
-    def MainPage():
+    def App():
         count, set_count = pn.use_state(0)
         return pn.Column(
             pn.Text(f"Count: {count}", style={"font_size": 24}),
@@ -36,7 +36,7 @@ Example:
 
     ```python
     host = pythonnative.page.create_page(
-        "app.main_page.MainPage",
+        "app.main",
         native_instance,
     )
     host.on_create()
@@ -88,22 +88,30 @@ def _resolve_component_path(page_ref: Any) -> str:
 
 
 def _import_component(component_path: str) -> Any:
-    """Import a component, supporting both dotted paths and registered apps.
+    """Import a component by module or dotted-attribute path.
+
+    PythonNative's entry-point convention is "define a function named
+    ``App`` at the top of your module, and the native templates will
+    find it". So the templates pass a *module path* like
+    ``"app.main"`` and this helper imports the module and returns its
+    ``App`` attribute.
+
+    A dotted ``module.Attribute`` path is also accepted as an escape
+    hatch (e.g. ``"app.main.RootScreen"``) for users who want to
+    expose a differently-named component without renaming it to
+    ``App``.
 
     Resolution order:
 
-    1. If ``component_path`` contains a ``.`` and the dotted suffix
-       names an attribute on the parent module, return that attribute
-       directly (legacy behaviour — e.g. ``"app.main_page.App"``).
-    2. Otherwise treat ``component_path`` as a module path: import
-       it and return the component registered via
-       [`pn.run`][pythonnative.run]. If nothing has been registered,
-       fall back to a top-level ``App`` attribute on the module.
+    1. If ``component_path`` resolves cleanly as a module, return its
+       ``App`` attribute.
+    2. Otherwise split on the final ``.``: import the parent module
+       and return the named attribute.
 
     Args:
-        component_path: Either ``"app.main_page.App"`` (dotted path to
-            a specific component) or ``"app.main_page"`` (module path
-            that calls ``pn.run(App)`` at import time).
+        component_path: Either ``"app.main"`` (module path with an
+            ``App`` attribute) or ``"app.main.SomeComponent"`` (dotted
+            path to a specific component).
 
     Returns:
         The resolved component callable.
@@ -111,36 +119,31 @@ def _import_component(component_path: str) -> Any:
     Raises:
         ImportError: If neither resolution path succeeds.
     """
-    from . import app_registry
+    try:
+        module = importlib.import_module(component_path)
+    except ModuleNotFoundError:
+        module = None
+    if module is not None:
+        component = getattr(module, "App", None)
+        if component is not None:
+            return component
 
     if "." in component_path:
         module_path, attr = component_path.rsplit(".", 1)
         try:
-            module = importlib.import_module(module_path)
+            parent = importlib.import_module(module_path)
         except ModuleNotFoundError:
-            module = None
-        if module is not None:
-            component = getattr(module, attr, None)
+            parent = None
+        if parent is not None:
+            component = getattr(parent, attr, None)
             if component is not None:
                 return component
 
-    importlib.import_module(component_path)
-    registered = app_registry.get_registered_app()
-    if registered is not None:
-        return registered
-
-    try:
-        module = importlib.import_module(component_path)
-        component = getattr(module, "App", None)
-        if component is not None:
-            return component
-    except ModuleNotFoundError:
-        pass
-
     raise ImportError(
         f"Could not resolve component {component_path!r}. "
-        "Pass a dotted path like 'app.main_page.App' or call pn.run(App) "
-        "inside the module so it can be auto-discovered."
+        "Define a top-level `App` function in the module (e.g. "
+        "`app/main.py`) or pass an explicit dotted path like "
+        "`app.main.RootScreen`."
     )
 
 
@@ -799,8 +802,8 @@ else:
 
     # Redirect Python's stdout/stderr through fd 2 so ``print()`` output is
     # visible via ``xcrun simctl launch --console-pty``. This runs at
-    # ``pythonnative.page`` import time, i.e. before any user page module
-    # (e.g. ``app.main_page``) is imported, so their top-level ``print()``
+    # ``pythonnative.page`` import time, i.e. before any user app module
+    # (e.g. ``app.main``) is imported, so their top-level ``print()``
     # calls are captured too. Gated on ``IS_IOS`` rather than rubicon-objc
     # being importable, so installing the ``[ios]`` extra on macOS does
     # not silently swap ``sys.stdout`` on a dev machine.
@@ -1343,9 +1346,11 @@ def create_page(
     [`@component`][pythonnative.component] function.
 
     Args:
-        component_path: Dotted Python path to the component, e.g.,
-            `"app.main_page.MainPage"`. The function is imported lazily
-            so user modules can be reloaded by the dev server.
+        component_path: Either a module path like `"app.main"` (the
+            module's top-level ``App`` attribute is used) or a dotted
+            attribute path like `"app.main.RootScreen"`. The function
+            is imported lazily so user modules can be reloaded by the
+            dev server.
         native_instance: The native `Activity` (Android) or
             `UIViewController` (iOS) pointer that owns this page.
         args_json: Optional JSON string of navigation arguments to pass
@@ -1358,7 +1363,7 @@ def create_page(
     Example:
         ```python
         host = pythonnative.page.create_page(
-            "app.main_page.MainPage",
+            "app.main",
             native_instance,
             args_json='{"id": 42}',
         )

@@ -60,7 +60,7 @@ def configure_dev_environment(writable_root: str) -> str:
     """Create and prioritize the writable hot-reload source overlay.
 
     The returned directory is inserted at the front of `sys.path`, so a
-    pushed `app/main_page.py` shadows the copy bundled into the native
+    pushed `app/main.py` shadows the copy bundled into the native
     application. Templates call this before importing user code.
 
     Args:
@@ -205,7 +205,7 @@ class ModuleReloader:
         """Reload a single module by its dotted name.
 
         Args:
-            module_name: Dotted module name (e.g., `"app.main_page"`).
+            module_name: Dotted module name (e.g., `"app.main"`).
 
         Returns:
             `True` if the module imported successfully from the current

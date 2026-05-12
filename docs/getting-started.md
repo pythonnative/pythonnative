@@ -13,12 +13,12 @@ pn init MyApp
 
 This scaffolds:
 
-- `app/` with a minimal `main_page.py`
+- `app/` with a minimal `main.py`
 - `pythonnative.json` project config
 - `requirements.txt`
 - `.gitignore`
 
-A minimal `app/main_page.py` looks like:
+A minimal `app/main.py` looks like:
 
 ```python
 import pythonnative as pn
@@ -53,17 +53,14 @@ def App():
             initial_route="Home",
         )
     )
-
-
-pn.run(App)
 ```
 
 Key ideas:
 
 - **`@pn.component`** marks a function as a PythonNative component. The function returns an element tree describing the UI. PythonNative creates and updates native views automatically.
-- **`pn.use_state(initial)`** creates local component state. Call the setter to update it — the UI re-renders automatically.
+- **`pn.use_state(initial)`** creates local component state. Call the setter to update it and the UI re-renders automatically.
 - **`pn.create_stack_navigator()`** returns a `Stack` with `.Navigator` and `.Screen` factories. Wrap them in `pn.NavigationContainer` to enable [`pn.use_navigation()`][pythonnative.use_navigation] and [`pn.use_route()`][pythonnative.use_route] anywhere below.
-- **`pn.run(App)`** registers `App` as the entry point for this Python process — analogous to `AppRegistry.registerComponent` in React Native. The Android and iOS templates load it automatically.
+- **The `App` function** is the entry point. The Android and iOS templates import `app.main`, look up its top-level `App` attribute, and start rendering. If you'd rather expose a differently-named component, configure your templates to load an explicit dotted path like `"app.main.RootScreen"`.
 - **`style={...}`** passes visual and layout properties as a dict (or list of dicts) to any component.
 - Element functions like `pn.Text(...)`, `pn.Button(...)`, `pn.Column(...)` create lightweight descriptions, not native objects.
 
@@ -133,9 +130,6 @@ def App():
         pn.Text(f"Count: {count}"),
         pn.Button("Tap me", on_click=lambda: set_count(count + 1)),
     )
-
-
-pn.run(App)
 ```
 
 - On Android, logs are streamed via `adb logcat` filtered to the

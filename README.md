@@ -66,12 +66,9 @@ def App():
         ),
         style={"spacing": 12, "padding": 16},
     )
-
-
-pn.run(App)
 ```
 
-`pn.run(App)` registers the root component for this Python process (analogous to `AppRegistry.registerComponent` in React Native). The bundled iOS and Android templates load your app by module path and pick up whatever component you register. See [Getting Started](https://docs.pythonnative.com/getting-started/) for the full `Stack.Navigator` scaffold that `pn init` produces.
+Save this as `app/main.py`. The bundled iOS and Android templates import `app.main` and look up its top-level `App` function (the convention is "name your root component `App`"). See [Getting Started](https://docs.pythonnative.com/getting-started/) for the full `Stack.Navigator` scaffold that `pn init` produces.
 
 ## Documentation
 

@@ -32,9 +32,9 @@ from typing import Any, Dict, List, Optional
 def init_project(args: argparse.Namespace) -> None:
     """Scaffold a new PythonNative project in the current directory.
 
-    Creates `app/main_page.py`, `pythonnative.json`,
-    `requirements.txt`, and `.gitignore`. Refuses to overwrite
-    existing files unless `--force` is passed.
+    Creates `app/main.py`, `pythonnative.json`, `requirements.txt`,
+    and `.gitignore`. Refuses to overwrite existing files unless
+    `--force` is passed.
 
     Args:
         args: The parsed argparse namespace. Recognized attributes:
@@ -68,9 +68,9 @@ def init_project(args: argparse.Namespace) -> None:
 
     os.makedirs(app_dir, exist_ok=True)
 
-    main_page_py = os.path.join(app_dir, "main_page.py")
-    if not os.path.exists(main_page_py) or args.force:
-        with open(main_page_py, "w", encoding="utf-8") as f:
+    main_py = os.path.join(app_dir, "main.py")
+    if not os.path.exists(main_py) or args.force:
+        with open(main_py, "w", encoding="utf-8") as f:
             f.write("""import pythonnative as pn
 
 Stack = pn.create_stack_navigator()
@@ -110,16 +110,13 @@ def App():
             Stack.Screen("Detail", component=DetailScreen, options={"title": "Detail"}),
         )
     )
-
-
-pn.run(App)
 """)
 
     # Create config
     config = {
         "name": project_name,
         "appId": "com.example." + project_name.replace(" ", "").lower(),
-        "entryPoint": "app/main_page.py",
+        "entryPoint": "app/main.py",
         "pythonVersion": "3.11",
         "ios": {},
         "android": {},

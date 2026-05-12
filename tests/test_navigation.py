@@ -959,7 +959,6 @@ def test_navigation_exports_from_package() -> None:
     assert hasattr(pn, "create_drawer_navigator")
     assert hasattr(pn, "use_route")
     assert hasattr(pn, "use_focus_effect")
-    assert hasattr(pn, "run")
 
 
 # ======================================================================

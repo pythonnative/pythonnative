@@ -28,7 +28,7 @@ class MainActivity : AppCompatActivity() {
                 filesDir.absolutePath
             )
             // Touch module to ensure bundled Python code is available; actual instantiation happens in PageFragment
-            py.getModule("app.main_page")
+            py.getModule("app.main")
         } catch (e: Exception) {
             Log.e("PythonNative", "Bootstrap failed", e)
             val tv = TextView(this)

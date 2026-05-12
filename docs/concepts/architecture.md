@@ -50,13 +50,13 @@ platform APIs synchronously from Python.
    [`create_page`][pythonnative.create_page] internally to bootstrap
    your Python component, and the reconciler drives the UI from
    there.
-10. **`pn.run(App)` entry point.** The user's app module exports a
-    root component and registers it with `pn.run(App)` — mirroring
-    React Native's `AppRegistry.registerComponent`. The native
-    templates load the app by **module path** (e.g.
-    `"app.main_page"`) and pick up whichever component was
-    registered, so a refactor that renames the root component never
-    requires touching the Kotlin/Swift templates.
+10. **`App` entry point.** The user's app module (`app/main.py`)
+    defines a top-level component named `App`. Native templates
+    import that module by path (`"app.main"`) and look up its `App`
+    attribute, so users never write a separate registration step.
+    Components with other names can still be loaded by passing an
+    explicit dotted path like `"app.main.RootScreen"` to the
+    template.
 
 ## How it works
 
@@ -321,8 +321,9 @@ PythonNative navigation is **declarative** and **native-backed**:
   [`create_tab_navigator`][pythonnative.create_tab_navigator],
   [`create_drawer_navigator`][pythonnative.create_drawer_navigator])
   wrapped in
-  [`NavigationContainer`][pythonnative.NavigationContainer], then
-  registers the root with `pn.run(App)`.
+  [`NavigationContainer`][pythonnative.NavigationContainer], and
+  names the root component `App` so the native templates can find
+  it.
 - The outermost `Stack.Navigator` delegates `navigate(...)`,
   `go_back()`, and `reset(...)` to the platform's native navigation
   controller — `UINavigationController` on iOS and the AndroidX

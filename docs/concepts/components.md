@@ -170,15 +170,16 @@ element tree:
 
 ```python
 @pn.component
-def MainPage():
+def App():
     name, set_name = pn.use_state("World")
     return pn.Text(f"Hello, {name}!", style={"font_size": 24})
 ```
 
 The entry point [`create_page`][pythonnative.create_page] is called
 internally by native templates to bootstrap your root component. You
-don't call it directly; just export your component and configure the
-entry point in `pythonnative.json`.
+don't call it directly: name your top-level component `App` (so the
+templates can find it by convention) and `pythonnative.json` points
+at the module that defines it.
 
 ## State and re-rendering
 
@@ -221,7 +222,7 @@ def Counter(label: str = "Count", initial: int = 0):
 
 
 @pn.component
-def MainPage():
+def App():
     return pn.Column(
         Counter(label="Apples", initial=0),
         Counter(label="Oranges", initial=5),

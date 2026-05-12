@@ -110,14 +110,13 @@ class ViewController: UIViewController {
                 NSLog("[PN] Hot reload setup skipped: \(error)")
             }
         }
-        // Determine which Python page to load.
-        //
-        // The new entry-point convention is "app.main_page.App" — the
-        // user's module calls pn.run(App) at import time so the host
-        // simply loads the registered component. The demo also
-        // exports MainPage as an alias for backwards compatibility,
-        // so either path still resolves.
-        let pagePath: String = requestedPagePath ?? "app.main_page.App"
+        // Determine which Python module to load. PythonNative's
+        // convention is "import the module and grab its top-level
+        // `App` attribute", so the default is just the module path
+        // "app.main". Push navigation overrides this via
+        // `requestedPagePath`, which may also be a dotted-attribute
+        // path like "app.main.RootScreen".
+        let pagePath: String = requestedPagePath ?? "app.main"
         do {
             let pnPage = try Python.attemptImport("pythonnative.page")
             let ptr = Unmanaged.passUnretained(self).toOpaque()

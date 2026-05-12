@@ -33,7 +33,7 @@ def test_configure_dev_environment_prioritizes_overlay(tmp_path: Path) -> None:
 
 
 def test_file_to_module_normalizes_relative_paths() -> None:
-    assert ModuleReloader.file_to_module("app/main_page.py") == "app.main_page"
+    assert ModuleReloader.file_to_module("app/main.py") == "app.main"
     assert ModuleReloader.file_to_module("app\\pages\\home.py") == "app.pages.home"
     assert ModuleReloader.file_to_module("app/__init__.py") == "app"
 
@@ -52,19 +52,19 @@ def test_reload_from_manifest_calls_reload_once(tmp_path: Path) -> None:
         json.dump(
             {
                 "version": "1",
-                "files": ["app/main_page.py"],
-                "modules": ["app.main_page"],
+                "files": ["app/main.py"],
+                "modules": ["app.main"],
             },
             f,
         )
 
     version = ModuleReloader.reload_from_manifest(Page(), manifest_path)
     assert version == "1"
-    assert calls == [["app.main_page"]]
+    assert calls == [["app.main"]]
 
     version = ModuleReloader.reload_from_manifest(Page(), manifest_path, last_version=version)
     assert version == "1"
-    assert calls == [["app.main_page"]]
+    assert calls == [["app.main"]]
 
 
 def test_reload_module_imports_from_prioritized_sys_path(

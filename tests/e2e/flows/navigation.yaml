@@ -1,12 +1,12 @@
 appId: ${APP_ID}
 ---
-# Navigate through all three pages and back to main.
+# Navigate through all three pages and back to the home screen.
 - launchApp
 - extendedWaitUntil:
     visible: "Hello from PythonNative Demo!"
     timeout: 30000
 - tapOn: "Go to Second Page"
-- assertVisible: "Greetings from MainPage"
+- assertVisible: "Greetings from Home"
 - assertVisible: "Go to Third Page"
 - assertVisible: "Back"
 - tapOn: "Go to Third Page"
@@ -14,6 +14,6 @@ appId: ${APP_ID}
 - assertVisible: "You navigated two levels deep."
 - assertVisible: "Back to Second"
 - tapOn: "Back to Second"
-- assertVisible: "Greetings from MainPage"
+- assertVisible: "Greetings from Home"
 - tapOn: "Back"
 - assertVisible: "Hello from PythonNative Demo!"

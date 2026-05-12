@@ -25,13 +25,13 @@ def test_cli_init_and_clean() -> None:
         assert result.returncode == 0, result.stderr
         assert os.path.isdir(os.path.join(tmpdir, "app"))
         # scaffolded entrypoint
-        main_page_path = os.path.join(tmpdir, "app", "main_page.py")
-        assert os.path.isfile(main_page_path)
-        with open(main_page_path, "r", encoding="utf-8") as f:
+        main_path = os.path.join(tmpdir, "app", "main.py")
+        assert os.path.isfile(main_path)
+        with open(main_path, "r", encoding="utf-8") as f:
             content = f.read()
         assert "def App(" in content
-        assert "pn.run(App)" in content
         assert "Stack.Navigator" in content
+        assert "pn.run" not in content
         assert os.path.isfile(os.path.join(tmpdir, "pythonnative.json"))
         assert os.path.isfile(os.path.join(tmpdir, "requirements.txt"))
         assert os.path.isfile(os.path.join(tmpdir, ".gitignore"))
@@ -174,23 +174,23 @@ def test_booted_ios_udid_handles_xcrun_missing(monkeypatch: pytest.MonkeyPatch) 
 def test_hot_reload_manifest_payload_maps_files_to_modules(tmp_path: Path) -> None:
     app_dir = tmp_path / "app"
     app_dir.mkdir()
-    changed = app_dir / "main_page.py"
+    changed = app_dir / "main.py"
     changed.write_text("print('hi')\n", encoding="utf-8")
 
     payload = pn_cli._hot_reload_manifest_payload([os.fspath(changed)], os.fspath(tmp_path), version="v1")
 
     assert payload == {
         "version": "v1",
-        "files": ["app/main_page.py"],
-        "modules": ["app.main_page"],
+        "files": ["app/main.py"],
+        "modules": ["app.main"],
     }
 
 
 def test_android_hot_reload_dest_points_to_overlay() -> None:
-    assert pn_cli._android_hot_reload_dest("app/main_page.py") == os.path.join(
+    assert pn_cli._android_hot_reload_dest("app/main.py") == os.path.join(
         "files",
         "pythonnative_dev",
-        "app/main_page.py",
+        "app/main.py",
     )
 
 

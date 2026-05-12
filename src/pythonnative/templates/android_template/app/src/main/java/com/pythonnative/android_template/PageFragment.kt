@@ -37,11 +37,12 @@ class PageFragment : Fragment() {
         }
         try {
             val py = Python.getInstance()
-            // Default to app.main_page.App — the new Stack-rooted entry
-            // point registered via pn.run(App). The legacy
-            // "app.main_page.MainPage" still resolves because the demo
-            // exports a backwards-compatible alias.
-            val pagePath = arguments?.getString("page_path") ?: "app.main_page.App"
+            // Default to "app.main": PythonNative imports the module
+            // and looks up its top-level `App` attribute. Override
+            // via fragment arguments / nav graph to load a different
+            // module or a specific dotted-attribute path (e.g.
+            // "app.main.RootScreen").
+            val pagePath = arguments?.getString("page_path") ?: "app.main"
             val argsJson = arguments?.getString("args_json")
             val filesRoot = requireContext().filesDir.absolutePath
             val devRoot = "$filesRoot/pythonnative_dev"

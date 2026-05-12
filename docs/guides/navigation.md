@@ -18,9 +18,9 @@ work everywhere.
 
 ## Declarative navigation
 
-Define a root component that wraps a navigator in
-[`NavigationContainer`][pythonnative.NavigationContainer], then
-register it with `pn.run`:
+Save a module at `app/main.py` that defines an `App` component
+wrapping a navigator in
+[`NavigationContainer`][pythonnative.NavigationContainer]:
 
 ```python
 import pythonnative as pn
@@ -37,15 +37,12 @@ def App():
             initial_route="Home",
         )
     )
-
-
-pn.run(App)
 ```
 
 The native templates (Android `PageFragment`, iOS `ViewController`)
-look up the component registered via `pn.run`, so no other wiring is
-required. `options={"title": ...}` propagates to the native
-navigation bar.
+import `app.main` and look up its top-level `App` attribute, so no
+other wiring is required. `options={"title": ...}` propagates to the
+native navigation bar.
 
 ### Stack navigator
 
@@ -69,8 +66,6 @@ def App():
         )
     )
 
-
-pn.run(App)
 
 @pn.component
 def HomeScreen():
@@ -113,9 +108,6 @@ def App():
             Tab.Screen("Settings", SettingsScreen, options={"title": "Settings"}),
         )
     )
-
-
-pn.run(App)
 ```
 
 The tab bar emits a `TabBar` element that maps to platform-native views:
@@ -142,8 +134,6 @@ def App():
         )
     )
 
-
-pn.run(App)
 
 @pn.component
 def HomeScreen():
@@ -189,9 +179,6 @@ def App():
             Stack.Screen("Detail", DetailScreen, options={"title": "Detail"}),
         )
     )
-
-
-pn.run(App)
 ```
 
 Inside `HomeScreen`, calling `nav.navigate("Detail")` walks up to the

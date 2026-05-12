@@ -2,7 +2,7 @@ appId: com.pythonnative.android_template
 env:
   APP_ID: com.pythonnative.android_template
 ---
-- runFlow: flows/main_page.yaml
+- runFlow: flows/main.yaml
 - runFlow: flows/navigation.yaml
 - runFlow: flows/layout_tab.yaml
 - runFlow: flows/list_tab.yaml

@@ -7,8 +7,7 @@ in this overview; deeper internals (`reconciler`, `native_views`,
 
 ## Entry point
 
-Your app module exports a root component and registers it with
-`pn.run`:
+Your app module defines a top-level component named `App`:
 
 ```python
 import pythonnative as pn
@@ -16,16 +15,14 @@ import pythonnative as pn
 @pn.component
 def App():
     return pn.NavigationContainer(...)
-
-pn.run(App)
 ```
 
-`pn.run` mirrors React Native's `AppRegistry.registerComponent`:
-it stores the component for the native host to look up. The bundled
-Android `PageFragment` and iOS `ViewController` load your app by
-**module path** (`"app.main_page"`) and pick up the registered
-component, so renaming your root component never requires touching
-the native templates.
+The bundled Android `PageFragment` and iOS `ViewController` load
+your app by **module path** (`"app.main"`) and look up the
+module's top-level `App` attribute. There is no registration step
+or imperative bootstrap call. If you need to expose a
+differently-named root component, configure the templates to load
+an explicit dotted path like `"app.main.RootScreen"` instead.
 
 ::: pythonnative
     options:

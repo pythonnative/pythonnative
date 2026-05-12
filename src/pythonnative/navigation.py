@@ -42,8 +42,6 @@ Example:
                 Stack.Screen("Detail", component=DetailScreen, options={"title": "Detail"}),
             )
         )
-
-    pn.run(App)
     ```
 """
 

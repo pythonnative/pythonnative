@@ -19,11 +19,11 @@ project scaffolded with `pn init`.
 ```bash
 pn init my-app
 cd my-app
-# Edit app/main_page.py and paste any of the snippets below.
+# Edit app/main.py and paste any of the snippets below.
 pn run android   # or: pn run ios
 ```
 
-The `app/main_page.py` that `pn init` writes already returns a small
+The `app/main.py` that `pn init` writes already returns a small
 counter; replace it with one of the snippets to try a different
 example.
 
