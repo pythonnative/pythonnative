@@ -47,7 +47,7 @@ platform APIs synchronously from Python.
      the JNI bridge.
 9. **Thin native bootstrap.** The host app remains native (Android
    `Activity` or iOS `UIViewController`). It calls
-   [`create_page`][pythonnative.create_page] internally to bootstrap
+   [`create_screen`][pythonnative.create_screen] internally to bootstrap
    your Python component, and the reconciler drives the UI from
    there.
 10. **`App` entry point.** The user's app module (`app/main.py`)
@@ -120,7 +120,7 @@ Each component is a Python function that:
 - Has its own hook state per call site (each instance gets its own
   slot table).
 
-The entry point [`create_page`][pythonnative.create_page] is called
+The entry point [`create_screen`][pythonnative.create_screen] is called
 internally by the bundled native templates to bootstrap your root
 component. App code does not call it directly.
 
@@ -259,7 +259,7 @@ See [Mental model](mental-model.md) for a wider comparison table.
 ## iOS flow (rubicon-objc)
 
 - The iOS template (Swift plus PythonKit) boots Python and calls
-  [`create_page`][pythonnative.create_page] internally with the
+  [`create_screen`][pythonnative.create_screen] internally with the
   current `UIViewController` pointer.
 - The reconciler creates UIKit views and attaches them to the
   controller's view.
@@ -270,7 +270,7 @@ See [Mental model](mental-model.md) for a wider comparison table.
 
 - The Android template (Kotlin plus Chaquopy) initializes Python in
   `MainActivity` and passes the `Activity` to Python.
-- `PageFragment` calls [`create_page`][pythonnative.create_page]
+- `ScreenFragment` calls [`create_screen`][pythonnative.create_screen]
   internally, which renders the root component and attaches views to
   the fragment container.
 - State changes trigger re-render; the reconciler patches Android
@@ -285,7 +285,7 @@ near-instant UI updates without full rebuilds.
 PythonNative uses a **Fast Refresh** strategy:
 
 1. Reload the changed module(s) on the device.
-2. For every active page host, walk the VNode tree and collect every
+2. For every active screen host, walk the VNode tree and collect every
    component function defined in a reloaded module.
 3. Match each one to its replacement by `__module__` +
    `__qualname__` and rewrite `Element.type` in place.
@@ -331,7 +331,7 @@ PythonNative navigation is **declarative** and **native-backed**:
   stack, stacks inside tabs) stay in Python and reuse the existing
   reconciler.
 - Each pushed native screen is a fresh host with its own reconciler
-  and `_AppHost`. Initial routes are forwarded via host arguments
+  and `_ScreenHost`. Initial routes are forwarded via host arguments
   (`__pn_initial_route__` / `__pn_initial_params__`), so a pushed
   screen knows which `Stack.Screen` to render on its first frame.
 - Inside any screen, [`use_navigation`][pythonnative.use_navigation]
@@ -347,7 +347,7 @@ native navigation bar.
 - iOS: one host `UIViewController` class, many instances pushed on a
   `UINavigationController`.
 - Android: single host `Activity` with a `NavHostFragment` and a
-  stack of generic `PageFragment`s driven by a navigation graph.
+  stack of generic `ScreenFragment`s driven by a navigation graph.
 
 ## Next steps
 

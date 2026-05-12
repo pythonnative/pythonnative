@@ -9,7 +9,7 @@ fold into it, and where you can hook in.
 
 A render pass is triggered by:
 
-- Initial mount via [`create_page`][pythonnative.create_page].
+- Initial mount via [`create_screen`][pythonnative.create_screen].
 - A setter from [`use_state`][pythonnative.use_state] or a `dispatch`
   from [`use_reducer`][pythonnative.use_reducer].
 - A navigation event (`navigate`, `go_back`, `replace`).
@@ -29,7 +29,7 @@ The phases:
    first; new [`use_effect`][pythonnative.use_effect] callbacks run
    after, in depth-first order so children commit before parents.
 4. **Drain**. If any effect set state, another render pass is queued
-   immediately. The page host caps the loop to prevent runaway
+   immediately. The screen host caps the loop to prevent runaway
    re-renders.
 
 ```text
@@ -86,7 +86,7 @@ When the user navigates away:
 
 ## App lifecycle (Android / iOS)
 
-The page host forwards the platform's app-level lifecycle to navigators
+The screen host forwards the platform's app-level lifecycle to navigators
 and effects:
 
 - **Resume / `viewWillAppear`**: the active screen's `use_focus_effect`

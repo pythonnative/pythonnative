@@ -8,8 +8,8 @@ Two cooperating pieces:
   ``simctl`` file copy on iOS).
 - **Device-side**:
   [`ModuleReloader`][pythonnative.hot_reload.ModuleReloader] reloads
-  changed Python modules using ``importlib`` and asks the page host
-  to re-render its current tree.
+  changed Python modules using ``importlib`` and asks the screen
+  host to re-render its current tree.
 
 Two strategies share the device-side surface:
 
@@ -264,7 +264,7 @@ class ModuleReloader:
                 If empty, `file_path` is treated as already relative.
 
         Returns:
-            The dotted module name (e.g., `"app.pages.home"`), or
+            The dotted module name (e.g., `"app.screens.home"`), or
             `None` for an empty path.
         """
         rel = os.path.relpath(file_path, base_dir) if base_dir else file_path
@@ -287,24 +287,24 @@ class ModuleReloader:
         return modules
 
     @staticmethod
-    def reload_page(page_instance: Any, module_names: Optional[Sequence[str]] = None) -> None:
-        """Force a page re-render after a module reload.
+    def reload_screen(screen_instance: Any, module_names: Optional[Sequence[str]] = None) -> None:
+        """Force a screen re-render after a module reload.
 
         Args:
-            page_instance: An `_AppHost` instance (or duck-typed
+            screen_instance: A `_ScreenHost` instance (or duck-typed
                 equivalent) that exposes a `_reconciler` attribute.
             module_names: Optional modules that changed. Reload-aware
-                page hosts use this to refresh imports before re-render.
+                screen hosts use this to refresh imports before re-render.
         """
-        reload_fn = getattr(page_instance, "reload", None)
+        reload_fn = getattr(screen_instance, "reload", None)
         if callable(reload_fn):
             reload_fn(list(module_names or []))
             return
 
-        from .page import _request_render
+        from .screen import _request_render
 
-        if hasattr(page_instance, "_reconciler") and page_instance._reconciler is not None:
-            _request_render(page_instance)
+        if hasattr(screen_instance, "_reconciler") and screen_instance._reconciler is not None:
+            _request_render(screen_instance)
 
     @staticmethod
     def find_replacement_function(old_fn: Any) -> Optional[Any]:
@@ -460,7 +460,7 @@ class ModuleReloader:
 
     @staticmethod
     def reload_from_manifest(
-        page_instance: Any,
+        screen_instance: Any,
         manifest_path: str,
         *,
         last_version: Optional[str] = None,
@@ -468,9 +468,9 @@ class ModuleReloader:
         """Apply a reload manifest if it is newer than `last_version`.
 
         Args:
-            page_instance: Page host to refresh.
+            screen_instance: Screen host to refresh.
             manifest_path: JSON manifest written by the CLI.
-            last_version: Version already applied by this page host.
+            last_version: Version already applied by this screen host.
 
         Returns:
             The manifest version after applying, or `last_version` when
@@ -491,5 +491,5 @@ class ModuleReloader:
             files = manifest.get("files", [])
             modules = ModuleReloader.modules_from_files(files if isinstance(files, list) else [])
 
-        ModuleReloader.reload_page(page_instance, [str(module) for module in modules])
+        ModuleReloader.reload_screen(screen_instance, [str(module) for module in modules])
         return version

@@ -643,7 +643,7 @@ def test_layout_pass_positions_flex_children_in_row() -> None:
         ],
     )
     root = rec.mount(el)
-    # The root view's frame is owned by the page host (e.g., on iOS the root
+    # The root view's frame is owned by the screen host (e.g., on iOS the root
     # is positioned below the top safe-area inset by ``_sync_root_frame``);
     # the layout engine intentionally leaves it untouched. Children are
     # positioned relative to the root's local origin.

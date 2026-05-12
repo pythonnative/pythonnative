@@ -39,7 +39,7 @@ def App():
     )
 ```
 
-The native templates (Android `PageFragment`, iOS `ViewController`)
+The native templates (Android `ScreenFragment`, iOS `ViewController`)
 import `app.main` and look up its top-level `App` attribute, so no
 other wiring is required. `options={"title": ...}` propagates to the
 native navigation bar.
@@ -252,22 +252,22 @@ PythonNative forwards lifecycle events from the host:
 
 ### iOS (UIViewController per screen)
 - Each pushed screen is a Swift `ViewController` instance with its
-  own Python `_AppHost` and reconciler.
+  own Python `_ScreenHost` and reconciler.
 - Screens are pushed and popped on a root `UINavigationController`
   set up by the template's `SceneDelegate`.
 - The declarative `Stack.Navigator` delegates to
   `nav.pushViewController_animated_` / `popViewControllerAnimated_`
   and the initial-route name is forwarded via the host's
-  `requestedPagePath` / `requestedPageArgsJSON` properties.
+  `requestedScreenPath` / `requestedScreenArgsJSON` properties.
 - Screen `options.title` is applied via `UIViewController.title`,
   which the surrounding `UINavigationController` picks up.
 
 ### Android (single Activity, Fragment stack)
 - The host `MainActivity` embeds a `NavHostFragment` containing a
-  navigation graph with a single generic `PageFragment` destination.
-- Each pushed screen is a fresh `PageFragment` instance with its own
-  Python `_AppHost` and reconciler; arguments live in Fragment
-  arguments (`page_path` / `args_json`) and restore across
+  navigation graph with a single generic `ScreenFragment` destination.
+- Each pushed screen is a fresh `ScreenFragment` instance with its own
+  Python `_ScreenHost` and reconciler; arguments live in Fragment
+  arguments (`screen_path` / `args_json`) and restore across
   configuration changes.
 - Push/pop delegate to `NavController` through a small `Navigator`
   Kotlin helper, including `popToRoot` for `Stack.reset(...)`.
@@ -277,12 +277,12 @@ PythonNative forwards lifecycle events from the host:
 
 Pushing onto a native stack is most useful when the new screen does
 not have to re-bootstrap Python or re-run the whole tree. Each
-pushed view-controller / fragment owns its own Python `_AppHost`,
+pushed view-controller / fragment owns its own Python `_ScreenHost`,
 so:
 
 - The previous screen's reconciler stays alive in memory; its hook
   state and native views are preserved by the platform stack.
-- The new screen's `_AppHost` resolves its initial route from the
+- The new screen's `_ScreenHost` resolves its initial route from the
   arguments passed by the parent's `navigate(...)` call, so the
   declarative `Stack.Navigator` always renders the right screen on
   the first frame.

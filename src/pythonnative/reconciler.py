@@ -24,7 +24,7 @@ Supports:
   the committed VNodes and fed through
   [`calculate_layout`][pythonnative.layout.calculate_layout]; the
   resulting per-node frames are applied via the backend's
-  ``set_frame``. The viewport size is supplied by the page host via
+  ``set_frame``. The viewport size is supplied by the screen host via
   [`set_viewport_size`][pythonnative.reconciler.Reconciler.set_viewport_size].
 """
 
@@ -87,7 +87,7 @@ class Reconciler:
     def __init__(self, backend: Any) -> None:
         self.backend = backend
         self._tree: Optional[VNode] = None
-        self._page_re_render: Optional[Any] = None
+        self._screen_re_render: Optional[Any] = None
         self._viewport_size: Tuple[float, float] = (0.0, 0.0)
         self._layout_pass = 0
 
@@ -146,7 +146,7 @@ class Reconciler:
     def set_viewport_size(self, width: float, height: float) -> None:
         """Update the viewport size and re-run layout if it changed.
 
-        Called by the page host whenever the platform reports a new
+        Called by the screen host whenever the platform reports a new
         container size (Android: ``onLayoutChange``; iOS:
         ``viewDidLayoutSubviews``). The first call after mount
         triggers the initial layout pass; subsequent identical
@@ -272,7 +272,7 @@ class Reconciler:
             from .hooks import HookState, _set_hook_state
 
             hook_state = HookState()
-            hook_state._trigger_render = self._page_re_render
+            hook_state._trigger_render = self._screen_re_render
             _set_hook_state(hook_state)
             try:
                 rendered = element.type(**element.props)
@@ -385,7 +385,7 @@ class Reconciler:
 
                 hook_state = HookState()
             hook_state.reset_index()
-            hook_state._trigger_render = self._page_re_render
+            hook_state._trigger_render = self._screen_re_render
             _set_hook_state(hook_state)
             try:
                 rendered = new_el.type(**new_el.props)
@@ -644,12 +644,12 @@ class Reconciler:
         Wraps the user's root VNode in a synthetic outer
         `LayoutNode` with the viewport size so the user's root
         always fills the screen by default (matching React Native).
-        Skipped silently until the page host has supplied a
+        Skipped silently until the screen host has supplied a
         viewport size via
         [`set_viewport_size`][pythonnative.reconciler.Reconciler.set_viewport_size].
 
         The root native view's *frame* is intentionally NOT touched:
-        its position and size are owned by the page host (iOS
+        its position and size are owned by the screen host (iOS
         ``_sync_root_frame`` places it below the top safe-area
         inset; Android attaches it with ``MATCH_PARENT``). Calling
         ``set_frame(root, 0, 0, w, h)`` here would silently reset

@@ -18,7 +18,7 @@ import Python
 #if canImport(PythonKit)
 private func drainPythonNativeScheduledRenders() {
     do {
-        let pn = try Python.attemptImport("pythonnative.page")
+        let pn = try Python.attemptImport("pythonnative.screen")
         _ = try pn.drain_ios_scheduled_renders.throwing.dynamicallyCall(withArguments: [])
     } catch {
         NSLog("[PN] swift.renderScheduler -> drain_ios_scheduled_renders failed: \(error)")
@@ -38,12 +38,12 @@ public func pn_schedule_render_drain() {
 class ViewController: UIViewController {
     // Ensure Python.framework is configured only once per process
     private static var hasInitializedPython: Bool = false
-    // Optional keys for dynamic page navigation
-    @objc dynamic var requestedPagePath: String? = nil
-    @objc dynamic var requestedPageArgsJSON: String? = nil
+    // Optional keys for dynamic screen navigation
+    @objc dynamic var requestedScreenPath: String? = nil
+    @objc dynamic var requestedScreenArgsJSON: String? = nil
     private var pythonReady: Bool = false
     #if canImport(PythonKit)
-    private var page: PythonObject? = nil
+    private var screen: PythonObject? = nil
     #endif
     private var hotReloadTimer: Timer? = nil
 
@@ -92,7 +92,7 @@ class ViewController: UIViewController {
         }
         let sys = Python.import("sys")
         if firstInit {
-            // One concise bootstrap line per process; per-page detail is left
+            // One concise bootstrap line per process; per-screen detail is left
             // to Python-side print() statements streamed via pn run ios.
             let shortVersion = "\(sys.version)".split(separator: "\n").first.map(String.init) ?? "\(sys.version)"
             NSLog("[PN] Python \(shortVersion) initialized")
@@ -114,24 +114,24 @@ class ViewController: UIViewController {
         // convention is "import the module and grab its top-level
         // `App` attribute", so the default is just the module path
         // "app.main". Push navigation overrides this via
-        // `requestedPagePath`, which may also be a dotted-attribute
+        // `requestedScreenPath`, which may also be a dotted-attribute
         // path like "app.main.RootScreen".
-        let pagePath: String = requestedPagePath ?? "app.main"
+        let screenPath: String = requestedScreenPath ?? "app.main"
         do {
-            let pnPage = try Python.attemptImport("pythonnative.page")
+            let pnScreen = try Python.attemptImport("pythonnative.screen")
             let ptr = Unmanaged.passUnretained(self).toOpaque()
             let addr = UInt(bitPattern: ptr)
-            let argsJson: PythonObject = (requestedPageArgsJSON != nil)
-                ? PythonObject(requestedPageArgsJSON!)
+            let argsJson: PythonObject = (requestedScreenArgsJSON != nil)
+                ? PythonObject(requestedScreenArgsJSON!)
                 : Python.None
-            let page = try pnPage.create_page.throwing.dynamicallyCall(
-                withArguments: [pagePath, addr, argsJson]
+            let screen = try pnScreen.create_screen.throwing.dynamicallyCall(
+                withArguments: [screenPath, addr, argsJson]
             )
-            self.page = page
+            self.screen = screen
             let devRoot = "\(NSHomeDirectory())/Documents/pythonnative_dev"
             let manifestPath = "\(devRoot)/reload.json"
-            _ = try page.enable_hot_reload.throwing.dynamicallyCall(withArguments: [manifestPath, devRoot])
-            _ = try page.on_create.throwing.dynamicallyCall(withArguments: [])
+            _ = try screen.enable_hot_reload.throwing.dynamicallyCall(withArguments: [manifestPath, devRoot])
+            _ = try screen.on_create.throwing.dynamicallyCall(withArguments: [])
             startHotReloadPolling()
             return
         } catch {
@@ -154,7 +154,7 @@ class ViewController: UIViewController {
         if pythonReady {
             let ptr = UInt(bitPattern: Unmanaged.passUnretained(self).toOpaque())
             do {
-                let pn = try Python.attemptImport("pythonnative.page")
+                let pn = try Python.attemptImport("pythonnative.screen")
                 _ = try pn.forward_lifecycle.throwing.dynamicallyCall(withArguments: [ptr, "on_start"])
             } catch {}
         }
@@ -171,7 +171,7 @@ class ViewController: UIViewController {
         if pythonReady {
             let ptr = UInt(bitPattern: Unmanaged.passUnretained(self).toOpaque())
             do {
-                let pn = try Python.attemptImport("pythonnative.page")
+                let pn = try Python.attemptImport("pythonnative.screen")
                 _ = try pn.forward_lifecycle.throwing.dynamicallyCall(withArguments: [ptr, "on_layout"])
             } catch {
                 NSLog("[PN] swift.viewDidLayoutSubviews -> on_layout failed: \(error)")
@@ -186,7 +186,7 @@ class ViewController: UIViewController {
         if pythonReady {
             let ptrAddr = UInt(bitPattern: Unmanaged.passUnretained(self).toOpaque())
             do {
-                let pn = try Python.attemptImport("pythonnative.page")
+                let pn = try Python.attemptImport("pythonnative.screen")
                 _ = try pn.forward_lifecycle.throwing.dynamicallyCall(withArguments: [ptrAddr, "on_resume"])
             } catch {
                 NSLog("[PN] swift.viewDidAppear -> on_resume failed: \(error)")
@@ -201,7 +201,7 @@ class ViewController: UIViewController {
         if pythonReady {
             let ptr = UInt(bitPattern: Unmanaged.passUnretained(self).toOpaque())
             do {
-                let pn = try Python.attemptImport("pythonnative.page")
+                let pn = try Python.attemptImport("pythonnative.screen")
                 _ = try pn.forward_lifecycle.throwing.dynamicallyCall(withArguments: [ptr, "on_pause"])
             } catch {}
         }
@@ -214,7 +214,7 @@ class ViewController: UIViewController {
         if pythonReady {
             let ptr = UInt(bitPattern: Unmanaged.passUnretained(self).toOpaque())
             do {
-                let pn = try Python.attemptImport("pythonnative.page")
+                let pn = try Python.attemptImport("pythonnative.screen")
                 _ = try pn.forward_lifecycle.throwing.dynamicallyCall(withArguments: [ptr, "on_stop"])
             } catch {}
         }
@@ -227,7 +227,7 @@ class ViewController: UIViewController {
         if pythonReady {
             let ptr = UInt(bitPattern: Unmanaged.passUnretained(self).toOpaque())
             do {
-                let pn = try Python.attemptImport("pythonnative.page")
+                let pn = try Python.attemptImport("pythonnative.screen")
                 _ = try pn.forward_lifecycle.throwing.dynamicallyCall(withArguments: [ptr, "on_save_instance_state"])
             } catch {}
         }
@@ -240,7 +240,7 @@ class ViewController: UIViewController {
         if pythonReady {
             let ptr = UInt(bitPattern: Unmanaged.passUnretained(self).toOpaque())
             do {
-                let pn = try Python.attemptImport("pythonnative.page")
+                let pn = try Python.attemptImport("pythonnative.screen")
                 _ = try pn.forward_lifecycle.throwing.dynamicallyCall(withArguments: [ptr, "on_restore_instance_state"])
             } catch {}
         }
@@ -253,7 +253,7 @@ class ViewController: UIViewController {
         if pythonReady {
             let ptr = UInt(bitPattern: Unmanaged.passUnretained(self).toOpaque())
             do {
-                let pn = try Python.attemptImport("pythonnative.page")
+                let pn = try Python.attemptImport("pythonnative.screen")
                 _ = try pn.forward_lifecycle.throwing.dynamicallyCall(withArguments: [ptr, "on_destroy"])
             } catch {}
         }
@@ -264,9 +264,9 @@ class ViewController: UIViewController {
         #if canImport(PythonKit)
         hotReloadTimer?.invalidate()
         hotReloadTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            guard let page = self?.page else { return }
+            guard let screen = self?.screen else { return }
             do {
-                _ = try page.hot_reload_tick.throwing.dynamicallyCall(withArguments: [])
+                _ = try screen.hot_reload_tick.throwing.dynamicallyCall(withArguments: [])
             } catch {
                 NSLog("[PN] hot_reload_tick failed: \(error)")
             }

@@ -12,8 +12,8 @@ The default `ViewController.swift` initializes PythonKit, prints the Python vers
 
 Your `app/` directory contains `@pn.component` function components.
 The native iOS template uses
-[`create_page`][pythonnative.create_page] internally to bootstrap your
-root component inside a `ViewController`. You don't call `create_page`
+[`create_screen`][pythonnative.create_screen] internally to bootstrap your
+root component inside a `ViewController`. You don't call `create_screen`
 directly; just export your component and configure the entry point in
 `pythonnative.json`.
 

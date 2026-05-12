@@ -14,14 +14,14 @@ import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 
-class PageFragment : Fragment() {
+class ScreenFragment : Fragment() {
     private val TAG = javaClass.simpleName
-    private var page: PyObject? = null
+    private var screen: PyObject? = null
     private val hotReloadHandler = Handler(Looper.getMainLooper())
     private val hotReloadRunnable = object : Runnable {
         override fun run() {
             try {
-                page?.callAttr("hot_reload_tick")
+                screen?.callAttr("hot_reload_tick")
             } catch (e: Exception) {
                 Log.w(TAG, "hot_reload_tick failed", e)
             } finally {
@@ -42,17 +42,17 @@ class PageFragment : Fragment() {
             // via fragment arguments / nav graph to load a different
             // module or a specific dotted-attribute path (e.g.
             // "app.main.RootScreen").
-            val pagePath = arguments?.getString("page_path") ?: "app.main"
+            val screenPath = arguments?.getString("screen_path") ?: "app.main"
             val argsJson = arguments?.getString("args_json")
             val filesRoot = requireContext().filesDir.absolutePath
             val devRoot = "$filesRoot/pythonnative_dev"
             val hotReload = py.getModule("pythonnative.hot_reload")
             hotReload.callAttr("configure_dev_environment", filesRoot)
-            val pnPage = py.getModule("pythonnative.page")
-            page = pnPage.callAttr("create_page", pagePath, requireActivity(), argsJson)
-            page?.callAttr("enable_hot_reload", "$devRoot/reload.json", devRoot)
+            val pnScreen = py.getModule("pythonnative.screen")
+            screen = pnScreen.callAttr("create_screen", screenPath, requireActivity(), argsJson)
+            screen?.callAttr("enable_hot_reload", "$devRoot/reload.json", devRoot)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to instantiate page", e)
+            Log.e(TAG, "Failed to instantiate screen", e)
         }
     }
 
@@ -75,13 +75,13 @@ class PageFragment : Fragment() {
         // Python side will call set_root_view to attach a native view to Activity.
         // In fragment-based architecture, the Activity will set contentView once,
         // so we ensure the fragment's container is available for Python to target.
-        // Expose the fragment container to Python so Page.set_root_view can attach into it
+        // Expose the fragment container to Python so the screen host can attach into it.
         try {
             val py = Python.getInstance()
             val utils = py.getModule("pythonnative.utils")
             utils.callAttr("set_android_fragment_container", view)
             // Now that container exists, invoke on_create so Python can attach its root view
-            page?.callAttr("on_create")
+            screen?.callAttr("on_create")
             hotReloadHandler.removeCallbacks(hotReloadRunnable)
             hotReloadHandler.postDelayed(hotReloadRunnable, 500)
         } catch (e: Exception) {
@@ -91,22 +91,22 @@ class PageFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        try { page?.callAttr("on_start") } catch (e: Exception) { Log.w(TAG, "on_start failed", e) }
+        try { screen?.callAttr("on_start") } catch (e: Exception) { Log.w(TAG, "on_start failed", e) }
     }
 
     override fun onResume() {
         super.onResume()
-        try { page?.callAttr("on_resume") } catch (e: Exception) { Log.w(TAG, "on_resume failed", e) }
+        try { screen?.callAttr("on_resume") } catch (e: Exception) { Log.w(TAG, "on_resume failed", e) }
     }
 
     override fun onPause() {
         super.onPause()
-        try { page?.callAttr("on_pause") } catch (e: Exception) { Log.w(TAG, "on_pause failed", e) }
+        try { screen?.callAttr("on_pause") } catch (e: Exception) { Log.w(TAG, "on_pause failed", e) }
     }
 
     override fun onStop() {
         super.onStop()
-        try { page?.callAttr("on_stop") } catch (e: Exception) { Log.w(TAG, "on_stop failed", e) }
+        try { screen?.callAttr("on_stop") } catch (e: Exception) { Log.w(TAG, "on_stop failed", e) }
     }
 
     override fun onDestroyView() {
@@ -117,14 +117,14 @@ class PageFragment : Fragment() {
     override fun onDestroy() {
         super.onDestroy()
         hotReloadHandler.removeCallbacks(hotReloadRunnable)
-        try { page?.callAttr("on_destroy") } catch (e: Exception) { Log.w(TAG, "on_destroy failed", e) }
+        try { screen?.callAttr("on_destroy") } catch (e: Exception) { Log.w(TAG, "on_destroy failed", e) }
     }
 
     companion object {
-        fun newInstance(pagePath: String, argsJson: String?): PageFragment {
-            val f = PageFragment()
+        fun newInstance(screenPath: String, argsJson: String?): ScreenFragment {
+            val f = ScreenFragment()
             f.arguments = bundleOf(
-                "page_path" to pagePath,
+                "screen_path" to screenPath,
                 "args_json" to argsJson
             )
             return f

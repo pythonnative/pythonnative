@@ -215,7 +215,7 @@ def test_declarative_handle_navigate_unknown_raises() -> None:
 
 
 class _FakeHost:
-    """Stub `_AppHost` used to assert native-push delegation."""
+    """Stub `_ScreenHost` used to assert native-push delegation."""
 
     def __init__(self, component_path: str = "app.demo.App") -> None:
         self._component_path = component_path
@@ -262,8 +262,8 @@ def test_declarative_handle_native_push_when_parent_is_host() -> None:
     handle.navigate("Detail", {"id": 7})
 
     assert len(host.pushed) == 1
-    page_path, push_args = host.pushed[0]
-    assert page_path == "app.demo.App"
+    screen_path, push_args = host.pushed[0]
+    assert screen_path == "app.demo.App"
     assert push_args["__pn_initial_route__"] == "Detail"
     assert push_args["__pn_initial_params__"] == {"id": 7}
     assert set_stack_calls == []  # in-Python stack is NOT touched
@@ -454,7 +454,7 @@ def test_stack_navigator_renders_initial_screen() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Stack.Navigator(
         Stack.Screen("Home", component=HomeScreen),
@@ -489,7 +489,7 @@ def test_stack_navigator_respects_initial_route() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Stack.Navigator(
         Stack.Screen("Home", component=HomeScreen),
@@ -522,7 +522,7 @@ def test_stack_navigator_provides_navigation_context() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Stack.Navigator(Stack.Screen("Home", component=HomeScreen))
     rec.mount(el)
@@ -538,7 +538,7 @@ def test_stack_navigator_empty_screens() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Stack.Navigator()
     root = rec.mount(el)
@@ -569,7 +569,7 @@ def test_tab_navigator_renders_initial_screen() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Tab.Navigator(
         Tab.Screen("Home", component=HomeScreen, options={"title": "Home"}),
@@ -602,7 +602,7 @@ def test_tab_navigator_renders_native_tab_bar() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Tab.Navigator(
         Tab.Screen("TabA", component=ScreenA, options={"title": "Tab A"}),
@@ -634,7 +634,7 @@ def test_tab_navigator_empty_screens() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Tab.Navigator()
     root = rec.mount(el)
@@ -665,7 +665,7 @@ def test_drawer_navigator_renders_initial_screen() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Drawer.Navigator(
         Drawer.Screen("Home", component=HomeScreen),
@@ -690,7 +690,7 @@ def test_drawer_navigator_empty_screens() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Drawer.Navigator()
     root = rec.mount(el)
@@ -789,7 +789,7 @@ def test_stack_navigator_navigate_and_go_back() -> None:
     backend = MockBackend()
     rec = Reconciler(backend)
     renders: list = []
-    rec._page_re_render = lambda: renders.append(1)
+    rec._screen_re_render = lambda: renders.append(1)
 
     el = Stack.Navigator(
         Stack.Screen("Home", component=HomeScreen),
@@ -813,7 +813,7 @@ def test_stack_navigator_with_navigation_container() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = NavigationContainer(Stack.Navigator(Stack.Screen("Home", component=HomeScreen)))
     root = rec.mount(el)
@@ -930,7 +930,7 @@ def test_stack_inside_tab_forwards_to_parent() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Tab.Navigator(
         Tab.Screen("TabA", component=InnerStack),
@@ -1005,7 +1005,7 @@ def test_stack_navigator_initial_route_from_host_args() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Stack.Navigator(
         Stack.Screen("Home", component=HomeScreen),
@@ -1039,7 +1039,7 @@ def test_stack_navigator_falls_back_when_host_route_unknown() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Stack.Navigator(Stack.Screen("Home", component=HomeScreen))
     from pythonnative.hooks import Provider as _Provider
@@ -1090,7 +1090,7 @@ def test_stack_navigator_calls_set_screen_options() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     el = Stack.Navigator(Stack.Screen("Home", component=HomeScreen, options={"title": "Hello"}))
     from pythonnative.hooks import Provider as _Provider

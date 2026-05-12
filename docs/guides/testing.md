@@ -68,7 +68,7 @@ component under test.
 
 ## Rendering a component in a test
 
-`create_page` boots an `_AppHost` which is the same shape used at
+`create_screen` boots an `_ScreenHost` which is the same shape used at
 runtime. For tests we want a more direct path: invoke the reconciler
 with a known root and read its output.
 
@@ -84,7 +84,7 @@ def render(element):
     return rec.root_view  # the mock dict for the root element
 ```
 
-(For a longer-running test (effects, navigation), use `create_page` so
+(For a longer-running test (effects, navigation), use `create_screen` so
 you get the full lifecycle plumbing.)
 
 ## Asserting on rendered output

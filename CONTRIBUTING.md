@@ -110,8 +110,8 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `native_modules` – native API modules for device capabilities (`native_modules/`)
   - `native_views` – platform-specific native view creation and updates (`native_views/`)
   - `package` – `src/pythonnative/__init__.py` exports and package boundary
-  - `page` – Page component, lifecycle, and reactive state (`page.py`)
   - `reconciler` – virtual view tree diffing and reconciliation (`reconciler.py`)
+  - `screen` – screen host, native lifecycle bridge, and render scheduling (`screen.py`)
   - `style` – StyleSheet and theming (`style.py`)
   - `utils` – shared utilities (`utils.py`)
 
@@ -154,7 +154,7 @@ Breaking changes:
 - Use `!` after the type/scope or a `BREAKING CHANGE:` footer.
 
 ```text
-feat(core)!: rename Page.set_root_view to set_root
+feat(screen)!: rename create_page to create_screen
 
 BREAKING CHANGE: API renamed; update app code and templates.
 ```
@@ -288,7 +288,7 @@ pn run ios
 maestro --platform ios test ../../tests/e2e/ios.yaml
 ```
 
-Test flows live in `tests/e2e/flows/` and cover main page rendering, counter interaction, and multi-page navigation. The `e2e.yml` workflow runs these automatically on pushes to `main` and PRs.
+Test flows live in `tests/e2e/flows/` and cover the main screen rendering, counter interaction, and multi-screen navigation. The `e2e.yml` workflow runs these automatically on pushes to `main` and PRs.
 
 ### CI
 

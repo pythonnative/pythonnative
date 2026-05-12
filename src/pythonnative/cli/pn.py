@@ -344,7 +344,7 @@ ANDROID_LOGCAT_FILTERS: list[str] = [
     "python.stdout:V",
     "python.stderr:V",
     "MainActivity:V",
-    "PageFragment:V",
+    "ScreenFragment:V",
     "Navigator:V",
     "PythonNative:V",
     "AndroidRuntime:E",

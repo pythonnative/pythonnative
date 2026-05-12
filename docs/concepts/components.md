@@ -175,7 +175,7 @@ def App():
     return pn.Text(f"Hello, {name}!", style={"font_size": 24})
 ```
 
-The entry point [`create_page`][pythonnative.create_page] is called
+The entry point [`create_screen`][pythonnative.create_screen] is called
 internally by native templates to bootstrap your root component. You
 don't call it directly: name your top-level component `App` (so the
 templates can find it by convention) and `pythonnative.json` points

@@ -98,8 +98,8 @@ from .navigation import (
     use_focus_effect,
     use_route,
 )
-from .page import create_page
 from .platform import Platform
+from .screen import create_screen
 from .style import StyleSheet, ThemeContext
 
 __all__ = [
@@ -130,7 +130,7 @@ __all__ = [
     "WebView",
     # Core
     "Element",
-    "create_page",
+    "create_screen",
     # Hooks
     "batch_updates",
     "component",

@@ -95,7 +95,7 @@ def test_cli_run_prepare_only_android_and_ios() -> None:
             "com",
             "pythonnative",
             "android_template",
-            "PageFragment.kt",
+            "ScreenFragment.kt",
         )
         assert os.path.isfile(page_fragment)
         virtual_list_helper = os.path.join(

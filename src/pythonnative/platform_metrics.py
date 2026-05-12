@@ -1,6 +1,6 @@
-"""Platform-level metrics shared between page hosts and view handlers.
+"""Platform-level metrics shared between screen hosts and view handlers.
 
-The page host (`pythonnative.page`) is the only place that knows
+The screen host (`pythonnative.screen`) is the only place that knows
 about native window/safe-area state because it is the only piece of
 code that holds a reference to the native ``UIViewController``
 (iOS) or ``Activity`` (Android). Native view handlers, however, need
@@ -15,11 +15,11 @@ that state to size themselves correctly:
 
 Rather than threading those values through every
 [`measure_intrinsic`][pythonnative.native_views.base.ViewHandler.measure_intrinsic]
-call signature, the page host writes them here and handlers read
+call signature, the screen host writes them here and handlers read
 them on demand. Values are in **dp on Android** and **pt on iOS** —
 i.e., the same "layout units" the layout engine uses on each
 platform, so handlers can add them to other layout-unit values
-without further conversion. On iOS the page host consumes the top
+without further conversion. On iOS the screen host consumes the top
 safe-area inset by positioning the root view below it, then publishes
 ``top=0`` here; Android publishes the raw system-bar insets because
 the host view normally remains full-screen.
@@ -107,7 +107,7 @@ def subscribe(callback: Callable[[], None]) -> Callable[[], None]:
 def set_safe_area_insets(top: float, left: float, bottom: float, right: float) -> None:
     """Publish the current safe-area insets.
 
-    Called by the platform-specific page host whenever it learns a
+    Called by the platform-specific screen host whenever it learns a
     new value (e.g., on first layout, on rotation, on multitasking
     split-view changes). Negative inputs are clamped to ``0.0`` so
     handlers don't have to defend against bad data from native
@@ -140,7 +140,7 @@ def get_safe_area_insets() -> SafeAreaInsets:
 
     The default value is ``(0, 0, 0, 0)`` — handlers should still
     function correctly on a desktop / unit-test environment where no
-    page host has published insets.
+    screen host has published insets.
     """
     return _safe_area_insets
 
@@ -160,7 +160,7 @@ def reset_safe_area_insets() -> None:
 def set_window_dimensions(width: float, height: float) -> None:
     """Publish the viewport size in layout units.
 
-    Called by the page host on initial layout, rotation, and split-
+    Called by the screen host on initial layout, rotation, and split-
     view changes. Notifies subscribers (and therefore re-renders
     components using ``use_window_dimensions``) only when the size
     actually changes.
@@ -215,7 +215,7 @@ def reset_keyboard_height() -> None:
 #
 # Only iOS exposes an explicit constant here. The iOS handler can't
 # trust ``UITabBar.sizeThatFits_`` (it has historically returned 0 in
-# some configurations) and the page host deliberately extends the
+# some configurations) and the screen host deliberately extends the
 # root view past the bottom safe area so the bar reaches the home
 # indicator — both pieces conspire to require a single source of
 # truth for the height formula.
@@ -238,7 +238,7 @@ def ios_tab_bar_height() -> float:
     """Return the iOS tab-bar intrinsic height in points.
 
     Equal to ``IOS_TAB_BAR_BASE_HEIGHT_PT + safe_area_insets.bottom``
-    so the bar reaches the home indicator. The iOS page host
+    so the bar reaches the home indicator. The iOS screen host
     deliberately extends the root view past the bottom safe area for
     this very reason — the tab bar absorbs the inset and UIKit
     renders the pill with internal padding for the home indicator.

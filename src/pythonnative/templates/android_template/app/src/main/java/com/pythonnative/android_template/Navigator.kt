@@ -7,15 +7,15 @@ import androidx.navigation.fragment.NavHostFragment
 
 object Navigator {
     @JvmStatic
-    fun push(activity: FragmentActivity, pagePath: String, argsJson: String?) {
+    fun push(activity: FragmentActivity, screenPath: String, argsJson: String?) {
         val navHost = activity.supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         val navController = navHost.navController
         val args = Bundle()
-        args.putString("page_path", pagePath)
+        args.putString("screen_path", screenPath)
         if (argsJson != null) {
             args.putString("args_json", argsJson)
         }
-        navController.navigate(R.id.pageFragment, args)
+        navController.navigate(R.id.screenFragment, args)
     }
 
     @JvmStatic

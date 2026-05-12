@@ -140,8 +140,8 @@ class _DeclarativeNavHandle:
     Implements the same interface as
     [`NavigationHandle`][pythonnative.hooks.NavigationHandle] so
     [`use_navigation`][pythonnative.use_navigation] returns a
-    compatible object regardless of whether the app uses page-based
-    navigation or declarative navigators.
+    compatible object regardless of whether the app drives navigation
+    imperatively or through declarative navigators.
 
     When ``parent`` is the host's own ``NavigationHandle`` (root
     Stack), ``navigate`` / ``go_back`` / ``reset`` drive the native

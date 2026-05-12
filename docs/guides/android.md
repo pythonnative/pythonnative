@@ -12,8 +12,8 @@ No network is required for the template itself; the template zip is bundled with
 
 Your `app/` directory contains `@pn.component` function components.
 The native Android template uses
-[`create_page`][pythonnative.create_page] internally to bootstrap your
-root component inside a `PageFragment`. You don't call `create_page`
+[`create_screen`][pythonnative.create_screen] internally to bootstrap your
+root component inside a `ScreenFragment`. You don't call `create_screen`
 directly; just export your component and configure the entry point in
 `pythonnative.json`.
 
@@ -41,7 +41,7 @@ the template use, so you get Python output without the usual logcat noise:
 |-----------------|--------------------------------------------------|
 | `python.stdout` | `print()` / anything written to `sys.stdout`     |
 | `python.stderr` | tracebacks / anything written to `sys.stderr`    |
-| `MainActivity`, `PageFragment`, `Navigator` | Kotlin template lifecycle |
+| `MainActivity`, `ScreenFragment`, `Navigator` | Kotlin template lifecycle |
 | `AndroidRuntime:E` | Fatal Java/Kotlin exceptions                  |
 
 Press Ctrl+C to stop streaming. Pass `--no-logs` to skip log streaming

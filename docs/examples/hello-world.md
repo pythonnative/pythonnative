@@ -31,7 +31,7 @@ def App():
   (like `use_state`) work because the decorator establishes a hook
   context for each call.
 - `pn.use_state(0)` returns `(value, setter)`. The setter triggers a
-  re-render scheduled by the page host.
+  re-render scheduled by the screen host.
 - `pn.Column(*children, style=...)` returns a vertical container
   element. Both the children and the style are read on every render;
   the reconciler diffs them against the previous render and updates

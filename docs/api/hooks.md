@@ -16,7 +16,7 @@ slot across renders.
 
 These hooks subscribe to values published by
 `pythonnative.platform_metrics` and re-render the component when they
-change. The page host is the only code that updates the underlying
+change. The screen host is the only code that updates the underlying
 values; user code consumes them.
 
 - [`use_window_dimensions`][pythonnative.use_window_dimensions] — viewport size.

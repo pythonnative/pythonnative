@@ -91,7 +91,7 @@ def test_use_window_dimensions_re_renders_on_change() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: rec.reconcile(comp())
+    rec._screen_re_render = lambda: rec.reconcile(comp())
     rec.mount(comp())
     initial_render_count = len(rendered)
 
@@ -125,7 +125,7 @@ def test_use_safe_area_insets_re_renders_on_change() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: rec.reconcile(comp())
+    rec._screen_re_render = lambda: rec.reconcile(comp())
     rec.mount(comp())
     before = len(rendered)
 
@@ -158,7 +158,7 @@ def test_use_keyboard_height_re_renders_on_change() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: rec.reconcile(comp())
+    rec._screen_re_render = lambda: rec.reconcile(comp())
     rec.mount(comp())
     before = len(rendered)
 

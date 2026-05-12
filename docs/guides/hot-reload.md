@@ -3,7 +3,7 @@
 Hot reload turns your edit-save-rebuild loop into edit-save-see. The
 `pn` CLI watches `app/` for changes and pushes the modified files
 straight to the running app, where a small device-side helper reloads
-the affected modules and asks the page host to re-render.
+the affected modules and asks the screen host to re-render.
 
 ## Turn it on
 
@@ -43,7 +43,7 @@ When a source file changes, the CLI copies it to that overlay:
 
 After the files are in place, the CLI writes `reload.json`. The
 Android and iOS templates poll that manifest on the platform main
-thread and call the page host's reload hook. The host re-imports the
+thread and call the screen host's reload hook. The host re-imports the
 root component by dotted path, resets hook/navigation state for the
 page, and mounts the refreshed tree.
 
@@ -54,7 +54,7 @@ PythonNative reloads any `.py` file under `app/`. The device-side
 the file to a dotted module name (e.g., `app/pages/home.py` becomes
 `app.pages.home`) and re-imports it from disk.
 
-After reloading, every active page host runs **Fast Refresh** in
+After reloading, every active screen host runs **Fast Refresh** in
 place:
 
 1. Walk the live VNode tree and collect every component function
@@ -79,7 +79,7 @@ tree doesn't reference yet, or the swap raises — the host
 get stuck with a stale tree. Hook state is reset in that case.
 
 Per-screen scope: each native screen (UIViewController on iOS,
-PageFragment on Android) runs its own host, so Fast Refresh
+ScreenFragment on Android) runs its own host, so Fast Refresh
 operates independently per host. Two pushed screens both running
 Fast Refresh for the same changed module each swap their own
 references.
@@ -104,8 +104,8 @@ references.
 
 !!! warning "References across modules"
     If module `a` does `from b import Foo` and only `b.py` changes,
-    module `a` may still hold the *old* `Foo`. The page host always
-    reloads the root page module after changed modules so common
+    module `a` may still hold the *old* `Foo`. The screen host always
+    reloads the root screen module after changed modules so common
     component imports update, but long-lived references (e.g., stashed
     in a global) can drift. When in doubt, restart the app.
 

@@ -19,15 +19,15 @@ class MainActivity : AppCompatActivity() {
             Python.start(AndroidPlatform(this))
         }
         try {
-            // Set content view to the NavHost layout; the initial page loads via nav_graph startDestination
+            // Set content view to the NavHost layout; the initial screen loads via nav_graph startDestination
             setContentView(R.layout.activity_main)
-            // Optionally, bootstrap Python so first fragment can create the initial page onCreate
+            // Optionally, bootstrap Python so first fragment can create the initial screen onCreate
             val py = Python.getInstance()
             py.getModule("pythonnative.hot_reload").callAttr(
                 "configure_dev_environment",
                 filesDir.absolutePath
             )
-            // Touch module to ensure bundled Python code is available; actual instantiation happens in PageFragment
+            // Touch module to ensure bundled Python code is available; actual instantiation happens in ScreenFragment
             py.getModule("app.main")
         } catch (e: Exception) {
             Log.e("PythonNative", "Bootstrap failed", e)

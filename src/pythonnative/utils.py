@@ -7,7 +7,7 @@ results are cached the first time
 [`IS_IOS`][pythonnative.utils.IS_IOS] are read.
 
 The Android variants also expose a small global registry for the
-current `Activity` / `Context` and the page's fragment container view;
+current `Activity` / `Context` and the screen's fragment container view;
 both are populated by the bundled Android template before any
 PythonNative code runs.
 
@@ -140,7 +140,7 @@ def set_android_fragment_container(container_view: Any) -> None:
 
     Args:
         container_view: A Java `android.view.ViewGroup` that holds the
-            page's view tree.
+            screen's view tree.
     """
     global _android_fragment_container
     _android_fragment_container = container_view
@@ -160,7 +160,7 @@ def get_android_context() -> Any:
         raise RuntimeError("get_android_context() called on non-Android platform")
     if _android_context is None:
         raise RuntimeError(
-            "Android context not set. Ensure Page is initialized from an Activity before constructing views."
+            "Android context not set. Ensure the screen host is initialized from an Activity before constructing views."
         )
     return _android_context
 
@@ -173,12 +173,12 @@ def get_android_fragment_container() -> Any:
 
     Raises:
         RuntimeError: If called on a non-Android platform, or before
-            `PageFragment` has registered its container.
+            `ScreenFragment` has registered its container.
     """
     if not IS_ANDROID:
         raise RuntimeError("get_android_fragment_container() called on non-Android platform")
     if _android_fragment_container is None:
         raise RuntimeError(
-            "Android fragment container not set. Ensure PageFragment has been created before set_root_view."
+            "Android fragment container not set. Ensure ScreenFragment has been created before set_root_view."
         )
     return _android_fragment_container

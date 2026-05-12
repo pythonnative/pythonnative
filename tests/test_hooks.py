@@ -209,7 +209,7 @@ def test_use_reducer_in_reconciler() -> None:
     backend = MockBackend()
     rec = Reconciler(backend)
     re_rendered: list = []
-    rec._page_re_render = lambda: re_rendered.append(1)
+    rec._screen_re_render = lambda: re_rendered.append(1)
 
     root = rec.mount(counter())
     assert root.props["text"] == "0"
@@ -617,7 +617,7 @@ def test_function_component_use_state() -> None:
     backend = MockBackend()
     rec = Reconciler(backend)
     re_rendered: list = []
-    rec._page_re_render = lambda: re_rendered.append(1)
+    rec._screen_re_render = lambda: re_rendered.append(1)
 
     root = rec.mount(counter())
     assert root.props["text"] == "0"

@@ -101,7 +101,7 @@ nav:
     - Alerts: api/alerts.md
     - Platform: api/platform.md
     - Element: api/element.md
-    - Page: api/page.md
+    - Screen: api/screen.md
     - Reconciler: api/reconciler.md
     - Layout: api/layout.md
     - Style: api/style.md

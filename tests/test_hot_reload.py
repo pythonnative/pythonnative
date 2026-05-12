@@ -213,7 +213,7 @@ def test_refresh_in_place_swaps_components_and_preserves_state(
 
     backend = _MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
 
     root = rec.mount(module.Counter())
 
@@ -271,7 +271,7 @@ def test_refresh_in_place_returns_false_for_unreloaded_modules() -> None:
 
     backend = _MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
     rec.mount(Element("Text", {"text": "static"}, []))
 
     refreshed = ModuleReloader.refresh_in_place(rec, ["some.other.module"])
@@ -296,7 +296,7 @@ def test_build_replacement_map_skips_nested_functions() -> None:
     inner = make_nested()
     backend = _MockBackend()
     rec = Reconciler(backend)
-    rec._page_re_render = lambda: None
+    rec._screen_re_render = lambda: None
     rec.mount(Element(inner, {}, []))
 
     mapping = ModuleReloader.build_replacement_map(rec, [inner.__module__])

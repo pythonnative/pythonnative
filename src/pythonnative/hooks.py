@@ -511,13 +511,13 @@ def use_window_dimensions() -> Dict[str, float]:
     """Return the current viewport size and re-render when it changes.
 
     Equivalent to React Native's ``useWindowDimensions``. The values
-    are pushed by the page host whenever the platform reports a new
+    are pushed by the screen host whenever the platform reports a new
     size (initial layout, rotation, multitasking split-view).
 
     Returns:
         A dict with ``"width"`` and ``"height"`` floats in layout
         units (pt on iOS, dp on Android). Both are ``0.0`` until the
-        page host has run its first layout pass.
+        screen host has run its first layout pass.
 
     Raises:
         RuntimeError: If called outside a `@component` function.
@@ -742,20 +742,20 @@ class NavigationHandle:
     def __init__(self, host: Any) -> None:
         self._host = host
 
-    def navigate(self, page: Any, params: Optional[Dict[str, Any]] = None) -> None:
-        """Push ``page`` onto the navigation stack.
+    def navigate(self, component: Any, params: Optional[Dict[str, Any]] = None) -> None:
+        """Push ``component`` onto the navigation stack.
 
         Args:
-            page: A ``@component`` function or a dotted Python path
-                (e.g. ``"app.detail.DetailScreen"``). When a Stack
-                navigator is the root of the app, prefer the
+            component: A ``@component`` function or a dotted Python
+                path (e.g. ``"app.detail.DetailScreen"``). When a
+                Stack navigator is the root of the app, prefer the
                 declarative ``nav.navigate("Detail", params)`` form
-                returned by ``use_navigation()`` — it pushes by route
-                name and the host re-uses its own ``App`` component.
+                returned by ``use_navigation()`` (it pushes by route
+                name and the host re-uses its own ``App`` component).
             params: Optional dict of arguments serialized into the
                 target screen.
         """
-        self._host._push(page, params)
+        self._host._push(component, params)
 
     def go_back(self) -> None:
         """Pop the current screen and return to the previous one."""
@@ -780,13 +780,13 @@ def use_navigation() -> NavigationHandle:
 
     Raises:
         RuntimeError: If called outside a component rendered via
-            [`create_page`][pythonnative.create_page].
+            [`create_screen`][pythonnative.create_screen].
     """
     handle = use_context(_NavigationContext)
     if handle is None:
         raise RuntimeError(
-            "use_navigation() called outside a PythonNative page. "
-            "Ensure your component is rendered via create_page()."
+            "use_navigation() called outside a PythonNative screen. "
+            "Ensure your component is rendered via create_screen()."
         )
     return handle
 
