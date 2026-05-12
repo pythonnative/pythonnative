@@ -37,7 +37,8 @@ PythonNative is a cross-platform toolkit for building native Android and iOS app
 - **Virtual view tree + reconciler:** Element trees are diffed and patched with minimal native mutations, similar to React's reconciliation.
 - **Direct native bindings:** Python calls platform APIs directly through Chaquopy and rubicon-objc, with no JavaScript bridge.
 - **CLI scaffolding:** `pn init` creates a ready-to-run project; `pn run android` and `pn run ios` build and launch your app.
-- **Navigation:** Push and pop screens with argument passing via the `use_navigation()` hook.
+- **Native-backed navigation:** Declarative `Stack`, `Tab`, and `Drawer` navigators inspired by React Navigation. The root stack drives the platform's native navigation controller (`UINavigationController` on iOS, AndroidX Navigation Component on Android), so transitions, back gestures, and the hardware back button match what users expect.
+- **Fast Refresh hot reload:** `pn run --hot-reload` watches `app/` and patches edits into the running app on save, preserving component state across most changes.
 - **Bundled templates:** Android Gradle and iOS Xcode templates are included, so scaffolding requires no network access.
 
 ## Quick Start
@@ -55,7 +56,7 @@ import pythonnative as pn
 
 
 @pn.component
-def MainPage():
+def App():
     count, set_count = pn.use_state(0)
     return pn.Column(
         pn.Text(f"Count: {count}", style={"font_size": 24}),
@@ -65,7 +66,12 @@ def MainPage():
         ),
         style={"spacing": 12, "padding": 16},
     )
+
+
+pn.run(App)
 ```
+
+`pn.run(App)` registers the root component for this Python process (analogous to `AppRegistry.registerComponent` in React Native). The bundled iOS and Android templates load your app by module path and pick up whatever component you register. See [Getting Started](https://docs.pythonnative.com/getting-started/) for the full `Stack.Navigator` scaffold that `pn init` produces.
 
 ## Documentation
 
