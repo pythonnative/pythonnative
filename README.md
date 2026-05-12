@@ -68,8 +68,6 @@ def App():
     )
 ```
 
-Save this as `app/main.py`. The bundled iOS and Android templates import `app.main` and look up its top-level `App` function (the convention is "name your root component `App`"). See [Getting Started](https://docs.pythonnative.com/getting-started/) for the full `Stack.Navigator` scaffold that `pn init` produces.
-
 ## Documentation
 
 Visit [docs.pythonnative.com](https://docs.pythonnative.com/) for the full documentation, including getting started guides, platform-specific instructions for Android and iOS, API reference, and working examples.
