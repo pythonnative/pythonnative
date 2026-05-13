@@ -18,9 +18,9 @@ import pythonnative as pn
 def Counter(initial: int = 0):
     count, set_count = pn.use_state(initial)
     return pn.Column(
-        pn.Text(f"Count: {count}", style={"font_size": 24, "bold": True}),
+        pn.Text(f"Count: {count}", style=pn.style(font_size=24, bold=True)),
         pn.Button("+", on_click=lambda: set_count(count + 1)),
-        style={"spacing": 12, "padding": 16},
+        style=pn.style(spacing=12, padding=16),
     )
 ```
 
@@ -39,6 +39,12 @@ produce identical frames on both platforms.
 - **No JS bridge, no transpiler.** The reconciler runs synchronously
   in Python on the platform's main thread; native API calls are
   direct method calls.
+- **Typed styling.** [`pn.Style`][pythonnative.style.Style] is a
+  `TypedDict` with `Literal` enums for every fixed-value field, so
+  mypy and your editor catch typos in `align_items` or
+  `font_weight` before the app ever runs. The
+  [`pn.style(...)`][pythonnative.style.style] helper makes the
+  call sites tidy.
 - **Native-backed navigation.** The root `Stack.Navigator` drives
   the platform's real navigation controller — Android Navigation
   Component fragments on Android, `UINavigationController` on iOS —
@@ -47,6 +53,10 @@ produce identical frames on both platforms.
 - **Fast Refresh hot reload.** `pn run --hot-reload` watches `app/`
   and patches the running app in place, preserving component state
   across most edits.
+- **An extension SDK.** [`pythonnative.sdk`](api/sdk.md) lets you
+  wrap any platform widget as a first-class element with
+  type-checked props, and PyPI plugins auto-register through the
+  `pythonnative.handlers` entry-point group.
 - **A small surface.** A handful of element factories, a handful of
   hooks, and one navigation primitive.
 
@@ -55,6 +65,8 @@ produce identical frames on both platforms.
 - New here? Start with [Getting started](getting-started.md).
 - Want the bigger picture? Read [Mental model](concepts/mental-model.md).
 - Looking up an API? [Package overview](api/pythonnative.md).
+- Wrapping a custom widget? Read
+  [Custom native components](guides/custom-native-components.md).
 - Stuck on an error? Try [Troubleshooting](meta/troubleshooting.md).
 
 ## Project status

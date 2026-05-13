@@ -168,32 +168,54 @@ introspect.
 
 ## Custom widgets
 
-Adding a widget is a three-step process:
+Adding a widget is a three-step process, and the
+[`pythonnative.sdk`](../api/sdk.md) module gives you a ready-made,
+type-checked entry point for each step:
 
-1. Implement a handler subclass for each platform you support.
-2. Register it under a unique type string.
-3. Add a small Python factory that returns
-   `Element(<type>, props, children)`.
+1. Define a frozen [`Props`][pythonnative.sdk._components.Props]
+   dataclass listing the widget's API surface.
+2. Implement a [`ViewHandler`][pythonnative.native_views.base.ViewHandler]
+   subclass per platform and decorate it with
+   [`@native_component`][pythonnative.sdk._components.native_component].
+3. Hand callers an
+   [`element_factory`][pythonnative.sdk._components.element_factory]
+   that validates kwargs against the dataclass and returns regular
+   `Element` instances.
 
 ```python
+from dataclasses import dataclass
+from typing import Optional
 import pythonnative as pn
-from pythonnative.element import Element
-from pythonnative.native_views import get_registry
+from pythonnative.sdk import Props, ViewHandler, element_factory, native_component
 
-class _RatingHandler:
-    def create_view(self, props):
-        # platform-specific stars widget
+
+@dataclass(frozen=True)
+class RatingProps(Props):
+    value: float = 0.0
+    on_change: Optional[callable] = None
+    style: Optional[pn.StyleProp] = None
+
+
+@native_component("Rating", props=RatingProps, platforms=("ios",))
+class IOSRatingHandler(ViewHandler):
+    def create(self, props):
+        ...  # build a UIView wrapping star UIImageViews
+    def update(self, view, changed):
         ...
-    def update_view(self, view, prev, next):
-        ...
 
-get_registry().register("Rating", _RatingHandler())
 
-def Rating(value: float, *, on_change=None, **kwargs):
-    return Element("Rating", {"value": value, "on_change": on_change, **kwargs}, [])
+Rating = element_factory("Rating")
 ```
 
-The reconciler treats `Rating` like any other element after that.
+After registration the reconciler treats `Rating` like any other
+element. PyPI plugins can register their handlers automatically via
+the `pythonnative.handlers` entry-point group (see
+[`ENTRY_POINT_GROUP`][pythonnative.sdk._components.ENTRY_POINT_GROUP]),
+so users only have to `pip install` your package.
+
+For the full walkthrough — typed props, iOS handler, Android handler,
+distribution as a plugin, unit-testing — see the
+[Custom native components guide](../guides/custom-native-components.md).
 
 ## Next steps
 

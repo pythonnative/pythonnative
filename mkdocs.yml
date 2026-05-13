@@ -83,6 +83,7 @@ nav:
     - Lists: guides/lists.md
     - Platform & Accessibility: guides/platform-accessibility.md
     - Native Modules: guides/native-modules.md
+    - Custom Native Components: guides/custom-native-components.md
     - Hot Reload: guides/hot-reload.md
     - Error Boundaries: guides/error-boundaries.md
     - Testing: guides/testing.md
@@ -108,6 +109,7 @@ nav:
     - Navigation: api/navigation.md
     - Native modules: api/native_modules.md
     - Native views: api/native_views.md
+    - SDK: api/sdk.md
     - Hot reload: api/hot_reload.md
     - Utilities: api/utils.md
     - CLI (pn): api/cli.md

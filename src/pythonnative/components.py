@@ -35,10 +35,18 @@ Example:
     ```
 """
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional
 
 from .element import Element
-from .style import StyleValue, resolve_style
+from .style import (
+    AutoCapitalize,
+    Color,
+    KeyboardType,
+    ReturnKeyType,
+    ScaleType,
+    StyleProp,
+    resolve_style,
+)
 
 # ======================================================================
 # Leaf components
@@ -73,7 +81,7 @@ def _accessibility_props(
 def Text(
     text: str = "",
     *,
-    style: StyleValue = None,
+    style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
@@ -118,7 +126,7 @@ def Button(
     *,
     on_click: Optional[Callable[[], None]] = None,
     enabled: bool = True,
-    style: StyleValue = None,
+    style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessible: Optional[bool] = None,
@@ -174,14 +182,14 @@ def TextInput(
     on_submit: Optional[Callable[[str], None]] = None,
     secure: bool = False,
     multiline: bool = False,
-    keyboard_type: Optional[str] = None,
-    auto_capitalize: Optional[str] = None,
+    keyboard_type: Optional[KeyboardType] = None,
+    auto_capitalize: Optional[AutoCapitalize] = None,
     auto_correct: Optional[bool] = None,
     auto_focus: bool = False,
-    return_key_type: Optional[str] = None,
+    return_key_type: Optional[ReturnKeyType] = None,
     max_length: Optional[int] = None,
-    placeholder_color: Optional[str] = None,
-    style: StyleValue = None,
+    placeholder_color: Optional[Color] = None,
+    style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessible: Optional[bool] = None,
@@ -257,9 +265,9 @@ def TextInput(
 def Image(
     source: str = "",
     *,
-    scale_type: Optional[str] = None,
-    tint_color: Optional[str] = None,
-    style: StyleValue = None,
+    scale_type: Optional[ScaleType] = None,
+    tint_color: Optional[Color] = None,
+    style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessible: Optional[bool] = None,
     ref: Optional[Dict[str, Any]] = None,
@@ -307,7 +315,7 @@ def Switch(
     *,
     value: bool = False,
     on_change: Optional[Callable[[bool], None]] = None,
-    style: StyleValue = None,
+    style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """Display a toggle switch.
@@ -331,7 +339,7 @@ def Switch(
 def ProgressBar(
     *,
     value: float = 0.0,
-    style: StyleValue = None,
+    style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """Show determinate progress as a value between 0.0 and 1.0.
@@ -356,7 +364,7 @@ def ProgressBar(
 def ActivityIndicator(
     *,
     animating: bool = True,
-    style: StyleValue = None,
+    style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """Show an indeterminate loading spinner.
@@ -378,7 +386,7 @@ def ActivityIndicator(
 def WebView(
     *,
     url: str = "",
-    style: StyleValue = None,
+    style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """Embed web content from a URL.
@@ -440,7 +448,7 @@ def Slider(
     min_value: float = 0.0,
     max_value: float = 1.0,
     on_change: Optional[Callable[[float], None]] = None,
-    style: StyleValue = None,
+    style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """Continuous-value slider between `min_value` and `max_value`.
@@ -475,7 +483,7 @@ def Slider(
 
 def View(
     *children: Element,
-    style: StyleValue = None,
+    style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
@@ -530,7 +538,7 @@ def View(
 
 def Column(
     *children: Element,
-    style: StyleValue = None,
+    style: StyleProp = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -571,7 +579,7 @@ def Column(
 
 def Row(
     *children: Element,
-    style: StyleValue = None,
+    style: StyleProp = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -614,7 +622,7 @@ def ScrollView(
     child: Optional[Element] = None,
     *,
     refresh_control: Optional[Dict[str, Any]] = None,
-    style: StyleValue = None,
+    style: StyleProp = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -647,7 +655,7 @@ def ScrollView(
 
 def SafeAreaView(
     *children: Element,
-    style: StyleValue = None,
+    style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """Container that respects safe-area insets (notch, status bar, home indicator).
@@ -670,9 +678,9 @@ def Modal(
     visible: bool = False,
     on_dismiss: Optional[Callable[[], None]] = None,
     title: Optional[str] = None,
-    animation_type: str = "slide",
+    animation_type: Literal["slide", "fade", "none"] = "slide",
     transparent: bool = False,
-    style: StyleValue = None,
+    style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """Overlay modal dialog backed by a real native presentation.
@@ -720,7 +728,7 @@ def Pressable(
     on_press: Optional[Callable[[], None]] = None,
     on_long_press: Optional[Callable[[], None]] = None,
     pressed_opacity: float = 0.6,
-    style: StyleValue = None,
+    style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessible: Optional[bool] = None,
@@ -811,7 +819,7 @@ def FlatList(
     separator_height: float = 0,
     refresh_control: Optional[Dict[str, Any]] = None,
     on_item_press: Optional[Callable[[int], None]] = None,
-    style: StyleValue = None,
+    style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """Virtualized scrollable list that renders items from `data` lazily.
@@ -941,7 +949,7 @@ def SectionList(
     item_height: Optional[float] = None,
     section_header_height: float = 32.0,
     separator_height: float = 0,
-    style: StyleValue = None,
+    style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """Virtualized list that supports section headers.
@@ -1040,8 +1048,8 @@ def SectionList(
 
 def StatusBar(
     *,
-    style: Optional[str] = None,
-    background_color: Optional[str] = None,
+    style: Optional[Literal["light", "dark", "default"]] = None,
+    background_color: Optional[Color] = None,
     hidden: Optional[bool] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -1075,8 +1083,8 @@ def StatusBar(
 
 def KeyboardAvoidingView(
     *children: Element,
-    behavior: str = "padding",
-    style: StyleValue = None,
+    behavior: Literal["padding", "position"] = "padding",
+    style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """Wrap content that should shift up when the keyboard is shown.
@@ -1106,7 +1114,7 @@ def RefreshControl(
     *,
     refreshing: bool = False,
     on_refresh: Optional[Callable[[], None]] = None,
-    tint_color: Optional[str] = None,
+    tint_color: Optional[Color] = None,
 ) -> Dict[str, Any]:
     """Pull-to-refresh spec for [`ScrollView`][pythonnative.ScrollView] / [`FlatList`][pythonnative.FlatList].
 
@@ -1162,7 +1170,7 @@ def Picker(
     items: Optional[List[Dict[str, Any]]] = None,
     on_change: Optional[Callable[[Any], None]] = None,
     placeholder: str = "Select…",
-    style: StyleValue = None,
+    style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """A select / dropdown widget.

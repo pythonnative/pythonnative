@@ -112,6 +112,7 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `platform_metrics` – platform-reported metrics like safe-area insets and bar heights (`platform_metrics.py`)
   - `reconciler` – virtual view tree diffing and reconciliation (`reconciler.py`)
   - `screen` – screen host, native lifecycle bridge, and render scheduling (`screen.py`)
+  - `sdk` – public extension SDK for custom native components (`sdk/`)
   - `style` – StyleSheet and theming (`style.py`)
   - `utils` – shared utilities (`utils.py`)
 

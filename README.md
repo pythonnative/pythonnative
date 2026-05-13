@@ -32,10 +32,11 @@ PythonNative is a cross-platform toolkit for building native Android and iOS app
 
 - **Declarative UI:** Describe *what* your UI should look like with element functions (`Text`, `Button`, `Column`, `Row`, etc.). PythonNative creates and updates native views automatically.
 - **Hooks and function components:** Manage state with `use_state`, side effects with `use_effect`, and navigation with `use_navigation`, all through one consistent pattern.
-- **`style` prop:** Pass all visual and layout properties through a single `style` dict, composable via `StyleSheet`.
+- **Typed `style` prop:** Pass all visual and layout properties through a single `style` dict, fully described by the `pn.Style` `TypedDict` and the ergonomic `pn.style(...)` helper for IDE autocomplete and static checking. Compose reusable styles with `StyleSheet`.
 - **Cross-platform flexbox engine:** A pure-Python, Yoga-style layout engine computes frames once and applies them to native views, so `flex`, `padding`, `aspect_ratio`, and `position: "absolute"` produce the same geometry on Android and iOS.
 - **Virtual view tree + reconciler:** Element trees are diffed and patched with minimal native mutations, similar to React's reconciliation.
 - **Direct native bindings:** Python calls platform APIs directly through Chaquopy and rubicon-objc, with no JavaScript bridge.
+- **Custom-component SDK:** Wrap any platform widget as a first-class element with type-checked props via `pythonnative.sdk` (`Props`, `@native_component`, `element_factory`). Plugins distributed on PyPI auto-register through the `pythonnative.handlers` entry-point group.
 - **CLI scaffolding:** `pn init` creates a ready-to-run project; `pn run android` and `pn run ios` build and launch your app.
 - **Native-backed navigation:** Declarative `Stack`, `Tab`, and `Drawer` navigators inspired by React Navigation. The root stack drives the platform's native navigation controller (`UINavigationController` on iOS, AndroidX Navigation Component on Android), so transitions, back gestures, and the hardware back button match what users expect.
 - **Fast Refresh hot reload:** `pn run --hot-reload` watches `app/` and patches edits into the running app on save, preserving component state across most changes.
@@ -59,12 +60,12 @@ import pythonnative as pn
 def App():
     count, set_count = pn.use_state(0)
     return pn.Column(
-        pn.Text(f"Count: {count}", style={"font_size": 24}),
+        pn.Text(f"Count: {count}", style=pn.style(font_size=24, bold=True)),
         pn.Button(
             "Tap me",
             on_click=lambda: set_count(count + 1),
         ),
-        style={"spacing": 12, "padding": 16},
+        style=pn.style(spacing=12, padding=16),
     )
 ```
 

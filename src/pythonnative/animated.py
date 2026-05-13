@@ -58,7 +58,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .element import Element
 from .hooks import use_effect, use_ref
-from .style import StyleValue, resolve_style
+from .style import StyleProp, resolve_style
 
 # Maximum frame rate at which the Python ticker drives animations.
 # We aim for 60 Hz but back off when no animation is active.
@@ -433,7 +433,7 @@ class _AnimationHandle:
 # ======================================================================
 
 
-def _resolve_style_with_values(style: StyleValue) -> Tuple[Dict[str, Any], Dict[str, AnimatedValue]]:
+def _resolve_style_with_values(style: StyleProp) -> Tuple[Dict[str, Any], Dict[str, AnimatedValue]]:
     """Return ``(plain_style, animated_bindings)``.
 
     AnimatedValue entries in the style are replaced with their

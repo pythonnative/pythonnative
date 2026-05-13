@@ -42,13 +42,14 @@ The reference is split per module so each page stays scannable:
 | System dialogs | [Alerts](alerts.md) | [`Alert`][pythonnative.Alert] |
 | Platform | [Platform](platform.md) | [`Platform`][pythonnative.Platform] |
 | Navigation | [Navigation](navigation.md) | [`NavigationContainer`][pythonnative.NavigationContainer], [`create_stack_navigator`][pythonnative.create_stack_navigator], [`create_tab_navigator`][pythonnative.create_tab_navigator], [`create_drawer_navigator`][pythonnative.create_drawer_navigator], [`use_navigation`][pythonnative.use_navigation] |
-| Styling | [Style](style.md) | [`StyleSheet`][pythonnative.StyleSheet], [`ThemeContext`][pythonnative.style.ThemeContext] |
+| Styling | [Style](style.md) | [`StyleSheet`][pythonnative.StyleSheet], [`Style`][pythonnative.style.Style], [`StyleProp`][pythonnative.style.StyleProp], [`style`][pythonnative.style.style], [`ThemeContext`][pythonnative.style.ThemeContext] |
 | Element descriptor | [Element](element.md) | [`Element`][pythonnative.Element] |
 | Screen host | [Screen](screen.md) | [`create_screen`][pythonnative.create_screen] |
 | Reconciler | [Reconciler](reconciler.md) | [`Reconciler`][pythonnative.reconciler.Reconciler] |
 | Native modules | [Native modules](native_modules.md) | `Camera`, `Location`, `FileSystem`, `Notifications` |
 | Native views | [Native views](native_views.md) | [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry], [`ViewHandler`][pythonnative.native_views.base.ViewHandler] |
 | Hot reload | [Hot reload](hot_reload.md) | [`FileWatcher`][pythonnative.hot_reload.FileWatcher], [`ModuleReloader`][pythonnative.hot_reload.ModuleReloader] |
+| Custom components SDK | [SDK](sdk.md) | [`Props`][pythonnative.sdk._components.Props], [`ViewHandler`][pythonnative.native_views.base.ViewHandler], [`native_component`][pythonnative.sdk._components.native_component], [`register_component`][pythonnative.sdk._components.register_component], [`element_factory`][pythonnative.sdk._components.element_factory] |
 | Utilities | [Utilities](utils.md) | `IS_ANDROID`, `IS_IOS`, [`get_android_context`][pythonnative.utils.get_android_context] |
 | CLI | [CLI (`pn`)](cli.md) | `pn init`, `pn run`, `pn clean` |
 

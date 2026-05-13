@@ -15,15 +15,19 @@ from app.theme import styles
 
 MEDALS = [":1st_place_medal:", ":2nd_place_medal:", ":3rd_place_medal:"]
 
+# ``pn.style(...)`` returns a fully-typed ``pn.Style`` TypedDict so each
+# entry below benefits from IDE autocomplete and mypy/pyright checking
+# against the supported style keys and ``Literal`` value sets (e.g.
+# ``align_items``).
 local_styles = pn.StyleSheet.create(
-    medal={"font_size": 32},
-    card={
-        "spacing": 12,
-        "padding": 16,
-        "background_color": "#F8F9FA",
-        "align_items": "center",
-    },
-    button_row={"spacing": 8, "align_items": "center"},
+    medal=pn.style(font_size=32),
+    card=pn.style(
+        spacing=12,
+        padding=16,
+        background_color="#F8F9FA",
+        align_items="center",
+    ),
+    button_row=pn.style(spacing=8, align_items="center"),
 )
 
 

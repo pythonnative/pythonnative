@@ -1,9 +1,12 @@
 # Styling
 
-Style properties are passed via the `style` prop as a dict (or list of
-dicts) to any element function. PythonNative also provides a
-[`StyleSheet`][pythonnative.StyleSheet] utility for creating reusable
-styles and a theming system via context.
+Style properties are passed via the `style` prop on every element
+factory. The value can be a plain dict, a [typed
+`Style`](#typed-styles-with-pnstyle) `TypedDict` built with
+[`pn.style(...)`][pythonnative.style.style], a list mixing those
+(later entries win on key collision), or `None`. PythonNative also
+provides a [`StyleSheet`][pythonnative.StyleSheet] utility for
+declaring named styles and a theming system via context.
 
 ## Inline styles
 
@@ -14,6 +17,73 @@ pn.Text("Hello", style={"color": "#FF3366", "font_size": 24, "bold": True})
 pn.Button("Tap", style={"background_color": "#FF1E88E5", "color": "#FFFFFF"})
 pn.Column(pn.Text("Content"), style={"background_color": "#FFF5F5F5"})
 ```
+
+## Typed styles with `pn.style()`
+
+[`pn.style(**props)`][pythonnative.style.style] is a tiny helper that
+returns a [`pn.Style`][pythonnative.style.Style] `TypedDict`. Values are
+plain Python `dict` instances at runtime, but the type is fully
+recognised by static checkers (mypy, pyright, Pylance) and editors
+will autocomplete known keys and `Literal` values:
+
+```python
+import pythonnative as pn
+
+heading: pn.Style = pn.style(
+    font_size=28,
+    font_weight="700",        # Literal: "100".."900" | "bold" | "normal" | …
+    text_align="center",      # Literal: "left" | "center" | "right" | "justify"
+    color="#0F172A",
+)
+
+pn.Text("Welcome", style=heading)
+```
+
+Why use `pn.style()` over a raw dict?
+
+- **IDE autocomplete** for every supported key (`flex_direction`,
+  `align_items`, `transform`, `shadow_offset`, …).
+- **Type-checked literals** — typos like `align_items="centre"` are
+  flagged before you ever run the app.
+- **Self-documenting code** — the `pn.Style` annotation tells readers
+  this dict is meant to flow into the `style` prop.
+
+Because `Style` is `total=False`, every key is optional; you only
+include the props you care about. Plain dicts continue to work
+everywhere (they're widened to the same `StyleProp` type) and
+existing code does not need to change.
+
+### `StyleProp` for component authors
+
+The argument type accepted by every built-in factory is
+[`pn.StyleProp`][pythonnative.style.StyleProp]:
+
+```python
+StyleProp = Style | dict[str, Any] | list[Style | dict | None] | None
+```
+
+Use it in your own components when you want to forward styles
+through:
+
+```python
+from typing import Optional
+import pythonnative as pn
+
+@pn.component
+def Card(
+    *children: pn.Element,
+    style: Optional[pn.StyleProp] = None,
+) -> pn.Element:
+    base: pn.Style = pn.style(
+        padding=16,
+        border_radius=12,
+        background_color="#FFFFFF",
+    )
+    return pn.View(*children, style=[base, style])
+```
+
+The list form lets callers layer overrides on top of `base` without
+losing any keys you didn't override.
 
 ## StyleSheet
 
@@ -63,6 +133,16 @@ Flatten a style or list of styles into a single dict:
 ```python
 pn.StyleSheet.flatten([base, highlight])
 pn.StyleSheet.flatten(None)  # returns {}
+```
+
+### `StyleSheet.absolute_fill`
+
+Convenience factory for the common "fill the parent" overlay style:
+
+```python
+overlay = pn.StyleSheet.absolute_fill()
+# {"position": "absolute", "top": 0, "right": 0, "bottom": 0, "left": 0}
+pn.View(pn.Text("Loading…"), style=[overlay, {"background_color": "#0008"}])
 ```
 
 ## Colors
@@ -373,5 +453,7 @@ pn.ScrollView(
   [Lists](../examples/lists.md).
 - Browse the API: [Style](../api/style.md),
   [Components](../api/components.md).
+- Forward typed styles through your own widgets:
+  [Custom native components](custom-native-components.md).
 - Learn about reconciliation and how style props are diffed:
   [Reconciliation](../concepts/reconciliation.md).

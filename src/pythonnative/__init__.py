@@ -23,8 +23,18 @@ Key building blocks:
   factories.
 - **Styling** uses a single ``style`` dict per element (or a list of
   dicts), composable via [`StyleSheet`][pythonnative.StyleSheet].
+  PythonNative ships a fully-typed [`Style`][pythonnative.style.Style]
+  TypedDict so editors and ``mypy`` validate every key as you type.
 - **Animations** use the ``Animated`` namespace, modeled on React
   Native's animation API.
+- **Custom native components** can be authored with the
+  ``pythonnative.sdk`` package: define a typed
+  [`Props`][pythonnative.sdk.Props] dataclass, implement a
+  [`ViewHandler`][pythonnative.native_views.base.ViewHandler] for each
+  platform, and register it via
+  [`@native_component`][pythonnative.sdk.native_component] (or expose
+  it from a PyPI package via the ``pythonnative.handlers`` entry-point
+  group).
 
 Example:
     ```python
@@ -34,15 +44,16 @@ Example:
     def App():
         count, set_count = pn.use_state(0)
         return pn.Column(
-            pn.Text(f"Count: {count}", style={"font_size": 24}),
+            pn.Text(f"Count: {count}", style=pn.style(font_size=24)),
             pn.Button("+", on_click=lambda: set_count(count + 1)),
-            style={"spacing": 12},
+            style=pn.style(spacing=12),
         )
     ```
 """
 
 __version__ = "0.14.0"
 
+from . import sdk
 from .alerts import Alert
 from .animated import Animated, AnimatedValue
 from .components import (
@@ -100,7 +111,39 @@ from .navigation import (
 )
 from .platform import Platform
 from .screen import create_screen
-from .style import StyleSheet, ThemeContext
+from .sdk import (
+    Props,
+    ViewHandler,
+    element_factory,
+    native_component,
+    register_component,
+)
+from .style import (
+    AlignItems,
+    AlignSelf,
+    AutoCapitalize,
+    Color,
+    Dimension,
+    EdgeInsets,
+    FlexDirection,
+    FontWeight,
+    JustifyContent,
+    KeyboardType,
+    Overflow,
+    Position,
+    ReturnKeyType,
+    ScaleType,
+    ShadowOffset,
+    Style,
+    StyleProp,
+    StyleSheet,
+    TextAlign,
+    TextDecoration,
+    ThemeContext,
+    TransformSpec,
+    resolve_style,
+    style,
+)
 
 __all__ = [
     # Components
@@ -154,9 +197,31 @@ __all__ = [
     "create_drawer_navigator",
     "create_stack_navigator",
     "create_tab_navigator",
-    # Styling
+    # Styling - typed primitives
+    "AlignItems",
+    "AlignSelf",
+    "AutoCapitalize",
+    "Color",
+    "Dimension",
+    "EdgeInsets",
+    "FlexDirection",
+    "FontWeight",
+    "JustifyContent",
+    "KeyboardType",
+    "Overflow",
+    "Position",
+    "ReturnKeyType",
+    "ScaleType",
+    "ShadowOffset",
+    "Style",
+    "StyleProp",
     "StyleSheet",
+    "TextAlign",
+    "TextDecoration",
     "ThemeContext",
+    "TransformSpec",
+    "resolve_style",
+    "style",
     # Animation
     "Animated",
     "AnimatedValue",
@@ -169,4 +234,11 @@ __all__ = [
     "Notifications",
     # Platform
     "Platform",
+    # Custom-component SDK
+    "Props",
+    "ViewHandler",
+    "element_factory",
+    "native_component",
+    "register_component",
+    "sdk",
 ]

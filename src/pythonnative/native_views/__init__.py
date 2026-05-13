@@ -237,12 +237,50 @@ class NativeViewRegistry:
 _registry: Optional[NativeViewRegistry] = None
 
 
+def _active_platform_name() -> str:
+    """Return ``"android"`` or ``"ios"`` for the active runtime."""
+    from ..utils import IS_ANDROID
+
+    return "android" if IS_ANDROID else "ios"
+
+
+def _register_builtin_handlers(registry: NativeViewRegistry) -> None:
+    """Register every built-in handler for the active platform."""
+    from ..utils import IS_ANDROID
+
+    if IS_ANDROID:
+        from .android import register_handlers
+    else:
+        from .ios import register_handlers
+    register_handlers(registry)
+
+
+def _install_sdk_handlers(registry: NativeViewRegistry) -> None:
+    """Copy decorator-registered SDK handlers + entry-point plugins.
+
+    Imported lazily so unit tests that never touch the SDK don't pay the
+    entry-point discovery cost.
+    """
+    try:
+        from ..sdk._components import install_into_registry as _sdk_install
+    except Exception:
+        return
+    try:
+        _sdk_install(registry, _active_platform_name())
+    except Exception:
+        # A misbehaving plugin must not break PythonNative's startup.
+        pass
+
+
 def get_registry() -> NativeViewRegistry:
     """Return the process-wide registry, lazily registering handlers.
 
-    The first call instantiates the registry and registers either the
-    Android or iOS handlers based on `IS_ANDROID`. Subsequent calls
-    return the same instance.
+    The first call instantiates the registry, registers either the
+    Android or iOS handlers based on `IS_ANDROID`, then layers on every
+    decorator-registered SDK handler (and any handlers exposed by
+    third-party packages via the
+    [`pythonnative.handlers`][pythonnative.sdk.ENTRY_POINT_GROUP] entry
+    point group). Subsequent calls return the same instance.
 
     Returns:
         The active `NativeViewRegistry`.
@@ -251,30 +289,40 @@ def get_registry() -> NativeViewRegistry:
     if _registry is not None:
         return _registry
     _registry = NativeViewRegistry()
-
-    from ..utils import IS_ANDROID
-
-    if IS_ANDROID:
-        from .android import register_handlers
-
-        register_handlers(_registry)
-    else:
-        from .ios import register_handlers
-
-        register_handlers(_registry)
+    _register_builtin_handlers(_registry)
+    _install_sdk_handlers(_registry)
     return _registry
 
 
-def set_registry(registry: NativeViewRegistry) -> None:
+def refresh_registry() -> NativeViewRegistry:
+    """Re-run SDK handler installation against the existing registry.
+
+    Call this after registering a new component at runtime if the
+    registry has already been instantiated. This is mostly useful in
+    REPL sessions and tests; the normal flow is "register, then call
+    [`get_registry`][pythonnative.native_views.get_registry]" and the
+    handlers come along automatically.
+
+    Returns:
+        The active `NativeViewRegistry`.
+    """
+    registry = get_registry()
+    _install_sdk_handlers(registry)
+    return registry
+
+
+def set_registry(registry: Optional[NativeViewRegistry]) -> None:
     """Install a custom registry (primarily for testing).
 
     Replaces the lazy singleton so subsequent
     [`get_registry`][pythonnative.native_views.get_registry] calls
     return `registry`. Pass a mock to drive the reconciler from
-    unit tests without touching real native APIs.
+    unit tests without touching real native APIs. Pass ``None`` to
+    reset the singleton; the next ``get_registry`` call will then
+    rebuild it from scratch.
 
     Args:
-        registry: The replacement registry.
+        registry: The replacement registry, or ``None`` to clear.
     """
     global _registry
     _registry = registry
