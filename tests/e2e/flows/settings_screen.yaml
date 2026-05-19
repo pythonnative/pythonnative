@@ -9,7 +9,7 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Settings"
     timeout: 10000
-- assertVisible: "PythonNative v"
+- assertVisible: "PythonNative v.*"
 - assertVisible: "Show alert"
 - tapOn: "Show alert"
 - extendedWaitUntil:
