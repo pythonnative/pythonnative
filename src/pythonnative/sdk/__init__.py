@@ -72,7 +72,7 @@ Example:
 """
 
 from ..element import Element
-from ..native_views.base import ViewHandler, parse_color_int, resolve_padding
+from ..native_views.base import ViewHandler, parse_color_int
 from ..style import (
     Color,
     Dimension,
@@ -118,7 +118,6 @@ __all__ = [
     "style",
     # SDK helpers (re-exported so users only import from one place)
     "parse_color_int",
-    "resolve_padding",
     # Native-component SDK
     "ENTRY_POINT_GROUP",
     "Props",

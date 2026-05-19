@@ -1315,14 +1315,14 @@ class StatusBarHandler(AndroidViewHandler):
                 return
             if "background_color" in props and props["background_color"] is not None:
                 window.setStatusBarColor(parse_color_int(props["background_color"]))
-            if "style" in props and props["style"] is not None:
+            if "bar_style" in props and props["bar_style"] is not None:
                 # API 23+: setSystemUiVisibility with SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
                 # for dark-content (light backgrounds), 0 for light-content.
                 View = jclass("android.view.View")
-                style = props["style"]
+                bar_style = props["bar_style"]
                 decor = window.getDecorView()
                 flags = decor.getSystemUiVisibility()
-                if style in ("dark", "default"):
+                if bar_style in ("dark", "default"):
                     flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
                 else:
                     flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
@@ -1578,6 +1578,97 @@ def _present_alert(
 
 
 # ======================================================================
+# Picker — native dropdown / select widget
+# ======================================================================
+#
+# Renders the PythonNative `Picker` element as an Android ``Spinner``,
+# which is the platform's standard dropdown widget. The selected item is
+# pushed to the user's callback via ``OnItemSelectedListener``.
+
+
+class PickerHandler(AndroidViewHandler):
+    """``Picker`` element handler — native ``Spinner`` dropdown."""
+
+    def create(self, props: Dict[str, Any]) -> Any:
+        Spinner = jclass("android.widget.Spinner")
+        sp = Spinner(_ctx())
+        self._state: Dict[int, Dict[str, Any]] = getattr(self, "_state", {})
+        self._state[id(sp)] = {"items": [], "on_change": None, "suppress": False}
+        self._apply(sp, props, initial=True)
+        return sp
+
+    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
+        self._apply(native_view, changed, initial=False)
+
+    def _apply(self, sp: Any, props: Dict[str, Any], initial: bool) -> None:
+        state = self._state.setdefault(id(sp), {"items": [], "on_change": None, "suppress": False})
+
+        if "items" in props or initial:
+            items = list(props.get("items") or state.get("items") or [])
+            labels = []
+            for item in items:
+                if isinstance(item, dict):
+                    labels.append(str(item.get("label", item.get("value", ""))))
+                else:
+                    labels.append(str(item))
+            ArrayAdapter = jclass("android.widget.ArrayAdapter")
+            R = jclass("android.R")
+            adapter = ArrayAdapter(_ctx(), R.layout.simple_spinner_item, labels)
+            adapter.setDropDownViewResource(R.layout.simple_spinner_dropdown_item)
+            state["suppress"] = True
+            sp.setAdapter(adapter)
+            state["suppress"] = False
+            state["items"] = items
+
+        if "value" in props or initial:
+            items = state["items"]
+            value = props.get("value") if "value" in props else None
+            target_index = -1
+            for i, item in enumerate(items):
+                v = item.get("value") if isinstance(item, dict) else item
+                if v == value:
+                    target_index = i
+                    break
+            if target_index >= 0 and sp.getSelectedItemPosition() != target_index:
+                state["suppress"] = True
+                sp.setSelection(target_index, False)
+                state["suppress"] = False
+
+        if "on_change" in props or initial:
+            state["on_change"] = props.get("on_change") if "on_change" in props else state.get("on_change")
+
+            class _PickerListener(dynamic_proxy(jclass("android.widget.AdapterView").OnItemSelectedListener)):
+                def __init__(self, owner_state: Dict[str, Any]) -> None:
+                    super().__init__()
+                    self._owner_state = owner_state
+
+                def onItemSelected(
+                    self,
+                    parent: Any,
+                    view: Any,  # noqa: ARG002
+                    position: int,
+                    id_: int,  # noqa: ARG002
+                ) -> None:
+                    if self._owner_state.get("suppress"):
+                        return
+                    items = self._owner_state.get("items") or []
+                    if 0 <= position < len(items):
+                        item = items[position]
+                        v = item.get("value") if isinstance(item, dict) else item
+                        cb = self._owner_state.get("on_change")
+                        if cb is not None:
+                            try:
+                                cb(v)
+                            except Exception:
+                                pass
+
+                def onNothingSelected(self, parent: Any) -> None:  # noqa: ARG002
+                    pass
+
+            sp.setOnItemSelectedListener(_PickerListener(state))
+
+
+# ======================================================================
 # Registration
 # ======================================================================
 
@@ -1606,6 +1697,7 @@ def register_handlers(registry: Any) -> None:
     registry.register("StatusBar", StatusBarHandler())
     registry.register("KeyboardAvoidingView", KeyboardAvoidingViewHandler())
     registry.register("VirtualList", VirtualListHandler())
+    registry.register("Picker", PickerHandler())
 
 
 __all__ = [
@@ -1629,5 +1721,6 @@ __all__ = [
     "StatusBarHandler",
     "KeyboardAvoidingViewHandler",
     "VirtualListHandler",
+    "PickerHandler",
     "register_handlers",
 ]

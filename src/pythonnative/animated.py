@@ -661,7 +661,45 @@ class _AnimatedNamespace:
 Animated = _AnimatedNamespace()
 
 
+def use_animated_value(initial: float = 0.0) -> AnimatedValue:
+    """Return an [`AnimatedValue`][pythonnative.AnimatedValue] with a stable identity across renders.
+
+    Convenience wrapper for the common pattern
+    ``pn.use_memo(lambda: AnimatedValue(initial), [])``. The same
+    instance is returned on every render of the same component, so
+    you can drive it from event handlers without recreating it.
+
+    Args:
+        initial: The starting numeric value.
+
+    Returns:
+        A mount-stable [`AnimatedValue`][pythonnative.AnimatedValue].
+
+    Example:
+        ```python
+        import pythonnative as pn
+
+        @pn.component
+        def FadeIn():
+            opacity = pn.use_animated_value(0.0)
+
+            def fade_in():
+                pn.Animated.timing(opacity, to=1.0, duration=300).start()
+
+            pn.use_effect(lambda: fade_in(), [])
+            return pn.Animated.View(
+                pn.Text("Hello"),
+                style=pn.style(opacity=opacity),
+            )
+        ```
+    """
+    from .hooks import use_memo
+
+    return use_memo(lambda: AnimatedValue(initial), [])
+
+
 __all__ = [
     "AnimatedValue",
     "Animated",
+    "use_animated_value",
 ]

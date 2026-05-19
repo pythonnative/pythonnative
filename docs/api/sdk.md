@@ -23,7 +23,7 @@ convenience and are documented on their canonical pages:
 | [`Element`][pythonnative.element.Element] | [Element](element.md) |
 | [`ViewHandler`][pythonnative.native_views.base.ViewHandler] | [Native views](native_views.md) |
 | [`Style`][pythonnative.style.Style], [`StyleProp`][pythonnative.style.StyleProp], [`Color`][pythonnative.style.Color], [`Dimension`][pythonnative.style.Dimension], [`EdgeInsets`][pythonnative.style.EdgeInsets], [`EdgeValue`][pythonnative.style.EdgeValue], `FlexDirection`, `JustifyContent`, `Overflow`, `Position`, [`TransformSpec`][pythonnative.style.TransformSpec], [`style`][pythonnative.style.style] | [Style](style.md) |
-| `parse_color_int`, `resolve_padding` | `pythonnative.native_views.base` |
+| `parse_color_int` | `pythonnative.native_views.base` |
 
 ## Custom-component primitives
 

@@ -6,6 +6,7 @@ from pythonnative.components import (
     Column,
     ErrorBoundary,
     FlatList,
+    Fragment,
     Image,
     Modal,
     Pressable,
@@ -401,3 +402,36 @@ def test_error_boundary_no_child() -> None:
 def test_error_boundary_with_key() -> None:
     el = ErrorBoundary(Text("x"), fallback=Text("err"), key="eb1")
     assert el.key == "eb1"
+
+
+# ======================================================================
+# Fragment
+# ======================================================================
+
+
+def test_fragment_no_children() -> None:
+    el = Fragment()
+    assert el.type == "__Fragment__"
+    assert el.children == []
+    assert el.props == {}
+
+
+def test_fragment_with_children() -> None:
+    a = Text("a")
+    b = Text("b")
+    el = Fragment(a, b)
+    assert el.type == "__Fragment__"
+    assert el.children == [a, b]
+
+
+def test_fragment_with_key() -> None:
+    el = Fragment(Text("a"), key="frag1")
+    assert el.key == "frag1"
+    assert "key" not in el.props
+
+
+def test_fragment_drops_none_children() -> None:
+    a = Text("a")
+    c = Text("c")
+    el = Fragment(a, None, c, None)
+    assert el.children == [a, c]

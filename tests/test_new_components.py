@@ -25,8 +25,8 @@ def test_status_bar_default() -> None:
 
 
 def test_status_bar_style_and_hidden() -> None:
-    el = StatusBar(style="dark", background_color="#FFFFFF", hidden=False)
-    assert el.props["style"] == "dark"
+    el = StatusBar(bar_style="dark", background_color="#FFFFFF", hidden=False)
+    assert el.props["bar_style"] == "dark"
     assert el.props["background_color"] == "#FFFFFF"
     assert el.props["hidden"] is False
 
@@ -72,29 +72,34 @@ def test_refresh_control_minimal() -> None:
 # ======================================================================
 
 
-def test_picker_renders_pressable_with_label() -> None:
+def test_picker_creates_native_picker_element() -> None:
+    cb = lambda _: None  # noqa: E731
     el = Picker(
         value="b",
         items=[
             {"value": "a", "label": "Apple"},
             {"value": "b", "label": "Banana"},
         ],
-        on_change=lambda _: None,
+        on_change=cb,
     )
-    assert el.type == "Pressable"
-    assert el.props.get("on_press") is not None
-    # The child should be a Text with the selected label.
-    assert el.children[0].type == "Text"
-    assert el.children[0].props["text"] == "Banana"
+    assert el.type == "Picker"
+    assert el.props["value"] == "b"
+    assert el.props["on_change"] is cb
+    assert el.props["items"] == [
+        {"value": "a", "label": "Apple"},
+        {"value": "b", "label": "Banana"},
+    ]
 
 
-def test_picker_placeholder_when_no_match() -> None:
-    el = Picker(
-        value="zzz",
-        items=[{"value": "a", "label": "Apple"}],
-        placeholder="Pick one",
-    )
-    assert el.children[0].props["text"] == "Pick one"
+def test_picker_default_placeholder_in_props() -> None:
+    el = Picker(items=[{"value": "a", "label": "Apple"}])
+    assert el.props["placeholder"] == "Select…"
+    assert el.props["items"] == [{"value": "a", "label": "Apple"}]
+
+
+def test_picker_empty_when_no_items() -> None:
+    el = Picker()
+    assert el.props["items"] == []
 
 
 # ======================================================================

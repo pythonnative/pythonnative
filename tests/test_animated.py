@@ -6,7 +6,10 @@ import threading
 import time
 from typing import Any
 
-from pythonnative.animated import Animated, AnimatedValue
+from pythonnative.animated import Animated, AnimatedValue, use_animated_value
+from pythonnative.element import Element
+from pythonnative.hooks import component
+from pythonnative.reconciler import Reconciler
 
 # ======================================================================
 # AnimatedValue
@@ -166,3 +169,77 @@ def test_stop_freezes_value() -> None:
     # After stop, value should not advance further toward 10.
     assert abs(v.value - snapshot) < 0.1
     assert v.value < 9.0
+
+
+# ======================================================================
+# use_animated_value
+# ======================================================================
+
+
+class _Stub:
+    def __init__(self, type_name: str, props: dict) -> None:
+        self.type_name = type_name
+        self.props = props
+        self.children: list = []
+
+
+class _StubBackend:
+    def create_view(self, type_name: str, props: dict) -> _Stub:
+        return _Stub(type_name, props)
+
+    def update_view(self, view: _Stub, type_name: str, changed: dict) -> None:
+        view.props.update(changed)
+
+    def add_child(self, parent: _Stub, child: _Stub, parent_type: str) -> None:
+        parent.children.append(child)
+
+    def remove_child(self, parent: _Stub, child: _Stub, parent_type: str) -> None:
+        parent.children = [c for c in parent.children if c is not child]
+
+    def insert_child(self, parent: _Stub, child: _Stub, parent_type: str, index: int) -> None:
+        parent.children.insert(index, child)
+
+
+def test_use_animated_value_returns_animated_value() -> None:
+    captured: list = []
+
+    @component
+    def view() -> Element:
+        v = use_animated_value(0.5)
+        captured.append(v)
+        return Element("View", {"opacity": v}, [])
+
+    rec = Reconciler(_StubBackend())
+    rec.mount(view())
+    assert isinstance(captured[0], AnimatedValue)
+    assert captured[0].value == 0.5
+
+
+def test_use_animated_value_stable_across_renders() -> None:
+    captured: list = []
+
+    @component
+    def view() -> Element:
+        v = use_animated_value(0.0)
+        captured.append(v)
+        return Element("View", {"opacity": v}, [])
+
+    rec = Reconciler(_StubBackend())
+    rec.mount(view())
+    rec.reconcile(view())
+    rec.reconcile(view())
+    assert captured[0] is captured[1] is captured[2]
+
+
+def test_use_animated_value_default_initial_zero() -> None:
+    captured: list = []
+
+    @component
+    def view() -> Element:
+        v = use_animated_value()
+        captured.append(v)
+        return Element("View", {"opacity": v}, [])
+
+    rec = Reconciler(_StubBackend())
+    rec.mount(view())
+    assert captured[0].value == 0.0

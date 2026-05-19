@@ -60,7 +60,6 @@ class HookState:
         effects: One `(deps, cleanup)` tuple per `use_effect` call.
         memos: One `(deps, value)` tuple per `use_memo` / `use_callback`.
         refs: One mutable dict per `use_ref` call.
-        hook_index: Cursor reset to 0 at the start of every render.
     """
 
     __slots__ = (
@@ -68,13 +67,13 @@ class HookState:
         "effects",
         "memos",
         "refs",
-        "hook_index",
         "state_index",
         "effect_index",
         "memo_index",
         "ref_index",
         "_trigger_render",
         "_pending_effects",
+        "_dirty",
     )
 
     def __init__(self) -> None:
@@ -82,18 +81,18 @@ class HookState:
         self.effects: List[Tuple[Any, Any]] = []
         self.memos: List[Tuple[Any, Any]] = []
         self.refs: List[dict] = []
-        # ``hook_index`` is retained for backwards compatibility with
-        # any external code that still reads it; the per-hook cursors
-        # below are what each hook function actually uses so that
-        # ``use_state`` and ``use_effect`` can coexist in the same
-        # component without colliding on a shared counter.
-        self.hook_index: int = 0
         self.state_index: int = 0
         self.effect_index: int = 0
         self.memo_index: int = 0
         self.ref_index: int = 0
         self._trigger_render: Optional[Callable[[], None]] = None
         self._pending_effects: List[Tuple[int, Callable, Any]] = []
+        # Cleared by the reconciler after each successful render.
+        # ``use_state`` / ``use_reducer`` setters flip it to ``True``
+        # whenever they actually mutate state, so [`memo`][pythonnative.memo]
+        # knows that a memoized component still needs to re-render even
+        # when its props didn't change.
+        self._dirty: bool = False
 
     def reset_index(self) -> None:
         """Reset every per-hook cursor to ``0``.
@@ -102,7 +101,6 @@ class HookState:
         the next render reads slots in the same order they were
         written.
         """
-        self.hook_index = 0
         self.state_index = 0
         self.effect_index = 0
         self.memo_index = 0
@@ -260,7 +258,6 @@ def use_state(initial: Any = None) -> Tuple[Any, Callable]:
 
     idx = ctx.state_index
     ctx.state_index += 1
-    ctx.hook_index += 1
 
     if idx >= len(ctx.states):
         val = initial() if callable(initial) else initial
@@ -273,6 +270,7 @@ def use_state(initial: Any = None) -> Tuple[Any, Callable]:
             new_value = new_value(ctx.states[idx])
         if ctx.states[idx] is not new_value and ctx.states[idx] != new_value:
             ctx.states[idx] = new_value
+            ctx._dirty = True
             if ctx._trigger_render:
                 _schedule_trigger(ctx._trigger_render)
 
@@ -328,7 +326,6 @@ def use_reducer(reducer: Callable[[Any, Any], Any], initial_state: Any) -> Tuple
 
     idx = ctx.state_index
     ctx.state_index += 1
-    ctx.hook_index += 1
 
     if idx >= len(ctx.states):
         val = initial_state() if callable(initial_state) else initial_state
@@ -340,6 +337,7 @@ def use_reducer(reducer: Callable[[Any, Any], Any], initial_state: Any) -> Tuple
         new_state = reducer(ctx.states[idx], action)
         if ctx.states[idx] is not new_state and ctx.states[idx] != new_state:
             ctx.states[idx] = new_state
+            ctx._dirty = True
             if ctx._trigger_render:
                 _schedule_trigger(ctx._trigger_render)
 
@@ -395,7 +393,6 @@ def use_effect(effect: Callable, deps: Optional[list] = None) -> None:
 
     idx = ctx.effect_index
     ctx.effect_index += 1
-    ctx.hook_index += 1
 
     if idx >= len(ctx.effects):
         ctx.effects.append((_SENTINEL, None))
@@ -431,7 +428,6 @@ def use_memo(factory: Callable[[], T], deps: list) -> T:
 
     idx = ctx.memo_index
     ctx.memo_index += 1
-    ctx.hook_index += 1
 
     if idx >= len(ctx.memos):
         value = factory()
@@ -492,7 +488,6 @@ def use_ref(initial: Any = None) -> dict:
 
     idx = ctx.ref_index
     ctx.ref_index += 1
-    ctx.hook_index += 1
 
     if idx >= len(ctx.refs):
         ref: dict = {"current": initial}
@@ -680,14 +675,19 @@ def use_context(context: Context) -> Any:
 # ======================================================================
 
 
-def Provider(context: Context, value: Any, child: Element) -> Element:
-    """Provide `value` for `context` to all descendants of `child`.
+def Provider(context: "Context", value: Any, *children: Element) -> Element:
+    """Provide ``value`` for ``context`` to all descendants of ``children``.
+
+    Accepts any number of children (varargs). Multiple children are
+    grouped under an internal [`Fragment`][pythonnative.Fragment] so
+    they all share the same provided value without an extra wrapping
+    native view.
 
     Args:
-        context: The `Context` to set.
+        context: The [`Context`][pythonnative.hooks.Context] to set.
         value: Value made available to descendants via
             [`use_context`][pythonnative.use_context].
-        child: Subtree under which the provider applies.
+        *children: Subtree(s) under which the provider applies.
 
     Returns:
         An [`Element`][pythonnative.Element] that the reconciler treats
@@ -701,10 +701,64 @@ def Provider(context: Context, value: Any, child: Element) -> Element:
 
         @pn.component
         def App():
-            return pn.Provider(ThemeContext, {"primary": "#FF0000"}, MyView())
+            return pn.Provider(
+                ThemeContext,
+                {"primary": "#FF0000"},
+                Header(),
+                Body(),
+            )
         ```
     """
-    return Element("__Provider__", {"__context__": context, "__value__": value}, [child])
+    if not children:
+        kids: List[Element] = []
+    elif len(children) == 1:
+        kids = [children[0]]
+    else:
+        kids = [Element("__Fragment__", {}, list(children))]
+    return Element("__Provider__", {"__context__": context, "__value__": value}, kids)
+
+
+def memo(component_fn: Callable[..., Element]) -> Callable[..., Element]:
+    """Skip a function component's render when its props haven't changed.
+
+    Decorate a ``@component``-wrapped function to opt into shallow-prop
+    memoization. When the reconciler re-renders the parent tree, a
+    memoized child is skipped (its previously-rendered subtree is
+    reused) iff:
+
+    - Its props are shallowly equal to the previous render's props
+      (callables compared by identity, scalars by ``==``).
+    - None of its internal ``use_state`` / ``use_reducer`` setters fired
+      since the last render.
+
+    Pair with [`use_callback`][pythonnative.use_callback] when passing
+    callbacks as props, otherwise a fresh closure will defeat the memo.
+
+    Args:
+        component_fn: A function previously decorated with
+            [`component`][pythonnative.component].
+
+    Returns:
+        The same function, marked for memoization.
+
+    Example:
+        ```python
+        import pythonnative as pn
+
+        @pn.memo
+        @pn.component
+        def ExpensiveRow(label: str):
+            ...
+        ```
+    """
+    component_fn._pn_memo = True
+    # ``@component`` builds a wrapper that emits an ``Element`` whose
+    # ``type`` is the underlying function, so propagate the marker to
+    # ``__wrapped__`` so the reconciler can find it via ``Element.type``.
+    wrapped = getattr(component_fn, "__wrapped__", None)
+    if wrapped is not None:
+        wrapped._pn_memo = True
+    return component_fn
 
 
 # ======================================================================

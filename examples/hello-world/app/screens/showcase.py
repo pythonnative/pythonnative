@@ -32,9 +32,9 @@ local_styles = pn.StyleSheet.create(
 
 @pn.component
 def AnimatedCard() -> pn.Element:
-    """Demonstrates ``Animated.View`` driven by ``AnimatedValue`` + ``use_memo``."""
-    opacity = pn.use_memo(lambda: pn.Animated.Value(0.0), [])
-    scale = pn.use_memo(lambda: pn.Animated.Value(0.9), [])
+    """Demonstrates ``Animated.View`` driven by ``use_animated_value``."""
+    opacity = pn.use_animated_value(0.0)
+    scale = pn.use_animated_value(0.9)
 
     def _enter() -> None:
         pn.Animated.parallel(
@@ -63,8 +63,11 @@ def AnimatedCard() -> pn.Element:
     )
 
 
+@pn.memo
 @pn.component
 def TypographyDemo() -> pn.Element:
+    """Wrapped in [`pn.memo`][pythonnative.memo] so it skips re-render when parent state changes."""
+    print("[TypographyDemo] render (should only appear once)")
     return pn.Column(
         pn.Text("Headline", style={"font_size": 28, "font_weight": "700"}),
         pn.Text(
@@ -84,6 +87,7 @@ def TypographyDemo() -> pn.Element:
     )
 
 
+@pn.memo
 @pn.component
 def BordersAndShadows() -> pn.Element:
     return pn.View(
@@ -96,6 +100,7 @@ def BordersAndShadows() -> pn.Element:
     )
 
 
+@pn.memo
 @pn.component
 def Chips() -> pn.Element:
     return pn.Row(
@@ -109,6 +114,20 @@ def Chips() -> pn.Element:
             style={**local_styles["chip"], "background_color": "#EF4444"},
         ),
         style={"spacing": 8},
+    )
+
+
+def section_heading(title: str, hint: str) -> pn.Element:
+    """Compose two sibling [`pn.Text`][pythonnative.Text] nodes via [`pn.Fragment`][pythonnative.Fragment].
+
+    Returning a Fragment from a plain helper (not a ``@pn.component``)
+    lets the surrounding parent (here a [`pn.Column`][pythonnative.Column])
+    flatten the siblings into its own child list without an extra
+    wrapper view.
+    """
+    return pn.Fragment(
+        pn.Text(title, style=styles["section_title"]),
+        pn.Text(hint, style=styles["hint"]),
     )
 
 
@@ -133,10 +152,10 @@ def ShowcaseScreen() -> pn.Element:
         pn.Column(
             pn.Text(message, style=styles["title"]),
             AnimatedCard(),
-            pn.Text("Typography", style=styles["section_title"]),
+            section_heading("Typography", "Memoized via @pn.memo; renders only once."),
             TypographyDemo(),
             BordersAndShadows(),
-            pn.Text("Chips", style=styles["section_title"]),
+            section_heading("Chips", "Composed via pn.Fragment without an extra container."),
             Chips(),
             pn.Pressable(
                 pn.View(

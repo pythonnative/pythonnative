@@ -1,8 +1,9 @@
 """Shared base classes and utilities for native-view handlers.
 
 Provides the [`ViewHandler`][pythonnative.native_views.base.ViewHandler]
-protocol implemented by Android and iOS handlers, plus common helpers
-for color parsing and padding normalization shared across platforms.
+protocol implemented by Android and iOS handlers, plus the
+[`parse_color_int`][pythonnative.native_views.base.parse_color_int]
+helper shared across platforms.
 
 Layout itself is *not* a handler responsibility. The pure-Python flex
 engine in ``pythonnative.layout`` owns sizing and positioning;
@@ -148,96 +149,6 @@ def parse_color_int(color: Union[str, int]) -> int:
     if val > 0x7FFFFFFF:
         val -= 0x100000000
     return val
-
-
-# ======================================================================
-# Padding helper (kept for backwards-compat; now mostly used by
-# handlers that apply padding to native widgets, e.g., text inset).
-# ======================================================================
-
-
-def resolve_padding(padding: Any) -> Tuple[int, int, int, int]:
-    """Normalize a padding value to ``(left, top, right, bottom)``.
-
-    Accepts:
-
-    - `None`: returns `(0, 0, 0, 0)`.
-    - A scalar int/float: same value on all sides.
-    - A dict with any of `horizontal`, `vertical`, `left`, `right`,
-      `top`, `bottom`, `all` keys.
-
-    Args:
-        padding: One of the forms above.
-
-    Returns:
-        A 4-tuple of `(left, top, right, bottom)` ints.
-    """
-    if padding is None:
-        return (0, 0, 0, 0)
-    if isinstance(padding, (int, float)):
-        v = int(padding)
-        return (v, v, v, v)
-    if isinstance(padding, dict):
-        h = int(padding.get("horizontal", 0))
-        v = int(padding.get("vertical", 0))
-        left = int(padding.get("left", h))
-        right = int(padding.get("right", h))
-        top = int(padding.get("top", v))
-        bottom = int(padding.get("bottom", v))
-        a = int(padding.get("all", 0))
-        if a:
-            left = left or a
-            right = right or a
-            top = top or a
-            bottom = bottom or a
-        return (left, top, right, bottom)
-    return (0, 0, 0, 0)
-
-
-# ======================================================================
-# Backwards-compat constants (re-exports of layout engine constants).
-# Kept here so legacy imports of pythonnative.native_views.base still
-# resolve without modification.
-# ======================================================================
-
-FLEX_DIRECTION_COLUMN = "column"
-FLEX_DIRECTION_ROW = "row"
-FLEX_DIRECTION_COLUMN_REVERSE = "column_reverse"
-FLEX_DIRECTION_ROW_REVERSE = "row_reverse"
-
-JUSTIFY_FLEX_START = "flex_start"
-JUSTIFY_CENTER = "center"
-JUSTIFY_FLEX_END = "flex_end"
-JUSTIFY_SPACE_BETWEEN = "space_between"
-JUSTIFY_SPACE_AROUND = "space_around"
-JUSTIFY_SPACE_EVENLY = "space_evenly"
-
-ALIGN_STRETCH = "stretch"
-ALIGN_FLEX_START = "flex_start"
-ALIGN_CENTER = "center"
-ALIGN_FLEX_END = "flex_end"
-
-POSITION_RELATIVE = "relative"
-POSITION_ABSOLUTE = "absolute"
-
-OVERFLOW_VISIBLE = "visible"
-OVERFLOW_HIDDEN = "hidden"
-OVERFLOW_SCROLL = "scroll"
-
-
-def is_vertical(direction: str) -> bool:
-    """Return whether `direction` represents a vertical (column) axis."""
-    return direction in (FLEX_DIRECTION_COLUMN, FLEX_DIRECTION_COLUMN_REVERSE)
-
-
-# Visual prop keys handled by container handlers (subset of all props
-# they care about; layout-related keys are owned by the layout engine).
-CONTAINER_VISUAL_KEYS = frozenset(
-    {
-        "background_color",
-        "overflow",
-    }
-)
 
 
 # ======================================================================

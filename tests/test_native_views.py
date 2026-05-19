@@ -14,9 +14,7 @@ from pythonnative.layout import LAYOUT_STYLE_KEYS
 from pythonnative.native_views import NativeViewRegistry, set_registry
 from pythonnative.native_views.base import (
     ViewHandler,
-    is_vertical,
     parse_color_int,
-    resolve_padding,
 )
 
 # ======================================================================
@@ -51,63 +49,6 @@ def test_parse_color_signed_conversion() -> None:
 
 def test_parse_color_with_whitespace() -> None:
     assert parse_color_int("  #FF0000  ") == parse_color_int("#FF0000")
-
-
-# ======================================================================
-# resolve_padding (legacy helper retained for handlers that still need it)
-# ======================================================================
-
-
-def test_resolve_padding_none() -> None:
-    assert resolve_padding(None) == (0, 0, 0, 0)
-
-
-def test_resolve_padding_int() -> None:
-    assert resolve_padding(16) == (16, 16, 16, 16)
-
-
-def test_resolve_padding_float() -> None:
-    assert resolve_padding(8.5) == (8, 8, 8, 8)
-
-
-def test_resolve_padding_dict_horizontal_vertical() -> None:
-    result = resolve_padding({"horizontal": 10, "vertical": 20})
-    assert result == (10, 20, 10, 20)
-
-
-def test_resolve_padding_dict_individual() -> None:
-    result = resolve_padding({"left": 1, "top": 2, "right": 3, "bottom": 4})
-    assert result == (1, 2, 3, 4)
-
-
-def test_resolve_padding_dict_all() -> None:
-    result = resolve_padding({"all": 12})
-    assert result == (12, 12, 12, 12)
-
-
-def test_resolve_padding_unsupported_type() -> None:
-    assert resolve_padding("invalid") == (0, 0, 0, 0)
-
-
-# ======================================================================
-# is_vertical
-# ======================================================================
-
-
-def test_is_vertical_column() -> None:
-    assert is_vertical("column") is True
-
-
-def test_is_vertical_column_reverse() -> None:
-    assert is_vertical("column_reverse") is True
-
-
-def test_is_vertical_row() -> None:
-    assert is_vertical("row") is False
-
-
-def test_is_vertical_row_reverse() -> None:
-    assert is_vertical("row_reverse") is False
 
 
 # ======================================================================

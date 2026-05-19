@@ -8,8 +8,9 @@ frame.
 
 ## Mental model
 
-1. Create an [`AnimatedValue`][pythonnative.AnimatedValue] using
-   [`use_memo`][pythonnative.use_memo] (so it survives re-renders).
+1. Create an [`AnimatedValue`][pythonnative.AnimatedValue] with
+   [`use_animated_value`][pythonnative.use_animated_value] (so it
+   survives re-renders).
 2. Bind the value into the `style` of an `Animated.View`,
    `Animated.Text`, or `Animated.Image`.
 3. Drive the value with `Animated.timing`, `Animated.spring`, or
@@ -31,7 +32,7 @@ import pythonnative as pn
 
 @pn.component
 def FadeInBox():
-    opacity = pn.use_memo(lambda: pn.Animated.Value(0.0), [])
+    opacity = pn.use_animated_value(0.0)
 
     def _fade_in():
         pn.Animated.timing(opacity, to=1.0, duration=400).start()
@@ -57,7 +58,7 @@ def FadeInBox():
 ```python
 @pn.component
 def Bouncy():
-    scale = pn.use_memo(lambda: pn.Animated.Value(1.0), [])
+    scale = pn.use_animated_value(1.0)
 
     def _press():
         pn.Animated.spring(scale, to=1.2, stiffness=200, damping=8).start()
@@ -79,8 +80,8 @@ animation property.
 ## Sequencing and parallel composition
 
 ```python
-opacity = pn.Animated.Value(0.0)
-translate_y = pn.Animated.Value(20.0)
+opacity = pn.use_animated_value(0.0)
+translate_y = pn.use_animated_value(20.0)
 
 pn.Animated.parallel([
     pn.Animated.timing(opacity, to=1.0, duration=300),

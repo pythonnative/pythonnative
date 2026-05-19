@@ -1,43 +1,34 @@
-"""Built-in element factories for declarative UI composition.
+"""Built-in element factories and the typed prop schemas they share.
 
-Each function in this module returns an [`Element`][pythonnative.Element]
-describing a native UI widget. Element factories are pure data: no
-native views are created until the reconciler mounts the element tree.
+Each ``@dataclass(frozen=True)`` class in this module — ``TextProps``,
+``ButtonProps``, etc. — is the canonical schema for one built-in
+component. Each factory function (``Text``, ``Button``, …) is a thin
+ergonomic wrapper that builds an [`Element`][pythonnative.Element]
+through the shared :func:`_make_element` helper, so style resolution,
+``ref`` attachment, ``None``-default dropping, and forced overrides
+(e.g. ``Column``'s fixed ``flex_direction``) live in exactly one place.
 
-All visual and layout properties are passed via the `style` parameter,
-which accepts a dict or a list of dicts (later entries override
-earlier ones; see [`resolve_style`][pythonnative.style.resolve_style]).
-
-Layout properties supported by every component:
-
-- `width`, `height`, `flex`, `flex_grow`, `flex_shrink`, `margin`,
-  `min_width`, `max_width`, `min_height`, `max_height`, `align_self`.
-
-Flex container properties (`View` / `Column` / `Row`):
-
-- `flex_direction`, `justify_content`, `align_items`, `overflow`,
-  `spacing`, `padding`.
-
-[`View`][pythonnative.View] is the universal flex container (like React
-Native's `View`). It defaults to `flex_direction: "column"`.
-[`Column`][pythonnative.Column] and [`Row`][pythonnative.Row] are
-convenience wrappers that fix the direction.
+The same Props dataclasses are used by the `pythonnative.sdk` surface
+for third-party components, so the built-in API and the extension API
+speak the same shape.
 
 Example:
     ```python
     import pythonnative as pn
 
     pn.Column(
-        pn.Text("Hello", style={"font_size": 18}),
+        pn.Text("Hello", style=pn.style(font_size=18)),
         pn.Button("Tap", on_click=lambda: print("tapped")),
-        style={"spacing": 12, "padding": 16},
+        style=pn.style(spacing=12, padding=16),
     )
     ```
 """
 
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Literal, Optional
 
 from .element import Element
+from .sdk import Props
 from .style import (
     AutoCapitalize,
     Color,
@@ -49,33 +40,265 @@ from .style import (
 )
 
 # ======================================================================
-# Leaf components
+# Canonical element builder
 # ======================================================================
 
 
-def _accessibility_props(
-    accessibility_label: Optional[str],
-    accessibility_hint: Optional[str],
-    accessibility_role: Optional[str],
-    accessible: Optional[bool],
-) -> Dict[str, Any]:
-    """Collect the four accessibility prop keys into a dict.
+def _make_element(
+    name: str,
+    *children: Element,
+    style: StyleProp = None,
+    ref: Optional[Dict[str, Any]] = None,
+    key: Optional[str] = None,
+    _defaults: Optional[Dict[str, Any]] = None,
+    _forced: Optional[Dict[str, Any]] = None,
+    **props: Any,
+) -> Element:
+    """Build an [`Element`][pythonnative.Element] of type ``name``.
 
-    Internal helper kept here so every component factory can expose
-    the same four kwargs without repeating the ``if x is not None``
-    plumbing. Returns an empty dict when no accessibility values are
-    supplied so we don't bloat element props.
+    This is the single helper every built-in factory routes through, so
+    the cross-cutting concerns that used to be duplicated per component
+    live in one place:
+
+    1. ``style`` is flattened via
+       [`resolve_style`][pythonnative.style.resolve_style] (list-of-dicts
+       and ``None`` both handled).
+    2. ``_defaults`` are filled in for keys not already present (used for
+       things like ``View``'s default ``flex_direction: "column"`` that
+       a user style may legitimately override).
+    3. ``**props`` are merged on top, with ``None`` values *dropped* so
+       optional kwargs don't pollute the prop dict.
+    4. ``ref`` is attached under the reserved ``"ref"`` key.
+    5. ``_forced`` overrides everything (used by ``Column`` / ``Row`` to
+       lock their flex direction regardless of user style).
+
+    Args:
+        name: Element type name (e.g. ``"Text"``).
+        *children: Child elements.
+        style: Style dict, list of dicts, or ``None``.
+        ref: Optional ``use_ref()`` dict; the reconciler populates
+            ``ref["current"]`` with the underlying native view.
+        key: Stable identity for keyed reconciliation.
+        _defaults: Internal: fill-only-if-missing prop defaults.
+        _forced: Internal: prop overrides applied last.
+        **props: Per-component props. ``None`` values are dropped.
+
+    Returns:
+        A fresh [`Element`][pythonnative.Element].
     """
-    out: Dict[str, Any] = {}
-    if accessibility_label is not None:
-        out["accessibility_label"] = accessibility_label
-    if accessibility_hint is not None:
-        out["accessibility_hint"] = accessibility_hint
-    if accessibility_role is not None:
-        out["accessibility_role"] = accessibility_role
-    if accessible is not None:
-        out["accessible"] = accessible
-    return out
+    out: Dict[str, Any] = dict(resolve_style(style))
+    if _defaults:
+        for k, v in _defaults.items():
+            out.setdefault(k, v)
+    for k, v in props.items():
+        if v is not None:
+            out[k] = v
+    if ref is not None:
+        out["ref"] = ref
+    if _forced:
+        out.update(_forced)
+    return Element(name, out, list(children), key=key)
+
+
+# ======================================================================
+# Props dataclasses
+# ======================================================================
+#
+# These are the canonical schemas for every built-in component. They
+# subclass the SDK's ``Props`` base, so the same shape works for both
+# the built-in factory functions and the third-party
+# [`element_factory`][pythonnative.element_factory] API.
+
+
+@dataclass(frozen=True)
+class TextProps(Props):
+    """Props for [`Text`][pythonnative.Text]."""
+
+    text: str = ""
+    accessibility_label: Optional[str] = None
+    accessibility_hint: Optional[str] = None
+    accessibility_role: Optional[str] = None
+    accessible: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class ButtonProps(Props):
+    """Props for [`Button`][pythonnative.Button]."""
+
+    title: str = ""
+    on_click: Optional[Callable[[], None]] = None
+    enabled: bool = True
+    accessibility_label: Optional[str] = None
+    accessibility_hint: Optional[str] = None
+    accessibility_role: Optional[str] = None
+    accessible: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class TextInputProps(Props):
+    """Props for [`TextInput`][pythonnative.TextInput]."""
+
+    value: str = ""
+    placeholder: Optional[str] = None
+    on_change: Optional[Callable[[str], None]] = None
+    on_submit: Optional[Callable[[str], None]] = None
+    secure: bool = False
+    multiline: bool = False
+    keyboard_type: Optional[KeyboardType] = None
+    auto_capitalize: Optional[AutoCapitalize] = None
+    auto_correct: Optional[bool] = None
+    auto_focus: bool = False
+    return_key_type: Optional[ReturnKeyType] = None
+    max_length: Optional[int] = None
+    placeholder_color: Optional[Color] = None
+    accessibility_label: Optional[str] = None
+    accessibility_hint: Optional[str] = None
+    accessible: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class ImageProps(Props):
+    """Props for [`Image`][pythonnative.Image]."""
+
+    source: Optional[str] = None
+    scale_type: Optional[ScaleType] = None
+    tint_color: Optional[Color] = None
+    accessibility_label: Optional[str] = None
+    accessibility_role: Optional[str] = None
+    accessible: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class SwitchProps(Props):
+    """Props for [`Switch`][pythonnative.Switch]."""
+
+    value: bool = False
+    on_change: Optional[Callable[[bool], None]] = None
+
+
+@dataclass(frozen=True)
+class ProgressBarProps(Props):
+    """Props for [`ProgressBar`][pythonnative.ProgressBar]."""
+
+    value: float = 0.0
+
+
+@dataclass(frozen=True)
+class ActivityIndicatorProps(Props):
+    """Props for [`ActivityIndicator`][pythonnative.ActivityIndicator]."""
+
+    animating: bool = True
+
+
+@dataclass(frozen=True)
+class WebViewProps(Props):
+    """Props for [`WebView`][pythonnative.WebView]."""
+
+    url: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class SpacerProps(Props):
+    """Props for [`Spacer`][pythonnative.Spacer]."""
+
+    size: Optional[float] = None
+    flex: Optional[float] = None
+
+
+@dataclass(frozen=True)
+class SliderProps(Props):
+    """Props for [`Slider`][pythonnative.Slider]."""
+
+    value: float = 0.0
+    min_value: float = 0.0
+    max_value: float = 1.0
+    on_change: Optional[Callable[[float], None]] = None
+
+
+@dataclass(frozen=True)
+class ViewProps(Props):
+    """Props for [`View`][pythonnative.View], [`Column`][pythonnative.Column], and [`Row`][pythonnative.Row]."""
+
+    accessibility_label: Optional[str] = None
+    accessibility_hint: Optional[str] = None
+    accessibility_role: Optional[str] = None
+    accessible: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class ScrollViewProps(Props):
+    """Props for [`ScrollView`][pythonnative.ScrollView]."""
+
+    refresh_control: Optional[Dict[str, Any]] = None
+    scroll_axis: Optional[Literal["vertical", "horizontal"]] = None
+
+
+@dataclass(frozen=True)
+class SafeAreaViewProps(Props):
+    """Props for [`SafeAreaView`][pythonnative.SafeAreaView]."""
+
+
+@dataclass(frozen=True)
+class ModalProps(Props):
+    """Props for [`Modal`][pythonnative.Modal]."""
+
+    visible: bool = False
+    on_dismiss: Optional[Callable[[], None]] = None
+    title: Optional[str] = None
+    animation_type: Literal["slide", "fade", "none"] = "slide"
+    transparent: bool = False
+
+
+@dataclass(frozen=True)
+class PressableProps(Props):
+    """Props for [`Pressable`][pythonnative.Pressable]."""
+
+    on_press: Optional[Callable[[], None]] = None
+    on_long_press: Optional[Callable[[], None]] = None
+    pressed_opacity: float = 0.6
+    accessibility_label: Optional[str] = None
+    accessibility_hint: Optional[str] = None
+    accessibility_role: Optional[str] = None
+    accessible: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class StatusBarProps(Props):
+    """Props for [`StatusBar`][pythonnative.StatusBar]."""
+
+    bar_style: Optional[Literal["light", "dark", "default"]] = None
+    background_color: Optional[Color] = None
+    hidden: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class KeyboardAvoidingViewProps(Props):
+    """Props for [`KeyboardAvoidingView`][pythonnative.KeyboardAvoidingView]."""
+
+    behavior: Literal["padding", "position"] = "padding"
+
+
+@dataclass(frozen=True)
+class PickerProps(Props):
+    """Props for [`Picker`][pythonnative.Picker].
+
+    ``items`` is an ordered list of ``{"value": Any, "label": str}``
+    entries. ``value`` is matched against ``items[i]["value"]`` to
+    determine the currently selected row.
+    """
+
+    value: Any = None
+    items: List[Dict[str, Any]] = field(default_factory=list)
+    on_change: Optional[Callable[[Any], None]] = None
+    placeholder: str = "Select…"
+    accessibility_label: Optional[str] = None
+    accessibility_hint: Optional[str] = None
+    accessible: Optional[bool] = None
+
+
+# ======================================================================
+# Leaf factories
+# ======================================================================
 
 
 def Text(
@@ -91,34 +314,38 @@ def Text(
 ) -> Element:
     """Display a string of text.
 
-    Style properties: `font_size`, `color`, `bold`, `font_weight`,
-    `font_family`, `italic`, `text_align`, `background_color`,
-    `max_lines`, `letter_spacing`, `line_height`, `text_decoration`
-    (`"underline"` / `"line_through"`), `border_radius`,
-    `border_width`, `border_color`, `shadow_*`, `opacity`,
-    `transform`, plus the common layout props.
+    Style properties: ``font_size``, ``color``, ``bold``,
+    ``font_weight``, ``font_family``, ``italic``, ``text_align``,
+    ``background_color``, ``max_lines``, ``letter_spacing``,
+    ``line_height``, ``text_decoration`` (``"underline"`` /
+    ``"line_through"``), ``border_radius``, ``border_width``,
+    ``border_color``, ``shadow_*``, ``opacity``, ``transform``, plus
+    the common layout props.
 
     Args:
         text: Text content to display.
-        style: Style dict (or list of dicts) controlling appearance and
-            layout.
+        style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
         accessibility_role: Semantic role for assistive tech.
         accessible: Override whether the element is exposed to AT.
-        ref: Optional ``use_ref()`` dict; the reconciler populates
-            ``ref["current"]`` with the underlying native view.
-        key: Stable identity for keyed reconciliation in lists.
+        ref: Optional ``use_ref()`` dict.
+        key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"Text"`.
+        An [`Element`][pythonnative.Element] of type ``"Text"``.
     """
-    props: Dict[str, Any] = {"text": text}
-    props.update(resolve_style(style))
-    props.update(_accessibility_props(accessibility_label, accessibility_hint, accessibility_role, accessible))
-    if ref is not None:
-        props["ref"] = ref
-    return Element("Text", props, [], key=key)
+    return _make_element(
+        "Text",
+        style=style,
+        ref=ref,
+        key=key,
+        text=text,
+        accessibility_label=accessibility_label,
+        accessibility_hint=accessibility_hint,
+        accessibility_role=accessibility_role,
+        accessible=accessible,
+    )
 
 
 def Button(
@@ -129,55 +356,55 @@ def Button(
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
+    accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Display a tappable button.
 
-    Style properties: `color`, `background_color`, `font_size`,
-    `border_radius`, `border_width`, `border_color`, `shadow_*`,
-    `opacity`, `transform`, plus the common layout props.
+    Style properties: ``color``, ``background_color``, ``font_size``,
+    ``border_radius``, ``border_width``, ``border_color``, ``shadow_*``,
+    ``opacity``, ``transform``, plus the common layout props.
+
+    Buttons get ``accessibility_role="button"`` by default.
 
     Args:
         title: Button label.
         on_click: Callback invoked when the user taps the button.
-        enabled: When `False`, the button is disabled and cannot be
+        enabled: When ``False``, the button is disabled and cannot be
             tapped.
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
+        accessibility_role: Override the default ``"button"`` role.
         accessible: Override whether the element is exposed to AT.
-        ref: Optional ``use_ref()`` dict; the reconciler populates
-            ``ref["current"]`` with the underlying native view.
+        ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"Button"`.
+        An [`Element`][pythonnative.Element] of type ``"Button"``.
     """
-    props: Dict[str, Any] = {"title": title}
-    if on_click is not None:
-        props["on_click"] = on_click
-    if not enabled:
-        props["enabled"] = False
-    props.update(resolve_style(style))
-    # Buttons get accessibility_role="button" by default.
-    if accessibility_label is not None:
-        props["accessibility_label"] = accessibility_label
-    if accessibility_hint is not None:
-        props["accessibility_hint"] = accessibility_hint
-    if accessible is not None:
-        props["accessible"] = accessible
-    props.setdefault("accessibility_role", "button")
-    if ref is not None:
-        props["ref"] = ref
-    return Element("Button", props, [], key=key)
+    return _make_element(
+        "Button",
+        style=style,
+        ref=ref,
+        key=key,
+        title=title,
+        on_click=on_click,
+        enabled=enabled,
+        accessibility_label=accessibility_label,
+        accessibility_hint=accessibility_hint,
+        accessibility_role=accessibility_role,
+        accessible=accessible,
+        _defaults={"accessibility_role": "button"},
+    )
 
 
 def TextInput(
     *,
     value: str = "",
-    placeholder: str = "",
+    placeholder: Optional[str] = None,
     on_change: Optional[Callable[[str], None]] = None,
     on_submit: Optional[Callable[[str], None]] = None,
     secure: bool = False,
@@ -196,30 +423,29 @@ def TextInput(
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Display a text entry field (single-line by default, or `multiline`).
+    """Display a text-entry field (single-line by default, or ``multiline``).
 
-    Style properties: `font_size`, `color`, `background_color`,
-    `border_*`, plus the common layout props.
+    Style properties: ``font_size``, ``color``, ``background_color``,
+    ``border_*``, plus the common layout props.
 
     Args:
         value: Current text content (controlled-input pattern).
-        placeholder: Hint shown when `value` is empty.
+        placeholder: Hint shown when ``value`` is empty.
         on_change: Callback invoked with the new string each keystroke.
         on_submit: Callback invoked when the user submits (Return /
             Done / etc.). Receives the final text.
-        secure: When `True`, characters are masked (use for passwords).
-        multiline: When `True`, allows multiple lines of input.
+        secure: When ``True``, characters are masked (use for passwords).
+        multiline: When ``True``, allows multiple lines of input.
         keyboard_type: One of ``"default"``, ``"email_address"``,
-            ``"number_pad"``, ``"decimal_pad"``, ``"phone_pad"``,
-            ``"url"``.
-        auto_capitalize: One of ``"none"``, ``"sentences"``,
-            ``"words"``, ``"characters"``.
+            ``"number_pad"``, ``"decimal_pad"``, ``"phone_pad"``, ``"url"``.
+        auto_capitalize: One of ``"none"``, ``"sentences"``, ``"words"``,
+            ``"characters"``.
         auto_correct: Enable/disable autocorrection.
         auto_focus: Request focus on mount.
         return_key_type: One of ``"default"``, ``"done"``, ``"go"``,
             ``"next"``, ``"send"``, ``"search"``.
         max_length: Maximum number of characters allowed.
-        placeholder_color: Color to use for the placeholder string.
+        placeholder_color: Color used for the placeholder string.
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
@@ -228,38 +454,30 @@ def TextInput(
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"TextInput"`.
+        An [`Element`][pythonnative.Element] of type ``"TextInput"``.
     """
-    props: Dict[str, Any] = {"value": value}
-    if placeholder:
-        props["placeholder"] = placeholder
-    if on_change is not None:
-        props["on_change"] = on_change
-    if on_submit is not None:
-        props["on_submit"] = on_submit
-    if secure:
-        props["secure"] = True
-    if multiline:
-        props["multiline"] = True
-    if keyboard_type is not None:
-        props["keyboard_type"] = keyboard_type
-    if auto_capitalize is not None:
-        props["auto_capitalize"] = auto_capitalize
-    if auto_correct is not None:
-        props["auto_correct"] = auto_correct
-    if auto_focus:
-        props["auto_focus"] = True
-    if return_key_type is not None:
-        props["return_key_type"] = return_key_type
-    if max_length is not None:
-        props["max_length"] = max_length
-    if placeholder_color is not None:
-        props["placeholder_color"] = placeholder_color
-    props.update(resolve_style(style))
-    props.update(_accessibility_props(accessibility_label, accessibility_hint, None, accessible))
-    if ref is not None:
-        props["ref"] = ref
-    return Element("TextInput", props, [], key=key)
+    return _make_element(
+        "TextInput",
+        style=style,
+        ref=ref,
+        key=key,
+        value=value,
+        placeholder=placeholder,
+        on_change=on_change,
+        on_submit=on_submit,
+        secure=secure or None,
+        multiline=multiline or None,
+        keyboard_type=keyboard_type,
+        auto_capitalize=auto_capitalize,
+        auto_correct=auto_correct,
+        auto_focus=auto_focus or None,
+        return_key_type=return_key_type,
+        max_length=max_length,
+        placeholder_color=placeholder_color,
+        accessibility_label=accessibility_label,
+        accessibility_hint=accessibility_hint,
+        accessible=accessible,
+    )
 
 
 def Image(
@@ -269,46 +487,50 @@ def Image(
     tint_color: Optional[Color] = None,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
+    accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Display an image from a resource path or URL.
 
-    Style properties: `background_color`, `border_*`, `opacity`,
-    `transform`, plus the common layout props.
+    Style properties: ``background_color``, ``border_*``, ``opacity``,
+    ``transform``, plus the common layout props.
 
     Network images (``http://`` / ``https://``) are loaded
-    asynchronously off the main thread on both iOS (via NSURLSession)
-    and Android (via a worker thread + `BitmapFactory`).
+    asynchronously off the main thread on both iOS (via
+    ``NSURLSession``) and Android (via a worker thread plus
+    ``BitmapFactory``).
 
     Args:
         source: Image resource name or URL.
-        scale_type: Fit mode: `"cover"`, `"contain"`, `"stretch"`,
-            `"center"`.
+        scale_type: Fit mode: ``"cover"``, ``"contain"``, ``"stretch"``,
+            ``"center"``.
         tint_color: Color overlay applied to template images
             (monochrome icons).
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
+        accessibility_role: Override the default ``"image"`` role.
         accessible: Override whether the element is exposed to AT.
         ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"Image"`.
+        An [`Element`][pythonnative.Element] of type ``"Image"``.
     """
-    props: Dict[str, Any] = {}
-    if source:
-        props["source"] = source
-    if scale_type is not None:
-        props["scale_type"] = scale_type
-    if tint_color is not None:
-        props["tint_color"] = tint_color
-    props.update(resolve_style(style))
-    props.update(_accessibility_props(accessibility_label, None, "image", accessible))
-    if ref is not None:
-        props["ref"] = ref
-    return Element("Image", props, [], key=key)
+    return _make_element(
+        "Image",
+        style=style,
+        ref=ref,
+        key=key,
+        source=source or None,
+        scale_type=scale_type,
+        tint_color=tint_color,
+        accessibility_label=accessibility_label,
+        accessibility_role=accessibility_role,
+        accessible=accessible,
+        _defaults={"accessibility_role": "image"},
+    )
 
 
 def Switch(
@@ -327,13 +549,15 @@ def Switch(
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"Switch"`.
+        An [`Element`][pythonnative.Element] of type ``"Switch"``.
     """
-    props: Dict[str, Any] = {"value": value}
-    if on_change is not None:
-        props["on_change"] = on_change
-    props.update(resolve_style(style))
-    return Element("Switch", props, [], key=key)
+    return _make_element(
+        "Switch",
+        style=style,
+        key=key,
+        value=value,
+        on_change=on_change,
+    )
 
 
 def ProgressBar(
@@ -342,23 +566,26 @@ def ProgressBar(
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Show determinate progress as a value between 0.0 and 1.0.
+    """Show determinate progress as a value between ``0.0`` and ``1.0``.
 
     For indeterminate progress, use
     [`ActivityIndicator`][pythonnative.ActivityIndicator] instead.
 
     Args:
-        value: Fraction complete (clamped to `[0.0, 1.0]` by the
+        value: Fraction complete (clamped to ``[0.0, 1.0]`` by the
             platform handler).
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"ProgressBar"`.
+        An [`Element`][pythonnative.Element] of type ``"ProgressBar"``.
     """
-    props: Dict[str, Any] = {"value": value}
-    props.update(resolve_style(style))
-    return Element("ProgressBar", props, [], key=key)
+    return _make_element(
+        "ProgressBar",
+        style=style,
+        key=key,
+        value=value,
+    )
 
 
 def ActivityIndicator(
@@ -370,17 +597,20 @@ def ActivityIndicator(
     """Show an indeterminate loading spinner.
 
     Args:
-        animating: When `False`, the spinner is hidden.
+        animating: When ``False``, the spinner is hidden.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
 
     Returns:
         An [`Element`][pythonnative.Element] of type
-        `"ActivityIndicator"`.
+        ``"ActivityIndicator"``.
     """
-    props: Dict[str, Any] = {"animating": animating}
-    props.update(resolve_style(style))
-    return Element("ActivityIndicator", props, [], key=key)
+    return _make_element(
+        "ActivityIndicator",
+        style=style,
+        key=key,
+        animating=animating,
+    )
 
 
 def WebView(
@@ -397,13 +627,14 @@ def WebView(
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"WebView"`.
+        An [`Element`][pythonnative.Element] of type ``"WebView"``.
     """
-    props: Dict[str, Any] = {}
-    if url:
-        props["url"] = url
-    props.update(resolve_style(style))
-    return Element("WebView", props, [], key=key)
+    return _make_element(
+        "WebView",
+        style=style,
+        key=key,
+        url=url or None,
+    )
 
 
 def Spacer(
@@ -414,32 +645,31 @@ def Spacer(
 ) -> Element:
     """Insert empty space inside a flex container.
 
-    Pass `size` for a fixed gap, or `flex` to expand and absorb
+    Pass ``size`` for a fixed gap, or ``flex`` to expand and absorb
     remaining space.
 
     Args:
-        size: Fixed gap in dp/pt along the parent's main axis.
+        size: Fixed gap in dp/pt along the parent's main axis. Mirrored
+            on both axes — whichever axis the parent's
+            ``flex_direction`` chooses as main becomes the actual gap.
         flex: Flex-grow weight; useful for pushing siblings to the
             opposite end of a [`Row`][pythonnative.Row] or
             [`Column`][pythonnative.Column].
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"Spacer"`.
+        An [`Element`][pythonnative.Element] of type ``"Spacer"``.
     """
-    props: Dict[str, Any] = {}
-    if size is not None:
-        # The layout engine sees ``width`` / ``height`` only, so a fixed
-        # ``size`` is mirrored on both axes. Whichever axis the parent
-        # container's ``flex_direction`` chooses as main becomes the
-        # actual gap; the cross axis is constrained by the parent's
-        # ``align_items`` (typically ``stretch``) anyway.
-        props["size"] = size
-        props["width"] = size
-        props["height"] = size
-    if flex is not None:
-        props["flex"] = flex
-    return Element("Spacer", props, [], key=key)
+    width = size if size is not None else None
+    height = size if size is not None else None
+    return _make_element(
+        "Spacer",
+        key=key,
+        size=size,
+        width=width,
+        height=height,
+        flex=flex,
+    )
 
 
 def Slider(
@@ -451,7 +681,7 @@ def Slider(
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Continuous-value slider between `min_value` and `max_value`.
+    """Continuous-value slider between ``min_value`` and ``max_value``.
 
     Args:
         value: Current slider value.
@@ -463,21 +693,21 @@ def Slider(
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"Slider"`.
+        An [`Element`][pythonnative.Element] of type ``"Slider"``.
     """
-    props: Dict[str, Any] = {
-        "value": value,
-        "min_value": min_value,
-        "max_value": max_value,
-    }
-    if on_change is not None:
-        props["on_change"] = on_change
-    props.update(resolve_style(style))
-    return Element("Slider", props, [], key=key)
+    return _make_element(
+        "Slider",
+        style=style,
+        key=key,
+        value=value,
+        min_value=min_value,
+        max_value=max_value,
+        on_change=on_change,
+    )
 
 
 # ======================================================================
-# Container components
+# Container factories
 # ======================================================================
 
 
@@ -491,28 +721,24 @@ def View(
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Universal flex container (like React Native's `View`).
+    """Universal flex container (like React Native's ``View``).
 
-    Defaults to `flex_direction: "column"`. Override via `style`:
+    Defaults to ``flex_direction: "column"`` (override via ``style``).
 
-    ```python
-    pn.View(child_a, child_b, style={"flex_direction": "row"})
-    ```
+    Flex container properties (passed via ``style``):
 
-    Flex container properties (inside `style`):
-
-    - `flex_direction`: `"column"` (default), `"row"`,
-      `"column_reverse"`, `"row_reverse"`.
-    - `justify_content`: main-axis distribution. Accepts `"flex_start"`
-      (default), `"center"`, `"flex_end"`, `"space_between"`,
-      `"space_around"`, `"space_evenly"`.
-    - `align_items`: cross-axis alignment. Accepts `"stretch"` (default),
-      `"flex_start"`, `"center"`, `"flex_end"`.
-    - `overflow`: `"visible"` (default) or `"hidden"`.
-    - `spacing`, `padding`, `background_color`, `border_radius`,
-      `border_width`, `border_color`, `shadow_color`, `shadow_offset`,
-      `shadow_opacity`, `shadow_radius`, `elevation`, `opacity`,
-      `transform`.
+    - ``flex_direction``: ``"column"`` (default), ``"row"``,
+      ``"column_reverse"``, ``"row_reverse"``.
+    - ``justify_content``: main-axis distribution. Accepts
+      ``"flex_start"`` (default), ``"center"``, ``"flex_end"``,
+      ``"space_between"``, ``"space_around"``, ``"space_evenly"``.
+    - ``align_items``: cross-axis alignment. Accepts ``"stretch"``
+      (default), ``"flex_start"``, ``"center"``, ``"flex_end"``.
+    - ``overflow``: ``"visible"`` (default) or ``"hidden"``.
+    - ``spacing``, ``padding``, ``background_color``, ``border_radius``,
+      ``border_width``, ``border_color``, ``shadow_color``,
+      ``shadow_offset``, ``shadow_opacity``, ``shadow_radius``,
+      ``elevation``, ``opacity``, ``transform``.
 
     Args:
         *children: Child elements rendered inside the container.
@@ -521,19 +747,24 @@ def View(
         accessibility_hint: Spoken extra detail (iOS only).
         accessibility_role: Semantic role for assistive tech.
         accessible: Override whether the element is exposed to AT.
-        ref: Optional ``use_ref()`` dict; the reconciler populates
-            ``ref["current"]`` with the underlying native view.
+        ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"View"`.
+        An [`Element`][pythonnative.Element] of type ``"View"``.
     """
-    props: Dict[str, Any] = {"flex_direction": "column"}
-    props.update(resolve_style(style))
-    props.update(_accessibility_props(accessibility_label, accessibility_hint, accessibility_role, accessible))
-    if ref is not None:
-        props["ref"] = ref
-    return Element("View", props, list(children), key=key)
+    return _make_element(
+        "View",
+        *children,
+        style=style,
+        ref=ref,
+        key=key,
+        accessibility_label=accessibility_label,
+        accessibility_hint=accessibility_hint,
+        accessibility_role=accessibility_role,
+        accessible=accessible,
+        _defaults={"flex_direction": "column"},
+    )
 
 
 def Column(
@@ -545,20 +776,8 @@ def Column(
     """Arrange children vertically.
 
     Convenience wrapper around [`View`][pythonnative.View] with
-    `flex_direction` fixed to `"column"`. Use `View` directly if you
-    need to switch between row and column at runtime.
-
-    Style properties: `spacing`, `padding`, `align_items`,
-    `justify_content`, `background_color`, `overflow`, plus the common
-    layout props.
-
-    `align_items` controls cross-axis (horizontal) alignment:
-    `"stretch"` (default), `"flex_start"` / `"leading"`, `"center"`, or
-    `"flex_end"` / `"trailing"`.
-
-    `justify_content` controls main-axis (vertical) distribution:
-    `"flex_start"` (default), `"center"`, `"flex_end"`,
-    `"space_between"`, `"space_around"`, `"space_evenly"`.
+    ``flex_direction`` locked to ``"column"``. Use ``View`` directly if
+    you need to switch between row and column at runtime.
 
     Args:
         *children: Child elements stacked top to bottom.
@@ -567,14 +786,16 @@ def Column(
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"Column"`.
+        An [`Element`][pythonnative.Element] of type ``"Column"``.
     """
-    props: Dict[str, Any] = {"flex_direction": "column"}
-    props.update(resolve_style(style))
-    props["flex_direction"] = "column"
-    if ref is not None:
-        props["ref"] = ref
-    return Element("Column", props, list(children), key=key)
+    return _make_element(
+        "Column",
+        *children,
+        style=style,
+        ref=ref,
+        key=key,
+        _forced={"flex_direction": "column"},
+    )
 
 
 def Row(
@@ -586,20 +807,8 @@ def Row(
     """Arrange children horizontally.
 
     Convenience wrapper around [`View`][pythonnative.View] with
-    `flex_direction` fixed to `"row"`. Use `View` directly if you need
-    to switch between row and column at runtime.
-
-    Style properties: `spacing`, `padding`, `align_items`,
-    `justify_content`, `background_color`, `overflow`, plus the common
-    layout props.
-
-    `align_items` controls cross-axis (vertical) alignment:
-    `"stretch"` (default), `"flex_start"` / `"top"`, `"center"`, or
-    `"flex_end"` / `"bottom"`.
-
-    `justify_content` controls main-axis (horizontal) distribution:
-    `"flex_start"` (default), `"center"`, `"flex_end"`,
-    `"space_between"`, `"space_around"`, `"space_evenly"`.
+    ``flex_direction`` locked to ``"row"``. Use ``View`` directly if you
+    need to switch between row and column at runtime.
 
     Args:
         *children: Child elements arranged left to right.
@@ -608,49 +817,57 @@ def Row(
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"Row"`.
+        An [`Element`][pythonnative.Element] of type ``"Row"``.
     """
-    props: Dict[str, Any] = {"flex_direction": "row"}
-    props.update(resolve_style(style))
-    props["flex_direction"] = "row"
-    if ref is not None:
-        props["ref"] = ref
-    return Element("Row", props, list(children), key=key)
+    return _make_element(
+        "Row",
+        *children,
+        style=style,
+        ref=ref,
+        key=key,
+        _forced={"flex_direction": "row"},
+    )
 
 
 def ScrollView(
-    child: Optional[Element] = None,
-    *,
+    *children: Element,
     refresh_control: Optional[Dict[str, Any]] = None,
+    scroll_axis: Optional[Literal["vertical", "horizontal"]] = None,
     style: StyleProp = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Wrap a single child in a scrollable container.
+    """Wrap children in a scrollable container.
+
+    ``ScrollView`` typically takes a single child (a ``Column`` or
+    ``Row`` aggregating the scrollable content). It accepts ``*children``
+    for ergonomic call sites; the underlying native scroll view stacks
+    them on its content axis.
 
     Args:
-        child: The single child to scroll. Wrap multiple elements in a
-            [`Column`][pythonnative.Column] or
-            [`Row`][pythonnative.Row] first.
+        *children: Child elements to scroll.
         refresh_control: Optional pull-to-refresh spec, typically
             constructed via
             [`RefreshControl`][pythonnative.RefreshControl]. The dict
-            must have ``refreshing`` (bool) and ``on_refresh`` (callable).
+            must have ``refreshing`` (bool) and ``on_refresh``
+            (callable).
+        scroll_axis: ``"vertical"`` (default) or ``"horizontal"``.
         style: Style dict (or list of dicts).
         ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"ScrollView"`.
+        An [`Element`][pythonnative.Element] of type ``"ScrollView"``.
     """
-    children = [child] if child is not None else []
-    props: Dict[str, Any] = {}
-    if refresh_control is not None:
-        props["refresh_control"] = refresh_control
-    props.update(resolve_style(style))
-    if ref is not None:
-        props["ref"] = ref
-    return Element("ScrollView", props, children, key=key)
+    return _make_element(
+        "ScrollView",
+        *children,
+        style=style,
+        ref=ref,
+        key=key,
+        refresh_control=refresh_control,
+        scroll_axis=scroll_axis,
+    )
 
 
 def SafeAreaView(
@@ -666,11 +883,14 @@ def SafeAreaView(
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"SafeAreaView"`.
+        An [`Element`][pythonnative.Element] of type ``"SafeAreaView"``.
     """
-    props: Dict[str, Any] = {}
-    props.update(resolve_style(style))
-    return Element("SafeAreaView", props, list(children), key=key)
+    return _make_element(
+        "SafeAreaView",
+        *children,
+        style=style,
+        key=key,
+    )
 
 
 def Modal(
@@ -685,21 +905,21 @@ def Modal(
 ) -> Element:
     """Overlay modal dialog backed by a real native presentation.
 
-    The modal is shown when `visible=True` and hidden when `False`.
-    Drive `visible` from a hook so the parent component can dismiss
+    The modal is shown when ``visible=True`` and hidden when ``False``.
+    Drive ``visible`` from a hook so the parent component can dismiss
     the modal in response to user actions. On iOS this presents a
-    `UIViewController`; on Android it shows an `android.app.Dialog`.
+    ``UIViewController``; on Android it shows an ``android.app.Dialog``.
 
     Children are mounted as the modal's content view, not into the
-    on-tree placeholder, so they appear above all other native
-    content and don't influence the underlying layout.
+    on-tree placeholder, so they appear above all other native content
+    and don't influence the underlying layout.
 
     Args:
         *children: Modal content.
         visible: Controls whether the modal is presented.
         on_dismiss: Callback invoked when the user dismisses the modal
-            via system gesture (e.g., backdrop tap or back button).
-        title: Optional title bar text.
+            via system gesture.
+        title: Optional title-bar text.
         animation_type: ``"slide"`` (default), ``"fade"``, or ``"none"``.
         transparent: When ``True``, the underlying view is dimmed
             instead of fully covered.
@@ -707,91 +927,152 @@ def Modal(
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"Modal"`.
+        An [`Element`][pythonnative.Element] of type ``"Modal"``.
     """
-    props: Dict[str, Any] = {
-        "visible": visible,
-        "animation_type": animation_type,
-        "transparent": transparent,
-    }
-    if on_dismiss is not None:
-        props["on_dismiss"] = on_dismiss
-    if title is not None:
-        props["title"] = title
-    props.update(resolve_style(style))
-    return Element("Modal", props, list(children), key=key)
+    return _make_element(
+        "Modal",
+        *children,
+        style=style,
+        key=key,
+        visible=visible,
+        animation_type=animation_type,
+        transparent=transparent,
+        on_dismiss=on_dismiss,
+        title=title,
+    )
 
 
 def Pressable(
-    child: Optional[Element] = None,
-    *,
+    *children: Element,
     on_press: Optional[Callable[[], None]] = None,
     on_long_press: Optional[Callable[[], None]] = None,
     pressed_opacity: float = 0.6,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
+    accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Wrap any child element with tap and long-press handlers.
+    """Wrap children with tap and long-press handlers.
 
     Useful for making non-button elements (text, images, custom views)
     respond to user taps. The wrapper view fades to ``pressed_opacity``
-    on touch-down and back to full opacity on touch-up, providing
-    subtle visual feedback (matches React Native's `Pressable` default).
+    on touch-down and back to full opacity on touch-up.
+
+    Pressable gets ``accessibility_role="button"`` by default.
 
     Args:
-        child: The single element to make pressable.
+        *children: Elements to make pressable.
         on_press: Callback invoked on a normal tap.
         on_long_press: Callback invoked on a sustained press.
-        pressed_opacity: Opacity (0-1) applied to the wrapper while
-            the user's finger is down. Set to ``1.0`` for no visual
-            feedback.
+        pressed_opacity: Opacity (0–1) applied while the user's finger
+            is down. Set to ``1.0`` for no visual feedback.
         style: Style dict applied to the wrapper.
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
+        accessibility_role: Override the default ``"button"`` role.
         accessible: Override whether the element is exposed to AT.
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"Pressable"`.
+        An [`Element`][pythonnative.Element] of type ``"Pressable"``.
     """
-    props: Dict[str, Any] = {}
-    if on_press is not None:
-        props["on_press"] = on_press
-    if on_long_press is not None:
-        props["on_long_press"] = on_long_press
-    if pressed_opacity != 0.6:
-        props["pressed_opacity"] = pressed_opacity
-    else:
-        props.setdefault("pressed_opacity", 0.6)
-    props.update(resolve_style(style))
-    props.update(_accessibility_props(accessibility_label, accessibility_hint, "button", accessible))
-    children = [child] if child is not None else []
-    return Element("Pressable", props, children, key=key)
+    return _make_element(
+        "Pressable",
+        *children,
+        style=style,
+        key=key,
+        on_press=on_press,
+        on_long_press=on_long_press,
+        pressed_opacity=pressed_opacity,
+        accessibility_label=accessibility_label,
+        accessibility_hint=accessibility_hint,
+        accessibility_role=accessibility_role,
+        accessible=accessible,
+        _defaults={"accessibility_role": "button"},
+    )
+
+
+# ======================================================================
+# Fragment
+# ======================================================================
+
+
+def Fragment(*children: Optional[Element], key: Optional[str] = None) -> Element:
+    """Group children without adding a wrapping native view.
+
+    Like React's ``<></>``: returns multiple elements from a component
+    without introducing an extra container. The reconciler flattens
+    Fragment elements at the children-list level, so each child appears
+    as a direct sibling of the Fragment's parent in the native tree.
+
+    Useful inside [`Provider`][pythonnative.Provider] /
+    [`memo`][pythonnative.memo] / conditional logic when grouping
+    siblings inside another component's child list:
+
+    ```python
+    pn.Column(
+        pn.Text("Top"),
+        pn.Fragment(
+            pn.Text("Middle A"),
+            pn.Text("Middle B"),
+        ),
+        pn.Text("Bottom"),
+    )
+    ```
+
+    Args:
+        *children: Child elements to expose at the parent level. ``None``
+            children are dropped, which makes conditional rendering with
+            ``cond and pn.Text(...)`` ergonomic.
+        key: Optional key for the Fragment itself (rarely useful since
+            Fragment doesn't appear in the native tree).
+
+    Returns:
+        An [`Element`][pythonnative.Element] of type ``"__Fragment__"``.
+
+    Note:
+        Today, returning a Fragment from a ``@pn.component`` function
+        only mounts its first child as the component's root. To return
+        multiple top-level elements from a function component, use a
+        container such as [`Column`][pythonnative.Column] or
+        [`Row`][pythonnative.Row] instead.
+    """
+    filtered = [c for c in children if c is not None]
+    return Element("__Fragment__", {}, filtered, key=key)
+
+
+# ======================================================================
+# Error boundary
+# ======================================================================
 
 
 def ErrorBoundary(
-    child: Optional[Element] = None,
-    *,
+    *children: Element,
     fallback: Optional[Any] = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Catch render errors in `child` and display `fallback` instead.
+    """Catch render errors in the wrapped subtree and display ``fallback`` instead.
 
-    `fallback` may be an [`Element`][pythonnative.Element] or a callable
-    that receives the exception and returns an `Element`. Useful for
-    isolating risky subtrees so a single failure doesn't crash the page.
+    ``fallback`` may be an [`Element`][pythonnative.Element] or a
+    callable that receives the exception and returns an ``Element``.
+    Useful for isolating risky subtrees so a single failure doesn't
+    crash the page.
+
+    When multiple children are passed they're grouped under a
+    [`Fragment`][pythonnative.Fragment] so the boundary still wraps a
+    single logical subtree.
 
     Args:
-        child: Subtree to wrap.
-        fallback: Element to render when `child` raises during render,
-            or a callable `fallback(err) -> Element`.
+        *children: Subtree to wrap.
+        fallback: Element rendered when the subtree raises during
+            render, or a callable ``fallback(err) -> Element``.
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"__ErrorBoundary__"`.
+        An [`Element`][pythonnative.Element] of type
+        ``"__ErrorBoundary__"``.
 
     Example:
         ```python
@@ -806,8 +1087,16 @@ def ErrorBoundary(
     props: Dict[str, Any] = {}
     if fallback is not None:
         props["__fallback__"] = fallback
-    children = [child] if child is not None else []
-    return Element("__ErrorBoundary__", props, children, key=key)
+    if len(children) <= 1:
+        kids = list(children)
+    else:
+        kids = [Fragment(*children)]
+    return Element("__ErrorBoundary__", props, kids, key=key)
+
+
+# ======================================================================
+# Lists
+# ======================================================================
 
 
 def FlatList(
@@ -822,17 +1111,18 @@ def FlatList(
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Virtualized scrollable list that renders items from `data` lazily.
+    """Virtualized scrollable list that renders items from ``data`` lazily.
 
-    Backed by `UITableView` on iOS and `RecyclerView` on Android via the
-    `VirtualList` element. Each visible row is mounted on demand by a
-    nested [`Reconciler`][pythonnative.reconciler.Reconciler] when
+    Backed by ``UITableView`` on iOS and ``RecyclerView`` on Android via
+    the ``VirtualList`` element. Each visible row is mounted on demand
+    by a nested
+    [`Reconciler`][pythonnative.reconciler.Reconciler] when
     ``item_height`` is specified.
 
     When ``item_height`` is omitted the implementation falls back to an
     eager (non-virtualized) ``ScrollView`` of every row — keep the data
-    set small in that mode (the fallback is convenient for short
-    lists where virtualization overhead would dominate).
+    set small in that mode (the fallback is convenient for short lists
+    where virtualization overhead would dominate).
 
     Args:
         data: Iterable of arbitrary item values.
@@ -852,11 +1142,12 @@ def FlatList(
         on_item_press: Callback invoked with the row index when the
             user taps a row (virtualized backend only).
         style: Style dict (or list of dicts).
-        key: Stable identity for keyed reconciliation of the list itself.
+        key: Stable identity for keyed reconciliation of the list
+            itself.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"VirtualList"`
-        (virtualized) or `"ScrollView"` (eager fallback).
+        An [`Element`][pythonnative.Element] of type ``"VirtualList"``
+        (virtualized) or ``"ScrollView"`` (eager fallback).
 
     Example:
         ```python
@@ -883,11 +1174,7 @@ def FlatList(
                 el = Element(el.type, el.props, el.children, key=key_extractor(item, i))
             items_eager.append(el)
         inner = Column(*items_eager, style={"spacing": separator_height} if separator_height else None)
-        sv_props: Dict[str, Any] = {}
-        if refresh_control is not None:
-            sv_props["refresh_control"] = refresh_control
-        sv_props.update(resolve_style(style))
-        return Element("ScrollView", sv_props, [inner], key=key)
+        return ScrollView(inner, refresh_control=refresh_control, style=style, key=key)
 
     # Virtualized path: render_item is invoked lazily by the native
     # cell mount callback when each row scrolls into view.
@@ -928,17 +1215,16 @@ def FlatList(
 
         backend.add_child(content_view, native_root, "View")
 
-    list_props: Dict[str, Any] = {
-        "count": len(items_list),
-        "row_height": row_h,
-        "mount_row": _mount_row,
-    }
-    if on_item_press is not None:
-        list_props["on_row_press"] = on_item_press
-    if refresh_control is not None:
-        list_props["refresh_control"] = refresh_control
-    list_props.update(resolve_style(style))
-    return Element("VirtualList", list_props, [], key=key)
+    return _make_element(
+        "VirtualList",
+        style=style,
+        key=key,
+        count=len(items_list),
+        row_height=row_h,
+        mount_row=_mount_row,
+        on_row_press=on_item_press,
+        refresh_control=refresh_control,
+    )
 
 
 def SectionList(
@@ -961,8 +1247,10 @@ def SectionList(
 
     Args:
         sections: Each section is ``{"title": ..., "data": [...]}``.
-        render_item: ``render_item(item, item_index, section_index) -> Element``.
-        render_section_header: ``render_section_header(section, section_index) -> Element``.
+        render_item: ``render_item(item, item_index, section_index) ->
+            Element``.
+        render_section_header: ``render_section_header(section,
+            section_index) -> Element``.
         item_height: Fixed row height for items, in layout units.
         section_header_height: Fixed header height in layout units.
         separator_height: Gap appended below each item, in layout units.
@@ -970,9 +1258,9 @@ def SectionList(
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"VirtualList"`
-        (virtualized). When ``item_height`` is omitted the layout
-        falls back to an eager column.
+        An [`Element`][pythonnative.Element] of type ``"VirtualList"``
+        (virtualized). When ``item_height`` is omitted the layout falls
+        back to an eager column.
     """
     sections_list = list(sections or [])
 
@@ -997,9 +1285,7 @@ def SectionList(
                 else:
                     children.append(Text(str(entry["item"])))
         inner = Column(*children, style={"spacing": separator_height} if separator_height else None)
-        sv_props: Dict[str, Any] = {}
-        sv_props.update(resolve_style(style))
-        return Element("ScrollView", sv_props, [inner], key=key)
+        return ScrollView(inner, style=style, key=key)
 
     # Virtualized: mixed row heights aren't supported in v1, so we
     # use the larger of section_header_height and item_height + sep.
@@ -1032,23 +1318,24 @@ def SectionList(
         except Exception:
             pass
 
-    list_props: Dict[str, Any] = {
-        "count": len(flat),
-        "row_height": row_h,
-        "mount_row": _mount_row,
-    }
-    list_props.update(resolve_style(style))
-    return Element("VirtualList", list_props, [], key=key)
+    return _make_element(
+        "VirtualList",
+        style=style,
+        key=key,
+        count=len(flat),
+        row_height=row_h,
+        mount_row=_mount_row,
+    )
 
 
 # ======================================================================
-# Status bar / keyboard / refresh / alert / picker
+# StatusBar / KeyboardAvoidingView / RefreshControl / Picker
 # ======================================================================
 
 
 def StatusBar(
     *,
-    style: Optional[Literal["light", "dark", "default"]] = None,
+    bar_style: Optional[Literal["light", "dark", "default"]] = None,
     background_color: Optional[Color] = None,
     hidden: Optional[bool] = None,
     key: Optional[str] = None,
@@ -1059,8 +1346,13 @@ def StatusBar(
     content but applies its props to the host platform's status bar.
     Mount one near the top of your tree.
 
+    The ``bar_style`` parameter is named separately from the universal
+    ``style`` kwarg (which is unused here) to avoid the conflict that
+    ``style="light"`` would create with the visual-style dict used
+    elsewhere.
+
     Args:
-        style: ``"light"`` (light icons over dark backgrounds),
+        bar_style: ``"light"`` (light icons over dark backgrounds),
             ``"dark"`` (dark icons over light backgrounds), or
             ``"default"`` (system default).
         background_color: Color of the status-bar background (Android
@@ -1069,11 +1361,11 @@ def StatusBar(
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"StatusBar"`.
+        An [`Element`][pythonnative.Element] of type ``"StatusBar"``.
     """
     props: Dict[str, Any] = {}
-    if style is not None:
-        props["style"] = style
+    if bar_style is not None:
+        props["bar_style"] = bar_style
     if background_color is not None:
         props["background_color"] = background_color
     if hidden is not None:
@@ -1091,8 +1383,8 @@ def KeyboardAvoidingView(
 
     Subscribes to the platform-reported keyboard height (via
     [`use_keyboard_height`][pythonnative.use_keyboard_height]
-    internally) and applies it as bottom padding so the focused
-    text input stays visible.
+    internally) and applies it as bottom padding so the focused text
+    input stays visible.
 
     Args:
         *children: Children rendered inside the avoiding container.
@@ -1103,11 +1395,15 @@ def KeyboardAvoidingView(
 
     Returns:
         An [`Element`][pythonnative.Element] of type
-        `"KeyboardAvoidingView"`.
+        ``"KeyboardAvoidingView"``.
     """
-    props: Dict[str, Any] = {"behavior": behavior}
-    props.update(resolve_style(style))
-    return Element("KeyboardAvoidingView", props, list(children), key=key)
+    return _make_element(
+        "KeyboardAvoidingView",
+        *children,
+        style=style,
+        key=key,
+        behavior=behavior,
+    )
 
 
 def RefreshControl(
@@ -1119,16 +1415,16 @@ def RefreshControl(
     """Pull-to-refresh spec for [`ScrollView`][pythonnative.ScrollView] / [`FlatList`][pythonnative.FlatList].
 
     Returns a plain dict that should be passed as the
-    ``refresh_control=`` prop. Modeled as a dict (not an Element) so
-    the host scroll container can hold one without it appearing as a
-    child node.
+    ``refresh_control=`` prop. Modeled as a dict (not an
+    [`Element`][pythonnative.Element]) so the host scroll container can
+    hold one without it appearing as a child node.
 
     Args:
         refreshing: Drive the spinner's visibility from a use_state
             value.
-        on_refresh: Callback invoked when the user pulls down past
-            the threshold. Set ``refreshing`` to True for the
-            duration of the work, then back to False on completion.
+        on_refresh: Callback invoked when the user pulls down past the
+            threshold. Set ``refreshing`` to ``True`` for the duration
+            of the work, then back to ``False`` on completion.
         tint_color: Color of the spinner.
 
     Returns:
@@ -1171,53 +1467,49 @@ def Picker(
     on_change: Optional[Callable[[Any], None]] = None,
     placeholder: str = "Select…",
     style: StyleProp = None,
+    accessibility_label: Optional[str] = None,
+    accessibility_hint: Optional[str] = None,
+    accessible: Optional[bool] = None,
+    ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
-    """A select / dropdown widget.
+    """A real native dropdown / select widget.
 
-    Implemented as a plain
-    [`Pressable`][pythonnative.Pressable] that, on tap, presents an
-    [`Alert`][pythonnative.Alert]-style action sheet listing the
-    options. Selecting an option fires ``on_change(value)``.
+    Renders a tappable trigger labelled with the selected item; the
+    iOS handler attaches a ``UIMenu`` (system dropdown) and the Android
+    handler uses a native ``Spinner``. Selecting an item fires
+    ``on_change(value)``.
+
+    ``items`` is an ordered list of ``{"value": Any, "label": str}``
+    entries (``label`` defaults to ``str(value)`` when omitted).
 
     Args:
         value: Currently selected value (matched against
             ``items[i]["value"]``).
-        items: Each item is ``{"value": ..., "label": ...}``.
-        on_change: Callback invoked with the selected value.
-        placeholder: Label shown when nothing is selected.
-        style: Style dict applied to the trigger pressable.
+        items: Selectable options.
+        on_change: Callback invoked with the new value.
+        placeholder: Label shown when no item matches ``value``.
+        style: Style dict applied to the trigger.
+        accessibility_label: Spoken description for screen readers.
+        accessibility_hint: Spoken extra detail (iOS only).
+        accessible: Override whether the element is exposed to AT.
+        ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type `"Pressable"`.
+        An [`Element`][pythonnative.Element] of type ``"Picker"``.
     """
-    items_list = list(items or [])
-    selected_label = placeholder
-    for it in items_list:
-        if it.get("value") == value:
-            selected_label = str(it.get("label", value))
-            break
-
-    def _open() -> None:
-        try:
-            from .alerts import Alert
-        except Exception:
-            return
-
-        def _make_btn(item: Dict[str, Any]) -> Dict[str, Any]:
-            def _press() -> None:
-                if on_change is not None:
-                    try:
-                        on_change(item.get("value"))
-                    except Exception:
-                        pass
-
-            return {"label": str(item.get("label", item.get("value"))), "on_press": _press}
-
-        buttons = [_make_btn(it) for it in items_list]
-        buttons.append({"label": "Cancel", "style": "cancel"})
-        Alert.show(title=placeholder, buttons=buttons, style="action_sheet")
-
-    label_text = Text(selected_label)
-    return Pressable(label_text, on_press=_open, style=style, key=key)
+    return _make_element(
+        "Picker",
+        style=style,
+        ref=ref,
+        key=key,
+        value=value,
+        items=list(items) if items is not None else [],
+        on_change=on_change,
+        placeholder=placeholder,
+        accessibility_label=accessibility_label,
+        accessibility_hint=accessibility_hint,
+        accessible=accessible,
+        _defaults={"accessibility_role": "button"},
+    )

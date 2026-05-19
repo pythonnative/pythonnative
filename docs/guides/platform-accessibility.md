@@ -55,7 +55,7 @@ Mount [`StatusBar`][pythonnative.StatusBar] anywhere in the tree (it
 renders nothing visible) to control style and visibility:
 
 ```python
-pn.StatusBar(style="light", background_color="#000000")
+pn.StatusBar(bar_style="light", background_color="#000000")
 ```
 
 `style` is `"light"` (light icons, dark background), `"dark"` (dark

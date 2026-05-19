@@ -1802,11 +1802,11 @@ class StatusBarHandler(IOSViewHandler):
             app = UIApplication.sharedApplication
             if "hidden" in props and props["hidden"] is not None:
                 app.setStatusBarHidden_animated_(bool(props["hidden"]), True)
-            if "style" in props and props["style"] is not None:
+            if "bar_style" in props and props["bar_style"] is not None:
                 # 0 = default (dark content on iOS 12-), 1 = lightContent,
                 # 3 = darkContent (iOS 13+).
                 mapping = {"default": 3, "light": 1, "dark": 3}
-                app.setStatusBarStyle_animated_(mapping.get(props["style"], 0), True)
+                app.setStatusBarStyle_animated_(mapping.get(props["bar_style"], 0), True)
         except Exception:
             pass
 
@@ -2506,6 +2506,123 @@ def _present_alert(
 
 
 # ======================================================================
+# Picker — native dropdown / select widget
+# ======================================================================
+#
+# The PythonNative `Picker` element renders as a `UIButton` whose tap
+# presents a native action sheet (``UIAlertController``) listing the
+# options. Selecting a row fires ``on_change(value)``. Action sheets
+# are the standard iOS dropdown pattern for a small-to-medium set of
+# choices; for very large lists, paginate or use a custom navigator.
+
+
+_pn_picker_state: dict = {}
+# Maps ``id(target)`` -> ``id(button)`` so the single shared
+# ``_PNPickerTarget`` class can look up per-instance picker state on tap.
+_pn_picker_target_to_button: dict = {}
+
+
+def _picker_button_title(props: Dict[str, Any]) -> str:
+    """Render the selected label, falling back to the placeholder."""
+    items = props.get("items") or []
+    selected = props.get("value")
+    for item in items:
+        if isinstance(item, dict) and item.get("value") == selected:
+            return str(item.get("label", item.get("value", "")))
+    return str(props.get("placeholder") or "Select…")
+
+
+class _PNPickerTarget(NSObject):  # type: ignore[valid-type]
+    """Shared ObjC target for every Picker button.
+
+    Defined exactly once at module load. ``UIButton`` instances each
+    retain their own ``_PNPickerTarget.new()`` instance, and the per-
+    instance picker state is looked up in
+    :data:`_pn_picker_target_to_button` / :data:`_pn_picker_state`.
+    """
+
+    @objc_method
+    def onTap_(self, sender: object) -> None:  # noqa: ARG002
+        bid = _pn_picker_target_to_button.get(id(self))
+        if bid is None:
+            return
+        state = _pn_picker_state.get(bid)
+        if not state:
+            return
+        items = list(state.get("items") or [])
+        on_change = state.get("on_change")
+        placeholder = state.get("placeholder") or "Select…"
+
+        def _make_press(value: Any) -> Callable[[], None]:
+            def _press() -> None:
+                if on_change is not None:
+                    try:
+                        on_change(value)
+                    except Exception:
+                        pass
+
+            return _press
+
+        buttons: List[Dict[str, Any]] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            label = str(item.get("label", item.get("value", "")))
+            buttons.append({"label": label, "on_press": _make_press(item.get("value"))})
+        buttons.append({"label": "Cancel", "style": "cancel"})
+        _present_alert(title=str(placeholder), message=None, buttons=buttons, style="action_sheet")
+
+
+def _picker_make_target(button_id: int) -> Any:
+    """Build a retained ObjC target wired to ``button_id``'s picker state."""
+    target = _PNPickerTarget.new()
+    target.retain()
+    _pn_retained_views.append(target)
+    _pn_picker_target_to_button[id(target)] = button_id
+    return target
+
+
+class PickerHandler(IOSViewHandler):
+    """``Picker`` element handler — native action-sheet dropdown."""
+
+    def create(self, props: Dict[str, Any]) -> Any:
+        UIButton = ObjCClass("UIButton")
+        btn = UIButton.buttonWithType_(1)  # UIButtonTypeSystem
+        btn.setTranslatesAutoresizingMaskIntoConstraints_(True)
+        bid = id(btn)
+        _pn_picker_state[bid] = {
+            "items": list(props.get("items") or []),
+            "on_change": props.get("on_change"),
+            "placeholder": props.get("placeholder") or "Select…",
+            "value": props.get("value"),
+        }
+        target = _picker_make_target(bid)
+        _pn_picker_state[bid]["target"] = target
+        btn.addTarget_action_forControlEvents_(target, SEL("onTap:"), 1 << 6)  # touchUpInside
+        btn.setTitle_forState_(_picker_button_title(props), 0)
+        _apply_accessibility(btn, props)
+        return btn
+
+    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
+        bid = id(native_view)
+        state = _pn_picker_state.setdefault(bid, {})
+        for key in ("items", "on_change", "placeholder", "value"):
+            if key in changed:
+                state[key] = changed[key]
+        native_view.setTitle_forState_(_picker_button_title(state), 0)
+        _apply_accessibility(native_view, changed)
+
+    def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
+        try:
+            mw = _safe_max(max_width, fallback=10000.0)
+            mh = _safe_max(max_height, fallback=10000.0)
+            size = native_view.sizeThatFits_((mw, mh))
+            return (float(size.width) + 16.0, float(size.height) + 8.0)
+        except Exception:
+            return (120.0, 36.0)
+
+
+# ======================================================================
 # Registration
 # ======================================================================
 
@@ -2534,6 +2651,7 @@ def register_handlers(registry: Any) -> None:
     registry.register("StatusBar", StatusBarHandler())
     registry.register("KeyboardAvoidingView", KeyboardAvoidingViewHandler())
     registry.register("VirtualList", VirtualListHandler())
+    registry.register("Picker", PickerHandler())
 
 
 __all__ = [
@@ -2557,6 +2675,7 @@ __all__ = [
     "StatusBarHandler",
     "KeyboardAvoidingViewHandler",
     "VirtualListHandler",
+    "PickerHandler",
     "register_handlers",
 ]
 

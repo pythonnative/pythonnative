@@ -75,6 +75,12 @@ pn.Column(
 - [`ErrorBoundary(child, fallback)`][pythonnative.ErrorBoundary]:
   catches render errors in child and displays fallback.
 
+**Composition:**
+
+- [`Fragment(*children)`][pythonnative.Fragment]: group siblings into a
+  parent's child list without an extra wrapping view (analogous to
+  React's `<>…</>`).
+
 **Lists:**
 
 - [`FlatList(data, render_item, key_extractor, item_height, ...)`][pythonnative.FlatList]:
@@ -86,7 +92,7 @@ pn.Column(
 
 **Platform UI:**
 
-- [`StatusBar(style, background_color, hidden)`][pythonnative.StatusBar]:
+- [`StatusBar(bar_style, background_color, hidden)`][pythonnative.StatusBar]:
   configure the device's status bar (light/dark icons, color, hidden).
 - [`KeyboardAvoidingView(*children, behavior)`][pythonnative.KeyboardAvoidingView]:
   shift content up when the software keyboard appears.
@@ -249,6 +255,9 @@ hook state.
   persists across renders. When passed via the `ref=` prop, the
   reconciler populates `ref["current"]` with the underlying native
   view.
+- [`use_animated_value(initial)`][pythonnative.use_animated_value]:
+  stable [`AnimatedValue`][pythonnative.AnimatedValue] across renders;
+  the canonical way to drive `Animated.View`.
 - [`use_context(context)`][pythonnative.use_context]: read from a
   context provider.
 - [`use_navigation()`][pythonnative.use_navigation]: navigation
@@ -263,6 +272,9 @@ hook state.
   reactive safe-area insets.
 - [`use_keyboard_height()`][pythonnative.use_keyboard_height]:
   reactive software-keyboard height.
+- [`@memo`][pythonnative.memo]: decorator that skips a function
+  component's re-render when its props are shallowly equal and its
+  internal state is unchanged.
 
 ### Custom hooks
 

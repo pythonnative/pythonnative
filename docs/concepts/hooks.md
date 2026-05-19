@@ -209,6 +209,17 @@ render_count = pn.use_ref(0)
 render_count["current"] += 1
 ```
 
+### use_animated_value
+
+Create an [`AnimatedValue`][pythonnative.AnimatedValue] that's stable
+across renders. Equivalent to wrapping `pn.Animated.Value(initial)` in
+`use_memo(..., [])` but more discoverable:
+
+```python
+opacity = pn.use_animated_value(0.0)
+pn.Animated.timing(opacity, to=1.0, duration=300).start()
+```
+
 ### use_context
 
 Read a value from the nearest `Provider` ancestor:
@@ -266,6 +277,32 @@ State updates triggered by effects during a render pass are
 automatically batched; the framework drains any pending re-renders
 after effect flushing completes, so you don't need `batch_updates()`
 inside effects.
+
+## Memoizing function components
+
+Wrap a function component with [`@pn.memo`][pythonnative.memo] to skip
+its body when neither its props nor its internal state have changed:
+
+```python
+@pn.memo
+@pn.component
+def ExpensiveRow(label: str, value: int):
+    return pn.Row(
+        pn.Text(label, style={"flex": 1}),
+        pn.Text(str(value)),
+    )
+```
+
+When a `memo`'d component is reconciled, the reconciler compares the
+new props against the previous props using shallow equality. If they
+match and none of the component's `use_state` / `use_reducer` setters
+have fired since the last render, the previously-rendered subtree is
+reused and the component body is not re-executed. This is the
+component-level equivalent of [`use_memo`][pythonnative.use_memo].
+
+`memo` is typically used on pure, prop-driven leaves that re-render
+frequently as part of a larger tree, e.g. rows inside a list whose
+identity doesn't change between renders of the parent.
 
 ## Error boundaries
 

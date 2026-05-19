@@ -846,3 +846,65 @@ def test_spacer_with_size_prop_takes_that_dimension() -> None:
     a, spacer, b = root.children
     assert spacer.frame[2] == 24.0, "Spacer(size=24) must take 24pt on the row's main axis"
     assert b.frame[0] == a.frame[2] + spacer.frame[2], "Sibling sits after spacer"
+
+
+# ======================================================================
+# Fragment (transparent grouping element)
+# ======================================================================
+
+
+def test_fragment_flattens_into_parent() -> None:
+    """A Fragment inside a parent contributes its children at the parent level."""
+    import pythonnative as pn
+
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    rec.mount(
+        Element(
+            "Column",
+            {},
+            [
+                Element("Text", {"text": "before"}, []),
+                pn.Fragment(
+                    Element("Text", {"text": "frag-a"}, []),
+                    Element("Text", {"text": "frag-b"}, []),
+                ),
+                Element("Text", {"text": "after"}, []),
+            ],
+        )
+    )
+    # Find the Column view and assert it received 4 direct children.
+    create_ops = [op for op in backend.ops if op[0] == "create"]
+    column_id = next(op[2] for op in create_ops if op[1] == "Column")
+    add_to_column = [op for op in backend.ops if op[0] == "add_child" and op[1] == column_id]
+    assert len(add_to_column) == 4, "Fragment should be transparent and contribute 2 children directly"
+
+
+def test_fragment_reconciles_keyed_siblings() -> None:
+    """Reordering keyed children inside a Fragment moves rather than recreates."""
+    import pythonnative as pn
+
+    @component
+    def row(reversed_order: bool = False) -> Element:
+        items: list[Element] = [
+            Element("Text", {"text": "A"}, [], key="a"),
+            Element("Text", {"text": "B"}, [], key="b"),
+        ]
+        if reversed_order:
+            items.reverse()
+        return Element("Column", {}, [pn.Fragment(*items)])
+
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    rec.mount(row(reversed_order=False))
+
+    create_ops_before = [op for op in backend.ops if op[0] == "create"]
+    backend.ops.clear()
+
+    rec.reconcile(row(reversed_order=True))
+
+    create_ops_after = [op for op in backend.ops if op[0] == "create"]
+    assert create_ops_after == [], "Reordering keyed children inside Fragment must not recreate views"
+    assert any(op[0] in ("insert_child", "add_child", "remove_child") for op in backend.ops)
+    # Two Text views existed before; no new ones should have been added.
+    assert sum(1 for op in create_ops_before if op[1] == "Text") == 2

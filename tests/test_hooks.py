@@ -12,6 +12,7 @@ from pythonnative.hooks import (
     batch_updates,
     component,
     create_context,
+    memo,
     use_callback,
     use_context,
     use_effect,
@@ -722,3 +723,115 @@ def test_navigation_handle_methods() -> None:
     assert len(popped) == 1
 
     assert handle.get_params() == {"key": "value"}
+
+
+# ======================================================================
+# Provider with *children
+# ======================================================================
+
+
+def test_provider_with_multiple_children_wraps_in_fragment() -> None:
+    theme = create_context("light")
+    child_a = Element("Text", {"text": "a"}, [])
+    child_b = Element("Text", {"text": "b"}, [])
+
+    el = Provider(theme, "dark", child_a, child_b)
+    assert el.type == "__Provider__"
+    inner = el.children[0]
+    assert inner.type == "__Fragment__"
+    assert inner.children == [child_a, child_b]
+
+
+def test_provider_with_single_child_no_fragment_wrap() -> None:
+    theme = create_context("light")
+    child = Element("Text", {"text": "single"}, [])
+
+    el = Provider(theme, "dark", child)
+    assert el.type == "__Provider__"
+    assert el.children == [child]
+
+
+# ======================================================================
+# @memo
+# ======================================================================
+
+
+def test_memo_marks_component() -> None:
+    @memo
+    @component
+    def my_comp(label: str = "x") -> Element:
+        return Element("Text", {"text": label}, [])
+
+    assert getattr(my_comp, "_pn_memo", False) is True
+
+
+def test_memo_skips_rerender_with_same_props() -> None:
+    render_count = [0]
+
+    @memo
+    @component
+    def my_comp(label: str = "x") -> Element:
+        render_count[0] += 1
+        return Element("Text", {"text": label}, [])
+
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    rec.mount(my_comp(label="A"))
+    assert render_count[0] == 1
+
+    rec.reconcile(my_comp(label="A"))
+    assert render_count[0] == 1, "memoized component should not re-render when props are unchanged"
+
+
+def test_memo_rerenders_when_props_change() -> None:
+    render_count = [0]
+
+    @memo
+    @component
+    def my_comp(label: str = "x") -> Element:
+        render_count[0] += 1
+        return Element("Text", {"text": label}, [])
+
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    rec.mount(my_comp(label="A"))
+    rec.reconcile(my_comp(label="B"))
+    assert render_count[0] == 2
+
+
+def test_memo_rerenders_when_internal_state_changes() -> None:
+    render_count = [0]
+    captured_setter: list = [None]
+
+    @memo
+    @component
+    def stateful() -> Element:
+        render_count[0] += 1
+        value, set_value = use_state(0)
+        captured_setter[0] = set_value
+        return Element("Text", {"text": str(value)}, [])
+
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    rec.mount(stateful())
+    assert render_count[0] == 1
+
+    setter_fn = captured_setter[0]
+    assert setter_fn is not None
+    setter_fn(5)
+
+    rec.reconcile(stateful())
+    assert render_count[0] == 2, "memo should still re-render when internal state changed"
+
+
+def test_memo_can_be_called_with_explicit_argument() -> None:
+    """``memo`` works as a plain function as well as a decorator."""
+
+    @component
+    def my_comp(label: str = "x") -> Element:
+        return Element("Text", {"text": label}, [])
+
+    wrapped = memo(my_comp)
+    assert getattr(wrapped, "_pn_memo", False) is True
+    el = wrapped(label="hi")
+    assert isinstance(el, Element)

@@ -38,7 +38,7 @@ def SettingsScreen() -> pn.Element:
 
     return pn.ScrollView(
         pn.Column(
-            pn.StatusBar(style="dark"),
+            pn.StatusBar(bar_style="dark"),
             pn.Text("Settings", style=styles["title"]),
             pn.Text(f"PythonNative v{pn.__version__}", style=styles["subtitle"]),
             pn.Text(

@@ -42,6 +42,58 @@ from .layout import LayoutNode, calculate_layout, extract_layout_style
 _RECONCILER_OWNED_PROPS = frozenset({"ref"})
 
 
+def _shallow_equal_props(old: dict, new: dict) -> bool:
+    """Return whether two prop dicts are equal under shallow comparison.
+
+    Used by [`memo`][pythonnative.memo] to skip re-rendering when none
+    of a component's props changed identity. Callables only count as
+    equal if they're the *same object* — fresh closures always invalidate
+    the memo (matching React's behavior; pair with
+    [`use_callback`][pythonnative.use_callback] when stability matters).
+    """
+    if old is new:
+        return True
+    if set(old.keys()) != set(new.keys()):
+        return False
+    for key, ov in old.items():
+        nv = new[key]
+        if ov is nv:
+            continue
+        if callable(ov) or callable(nv):
+            return False
+        try:
+            if ov != nv:
+                return False
+        except Exception:
+            return False
+    return True
+
+
+def _flatten_children(children: List[Element]) -> List[Element]:
+    """Expand [`Fragment`][pythonnative.Fragment] elements inline.
+
+    The reconciler treats Fragments as transparent: when one appears in
+    a child list, its own children become direct siblings of the
+    Fragment's location in the parent's child list. This keeps the
+    Fragment element out of the native tree entirely.
+
+    Args:
+        children: An ordered child list possibly containing Fragments.
+
+    Returns:
+        A new list with every Fragment recursively expanded in place.
+    """
+    if not children:
+        return list(children)
+    out: List[Element] = []
+    for el in children:
+        if isinstance(el.type, str) and el.type == "__Fragment__":
+            out.extend(_flatten_children(el.children))
+        else:
+            out.append(el)
+    return out
+
+
 class VNode:
     """A mounted [`Element`][pythonnative.Element] plus its native view.
 
@@ -251,12 +303,13 @@ class Reconciler:
     # ------------------------------------------------------------------
 
     def _create_tree(self, element: Element) -> VNode:
-        # Provider: push context, create child, pop context
+        # Provider: push context, create children, pop context
         if element.type == "__Provider__":
             context = element.props["__context__"]
             context._stack.append(element.props["__value__"])
             try:
-                child_node = self._create_tree(element.children[0]) if element.children else None
+                provider_children = _flatten_children(element.children)
+                child_node = self._create_tree(provider_children[0]) if provider_children else None
             finally:
                 context._stack.pop()
             native_view = child_node.native_view if child_node else None
@@ -266,6 +319,16 @@ class Reconciler:
         # Error boundary: catch exceptions in the child subtree
         if element.type == "__ErrorBoundary__":
             return self._create_error_boundary(element)
+
+        # Fragment elements should never reach here directly (the parent
+        # flattens them out of its child list). If we somehow get one as
+        # a root element, mount its first child.
+        if element.type == "__Fragment__":
+            kids = _flatten_children(element.children)
+            if not kids:
+                return VNode(element, None, [])
+            child_node = self._create_tree(kids[0])
+            return VNode(element, child_node.native_view, [child_node])
 
         # Function component: call with hook context
         if callable(element.type):
@@ -278,6 +341,7 @@ class Reconciler:
                 rendered = element.type(**element.props)
             finally:
                 _set_hook_state(None)
+                hook_state._dirty = False
 
             child_node = self._create_tree(rendered)
             vnode = VNode(element, child_node.native_view, [child_node])
@@ -299,7 +363,8 @@ class Reconciler:
         self._log_viewport(f"_create_tree: native created type={element.type!r} view={self._obj_debug(native_view)}")
         self._attach_ref(element, native_view)
         children: List[VNode] = []
-        for i, child_el in enumerate(element.children):
+        flat_children = _flatten_children(element.children)
+        for i, child_el in enumerate(flat_children):
             child_type = self._type_label(child_el.type)
             self._log_viewport(f"_create_tree: creating child[{i}] type={child_type!r} of {element.type!r}")
             try:
@@ -329,8 +394,9 @@ class Reconciler:
 
     def _create_error_boundary(self, element: Element) -> VNode:
         fallback_fn = element.props.get("__fallback__")
+        eb_children = _flatten_children(element.children)
         try:
-            child_node = self._create_tree(element.children[0]) if element.children else None
+            child_node = self._create_tree(eb_children[0]) if eb_children else None
         except Exception as exc:
             if fallback_fn is not None:
                 fallback_el = fallback_fn(exc) if callable(fallback_fn) else fallback_fn
@@ -358,12 +424,13 @@ class Reconciler:
             context = new_el.props["__context__"]
             context._stack.append(new_el.props["__value__"])
             try:
-                if old.children and new_el.children:
-                    child = self._reconcile_node(old.children[0], new_el.children[0])
+                provider_kids = _flatten_children(new_el.children)
+                if old.children and provider_kids:
+                    child = self._reconcile_node(old.children[0], provider_kids[0])
                     old.children = [child]
                     old.native_view = child.native_view
-                elif new_el.children:
-                    child = self._create_tree(new_el.children[0])
+                elif provider_kids:
+                    child = self._create_tree(provider_kids[0])
                     old.children = [child]
                     old.native_view = child.native_view
             finally:
@@ -379,6 +446,15 @@ class Reconciler:
         if callable(new_el.type):
             from .hooks import _set_hook_state
 
+            # ``@memo`` skip: if the props haven't changed shallowly and
+            # the component's own hook state is clean (no setter fired
+            # while we were rebuilding the parent tree), reuse the
+            # previously-rendered subtree without invoking the body.
+            if self._can_skip_memoized(old, new_el):
+                old.element = new_el
+                self._log_viewport(f"_reconcile_node: memo skip type={self._type_label(new_el.type)!r}")
+                return old
+
             hook_state = old.hook_state
             if hook_state is None:
                 from .hooks import HookState
@@ -391,6 +467,7 @@ class Reconciler:
                 rendered = new_el.type(**new_el.props)
             finally:
                 _set_hook_state(None)
+                hook_state._dirty = False
 
             if old.children:
                 child = self._reconcile_node(old.children[0], rendered)
@@ -439,13 +516,14 @@ class Reconciler:
 
     def _reconcile_error_boundary(self, old: VNode, new_el: Element) -> VNode:
         fallback_fn = new_el.props.get("__fallback__")
+        eb_kids = _flatten_children(new_el.children)
         try:
-            if old.children and new_el.children:
-                child = self._reconcile_node(old.children[0], new_el.children[0])
+            if old.children and eb_kids:
+                child = self._reconcile_node(old.children[0], eb_kids[0])
                 old.children = [child]
                 old.native_view = child.native_view
-            elif new_el.children:
-                child = self._create_tree(new_el.children[0])
+            elif eb_kids:
+                child = self._create_tree(eb_kids[0])
                 old.children = [child]
                 old.native_view = child.native_view
         except Exception as exc:
@@ -461,10 +539,40 @@ class Reconciler:
         old.element = new_el
         return old
 
+    @staticmethod
+    def _can_skip_memoized(old: VNode, new_el: Element) -> bool:
+        """Return whether a memo'd function component can skip its body.
+
+        A component is skippable iff:
+
+        1. Its type has the ``_pn_memo`` marker set by
+           [`memo`][pythonnative.memo].
+        2. It has been rendered before (``old._rendered`` is populated).
+        3. None of its internal state setters fired since the last
+           render (``hook_state._dirty`` is ``False``).
+        4. The new props are shallowly equal to the old props.
+        """
+        fn = new_el.type
+        if not getattr(fn, "_pn_memo", False):
+            return False
+        if old._rendered is None:
+            return False
+        hook_state = old.hook_state
+        if hook_state is None:
+            return False
+        if hook_state._dirty:
+            return False
+        return _shallow_equal_props(old.element.props, new_el.props)
+
     def _reconcile_children(self, parent: VNode, new_children: List[Element]) -> None:
+        new_children = _flatten_children(new_children)
         old_children = parent.children
         parent_type = parent.element.type
-        is_native = isinstance(parent_type, str) and parent_type not in ("__Provider__", "__ErrorBoundary__")
+        is_native = isinstance(parent_type, str) and parent_type not in (
+            "__Provider__",
+            "__ErrorBoundary__",
+            "__Fragment__",
+        )
 
         old_by_key: dict = {}
         old_unkeyed: list = []
@@ -714,7 +822,7 @@ class Reconciler:
         element = vnode.element
         if not isinstance(element.type, str):
             return self._build_layout_tree(vnode.children[0]) if vnode.children else None
-        if element.type in ("__Provider__", "__ErrorBoundary__"):
+        if element.type in ("__Provider__", "__ErrorBoundary__", "__Fragment__"):
             return self._build_layout_tree(vnode.children[0]) if vnode.children else None
         if element.type == "Modal":
             return None  # Off-screen placeholder; not part of the visible flow.
@@ -773,6 +881,7 @@ class Reconciler:
             "ProgressBar",
             "ActivityIndicator",
             "TabBar",
+            "Picker",
         }
     )
 
