@@ -8,6 +8,7 @@ appId: ${APP_ID}
 - tapOn: "View Showcase"
 - assertVisible: "Greetings from Home"
 - scroll
+- scroll
 - extendedWaitUntil:
     visible: "View Forms"
     timeout: 10000
@@ -20,6 +21,7 @@ appId: ${APP_ID}
 - assertVisible: "Back to Showcase"
 - tapOn: "Back to Showcase"
 - assertVisible: "Greetings from Home"
+- scroll
 - scroll
 - extendedWaitUntil:
     visible: "Back"
