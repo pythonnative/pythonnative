@@ -40,21 +40,7 @@ jobs:
         with:
           api-level: 31
           arch: x86_64
-          script: |
-            export MAESTRO_CLI_NO_ANALYTICS=1
-            cd examples/hello-world
-            pn run android --no-logs
-            cd ../..
-            maestro test tests/e2e/android.yaml || {
-              status=$?
-              adb devices || true
-              adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' || true
-              adb shell dumpsys activity top | head -120 || true
-              adb shell uiautomator dump /sdcard/window.xml || true
-              adb shell cat /sdcard/window.xml || true
-              adb logcat -d -t 1000 PythonNative:D MainActivity:D ScreenFragment:D python.stdout:I python.stderr:E AndroidRuntime:E '*:S' || true
-              exit "$status"
-            }
+          script: bash scripts/run-android-e2e-ci.sh
 
       - name: Upload Android E2E debug artifacts
         if: failure()
