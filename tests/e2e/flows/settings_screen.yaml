@@ -4,7 +4,7 @@ appId: ${APP_ID}
 - launchApp
 - extendedWaitUntil:
     visible: "Hello from PythonNative Demo!"
-    timeout: 120000
+    timeout: 30000
 - tapOn: "Settings"
 - extendedWaitUntil:
     visible: "Settings"

@@ -46,14 +46,8 @@ jobs:
         with:
           api-level: 31
           arch: x86_64
-          script: bash scripts/run-android-e2e-ci.sh
-
-      - name: Upload Android E2E debug artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-e2e-debug
-          path: ~/.maestro/tests
+          script: >-
+            bash -lc "cd examples/hello-world && pn run android --no-logs && cd ../.. && maestro test tests/e2e/android.yaml"
 
   e2e-ios:
     runs-on: macos-latest
