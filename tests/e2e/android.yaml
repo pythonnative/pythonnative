@@ -4,6 +4,6 @@ env:
 ---
 - runFlow: flows/main.yaml
 - runFlow: flows/navigation_android.yaml
-- runFlow: flows/layout_screen.yaml
+- runFlow: flows/layout_android.yaml
 - runFlow: flows/list_screen.yaml
 - runFlow: flows/settings_screen.yaml

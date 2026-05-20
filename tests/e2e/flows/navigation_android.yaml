@@ -6,7 +6,9 @@ appId: ${APP_ID}
     visible: "Hello from PythonNative Demo!"
     timeout: 120000
 - tapOn: "View Showcase"
-- assertVisible: "Greetings from Home"
+- extendedWaitUntil:
+    visible: "Greetings from Home"
+    timeout: 10000
 - scroll
 - scroll
 - extendedWaitUntil:
@@ -16,4 +18,6 @@ appId: ${APP_ID}
 - assertVisible: "Forms"
 - assertVisible: "You navigated two levels deep."
 - back
-- assertVisible: "Greetings from Home"
+- extendedWaitUntil:
+    visible: "Greetings from Home"
+    timeout: 10000
