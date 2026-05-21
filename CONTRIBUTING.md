@@ -107,12 +107,15 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `native_modules` – native API modules for device capabilities (`native_modules/`)
   - `native_views` – platform-specific native view creation and updates (`native_views/`)
   - `navigation` – navigation containers and stack/tab/drawer navigators (`navigation.py`)
+  - `net` – awaitable HTTP client (`net.py`)
   - `package` – `src/pythonnative/__init__.py` exports and package boundary
   - `platform` – `Platform.OS`/`Platform.select` and version detection (`platform.py`)
   - `platform_metrics` – platform-reported metrics like safe-area insets and bar heights (`platform_metrics.py`)
   - `reconciler` – virtual view tree diffing and reconciliation (`reconciler.py`)
+  - `runtime` – framework-wide asyncio loop and thread-safe future helpers (`runtime.py`)
   - `screen` – screen host, native lifecycle bridge, and render scheduling (`screen.py`)
   - `sdk` – public extension SDK for custom native components (`sdk/`)
+  - `storage` – AsyncStorage key/value persistence and `use_persisted_state` (`storage.py`)
   - `style` – StyleSheet and theming (`style.py`)
   - `utils` – shared utilities (`utils.py`)
 

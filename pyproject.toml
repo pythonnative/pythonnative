@@ -43,12 +43,14 @@ dev = [
   "ruff>=0.5",
   "mypy>=1.10",
   "pytest>=8.0",
+  "pytest-asyncio>=0.23",
 ]
 ci = [
   "black>=24.0",
   "ruff>=0.5",
   "mypy>=1.10",
   "pytest>=8.0",
+  "pytest-asyncio>=0.23",
 ]
 
 [project.scripts]
@@ -119,6 +121,9 @@ convention = "google"
 [tool.black]
 line-length = 120
 target-version = ['py39']
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 
 # ── Semantic Release ────────────────────────────────────────────────
 

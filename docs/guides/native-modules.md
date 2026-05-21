@@ -6,8 +6,13 @@ and local notifications. Each module is implemented twice (once per
 platform) and dispatches at runtime based on `utils.IS_ANDROID` /
 `utils.IS_IOS`, so app code stays single-source.
 
-This guide covers the four built-in modules: where to import them,
-which permissions they need, and the typical usage shape.
+Apart from `FileSystem`, every public method is a coroutine —
+`async def take_photo()`, `async def get_current()`, and so on. The
+typical call site uses `await` (inside a component, that means
+[`use_async_effect`][pythonnative.hooks.use_async_effect],
+[`use_query`][pythonnative.hooks.use_query], or
+[`pn.run_async(coro)`][pythonnative.runtime.run_async] from a sync
+handler).
 
 ## Permissions: declare them once, request at runtime
 
@@ -41,78 +46,85 @@ write them as you would want a user to read them.
 ## Camera
 
 [`Camera`][pythonnative.native_modules.camera.Camera] wraps photo
-capture and gallery picking. Both methods return a path to the saved
-file (or `None` if the user cancelled).
+capture and gallery picking. Both coroutines resolve to a path to the
+saved file (or `None` if the user cancelled).
 
 ```python
-from pythonnative.native_modules import Camera
+import pythonnative as pn
+
 
 @pn.component
 def CameraScreen():
     photo, set_photo = pn.use_state(None)
 
-    def take():
-        path = Camera().take_photo()
+    async def take():
+        path = await pn.Camera.take_photo()
         if path:
             set_photo(path)
 
     return pn.Column(
-        pn.Button("Take photo", on_click=take),
+        pn.Button("Take photo", on_click=lambda: pn.run_async(take())),
         pn.Image(source=photo) if photo else pn.Spacer(),
     )
 ```
 
 !!! note "Cold-start permissions"
     The first call shows the system permission prompt. If the user
-    denies it, subsequent calls return `None` immediately; surface a
-    helpful message in your UI rather than calling in a loop.
+    denies it, subsequent calls resolve to `None` immediately; surface
+    a helpful message in your UI rather than calling in a loop.
 
 ## Location
 
-[`Location`][pythonnative.native_modules.location.Location] reads a
-single GPS fix.
+[`Location.get_current`][pythonnative.native_modules.location.Location.get_current]
+reads a single GPS fix.
 
 ```python
-from pythonnative.native_modules import Location
+import pythonnative as pn
+
 
 @pn.component
 def WhereAmI():
-    fix, set_fix = pn.use_state(None)
-
-    pn.use_focus_effect(lambda: (set_fix(Location().get_current()), None)[1], deps=[])
-
-    if fix is None:
+    q = pn.use_query(pn.Location.get_current, [])
+    if q.loading:
         return pn.Text("Acquiring location...")
-    return pn.Text(f"{fix['latitude']:.4f}, {fix['longitude']:.4f}")
+    if q.data is None:
+        return pn.Text("Location unavailable")
+    lat, lon = q.data
+    return pn.Text(f"{lat:.4f}, {lon:.4f}")
 ```
 
-For continuous updates, write a small native module that subscribes to
-`CLLocationManagerDelegate` (iOS) or `LocationManager.requestUpdates`
+[`use_query`][pythonnative.hooks.use_query] manages the
+loading/data/error state for you and exposes a `refetch()` callable.
+
+For continuous updates, write a small native module that subscribes
+to `CLLocationManagerDelegate` (iOS) or `LocationManager.requestUpdates`
 (Android) and pushes deltas through `set_state` from the main thread.
 
 ## File system
 
 [`FileSystem`][pythonnative.native_modules.file_system.FileSystem] is
 scoped to your app's documents directory; relative paths are resolved
-inside that sandbox automatically.
+inside that sandbox automatically. Unlike the other modules, the file
+system surface is synchronous — local disk reads are typically
+faster than the cost of hopping onto the asyncio loop. For large
+files you can opt into a worker thread:
 
 ```python
-from pythonnative.native_modules import FileSystem
+import asyncio
+import pythonnative as pn
 
-fs = FileSystem()
-fs.write_text("notes.txt", "hello")
-fs.exists("notes.txt")           # True
-fs.list_dir("")                  # ["notes.txt"]
-fs.read_text("notes.txt")        # "hello"
+# Sync — fine for small files (preferences, JSON state, etc.)
+pn.FileSystem.write_text("notes.txt", "hello")
+text = pn.FileSystem.read_text("notes.txt")
+
+# Async — explicitly offload to a worker thread for big payloads.
+text = await asyncio.to_thread(pn.FileSystem.read_text, "big.txt")
 ```
 
-For binary content, use `read_bytes` and `write_bytes`. For
-sub-directories, call `ensure_dir("photos")` before writing into it.
-
-!!! tip "Use `app_dir()` for absolute paths"
-    Some native APIs (e.g., `MediaStore`, `NSFileManager`) need an
-    absolute path. `fs.app_dir()` returns it without you needing to
-    know the platform-specific layout.
+!!! tip "Need just a key-value store?"
+    Prefer [`AsyncStorage`][pythonnative.storage.AsyncStorage] over
+    serialising JSON into a file by hand — it's the native
+    `NSUserDefaults` / `SharedPreferences` API and is async-first.
 
 ## Notifications
 
@@ -120,38 +132,62 @@ sub-directories, call `ensure_dir("photos")` before writing into it.
 schedules local notifications and cancels previously scheduled ones.
 
 ```python
-from pythonnative.native_modules import Notifications
+import pythonnative as pn
 
-n = Notifications()
-n.request_permission()
-n.schedule(id="reminder", title="Stretch break", body="Stand up!", delay_seconds=1800)
-n.cancel("reminder")
+
+async def setup_reminder():
+    granted = await pn.Notifications.request_permission()
+    if not granted:
+        return
+    await pn.Notifications.schedule(
+        title="Stretch break",
+        body="Stand up!",
+        delay_seconds=1800,
+        identifier="reminder",
+    )
 ```
 
-`request_permission()` is required on iOS and on Android 13+. On older
-Android, the call is a no-op.
+`request_permission()` is required on iOS and on Android 13+. On
+older Android the call returns `True` without prompting.
 
 ## Writing your own native module
 
 A native module is just a class with two implementations behind a
-runtime dispatch:
+runtime dispatch. Coroutine wrappers should bridge native delegates
+through the [`pn.runtime`](../api/runtime.md) helpers:
 
 ```python
+import asyncio
+
+from pythonnative.runtime import resolve_future
 from pythonnative.utils import IS_ANDROID, IS_IOS
 
+
 class Battery:
-    def get_level(self) -> float:
+    @staticmethod
+    async def get_level() -> float:
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[float] = loop.create_future()
+
         if IS_ANDROID:
             from java import jclass
-            ctx = ...  # via get_android_context()
+
+            from pythonnative.utils import get_android_context
+
+            ctx = get_android_context()
             mgr = ctx.getSystemService("batterymanager")
-            return mgr.getIntProperty(jclass(...).BATTERY_PROPERTY_CAPACITY) / 100.0
-        if IS_IOS:
+            level = mgr.getIntProperty(jclass(...).BATTERY_PROPERTY_CAPACITY) / 100.0
+            resolve_future(future, level)
+        elif IS_IOS:
             from rubicon.objc import ObjCClass
+
             UIDevice = ObjCClass("UIDevice")
             UIDevice.currentDevice.batteryMonitoringEnabled = True
-            return float(UIDevice.currentDevice.batteryLevel)
-        raise RuntimeError("Battery is only available on Android or iOS")
+            resolve_future(future, float(UIDevice.currentDevice.batteryLevel))
+        else:
+            raise RuntimeError("Battery is only available on Android or iOS")
+
+        return await future
 ```
 
 Keep platform imports inside the platform branch so the desktop
@@ -160,5 +196,6 @@ import path doesn't pull in Chaquopy or rubicon-objc.
 ## Next steps
 
 - Reference: [Native modules API](../api/native_modules.md).
+- Async hooks and data fetching: [Async + data](async.md).
 - See how device APIs interact with focus: [Lifecycle](../concepts/lifecycle.md).
 - Wrap a custom widget instead of an API: [Native views](../concepts/native-views.md).

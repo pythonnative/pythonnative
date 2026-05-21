@@ -1512,8 +1512,28 @@ def _present_alert(
     message: Optional[str],
     buttons: list,
     style: str = "alert",
+    on_result: Callable[[int], None] = lambda _idx: None,
 ) -> None:
-    """Internal: present an AlertDialog or BottomSheet (style='action_sheet')."""
+    """Present an AlertDialog or BottomSheet (``style='action_sheet'``).
+
+    ``buttons`` is a list of ``{"label": str, "style":
+    "default"|"cancel"|"destructive"}`` dicts (no ``on_press``).
+    Exactly one ``on_result(index)`` is invoked when the user picks a
+    button; a dismiss delivers ``-1``. ``on_result`` runs on the
+    Android main thread.
+    """
+    del style  # AlertDialog has no distinct action-sheet style on Android.
+    delivered = [False]
+
+    def _deliver(index: int) -> None:
+        if delivered[0]:
+            return
+        delivered[0] = True
+        try:
+            on_result(index)
+        except Exception:
+            pass
+
     try:
         AlertDialog = jclass("android.app.AlertDialog$Builder")
         builder = AlertDialog(_ctx())
@@ -1521,60 +1541,62 @@ def _present_alert(
         if message is not None:
             builder.setMessage(str(message))
         if not buttons:
-            buttons = [{"label": "OK"}]
-        positive = None
-        negative = None
-        neutral = None
-        for spec in buttons:
+            buttons = [{"label": "OK", "style": "default"}]
+
+        # AlertDialog only has three slots (positive/negative/neutral).
+        # Assign the first matching style class to the conventional
+        # slot, then spill any leftovers into whichever slot is free.
+        slot_for: dict = {}
+        free_slots = ["positive", "negative", "neutral"]
+        for i, spec in enumerate(buttons):
             kind = spec.get("style", "default")
-            if positive is None and kind == "default":
-                positive = spec
-            elif negative is None and kind == "cancel":
-                negative = spec
-            elif neutral is None and kind == "destructive":
-                neutral = spec
-            elif positive is None:
-                positive = spec
-            elif negative is None:
-                negative = spec
-            elif neutral is None:
-                neutral = spec
+            preferred = {
+                "default": "positive",
+                "cancel": "negative",
+                "destructive": "neutral",
+            }.get(kind, "positive")
+            if preferred in free_slots:
+                slot_for[i] = preferred
+                free_slots.remove(preferred)
+        for i, spec in enumerate(buttons):
+            if i in slot_for:
+                continue
+            if not free_slots:
+                break
+            slot_for[i] = free_slots.pop(0)
 
         OnClickListener = jclass("android.content.DialogInterface$OnClickListener")
 
-        def make_listener(callback: Any) -> Any:
+        def make_listener(button_index: int) -> Any:
             class _Proxy(dynamic_proxy(OnClickListener)):
-                def __init__(self, cb: Any) -> None:
-                    super().__init__()
-                    self.cb = cb
-
                 def onClick(self, dialog: Any, which: int) -> None:
-                    if self.cb is not None:
-                        try:
-                            self.cb()
-                        except Exception:
-                            pass
+                    _deliver(button_index)
 
-            return _Proxy(callback)
+            return _Proxy()
 
-        if positive is not None:
-            builder.setPositiveButton(
-                str(positive.get("label", "OK")),
-                make_listener(positive.get("on_press")),
-            )
-        if negative is not None:
-            builder.setNegativeButton(
-                str(negative.get("label", "Cancel")),
-                make_listener(negative.get("on_press")),
-            )
-        if neutral is not None:
-            builder.setNeutralButton(
-                str(neutral.get("label", "")),
-                make_listener(neutral.get("on_press")),
-            )
+        for i, spec in enumerate(buttons):
+            slot = slot_for.get(i)
+            if slot is None:
+                continue
+            label = str(spec.get("label", ""))
+            listener = make_listener(i)
+            if slot == "positive":
+                builder.setPositiveButton(label, listener)
+            elif slot == "negative":
+                builder.setNegativeButton(label, listener)
+            else:
+                builder.setNeutralButton(label, listener)
+
+        OnCancelListener = jclass("android.content.DialogInterface$OnCancelListener")
+
+        class _CancelProxy(dynamic_proxy(OnCancelListener)):
+            def onCancel(self, dialog: Any) -> None:
+                _deliver(-1)
+
+        builder.setOnCancelListener(_CancelProxy())
         builder.show()
     except Exception:
-        pass
+        _deliver(-1)
 
 
 # ======================================================================

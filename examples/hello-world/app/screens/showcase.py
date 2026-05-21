@@ -32,24 +32,29 @@ local_styles = pn.StyleSheet.create(
 
 @pn.component
 def AnimatedCard() -> pn.Element:
-    """Demonstrates ``Animated.View`` driven by ``use_animated_value``."""
+    """Demonstrates ``Animated.View`` driven by ``use_animated_value``.
+
+    Uses ``use_async_effect`` so the parallel enter animation is
+    awaited (no callback ladder) and gets automatically cancelled if
+    the screen unmounts before it finishes.
+    """
     opacity = pn.use_animated_value(0.0)
     scale = pn.use_animated_value(0.9)
 
-    def _enter() -> None:
-        pn.Animated.parallel(
+    async def _enter() -> None:
+        await pn.Animated.parallel(
             [
                 pn.Animated.timing(opacity, to=1.0, duration=400),
                 pn.Animated.spring(scale, to=1.0, stiffness=180, damping=14),
             ]
-        ).start()
+        )
 
-    pn.use_effect(_enter, [])
+    pn.use_async_effect(_enter, [])
 
     return pn.Animated.View(
         pn.Text("I faded in", style={"font_size": 18, "font_weight": "600"}),
         pn.Text(
-            "Animated.parallel with timing + spring drives this card.",
+            "Awaited Animated.parallel(timing + spring).",
             style={"font_size": 13, "color": "#6B7280"},
         ),
         style={
@@ -145,6 +150,9 @@ def ShowcaseScreen() -> pn.Element:
     def view_forms() -> None:
         nav.navigate("Forms")
 
+    def view_data() -> None:
+        nav.navigate("Data")
+
     def go_back() -> None:
         nav.go_back()
 
@@ -174,6 +182,7 @@ def ShowcaseScreen() -> pn.Element:
                 pressed_opacity=0.7,
             ),
             pn.Button("View Forms", on_click=view_forms),
+            pn.Button("View Async Demo", on_click=view_data),
             pn.Button("Back", on_click=go_back),
             style=styles["section"],
         )

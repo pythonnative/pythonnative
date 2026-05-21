@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import threading
+import asyncio
 import time
 from typing import Any
+
+import pytest
 
 from pythonnative.animated import Animated, AnimatedValue, use_animated_value
 from pythonnative.element import Element
@@ -52,45 +54,46 @@ def test_animated_value_subscriber_exception_isolated() -> None:
 # ======================================================================
 
 
-def _run_until(predicate: Any, timeout: float = 2.0) -> bool:
-    """Spin until ``predicate`` returns True or ``timeout`` elapses."""
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if predicate():
-            return True
-        time.sleep(0.02)
-    return False
-
-
-def test_timing_completes_at_target() -> None:
+@pytest.mark.asyncio
+async def test_timing_completes_at_target() -> None:
     v = AnimatedValue(0.0)
-    completed = threading.Event()
-    Animated.timing(v, to=10.0, duration=80, easing="linear").start(on_complete=completed.set)
-    assert completed.wait(2.0), "animation never completed"
+    await Animated.timing(v, to=10.0, duration=80, easing="linear")
     assert abs(v.value - 10.0) < 0.05
 
 
-def test_timing_progress_fires_listener() -> None:
+@pytest.mark.asyncio
+async def test_timing_progress_fires_listener() -> None:
     v = AnimatedValue(0.0)
     received: list = []
     v.add_listener("opacity", lambda x: received.append(x))
-    completed = threading.Event()
-    Animated.timing(v, to=1.0, duration=120, easing="linear").start(on_complete=completed.set)
-    assert completed.wait(2.0)
+    await Animated.timing(v, to=1.0, duration=120, easing="linear")
     # Should have received intermediate values, not just the final.
     assert len(received) >= 3
     assert received[0] > 0.0
     assert received[-1] == 1.0
 
 
-def test_timing_easing_curves() -> None:
-    """Easing curves change intermediate values; we just smoke-test the API."""
-    for easing in ("linear", "ease_in", "ease_out", "ease_in_out", "bounce"):
-        v = AnimatedValue(0.0)
-        completed = threading.Event()
-        Animated.timing(v, to=1.0, duration=40, easing=easing).start(on_complete=completed.set)
-        assert completed.wait(2.0), f"easing {easing} did not finish"
-        assert abs(v.value - 1.0) < 0.05
+@pytest.mark.asyncio
+@pytest.mark.parametrize("easing", ["linear", "ease_in", "ease_out", "ease_in_out", "bounce"])
+async def test_timing_easing_curves(easing: str) -> None:
+    v = AnimatedValue(0.0)
+    await Animated.timing(v, to=1.0, duration=40, easing=easing)
+    assert abs(v.value - 1.0) < 0.05
+
+
+def test_start_is_fire_and_forget() -> None:
+    """``handle.start()`` returns immediately and runs in the background."""
+    v = AnimatedValue(0.0)
+    handle = Animated.timing(v, to=10.0, duration=80, easing="linear")
+    started = time.monotonic()
+    handle.start()
+    # The call returns well before the animation completes.
+    assert (time.monotonic() - started) < 0.02
+    # Wait for completion by polling.
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and v.value < 9.9:
+        time.sleep(0.02)
+    assert abs(v.value - 10.0) < 0.1
 
 
 # ======================================================================
@@ -98,11 +101,10 @@ def test_timing_easing_curves() -> None:
 # ======================================================================
 
 
-def test_spring_settles() -> None:
+@pytest.mark.asyncio
+async def test_spring_settles() -> None:
     v = AnimatedValue(0.0)
-    completed = threading.Event()
-    Animated.spring(v, to=5.0, stiffness=200, damping=20, mass=1.0).start(on_complete=completed.set)
-    assert completed.wait(3.0)
+    await Animated.spring(v, to=5.0, stiffness=200, damping=20, mass=1.0)
     assert abs(v.value - 5.0) < 0.1
 
 
@@ -111,33 +113,31 @@ def test_spring_settles() -> None:
 # ======================================================================
 
 
-def test_sequence_runs_in_order() -> None:
+@pytest.mark.asyncio
+async def test_sequence_runs_in_order() -> None:
     v1 = AnimatedValue(0.0)
     v2 = AnimatedValue(0.0)
-    completed = threading.Event()
-    Animated.sequence(
+    await Animated.sequence(
         [
             Animated.timing(v1, to=1.0, duration=40, easing="linear"),
             Animated.timing(v2, to=2.0, duration=40, easing="linear"),
         ]
-    ).start(on_complete=completed.set)
-    assert completed.wait(3.0)
+    )
     assert abs(v1.value - 1.0) < 0.1
     assert abs(v2.value - 2.0) < 0.1
 
 
-def test_parallel_runs_concurrently() -> None:
+@pytest.mark.asyncio
+async def test_parallel_runs_concurrently() -> None:
     v1 = AnimatedValue(0.0)
     v2 = AnimatedValue(0.0)
-    completed = threading.Event()
     started = time.monotonic()
-    Animated.parallel(
+    await Animated.parallel(
         [
             Animated.timing(v1, to=1.0, duration=120, easing="linear"),
             Animated.timing(v2, to=2.0, duration=120, easing="linear"),
         ]
-    ).start(on_complete=completed.set)
-    assert completed.wait(3.0)
+    )
     elapsed = time.monotonic() - started
     # Two parallel 120ms animations should take ~120ms, not 240ms.
     assert elapsed < 0.5
@@ -145,11 +145,10 @@ def test_parallel_runs_concurrently() -> None:
     assert abs(v2.value - 2.0) < 0.1
 
 
-def test_delay_waits_then_completes() -> None:
-    completed = threading.Event()
+@pytest.mark.asyncio
+async def test_delay_waits_then_completes() -> None:
     started = time.monotonic()
-    Animated.delay(80).start(on_complete=completed.set)
-    assert completed.wait(2.0)
+    await Animated.delay(80)
     assert (time.monotonic() - started) >= 0.05
 
 
@@ -167,6 +166,26 @@ def test_stop_freezes_value() -> None:
     snapshot = v.value
     time.sleep(0.2)
     # After stop, value should not advance further toward 10.
+    assert abs(v.value - snapshot) < 0.1
+    assert v.value < 9.0
+
+
+@pytest.mark.asyncio
+async def test_cancelling_await_stops_animation() -> None:
+    """Cancelling the awaiting task should freeze the in-flight animation."""
+    v = AnimatedValue(0.0)
+    handle = Animated.timing(v, to=10.0, duration=400, easing="linear")
+
+    async def run() -> None:
+        await handle
+
+    task = asyncio.create_task(run())
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    snapshot = v.value
+    await asyncio.sleep(0.2)
     assert abs(v.value - snapshot) < 0.1
     assert v.value < 9.0
 
@@ -243,3 +262,7 @@ def test_use_animated_value_default_initial_zero() -> None:
     rec = Reconciler(_StubBackend())
     rec.mount(view())
     assert captured[0].value == 0.0
+
+
+# Suppress unused-import lint for the typing helper.
+_ = Any

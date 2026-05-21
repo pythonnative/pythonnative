@@ -1,46 +1,42 @@
 """Animated values + animation drivers + animated component wrappers.
 
-Modeled on React Native's `Animated` API. The core primitives are:
+Modeled on React Native's ``Animated`` API but with an
+``async``-aware completion contract. The core primitives are:
 
 - [`AnimatedValue`][pythonnative.animated.AnimatedValue]: a numeric
   cell with subscribers; animations mutate it over time.
 - ``Animated.timing`` / ``Animated.spring`` / ``Animated.decay``:
-  animation factories.
+  animation factories. The objects they return implement
+  ``__await__``, so you can write ``await Animated.timing(v, to=1.0)``
+  to suspend until the animation finishes.
 - ``Animated.sequence`` / ``Animated.parallel`` / ``Animated.delay``:
-  composition.
+  composition; also awaitable.
 - ``Animated.View`` / ``Animated.Text`` / ``Animated.Image``:
   components whose ``style`` may contain ``AnimatedValue`` instances.
-  The component subscribes to the value during mount and forwards
-  changes directly to the underlying native handler's
-  ``set_animated_property`` hook (bypassing the reconciler so
-  per-frame work doesn't go through full Python reconciliation).
 
 Driver:
 
-- A single background thread ticks at ~60 Hz, advancing every
-  active animation by ``dt``. When an animation finishes it removes
-  itself from the active set; the thread sleeps when nothing is
-  running.
-- For platforms that have a native easing/animation API,
-  ``AnimatedValue`` *also* sends a one-shot
-  ``set_animated_property(view, prop, target, duration_ms, easing)``
-  call when the animation starts, so UIKit / Android can interpolate
-  at GPU 60 Hz without per-frame Python work. The Python ticker
-  then keeps the reactive ``AnimatedValue.value`` reading
-  approximately synchronized for any non-native consumers.
+- A single background thread ticks at ~60 Hz, advancing every active
+  animation by ``dt``.
+- Animations expose two APIs:
+  - ``handle.start()`` — fire-and-forget. Returns ``self``.
+  - ``await handle`` (or ``await handle.run()``) — wait for the
+    animation to complete; cancellation cancels the animation.
 
 Example:
     ```python
     import pythonnative as pn
 
+
     @pn.component
     def FadeIn():
-        opacity = pn.use_memo(lambda: pn.Animated.Value(0.0), [])
+        opacity = pn.use_animated_value(0.0)
 
-        def fade_in():
-            pn.Animated.timing(opacity, to=1.0, duration=400).start()
+        async def fade_in():
+            await pn.Animated.timing(opacity, to=1.0, duration=400)
+            await pn.Animated.timing(opacity, to=0.5, duration=200)
 
-        pn.use_effect(fade_in, [])
+        pn.use_async_effect(fade_in, [])
 
         return pn.Animated.View(
             pn.Text("Hello!"),
@@ -51,6 +47,7 @@ Example:
 
 from __future__ import annotations
 
+import asyncio
 import math
 import threading
 import time
@@ -58,14 +55,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .element import Element
 from .hooks import use_effect, use_ref
+from .runtime import resolve_future
 from .style import StyleProp, resolve_style
 
 # Maximum frame rate at which the Python ticker drives animations.
-# We aim for 60 Hz but back off when no animation is active.
 _TARGET_FPS = 60.0
 _FRAME_DT = 1.0 / _TARGET_FPS
 
-# Easing functions: t in [0, 1] -> [0, 1].
 _EASINGS: Dict[str, Callable[[float], float]] = {
     "linear": lambda t: t,
     "ease_in": lambda t: t * t,
@@ -104,13 +100,14 @@ def _resolve_easing(name: Any) -> Callable[[float], float]:
 class AnimatedValue:
     """A subscribable numeric cell driven by animations.
 
-    Direct mutation via [`set_value`][pythonnative.animated.AnimatedValue.set_value]
-    fires subscribers immediately; animations call `set_value` from
+    Direct mutation via
+    [`set_value`][pythonnative.animated.AnimatedValue.set_value]
+    fires subscribers immediately; animations call ``set_value`` from
     the ticker thread.
 
     Subscribers are ``(prop_name, callback)`` tuples. Each animated
-    component (e.g., `Animated.View`) subscribes once per
-    AnimatedValue prop in its style during mount.
+    component (e.g., ``Animated.View``) subscribes once per
+    ``AnimatedValue`` prop in its style during mount.
     """
 
     __slots__ = ("_value", "_subscribers", "_lock")
@@ -126,11 +123,7 @@ class AnimatedValue:
         return self._value
 
     def set_value(self, new_value: float) -> None:
-        """Set the value immediately and fire all subscribers.
-
-        Used by user code for instant snaps; animations also call this
-        once per tick to update the value.
-        """
+        """Set the value immediately and fire all subscribers."""
         new_value = float(new_value)
         with self._lock:
             self._value = new_value
@@ -146,8 +139,7 @@ class AnimatedValue:
 
         Returns an unsubscribe callable. ``prop`` is metadata only —
         it lets the subscriber differentiate this binding from others
-        on the same AnimatedValue (the value can be bound to
-        multiple props on multiple views).
+        on the same ``AnimatedValue``.
         """
         with self._lock:
             self._subscribers.append((prop, callback))
@@ -176,9 +168,9 @@ class AnimatedValue:
 class _AnimationManager:
     """Single-threaded driver for all currently-running animations.
 
-    Holds a list of ``(animation, advance_callback)`` pairs and
-    ticks them at ~60 Hz. The thread starts on first use and idles
-    (releases the GIL via ``time.sleep``) when nothing is active.
+    Holds a list of ``_RunningAnimation`` instances and ticks them at
+    ~60 Hz. The thread starts on first use and idles when nothing is
+    active.
     """
 
     def __init__(self) -> None:
@@ -214,7 +206,6 @@ class _AnimationManager:
             with self._lock:
                 active = list(self._animations)
             if not active:
-                # Idle: sleep longer until something starts.
                 time.sleep(0.05)
                 last = time.monotonic()
                 continue
@@ -237,21 +228,28 @@ _manager = _AnimationManager()
 
 
 class _RunningAnimation:
-    """Base class for in-flight animations; advance() returns True when done."""
+    """Base class for in-flight animations; ``advance()`` returns True when done."""
 
-    def __init__(self, value: AnimatedValue, on_complete: Optional[Callable[[], None]]) -> None:
+    def __init__(self, value: AnimatedValue) -> None:
         self.value = value
-        self._on_complete = on_complete
+        self._completion_futures: List[asyncio.Future[None]] = []
+        self._completed = False
+
+    def add_completion_future(self, future: asyncio.Future[None]) -> None:
+        """Register ``future`` to be resolved when the animation ends."""
+        self._completion_futures.append(future)
+        if self._completed:
+            resolve_future(future, None)
 
     def advance(self, dt: float) -> bool:
         raise NotImplementedError
 
     def _finish(self) -> None:
-        if self._on_complete is not None:
-            try:
-                self._on_complete()
-            except Exception:
-                pass
+        if self._completed:
+            return
+        self._completed = True
+        for fut in self._completion_futures:
+            resolve_future(fut, None)
 
 
 class _TimingAnimation(_RunningAnimation):
@@ -261,9 +259,8 @@ class _TimingAnimation(_RunningAnimation):
         to: float,
         duration: float,
         easing: Callable[[float], float],
-        on_complete: Optional[Callable[[], None]],
     ) -> None:
-        super().__init__(value, on_complete)
+        super().__init__(value)
         self._from = value.value
         self._to = float(to)
         self._duration = max(0.001, float(duration) / 1000.0)
@@ -292,9 +289,8 @@ class _SpringAnimation(_RunningAnimation):
         stiffness: float,
         damping: float,
         mass: float,
-        on_complete: Optional[Callable[[], None]],
     ) -> None:
-        super().__init__(value, on_complete)
+        super().__init__(value)
         self._to = float(to)
         self._velocity = 0.0
         self._stiffness = float(stiffness)
@@ -316,20 +312,13 @@ class _SpringAnimation(_RunningAnimation):
 
 
 class _DecayAnimation(_RunningAnimation):
-    def __init__(
-        self,
-        value: AnimatedValue,
-        velocity: float,
-        deceleration: float,
-        on_complete: Optional[Callable[[], None]],
-    ) -> None:
-        super().__init__(value, on_complete)
+    def __init__(self, value: AnimatedValue, velocity: float, deceleration: float) -> None:
+        super().__init__(value)
         self._velocity = float(velocity)
         self._deceleration = float(deceleration)
         self._rest_threshold = 0.001
 
     def advance(self, dt: float) -> bool:
-        # Exponential decay of velocity.
         self._velocity *= math.exp(-self._deceleration * dt * 1000.0)
         new_x = self.value.value + self._velocity * dt
         self.value.set_value(new_x)
@@ -339,60 +328,124 @@ class _DecayAnimation(_RunningAnimation):
         return False
 
 
-class _CompositeAnimation:
-    """Wraps a list of animations played in sequence or in parallel."""
+class _DelayAnimation(_RunningAnimation):
+    def __init__(self, duration_ms: float) -> None:
+        super().__init__(AnimatedValue(0.0))
+        self._elapsed = 0.0
+        self._duration = max(0.001, duration_ms / 1000.0)
+
+    def advance(self, dt: float) -> bool:
+        self._elapsed += dt
+        if self._elapsed >= self._duration:
+            self._finish()
+            return True
+        return False
+
+
+# ======================================================================
+# Public animation handles
+# ======================================================================
+
+
+class _AwaitableAnimation:
+    """Base for awaitable animation handles.
+
+    Subclasses implement :meth:`start` and :meth:`stop`. Awaiting the
+    handle (``await handle``) starts the animation if necessary and
+    suspends until it completes. Cancelling the awaiting task calls
+    :meth:`stop`.
+
+    Calling :meth:`start` returns ``self`` so handles can be chained
+    or stashed: ``handle = pn.Animated.timing(...).start()``.
+    """
+
+    def start(self) -> "_AwaitableAnimation":
+        raise NotImplementedError
+
+    def stop(self) -> None:
+        raise NotImplementedError
+
+    def run(self) -> "_AwaitableAnimation":
+        """Return ``self`` for explicit ``await handle.run()`` style.
+
+        Equivalent to ``await handle`` directly; provided because some
+        readers prefer the slightly more explicit form, particularly
+        when storing the awaitable before resolving it.
+        """
+        return self
+
+    async def _drive(self) -> None:
+        raise NotImplementedError
+
+    def __await__(self) -> Any:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError as exc:
+            raise RuntimeError(
+                "Animations can only be awaited from inside an asyncio task; "
+                "use handle.start() to fire-and-forget instead."
+            ) from exc
+
+        async def _runner() -> None:
+            try:
+                await self._drive()
+            except asyncio.CancelledError:
+                self.stop()
+                raise
+
+        return _runner().__await__()
+
+
+class _AnimationHandle(_AwaitableAnimation):
+    """Public handle returned by ``Animated.timing`` / ``.spring`` / ``.decay``.
+
+    Wraps a ``_RunningAnimation`` factory so each ``.start()`` call
+    creates a fresh in-flight animation (matches React Native — the
+    ``Animated.timing`` return value is reusable).
+    """
+
+    def __init__(self, factory: Callable[[], _RunningAnimation]) -> None:
+        self._factory = factory
+        self._current: Optional[_RunningAnimation] = None
+
+    def start(self) -> "_AnimationHandle":
+        """Begin the animation. Returns ``self`` for chaining."""
+        self.stop()
+        anim = self._factory()
+        self._current = anim
+        _manager.add(anim)
+        return self
+
+    def stop(self) -> None:
+        """Cancel the running instance (no-op if not running)."""
+        if self._current is not None:
+            self._current._finish()
+            _manager.remove(self._current)
+            self._current = None
+
+    async def _drive(self) -> None:
+        if self._current is None:
+            self.start()
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[None] = loop.create_future()
+        assert self._current is not None
+        self._current.add_completion_future(future)
+        await future
+
+
+class _CompositeAnimation(_AwaitableAnimation):
+    """Run a list of animations in sequence or in parallel."""
 
     def __init__(self, items: List[Any], mode: str) -> None:
         self._items = list(items)
         self._mode = mode
 
-    def start(self, on_complete: Optional[Callable[[], None]] = None) -> None:
-        if self._mode == "parallel":
-            remaining = [len(self._items)]
-            lock = threading.Lock()
+    def start(self) -> "_CompositeAnimation":
+        """Schedule the composite on the framework runtime, fire-and-forget."""
+        from .runtime import run_async
 
-            def _one_done() -> None:
-                with lock:
-                    remaining[0] -= 1
-                    if remaining[0] <= 0 and on_complete is not None:
-                        try:
-                            on_complete()
-                        except Exception:
-                            pass
-
-            for item in self._items:
-                if item is None:
-                    _one_done()
-                    continue
-                try:
-                    item.start(_one_done)
-                except Exception:
-                    _one_done()
-            return
-
-        # Sequence
-        index = [0]
-
-        def _next() -> None:
-            i = index[0]
-            if i >= len(self._items):
-                if on_complete is not None:
-                    try:
-                        on_complete()
-                    except Exception:
-                        pass
-                return
-            item = self._items[i]
-            index[0] += 1
-            if item is None:
-                _next()
-                return
-            try:
-                item.start(_next)
-            except Exception:
-                _next()
-
-        _next()
+        run_async(self._drive())
+        return self
 
     def stop(self) -> None:
         for item in self._items:
@@ -401,31 +454,23 @@ class _CompositeAnimation:
             except Exception:
                 pass
 
+    async def _drive(self) -> None:
+        if self._mode == "parallel":
+            await asyncio.gather(*(self._await_item(item) for item in self._items))
+            return
+        for item in self._items:
+            await self._await_item(item)
 
-class _AnimationHandle:
-    """Public handle returned by `Animated.timing` / `.spring` / `.decay`.
-
-    Wraps a `_RunningAnimation` factory so each ``.start()`` call creates
-    a fresh in-flight animation (matches RN — the `Animated.timing`
-    return value is reusable).
-    """
-
-    def __init__(self, factory: Callable[[Optional[Callable[[], None]]], _RunningAnimation]) -> None:
-        self._factory = factory
-        self._current: Optional[_RunningAnimation] = None
-
-    def start(self, on_complete: Optional[Callable[[], None]] = None) -> None:
-        """Begin the animation, optionally invoking ``on_complete`` at the end."""
-        self.stop()
-        anim = self._factory(on_complete)
-        self._current = anim
-        _manager.add(anim)
-
-    def stop(self) -> None:
-        """Cancel the running instance (no-op if not running)."""
-        if self._current is not None:
-            _manager.remove(self._current)
-            self._current = None
+    @staticmethod
+    async def _await_item(item: Any) -> None:
+        if item is None:
+            return
+        if isinstance(item, _AwaitableAnimation):
+            await item
+        else:
+            # Plain awaitables and coroutines are supported too — lets
+            # users mix in ``asyncio.sleep`` or other awaitables.
+            await item
 
 
 # ======================================================================
@@ -434,10 +479,10 @@ class _AnimationHandle:
 
 
 def _resolve_style_with_values(style: StyleProp) -> Tuple[Dict[str, Any], Dict[str, AnimatedValue]]:
-    """Return ``(plain_style, animated_bindings)``.
+    """Split ``style`` into a plain dict and animated bindings.
 
-    AnimatedValue entries in the style are replaced with their
-    current numeric value in ``plain_style`` and recorded in
+    AnimatedValue entries in the style are replaced with their current
+    numeric value in ``plain_style`` and recorded in
     ``animated_bindings`` so the wrapping component can subscribe
     after mount.
     """
@@ -457,11 +502,7 @@ def _make_animated_factory(
     element_type: str,
     accept_children: bool,
 ) -> Callable[..., Element]:
-    """Build an animated wrapper for ``element_type``.
-
-    The returned factory is used as the public
-    ``Animated.View`` / ``Animated.Text`` / ``Animated.Image``.
-    """
+    """Build an animated wrapper for ``element_type``."""
     from .hooks import component  # local import to avoid cycle
 
     @component
@@ -482,9 +523,9 @@ def _make_animated_factory(
                 return lambda: None
 
             for prop, value in bindings.items():
-                # Capture into closure via default arg.
+
                 def _on_change(new_val: float, _prop: str = prop, _view: Any = view) -> None:
-                    handler = _get_handler_for(view)
+                    handler = _get_handler_for(_view)
                     if handler is None:
                         return
                     setter = getattr(handler, "set_animated_property", None)
@@ -516,7 +557,6 @@ def _make_animated_factory(
         if element_type == "Image":
             source = args[0] if args else kwargs.pop("source", "")
             return _Image(source, style=plain_style, ref=ref)
-        # View
         children = list(args) if accept_children else []
         return _View(*children, style=plain_style, ref=ref)
 
@@ -524,29 +564,19 @@ def _make_animated_factory(
 
 
 def _animated_prop_name(prop: str) -> str:
-    """Map a style key to the name expected by `set_animated_property`."""
+    """Map a style key to the name expected by ``set_animated_property``."""
     if prop == "opacity":
         return "opacity"
     if prop == "background_color":
         return "background_color"
-    # Transform shorthand keys: ``translate_x``, ``translate_y``,
-    # ``scale``, ``scale_x``, ``scale_y``, ``rotate``.
     if prop in ("translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate"):
         return prop
     return prop
 
 
 def _get_handler_for(native_view: Any) -> Any:
-    """Best-effort lookup of the registered handler for ``native_view``.
-
-    Animated bindings need a handler reference to call
-    `set_animated_property`. Since the registry is keyed by element
-    type and we only have the native view, we fall back to looking
-    up the most recently registered "View" handler — works in
-    practice because all animated targets are flex containers,
-    images, or text views, and every iOS/Android handler subclass
-    inherits the same `set_animated_property` from the base.
-    """
+    """Best-effort lookup of the registered handler for ``native_view``."""
+    del native_view
     try:
         from .native_views import get_registry
 
@@ -570,8 +600,8 @@ def _get_handler_for(native_view: Any) -> Any:
 class _AnimatedNamespace:
     """Public ``Animated`` namespace.
 
-    Exposes the `Value`, animation factories, composers, and
-    component wrappers (`View`, `Text`, `Image`).
+    Exposes the ``Value`` type, animation factories, composers, and
+    component wrappers (``View``, ``Text``, ``Image``).
     """
 
     Value = AnimatedValue
@@ -586,8 +616,8 @@ class _AnimatedNamespace:
     ) -> _AnimationHandle:
         """Linearly interpolate ``value`` to ``to`` over ``duration`` ms."""
 
-        def _factory(on_complete: Optional[Callable[[], None]]) -> _RunningAnimation:
-            return _TimingAnimation(value, to, duration, _resolve_easing(easing), on_complete)
+        def _factory() -> _RunningAnimation:
+            return _TimingAnimation(value, to, duration, _resolve_easing(easing))
 
         return _AnimationHandle(_factory)
 
@@ -602,8 +632,8 @@ class _AnimatedNamespace:
     ) -> _AnimationHandle:
         """Run a damped harmonic spring toward ``to``."""
 
-        def _factory(on_complete: Optional[Callable[[], None]]) -> _RunningAnimation:
-            return _SpringAnimation(value, to, stiffness, damping, mass, on_complete)
+        def _factory() -> _RunningAnimation:
+            return _SpringAnimation(value, to, stiffness, damping, mass)
 
         return _AnimationHandle(_factory)
 
@@ -616,8 +646,8 @@ class _AnimatedNamespace:
     ) -> _AnimationHandle:
         """Decelerate ``value`` from its current velocity until it rests."""
 
-        def _factory(on_complete: Optional[Callable[[], None]]) -> _RunningAnimation:
-            return _DecayAnimation(value, velocity, deceleration, on_complete)
+        def _factory() -> _RunningAnimation:
+            return _DecayAnimation(value, velocity, deceleration)
 
         return _AnimationHandle(_factory)
 
@@ -635,21 +665,8 @@ class _AnimatedNamespace:
     def delay(duration: float) -> _AnimationHandle:
         """Wait ``duration`` ms before continuing in a sequence."""
 
-        def _factory(on_complete: Optional[Callable[[], None]]) -> _RunningAnimation:
-            class _Delay(_RunningAnimation):
-                def __init__(self, on_complete: Optional[Callable[[], None]]) -> None:
-                    super().__init__(AnimatedValue(0.0), on_complete)
-                    self._elapsed = 0.0
-                    self._duration = max(0.001, duration / 1000.0)
-
-                def advance(self, dt: float) -> bool:
-                    self._elapsed += dt
-                    if self._elapsed >= self._duration:
-                        self._finish()
-                        return True
-                    return False
-
-            return _Delay(on_complete)
+        def _factory() -> _RunningAnimation:
+            return _DelayAnimation(duration)
 
         return _AnimationHandle(_factory)
 
@@ -662,7 +679,7 @@ Animated = _AnimatedNamespace()
 
 
 def use_animated_value(initial: float = 0.0) -> AnimatedValue:
-    """Return an [`AnimatedValue`][pythonnative.AnimatedValue] with a stable identity across renders.
+    """Return an [`AnimatedValue`][pythonnative.AnimatedValue] that is stable across renders.
 
     Convenience wrapper for the common pattern
     ``pn.use_memo(lambda: AnimatedValue(initial), [])``. The same
@@ -679,14 +696,15 @@ def use_animated_value(initial: float = 0.0) -> AnimatedValue:
         ```python
         import pythonnative as pn
 
+
         @pn.component
         def FadeIn():
             opacity = pn.use_animated_value(0.0)
 
-            def fade_in():
-                pn.Animated.timing(opacity, to=1.0, duration=300).start()
+            async def fade_in():
+                await pn.Animated.timing(opacity, to=1.0, duration=300)
 
-            pn.use_effect(lambda: fade_in(), [])
+            pn.use_async_effect(fade_in, [])
             return pn.Animated.View(
                 pn.Text("Hello"),
                 style=pn.style(opacity=opacity),

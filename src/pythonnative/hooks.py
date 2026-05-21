@@ -25,10 +25,12 @@ Example:
     ```
 """
 
+import asyncio
 import inspect
 import threading
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, TypeVar
+from dataclasses import dataclass, field, replace
+from typing import Any, Awaitable, Callable, Dict, Generator, Generic, List, Optional, Tuple, TypeVar
 
 from .element import Element
 
@@ -495,6 +497,274 @@ def use_ref(initial: Any = None) -> dict:
         return ref
 
     return ctx.refs[idx]
+
+
+# ======================================================================
+# Async hooks
+# ======================================================================
+
+
+def use_async_effect(
+    effect: Callable[[], Awaitable[None]],
+    deps: Optional[list] = None,
+) -> None:
+    """Schedule an async effect that's cancelled on re-run / unmount.
+
+    Like [`use_effect`][pythonnative.use_effect] but takes an
+    ``async def`` (or any zero-arg callable returning an awaitable).
+    The coroutine is scheduled on the framework runtime via
+    [`run_async`][pythonnative.runtime.run_async] after the native
+    commit. When ``deps`` change (or the component unmounts), the
+    in-flight future is cancelled.
+
+    Args:
+        effect: A zero-arg callable returning an awaitable. Typically
+            an ``async def`` defined inside the component.
+        deps: Dependency list, or ``None`` to re-run on every render.
+
+    Raises:
+        RuntimeError: If called outside a ``@component`` function.
+
+    Example:
+        ```python
+        import pythonnative as pn
+
+
+        @pn.component
+        def Posts(user_id):
+            posts, set_posts = pn.use_state([])
+
+            async def load():
+                set_posts(await api.get_posts(user_id))
+
+            pn.use_async_effect(load, [user_id])
+            return pn.FlatList(posts, render_item=...)
+        ```
+    """
+    from .runtime import run_async
+
+    def _sync_effect() -> Callable[[], None]:
+        future = run_async(effect())
+
+        def _cancel() -> None:
+            future.cancel()
+
+        return _cancel
+
+    use_effect(_sync_effect, deps)
+
+
+@dataclass(frozen=True)
+class QueryResult(Generic[T]):
+    """Snapshot of a [`use_query`][pythonnative.use_query] subscription.
+
+    Attributes:
+        data: The most recent successful result, or the ``initial``
+            value before the first fetch completes.
+        loading: ``True`` while a fetch is in flight (including the
+            initial fetch and any refetches).
+        error: The exception raised by the most recent failed fetch,
+            or ``None`` if no fetch has failed since the last success.
+        refetch: A zero-arg callable that triggers a refetch. Stable
+            across renders.
+    """
+
+    data: Optional[T] = None
+    loading: bool = True
+    error: Optional[BaseException] = None
+    refetch: Callable[[], None] = field(default=lambda: None)
+
+
+def use_query(
+    fetcher: Callable[[], Awaitable[T]],
+    deps: Optional[list] = None,
+    *,
+    initial: Optional[T] = None,
+) -> QueryResult[T]:
+    """Subscribe to an async fetcher and re-render when its result changes.
+
+    The fetcher is called on mount and any time ``deps`` change, with
+    cancellation propagated when the component unmounts mid-fetch.
+
+    Args:
+        fetcher: Zero-arg ``async`` callable that resolves to the
+            current data.
+        deps: Dependency list — refetches whenever any entry changes.
+        initial: Optional starting value for ``data`` before the
+            first fetch completes.
+
+    Returns:
+        A frozen [`QueryResult`][pythonnative.QueryResult] with
+        ``data`` / ``loading`` / ``error`` / ``refetch``.
+
+    Raises:
+        RuntimeError: If called outside a ``@component`` function.
+
+    Example:
+        ```python
+        import pythonnative as pn
+
+
+        @pn.component
+        def UserCard(user_id):
+            q = pn.use_query(lambda: api.get_user(user_id), [user_id])
+            if q.loading:
+                return pn.Text("Loading…")
+            if q.error:
+                return pn.Text(f"Error: {q.error}")
+            return pn.Text(q.data["name"])
+        ```
+    """
+    from .runtime import run_async
+
+    state, set_state = use_state(lambda: QueryResult[T](data=initial, loading=True))
+    nonce, set_nonce = use_state(0)
+
+    refetch = use_callback(lambda: set_nonce(lambda n: n + 1), [])
+
+    # Surface the stable refetch callable on every returned result.
+    if state.refetch is not refetch:
+        state = replace(state, refetch=refetch)
+
+    def _start_fetch() -> Callable[[], None]:
+        set_state(lambda s: replace(s, loading=True, error=None))
+
+        async def _runner() -> None:
+            try:
+                data = await fetcher()
+                set_state(lambda s: replace(s, data=data, loading=False, error=None))
+            except asyncio.CancelledError:
+                raise
+            except BaseException as exc:  # pragma: no cover - surfaced to user
+                set_state(lambda s, e=exc: replace(s, loading=False, error=e))
+
+        future = run_async(_runner())
+
+        def _cancel() -> None:
+            future.cancel()
+
+        return _cancel
+
+    effect_deps: List[Any] = list(deps or []) + [nonce]
+    use_effect(_start_fetch, effect_deps)
+
+    return state
+
+
+@dataclass(frozen=True)
+class MutationState(Generic[T]):
+    """Snapshot of a [`use_mutation`][pythonnative.use_mutation] subscription.
+
+    Attributes:
+        data: The most recent successful return value of the mutator,
+            or ``None`` if no mutation has succeeded yet.
+        loading: ``True`` while a mutation is in flight.
+        error: The exception raised by the most recent failed
+            mutation, or ``None``.
+    """
+
+    data: Optional[T] = None
+    loading: bool = False
+    error: Optional[BaseException] = None
+
+
+class MutationCall(Generic[T]):
+    """Awaitable handle returned by a mutator trigger.
+
+    Returned by the second element of the
+    [`use_mutation`][pythonnative.use_mutation] tuple. Awaiting the
+    handle resolves to the mutator's return value (or re-raises its
+    exception); discarding the handle is safe — Python won't warn
+    about an unawaited coroutine because this is a plain object.
+
+    Example:
+        ```python
+        # Fire-and-forget:
+        save_button.on_click = lambda: mutate(post)
+
+        # Or await for the result:
+        async def submit():
+            try:
+                created = await mutate(post)
+            except ApiError as exc:
+                await pn.Alert.show(title="Save failed", message=str(exc))
+        ```
+    """
+
+    __slots__ = ("_future",)
+
+    def __init__(self, future: "Any") -> None:
+        self._future = future
+
+    def __await__(self) -> Any:
+        return asyncio.wrap_future(self._future).__await__()
+
+    def cancel(self) -> bool:
+        """Cancel the underlying mutation. Returns whether cancellation succeeded."""
+        return self._future.cancel()
+
+    def done(self) -> bool:
+        """Whether the underlying mutation has finished."""
+        return self._future.done()
+
+
+def use_mutation(
+    mutator: Callable[..., Awaitable[T]],
+) -> Tuple[MutationState[T], Callable[..., MutationCall[T]]]:
+    """Wrap an async mutator with loading/error state and a trigger.
+
+    Returns ``(state, mutate)``. Call ``mutate(*args, **kwargs)`` to
+    invoke the mutator; ``state`` reflects loading/error/data and
+    re-renders on each transition. ``mutate`` returns a
+    [`MutationCall`][pythonnative.MutationCall] you can ``await`` for
+    the result, or discard for fire-and-forget.
+
+    Args:
+        mutator: An ``async`` callable that performs the side effect
+            and returns the resulting data.
+
+    Returns:
+        A 2-tuple ``(state, mutate)``.
+
+    Example:
+        ```python
+        import pythonnative as pn
+
+
+        @pn.component
+        def NewPostForm():
+            state, save = pn.use_mutation(api.create_post)
+
+            return pn.Column(
+                pn.Button("Save", on_click=lambda: save(post)),
+                pn.Text("Saving…") if state.loading else pn.Text(""),
+                pn.Text(str(state.error)) if state.error else pn.Text(""),
+            )
+        ```
+    """
+    from .runtime import run_async
+
+    state, set_state = use_state(lambda: MutationState[T]())
+
+    def mutate(*args: Any, **kwargs: Any) -> MutationCall[T]:
+        set_state(lambda s: replace(s, loading=True, error=None))
+
+        async def _runner() -> T:
+            try:
+                data = await mutator(*args, **kwargs)
+                set_state(lambda s: replace(s, data=data, loading=False, error=None))
+                return data
+            except asyncio.CancelledError:
+                set_state(lambda s: replace(s, loading=False))
+                raise
+            except BaseException as exc:
+                set_state(lambda s, e=exc: replace(s, loading=False, error=e))
+                raise
+
+        future = run_async(_runner())
+        return MutationCall[T](future)
+
+    return state, mutate
 
 
 # ======================================================================

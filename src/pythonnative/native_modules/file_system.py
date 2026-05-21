@@ -2,7 +2,7 @@
 
 Provides static helpers for reading, writing, and deleting files in the
 app's sandboxed storage area. Relative paths are resolved against
-[`FileSystem.app_dir`][pythonnative.native_modules.FileSystem.app_dir];
+[`FileSystem.app_dir`][pythonnative.native_modules.file_system.FileSystem.app_dir];
 absolute paths are used as-is.
 
 Example:
@@ -25,7 +25,7 @@ class FileSystem:
 
     Every instance method operates on either an absolute path or a path
     relative to
-    [`app_dir`][pythonnative.native_modules.FileSystem.app_dir].
+    [`app_dir`][pythonnative.native_modules.file_system.FileSystem.app_dir].
     Errors are swallowed and reported as falsy return values (`None`
     for readers, `False` for writers) so callers can treat the API as
     best-effort.
@@ -70,7 +70,7 @@ class FileSystem:
 
         Args:
             path: Absolute path or path relative to
-                [`app_dir`][pythonnative.native_modules.FileSystem.app_dir].
+                [`app_dir`][pythonnative.native_modules.file_system.FileSystem.app_dir].
             encoding: Text encoding (default `"utf-8"`).
 
         Returns:

@@ -15,23 +15,20 @@ def SettingsScreen() -> pn.Element:
     dims = pn.use_window_dimensions()
 
     def _show_alert() -> None:
-        pn.Alert.show(
-            title="Hello!",
-            message="This is a native alert dialog.",
-            buttons=[
-                {"label": "OK", "style": "default"},
-            ],
-        )
+        # Fire-and-forget; no await needed for a simple notice.
+        pn.Alert.show("Hello!", "This is a native alert dialog.")
 
     def _confirm_destructive() -> None:
-        pn.Alert.confirm(
-            title="Delete item?",
-            message="This action cannot be undone.",
-            confirm_label="Delete",
-            cancel_label="Keep",
-            on_confirm=lambda: print("[SettingsScreen] confirmed"),
-            on_cancel=lambda: print("[SettingsScreen] cancelled"),
-        )
+        async def _run() -> None:
+            ok = await pn.Alert.confirm(
+                "Delete item?",
+                message="This action cannot be undone.",
+                confirm_label="Delete",
+                cancel_label="Keep",
+            )
+            print(f"[SettingsScreen] {'confirmed' if ok else 'cancelled'}")
+
+        pn.run_async(_run())
 
     def _view_showcase() -> None:
         nav.navigate("Showcase", {"message": "Visual showcase"})

@@ -81,6 +81,7 @@ nav:
     - Styling: guides/styling.md
     - Animations: guides/animations.md
     - Lists: guides/lists.md
+    - Async + Data: guides/async.md
     - Platform & Accessibility: guides/platform-accessibility.md
     - Native Modules: guides/native-modules.md
     - Custom Native Components: guides/custom-native-components.md
@@ -100,6 +101,9 @@ nav:
     - Hooks: api/hooks.md
     - Animated: api/animated.md
     - Alerts: api/alerts.md
+    - Async runtime: api/runtime.md
+    - Network: api/net.md
+    - Storage: api/storage.md
     - Platform: api/platform.md
     - Element: api/element.md
     - Screen: api/screen.md

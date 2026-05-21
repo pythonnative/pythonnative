@@ -1,10 +1,9 @@
 # Animations
 
 PythonNative ships an `Animated` API modelled on React Native's. It's
-designed for the common case where a small set
-of style properties (opacity, transform, color) need to interpolate
-smoothly over time without re-rendering the component tree on every
-frame.
+designed for the common case where a small set of style properties
+(opacity, transform, color) need to interpolate smoothly over time
+without re-rendering the component tree on every frame.
 
 ## Mental model
 
@@ -14,8 +13,10 @@ frame.
 2. Bind the value into the `style` of an `Animated.View`,
    `Animated.Text`, or `Animated.Image`.
 3. Drive the value with `Animated.timing`, `Animated.spring`, or
-   `Animated.decay`. Each driver returns a handle with `.start()` /
-   `.stop()`.
+   `Animated.decay`. Each driver returns a handle with two faces:
+   - `handle.start()` is fire-and-forget (returns `self`).
+   - `await handle` runs the animation and suspends until it
+     completes. Cancelling the awaiting task stops the animation.
 
 The animated component captures a `ref` to the underlying native view
 (via the same [`use_ref`][pythonnative.use_ref] mechanism users have
@@ -34,10 +35,10 @@ import pythonnative as pn
 def FadeInBox():
     opacity = pn.use_animated_value(0.0)
 
-    def _fade_in():
-        pn.Animated.timing(opacity, to=1.0, duration=400).start()
+    async def _fade_in():
+        await pn.Animated.timing(opacity, to=1.0, duration=400)
 
-    pn.use_effect(_fade_in, [])
+    pn.use_async_effect(_fade_in, [])
 
     return pn.Animated.View(
         pn.Text("Hello!"),
@@ -51,7 +52,17 @@ def FadeInBox():
 ```
 
 `opacity` starts at `0.0` and the timing animation interpolates it to
-`1.0` over 400 ms.
+`1.0` over 400 ms. Using `use_async_effect` means the in-flight
+animation is automatically cancelled if the component unmounts before
+the 400 ms is up.
+
+If you don't need to react to completion, the synchronous form is fine
+too:
+
+```python
+def _press():
+    pn.Animated.timing(opacity, to=1.0, duration=400).start()
+```
 
 ## Spring animation on press
 
@@ -80,17 +91,21 @@ animation property.
 ## Sequencing and parallel composition
 
 ```python
-opacity = pn.use_animated_value(0.0)
-translate_y = pn.use_animated_value(20.0)
+async def _intro():
+    opacity = pn.use_animated_value(0.0)
+    translate_y = pn.use_animated_value(20.0)
 
-pn.Animated.parallel([
-    pn.Animated.timing(opacity, to=1.0, duration=300),
-    pn.Animated.spring(translate_y, to=0.0),
-]).start()
+    await pn.Animated.parallel([
+        pn.Animated.timing(opacity, to=1.0, duration=300),
+        pn.Animated.spring(translate_y, to=0.0),
+    ])
+    await pn.Animated.delay(80)
+    await pn.Animated.timing(opacity, to=0.5, duration=200)
 ```
 
-Use `Animated.sequence` for one-after-another execution and
-`Animated.delay(ms)` to insert pauses inside a sequence.
+`Animated.parallel` returns when **all** animations finish.
+`Animated.sequence` runs animations one-after-another. Both are also
+awaitable.
 
 ## Easing
 
@@ -101,7 +116,18 @@ Use `Animated.sequence` for one-after-another execution and
 
 `start()` returns the handle you started with, and the handle exposes
 `.stop()`. A common pattern is to keep the handle in a `use_ref` so
-you can cancel a long-running animation when the user interrupts.
+you can cancel a long-running animation when the user interrupts. If
+you're awaiting the animation instead, cancelling the awaiting task
+stops the animation:
+
+```python
+async def _enter():
+    await pn.Animated.timing(opacity, to=1.0, duration=2000)
+
+task = pn.run_async(_enter())
+# Sometime later:
+task.cancel()  # animation snaps to wherever it was; opacity stops here.
+```
 
 ## When NOT to use `Animated`
 

@@ -104,10 +104,13 @@ pn.Column(
 
 **Imperative APIs:**
 
-- [`Alert.show(title, message, buttons, style)`][pythonnative.Alert]:
-  present a native alert dialog or action sheet.
-- [`Alert.confirm(title, on_confirm, on_cancel)`][pythonnative.alerts.Alert.confirm]:
-  two-button confirm/cancel.
+- [`Alert.show(title, message)`][pythonnative.alerts.Alert.show]:
+  fire-and-forget single-button notice.
+- [`await Alert.confirm(title, message)`][pythonnative.alerts.Alert.confirm]:
+  awaitable two-button yes/no — resolves to a ``bool``.
+- [`await Alert.choose(title, options=[...])`][pythonnative.alerts.Alert.choose]:
+  awaitable multi-button picker / action sheet — resolves to the
+  selected label (or ``None``).
 
 **Animations:**
 

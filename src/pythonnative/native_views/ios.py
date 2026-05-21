@@ -2463,8 +2463,16 @@ def _present_alert(
     message: Optional[str],
     buttons: List[Dict[str, Any]],
     style: str = "alert",
+    on_result: Callable[[int], None] = lambda _idx: None,
 ) -> None:
-    """Internal: present a UIAlertController of the given style."""
+    """Present a UIAlertController of the given style.
+
+    ``buttons`` is a list of ``{"label": str, "style":
+    "default"|"cancel"|"destructive"}`` dicts (no ``on_press``). When
+    the user picks button ``i`` the helper invokes ``on_result(i)``
+    exactly once. A dismiss (e.g. swipe-to-cancel on iPad) delivers
+    ``-1``. ``on_result`` runs on the main thread.
+    """
     try:
         UIAlertController = ObjCClass("UIAlertController")
         UIAlertAction = ObjCClass("UIAlertAction")
@@ -2475,34 +2483,46 @@ def _present_alert(
             0 if style == "alert" else 1,
         )
         if not buttons:
-            buttons = [{"label": "OK"}]
-        for spec in buttons:
+            buttons = [{"label": "OK", "style": "default"}]
+
+        delivered = [False]
+
+        def _deliver(index: int) -> None:
+            if delivered[0]:
+                return
+            delivered[0] = True
+            try:
+                on_result(index)
+            except Exception:
+                pass
+
+        for i, spec in enumerate(buttons):
             label = str(spec.get("label", "OK"))
-            cb = spec.get("on_press")
             kind = spec.get("style", "default")
             kind_int = {"default": 0, "cancel": 1, "destructive": 2}.get(kind, 0)
 
-            def make_handler(callback: Any) -> Any:
+            def make_handler(button_index: int) -> Any:
                 def _on_action(action: _ct.c_void_p) -> None:  # noqa: ARG001
-                    if callback is not None:
-                        try:
-                            callback()
-                        except Exception:
-                            pass
+                    _deliver(button_index)
 
                 return _on_action
 
             action = UIAlertAction.actionWithTitle_style_handler_(
                 label,
                 kind_int,
-                make_handler(cb) if cb is not None else None,
+                make_handler(i),
             )
             ctrl.addAction_(action)
         top = _top_view_controller_for_alert(UIApplication.sharedApplication)
         if top is not None:
             top.presentViewController_animated_completion_(ctrl, True, None)
+        else:
+            _deliver(-1)
     except Exception:
-        pass
+        try:
+            on_result(-1)
+        except Exception:
+            pass
 
 
 # ======================================================================

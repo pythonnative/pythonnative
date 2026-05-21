@@ -19,6 +19,7 @@ look up the top-level ``App`` attribute.
 """
 
 import pythonnative as pn
+from app.screens.data import DataScreen
 from app.screens.forms import FormsScreen
 from app.screens.home import HomeScreen
 from app.screens.layout import LayoutScreen
@@ -92,5 +93,6 @@ def App() -> pn.Element:
             Stack.Screen("Tabs", component=MainTabs, options={"title": "Hello World"}),
             Stack.Screen("Showcase", component=ShowcaseScreen, options={"title": "Showcase"}),
             Stack.Screen("Forms", component=FormsScreen, options={"title": "Forms"}),
+            Stack.Screen("Data", component=DataScreen, options={"title": "Async Demo"}),
         )
     )

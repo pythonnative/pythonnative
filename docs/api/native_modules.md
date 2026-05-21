@@ -6,12 +6,10 @@ local notifications. Each module is implemented twice (once per
 platform) and dispatches at runtime based on the `IS_ANDROID` and
 `IS_IOS` flags from `pythonnative.utils`.
 
-::: pythonnative.native_modules
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      members_order: source
-      filters: ["!^_"]
+Apart from `FileSystem`, every public method is a coroutine: ``await
+Camera.take_photo()``, ``await Location.get_current()``, and so on.
+For the call-site patterns and the runtime they're scheduled on, see
+the [Async + data guide](../guides/async.md).
 
 ## Camera
 

@@ -53,7 +53,7 @@ Example:
 
 __version__ = "0.16.0"
 
-from . import sdk
+from . import runtime, sdk
 from .alerts import Alert
 from .animated import Animated, AnimatedValue, use_animated_value
 from .components import (
@@ -103,17 +103,23 @@ from .components import (
 )
 from .element import Element
 from .hooks import (
+    MutationCall,
+    MutationState,
     Provider,
+    QueryResult,
     batch_updates,
     component,
     create_context,
     memo,
+    use_async_effect,
     use_callback,
     use_context,
     use_effect,
     use_keyboard_height,
     use_memo,
+    use_mutation,
     use_navigation,
+    use_query,
     use_reducer,
     use_ref,
     use_safe_area_insets,
@@ -129,7 +135,9 @@ from .navigation import (
     use_focus_effect,
     use_route,
 )
+from .net import HTTPError, Response, fetch
 from .platform import Platform
+from .runtime import run_async
 from .screen import create_screen
 from .sdk import (
     Props,
@@ -138,6 +146,7 @@ from .sdk import (
     native_component,
     register_component,
 )
+from .storage import AsyncStorage, use_persisted_state
 from .style import (
     AlignItems,
     AlignSelf,
@@ -219,13 +228,20 @@ __all__ = [
     "component",
     "create_context",
     "memo",
+    "MutationCall",
+    "MutationState",
+    "QueryResult",
+    "use_async_effect",
     "use_callback",
     "use_context",
     "use_effect",
     "use_focus_effect",
     "use_keyboard_height",
     "use_memo",
+    "use_mutation",
     "use_navigation",
+    "use_persisted_state",
+    "use_query",
     "use_reducer",
     "use_ref",
     "use_route",
@@ -274,6 +290,14 @@ __all__ = [
     "FileSystem",
     "Location",
     "Notifications",
+    # Networking + persistence
+    "AsyncStorage",
+    "fetch",
+    "HTTPError",
+    "Response",
+    # Runtime
+    "run_async",
+    "runtime",
     # Platform
     "Platform",
     # Custom-component SDK
