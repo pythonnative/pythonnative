@@ -1516,13 +1516,23 @@ def _present_alert(
 ) -> None:
     """Present an AlertDialog or BottomSheet (``style='action_sheet'``).
 
+    Safe to call from any thread — the AlertDialog work is automatically
+    marshalled to the main looper via
+    [`pythonnative.runtime.call_on_main_thread`][pythonnative.runtime.call_on_main_thread].
+    Returns immediately; the dialog appears on the next main-loop tick.
+
     ``buttons`` is a list of ``{"label": str, "style":
     "default"|"cancel"|"destructive"}`` dicts (no ``on_press``).
     Exactly one ``on_result(index)`` is invoked when the user picks a
-    button; a dismiss delivers ``-1``. ``on_result`` runs on the
-    Android main thread.
+    button; a dismiss delivers ``-1``. ``on_result`` always runs on
+    the Android main thread; if it needs to wake an asyncio.Future,
+    use
+    [`pythonnative.runtime.resolve_future`][pythonnative.runtime.resolve_future]
+    to hop back onto the loop thread.
     """
     del style  # AlertDialog has no distinct action-sheet style on Android.
+    from ..runtime import call_on_main_thread
+
     delivered = [False]
 
     def _deliver(index: int) -> None:
@@ -1534,69 +1544,71 @@ def _present_alert(
         except Exception:
             pass
 
-    try:
-        AlertDialog = jclass("android.app.AlertDialog$Builder")
-        builder = AlertDialog(_ctx())
-        builder.setTitle(str(title or ""))
-        if message is not None:
-            builder.setMessage(str(message))
-        if not buttons:
-            buttons = [{"label": "OK", "style": "default"}]
+    def _present_on_main() -> None:
+        try:
+            AlertDialog = jclass("android.app.AlertDialog$Builder")
+            builder = AlertDialog(_ctx())
+            builder.setTitle(str(title or ""))
+            if message is not None:
+                builder.setMessage(str(message))
+            button_specs = buttons or [{"label": "OK", "style": "default"}]
 
-        # AlertDialog only has three slots (positive/negative/neutral).
-        # Assign the first matching style class to the conventional
-        # slot, then spill any leftovers into whichever slot is free.
-        slot_for: dict = {}
-        free_slots = ["positive", "negative", "neutral"]
-        for i, spec in enumerate(buttons):
-            kind = spec.get("style", "default")
-            preferred = {
-                "default": "positive",
-                "cancel": "negative",
-                "destructive": "neutral",
-            }.get(kind, "positive")
-            if preferred in free_slots:
-                slot_for[i] = preferred
-                free_slots.remove(preferred)
-        for i, spec in enumerate(buttons):
-            if i in slot_for:
-                continue
-            if not free_slots:
-                break
-            slot_for[i] = free_slots.pop(0)
+            # AlertDialog only has three slots (positive/negative/neutral).
+            # Assign the first matching style class to the conventional
+            # slot, then spill any leftovers into whichever slot is free.
+            slot_for: dict = {}
+            free_slots = ["positive", "negative", "neutral"]
+            for i, spec in enumerate(button_specs):
+                kind = spec.get("style", "default")
+                preferred = {
+                    "default": "positive",
+                    "cancel": "negative",
+                    "destructive": "neutral",
+                }.get(kind, "positive")
+                if preferred in free_slots:
+                    slot_for[i] = preferred
+                    free_slots.remove(preferred)
+            for i, spec in enumerate(button_specs):
+                if i in slot_for:
+                    continue
+                if not free_slots:
+                    break
+                slot_for[i] = free_slots.pop(0)
 
-        OnClickListener = jclass("android.content.DialogInterface$OnClickListener")
+            OnClickListener = jclass("android.content.DialogInterface$OnClickListener")
 
-        def make_listener(button_index: int) -> Any:
-            class _Proxy(dynamic_proxy(OnClickListener)):
-                def onClick(self, dialog: Any, which: int) -> None:
-                    _deliver(button_index)
+            def make_listener(button_index: int) -> Any:
+                class _Proxy(dynamic_proxy(OnClickListener)):
+                    def onClick(self, dialog: Any, which: int) -> None:
+                        _deliver(button_index)
 
-            return _Proxy()
+                return _Proxy()
 
-        for i, spec in enumerate(buttons):
-            slot = slot_for.get(i)
-            if slot is None:
-                continue
-            label = str(spec.get("label", ""))
-            listener = make_listener(i)
-            if slot == "positive":
-                builder.setPositiveButton(label, listener)
-            elif slot == "negative":
-                builder.setNegativeButton(label, listener)
-            else:
-                builder.setNeutralButton(label, listener)
+            for i, spec in enumerate(button_specs):
+                slot = slot_for.get(i)
+                if slot is None:
+                    continue
+                label = str(spec.get("label", ""))
+                listener = make_listener(i)
+                if slot == "positive":
+                    builder.setPositiveButton(label, listener)
+                elif slot == "negative":
+                    builder.setNegativeButton(label, listener)
+                else:
+                    builder.setNeutralButton(label, listener)
 
-        OnCancelListener = jclass("android.content.DialogInterface$OnCancelListener")
+            OnCancelListener = jclass("android.content.DialogInterface$OnCancelListener")
 
-        class _CancelProxy(dynamic_proxy(OnCancelListener)):
-            def onCancel(self, dialog: Any) -> None:
-                _deliver(-1)
+            class _CancelProxy(dynamic_proxy(OnCancelListener)):
+                def onCancel(self, dialog: Any) -> None:
+                    _deliver(-1)
 
-        builder.setOnCancelListener(_CancelProxy())
-        builder.show()
-    except Exception:
-        _deliver(-1)
+            builder.setOnCancelListener(_CancelProxy())
+            builder.show()
+        except Exception:
+            _deliver(-1)
+
+    call_on_main_thread(_present_on_main)
 
 
 # ======================================================================

@@ -9,6 +9,7 @@ import time
 import pytest
 
 from pythonnative.runtime import (
+    call_on_main_thread,
     call_threadsafe,
     create_future,
     get_loop,
@@ -111,3 +112,35 @@ def test_resolve_after_done_is_noop() -> None:
 
     # Race-free wait for the first resolution to land via call_soon_threadsafe.
     assert run_async(wait()).result(timeout=2.0) == 1
+
+
+def test_call_on_main_thread_runs_inline_off_device() -> None:
+    """Off-device the helper has no platform main loop to marshal onto;
+    it should just invoke ``fn`` synchronously on the caller's thread."""
+    received: list = []
+    caller_thread = threading.current_thread()
+
+    def fn() -> None:
+        received.append(threading.current_thread())
+
+    call_on_main_thread(fn)
+    assert received == [caller_thread]
+
+
+def test_call_on_main_thread_bridges_coroutine_to_caller_thread() -> None:
+    """Off-device, ``call_on_main_thread`` from inside a coroutine runs
+    ``fn`` on the asyncio loop thread (the only "main-like" thread we
+    have in tests). The future round-trip mirrors the iOS / Android
+    flow: coroutine → main → resolve_future → coroutine."""
+
+    async def confirm() -> str:
+        future = create_future()
+
+        def on_main() -> None:
+            resolve_future(future, threading.current_thread().name)
+
+        call_on_main_thread(on_main)
+        return await future
+
+    name = run_async(confirm()).result(timeout=2.0)
+    assert name == "pn-asyncio"
