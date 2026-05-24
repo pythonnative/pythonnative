@@ -15,9 +15,8 @@ from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, se
 @pn.component
 def ParamsPassingDemo() -> pn.Element:
     """Render the active route's params using ``use_route``."""
-    route = pn.use_route()
+    params = pn.use_route()
     nav = pn.use_navigation()
-    params = route.get("params") or {}
 
     def push_with(value: str) -> None:
         nav.navigate("params_passing", {"value": value})
@@ -27,7 +26,6 @@ def ParamsPassingDemo() -> pn.Element:
         "use_route reads the active route's params; navigating with new params updates the readout.",
         section(
             "Route info",
-            result_text("Route name", route.get("name") or "(none)"),
             result_text("Param 'value'", params.get("value") or "(none)"),
             buttons_row(
                 pn.Button("Push value=alpha", on_click=lambda: push_with("alpha")),

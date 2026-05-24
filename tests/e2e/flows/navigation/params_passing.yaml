@@ -14,6 +14,13 @@ appId: ${APP_ID}
 - assertVisible: "Param 'value': alpha"
 - tapOn: "Push value=beta"
 - assertVisible: "Param 'value': beta"
+# Each ``Push value=…`` pushes a new ``params_passing`` entry onto
+# the stack, so two pops are needed to drain that history before
+# the standard close_demo tap pops out of the demo to the category.
+- tapOn: "Back to list"
+- assertVisible: "Param 'value': alpha"
+- tapOn: "Back to list"
+- assertVisible: "Param 'value': (none)"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

@@ -62,6 +62,12 @@ from .style import StyleProp, resolve_style
 _TARGET_FPS = 60.0
 _FRAME_DT = 1.0 / _TARGET_FPS
 
+# Upper bound on how much wall-clock time the animation loop will try to
+# catch up on in a single iteration after thread starvation. At 60 fps
+# this is ~333 ms of simulated motion; further drift is dropped to keep
+# the loop responsive.
+_MAX_CATCHUP_FRAMES = 20
+
 _EASINGS: Dict[str, Callable[[float], float]] = {
     "linear": lambda t: t,
     "ease_in": lambda t: t * t,
@@ -199,6 +205,20 @@ class _AnimationManager:
 
     def _loop(self) -> None:
         last = time.monotonic()
+        # Clamping the per-tick dt is important for numerical stability:
+        # an underdamped spring with a 0.3 s step explodes immediately,
+        # and on iOS/Android the animation thread can be starved for
+        # several frames during render bursts. We integrate physics on a
+        # clamped dt (max 2 target frames) and sub-step when wall-clock
+        # has advanced more than that, so the perceived motion still
+        # tracks real time at most a couple of frames behind. After an
+        # extreme starvation (e.g. the app was backgrounded for seconds)
+        # we cap the catch-up at ``_MAX_CATCHUP_FRAMES`` worth of
+        # physics; any further wall-clock drift is dropped on the floor,
+        # which keeps the loop responsive instead of spinning forward
+        # through hundreds of substeps.
+        max_step = _FRAME_DT * 2.0
+        max_catchup = _FRAME_DT * _MAX_CATCHUP_FRAMES
         while not self._stopped:
             now = time.monotonic()
             dt = now - last
@@ -209,13 +229,19 @@ class _AnimationManager:
                 time.sleep(0.05)
                 last = time.monotonic()
                 continue
-            for anim in active:
-                try:
-                    finished = anim.advance(dt)
-                except Exception:
-                    finished = True
-                if finished:
-                    self.remove(anim)
+            remaining = min(dt, max_catchup)
+            while remaining > 0.0:
+                step = remaining if remaining <= max_step else max_step
+                remaining -= step
+                for anim in active:
+                    if getattr(anim, "_completed", False):
+                        continue
+                    try:
+                        finished = anim.advance(step)
+                    except Exception:
+                        finished = True
+                    if finished:
+                        self.remove(anim)
             time.sleep(_FRAME_DT)
 
 

@@ -3,13 +3,34 @@
 # Run at the end of every demo flow so the suite can chain flows
 # without leaking state. Idempotent — calling this when already on
 # home is a no-op.
+#
+# The category screen renders every demo button inside a ScrollView
+# and "Back to home" sits at the bottom. With 20+ demos in a category
+# (e.g. ``Components``) the button lands below the visible fold after
+# returning from a demo, and ``tapOn`` does not auto-scroll. iOS
+# additionally preserves a parent ScrollView's scroll offset across
+# navigation, so after a deep demo the category title can also start
+# *above* the visible fold — we scroll up to it first, then assert.
 appId: ${APP_ID}
 ---
 - tapOn: "Back to list"
-- extendedWaitUntil:
-    visible: "Demos in ${CATEGORY}"
+- scrollUntilVisible:
+    element:
+      text: "Demos in ${CATEGORY}"
+    direction: UP
     timeout: 15000
+- assertVisible: "Demos in ${CATEGORY}"
+- scrollUntilVisible:
+    element:
+      text: "Back to home"
+    direction: DOWN
 - tapOn: "Back to home"
-- extendedWaitUntil:
-    visible: "E2E Suite home"
+# Same scroll-position preservation applies to the home screen on iOS:
+# after popping back from a deep demo, the home ScrollView can still be
+# scrolled past its title. Scroll up to surface it before asserting.
+- scrollUntilVisible:
+    element:
+      text: "E2E Suite home"
+    direction: UP
     timeout: 15000
+- assertVisible: "E2E Suite home"

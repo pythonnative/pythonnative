@@ -52,18 +52,32 @@ T = TypeVar("T")
 _DEFAULTS_SUITE = "pn_async_storage"
 
 
-def _ios_set(key: str, value: str) -> None:
-    from rubicon.objc import ObjCClass
+# Cache the NSUserDefaults class lookup. rubicon.objc's
+# ``ObjCClass("NSUserDefaults")`` walks the ObjC runtime metadata which
+# takes hundreds of milliseconds on first call; resolving once at module
+# import keeps every later get/set/delete in the sub-millisecond range.
+_ios_defaults: Any = None
 
-    defaults = ObjCClass("NSUserDefaults").standardUserDefaults
+
+def _ios_get_defaults() -> Any:
+    global _ios_defaults
+    if _ios_defaults is None:
+        from rubicon.objc import ObjCClass
+
+        _ios_defaults = ObjCClass("NSUserDefaults").standardUserDefaults
+    return _ios_defaults
+
+
+def _ios_set(key: str, value: str) -> None:
+    defaults = _ios_get_defaults()
     defaults.setObject_forKey_(value, key)
-    defaults.synchronize()
+    # ``synchronize()`` is documented as unnecessary on modern iOS and
+    # can block for seconds while it flushes to disk on a busy system;
+    # NSUserDefaults already coalesces writes asynchronously.
 
 
 def _ios_get(key: str) -> Optional[str]:
-    from rubicon.objc import ObjCClass
-
-    defaults = ObjCClass("NSUserDefaults").standardUserDefaults
+    defaults = _ios_get_defaults()
     val = defaults.stringForKey_(key)
     if val is None:
         return None
@@ -74,17 +88,12 @@ def _ios_get(key: str) -> Optional[str]:
 
 
 def _ios_delete(key: str) -> None:
-    from rubicon.objc import ObjCClass
-
-    defaults = ObjCClass("NSUserDefaults").standardUserDefaults
+    defaults = _ios_get_defaults()
     defaults.removeObjectForKey_(key)
-    defaults.synchronize()
 
 
 def _ios_all_keys() -> List[str]:
-    from rubicon.objc import ObjCClass
-
-    defaults = ObjCClass("NSUserDefaults").standardUserDefaults
+    defaults = _ios_get_defaults()
     rep = defaults.dictionaryRepresentation()
     if rep is None:
         return []

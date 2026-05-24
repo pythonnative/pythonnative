@@ -25,7 +25,8 @@
 # The script:
 #     1. Builds + installs the e2e-suite app via `pn run <platform> --no-logs`.
 #     2. Picks the right Maestro YAML based on platform + suite.
-#     3. Runs `maestro test` and exits with Maestro's exit code.
+#     3. Runs `maestro test` up to ``MAESTRO_MAX_ATTEMPTS`` times (default
+#        2) and exits with the last attempt's exit code.
 #
 # A successful run prints "All E2E suites passed." at the end and exits 0.
 # Any failed flow is reported by Maestro in its standard format; see
@@ -87,11 +88,37 @@ pushd examples/e2e-suite > /dev/null
 pn run "$PLATFORM" --no-logs
 popd > /dev/null
 
+run_maestro() {
+  if [[ "$PLATFORM" == "ios" ]]; then
+    maestro --platform ios test -e "APP_ID=$APP_ID" "$MAESTRO_TARGET"
+  else
+    maestro test -e "APP_ID=$APP_ID" "$MAESTRO_TARGET"
+  fi
+}
+
 printf "\n==> Running Maestro suite: %s\n" "$MAESTRO_TARGET"
-if [[ "$PLATFORM" == "ios" ]]; then
-  maestro --platform ios test -e "APP_ID=$APP_ID" "$MAESTRO_TARGET"
-else
-  maestro test -e "APP_ID=$APP_ID" "$MAESTRO_TARGET"
-fi
+
+# Maestro's iOS XCUITest driver occasionally loses its connection to the
+# app during long suites and surfaces transient "Application is not
+# running" / "Request for viewHierarchy failed" errors that have nothing
+# to do with the test under test. Allow one automatic retry of the whole
+# suite (overridable via ``MAESTRO_MAX_ATTEMPTS``) so CI doesn't fail on
+# driver flakes. A retry can also mask a genuine race in the suite, so
+# treat the "retrying..." line as a signal to investigate, not just to
+# trust the second pass.
+MAX_ATTEMPTS="${MAESTRO_MAX_ATTEMPTS:-2}"
+attempt=1
+while (( attempt <= MAX_ATTEMPTS )); do
+  if run_maestro; then
+    break
+  fi
+  if (( attempt == MAX_ATTEMPTS )); then
+    printf "\nMaestro suite failed after %d attempt(s).\n" "$attempt" >&2
+    exit 1
+  fi
+  printf "\n==> Maestro suite failed (attempt %d/%d); retrying...\n" \
+    "$attempt" "$MAX_ATTEMPTS" >&2
+  attempt=$(( attempt + 1 ))
+done
 
 printf "\nAll E2E suites passed.\n"

@@ -653,6 +653,45 @@ def test_layout_pass_positions_flex_children_in_row() -> None:
     assert root.children[2].frame == (240.0, 0.0, 60.0, 40.0)
 
 
+def test_layout_pass_clamps_scroll_view_to_viewport_height() -> None:
+    """ScrollView's own measured height fills the parent rather than tracking content.
+
+    Regression test: without this clamp, a screen-sized ScrollView that
+    wraps a taller child would size itself to the child's natural
+    height, leaving the native scroll view with
+    ``frame.height == contentSize.height`` and nothing to scroll. We
+    wrap the ScrollView in a View so it isn't the root (the root's
+    frame is owned by the screen host, not by the layout engine).
+    """
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    rec.set_viewport_size(400, 600)
+
+    el = Element(
+        "View",
+        {"width": 400, "height": 600},
+        [
+            Element(
+                "ScrollView",
+                {},
+                [
+                    Element(
+                        "Column",
+                        {},
+                        [Element("View", {"height": 200}, []) for _ in range(6)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    root = rec.mount(el)
+    scroll = root.children[0]
+    assert scroll.type_name == "ScrollView"
+    assert scroll.frame[3] == 600.0
+    inner_column = scroll.children[0]
+    assert inner_column.frame[3] == 1200.0
+
+
 def test_layout_pass_handles_absolute_positioning() -> None:
     backend = MockBackend()
     rec = Reconciler(backend)

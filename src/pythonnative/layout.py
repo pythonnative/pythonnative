@@ -401,7 +401,17 @@ class LayoutNode:
         height: Computed height in points.
     """
 
-    __slots__ = ("style", "children", "measure", "user_data", "x", "y", "width", "height")
+    __slots__ = (
+        "style",
+        "children",
+        "measure",
+        "user_data",
+        "x",
+        "y",
+        "width",
+        "height",
+        "_pn_scroll_axis",
+    )
 
     def __init__(
         self,
@@ -418,6 +428,14 @@ class LayoutNode:
         self.y: float = 0.0
         self.width: float = 0.0
         self.height: float = 0.0
+        # ``"x"``/``"y"`` for scroll containers; ``None`` for everything
+        # else. Consumed by ``_measure_container`` to clamp the node's
+        # own main-axis size to the parent's available space while still
+        # measuring children unbounded on the scroll axis (which is what
+        # makes the native ``UIScrollView`` / Android ``ScrollView``
+        # actually scroll). The reconciler stamps this when building the
+        # layout tree for ``ScrollView`` elements.
+        self._pn_scroll_axis: Optional[str] = None
 
     def __repr__(self) -> str:
         return (
@@ -576,6 +594,22 @@ def _measure_container(
 
     width = explicit_w if explicit_w is not None else (used_w + pad_x)
     height = explicit_h if explicit_h is not None else (used_h + pad_y)
+
+    # Scroll containers: clamp the container's own main-axis size to the
+    # parent's available space when no explicit size was provided. The
+    # children are still measured against an unbounded main-axis (handled
+    # via the wrapper inserted in ``Reconciler._build_layout_tree``) so the
+    # overflow becomes the scrollable region. Without this clamp, the
+    # container would grow to fit its content and there would be no
+    # overflow for the native ScrollView to scroll. Skipped when the
+    # parent is itself unbounded, so nested scroll views still fall back
+    # to natural sizing (the inner scroll is unscrollable in that case,
+    # which matches the behavior in React Native).
+    scroll_axis = getattr(node, "_pn_scroll_axis", None)
+    if scroll_axis == "y" and explicit_h is None and math.isfinite(avail_h):
+        height = avail_h
+    elif scroll_axis == "x" and explicit_w is None and math.isfinite(avail_w):
+        width = avail_w
     return width, height
 
 

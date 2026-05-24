@@ -803,7 +803,36 @@ class Reconciler:
         # root in the screen.
         for child in layout_root.children:
             self._apply_layout(child, 0.0, 0.0)
+        # Lay out the children of every visible ``Modal`` as a fresh
+        # subtree sized to the viewport. Modals are excluded from the
+        # main layout tree (their content lives in a separately
+        # presented native container) so without this pass the
+        # children's frames never get computed and the modal renders
+        # blank.
+        self._layout_visible_modals(self._tree, viewport_w, viewport_h)
         self._log_viewport(f"_run_layout: pass#{layout_pass} done")
+
+    def _layout_visible_modals(
+        self,
+        vnode: VNode,
+        viewport_w: float,
+        viewport_h: float,
+    ) -> None:
+        element = vnode.element
+        if isinstance(element.type, str) and element.type == "Modal":
+            if element.props.get("visible") and vnode.children:
+                child_layout = self._build_layout_tree(vnode.children[0])
+                if child_layout is not None:
+                    viewport = LayoutNode(
+                        style={"width": viewport_w, "height": viewport_h},
+                        children=[child_layout],
+                    )
+                    calculate_layout(viewport, viewport_w, viewport_h)
+                    for c in viewport.children:
+                        self._apply_layout(c, 0.0, 0.0)
+            return
+        for child in vnode.children:
+            self._layout_visible_modals(child, viewport_w, viewport_h)
 
     def _build_layout_tree(self, vnode: VNode) -> Optional[LayoutNode]:
         """Walk `vnode` and build a parallel `LayoutNode` tree of native nodes.
@@ -829,6 +858,15 @@ class Reconciler:
 
         style = extract_layout_style(element.props)
         layout = LayoutNode(style=style, user_data=vnode)
+        if element.type == "ScrollView":
+            # Mark the scroll axis so the layout engine clamps the
+            # container's own main-axis size to its parent's available
+            # space (otherwise the container grows to fit its content
+            # and there is no overflow for the native ScrollView to
+            # actually scroll). The children are still wrapped below so
+            # they see an unbounded main axis when measured.
+            scroll_axis = element.props.get("scroll_axis", "vertical")
+            layout._pn_scroll_axis = "x" if scroll_axis == "horizontal" else "y"
         self._log_viewport(
             f"_build_layout_tree: node type={element.type!r} view={self._obj_debug(vnode.native_view)} "
             f"style={style!r} children={len(vnode.children)}"

@@ -14,7 +14,11 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Demo: use_state"
     timeout: 10000
-- back
+# ``- back`` on iOS swipes from the left edge, which is unreliable
+# in the simulator. Tap the demo's own "Back to list" button instead,
+# which pops one stack entry — exactly what we need to refocus the
+# previous demo screen.
+- tapOn: "Back to list"
 - extendedWaitUntil:
     visible: "Demo: use_focus_effect"
     timeout: 10000

@@ -64,7 +64,14 @@ from .hooks import (
 # Focus context
 # ======================================================================
 
-_FocusContext = create_context(False)
+# Defaults to True: components rendered outside any declarative
+# navigator (e.g. the root component of a screen pushed via the host's
+# native nav stack) are by definition focused — the host's own
+# ``on_resume`` / ``on_pause`` lifecycle drives the focus state for
+# those. Declarative navigators override this provider on the active
+# subtree (always True today; reserved for future inactive-screen
+# rendering).
+_FocusContext = create_context(True)
 
 # ======================================================================
 # Data structures
@@ -925,6 +932,15 @@ def use_focus_effect(effect: Callable, deps: Optional[list] = None) -> None:
     one. Useful for starting subscriptions, refreshing data, or
     pausing animations on the inactive screen.
 
+    The focus state combines two sources of truth:
+
+    - The screen host's lifecycle (``on_resume`` / ``on_pause``), so
+      pushing a sibling onto the navigation stack blurs this screen and
+      popping back to it refocuses it.
+    - The in-tree ``_FocusContext`` value, which lets declarative
+      navigators (e.g. tabs, drawers) mark only the active subtree as
+      focused even when both screens are part of the same host.
+
     Args:
         effect: A zero-arg callable invoked when focused. Optionally
             returns a cleanup callable.
@@ -941,7 +957,46 @@ def use_focus_effect(effect: Callable, deps: Optional[list] = None) -> None:
             return pn.Text("Home")
         ```
     """
-    is_focused = use_context(_FocusContext)
+    context_focused = use_context(_FocusContext)
+
+    nav = use_context(_NavigationContext)
+    # Walk the navigator parent chain to find the screen host. Declarative
+    # navigators (Stack/Tab/Drawer) wrap the host's ``NavigationHandle``
+    # as ``_parent``; only the host-level handle has ``_host``.
+    host = None
+    cursor = nav
+    while cursor is not None:
+        candidate = getattr(cursor, "_host", None)
+        if candidate is not None:
+            host = candidate
+            break
+        cursor = getattr(cursor, "_parent", None)
+    initial_host_focus = bool(getattr(host, "_is_focused", True)) if host is not None else True
+    host_focused, set_host_focused = use_state(initial_host_focus)
+
+    def subscribe_to_host_focus() -> Any:
+        if host is None:
+            return None
+        subscribers = getattr(host, "_focus_subscribers", None)
+        if subscribers is None:
+            return None
+        subscribers.append(set_host_focused)
+        # The host may have changed focus state between the initial
+        # ``use_state`` call and this effect running (e.g. mid-render
+        # lifecycle event); resync once to avoid stale state.
+        set_host_focused(bool(host._is_focused))
+
+        def cleanup() -> None:
+            try:
+                subscribers.remove(set_host_focused)
+            except ValueError:
+                pass
+
+        return cleanup
+
+    use_effect(subscribe_to_host_focus, [])
+
+    is_focused = context_focused and host_focused
     all_deps = [is_focused] + (list(deps) if deps is not None else [])
 
     def wrapped_effect() -> Any:

@@ -13,7 +13,12 @@ appId: ${APP_ID}
 - tapOn: "Type your name here"
 - inputText: "Maestro"
 - assertVisible: "Echo: Maestro"
-- hideKeyboard
+# Maestro's ``hideKeyboard`` is unreliable on iOS 26+ (it looks for a
+# UI dismiss button that doesn't exist for a standard text keyboard).
+# ``pressKey: Enter`` works because the iOS handler installs a
+# ``UITextFieldDelegate.textFieldShouldReturn:`` that resigns first
+# responder, which is also the behavior most users expect.
+- pressKey: Enter
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

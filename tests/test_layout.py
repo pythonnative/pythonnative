@@ -755,6 +755,86 @@ def test_unbounded_with_pure_flex_collapses_to_zero() -> None:
 
 
 # ======================================================================
+# Scroll-axis clamping (the marker the reconciler stamps on ScrollView)
+# ======================================================================
+
+
+def test_scroll_axis_y_clamps_container_height_to_parent_avail() -> None:
+    """Vertical scroll containers fill the parent's height (don't grow with content).
+
+    Without this clamp the container would size itself to ``used_main``
+    (the natural content height), making
+    ``UIScrollView.frame.height == contentSize.height`` so the native
+    scroll view never has any overflow to actually scroll.
+    """
+    inner = LayoutNode(style={"width": 100, "height": 1000})
+    scroll = LayoutNode(children=[inner])
+    scroll._pn_scroll_axis = "y"
+    root = LayoutNode(
+        style={"flex_direction": "column", "width": 200, "height": 400},
+        children=[scroll],
+    )
+    calculate_layout(root, 200, 400)
+    assert scroll.height == 400
+    assert inner.height == 1000
+
+
+def test_scroll_axis_y_still_lets_children_measure_unbounded() -> None:
+    scroll = LayoutNode(
+        children=[LayoutNode(style={"width": 100, "height": 1500})],
+    )
+    scroll._pn_scroll_axis = "y"
+    root = LayoutNode(
+        style={"flex_direction": "column", "width": 200, "height": 300},
+        children=[scroll],
+    )
+    calculate_layout(root, 200, 300)
+    assert scroll.children[0].height == 1500
+
+
+def test_scroll_axis_y_respects_explicit_height() -> None:
+    scroll = LayoutNode(
+        style={"height": 250},
+        children=[LayoutNode(style={"width": 100, "height": 900})],
+    )
+    scroll._pn_scroll_axis = "y"
+    root = LayoutNode(
+        style={"flex_direction": "column", "width": 200, "height": 800},
+        children=[scroll],
+    )
+    calculate_layout(root, 200, 800)
+    assert scroll.height == 250
+
+
+def test_scroll_axis_y_with_unbounded_parent_falls_back_to_natural() -> None:
+    """Nested scroll containers (parent unbounded) fall back to natural size.
+
+    Matches React Native's behavior: an inner ``ScrollView`` whose
+    parent doesn't provide a finite height is treated as a normal
+    column — it sizes to its content and isn't independently scrollable.
+    """
+    inner = LayoutNode(style={"width": 100, "height": 600})
+    scroll = LayoutNode(children=[inner])
+    scroll._pn_scroll_axis = "y"
+    root = LayoutNode(style={"width": 200}, children=[scroll])
+    calculate_layout(root, 200, math.inf)
+    assert scroll.height == 600
+
+
+def test_scroll_axis_x_clamps_container_width_to_parent_avail() -> None:
+    inner = LayoutNode(style={"width": 1000, "height": 100})
+    scroll = LayoutNode(style={"flex_direction": "row"}, children=[inner])
+    scroll._pn_scroll_axis = "x"
+    root = LayoutNode(
+        style={"flex_direction": "column", "width": 400, "height": 200},
+        children=[scroll],
+    )
+    calculate_layout(root, 400, 200)
+    assert scroll.width == 400
+    assert inner.width == 1000
+
+
+# ======================================================================
 # extract_layout_style helper
 # ======================================================================
 

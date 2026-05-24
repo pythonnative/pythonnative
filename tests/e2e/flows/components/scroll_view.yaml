@@ -2,6 +2,15 @@
 #
 # Demo screen: examples/e2e-suite/app/screens/components/scroll_view.py
 # Source under test: src/pythonnative/components.py :: ScrollView
+#
+# The demo's inner ScrollView is intentionally small (200 dp) — that's
+# what's being tested — and it sits near the top of the screen, *not*
+# in the middle. Maestro's ``scrollUntilVisible`` always swipes from
+# the screen center, which lands below this scroll container and never
+# scrolls it. The recommended Maestro pattern for non-fullscreen
+# scrollables is a custom swipe loop with explicit coordinates that
+# stay inside the scroll container's bounds. See:
+#   https://docs.maestro.dev/examples/recipes/custom-scrolling-for-screen-fragments
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -10,10 +19,16 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: ScrollView
 - assertVisible: "ScrollRow 1"
-- scrollUntilVisible:
-    element: "ScrollRow 20"
-    direction: DOWN
-    timeout: 10000
+# Each swipe moves the inner ScrollView roughly 4-5 rows. ``ScrollRow 20``
+# sits ~12 rows in, so 3 swipes lands it inside the visible 200 dp area
+# without overshooting past the end of the list.
+- repeat:
+    times: 3
+    commands:
+      - swipe:
+          start: 50%, 22%
+          end: 50%, 6%
+          duration: 300
 - assertVisible: "ScrollRow 20"
 - runFlow:
     file: ../../helpers/close_demo.yaml

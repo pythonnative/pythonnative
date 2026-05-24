@@ -2,6 +2,13 @@
 #
 # Demo screen: examples/e2e-suite/app/screens/components/modal.py
 # Source under test: src/pythonnative/components.py :: Modal
+#
+# The intermediate ``Modal: open`` text from the outer screen is
+# *not* asserted while the modal is presented — on iOS the modal
+# sheet covers the outer screen so its accessibility elements are
+# offscreen for the duration. Instead we verify the toggle by
+# checking that ``Modal body text`` becomes / stops being visible
+# and that the outer state returns to ``Modal: closed`` after dismiss.
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -14,7 +21,6 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Modal body text"
     timeout: 10000
-- assertVisible: "Modal: open"
 - tapOn: "Close modal"
 - extendedWaitUntil:
     notVisible: "Modal body text"

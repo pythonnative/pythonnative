@@ -35,6 +35,7 @@ _pn_text_input_suppress_callbacks: dict = {}
 _pn_view_visual_props: dict = {}
 _DRAWABLE_STYLE_KEYS = ("background_color", "border_radius", "border_width", "border_color")
 
+
 # ======================================================================
 # Shared helpers
 # ======================================================================
@@ -509,18 +510,27 @@ class ButtonHandler(AndroidViewHandler):
 class ScrollViewHandler(AndroidViewHandler):
     """Scroll container — wraps a single child whose height is unbounded.
 
+    Uses ``androidx.core.widget.NestedScrollView`` rather than the
+    framework ``android.widget.ScrollView`` because the framework
+    ScrollView always intercepts vertical gestures, even when it has
+    no overflow. That breaks the common case of nesting a small
+    fixed-height scroll view inside a screen-level scroll view (the
+    outer steals every gesture and the inner never scrolls).
+    ``NestedScrollView`` implements the standard
+    ``NestedScrollingParent2`` / ``NestedScrollingChild2`` protocol so
+    the outer cooperates with any nested scroll, only consuming
+    leftover scroll when its child reaches its limit.
+
     When a ``refresh_control`` prop is provided, wraps the scroll in
     a `SwipeRefreshLayout` and forwards the on-refresh callback.
     """
 
     def create(self, props: Dict[str, Any]) -> Any:
-        sv = jclass("android.widget.ScrollView")(_ctx())
+        try:
+            sv = jclass("androidx.core.widget.NestedScrollView")(_ctx())
+        except Exception:
+            sv = jclass("android.widget.ScrollView")(_ctx())
         _apply_common_visual(sv, props)
-        # Wrap the inner ScrollView in a SwipeRefreshLayout when
-        # ``refresh_control`` is asked for. Implementing this cleanly
-        # would require returning a different parent; for v1, we
-        # attach the listener via a wrapper that we expose to
-        # add_child callers below.
         return sv
 
     def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
@@ -536,6 +546,17 @@ class ScrollViewHandler(AndroidViewHandler):
 class TextInputHandler(AndroidViewHandler):
     def create(self, props: Dict[str, Any]) -> Any:
         et = jclass("android.widget.EditText")(_ctx())
+        # Default to single-line so pressing Enter triggers IME_ACTION_DONE
+        # (submit / dismiss) instead of inserting a newline. The
+        # ``_apply`` path will override this if ``multiline=True`` is
+        # set in props. Without this, every TextInput without an
+        # explicit ``multiline`` value falls back to Android's
+        # multi-line default and Enter inserts ``\n``.
+        try:
+            if not props.get("multiline"):
+                et.setSingleLine(True)
+        except Exception:
+            pass
         self._apply(et, props)
         return et
 

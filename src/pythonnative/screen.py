@@ -165,6 +165,25 @@ def _init_host_common(host: Any, component_path: str, component_func: Any) -> No
     host._hot_reload_manifest_path = None
     host._hot_reload_last_version = None
     host._layout_listener = None  # retained on Android to prevent GC
+    # Focus state — drives ``use_focus_effect``. Starts focused because
+    # a host is only created when the screen is being presented; the
+    # platform lifecycle hooks (``on_resume`` / ``on_pause``) flip this
+    # when the user navigates to / from another screen.
+    host._is_focused = True
+    host._focus_subscribers = []
+
+
+def _set_host_focused(host: Any, focused: bool) -> None:
+    """Update ``host._is_focused`` and notify ``use_focus_effect`` subscribers."""
+    if getattr(host, "_is_focused", True) == focused:
+        return
+    host._is_focused = focused
+    subscribers = list(getattr(host, "_focus_subscribers", ()) or ())
+    for callback in subscribers:
+        try:
+            callback(focused)
+        except Exception:
+            pass
 
 
 def _push_viewport_size(host: Any, width: float, height: float) -> None:
@@ -711,7 +730,7 @@ if IS_ANDROID:
             pass
 
         def on_resume(self) -> None:
-            pass
+            _set_host_focused(self, True)
 
         def on_layout(self) -> None:
             # Android pushes viewport changes through the
@@ -721,7 +740,7 @@ if IS_ANDROID:
             pass
 
         def on_pause(self) -> None:
-            pass
+            _set_host_focused(self, False)
 
         def on_stop(self) -> None:
             pass
@@ -1052,7 +1071,7 @@ else:
                 pass
 
             def on_pause(self) -> None:
-                pass
+                _set_host_focused(self, False)
 
             def on_stop(self) -> None:
                 pass
@@ -1267,6 +1286,7 @@ else:
                 # ``viewDidAppear`` always follows ``viewDidLayoutSubviews``,
                 # but trigger one extra sync here for safety in case a
                 # template overrides the layout call without forwarding.
+                _set_host_focused(self, True)
                 if self._root_native_view is None:
                     _log_pn("on_resume: no root_native_view yet, skipping")
                     return

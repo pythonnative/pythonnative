@@ -38,6 +38,7 @@ def TextInputDemo() -> pn.Element:
                 placeholder="Type your name here",
                 on_change=set_name,
                 return_key_type="done",
+                auto_correct=False,
                 style=field_style,
             ),
             result_text("Echo", name or "(empty)"),

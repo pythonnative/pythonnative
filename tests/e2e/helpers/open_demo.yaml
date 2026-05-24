@@ -7,16 +7,31 @@
 #
 # This flow leaves the app on the corresponding demo screen with
 # ``"Demo: <DEMO_TITLE>"`` visible, ready for the caller's assertions.
+#
+# Both the home and category screens use a ScrollView and the target
+# button can be below the visible fold (especially in the Components
+# category, which lists 20+ demos). Maestro's ``tapOn`` does not
+# auto-scroll, so we explicitly ``scrollUntilVisible`` before each tap.
+# It's a no-op when the element is already on screen, so the helper is
+# safe to use for short lists too.
 appId: ${APP_ID}
 ---
 - launchApp
 - extendedWaitUntil:
     visible: "E2E Suite home"
     timeout: 60000
+- scrollUntilVisible:
+    element:
+      text: "Open ${CATEGORY}"
+    direction: DOWN
 - tapOn: "Open ${CATEGORY}"
 - extendedWaitUntil:
     visible: "Demos in ${CATEGORY}"
     timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Open: ${DEMO_TITLE}"
+    direction: DOWN
 - tapOn:
     text: "Open: ${DEMO_TITLE}"
 - extendedWaitUntil:

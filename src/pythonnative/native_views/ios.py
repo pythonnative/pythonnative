@@ -54,6 +54,19 @@ NSObject = ObjCClass("NSObject")
 UIColor = ObjCClass("UIColor")
 UIFont = ObjCClass("UIFont")
 
+# Declare ``superview`` as a property on UIView so rubicon-objc returns
+# the actual UIView (or None) on attribute access, instead of an
+# ObjCBoundMethod. Without this, accessing ``view.superview`` returns a
+# method handle and the entire codepath that updates UIScrollView's
+# ``contentSize`` would raise silently. See rubicon-objc docs on
+# ``declare_property`` for why some ``@property`` declarations aren't
+# auto-detected by the runtime introspection.
+try:
+    _UIView = ObjCClass("UIView")
+    _UIView.declare_property("superview")
+except Exception:
+    pass
+
 
 def _objc_ptr(obj: Any) -> Optional[int]:
     """Return the raw Objective-C pointer for a Rubicon object."""
@@ -131,6 +144,8 @@ _SEL_UTF8STRING = _sel_reg(b"UTF8String")
 _SEL_ADD_TARGET_ACTION_EVENTS = _sel_reg(b"addTarget:action:forControlEvents:")
 _SEL_ON_EDIT = _sel_reg(b"onEdit:")
 _SEL_ON_SUBMIT = _sel_reg(b"onSubmit:")
+_SEL_RESIGN_FIRST_RESPONDER = _sel_reg(b"resignFirstResponder")
+_SEL_TEXT_FIELD_SHOULD_RETURN = _sel_reg(b"textFieldShouldReturn:")
 
 _NS_OBJECT_CLS = _get_cls(b"NSObject")
 
@@ -507,12 +522,19 @@ class IOSViewHandler(ViewHandler):
                 pass
             try:
                 parent = native_view.superview
-                set_content_size = getattr(parent, "setContentSize_", None)
-                if set_content_size is not None:
+                parent_cls = ""
+                try:
+                    parent_cls = str(parent.objc_class.name) if parent is not None else ""
+                except Exception:
+                    parent_cls = ""
+                # Expand the parent UIScrollView's contentSize whenever a
+                # child's frame extends past the visible bounds, so the
+                # scroll view can actually scroll to reveal it.
+                if "UIScrollView" in parent_cls:
                     bounds = parent.bounds
                     content_w = max(float(bounds.size.width), frame_x + frame_w)
                     content_h = max(float(bounds.size.height), frame_y + frame_h)
-                    set_content_size((content_w, content_h))
+                    parent.setContentSize_((content_w, content_h))
             except Exception:
                 pass
         except Exception:
@@ -651,6 +673,7 @@ _pn_tf_raw_target_map: dict = {}
 _PN_TEXTFIELD_TARGET_CLS: Optional[int] = None
 _textfield_edit_imp_ref: Any = None
 _textfield_submit_imp_ref: Any = None
+_textfield_should_return_imp_ref: Any = None
 
 
 def _textfield_text(sender_ptr: int) -> str:
@@ -694,8 +717,27 @@ def _textfield_on_submit_imp(self_ptr: int, _cmd: int, sender_ptr: int) -> None:
         pass
 
 
+def _textfield_should_return_imp(self_ptr: int, _cmd: int, tf_ptr: int) -> bool:
+    """``UITextFieldDelegate.textFieldShouldReturn:`` — dismiss the keyboard.
+
+    iOS doesn't dismiss the keyboard on Return by default; the standard
+    pattern is for the delegate to call ``resignFirstResponder`` and
+    return ``YES``. Matching that here brings PythonNative's
+    ``TextInput`` in line with React Native's default behavior and with
+    what users expect from a ``return_key_type="done"`` style.
+    """
+    try:
+        _objc_msgSend.restype = None
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
+        _objc_msgSend(_ct.c_void_p(int(tf_ptr or 0)), _SEL_RESIGN_FIRST_RESPONDER)
+    except Exception:
+        pass
+    return True
+
+
 def _ensure_textfield_target_class() -> Optional[int]:
-    global _PN_TEXTFIELD_TARGET_CLS, _textfield_edit_imp_ref, _textfield_submit_imp_ref
+    global _PN_TEXTFIELD_TARGET_CLS
+    global _textfield_edit_imp_ref, _textfield_submit_imp_ref, _textfield_should_return_imp_ref
     if _PN_TEXTFIELD_TARGET_CLS is not None:
         return _PN_TEXTFIELD_TARGET_CLS
     existing = _get_cls(b"PNTextFieldActionTarget")
@@ -706,10 +748,18 @@ def _ensure_textfield_target_class() -> Optional[int]:
     if not cls:
         return None
     action_type = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
+    bool_type = _ct.CFUNCTYPE(_ct.c_bool, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
     _textfield_edit_imp_ref = action_type(_textfield_on_edit_imp)
     _textfield_submit_imp_ref = action_type(_textfield_on_submit_imp)
+    _textfield_should_return_imp_ref = bool_type(_textfield_should_return_imp)
     _add_method(cls, _SEL_ON_EDIT, _ct.cast(_textfield_edit_imp_ref, _ct.c_void_p), b"v@:@")
     _add_method(cls, _SEL_ON_SUBMIT, _ct.cast(_textfield_submit_imp_ref, _ct.c_void_p), b"v@:@")
+    _add_method(
+        cls,
+        _SEL_TEXT_FIELD_SHOULD_RETURN,
+        _ct.cast(_textfield_should_return_imp_ref, _ct.c_void_p),
+        b"c@:@",
+    )
     _reg_cls(cls)
     _PN_TEXTFIELD_TARGET_CLS = int(cls)
     return _PN_TEXTFIELD_TARGET_CLS
@@ -759,6 +809,16 @@ def _attach_textfield_raw_target(tf: Any, props: Dict[str, Any]) -> None:
             _ct.c_void_p(target_ptr),
             _SEL_ON_SUBMIT,
             1 << 6,
+        )
+        # Wire the same object as the UITextFieldDelegate so its
+        # ``textFieldShouldReturn:`` runs and resigns first responder
+        # — without this iOS keeps the keyboard up after Return.
+        _objc_msgSend.restype = None
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p]
+        _objc_msgSend(
+            _ct.c_void_p(tf_ptr),
+            _SEL_SET_DELEGATE,
+            _ct.c_void_p(target_ptr),
         )
     if "on_change" in props:
         _pn_tf_change_callback_map[int(target_ptr)] = props["on_change"]
@@ -1313,8 +1373,10 @@ class TextInputHandler(IOSViewHandler):
             except Exception:
                 pass
         self._common_apply(tf, props)
-        if "on_change" in props or "on_submit" in props:
-            _attach_textfield_raw_target(tf, props)
+        # Always wire the action target — even without ``on_change`` /
+        # ``on_submit`` we want the textfield's delegate set so Return
+        # dismisses the keyboard (textFieldShouldReturn:).
+        _attach_textfield_raw_target(tf, props)
 
     def _apply_textview(self, tv: Any, props: Dict[str, Any]) -> None:
         if "value" in props:

@@ -83,6 +83,24 @@ maestro test \
 
 The build step (`pn run <platform> --no-logs`) only needs to run once per change to `app/`. After that, repeat-run the Maestro flow as you iterate.
 
+### Suite-level retry
+
+`scripts/run-e2e.sh` re-invokes the whole `maestro test` once if the first attempt exits non-zero. The retry exists to absorb Maestro's iOS XCUITest driver flake (transient `Application is not running` / `Request for viewHierarchy failed`) — not to paper over real failures.
+
+When the script prints:
+
+```text
+==> Maestro suite failed (attempt 1/2); retrying...
+```
+
+treat it as a signal to investigate, not as "all clear." If a flow needs the retry to pass on a given run, the underlying issue is almost always one of:
+
+- a genuine race or timing assumption in the demo or flow (fix it),
+- a CPU-starvation-induced numerical instability in animated code (clamp the integrator),
+- or a real Maestro/driver bug worth filing upstream.
+
+Override or disable with `MAESTRO_MAX_ATTEMPTS=1 ./scripts/run-e2e.sh ios` when bisecting a flake.
+
 ## The flow header convention
 
 Every flow file under `tests/e2e/flows/` starts with a two-line header pointing at the demo and the source code:
