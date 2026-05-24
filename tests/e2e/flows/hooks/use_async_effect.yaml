@@ -1,0 +1,18 @@
+# Tests use_async_effect resolves and updates state on mount.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_async_effect.py
+# Source under test: src/pythonnative/hooks.py :: use_async_effect
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_async_effect
+- extendedWaitUntil:
+    visible: "Status: done"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

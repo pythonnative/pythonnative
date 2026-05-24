@@ -1,0 +1,32 @@
+# Tests Alert.confirm returns True / False from each button.
+#
+# Demo screen: examples/e2e-suite/app/screens/alerts/confirm_alert.py
+# Source under test: src/pythonnative/alerts.py :: Alert.confirm
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Alerts
+      DEMO_TITLE: Alert.confirm
+- assertVisible: "Last response: (none)"
+- tapOn: "Show confirm"
+- extendedWaitUntil:
+    visible: "Confirm action"
+    timeout: 5000
+- tapOn: "Confirm"
+- extendedWaitUntil:
+    visible: "Last response: confirmed"
+    timeout: 5000
+- tapOn: "Show confirm"
+- extendedWaitUntil:
+    visible: "Confirm action"
+    timeout: 5000
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    visible: "Last response: cancelled"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Alerts

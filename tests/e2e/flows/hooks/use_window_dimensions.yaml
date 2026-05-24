@@ -1,0 +1,17 @@
+# Tests use_window_dimensions returns a non-empty Window: line.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_window_dimensions.py
+# Source under test: src/pythonnative/hooks.py :: use_window_dimensions
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_window_dimensions
+- assertVisible:
+    text: "Window:.*×.*"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

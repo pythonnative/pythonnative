@@ -1,0 +1,24 @@
+# Tests Button taps increment a counter; disabled buttons don't fire.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/button.py
+# Source under test: src/pythonnative/components.py :: Button
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: Button
+- assertVisible: "Counter: 0"
+- tapOn: "Increment"
+- assertVisible: "Counter: 1"
+- tapOn: "Increment"
+- assertVisible: "Counter: 2"
+- tapOn: "Reset"
+- assertVisible: "Counter: 0"
+- tapOn: "Should not fire"
+- assertVisible: "Disabled taps: 0"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

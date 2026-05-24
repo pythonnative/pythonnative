@@ -1,0 +1,18 @@
+# Tests three align_items variants render labelled children.
+#
+# Demo screen: examples/e2e-suite/app/screens/layout/alignment.py
+# Source under test: src/pythonnative/layout.py, src/pythonnative/style.py
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Layout
+      DEMO_TITLE: Alignment
+- assertVisible: "align-start-a"
+- assertVisible: "align-center-a"
+- assertVisible: "align-end-a"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Layout

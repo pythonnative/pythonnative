@@ -1,0 +1,7 @@
+# Styling category suite.
+appId: ${APP_ID}
+---
+- runFlow: ../flows/styling/typography.yaml
+- runFlow: ../flows/styling/borders_shadows.yaml
+- runFlow: ../flows/styling/transform.yaml
+- runFlow: ../flows/styling/stylesheet.yaml

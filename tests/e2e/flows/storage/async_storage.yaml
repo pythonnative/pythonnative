@@ -1,0 +1,28 @@
+# Tests AsyncStorage write / read / delete round-trip.
+#
+# Demo screen: examples/e2e-suite/app/screens/storage/async_storage_demo.py
+# Source under test: src/pythonnative/storage.py :: AsyncStorage
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Storage
+      DEMO_TITLE: AsyncStorage
+- tapOn: "Clear"
+- assertVisible: "Read value: (unread)"
+- tapOn: "Write"
+- assertVisible: "Read value: (unread)"
+- tapOn: "Read"
+- extendedWaitUntil:
+    visible: "Read value: stored-value"
+    timeout: 5000
+- tapOn: "Clear"
+- tapOn: "Read"
+- extendedWaitUntil:
+    visible: "Read value: (none)"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Storage

@@ -1,0 +1,21 @@
+# Tests typography variants all render.
+#
+# Demo screen: examples/e2e-suite/app/screens/styling/typography.py
+# Source under test: src/pythonnative/style.py, src/pythonnative/components.py :: Text
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Styling
+      DEMO_TITLE: Typography
+- assertVisible: "type-headline"
+- assertVisible: "type-body"
+- assertVisible: "type-caption"
+- assertVisible: "type-italic"
+- assertVisible: "type-underline"
+- assertVisible: "type-letter-spacing"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Styling

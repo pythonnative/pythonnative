@@ -1,0 +1,17 @@
+# Tests the SDK surface loaded and Props subclassing works.
+#
+# Demo screen: examples/e2e-suite/app/screens/sdk/custom_component.py
+# Source under test: src/pythonnative/sdk/__init__.py, src/pythonnative/sdk/_components.py
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: SDK
+      DEMO_TITLE: Custom component
+- assertVisible: "Props subclass works: yes"
+- assertVisible: "SDK module loaded: yes"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: SDK

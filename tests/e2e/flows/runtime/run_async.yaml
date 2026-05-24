@@ -1,0 +1,20 @@
+# Tests run_async schedules a coroutine on the framework loop.
+#
+# Demo screen: examples/e2e-suite/app/screens/runtime/run_async_demo.py
+# Source under test: src/pythonnative/runtime.py :: run_async
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Runtime
+      DEMO_TITLE: run_async
+- assertVisible: "Status: idle"
+- tapOn: "Run async job"
+- extendedWaitUntil:
+    visible: "Status: done"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Runtime

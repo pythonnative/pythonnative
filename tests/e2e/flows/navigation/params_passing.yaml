@@ -1,0 +1,20 @@
+# Tests use_route reads navigation params; navigating with new params updates them.
+#
+# Demo screen: examples/e2e-suite/app/screens/navigation/params_passing.py
+# Source under test: src/pythonnative/navigation.py :: use_route, NavigationHandle.navigate
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Navigation
+      DEMO_TITLE: Route Params
+- assertVisible: "Param 'value': (none)"
+- tapOn: "Push value=alpha"
+- assertVisible: "Param 'value': alpha"
+- tapOn: "Push value=beta"
+- assertVisible: "Param 'value': beta"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Navigation

@@ -1,0 +1,23 @@
+# Tests use_ref keeps a silent value across non-render updates.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_ref.py
+# Source under test: src/pythonnative/hooks.py :: use_ref
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_ref
+- assertVisible: "Silent ref value: 0"
+- assertVisible: "Renders: 0"
+- tapOn: "Bump silent"
+- tapOn: "Bump silent"
+- assertVisible: "Silent ref value: 0"
+- tapOn: "Force render"
+- assertVisible: "Silent ref value: 2"
+- assertVisible: "Renders: 1"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

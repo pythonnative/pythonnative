@@ -1,0 +1,24 @@
+# Tests use_effect runs once on mount and again on each dep change.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_effect.py
+# Source under test: src/pythonnative/hooks.py :: use_effect
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_effect
+- assertVisible: "Mount runs: 1"
+- assertVisible: "Dep runs: 1"
+- assertVisible: "Dep value: 0"
+- tapOn: "Bump dep"
+- assertVisible: "Dep runs: 2"
+- assertVisible: "Dep value: 1"
+- tapOn: "Bump dep"
+- assertVisible: "Dep runs: 3"
+- assertVisible: "Mount runs: 1"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

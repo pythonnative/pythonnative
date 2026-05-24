@@ -1,0 +1,35 @@
+"""Demo screen for [`pn.use_async_effect`][pythonnative.use_async_effect].
+
+An async effect runs once on mount and waits 200 ms before flipping
+a "completed" flag. Maestro asserts the initial "loading" line, then
+re-asserts after the effect resolves.
+"""
+
+from __future__ import annotations
+
+import asyncio
+
+import pythonnative as pn
+from app.screens.scaffold import demo_screen, hint, result_text, section
+
+
+@pn.component
+def UseAsyncEffectDemo() -> pn.Element:
+    """Run an async effect that flips a 'done' flag after a short delay."""
+    done, set_done = pn.use_state(False)
+
+    async def _eventually_done() -> None:
+        await asyncio.sleep(0.2)
+        set_done(True)
+
+    pn.use_async_effect(_eventually_done, [])
+
+    return demo_screen(
+        "use_async_effect",
+        "Async effect resolves after a short delay and flips the status line.",
+        section(
+            "Status",
+            result_text("Status", "done" if done else "loading"),
+            hint("Maestro waits for 'Status: done' (timeout 5s)."),
+        ),
+    )

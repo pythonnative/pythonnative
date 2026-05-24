@@ -35,10 +35,13 @@ cd examples/hello-world && pn run android
 - `src/pythonnative/` – installable library and CLI
   - `pythonnative/` – core cross‑platform UI components and utilities
   - `cli/` – `pn` command
-- `tests/` – unit tests for the library
+- `tests/` – unit tests for the library, plus the Maestro E2E suite
+  - `e2e/` – the comprehensive E2E suite (see [E2E tests](#e2e-tests-maestro) below and `tests/e2e/AGENTS.md`)
 - `templates/` – Android/iOS project templates and zips
 - `examples/` – runnable example apps
-  - `hello-world/` – minimal demo app using the library
+  - `hello-world/` – minimal marketing demo
+  - `e2e-suite/` – comprehensive feature catalog that drives the Maestro E2E suite
+- `scripts/` – helper scripts (`check.sh`, `run-e2e.sh`, `check-e2e-coverage.py`)
 - `README.md`, `pyproject.toml` – repo docs and packaging
 
 ## Coding guidelines
@@ -269,7 +272,9 @@ fix/cli-regression
 
 ### E2E tests (Maestro)
 
-End-to-end tests use [Maestro](https://maestro.dev/) to drive the hello-world example on real emulators and simulators.
+End-to-end tests use [Maestro](https://maestro.dev/) to drive the dedicated `examples/e2e-suite` app on real emulators and simulators. That app contains one screen per public symbol in `pythonnative.__all__`; every flow under `tests/e2e/flows/<category>/` exercises one symbol.
+
+The dedicated `examples/hello-world` app is left in place as a small marketing demo; it is **not** the E2E target.
 
 ```bash
 # Install Maestro (one-time)
@@ -279,21 +284,36 @@ curl -Ls "https://get.maestro.mobile.dev" | bash
 brew tap facebook/fb && brew install idb-companion
 ```
 
-Build and launch the app first, then run the tests:
+Build and run everything via the convenience script:
 
 ```bash
-cd examples/hello-world
-
 # Android (emulator must be running)
-pn run android
-maestro test ../../tests/e2e/android.yaml
+./scripts/run-e2e.sh android
 
-# iOS (simulator must be running; --platform ios needed when an Android emulator is also connected)
-pn run ios
-maestro --platform ios test ../../tests/e2e/ios.yaml
+# iOS (simulator must be running)
+./scripts/run-e2e.sh ios
 ```
 
-Test flows live in `tests/e2e/flows/` and cover the main screen rendering, counter interaction, and multi-screen navigation. The `e2e.yml` workflow runs these automatically on pushes to `main` and PRs.
+For tight iteration, run a single category instead of the full pass:
+
+```bash
+./scripts/run-e2e.sh android hooks
+./scripts/run-e2e.sh ios components
+```
+
+Available categories: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `misc`.
+
+A coverage checker, `scripts/check-e2e-coverage.py`, gates CI: every name in `pythonnative.__all__` must be covered by a demo + flow, or listed in `INTENTIONAL_EXEMPTIONS` with a justification.
+
+When you add a new public symbol you must also:
+
+1. Add a demo screen under `examples/e2e-suite/app/screens/<category>/`.
+2. Append a `DemoEntry` in `examples/e2e-suite/app/registry.py`.
+3. Add a Maestro flow at `tests/e2e/flows/<category>/<name>.yaml`.
+4. Append the flow to the top-level `tests/e2e/android.yaml`, `tests/e2e/ios.yaml`, and the matching `tests/e2e/suites/<category>.yaml`.
+5. Confirm `python scripts/check-e2e-coverage.py` exits 0.
+
+`tests/e2e/AGENTS.md` is the deeper reference (label conventions, failure triage, naming rules); AI agents should read it before touching the suite. The `e2e.yml` workflow runs the suite automatically on pushes to `main` and PRs.
 
 ### CI
 

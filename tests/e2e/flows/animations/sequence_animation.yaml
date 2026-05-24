@@ -1,0 +1,20 @@
+# Tests Animated.sequence runs animations in order.
+#
+# Demo screen: examples/e2e-suite/app/screens/animations/sequence_animation.py
+# Source under test: src/pythonnative/animated.py :: Animated.sequence
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Animations
+      DEMO_TITLE: Animated.sequence
+- assertVisible: "Status: idle"
+- tapOn: "Run sequence"
+- extendedWaitUntil:
+    visible: "Status: done"
+    timeout: 10000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Animations

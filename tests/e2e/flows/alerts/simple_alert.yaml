@@ -1,0 +1,21 @@
+# Tests Alert.show opens a native dialog.
+#
+# Demo screen: examples/e2e-suite/app/screens/alerts/simple_alert.py
+# Source under test: src/pythonnative/alerts.py :: Alert.show
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Alerts
+      DEMO_TITLE: Alert.show
+- tapOn: "Show alert"
+- extendedWaitUntil:
+    visible: "Hello!"
+    timeout: 5000
+- assertVisible: "This is a native alert."
+- tapOn: "OK"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Alerts

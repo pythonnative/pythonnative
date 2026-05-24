@@ -1,0 +1,21 @@
+# Tests use_mutation submits and exposes the result data.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_mutation.py
+# Source under test: src/pythonnative/hooks.py :: use_mutation
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_mutation
+- assertVisible: "Status: idle"
+- assertVisible: "Last data: (none)"
+- tapOn: "Submit hello"
+- extendedWaitUntil:
+    visible: "Last data: echo:hello"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

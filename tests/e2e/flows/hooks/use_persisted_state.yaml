@@ -1,0 +1,23 @@
+# Tests use_persisted_state behaves like use_state in-session.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_persisted_state.py
+# Source under test: src/pythonnative/storage.py :: use_persisted_state
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_persisted_state
+- tapOn: "Clear"
+- assertVisible: "Persisted value: 0"
+- tapOn: "Bump"
+- assertVisible: "Persisted value: 1"
+- tapOn: "Bump"
+- assertVisible: "Persisted value: 2"
+- tapOn: "Clear"
+- assertVisible: "Persisted value: 0"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

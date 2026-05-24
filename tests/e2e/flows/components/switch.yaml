@@ -1,0 +1,20 @@
+# Tests Switch flips between ON and OFF in response to button taps.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/switch.py
+# Source under test: src/pythonnative/components.py :: Switch
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: Switch
+- assertVisible: "State: OFF"
+- tapOn: "Turn on"
+- assertVisible: "State: ON"
+- tapOn: "Turn off"
+- assertVisible: "State: OFF"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

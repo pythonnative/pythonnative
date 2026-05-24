@@ -1,0 +1,18 @@
+# Tests transform styles (translate, rotate, scale) render their labels.
+#
+# Demo screen: examples/e2e-suite/app/screens/styling/transform.py
+# Source under test: src/pythonnative/style.py :: TransformSpec, native handlers
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Styling
+      DEMO_TITLE: Transforms
+- assertVisible: "translate"
+- assertVisible: "rotate"
+- assertVisible: "scale"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Styling

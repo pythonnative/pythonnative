@@ -1,0 +1,27 @@
+# Tests use_focus_effect fires on focus / refocus.
+#
+# Demo screen: examples/e2e-suite/app/screens/navigation/focus_effect.py
+# Source under test: src/pythonnative/navigation.py :: use_focus_effect
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Navigation
+      DEMO_TITLE: use_focus_effect
+- assertVisible: "Focus count: 1"
+- tapOn: "Push another screen"
+- extendedWaitUntil:
+    visible: "Demo: use_state"
+    timeout: 10000
+- back
+- extendedWaitUntil:
+    visible: "Demo: use_focus_effect"
+    timeout: 10000
+# After refocus the counter must be >= 2; we assert one specific value
+# that is the typical observed sequence.
+- assertVisible: "Focus count: 2"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Navigation

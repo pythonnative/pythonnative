@@ -1,0 +1,22 @@
+# Tests View / Column / Row render their children in the right direction.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/view_column_row.py
+# Source under test: src/pythonnative/components.py :: View, Column, Row
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: View / Column / Row
+- assertVisible: "A"
+- assertVisible: "B"
+- assertVisible: "C"
+- assertVisible: "X"
+- assertVisible: "Y"
+- assertVisible: "Z"
+- assertVisible: "inside View"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

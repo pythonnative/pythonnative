@@ -1,0 +1,24 @@
+# Tests use_reducer dispatches inc / dec / reset actions.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_reducer.py
+# Source under test: src/pythonnative/hooks.py :: use_reducer
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_reducer
+- assertVisible: "Counter: 0"
+- tapOn: "Dispatch inc"
+- assertVisible: "Counter: 1"
+- tapOn: "Dispatch inc"
+- assertVisible: "Counter: 2"
+- tapOn: "Dispatch dec"
+- assertVisible: "Counter: 1"
+- tapOn: "Dispatch reset"
+- assertVisible: "Counter: 0"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

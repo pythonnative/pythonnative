@@ -1,0 +1,18 @@
+# Tests flex layout renders fixed, flex-grow, and fixed children in a row.
+#
+# Demo screen: examples/e2e-suite/app/screens/layout/flex_layout.py
+# Source under test: src/pythonnative/layout.py
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Layout
+      DEMO_TITLE: Flex layout
+- assertVisible: "flex-fixed-left"
+- assertVisible: "flex-grow"
+- assertVisible: "flex-fixed-right"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Layout

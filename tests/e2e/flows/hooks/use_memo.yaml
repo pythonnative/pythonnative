@@ -1,0 +1,24 @@
+# Tests use_memo factory only fires when its deps change.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_memo.py
+# Source under test: src/pythonnative/hooks.py :: use_memo
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_memo
+- assertVisible: "Factory runs: 1"
+- assertVisible: "Memo value: 0"
+- assertVisible: "Other state: 0"
+- tapOn: "Change other"
+- assertVisible: "Factory runs: 1"
+- assertVisible: "Other state: 1"
+- tapOn: "Change dep"
+- assertVisible: "Factory runs: 2"
+- assertVisible: "Memo value: 2"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

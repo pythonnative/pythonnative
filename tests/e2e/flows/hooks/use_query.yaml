@@ -1,0 +1,24 @@
+# Tests use_query loads, resolves, and refetches data.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_query.py
+# Source under test: src/pythonnative/hooks.py :: use_query, QueryResult
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_query
+- extendedWaitUntil:
+    visible: "Status: ready"
+    timeout: 5000
+- assertVisible: "Data: fetched-value"
+- tapOn: "Refetch"
+- extendedWaitUntil:
+    visible: "Status: ready"
+    timeout: 5000
+- assertVisible: "Data: fetched-value"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

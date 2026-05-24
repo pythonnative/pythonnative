@@ -1,0 +1,20 @@
+# Tests TextInput: typing into a single-line input mirrors into the echo line.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/text_input.py
+# Source under test: src/pythonnative/components.py :: TextInput
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: TextInput
+- assertVisible: "Echo: (empty)"
+- tapOn: "Type your name here"
+- inputText: "Maestro"
+- assertVisible: "Echo: Maestro"
+- hideKeyboard
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

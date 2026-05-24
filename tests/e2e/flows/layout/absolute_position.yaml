@@ -1,0 +1,20 @@
+# Tests position:"absolute" places four corners and a centered label.
+#
+# Demo screen: examples/e2e-suite/app/screens/layout/absolute_position.py
+# Source under test: src/pythonnative/layout.py
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Layout
+      DEMO_TITLE: Absolute positioning
+- assertVisible: "abs-top-left"
+- assertVisible: "abs-top-right"
+- assertVisible: "abs-bottom-left"
+- assertVisible: "abs-bottom-right"
+- assertVisible: "abs-center"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Layout

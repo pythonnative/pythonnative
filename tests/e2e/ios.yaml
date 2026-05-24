@@ -1,9 +1,74 @@
+# iOS master E2E suite for the e2e-suite example app.
+#
+# Mirrors android.yaml. The bundle ID differs between the two
+# templates but the flow set is the same; each flow file references
+# elements by accessibility text only, so the same YAML works on both
+# platforms.
+#
+# Run with:
+#     cd examples/e2e-suite && pn run ios --no-logs
+#     cd ../.. && maestro --platform ios test tests/e2e/ios.yaml
 appId: com.pythonnative.ios-template
 env:
   APP_ID: com.pythonnative.ios-template
 ---
-- runFlow: flows/main.yaml
-- runFlow: flows/navigation.yaml
-- runFlow: flows/layout_screen.yaml
-- runFlow: flows/list_screen.yaml
-- runFlow: flows/settings_screen.yaml
+- runFlow: flows/components/text.yaml
+- runFlow: flows/components/button.yaml
+- runFlow: flows/components/text_input.yaml
+- runFlow: flows/components/image.yaml
+- runFlow: flows/components/switch.yaml
+- runFlow: flows/components/slider.yaml
+- runFlow: flows/components/progress_bar.yaml
+- runFlow: flows/components/activity_indicator.yaml
+- runFlow: flows/components/view_column_row.yaml
+- runFlow: flows/components/scroll_view.yaml
+- runFlow: flows/components/safe_area_view.yaml
+- runFlow: flows/components/modal.yaml
+- runFlow: flows/components/pressable.yaml
+- runFlow: flows/components/picker.yaml
+- runFlow: flows/components/refresh_control.yaml
+- runFlow: flows/components/fragment.yaml
+- runFlow: flows/components/error_boundary.yaml
+- runFlow: flows/components/spacer.yaml
+- runFlow: flows/components/status_bar.yaml
+- runFlow: flows/components/keyboard_avoiding_view.yaml
+- runFlow: flows/components/flat_list.yaml
+- runFlow: flows/components/section_list.yaml
+- runFlow: flows/components/web_view.yaml
+- runFlow: flows/hooks/use_state.yaml
+- runFlow: flows/hooks/use_effect.yaml
+- runFlow: flows/hooks/use_reducer.yaml
+- runFlow: flows/hooks/use_ref.yaml
+- runFlow: flows/hooks/use_memo.yaml
+- runFlow: flows/hooks/use_callback.yaml
+- runFlow: flows/hooks/use_context.yaml
+- runFlow: flows/hooks/use_async_effect.yaml
+- runFlow: flows/hooks/use_query.yaml
+- runFlow: flows/hooks/use_mutation.yaml
+- runFlow: flows/hooks/use_persisted_state.yaml
+- runFlow: flows/hooks/use_window_dimensions.yaml
+- runFlow: flows/hooks/memo.yaml
+- runFlow: flows/hooks/batch_updates.yaml
+- runFlow: flows/navigation/tab_navigator.yaml
+- runFlow: flows/navigation/drawer_navigator.yaml
+- runFlow: flows/navigation/params_passing.yaml
+- runFlow: flows/navigation/focus_effect.yaml
+- runFlow: flows/layout/flex_layout.yaml
+- runFlow: flows/layout/aspect_ratio.yaml
+- runFlow: flows/layout/absolute_position.yaml
+- runFlow: flows/layout/padding_margin.yaml
+- runFlow: flows/layout/alignment.yaml
+- runFlow: flows/styling/typography.yaml
+- runFlow: flows/styling/borders_shadows.yaml
+- runFlow: flows/styling/transform.yaml
+- runFlow: flows/styling/stylesheet.yaml
+- runFlow: flows/animations/timing_animation.yaml
+- runFlow: flows/animations/spring_animation.yaml
+- runFlow: flows/animations/parallel_animation.yaml
+- runFlow: flows/animations/sequence_animation.yaml
+- runFlow: flows/alerts/simple_alert.yaml
+- runFlow: flows/alerts/confirm_alert.yaml
+- runFlow: flows/storage/async_storage.yaml
+- runFlow: flows/runtime/run_async.yaml
+- runFlow: flows/platform/platform_info.yaml
+- runFlow: flows/sdk/custom_component.yaml

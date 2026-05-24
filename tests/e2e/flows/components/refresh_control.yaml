@@ -1,0 +1,22 @@
+# Tests RefreshControl fires its callback and resolves.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/refresh_control.py
+# Source under test: src/pythonnative/components.py :: RefreshControl
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: RefreshControl
+- assertVisible: "Refreshing: no"
+- assertVisible: "Refresh runs: 0"
+- tapOn: "Trigger refresh"
+- extendedWaitUntil:
+    visible: "Refresh runs: 1"
+    timeout: 10000
+- assertVisible: "Refreshing: no"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

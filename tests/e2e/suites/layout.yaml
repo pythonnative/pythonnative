@@ -1,0 +1,8 @@
+# Layout category suite.
+appId: ${APP_ID}
+---
+- runFlow: ../flows/layout/flex_layout.yaml
+- runFlow: ../flows/layout/aspect_ratio.yaml
+- runFlow: ../flows/layout/absolute_position.yaml
+- runFlow: ../flows/layout/padding_margin.yaml
+- runFlow: ../flows/layout/alignment.yaml

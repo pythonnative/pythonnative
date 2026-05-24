@@ -1,0 +1,18 @@
+# Tests SectionList renders section headers and items together.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/section_list.py
+# Source under test: src/pythonnative/components.py :: SectionList
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: SectionList
+- assertVisible: "Section Alpha"
+- assertVisible: "Alpha row 1"
+- assertVisible: "Section Beta"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

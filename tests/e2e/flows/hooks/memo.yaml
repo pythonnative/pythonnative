@@ -1,0 +1,21 @@
+# Tests pn.memo prevents children from re-rendering on unrelated parent state changes.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/memo_demo.py
+# Source under test: src/pythonnative/hooks.py :: memo
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: memo
+- assertVisible: "MemoA render count: 1"
+- tapOn: "Bump parent"
+- assertVisible: "Parent renders: 1"
+- assertVisible: "MemoA render count: 1"
+- tapOn: "Toggle B label"
+- assertVisible: "MemoB label=y render count: 2"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

@@ -1,0 +1,15 @@
+# Reusable cleanup: pop back to the home screen from a demo.
+#
+# Run at the end of every demo flow so the suite can chain flows
+# without leaking state. Idempotent — calling this when already on
+# home is a no-op.
+appId: ${APP_ID}
+---
+- tapOn: "Back to list"
+- extendedWaitUntil:
+    visible: "Demos in ${CATEGORY}"
+    timeout: 15000
+- tapOn: "Back to home"
+- extendedWaitUntil:
+    visible: "E2E Suite home"
+    timeout: 15000

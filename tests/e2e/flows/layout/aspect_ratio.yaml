@@ -1,0 +1,17 @@
+# Tests aspect_ratio sizes both square and widescreen boxes.
+#
+# Demo screen: examples/e2e-suite/app/screens/layout/aspect_ratio.py
+# Source under test: src/pythonnative/layout.py
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Layout
+      DEMO_TITLE: Aspect ratio
+- assertVisible: "aspect-1-1"
+- assertVisible: "aspect-16-9"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Layout

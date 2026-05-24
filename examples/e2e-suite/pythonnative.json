@@ -1,0 +1,8 @@
+{
+  "name": "PythonNative E2E Suite",
+  "appId": "com.pythonnative.e2e",
+  "entryPoint": "app/main.py",
+  "pythonVersion": "3.11",
+  "ios": {},
+  "android": {}
+}

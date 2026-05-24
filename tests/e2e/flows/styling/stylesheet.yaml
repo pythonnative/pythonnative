@@ -1,0 +1,17 @@
+# Tests StyleSheet entries resolve to working styles.
+#
+# Demo screen: examples/e2e-suite/app/screens/styling/stylesheet_demo.py
+# Source under test: src/pythonnative/style.py :: StyleSheet, style
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Styling
+      DEMO_TITLE: StyleSheet
+- assertVisible: "stylesheet-pill"
+- assertVisible: "stylesheet-danger"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Styling

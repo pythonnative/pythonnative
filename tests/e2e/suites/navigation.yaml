@@ -1,0 +1,7 @@
+# Navigation category suite.
+appId: ${APP_ID}
+---
+- runFlow: ../flows/navigation/tab_navigator.yaml
+- runFlow: ../flows/navigation/drawer_navigator.yaml
+- runFlow: ../flows/navigation/params_passing.yaml
+- runFlow: ../flows/navigation/focus_effect.yaml

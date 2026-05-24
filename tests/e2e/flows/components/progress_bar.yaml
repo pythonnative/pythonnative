@@ -1,0 +1,20 @@
+# Tests ProgressBar advances by 25% per tap and clamps to 100%.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/progress_bar.py
+# Source under test: src/pythonnative/components.py :: ProgressBar
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: ProgressBar
+- assertVisible: "Progress: 25%"
+- tapOn: "Advance"
+- assertVisible: "Progress: 50%"
+- tapOn: "Reset"
+- assertVisible: "Progress: 0%"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

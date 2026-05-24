@@ -1,0 +1,20 @@
+# Tests use_context + Provider propagate values to a child.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_context.py
+# Source under test: src/pythonnative/hooks.py :: create_context, use_context, Provider
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_context
+- assertVisible: "Current theme: light"
+- assertVisible: "Consumer sees: light"
+- tapOn: "Set dark"
+- assertVisible: "Current theme: dark"
+- assertVisible: "Consumer sees: dark"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

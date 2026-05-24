@@ -1,0 +1,22 @@
+# Tests use_callback identity stays stable until dep changes.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_callback.py
+# Source under test: src/pythonnative/hooks.py :: use_callback
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_callback
+- assertVisible: "Identity changes: 0"
+- tapOn: "Change other"
+- assertVisible: "Identity changes: 0"
+- tapOn: "Change other"
+- assertVisible: "Identity changes: 0"
+- tapOn: "Change dep"
+- assertVisible: "Identity changes: 1"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

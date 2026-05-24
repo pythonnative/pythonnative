@@ -49,4 +49,7 @@ step "Build package (sdist + wheel)"
 step "Run tests (pytest)"
 "$PY" -m pytest -q
 
+step "Check E2E coverage"
+"$PY" scripts/check-e2e-coverage.py
+
 printf "\nAll CI checks passed.\n"

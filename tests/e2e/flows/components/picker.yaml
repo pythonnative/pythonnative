@@ -1,0 +1,20 @@
+# Tests Picker updates its bound value when buttons set it programmatically.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/picker.py
+# Source under test: src/pythonnative/components.py :: Picker
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: Picker
+- assertVisible: "Picked: apple"
+- tapOn: "Pick banana"
+- assertVisible: "Picked: banana"
+- tapOn: "Pick cherry"
+- assertVisible: "Picked: cherry"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

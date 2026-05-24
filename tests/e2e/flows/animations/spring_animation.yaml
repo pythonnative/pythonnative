@@ -1,0 +1,20 @@
+# Tests Animated.spring fires and completes.
+#
+# Demo screen: examples/e2e-suite/app/screens/animations/spring_animation.py
+# Source under test: src/pythonnative/animated.py :: Animated.spring
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Animations
+      DEMO_TITLE: Animated.spring
+- assertVisible: "Status: idle"
+- tapOn: "Run spring"
+- extendedWaitUntil:
+    visible: "Status: done"
+    timeout: 10000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Animations

@@ -1,0 +1,16 @@
+# Tests WebView mounts; surrounding labels remain visible.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/web_view.py
+# Source under test: src/pythonnative/components.py :: WebView
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: WebView
+- assertVisible: "WebView visible marker"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

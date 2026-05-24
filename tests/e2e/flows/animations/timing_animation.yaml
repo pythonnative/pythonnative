@@ -1,0 +1,24 @@
+# Tests Animated.timing fires and completes.
+#
+# Demo screen: examples/e2e-suite/app/screens/animations/timing_animation.py
+# Source under test: src/pythonnative/animated.py :: Animated.timing
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Animations
+      DEMO_TITLE: Animated.timing
+- assertVisible: "Status: idle"
+- tapOn: "Run timing"
+- extendedWaitUntil:
+    visible: "Status: done"
+    timeout: 5000
+- tapOn: "Reset"
+- extendedWaitUntil:
+    visible: "Status: idle"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Animations

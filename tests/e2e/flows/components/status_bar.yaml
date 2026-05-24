@@ -1,0 +1,20 @@
+# Tests StatusBar toggles between dark and light styles.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/status_bar.py
+# Source under test: src/pythonnative/components.py :: StatusBar
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: StatusBar
+- assertVisible: "Bar style: dark"
+- tapOn: "Toggle"
+- assertVisible: "Bar style: light"
+- tapOn: "Toggle"
+- assertVisible: "Bar style: dark"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

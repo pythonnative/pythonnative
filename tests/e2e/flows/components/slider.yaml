@@ -1,0 +1,22 @@
+# Tests Slider value updates via programmatic snap buttons.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/slider.py
+# Source under test: src/pythonnative/components.py :: Slider
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: Slider
+- assertVisible: "Value: 0.00"
+- tapOn: "Set 0.5"
+- assertVisible: "Value: 0.50"
+- tapOn: "Set 1.0"
+- assertVisible: "Value: 1.00"
+- tapOn: "Set 0.0"
+- assertVisible: "Value: 0.00"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

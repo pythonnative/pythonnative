@@ -1,0 +1,21 @@
+# Tests Platform.OS and Platform.Version expose non-empty values.
+#
+# Demo screen: examples/e2e-suite/app/screens/platform/platform_info.py
+# Source under test: src/pythonnative/platform.py
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Platform
+      DEMO_TITLE: Platform info
+- assertVisible:
+    text: "OS:.*"
+- assertVisible:
+    text: "Version:.*"
+- assertVisible:
+    text: "PythonNative:.*"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Platform

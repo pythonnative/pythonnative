@@ -1,0 +1,16 @@
+# Tests SafeAreaView renders its child without crashing.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/safe_area_view.py
+# Source under test: src/pythonnative/components.py :: SafeAreaView
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: SafeAreaView
+- assertVisible: "Inside SafeAreaView"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

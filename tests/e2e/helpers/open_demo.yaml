@@ -1,0 +1,24 @@
+# Reusable navigation helper: launch the app, open a category, open a demo.
+#
+# Callers pass two env vars:
+#
+#     CATEGORY: "Hooks"
+#     DEMO_TITLE: "use_state"
+#
+# This flow leaves the app on the corresponding demo screen with
+# ``"Demo: <DEMO_TITLE>"`` visible, ready for the caller's assertions.
+appId: ${APP_ID}
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "E2E Suite home"
+    timeout: 60000
+- tapOn: "Open ${CATEGORY}"
+- extendedWaitUntil:
+    visible: "Demos in ${CATEGORY}"
+    timeout: 15000
+- tapOn:
+    text: "Open: ${DEMO_TITLE}"
+- extendedWaitUntil:
+    visible: "Demo: ${DEMO_TITLE}"
+    timeout: 15000

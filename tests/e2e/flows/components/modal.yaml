@@ -1,0 +1,26 @@
+# Tests Modal opens and closes on demand.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/modal.py
+# Source under test: src/pythonnative/components.py :: Modal
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: Modal
+- assertVisible: "Modal: closed"
+- tapOn: "Open modal"
+- extendedWaitUntil:
+    visible: "Modal body text"
+    timeout: 10000
+- assertVisible: "Modal: open"
+- tapOn: "Close modal"
+- extendedWaitUntil:
+    notVisible: "Modal body text"
+    timeout: 10000
+- assertVisible: "Modal: closed"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

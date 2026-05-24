@@ -1,0 +1,21 @@
+# Tests batch_updates collapses multiple setters into a single render.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/batch_updates_demo.py
+# Source under test: src/pythonnative/hooks.py :: batch_updates
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: batch_updates
+- tapOn: "Batched bump"
+- assertVisible: "a: 1"
+- assertVisible: "b: 1"
+- tapOn: "Batched bump"
+- assertVisible: "a: 2"
+- assertVisible: "b: 2"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

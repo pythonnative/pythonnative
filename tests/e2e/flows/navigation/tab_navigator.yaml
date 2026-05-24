@@ -1,0 +1,22 @@
+# Tests the nested Tab navigator switches tabs and shows their body.
+#
+# Demo screen: examples/e2e-suite/app/screens/navigation/tab_navigator.py
+# Source under test: src/pythonnative/navigation.py :: create_tab_navigator
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Navigation
+      DEMO_TITLE: Tab Navigator
+- assertVisible: "Tab Alpha body"
+- tapOn: "Beta"
+- assertVisible: "Tab Beta body"
+- tapOn: "Gamma"
+- assertVisible: "Tab Gamma body"
+- tapOn: "Alpha"
+- assertVisible: "Tab Alpha body"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Navigation

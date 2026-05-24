@@ -1,0 +1,21 @@
+# Tests ScrollView reveals rows that started off-screen after scrolling.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/scroll_view.py
+# Source under test: src/pythonnative/components.py :: ScrollView
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: ScrollView
+- assertVisible: "ScrollRow 1"
+- scrollUntilVisible:
+    element: "ScrollRow 20"
+    direction: DOWN
+    timeout: 10000
+- assertVisible: "ScrollRow 20"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

@@ -1,0 +1,20 @@
+# Tests the nested Drawer navigator switches screens via explicit nav buttons.
+#
+# Demo screen: examples/e2e-suite/app/screens/navigation/drawer_navigator.py
+# Source under test: src/pythonnative/navigation.py :: create_drawer_navigator
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Navigation
+      DEMO_TITLE: Drawer Navigator
+- assertVisible: "Drawer screen One"
+- tapOn: "Go to Two"
+- assertVisible: "Drawer screen Two"
+- tapOn: "Go to One"
+- assertVisible: "Drawer screen One"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Navigation

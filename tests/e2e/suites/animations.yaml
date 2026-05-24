@@ -1,0 +1,7 @@
+# Animations category suite.
+appId: ${APP_ID}
+---
+- runFlow: ../flows/animations/timing_animation.yaml
+- runFlow: ../flows/animations/spring_animation.yaml
+- runFlow: ../flows/animations/parallel_animation.yaml
+- runFlow: ../flows/animations/sequence_animation.yaml

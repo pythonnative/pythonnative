@@ -1,0 +1,24 @@
+# Tests use_state increments / resets a counter.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_state.py
+# Source under test: src/pythonnative/hooks.py :: use_state
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_state
+- assertVisible: "Counter: 0"
+- tapOn: "Increment"
+- assertVisible: "Counter: 1"
+- tapOn: "Increment"
+- assertVisible: "Counter: 2"
+- tapOn: "Decrement"
+- assertVisible: "Counter: 1"
+- tapOn: "Reset"
+- assertVisible: "Counter: 0"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

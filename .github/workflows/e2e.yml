@@ -8,9 +8,24 @@ on:
   workflow_dispatch:
 
 jobs:
-  e2e-android:
+  coverage:
+    # Runs first; fast static check that gates the long device jobs so
+    # missing demos / flows fail before the emulator boots.
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check E2E coverage of pythonnative.__all__
+        run: python scripts/check-e2e-coverage.py
+
+  e2e-android:
+    needs: coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -46,12 +61,12 @@ jobs:
         with:
           api-level: 31
           arch: x86_64
-          script: >-
-            bash -lc "cd examples/hello-world && pn run android --no-logs && cd ../.. && maestro test tests/e2e/android.yaml"
+          script: bash -lc "./scripts/run-e2e.sh android"
 
   e2e-ios:
+    needs: coverage
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -71,11 +86,7 @@ jobs:
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
           brew tap facebook/fb && brew install idb-companion
 
-      - name: Build and launch iOS app
-        working-directory: examples/hello-world
-        run: pn run ios --no-logs
+      - name: Build and run E2E tests
+        run: ./scripts/run-e2e.sh ios
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run E2E tests
-        run: maestro --platform ios test tests/e2e/ios.yaml

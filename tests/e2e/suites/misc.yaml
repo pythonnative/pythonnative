@@ -1,0 +1,9 @@
+# Alerts / storage / runtime / platform / SDK category suite.
+appId: ${APP_ID}
+---
+- runFlow: ../flows/alerts/simple_alert.yaml
+- runFlow: ../flows/alerts/confirm_alert.yaml
+- runFlow: ../flows/storage/async_storage.yaml
+- runFlow: ../flows/runtime/run_async.yaml
+- runFlow: ../flows/platform/platform_info.yaml
+- runFlow: ../flows/sdk/custom_component.yaml

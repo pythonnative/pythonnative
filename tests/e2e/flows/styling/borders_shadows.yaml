@@ -1,0 +1,16 @@
+# Tests borders + shadow card renders with its label.
+#
+# Demo screen: examples/e2e-suite/app/screens/styling/borders_shadows.py
+# Source under test: src/pythonnative/style.py, native handlers
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Styling
+      DEMO_TITLE: Borders & shadows
+- assertVisible: "border-shadow-card"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Styling

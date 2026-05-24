@@ -1,0 +1,17 @@
+# Hooks category suite — Maestro entry-point for hook-only runs.
+appId: ${APP_ID}
+---
+- runFlow: ../flows/hooks/use_state.yaml
+- runFlow: ../flows/hooks/use_effect.yaml
+- runFlow: ../flows/hooks/use_reducer.yaml
+- runFlow: ../flows/hooks/use_ref.yaml
+- runFlow: ../flows/hooks/use_memo.yaml
+- runFlow: ../flows/hooks/use_callback.yaml
+- runFlow: ../flows/hooks/use_context.yaml
+- runFlow: ../flows/hooks/use_async_effect.yaml
+- runFlow: ../flows/hooks/use_query.yaml
+- runFlow: ../flows/hooks/use_mutation.yaml
+- runFlow: ../flows/hooks/use_persisted_state.yaml
+- runFlow: ../flows/hooks/use_window_dimensions.yaml
+- runFlow: ../flows/hooks/memo.yaml
+- runFlow: ../flows/hooks/batch_updates.yaml
