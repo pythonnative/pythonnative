@@ -1,33 +1,101 @@
-# Reusable navigation helper: launch the app, open a category, open a demo.
+# Reusable navigation helper: get the app to ``"Demo: <DEMO_TITLE>"``
+# from whatever screen we happen to be on.
 #
 # Callers pass two env vars:
 #
 #     CATEGORY: "Hooks"
 #     DEMO_TITLE: "use_state"
 #
-# This flow leaves the app on the corresponding demo screen with
-# ``"Demo: <DEMO_TITLE>"`` visible, ready for the caller's assertions.
+# This helper is *state-aware*: it does the minimum work needed to land
+# on the target demo. The full suite spends most of its time replaying
+# the same launch + nav-home + nav-category dance between every flow,
+# so the suite-wide speedup from short-circuiting these steps is
+# significant (and it removes a lot of ``launchApp`` calls, which is
+# where Maestro's iOS XCUITest driver tends to flake).
+#
+# State machine, evaluated top-to-bottom; each block runs only if the
+# previous one's effects still leave us off-target:
+#
+#   1. On a demo screen ("Back to list" visible)
+#      -> tap "Back to list", now on some category screen.
+#   2. On the wrong category screen ("Back to home" visible, but title
+#      != ``Demos in ${CATEGORY}``)
+#      -> tap "Back to home", now on the home screen.
+#   3. App is dead (neither right category nor home visible)
+#      -> ``launchApp``, now on the home screen.
+#   4. On the home screen (but not yet on the right category)
+#      -> tap ``Open ${CATEGORY}``, now on the right category screen.
+#   5. On the right category screen
+#      -> tap ``Open: ${DEMO_TITLE}``, now on the target demo.
 #
 # Both the home and category screens use a ScrollView and the target
-# button can be below the visible fold (especially in the Components
-# category, which lists 20+ demos). Maestro's ``tapOn`` does not
-# auto-scroll, so we explicitly ``scrollUntilVisible`` before each tap.
-# It's a no-op when the element is already on screen, so the helper is
-# safe to use for short lists too.
+# button can be below the visible fold (Components has 20+ demos).
+# Maestro's ``tapOn`` does not auto-scroll, so we ``scrollUntilVisible``
+# before each tap. iOS also preserves a ScrollView's offset across
+# navigation, so we scroll UP to surface the title before asserting.
 appId: ${APP_ID}
 ---
-- launchApp
-- extendedWaitUntil:
-    visible: "E2E Suite home"
-    timeout: 60000
-- scrollUntilVisible:
-    element:
-      text: "Open ${CATEGORY}"
-    direction: DOWN
-- tapOn: "Open ${CATEGORY}"
-- extendedWaitUntil:
-    visible: "Demos in ${CATEGORY}"
-    timeout: 15000
+# 1. If we landed on a demo screen, pop one level to its category list.
+- runFlow:
+    when:
+      visible: "Back to list"
+    commands:
+      - tapOn: "Back to list"
+      - extendedWaitUntil:
+          visible: "Back to home"
+          timeout: 15000
+
+# 2. If we're on the wrong category, go back to home.
+- runFlow:
+    when:
+      visible: "Back to home"
+      notVisible: "Demos in ${CATEGORY}"
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: "Back to home"
+          direction: DOWN
+      - tapOn: "Back to home"
+      - scrollUntilVisible:
+          element:
+            text: "E2E Suite home"
+          direction: UP
+          timeout: 15000
+      - assertVisible: "E2E Suite home"
+
+# 3. If neither the right category nor the home screen is visible, the
+# app is either not running yet (first flow of the suite) or the driver
+# lost its connection. Relaunch as a cold start.
+- runFlow:
+    when:
+      notVisible: "Demos in ${CATEGORY}"
+    commands:
+      - runFlow:
+          when:
+            notVisible: "E2E Suite home"
+          commands:
+            - launchApp
+            - extendedWaitUntil:
+                visible: "E2E Suite home"
+                timeout: 60000
+
+# 4. From the home screen, navigate into the right category.
+- runFlow:
+    when:
+      visible: "E2E Suite home"
+      notVisible: "Demos in ${CATEGORY}"
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: "Open ${CATEGORY}"
+          direction: DOWN
+      - tapOn: "Open ${CATEGORY}"
+      - extendedWaitUntil:
+          visible: "Demos in ${CATEGORY}"
+          timeout: 15000
+
+# 5. We're now guaranteed to be on the right category list. Open the
+# requested demo.
 - scrollUntilVisible:
     element:
       text: "Open: ${DEMO_TITLE}"

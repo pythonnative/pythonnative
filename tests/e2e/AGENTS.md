@@ -83,6 +83,12 @@ maestro test \
 
 The build step (`pn run <platform> --no-logs`) only needs to run once per change to `app/`. After that, repeat-run the Maestro flow as you iterate.
 
+### How `open_demo.yaml` decides what to do
+
+`helpers/open_demo.yaml` is *state-aware* — it inspects the current screen and runs only the steps it needs to land on `Demo: <DEMO_TITLE>`. Same-category consecutive flows stay on the category screen between demos (no detour through home, no `launchApp`); cross-category transitions go via home; a dead app gets relaunched. The companion `helpers/close_demo.yaml` only pops one level (back to the category list) so the next flow's `open_demo` can pick up cheaply.
+
+This is intentional and the source of the suite's speed. When debugging a flow, **don't** "simplify" `open_demo` to always `launchApp` + go home + go to category — that's the slow path the smart logic was written to avoid (about 15 min vs. 3 min of pure navigation overhead across the full iOS suite). If a flow needs a guaranteed clean app launch, set up that state in the flow itself.
+
 ### Suite-level retry
 
 `scripts/run-e2e.sh` re-invokes the whole `maestro test` once if the first attempt exits non-zero. The retry exists to absorb Maestro's iOS XCUITest driver flake (transient `Application is not running` / `Request for viewHierarchy failed`) — not to paper over real failures.

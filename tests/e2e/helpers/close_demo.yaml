@@ -1,16 +1,25 @@
-# Reusable cleanup: pop back to the home screen from a demo.
+# Reusable cleanup: pop from a demo screen back to its category list.
 #
-# Run at the end of every demo flow so the suite can chain flows
-# without leaking state. Idempotent — calling this when already on
-# home is a no-op.
+# Each flow ends with this helper so the next flow's ``open_demo.yaml``
+# can pick up from a known state. ``open_demo`` is state-aware and will
+# handle category-to-category or home-to-category transitions itself,
+# so this helper only needs to take a single step out of the demo —
+# the suite stays in the category screen between consecutive demos in
+# the same category, which is most of the suite by volume and the main
+# source of the suite-wide speedup.
 #
-# The category screen renders every demo button inside a ScrollView
-# and "Back to home" sits at the bottom. With 20+ demos in a category
-# (e.g. ``Components``) the button lands below the visible fold after
-# returning from a demo, and ``tapOn`` does not auto-scroll. iOS
-# additionally preserves a parent ScrollView's scroll offset across
-# navigation, so after a deep demo the category title can also start
-# *above* the visible fold — we scroll up to it first, then assert.
+# Callers pass:
+#
+#     CATEGORY: "Components"
+#
+# The ``Demos in ${CATEGORY}`` assertion catches a broken "Back to list"
+# button right here, with a clear error, instead of letting the failure
+# surface as a confusing scroll-not-found in the next flow's
+# ``open_demo``.
+#
+# iOS preserves a parent ScrollView's offset across navigation, so the
+# category title can start above the visible fold after returning from
+# a deep demo — we scroll up to it before asserting.
 appId: ${APP_ID}
 ---
 - tapOn: "Back to list"
@@ -20,17 +29,3 @@ appId: ${APP_ID}
     direction: UP
     timeout: 15000
 - assertVisible: "Demos in ${CATEGORY}"
-- scrollUntilVisible:
-    element:
-      text: "Back to home"
-    direction: DOWN
-- tapOn: "Back to home"
-# Same scroll-position preservation applies to the home screen on iOS:
-# after popping back from a deep demo, the home ScrollView can still be
-# scrolled past its title. Scroll up to surface it before asserting.
-- scrollUntilVisible:
-    element:
-      text: "E2E Suite home"
-    direction: UP
-    timeout: 15000
-- assertVisible: "E2E Suite home"
