@@ -251,6 +251,23 @@ def _flush_scheduled_renders(hosts: Sequence[Any]) -> None:
 def _on_create(host: Any) -> None:
     from .hooks import NavigationHandle, Provider, _NavigationContext
 
+    # ``on_create`` is idempotent across native-view recreations. On
+    # Android the FragmentManager destroys and recreates a screen's
+    # view every time the user pops back to it, and the platform
+    # template calls ``screen.on_create()`` again from
+    # ``onViewCreated`` — but the Python screen object (and therefore
+    # the reconciler, hook state, focus subscribers, etc.) persists
+    # across that. Re-running the full mount path here would reset
+    # use_state, clobber use_focus_effect subscriptions, and break
+    # navigation handles held by existing components, which is why
+    # the focus counter never advanced past ``1`` before this guard.
+    # If we're already mounted, just re-attach the existing root view
+    # to the (newly created) native container — ``on_resume`` will
+    # fire the focus subscribers separately.
+    if host._reconciler is not None and host._root_native_view is not None:
+        host._attach_root(host._root_native_view)
+        return
+
     host._nav_handle = NavigationHandle(host)
     host._reconciler = _new_reconciler(host)
 
@@ -813,6 +830,18 @@ if IS_ANDROID:
                 container = get_android_fragment_container()
                 try:
                     container.removeAllViews()
+                except Exception:
+                    pass
+                # When the user pops back to a previously mounted screen,
+                # ``native_view`` is the root from the prior mount and may
+                # still be parented under the old (destroyed) FrameLayout.
+                # ViewGroup.addView() throws if a view already has a
+                # parent, so detach it from the old one before re-attaching
+                # to the freshly created container.
+                try:
+                    old_parent = native_view.getParent()
+                    if old_parent is not None:
+                        old_parent.removeView(native_view)
                 except Exception:
                     pass
                 LayoutParams = jclass("android.view.ViewGroup$LayoutParams")

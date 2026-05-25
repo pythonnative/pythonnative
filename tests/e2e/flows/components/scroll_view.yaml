@@ -11,6 +11,15 @@
 # scrollables is a custom swipe loop with explicit coordinates that
 # stay inside the scroll container's bounds. See:
 #   https://docs.maestro.dev/examples/recipes/custom-scrolling-for-screen-fragments
+#
+# Per-swipe scroll travel is platform-dependent — Android's
+# ``NestedScrollView`` flings more aggressively per gesture than iOS's
+# ``UIScrollView``, so a fixed ``times: N`` overshoots on one platform
+# and undershoots on the other. We loop with ``while: notVisible``
+# instead, which exits as soon as ``ScrollRow 20`` enters the viewport
+# regardless of how many swipes that took on this platform. Swipes are
+# kept small (10% of screen height) so a single fling can't shoot
+# past row 20.
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -19,16 +28,15 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: ScrollView
 - assertVisible: "ScrollRow 1"
-# Each swipe moves the inner ScrollView roughly 4-5 rows. ``ScrollRow 20``
-# sits ~12 rows in, so 3 swipes lands it inside the visible 200 dp area
-# without overshooting past the end of the list.
 - repeat:
-    times: 3
+    times: 15
+    while:
+      notVisible: "ScrollRow 20"
     commands:
       - swipe:
-          start: 50%, 22%
-          end: 50%, 6%
-          duration: 300
+          start: 50%, 20%
+          end: 50%, 10%
+          duration: 500
 - assertVisible: "ScrollRow 20"
 - runFlow:
     file: ../../helpers/close_demo.yaml

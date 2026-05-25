@@ -89,6 +89,22 @@ The build step (`pn run <platform> --no-logs`) only needs to run once per change
 
 This is intentional and the source of the suite's speed. When debugging a flow, **don't** "simplify" `open_demo` to always `launchApp` + go home + go to category — that's the slow path the smart logic was written to avoid (about 15 min vs. 3 min of pure navigation overhead across the full iOS suite). If a flow needs a guaranteed clean app launch, set up that state in the flow itself.
 
+Gate conditions in `open_demo` deliberately use signals that work on **both** platforms. The two cross-platform asymmetries that matter here:
+
+- **Scroll preservation.** iOS preserves a ScrollView's offset across navigation; Android resets it to the top. A condition like `visible: "Back to home"` (button at the bottom of a category list) works on iOS after a return-from-demo but fails on Android because the list is back at the top. The helper gates on `"Demos in .*"` (top of the list, visible on both) and `notVisible: "Back to list"` (i.e. we left the demo screen) instead.
+- **Native-view recreation on Android.** The Android FragmentManager destroys and rebuilds a screen's view tree on pop-back; `pythonnative.screen._on_create` short-circuits the second call so hook state, `use_focus_effect` subscriptions, and `use_navigation` handles persist. If a future change to `screen.py` or `ScreenFragment.kt` breaks that idempotency, `flows/navigation/focus_effect.yaml` is the canary — it'll regress to `Focus count: 1` on pop-back.
+
+### Scrolling fixed-height containers (ScrollView / FlatList)
+
+Maestro's `scrollUntilVisible` always swipes from the screen center. That works for the outer page ScrollView (which fills the screen) but **not** for small in-page containers like the 200 dp `ScrollView` / `FlatList` demos — the screen center sits below those containers, so the swipe lands outside them and never moves the contents.
+
+`flows/components/scroll_view.yaml` and `flows/components/flat_list.yaml` work around this with an explicit-coordinate swipe loop wrapped in `repeat: while: notVisible: ...`. Two reasons for the loop rather than a fixed `times: N`:
+
+- Per-swipe scroll travel is platform-dependent — Android's `NestedScrollView` flings more aggressively than iOS's `UIScrollView`, so a count tuned for one platform overshoots on the other.
+- iOS preserves the inner ScrollView's offset across navigation, so a re-entry into the demo may already have the target row in view; `while: notVisible` exits the loop immediately in that case.
+
+When adding a new flow that needs to scroll a non-fullscreen container, copy this pattern (small swipes ~10% of screen height, ~500 ms each, `times` cap as a safety net) rather than calling `scrollUntilVisible`.
+
 ### Suite-level retry
 
 `scripts/run-e2e.sh` re-invokes the whole `maestro test` once if the first attempt exits non-zero. The retry exists to absorb Maestro's iOS XCUITest driver flake (transient `Application is not running` / `Request for viewHierarchy failed`) — not to paper over real failures.

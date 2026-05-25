@@ -2,6 +2,13 @@
 #
 # Demo screen: examples/e2e-suite/app/screens/components/flat_list.py
 # Source under test: src/pythonnative/components.py :: FlatList
+#
+# Same pattern as components/scroll_view.yaml: the FlatList is a
+# small fixed-height (200 dp) container near the top of the screen,
+# so Maestro's ``scrollUntilVisible`` (which swipes from the screen
+# center) misses the container entirely. We loop with explicit
+# coordinates and ``while: notVisible`` so the test exits as soon as
+# the target row is in view, regardless of per-platform fling physics.
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -10,10 +17,15 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: FlatList
 - assertVisible: "FlatRow 1"
-- scrollUntilVisible:
-    element: "FlatRow 20"
-    direction: DOWN
-    timeout: 15000
+- repeat:
+    times: 15
+    while:
+      notVisible: "FlatRow 20"
+    commands:
+      - swipe:
+          start: 50%, 20%
+          end: 50%, 10%
+          duration: 500
 - assertVisible: "FlatRow 20"
 - runFlow:
     file: ../../helpers/close_demo.yaml

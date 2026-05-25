@@ -36,19 +36,34 @@
 appId: ${APP_ID}
 ---
 # 1. If we landed on a demo screen, pop one level to its category list.
+# Confirm the pop by waiting for ``Back to list`` to disappear rather
+# than for the category's ``Back to home`` button to appear: Android
+# resets the category ScrollView's offset to the top after navigation,
+# so ``Back to home`` (at the bottom of the category list) starts
+# below the visible fold and isn't a reliable post-tap signal. iOS
+# preserves the offset so the latter would work there — but the
+# former works on both.
 - runFlow:
     when:
       visible: "Back to list"
     commands:
       - tapOn: "Back to list"
       - extendedWaitUntil:
-          visible: "Back to home"
+          notVisible: "Back to list"
           timeout: 15000
 
-# 2. If we're on the wrong category, go back to home.
+# 2. If we're on the wrong category, go back to home. We gate on the
+# category title (``Demos in ...``) being visible rather than the
+# ``Back to home`` button: Android resets the category ScrollView's
+# offset to the top after navigation, so ``Back to home`` (at the
+# bottom of the list) starts off-screen and isn't a reliable signal.
+# The title is at the top of the scroll content and ``close_demo``
+# always scrolls back to it before exiting, so it's visible on both
+# platforms when the next flow's ``open_demo`` runs.
 - runFlow:
     when:
-      visible: "Back to home"
+      visible:
+        text: "Demos in .*"
       notVisible: "Demos in ${CATEGORY}"
     commands:
       - scrollUntilVisible:
