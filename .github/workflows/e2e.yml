@@ -88,7 +88,28 @@ jobs:
   e2e-ios:
     needs: coverage
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 40
+    # iOS simulators are stable for the full suite (unlike the Android
+    # emulator — see the e2e-android note), so this split is purely a
+    # speed optimization: the iOS Maestro run is ~22 minutes and is the
+    # critical path for the whole E2E workflow. Sharding it across three
+    # simulators (same balanced groups as Android) runs them in parallel
+    # and roughly halves wall-clock time. macOS minutes are free on this
+    # public repo, so the extra per-shard build/boot overhead is fine.
+    # ``fail-fast: false`` so one shard's failure still lets the others
+    # report.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: components
+            suites: components
+          - name: hooks-nav
+            suites: hooks navigation
+          - name: layout-styling-anim-misc
+            suites: layout styling animations misc
+
+    name: e2e-ios (${{ matrix.name }})
 
     steps:
       - name: Checkout
@@ -109,6 +130,6 @@ jobs:
           brew tap facebook/fb && brew install idb-companion
 
       - name: Build and run E2E tests
-        run: ./scripts/run-e2e.sh ios
+        run: ./scripts/run-e2e.sh ios ${{ matrix.suites }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
