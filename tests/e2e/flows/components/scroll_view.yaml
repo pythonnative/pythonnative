@@ -23,15 +23,37 @@ appId: ${APP_ID}
       DEMO_TITLE: ScrollView
 - assertVisible: "ScrollRow 1"
 - assertVisible: "Scrolled: OFF"
+# Target the last row: the inner box is a fixed 400 dp on every device, so
+# the early rows (~1-21) are on-screen without scrolling. Asserting a row
+# that *is* already visible would let Maestro short-circuit with zero
+# swipes (it does exactly that for "ScrollRow 20" on iOS), and then
+# on_scroll never fires. The last row is always below the fold, forcing a
+# real scroll on both platforms.
 - scrollUntilVisible:
-    element: "ScrollRow 20"
+    element: "ScrollRow 30"
     direction: DOWN
     timeout: 20000
     visibilityPercentage: 100
     centerElement: false
-- assertVisible: "ScrollRow 20"
+- assertVisible: "ScrollRow 30"
 # on_scroll fired during the swipe(s), flipping the outer readout.
 - assertVisible: "Scrolled: ON"
+# The inner scroll's height plus the "Scrolled" readout push the demo's
+# "Back to list" button (rendered below the card by demo_screen) below the
+# fold on Android's shorter emulator viewport. close_demo taps it without
+# scrolling, so surface it first here. Android's NestedScrollView bubbles
+# the over-scroll to the outer page once the inner list bottoms out. iOS
+# keeps the button on-screen (its UIScrollView doesn't bubble to the parent,
+# and close_demo already worked there), so this is scoped to Android only.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: "Back to list"
+          direction: DOWN
+          timeout: 20000
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

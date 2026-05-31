@@ -1266,30 +1266,55 @@ class ButtonHandler(IOSViewHandler):
                 btn.addTarget_action_forControlEvents_(handler, SEL("onTap:"), 1 << 6)
 
 
-# Maps ``id(delegate)`` -> ``{"on_scroll": cb, "delegate": obj}`` so the
-# UIScrollViewDelegate can forward ``scrollViewDidScroll:`` back to Python.
-_pn_scroll_delegate_map: dict = {}
+# ``scrollViewDidScroll:`` hands the delegate a ``UIScrollView*``. rubicon's
+# ``@objc_method`` FFI bridge is unreliable for delegate callbacks that take
+# ObjC object arguments on arm64 (see the module header note) — on the arm64
+# simulator the callback simply never reaches Python, so ``on_scroll`` would
+# silently never fire. Exactly like the UITabBar delegate, we therefore build
+# the delegate class with raw libobjc and dispatch through a CFUNCTYPE IMP.
+#
+# We read ``contentOffset`` off the *retained rubicon* scroll view we already
+# hold (keyed by the delegate instance pointer) rather than off the raw
+# callback argument: that sidesteps both the object-arg marshaling issue and
+# the CGPoint struct-return ABI quirks of calling ``contentOffset`` via raw
+# ``objc_msgSend``.
+_pn_scroll_imp_map: Dict[int, Dict[str, Any]] = {}
+
+_SCROLL_IMP_TYPE = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
 
 
-class _PNScrollDelegate(NSObject):  # type: ignore[valid-type]
-    @objc_method
-    def scrollViewDidScroll_(self, scroll_view: object) -> None:
-        info = _pn_scroll_delegate_map.get(id(self))
-        if not info:
-            return
-        cb = info.get("on_scroll")
-        if cb is None:
-            return
-        try:
-            offset = scroll_view.contentOffset
-            x = float(offset.x)
-            y = float(offset.y)
-        except Exception:
-            return
-        try:
-            cb(x, y)
-        except Exception:
-            pass
+def _scroll_did_scroll_imp(self_ptr: int, _cmd_ptr: int, _scroll_view_ptr: int) -> None:
+    """Raw C callback for ``scrollViewDidScroll:``."""
+    info = _pn_scroll_imp_map.get(self_ptr)
+    if not info:
+        return
+    cb = info.get("on_scroll")
+    sv = info.get("sv")
+    if cb is None or sv is None:
+        return
+    try:
+        offset = sv.contentOffset
+        x = float(offset.x)
+        y = float(offset.y)
+    except Exception:
+        return
+    try:
+        cb(x, y)
+    except Exception:
+        pass
+
+
+_scroll_imp_ref = _SCROLL_IMP_TYPE(_scroll_did_scroll_imp)
+
+_PN_SCROLL_DELEGATE_CLS = _alloc_cls(_NS_OBJECT_CLS, b"_PNScrollDelegateCTypes", 0)
+if _PN_SCROLL_DELEGATE_CLS:
+    _add_method(
+        _PN_SCROLL_DELEGATE_CLS,
+        _sel_reg(b"scrollViewDidScroll:"),
+        _ct.cast(_scroll_imp_ref, _ct.c_void_p),
+        b"v@:@",
+    )
+    _reg_cls(_PN_SCROLL_DELEGATE_CLS)
 
 
 class ScrollViewHandler(IOSViewHandler):
@@ -1361,21 +1386,26 @@ class ScrollViewHandler(IOSViewHandler):
             self._wire_scroll(sv, props["on_scroll"])
 
     def _wire_scroll(self, sv: Any, on_scroll: Any) -> None:
-        delegate_id = getattr(sv, "_pn_scroll_delegate_id", None)
-        if delegate_id is None:
-            delegate = _PNScrollDelegate.new()
-            delegate.retain()
-            _pn_retained_views.append(delegate)
-            delegate_id = id(delegate)
-            sv._pn_scroll_delegate_id = delegate_id
-            _pn_scroll_delegate_map[delegate_id] = {"on_scroll": on_scroll, "delegate": delegate}
-            try:
-                sv.setDelegate_(delegate)
-            except Exception:
-                pass
+        delegate_ptr = getattr(sv, "_pn_scroll_delegate_ptr", None)
+        if delegate_ptr is None:
+            if not _PN_SCROLL_DELEGATE_CLS:
+                return
+            _objc_msgSend.restype = _ct.c_void_p
+            _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
+            d = _objc_msgSend(_PN_SCROLL_DELEGATE_CLS, _SEL_ALLOC)
+            d = _objc_msgSend(d, _SEL_INIT)
+            d = _objc_msgSend(d, _SEL_RETAIN)
+            delegate_ptr = int(d)
+            sv._pn_scroll_delegate_ptr = delegate_ptr
+            _pn_scroll_imp_map[delegate_ptr] = {"on_scroll": on_scroll, "sv": sv}
+            _objc_msgSend.restype = None
+            _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p]
+            sv_ptr = sv.ptr if hasattr(sv, "ptr") else sv
+            _objc_msgSend(sv_ptr, _SEL_SET_DELEGATE, _ct.c_void_p(delegate_ptr))
         else:
-            info = _pn_scroll_delegate_map.setdefault(delegate_id, {})
+            info = _pn_scroll_imp_map.setdefault(delegate_ptr, {})
             info["on_scroll"] = on_scroll
+            info["sv"] = sv
 
     def _apply_refresh(self, sv: Any, props: Dict[str, Any]) -> None:
         spec = props.get("refresh_control")
