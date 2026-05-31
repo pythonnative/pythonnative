@@ -682,7 +682,73 @@ class TextInputHandler(AndroidViewHandler):
                     et.addTextChangedListener(watcher)
             else:
                 _pn_text_input_callbacks[key] = None
-        if "on_submit" in props and props["on_submit"] is not None:
+        if "return_key_type" in props and props["return_key_type"] is not None:
+            # Map the cross-platform ``return_key_type`` to Android's
+            # ``EditorInfo.IME_ACTION_*`` so the soft keyboard renders the
+            # right action key (Done / Go / Search / Send / Next), which
+            # is what triggers the ``OnEditorActionListener`` below. iOS
+            # has a richer set (Google / Yahoo / Join / Route) with no
+            # direct AOSP equivalents — fall back to ``IME_ACTION_DONE``
+            # for those so the keyboard at least dismisses cleanly.
+            try:
+                EditorInfo = jclass("android.view.inputmethod.EditorInfo")
+                rkt_mapping = {
+                    "default": EditorInfo.IME_ACTION_UNSPECIFIED,
+                    "go": EditorInfo.IME_ACTION_GO,
+                    "google": EditorInfo.IME_ACTION_DONE,
+                    "join": EditorInfo.IME_ACTION_DONE,
+                    "next": EditorInfo.IME_ACTION_NEXT,
+                    "route": EditorInfo.IME_ACTION_DONE,
+                    "search": EditorInfo.IME_ACTION_SEARCH,
+                    "send": EditorInfo.IME_ACTION_SEND,
+                    "yahoo": EditorInfo.IME_ACTION_DONE,
+                    "done": EditorInfo.IME_ACTION_DONE,
+                }
+                action = rkt_mapping.get(props["return_key_type"], EditorInfo.IME_ACTION_DONE)
+                et.setImeOptions(action)
+            except Exception:
+                pass
+        if not props.get("multiline"):
+            # Always install an editor-action listener on single-line
+            # inputs so pressing the IME action key (Done / Go / etc.)
+            # *or* the Enter key on a single-line ``EditText`` dismisses
+            # the soft keyboard. Without this the keyboard stays up after
+            # ``inputText`` + ``pressKey: Enter`` in Maestro and on smaller
+            # screens hides the rest of the layout — and matches React
+            # Native's default Android behavior. ``on_submit`` (if any) is
+            # fired before dismissal so the callback sees the final text.
+            try:
+                on_submit_cb = props.get("on_submit")
+                EditorListener = jclass("android.widget.TextView$OnEditorActionListener")
+                Context = jclass("android.content.Context")
+
+                class SubmitProxy(dynamic_proxy(EditorListener)):
+                    def __init__(self, callback: Optional[Callable[[str], None]]) -> None:
+                        super().__init__()
+                        self.callback = callback
+
+                    def onEditorAction(self, view: Any, action_id: int, event: Any) -> bool:
+                        if self.callback is not None:
+                            try:
+                                self.callback(str(view.getText()))
+                            except Exception:
+                                pass
+                        try:
+                            view.clearFocus()
+                            ctx = view.getContext()
+                            imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE)
+                            imm.hideSoftInputFromWindow(view.getWindowToken(), 0)
+                        except Exception:
+                            pass
+                        return True
+
+                et.setOnEditorActionListener(SubmitProxy(on_submit_cb))
+            except Exception:
+                pass
+        elif "on_submit" in props and props["on_submit"] is not None:
+            # Multi-line inputs: only install the listener when an explicit
+            # ``on_submit`` is provided. Enter inserts a newline by default
+            # on multi-line ``EditText`` and we don't want to override that.
             try:
                 cb = props["on_submit"]
                 EditorListener = jclass("android.widget.TextView$OnEditorActionListener")
