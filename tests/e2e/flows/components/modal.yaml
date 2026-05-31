@@ -17,6 +17,7 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: Modal
 - assertVisible: "Modal: closed"
+- assertVisible: "Show count: 0"
 - tapOn: "Open modal"
 - extendedWaitUntil:
     visible: "Modal body text"
@@ -26,6 +27,8 @@ appId: ${APP_ID}
     notVisible: "Modal body text"
     timeout: 10000
 - assertVisible: "Modal: closed"
+# on_show fired exactly once during the presentation above.
+- assertVisible: "Show count: 1"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

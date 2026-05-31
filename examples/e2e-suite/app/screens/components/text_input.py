@@ -17,6 +17,7 @@ def TextInputDemo() -> pn.Element:
     """Render a single-line input, a multiline input, and live echoes."""
     name, set_name = pn.use_state("")
     notes, set_notes = pn.use_state("")
+    focused, set_focused = pn.use_state(False)
 
     field_style = pn.style(
         padding=10,
@@ -33,16 +34,21 @@ def TextInputDemo() -> pn.Element:
         section(
             "Single-line",
             label("Name"),
+            result_text("Focused", "ON" if focused else "OFF"),
             pn.TextInput(
                 value=name,
                 placeholder="Type your name here",
                 on_change=set_name,
+                on_focus=lambda: set_focused(True),
+                on_blur=lambda: set_focused(False),
+                clear_button=True,
+                selection_color="#2563EB",
                 return_key_type="done",
                 auto_correct=False,
                 style=field_style,
             ),
             result_text("Echo", name or "(empty)"),
-            hint("Maestro types into this field and asserts the echo updates."),
+            hint("Maestro types here and asserts the echo + focus update."),
         ),
         section(
             "Multiline",

@@ -10,7 +10,10 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: TextInput
 - assertVisible: "Echo: (empty)"
+- assertVisible: "Focused: OFF"
 - tapOn: "Type your name here"
+# on_focus fires when the field becomes first responder / gains focus.
+- assertVisible: "Focused: ON"
 - inputText: "Maestro"
 - assertVisible: "Echo: Maestro"
 # Maestro's ``hideKeyboard`` is unreliable on iOS 26+ (it looks for a

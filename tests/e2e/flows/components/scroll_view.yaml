@@ -22,6 +22,7 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: ScrollView
 - assertVisible: "ScrollRow 1"
+- assertVisible: "Scrolled: OFF"
 - scrollUntilVisible:
     element: "ScrollRow 20"
     direction: DOWN
@@ -29,6 +30,8 @@ appId: ${APP_ID}
     visibilityPercentage: 100
     centerElement: false
 - assertVisible: "ScrollRow 20"
+# on_scroll fired during the swipe(s), flipping the outer readout.
+- assertVisible: "Scrolled: ON"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

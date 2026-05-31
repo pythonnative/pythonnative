@@ -15,6 +15,7 @@ from app.screens.scaffold import demo_screen, hint, result_text, section
 def ModalDemo() -> pn.Element:
     """Render a button that opens a Modal containing a dismiss button."""
     visible, set_visible = pn.use_state(False)
+    show_count, set_show_count = pn.use_state(0)
 
     return demo_screen(
         "Modal",
@@ -22,6 +23,11 @@ def ModalDemo() -> pn.Element:
         section(
             "Modal toggle",
             result_text("Modal", "open" if visible else "closed"),
+            # ``on_show`` fires once per presentation. We surface its
+            # count on the *outer* screen (asserted after the modal
+            # closes) because on iOS the presented sheet covers the
+            # outer view, so a readout inside the modal can't be checked.
+            result_text("Show count", show_count),
             pn.Button("Open modal", on_click=lambda: set_visible(True)),
             hint("Maestro asserts 'Modal body text' appears after tap."),
         ),
@@ -40,6 +46,7 @@ def ModalDemo() -> pn.Element:
             ),
             visible=visible,
             title="Demo modal",
+            on_show=lambda: set_show_count(show_count + 1),
             on_dismiss=lambda: set_visible(False),
         ),
     )
