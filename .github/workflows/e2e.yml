@@ -25,7 +25,29 @@ jobs:
   e2e-android:
     needs: coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
+    # GitHub-hosted Android emulators grow unstable after ~15 minutes of
+    # sustained Maestro driving and start reporting "device offline" /
+    # "device not found" mid-run (the emulator VM, not the app, dies).
+    # The full 60-flow suite reliably crosses that threshold around the
+    # ~35th flow. Sharding the run into a few balanced groups — each on
+    # its own freshly booted emulator — keeps every session well under
+    # the limit, and parallelizes the Android pass as a bonus. Groups are
+    # sized so none exceeds ~25 flows; ``components`` is the largest
+    # single category and runs alone. ``fail-fast: false`` so one shard's
+    # failure still lets the others report.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: components
+            suites: components
+          - name: hooks-nav
+            suites: hooks navigation
+          - name: layout-styling-anim-misc
+            suites: layout styling animations misc
+
+    name: e2e-android (${{ matrix.name }})
 
     steps:
       - name: Checkout
@@ -61,7 +83,7 @@ jobs:
         with:
           api-level: 31
           arch: x86_64
-          script: bash -lc "./scripts/run-e2e.sh android"
+          script: bash -lc "./scripts/run-e2e.sh android ${{ matrix.suites }}"
 
   e2e-ios:
     needs: coverage

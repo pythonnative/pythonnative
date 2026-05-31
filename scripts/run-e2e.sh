@@ -5,16 +5,25 @@
 # full E2E pass locally. It mirrors what CI does in .github/workflows/e2e.yml.
 #
 # Usage:
-#     ./scripts/run-e2e.sh android [suite]
-#     ./scripts/run-e2e.sh ios     [suite]
+#     ./scripts/run-e2e.sh android [suite ...]
+#     ./scripts/run-e2e.sh ios     [suite ...]
 #
 # Examples:
-#     ./scripts/run-e2e.sh android                 # full suite
-#     ./scripts/run-e2e.sh android components      # only the components suite
-#     ./scripts/run-e2e.sh ios hooks               # only the hooks suite on iOS
+#     ./scripts/run-e2e.sh android                     # full suite
+#     ./scripts/run-e2e.sh android components          # only the components suite
+#     ./scripts/run-e2e.sh ios hooks                   # only the hooks suite on iOS
+#     ./scripts/run-e2e.sh android hooks navigation    # two categories, one session
 #
 # Available suites: full, components, hooks, navigation, layout, styling,
 # animations, misc.
+#
+# Multiple category suites can be passed at once; they run sequentially in
+# a single Maestro session (and against a single emulator/simulator boot).
+# CI uses this to shard the Android run into a few balanced groups so no
+# single emulator session has to survive the entire 60-flow marathon —
+# GitHub-hosted Android emulators grow unstable under ~15 minutes of
+# sustained Maestro driving and start reporting "device offline". See
+# .github/workflows/e2e.yml and tests/e2e/AGENTS.md.
 #
 # Prerequisites:
 #     - `pn` CLI available (e.g. via `pip install -e .`).
@@ -24,9 +33,9 @@
 #
 # The script:
 #     1. Builds + installs the e2e-suite app via `pn run <platform> --no-logs`.
-#     2. Picks the right Maestro YAML based on platform + suite.
-#     3. Runs `maestro test` up to ``MAESTRO_MAX_ATTEMPTS`` times (default
-#        2) and exits with the last attempt's exit code.
+#     2. Resolves each requested suite to its Maestro YAML target.
+#     3. Runs `maestro test` (over all targets) up to ``MAESTRO_MAX_ATTEMPTS``
+#        times (default 2) and exits with the last attempt's exit code.
 #
 # A successful run prints "All E2E suites passed." at the end and exits 0.
 # Any failed flow is reported by Maestro in its standard format; see
@@ -39,7 +48,12 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
 PLATFORM="${1:-android}"
-SUITE="${2:-full}"
+shift || true
+# Remaining args are suite names; default to the full aggregate suite.
+SUITES=("$@")
+if [[ ${#SUITES[@]} -eq 0 ]]; then
+  SUITES=("full")
+fi
 
 case "$PLATFORM" in
   android|ios) ;;
@@ -65,23 +79,29 @@ case "$PLATFORM" in
   ios)     APP_ID="com.pythonnative.ios-template" ;;
 esac
 
-case "$SUITE" in
-  full)
-    if [[ "$PLATFORM" == "android" ]]; then
-      MAESTRO_TARGET="tests/e2e/android.yaml"
-    else
-      MAESTRO_TARGET="tests/e2e/ios.yaml"
-    fi
-    ;;
-  components|hooks|navigation|layout|styling|animations|misc)
-    MAESTRO_TARGET="tests/e2e/suites/${SUITE}.yaml"
-    ;;
-  *)
-    echo "Error: unknown suite '$SUITE'" >&2
-    echo "Available suites: full, components, hooks, navigation, layout, styling, animations, misc" >&2
-    exit 2
-    ;;
-esac
+# Resolve each requested suite to a Maestro YAML target. ``full`` expands
+# to the platform's master aggregate; the category names map to the
+# per-category suite files under tests/e2e/suites/.
+MAESTRO_TARGETS=()
+for suite in "${SUITES[@]}"; do
+  case "$suite" in
+    full)
+      if [[ "$PLATFORM" == "android" ]]; then
+        MAESTRO_TARGETS+=("tests/e2e/android.yaml")
+      else
+        MAESTRO_TARGETS+=("tests/e2e/ios.yaml")
+      fi
+      ;;
+    components|hooks|navigation|layout|styling|animations|misc)
+      MAESTRO_TARGETS+=("tests/e2e/suites/${suite}.yaml")
+      ;;
+    *)
+      echo "Error: unknown suite '$suite'" >&2
+      echo "Available suites: full, components, hooks, navigation, layout, styling, animations, misc" >&2
+      exit 2
+      ;;
+  esac
+done
 
 printf "\n==> Building e2e-suite app for %s\n" "$PLATFORM"
 pushd examples/e2e-suite > /dev/null
@@ -90,13 +110,13 @@ popd > /dev/null
 
 run_maestro() {
   if [[ "$PLATFORM" == "ios" ]]; then
-    maestro --platform ios test -e "APP_ID=$APP_ID" "$MAESTRO_TARGET"
+    maestro --platform ios test -e "APP_ID=$APP_ID" "${MAESTRO_TARGETS[@]}"
   else
-    maestro test -e "APP_ID=$APP_ID" "$MAESTRO_TARGET"
+    maestro test -e "APP_ID=$APP_ID" "${MAESTRO_TARGETS[@]}"
   fi
 }
 
-printf "\n==> Running Maestro suite: %s\n" "$MAESTRO_TARGET"
+printf "\n==> Running Maestro suite(s): %s\n" "${MAESTRO_TARGETS[*]}"
 
 # Maestro's iOS XCUITest driver occasionally loses its connection to the
 # app during long suites and surfaces transient "Application is not
