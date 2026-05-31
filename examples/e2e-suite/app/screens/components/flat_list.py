@@ -30,13 +30,16 @@ def FlatListDemo() -> pn.Element:
         "Virtualized 100-row list; scroll to reveal rows further down.",
         section(
             "List body",
+            # See ``components/scroll_view.py`` for the rationale: this
+            # is sized so Maestro's screen-center swipe lands inside
+            # the FlatList on both the iOS and Android CI emulators.
             pn.FlatList(
                 data=items,
                 item_height=44,
                 separator_height=4,
                 render_item=render_row,
                 key_extractor=lambda item, _: str(item["id"]),
-                style=pn.style(height=200, background_color="#F1F5F9"),
+                style=pn.style(height=400, background_color="#F1F5F9"),
             ),
             hint("Maestro asserts 'FlatRow 1' and (after scroll) 'FlatRow 20'."),
         ),

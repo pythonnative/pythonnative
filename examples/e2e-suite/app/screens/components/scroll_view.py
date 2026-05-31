@@ -20,6 +20,15 @@ def ScrollViewDemo() -> pn.Element:
         "Scroll vertically to reveal rows beyond the visible area.",
         section(
             "Tall content",
+            # The ScrollView is intentionally large enough to overlap
+            # the screen's vertical center on both the iOS and Android
+            # CI emulators. Maestro's ``scrollUntilVisible`` always
+            # swipes from the screen center — a smaller (e.g. 200 dp)
+            # container near the top of the page leaves screen center
+            # outside its bounds, and the swipe scrolls the outer page
+            # ScrollView instead of this one. Keep this >= ~350 dp so
+            # the test exercises the inner scroll path on both
+            # platforms.
             pn.ScrollView(
                 pn.Column(
                     *[
@@ -31,7 +40,7 @@ def ScrollViewDemo() -> pn.Element:
                     ],
                     style=pn.style(spacing=4),
                 ),
-                style=pn.style(height=200, border_width=1, border_color="#CBD5E1"),
+                style=pn.style(height=400, border_width=1, border_color="#CBD5E1"),
             ),
             hint("Maestro scrolls to reveal a row from later in the list."),
         ),

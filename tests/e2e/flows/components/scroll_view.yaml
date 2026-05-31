@@ -3,23 +3,17 @@
 # Demo screen: examples/e2e-suite/app/screens/components/scroll_view.py
 # Source under test: src/pythonnative/components.py :: ScrollView
 #
-# The demo's inner ScrollView is intentionally small (200 dp) — that's
-# what's being tested — and it sits near the top of the screen, *not*
-# in the middle. Maestro's ``scrollUntilVisible`` always swipes from
-# the screen center, which lands below this scroll container and never
-# scrolls it. The recommended Maestro pattern for non-fullscreen
-# scrollables is a custom swipe loop with explicit coordinates that
-# stay inside the scroll container's bounds. See:
-#   https://docs.maestro.dev/examples/recipes/custom-scrolling-for-screen-fragments
-#
-# Per-swipe scroll travel is platform-dependent — Android's
-# ``NestedScrollView`` flings more aggressively per gesture than iOS's
-# ``UIScrollView``, so a fixed ``times: N`` overshoots on one platform
-# and undershoots on the other. We loop with ``while: notVisible``
-# instead, which exits as soon as ``ScrollRow 20`` enters the viewport
-# regardless of how many swipes that took on this platform. Swipes are
-# kept small (10% of screen height) so a single fling can't shoot
-# past row 20.
+# The demo sizes the inner ScrollView (~400 dp) so it overlaps the
+# vertical center of the screen on both the iOS and Android CI
+# emulators. That lets us use Maestro's standard ``scrollUntilVisible``
+# (which always swipes from the screen center) — its built-in
+# adaptive swiping handles per-platform fling differences automatically
+# and uses a single, viewport-aware visibility check, which avoids the
+# tree-vs-viewport mismatch we hit with a custom ``while: notVisible``
+# loop on Android API 31 (where off-screen ``NestedScrollView``
+# children can be present in the accessibility tree even though
+# clipped, causing the loop to exit before the row is actually in the
+# viewport).
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -28,15 +22,12 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: ScrollView
 - assertVisible: "ScrollRow 1"
-- repeat:
-    times: 15
-    while:
-      notVisible: "ScrollRow 20"
-    commands:
-      - swipe:
-          start: 50%, 20%
-          end: 50%, 10%
-          duration: 500
+- scrollUntilVisible:
+    element: "ScrollRow 20"
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: false
 - assertVisible: "ScrollRow 20"
 - runFlow:
     file: ../../helpers/close_demo.yaml
