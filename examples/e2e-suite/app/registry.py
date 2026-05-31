@@ -35,10 +35,13 @@ from app.screens.animations.spring_animation import SpringAnimationDemo
 from app.screens.animations.timing_animation import TimingAnimationDemo
 from app.screens.components.activity_indicator import ActivityIndicatorDemo
 from app.screens.components.button import ButtonDemo
+from app.screens.components.checkbox import CheckboxDemo
+from app.screens.components.date_picker import DatePickerDemo
 from app.screens.components.error_boundary import ErrorBoundaryDemo
 from app.screens.components.flat_list import FlatListDemo
 from app.screens.components.fragment import FragmentDemo
 from app.screens.components.image import ImageDemo
+from app.screens.components.image_background import ImageBackgroundDemo
 from app.screens.components.keyboard_avoiding_view import KeyboardAvoidingViewDemo
 from app.screens.components.modal import ModalDemo
 from app.screens.components.picker import PickerDemo
@@ -48,12 +51,14 @@ from app.screens.components.refresh_control import RefreshControlDemo
 from app.screens.components.safe_area_view import SafeAreaViewDemo
 from app.screens.components.scroll_view import ScrollViewDemo
 from app.screens.components.section_list import SectionListDemo
+from app.screens.components.segmented_control import SegmentedControlDemo
 from app.screens.components.slider import SliderDemo
 from app.screens.components.spacer import SpacerDemo
 from app.screens.components.status_bar import StatusBarDemo
 from app.screens.components.switch import SwitchDemo
 from app.screens.components.text import TextDemo
 from app.screens.components.text_input import TextInputDemo
+from app.screens.components.touchable_opacity import TouchableOpacityDemo
 from app.screens.components.view_column_row import ViewColumnRowDemo
 from app.screens.components.web_view import WebViewDemo
 from app.screens.hooks.batch_updates_demo import BatchUpdatesDemo
@@ -174,6 +179,11 @@ DEMOS: List[DemoEntry] = [
     DemoEntry("flat_list", "Components", "FlatList", "FlatList", FlatListDemo),
     DemoEntry("section_list", "Components", "SectionList", "SectionList", SectionListDemo),
     DemoEntry("web_view", "Components", "WebView", "WebView", WebViewDemo),
+    DemoEntry("touchable_opacity", "Components", "TouchableOpacity", "TouchableOpacity", TouchableOpacityDemo),
+    DemoEntry("image_background", "Components", "ImageBackground", "ImageBackground", ImageBackgroundDemo),
+    DemoEntry("checkbox", "Components", "Checkbox", "Checkbox", CheckboxDemo),
+    DemoEntry("segmented_control", "Components", "SegmentedControl", "SegmentedControl", SegmentedControlDemo),
+    DemoEntry("date_picker", "Components", "DatePicker", "DatePicker", DatePickerDemo),
     # ------------------------------------------------------------------
     # Hooks
     # ------------------------------------------------------------------

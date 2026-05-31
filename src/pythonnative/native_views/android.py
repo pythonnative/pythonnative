@@ -32,6 +32,9 @@ from .base import ViewHandler, _safe_max, parse_color_int
 _pn_text_input_watchers: dict = {}
 _pn_text_input_callbacks: dict = {}
 _pn_text_input_suppress_callbacks: dict = {}
+_pn_text_input_focus_listeners: dict = {}
+_pn_text_input_focus_callbacks: dict = {}
+_pn_text_input_clear_touch: dict = {}
 _pn_view_visual_props: dict = {}
 _DRAWABLE_STYLE_KEYS = ("background_color", "border_radius", "border_width", "border_color")
 
@@ -507,6 +510,9 @@ class ButtonHandler(AndroidViewHandler):
         _apply_common_visual(btn, props)
 
 
+_pn_scrollview_state: Dict[int, Dict[str, Any]] = {}
+
+
 class ScrollViewHandler(AndroidViewHandler):
     """Scroll container — wraps a single child whose height is unbounded.
 
@@ -521,8 +527,12 @@ class ScrollViewHandler(AndroidViewHandler):
     the outer cooperates with any nested scroll, only consuming
     leftover scroll when its child reaches its limit.
 
-    When a ``refresh_control`` prop is provided, wraps the scroll in
-    a `SwipeRefreshLayout` and forwards the on-refresh callback.
+    When a ``refresh_control`` prop is provided at creation, the scroll
+    view is wrapped in an ``androidx.swiperefreshlayout.widget.SwipeRefreshLayout``
+    (the returned view is the wrapper, and child management forwards
+    into the inner scroll view) so pull-to-refresh matches the iOS
+    ``UIRefreshControl`` path. Without ``refresh_control`` the bare
+    scroll view is returned unchanged.
     """
 
     def create(self, props: Dict[str, Any]) -> Any:
@@ -531,16 +541,150 @@ class ScrollViewHandler(AndroidViewHandler):
         except Exception:
             sv = jclass("android.widget.ScrollView")(_ctx())
         _apply_common_visual(sv, props)
+        self._apply_scroll_props(sv, props)
+        if props.get("refresh_control"):
+            wrapper = self._wrap_in_refresh(sv)
+            if wrapper is not None:
+                _pn_scrollview_state[id(wrapper)] = {
+                    "scroll": sv,
+                    "refresh": wrapper,
+                    "on_refresh": None,
+                    "listener_bound": False,
+                }
+                self._apply_refresh(wrapper, props)
+                return wrapper
         return sv
 
     def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        _apply_common_visual(native_view, changed)
+        state = _pn_scrollview_state.get(id(native_view))
+        scroll = state["scroll"] if state else native_view
+        _apply_common_visual(scroll, changed)
+        self._apply_scroll_props(scroll, changed)
+        if state is not None and "refresh_control" in changed:
+            self._apply_refresh(native_view, changed)
 
     def add_child(self, parent: Any, child: Any) -> None:
-        parent.addView(child)
+        state = _pn_scrollview_state.get(id(parent))
+        target = state["scroll"] if state else parent
+        target.addView(child)
 
     def remove_child(self, parent: Any, child: Any) -> None:
-        parent.removeView(child)
+        state = _pn_scrollview_state.get(id(parent))
+        target = state["scroll"] if state else parent
+        target.removeView(child)
+
+    def _apply_scroll_props(self, sv: Any, props: Dict[str, Any]) -> None:
+        if "shows_scroll_indicator" in props:
+            # Only present when ``False`` (hide); a removal restores bars.
+            show = props["shows_scroll_indicator"] is not False
+            try:
+                sv.setVerticalScrollBarEnabled(show)
+                sv.setHorizontalScrollBarEnabled(show)
+            except Exception:
+                pass
+        if "bounces" in props:
+            # ``bounces`` is only present when ``False``; map it to the
+            # closest analogue, the over-scroll (glow) mode.
+            try:
+                View = jclass("android.view.View")
+                mode = View.OVER_SCROLL_NEVER if props["bounces"] is False else View.OVER_SCROLL_IF_CONTENT_SCROLLS
+                sv.setOverScrollMode(mode)
+            except Exception:
+                pass
+        if "on_scroll" in props:
+            self._apply_on_scroll(sv, props.get("on_scroll"))
+        # ``paging_enabled`` and ``keyboard_dismiss_mode`` have no clean
+        # NestedScrollView analogue, so they are intentionally skipped
+        # rather than approximated poorly.
+
+    def _apply_on_scroll(self, sv: Any, cb: Optional[Callable[[float, float], None]]) -> None:
+        if cb is None:
+            return
+        try:
+            if jclass("android.os.Build$VERSION").SDK_INT < 23:
+                return
+            density = _density()
+
+            class _ScrollChangeProxy(dynamic_proxy(jclass("android.view.View").OnScrollChangeListener)):
+                def __init__(self, callback: Callable[[float, float], None], dens: float) -> None:
+                    super().__init__()
+                    self.callback = callback
+                    self.dens = dens if dens else 1.0
+
+                def onScrollChange(
+                    self,
+                    v: Any,
+                    scroll_x: int,
+                    scroll_y: int,
+                    old_x: int,
+                    old_y: int,
+                ) -> None:
+                    try:
+                        self.callback(scroll_x / self.dens, scroll_y / self.dens)
+                    except Exception:
+                        pass
+
+            sv.setOnScrollChangeListener(_ScrollChangeProxy(cb, density))
+        except Exception:
+            pass
+
+    def _wrap_in_refresh(self, sv: Any) -> Any:
+        try:
+            SwipeRefreshLayout = jclass("androidx.swiperefreshlayout.widget.SwipeRefreshLayout")
+            srl = SwipeRefreshLayout(_ctx())
+            LP = jclass("android.view.ViewGroup$LayoutParams")
+            srl.addView(sv, LP(LP.MATCH_PARENT, LP.MATCH_PARENT))
+            return srl
+        except Exception:
+            return None
+
+    def _apply_refresh(self, wrapper: Any, props: Dict[str, Any]) -> None:
+        state = _pn_scrollview_state.get(id(wrapper))
+        if state is None:
+            return
+        srl = state.get("refresh")
+        if srl is None:
+            return
+        spec = props.get("refresh_control")
+        if not isinstance(spec, dict):
+            try:
+                srl.setEnabled(False)
+            except Exception:
+                pass
+            return
+        try:
+            srl.setEnabled(True)
+        except Exception:
+            pass
+        state["on_refresh"] = spec.get("on_refresh")
+        if not state.get("listener_bound"):
+            owner = state
+
+            class _RefreshProxy(
+                dynamic_proxy(jclass("androidx.swiperefreshlayout.widget.SwipeRefreshLayout").OnRefreshListener)
+            ):
+                def onRefresh(self) -> None:
+                    callback = owner.get("on_refresh")
+                    if callback is not None:
+                        try:
+                            callback()
+                        except Exception:
+                            pass
+
+            try:
+                srl.setOnRefreshListener(_RefreshProxy())
+                state["listener_bound"] = True
+            except Exception:
+                pass
+        if spec.get("tint_color"):
+            try:
+                srl.setColorSchemeColors([parse_color_int(spec["tint_color"])])
+            except Exception:
+                pass
+        try:
+            srl.setRefreshing(bool(spec.get("refreshing")))
+        except Exception:
+            pass
 
 
 class TextInputHandler(AndroidViewHandler):
@@ -649,6 +793,30 @@ class TextInputHandler(AndroidViewHandler):
                 et.requestFocus()
             except Exception:
                 pass
+        if "editable" in props:
+            # ``editable`` is only present when ``False`` (read-only); a
+            # removal (``None``) restores editing. We keep the field
+            # visible (not greyed) by toggling focusability rather than
+            # ``setEnabled``.
+            editable = props["editable"] is not False
+            try:
+                et.setFocusable(editable)
+                et.setFocusableInTouchMode(editable)
+                et.setCursorVisible(editable)
+                et.setLongClickable(editable)
+            except Exception:
+                pass
+        if "selection_color" in props and props["selection_color"] is not None:
+            try:
+                et.setHighlightColor(parse_color_int(props["selection_color"]))
+            except Exception:
+                pass
+        if "text_content_type" in props and props["text_content_type"] is not None:
+            self._apply_autofill(et, str(props["text_content_type"]))
+        if "clear_button" in props:
+            self._apply_clear_button(et, bool(props.get("clear_button")))
+        if "on_focus" in props or "on_blur" in props:
+            self._apply_focus_listener(et, props)
         if "on_change" in props:
             key = id(et)
             cb = props["on_change"]
@@ -769,6 +937,101 @@ class TextInputHandler(AndroidViewHandler):
             except Exception:
                 pass
         _apply_common_visual(et, props)
+
+    @staticmethod
+    def _autofill_hint(content_type: str) -> Optional[str]:
+        mapping = {
+            "username": "username",
+            "password": "password",
+            "new_password": "newPassword",
+            "email": "emailAddress",
+            "email_address": "emailAddress",
+            "name": "name",
+            "given_name": "personGivenName",
+            "family_name": "personFamilyName",
+            "telephone": "phone",
+            "phone": "phone",
+            "phone_number": "phone",
+            "postal_code": "postalCode",
+            "street_address": "postalAddress",
+            "credit_card_number": "creditCardNumber",
+            "one_time_code": "smsOTPCode",
+        }
+        return mapping.get(content_type)
+
+    def _apply_autofill(self, et: Any, content_type: str) -> None:
+        # Autofill hints are an API 26+ concept; older devices ignore them.
+        try:
+            if jclass("android.os.Build$VERSION").SDK_INT < 26:
+                return
+            hint = self._autofill_hint(content_type)
+            if hint:
+                et.setAutofillHints([hint])
+        except Exception:
+            pass
+
+    def _apply_clear_button(self, et: Any, enabled: bool) -> None:
+        # Best-effort drawableEnd "X": shows a system clear icon and wires
+        # a touch listener that clears the field when the icon is tapped.
+        try:
+            if not enabled:
+                et.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
+                return
+            icon_id = int(getattr(jclass("android.R$drawable"), "ic_menu_close_clear_cancel", 0))
+            if icon_id:
+                et.setCompoundDrawablesWithIntrinsicBounds(0, 0, icon_id, 0)
+            key = id(et)
+            if key in _pn_text_input_clear_touch:
+                return
+
+            class _ClearTouchProxy(dynamic_proxy(jclass("android.view.View").OnTouchListener)):
+                def onTouch(self, view: Any, event: Any) -> bool:
+                    try:
+                        if event.getAction() == 1:  # ACTION_UP
+                            drawables = view.getCompoundDrawables()
+                            right = drawables[2] if drawables is not None and len(drawables) > 2 else None
+                            if right is not None:
+                                threshold = view.getWidth() - view.getPaddingRight() - right.getBounds().width()
+                                if event.getX() >= threshold:
+                                    view.setText("")
+                                    return True
+                    except Exception:
+                        pass
+                    return False
+
+            listener = _ClearTouchProxy()
+            _pn_text_input_clear_touch[key] = listener
+            et.setOnTouchListener(listener)
+        except Exception:
+            pass
+
+    def _apply_focus_listener(self, et: Any, props: Dict[str, Any]) -> None:
+        key = id(et)
+        entry = _pn_text_input_focus_callbacks.setdefault(key, {"on_focus": None, "on_blur": None})
+        if "on_focus" in props:
+            entry["on_focus"] = props.get("on_focus")
+        if "on_blur" in props:
+            entry["on_blur"] = props.get("on_blur")
+        if key in _pn_text_input_focus_listeners:
+            return
+
+        class _FocusProxy(dynamic_proxy(jclass("android.view.View").OnFocusChangeListener)):
+            def __init__(self, view_key: int) -> None:
+                super().__init__()
+                self.view_key = view_key
+
+            def onFocusChange(self, view: Any, has_focus: bool) -> None:
+                callbacks = _pn_text_input_focus_callbacks.get(self.view_key) or {}
+                cb = callbacks.get("on_focus") if has_focus else callbacks.get("on_blur")
+                if cb is not None:
+                    try:
+                        cb()
+                    except Exception:
+                        pass
+
+        listener = _FocusProxy(key)
+        _pn_text_input_focus_listeners[key] = listener
+        et.setOnFocusChangeListener(listener)
 
 
 class ImageHandler(AndroidViewHandler):
@@ -892,33 +1155,196 @@ class ProgressBarHandler(AndroidViewHandler):
         self._apply(native_view, changed)
 
     def _apply(self, pb: Any, props: Dict[str, Any]) -> None:
-        if "value" in props:
+        if "value" in props and props["value"] is not None:
             pb.setProgress(int(float(props["value"]) * 1000))
+        if "color" in props and props["color"] is not None:
+            try:
+                ColorStateList = jclass("android.content.res.ColorStateList")
+                pb.setProgressTintList(ColorStateList.valueOf(parse_color_int(props["color"])))
+            except Exception:
+                pass
+        if "track_color" in props and props["track_color"] is not None:
+            try:
+                ColorStateList = jclass("android.content.res.ColorStateList")
+                track = ColorStateList.valueOf(parse_color_int(props["track_color"]))
+                pb.setProgressBackgroundTintList(track)
+                pb.setSecondaryProgressTintList(track)
+            except Exception:
+                pass
+        if "indeterminate" in props:
+            try:
+                pb.setIndeterminate(bool(props["indeterminate"]))
+            except Exception:
+                pass
 
 
 class ActivityIndicatorHandler(AndroidViewHandler):
     def create(self, props: Dict[str, Any]) -> Any:
         pb = jclass("android.widget.ProgressBar")(_ctx())
-        if not props.get("animating", True):
-            pb.setVisibility(jclass("android.view.View").GONE)
+        self._apply(pb, props)
         return pb
 
     def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        View = jclass("android.view.View")
-        if "animating" in changed:
-            native_view.setVisibility(View.VISIBLE if changed["animating"] else View.GONE)
+        self._apply(native_view, changed)
+
+    def _apply(self, pb: Any, props: Dict[str, Any]) -> None:
+        if "animating" in props:
+            View = jclass("android.view.View")
+            pb.setVisibility(View.VISIBLE if props["animating"] else View.GONE)
+        if "color" in props and props["color"] is not None:
+            try:
+                ColorStateList = jclass("android.content.res.ColorStateList")
+                pb.setIndeterminateTintList(ColorStateList.valueOf(parse_color_int(props["color"])))
+            except Exception:
+                pass
+        if "size" in props and props["size"] is not None:
+            # The framework ProgressBar has no runtime size switch, so
+            # approximate "large" by scaling the indeterminate drawable.
+            try:
+                scale = 1.5 if str(props["size"]) == "large" else 1.0
+                pb.setScaleX(scale)
+                pb.setScaleY(scale)
+            except Exception:
+                pass
+
+
+_pn_webview_props: Dict[int, Dict[str, Any]] = {}
+
+
+def _make_web_client(store: Dict[str, Any]) -> Any:
+    """Best-effort ``WebViewClient`` proxy driving the WebView callbacks.
+
+    ``android.webkit.WebViewClient`` is an abstract *class*, not an
+    interface, so Chaquopy's ``dynamic_proxy`` may be unable to subclass
+    it at runtime. We attempt it and return ``None`` on failure, in
+    which case the caller falls back to the default client and page
+    loading still works.
+
+    When the proxy succeeds it drives ``on_navigation_state_change``
+    (``onPageStarted``), ``on_load`` (``onPageFinished``), evaluates
+    ``inject_javascript`` after each load, and bridges ``on_message``
+    via a ``pythonnative://`` URL scheme plus a small JS shim installed
+    as ``window.pythonnative.postMessage`` — so no ``@JavascriptInterface``
+    Java helper is required.
+    """
+    on_load = store.get("on_load")
+    on_nav = store.get("on_navigation_state_change")
+    inject_js = store.get("inject_javascript")
+    on_message = store.get("on_message")
+    scheme = "pythonnative://message/"
+    try:
+
+        class _WebClientProxy(dynamic_proxy(jclass("android.webkit.WebViewClient"))):
+            def onPageStarted(self, view: Any, url: Any, favicon: Any) -> None:
+                if on_nav is not None:
+                    try:
+                        on_nav(str(url))
+                    except Exception:
+                        pass
+
+            def onPageFinished(self, view: Any, url: Any) -> None:
+                if on_load is not None:
+                    try:
+                        on_load(str(url))
+                    except Exception:
+                        pass
+                if on_message is not None:
+                    try:
+                        shim = (
+                            "(function(){window.pythonnative=window.pythonnative||{};"
+                            "window.pythonnative.postMessage=function(m){"
+                            "window.location.href='" + scheme + "'+encodeURIComponent(m);};})();"
+                        )
+                        view.evaluateJavascript(shim, None)
+                    except Exception:
+                        pass
+                if inject_js:
+                    try:
+                        view.evaluateJavascript(str(inject_js), None)
+                    except Exception:
+                        pass
+
+            def shouldOverrideUrlLoading(self, view: Any, request: Any) -> bool:
+                try:
+                    url = request if isinstance(request, str) else str(request.getUrl())
+                except Exception:
+                    url = ""
+                if on_message is not None and url.startswith(scheme):
+                    try:
+                        from urllib.parse import unquote
+
+                        on_message(unquote(url[len(scheme) :]))
+                    except Exception:
+                        pass
+                    return True
+                return False
+
+        return _WebClientProxy()
+    except Exception:
+        return None
 
 
 class WebViewHandler(AndroidViewHandler):
+    _CLIENT_KEYS = ("on_load", "on_navigation_state_change", "inject_javascript", "on_message")
+
     def create(self, props: Dict[str, Any]) -> Any:
         wv = jclass("android.webkit.WebView")(_ctx())
-        if "url" in props and props["url"]:
-            wv.loadUrl(str(props["url"]))
+        _pn_webview_props[id(wv)] = {}
+        self._apply(wv, props, initial=True)
         return wv
 
     def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        if "url" in changed and changed["url"]:
-            native_view.loadUrl(str(changed["url"]))
+        self._apply(native_view, changed, initial=False)
+
+    def _apply(self, wv: Any, props: Dict[str, Any], initial: bool) -> None:
+        store = _pn_webview_props.setdefault(id(wv), {})
+        for key in self._CLIENT_KEYS:
+            if key in props:
+                store[key] = props[key]
+
+        # Enable JS whenever a callback / injection needs it.
+        if any(store.get(k) for k in self._CLIENT_KEYS):
+            try:
+                wv.getSettings().setJavaScriptEnabled(True)
+            except Exception:
+                pass
+
+        if initial or any(k in props for k in self._CLIENT_KEYS):
+            client = _make_web_client(store)
+            if client is not None:
+                try:
+                    wv.setWebViewClient(client)
+                except Exception:
+                    pass
+
+        # ``html`` takes precedence over ``url`` when both are present.
+        if "html" in props and props["html"]:
+            try:
+                wv.loadDataWithBaseURL(None, str(props["html"]), "text/html", "utf-8", None)
+            except Exception:
+                pass
+        elif "url" in props and props["url"]:
+            try:
+                wv.loadUrl(str(props["url"]))
+            except Exception:
+                pass
+
+        if "scroll_enabled" in props:
+            self._apply_scroll_enabled(wv, props["scroll_enabled"])
+
+    def _apply_scroll_enabled(self, wv: Any, scroll_enabled: Any) -> None:
+        try:
+            if scroll_enabled is False:
+
+                class _NoScrollProxy(dynamic_proxy(jclass("android.view.View").OnTouchListener)):
+                    def onTouch(self, view: Any, event: Any) -> bool:
+                        return event.getAction() == 2  # consume ACTION_MOVE
+
+                wv.setOnTouchListener(_NoScrollProxy())
+            else:
+                wv.setOnTouchListener(None)
+        except Exception:
+            pass
 
 
 class SpacerHandler(AndroidViewHandler):
@@ -1026,7 +1452,14 @@ class ModalHandler(AndroidViewHandler):
         elif not visible and state is not None:
             self._dismiss(placeholder)
         elif visible and state is not None:
-            state["on_dismiss"] = props.get("on_dismiss")
+            if "on_dismiss" in props:
+                state["on_dismiss"] = props.get("on_dismiss")
+            dialog = state.get("dialog")
+            if dialog is not None and "dismiss_on_backdrop" in props:
+                try:
+                    dialog.setCanceledOnTouchOutside(props["dismiss_on_backdrop"] is not False)
+                except Exception:
+                    pass
 
     def _present(self, placeholder: Any, props: Dict[str, Any]) -> None:
         try:
@@ -1035,11 +1468,34 @@ class ModalHandler(AndroidViewHandler):
             LayoutParams = jclass("android.view.ViewGroup$LayoutParams")
             dialog = Dialog(_ctx())
             content = FrameLayout(_ctx())
-            content.setBackgroundColor(parse_color_int("#FFFFFF"))
+            # ``overlay`` (or ``transparent``) keeps the dialog see-through
+            # with a dimmed backdrop so children float over the host UI;
+            # every other presentation style is the opaque, fullscreen-ish
+            # sheet. The content stays MATCH_PARENT either way so the layout
+            # engine keeps positioning children by absolute frame.
+            presentation = props.get("presentation_style", "page_sheet")
+            is_overlay = presentation == "overlay" or bool(props.get("transparent"))
+            content.setBackgroundColor(parse_color_int("#00FFFFFF" if is_overlay else "#FFFFFF"))
             dialog.setContentView(
                 content,
                 LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
             )
+            try:
+                window = dialog.getWindow()
+                if window is not None:
+                    if is_overlay:
+                        ColorDrawable = jclass("android.graphics.drawable.ColorDrawable")
+                        window.setBackgroundDrawable(ColorDrawable(parse_color_int("#00000000")))
+                        window.setDimAmount(0.5)
+                    else:
+                        WMLP = jclass("android.view.WindowManager$LayoutParams")
+                        window.setLayout(WMLP.MATCH_PARENT, WMLP.MATCH_PARENT)
+            except Exception:
+                pass
+            try:
+                dialog.setCanceledOnTouchOutside(props.get("dismiss_on_backdrop") is not False)
+            except Exception:
+                pass
             on_dismiss = props.get("on_dismiss")
             _pn_modal_states[id(placeholder)] = {
                 "dialog": dialog,
@@ -1051,6 +1507,22 @@ class ModalHandler(AndroidViewHandler):
                     content.addView(child)
                 except Exception:
                     pass
+            on_show = props.get("on_show")
+            if on_show is not None:
+                OnShowListener = jclass("android.content.DialogInterface$OnShowListener")
+
+                class _ShowProxy(dynamic_proxy(OnShowListener)):
+                    def __init__(self, callback: Callable[[], None]) -> None:
+                        super().__init__()
+                        self.callback = callback
+
+                    def onShow(self, di: Any) -> None:
+                        try:
+                            self.callback()
+                        except Exception:
+                            pass
+
+                dialog.setOnShowListener(_ShowProxy(on_show))
             if on_dismiss is not None:
                 OnDismissListener = jclass("android.content.DialogInterface$OnDismissListener")
 
@@ -1790,6 +2262,470 @@ class PickerHandler(AndroidViewHandler):
 
 
 # ======================================================================
+# Checkbox — native CheckBox with an optional inline label
+# ======================================================================
+
+
+class CheckboxHandler(AndroidViewHandler):
+    """``Checkbox`` element handler — native ``CheckBox`` widget.
+
+    Programmatic ``value`` updates are wrapped in a per-view
+    "suppress" guard (mirroring ``PickerHandler``) so pushing a new
+    state via ``setChecked`` never re-fires the user's ``on_change``.
+    """
+
+    def create(self, props: Dict[str, Any]) -> Any:
+        cb = jclass("android.widget.CheckBox")(_ctx())
+        self._state: Dict[int, Dict[str, Any]] = getattr(self, "_state", {})
+        self._state[id(cb)] = {"on_change": None, "suppress": False}
+        self._apply(cb, props, initial=True)
+        return cb
+
+    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
+        self._apply(native_view, changed, initial=False)
+
+    def _apply(self, cb: Any, props: Dict[str, Any], initial: bool) -> None:
+        state = self._state.setdefault(id(cb), {"on_change": None, "suppress": False})
+
+        if "label" in props:
+            cb.setText(str(props["label"]) if props["label"] is not None else "")
+
+        if "value" in props:
+            state["suppress"] = True
+            try:
+                cb.setChecked(bool(props["value"]))
+            finally:
+                state["suppress"] = False
+
+        if "disabled" in props:
+            # ``disabled`` is only present when truthy; a removal (``None``)
+            # re-enables the control.
+            cb.setEnabled(not bool(props["disabled"]))
+
+        if "color" in props and props["color"] is not None:
+            try:
+                ColorStateList = jclass("android.content.res.ColorStateList")
+                cb.setButtonTintList(ColorStateList.valueOf(parse_color_int(props["color"])))
+            except Exception:
+                pass
+
+        if "on_change" in props or initial:
+            state["on_change"] = props.get("on_change") if "on_change" in props else state.get("on_change")
+
+            class _CheckboxCheckedProxy(dynamic_proxy(jclass("android.widget.CompoundButton").OnCheckedChangeListener)):
+                def __init__(self, owner_state: Dict[str, Any]) -> None:
+                    super().__init__()
+                    self._owner_state = owner_state
+
+                def onCheckedChanged(self, button: Any, is_checked: bool) -> None:
+                    if self._owner_state.get("suppress"):
+                        return
+                    callback = self._owner_state.get("on_change")
+                    if callback is not None:
+                        try:
+                            callback(bool(is_checked))
+                        except Exception:
+                            pass
+
+            cb.setOnCheckedChangeListener(_CheckboxCheckedProxy(state))
+
+        _apply_accessibility(cb, props)
+
+
+# ======================================================================
+# SegmentedControl — horizontal toggle row (no UISegmentedControl on AOSP)
+# ======================================================================
+
+
+class SegmentedControlHandler(AndroidViewHandler):
+    """``SegmentedControl`` element — a horizontal row of toggle buttons.
+
+    Android has no ``UISegmentedControl`` equivalent, so the control is
+    built from a horizontal ``LinearLayout`` holding one ``Button`` per
+    segment. The selected segment is filled with the ``tint_color`` (or
+    a default accent); the rest are drawn outlined. Selection state and
+    the change callback live in a per-view dict, and a "suppress" guard
+    keeps programmatic ``selected_index`` updates from re-firing
+    ``on_change``. The control owns its own subviews, so
+    ``add_child`` / ``remove_child`` are intentional no-ops.
+    """
+
+    _DEFAULT_ACCENT = "#007AFF"
+
+    def create(self, props: Dict[str, Any]) -> Any:
+        LinearLayout = jclass("android.widget.LinearLayout")
+        ll = LinearLayout(_ctx())
+        ll.setOrientation(LinearLayout.HORIZONTAL)
+        self._state: Dict[int, Dict[str, Any]] = getattr(self, "_state", {})
+        self._state[id(ll)] = {
+            "segments": [],
+            "selected_index": 0,
+            "on_change": None,
+            "tint_color": None,
+            "enabled": True,
+            "buttons": [],
+            "suppress": False,
+        }
+        self._apply(ll, props, initial=True)
+        return ll
+
+    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
+        self._apply(native_view, changed, initial=False)
+
+    def add_child(self, parent: Any, child: Any) -> None:
+        # SegmentedControl renders its own segment buttons.
+        return
+
+    def remove_child(self, parent: Any, child: Any) -> None:
+        return
+
+    def _default_state(self) -> Dict[str, Any]:
+        return {
+            "segments": [],
+            "selected_index": 0,
+            "on_change": None,
+            "tint_color": None,
+            "enabled": True,
+            "buttons": [],
+            "suppress": False,
+        }
+
+    def _apply(self, ll: Any, props: Dict[str, Any], initial: bool) -> None:
+        state = self._state.setdefault(id(ll), self._default_state())
+
+        if "on_change" in props:
+            state["on_change"] = props.get("on_change")
+        if "tint_color" in props:
+            state["tint_color"] = props.get("tint_color")
+        if "enabled" in props:
+            # ``enabled`` is only present when ``False``; a removal (``None``)
+            # re-enables the control.
+            state["enabled"] = props["enabled"] is not False
+
+        segments_changed = False
+        if "segments" in props or initial:
+            raw = props.get("segments")
+            new_segments = [str(s) for s in raw] if raw else []
+            if initial or new_segments != state["segments"]:
+                state["segments"] = new_segments
+                segments_changed = True
+
+        if "selected_index" in props and props["selected_index"] is not None:
+            state["selected_index"] = int(props["selected_index"])
+
+        if segments_changed:
+            self._rebuild(ll, state)
+        else:
+            self._restyle(state)
+
+        _apply_accessibility(ll, props)
+
+    def _rebuild(self, ll: Any, state: Dict[str, Any]) -> None:
+        try:
+            ll.removeAllViews()
+        except Exception:
+            pass
+        state["buttons"] = []
+        LL_LP = jclass("android.widget.LinearLayout$LayoutParams")
+        restyle = self._restyle
+        for index, label in enumerate(state["segments"]):
+            btn = jclass("android.widget.Button")(_ctx())
+            btn.setText(str(label))
+            try:
+                btn.setAllCaps(False)
+            except Exception:
+                pass
+            # Equal-width segments: zero base width + weight 1, full height.
+            btn.setLayoutParams(LL_LP(0, LL_LP.MATCH_PARENT, 1.0))
+            btn.setEnabled(bool(state["enabled"]))
+
+            class _SegmentClickProxy(dynamic_proxy(jclass("android.view.View").OnClickListener)):
+                def __init__(self, owner_state: Dict[str, Any], seg_index: int, container: Any) -> None:
+                    super().__init__()
+                    self._owner_state = owner_state
+                    self._seg_index = seg_index
+                    self._container = container
+
+                def onClick(self, view: Any) -> None:
+                    if self._owner_state.get("suppress") or not self._owner_state.get("enabled", True):
+                        return
+                    self._owner_state["selected_index"] = self._seg_index
+                    restyle(self._owner_state)
+                    cb = self._owner_state.get("on_change")
+                    if cb is not None:
+                        try:
+                            cb(self._seg_index)
+                        except Exception:
+                            pass
+
+            btn.setOnClickListener(_SegmentClickProxy(state, index, ll))
+            ll.addView(btn)
+            state["buttons"].append(btn)
+        self._restyle(state)
+
+    def _restyle(self, state: Dict[str, Any]) -> None:
+        accent = state.get("tint_color") or self._DEFAULT_ACCENT
+        selected = state.get("selected_index", 0)
+        enabled = bool(state.get("enabled", True))
+        for i, btn in enumerate(state.get("buttons", [])):
+            self._style_segment(btn, i == selected, accent, enabled)
+
+    def _style_segment(self, btn: Any, selected: bool, accent: Any, enabled: bool) -> None:
+        try:
+            GradientDrawable = jclass("android.graphics.drawable.GradientDrawable")
+            drawable = GradientDrawable()
+            drawable.setCornerRadius(float(_dp(6)))
+            accent_int = parse_color_int(accent)
+            drawable.setStroke(_dp(1), accent_int)
+            if selected:
+                drawable.setColor(accent_int)
+                btn.setTextColor(parse_color_int("#FFFFFF"))
+            else:
+                drawable.setColor(parse_color_int("#00FFFFFF"))
+                btn.setTextColor(accent_int)
+            btn.setBackground(drawable)
+            btn.setEnabled(enabled)
+        except Exception:
+            pass
+
+    def measure_intrinsic(
+        self,
+        native_view: Any,
+        max_width: float,
+        max_height: float,
+    ) -> Tuple[float, float]:
+        # Weighted children measure to ~0 under an unspecified spec, so
+        # size to the sum of the segments' natural widths instead.
+        try:
+            density = _density()
+            View = jclass("android.view.View")
+            MeasureSpec = View.MeasureSpec
+            spec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+            count = native_view.getChildCount()
+            if count == 0:
+                return (0.0, 0.0)
+            total_w = 0
+            max_h = 0
+            for i in range(count):
+                child = native_view.getChildAt(i)
+                child.measure(spec, spec)
+                total_w += child.getMeasuredWidth()
+                max_h = max(max_h, child.getMeasuredHeight())
+            return (total_w / density, max_h / density)
+        except Exception:
+            return (0.0, 0.0)
+
+
+# ======================================================================
+# DatePicker — trigger button opening native date/time dialogs
+# ======================================================================
+
+
+class DatePickerHandler(AndroidViewHandler):
+    """``DatePicker`` element — a trigger ``Button`` opening native dialogs.
+
+    The button text reflects the current ISO ``value`` (or a
+    placeholder). Tapping it opens a ``DatePickerDialog`` (``mode``
+    ``"date"``), a ``TimePickerDialog`` (``"time"``), or a chained
+    date→time flow (``"datetime"``). Values are parsed / formatted with
+    ``java.util.Calendar`` + ``java.text.SimpleDateFormat`` using
+    per-mode ISO patterns, and the confirmed value is reported through
+    ``on_change``.
+    """
+
+    _PATTERNS = {"date": "yyyy-MM-dd", "time": "HH:mm", "datetime": "yyyy-MM-dd'T'HH:mm"}
+    _PLACEHOLDERS = {"date": "Select date", "time": "Select time", "datetime": "Select date & time"}
+
+    def create(self, props: Dict[str, Any]) -> Any:
+        btn = jclass("android.widget.Button")(_ctx())
+        try:
+            btn.setAllCaps(False)
+        except Exception:
+            pass
+        self._state: Dict[int, Dict[str, Any]] = getattr(self, "_state", {})
+        self._state[id(btn)] = {
+            "value": None,
+            "mode": "date",
+            "on_change": None,
+            "minimum": None,
+            "maximum": None,
+            "enabled": True,
+        }
+        self._apply(btn, props, initial=True)
+        return btn
+
+    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
+        self._apply(native_view, changed, initial=False)
+
+    def _apply(self, btn: Any, props: Dict[str, Any], initial: bool) -> None:
+        state = self._state.setdefault(
+            id(btn),
+            {"value": None, "mode": "date", "on_change": None, "minimum": None, "maximum": None, "enabled": True},
+        )
+
+        if "mode" in props and props["mode"]:
+            state["mode"] = str(props["mode"])
+        if "on_change" in props:
+            state["on_change"] = props.get("on_change")
+        if "minimum" in props:
+            state["minimum"] = props.get("minimum")
+        if "maximum" in props:
+            state["maximum"] = props.get("maximum")
+        if "enabled" in props:
+            state["enabled"] = props["enabled"] is not False
+            btn.setEnabled(bool(state["enabled"]))
+        if "value" in props or initial:
+            state["value"] = props.get("value") if "value" in props else state.get("value")
+
+        self._refresh_label(btn, state)
+        if initial:
+            self._attach_trigger(btn, state)
+
+        _apply_accessibility(btn, props)
+
+    def _refresh_label(self, btn: Any, state: Dict[str, Any]) -> None:
+        value = state.get("value")
+        if value:
+            btn.setText(str(value))
+        else:
+            btn.setText(self._PLACEHOLDERS.get(state.get("mode", "date"), "Select"))
+
+    def _attach_trigger(self, btn: Any, state: Dict[str, Any]) -> None:
+        open_dialog = self._open_dialog
+
+        class _DateTriggerProxy(dynamic_proxy(jclass("android.view.View").OnClickListener)):
+            def __init__(self, owner_state: Dict[str, Any], trigger: Any) -> None:
+                super().__init__()
+                self._owner_state = owner_state
+                self._trigger = trigger
+
+            def onClick(self, view: Any) -> None:
+                if not self._owner_state.get("enabled", True):
+                    return
+                open_dialog(self._trigger, self._owner_state)
+
+        btn.setOnClickListener(_DateTriggerProxy(state, btn))
+
+    def _open_dialog(self, btn: Any, state: Dict[str, Any]) -> None:
+        mode = state.get("mode", "date")
+        cal = self._parse_to_calendar(state.get("value"), mode)
+        if mode == "time":
+            self._open_time(btn, state, cal)
+        elif mode == "datetime":
+            self._open_date(btn, state, cal, then_time=True)
+        else:
+            self._open_date(btn, state, cal, then_time=False)
+
+    def _open_date(self, btn: Any, state: Dict[str, Any], cal: Any, then_time: bool) -> None:
+        Calendar = jclass("java.util.Calendar")
+        DatePickerDialog = jclass("android.app.DatePickerDialog")
+        commit = self._commit
+        open_time = self._open_time
+
+        class _DateSetProxy(dynamic_proxy(jclass("android.app.DatePickerDialog").OnDateSetListener)):
+            def __init__(self, owner_state: Dict[str, Any], trigger: Any, base_cal: Any) -> None:
+                super().__init__()
+                self._owner_state = owner_state
+                self._trigger = trigger
+                self._cal = base_cal
+
+            def onDateSet(self, view: Any, year: int, month: int, day: int) -> None:
+                self._cal.set(Calendar.YEAR, int(year))
+                self._cal.set(Calendar.MONTH, int(month))
+                self._cal.set(Calendar.DAY_OF_MONTH, int(day))
+                if then_time:
+                    open_time(self._trigger, self._owner_state, self._cal)
+                else:
+                    commit(self._trigger, self._owner_state, self._cal)
+
+        dialog = DatePickerDialog(
+            _ctx(),
+            _DateSetProxy(state, btn, cal),
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH),
+        )
+        self._apply_min_max(dialog, state)
+        dialog.show()
+
+    def _open_time(self, btn: Any, state: Dict[str, Any], cal: Any) -> None:
+        Calendar = jclass("java.util.Calendar")
+        TimePickerDialog = jclass("android.app.TimePickerDialog")
+        commit = self._commit
+
+        class _TimeSetProxy(dynamic_proxy(jclass("android.app.TimePickerDialog").OnTimeSetListener)):
+            def __init__(self, owner_state: Dict[str, Any], trigger: Any, base_cal: Any) -> None:
+                super().__init__()
+                self._owner_state = owner_state
+                self._trigger = trigger
+                self._cal = base_cal
+
+            def onTimeSet(self, view: Any, hour: int, minute: int) -> None:
+                self._cal.set(Calendar.HOUR_OF_DAY, int(hour))
+                self._cal.set(Calendar.MINUTE, int(minute))
+                commit(self._trigger, self._owner_state, self._cal)
+
+        dialog = TimePickerDialog(
+            _ctx(),
+            _TimeSetProxy(state, btn, cal),
+            cal.get(Calendar.HOUR_OF_DAY),
+            cal.get(Calendar.MINUTE),
+            True,
+        )
+        dialog.show()
+
+    def _apply_min_max(self, dialog: Any, state: Dict[str, Any]) -> None:
+        try:
+            mode = state.get("mode", "date")
+            picker = dialog.getDatePicker()
+            minimum = state.get("minimum")
+            maximum = state.get("maximum")
+            if minimum:
+                picker.setMinDate(self._parse_to_calendar(minimum, mode).getTimeInMillis())
+            if maximum:
+                picker.setMaxDate(self._parse_to_calendar(maximum, mode).getTimeInMillis())
+        except Exception:
+            pass
+
+    def _parse_to_calendar(self, value: Any, mode: str) -> Any:
+        Calendar = jclass("java.util.Calendar")
+        cal = Calendar.getInstance()
+        if value:
+            try:
+                SimpleDateFormat = jclass("java.text.SimpleDateFormat")
+                Locale = jclass("java.util.Locale")
+                fmt = SimpleDateFormat(self._PATTERNS.get(mode, self._PATTERNS["date"]), Locale.US)
+                cal.setTime(fmt.parse(str(value)))
+            except Exception:
+                pass
+        return cal
+
+    def _format_calendar(self, cal: Any, mode: str) -> str:
+        SimpleDateFormat = jclass("java.text.SimpleDateFormat")
+        Locale = jclass("java.util.Locale")
+        fmt = SimpleDateFormat(self._PATTERNS.get(mode, self._PATTERNS["date"]), Locale.US)
+        return str(fmt.format(cal.getTime()))
+
+    def _commit(self, btn: Any, state: Dict[str, Any], cal: Any) -> None:
+        mode = state.get("mode", "date")
+        try:
+            iso = self._format_calendar(cal, mode)
+        except Exception:
+            return
+        state["value"] = iso
+        try:
+            btn.setText(iso)
+        except Exception:
+            pass
+        cb = state.get("on_change")
+        if cb is not None:
+            try:
+                cb(iso)
+            except Exception:
+                pass
+
+
+# ======================================================================
 # Registration
 # ======================================================================
 
@@ -1819,6 +2755,9 @@ def register_handlers(registry: Any) -> None:
     registry.register("KeyboardAvoidingView", KeyboardAvoidingViewHandler())
     registry.register("VirtualList", VirtualListHandler())
     registry.register("Picker", PickerHandler())
+    registry.register("Checkbox", CheckboxHandler())
+    registry.register("SegmentedControl", SegmentedControlHandler())
+    registry.register("DatePicker", DatePickerHandler())
 
 
 __all__ = [
@@ -1843,5 +2782,8 @@ __all__ = [
     "KeyboardAvoidingViewHandler",
     "VirtualListHandler",
     "PickerHandler",
+    "CheckboxHandler",
+    "SegmentedControlHandler",
+    "DatePickerHandler",
     "register_handlers",
 ]

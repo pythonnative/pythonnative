@@ -1,0 +1,22 @@
+# Tests SegmentedControl updates its selection when buttons set it programmatically.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/segmented_control.py
+# Source under test: src/pythonnative/components.py :: SegmentedControl
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: SegmentedControl
+- assertVisible: "Selected: One"
+- tapOn: "Pick Two"
+- assertVisible: "Selected: Two"
+- tapOn: "Pick Three"
+- assertVisible: "Selected: Three"
+- tapOn: "Pick One"
+- assertVisible: "Selected: One"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

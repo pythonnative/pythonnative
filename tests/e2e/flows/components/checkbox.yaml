@@ -1,0 +1,20 @@
+# Tests Checkbox flips between ON and OFF in response to button taps.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/checkbox.py
+# Source under test: src/pythonnative/components.py :: Checkbox
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: Checkbox
+- assertVisible: "Checked: OFF"
+- tapOn: "Check"
+- assertVisible: "Checked: ON"
+- tapOn: "Uncheck"
+- assertVisible: "Checked: OFF"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

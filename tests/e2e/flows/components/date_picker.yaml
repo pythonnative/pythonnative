@@ -1,0 +1,18 @@
+# Tests DatePicker updates its bound value when a button sets it programmatically.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/date_picker.py
+# Source under test: src/pythonnative/components.py :: DatePicker
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: DatePicker
+- assertVisible: "Date: 2026-01-01"
+- tapOn: "Set 2026-12-25"
+- assertVisible: "Date: 2026-12-25"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

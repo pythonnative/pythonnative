@@ -79,6 +79,9 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # --------------------------------------------------------------
     "ActivityIndicatorProps",
     "ButtonProps",
+    "CheckboxProps",
+    "DatePickerProps",
+    "ImageBackgroundProps",
     "ImageProps",
     "KeyboardAvoidingViewProps",
     "ModalProps",
@@ -87,12 +90,14 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "ProgressBarProps",
     "SafeAreaViewProps",
     "ScrollViewProps",
+    "SegmentedControlProps",
     "SliderProps",
     "SpacerProps",
     "StatusBarProps",
     "SwitchProps",
     "TextInputProps",
     "TextProps",
+    "TouchableOpacityProps",
     "ViewProps",
     "WebViewProps",
     # --------------------------------------------------------------
@@ -118,19 +123,33 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # --------------------------------------------------------------
     "use_safe_area_insets",  # no reliable insets in emulator viewport
     "use_keyboard_height",  # requires a real keyboard transition
+    "use_app_state",  # requires backgrounding the app (device lifecycle)
+    "use_net_info",  # requires toggling real connectivity
     # --------------------------------------------------------------
     # Networking + native-module surfaces. These need network or
-    # platform hardware (camera, location, notifications) that CI
-    # emulators don't reliably provide; tested via unit tests in
-    # tests/test_net.py and the native_modules dummy paths.
+    # platform hardware (camera, location, notifications, clipboard,
+    # haptics, biometrics, …) that CI emulators don't reliably
+    # provide; tested via unit tests in tests/test_net.py and
+    # tests/test_native_modules.py against their desktop fallbacks.
     # --------------------------------------------------------------
     "fetch",
     "HTTPError",
     "Response",
+    "AppState",
+    "Battery",
+    "Biometrics",
     "Camera",
+    "Clipboard",
     "FileSystem",
+    "Haptics",
+    "Linking",
     "Location",
+    "NetInfo",
     "Notifications",
+    "Permissions",
+    "SecureStore",
+    "Share",
+    "Vibration",
     # --------------------------------------------------------------
     # SDK re-exports — module-level names mirroring submodule content.
     # --------------------------------------------------------------

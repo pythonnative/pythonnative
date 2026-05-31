@@ -35,6 +35,11 @@ env:
 - runFlow: flows/components/flat_list.yaml
 - runFlow: flows/components/section_list.yaml
 - runFlow: flows/components/web_view.yaml
+- runFlow: flows/components/touchable_opacity.yaml
+- runFlow: flows/components/image_background.yaml
+- runFlow: flows/components/checkbox.yaml
+- runFlow: flows/components/segmented_control.yaml
+- runFlow: flows/components/date_picker.yaml
 - runFlow: flows/hooks/use_state.yaml
 - runFlow: flows/hooks/use_effect.yaml
 - runFlow: flows/hooks/use_reducer.yaml

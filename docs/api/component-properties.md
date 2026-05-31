@@ -142,17 +142,50 @@ Container that respects safe area insets (notch, status bar).
 ## ScrollView
 
 ```python
-pn.ScrollView(child, style={"background_color": "#FFF"})
+pn.ScrollView(
+    child,
+    scroll_axis="vertical",        # or "horizontal"
+    on_scroll=lambda x, y: ...,    # content offset as the user scrolls
+    shows_scroll_indicator=True,
+    paging_enabled=False,          # snap to viewport-sized pages (carousel)
+    bounces=True,                  # iOS rubber-band overscroll
+    keyboard_dismiss_mode=None,    # "none" | "on_drag" | "interactive"
+    content_container_style={"padding": 16},
+    refresh_control=pn.RefreshControl(refreshing=loading, on_refresh=reload),
+    style={"background_color": "#FFF"},
+)
 ```
+
+- `scroll_axis` — `"vertical"` (default) or `"horizontal"`
+- `on_scroll` — callback `(x, y) -> None` with the content offset
+- `shows_scroll_indicator` — show/hide the scroll bar
+- `paging_enabled` — snap scrolling to multiples of the viewport size
+- `bounces` — enable the iOS overscroll bounce
+- `content_container_style` — style for the inner content wrapper (padding,
+  alignment, spacing), distinct from `style` (the scroll frame)
+- `keyboard_dismiss_mode` — `"none"`, `"on_drag"`, or `"interactive"`
+- `refresh_control` — pull-to-refresh spec (see [`RefreshControl`](#refreshcontrol))
 
 ## TextInput
 
 ```python
 pn.TextInput(value="", placeholder="Enter text", on_change=handler, secure=False,
+             editable=True, clear_button=True, on_focus=f, on_blur=g,
+             selection_color="#007AFF", text_content_type="password",
              style={"font_size": 16, "color": "#000", "background_color": "#FFF"})
 ```
 
 - `on_change` — callback `(str) -> None` receiving new text
+- `on_submit` — callback `(str) -> None` on Return / Done
+- `editable` — when `False`, the field is read-only
+- `clear_button` — show an inline clear ("x") button while editing
+- `on_focus` / `on_blur` — callbacks `() -> None` on focus changes
+- `selection_color` — cursor / selection highlight color
+- `text_content_type` — autofill hint (`"username"`, `"password"`,
+  `"one_time_code"`, …)
+- Other kwargs: `secure`, `multiline`, `keyboard_type`, `auto_capitalize`,
+  `auto_correct`, `auto_focus`, `return_key_type`, `max_length`,
+  `placeholder_color`
 
 ## Image
 
@@ -182,22 +215,45 @@ pn.Slider(value=0.5, min_value=0.0, max_value=1.0, on_change=handler)
 ## ProgressBar
 
 ```python
-pn.ProgressBar(value=0.5, style={"background_color": "#EEE"})
+pn.ProgressBar(value=0.5, color="#007AFF", track_color="#EEE", indeterminate=False)
 ```
 
 - `value` — 0.0 to 1.0
+- `color` — color of the filled portion
+- `track_color` — color of the unfilled track
+- `indeterminate` — animate continuously and ignore `value`
 
 ## ActivityIndicator
 
 ```python
-pn.ActivityIndicator(animating=True)
+pn.ActivityIndicator(animating=True, color="#007AFF", size="large")
 ```
+
+- `animating` — hide the spinner when `False`
+- `color` — spinner color
+- `size` — `"small"` (default) or `"large"`
 
 ## WebView
 
 ```python
-pn.WebView(url="https://example.com")
+pn.WebView(
+    url="https://example.com",
+    html=None,                          # render inline HTML instead of a URL
+    on_load=lambda url: ...,            # page finished loading
+    on_message=lambda msg: ...,         # window.pythonnative.postMessage(...)
+    on_navigation_state_change=lambda url: ...,
+    inject_javascript="document.body.style.background='#fff'",
+    scroll_enabled=True,
+)
 ```
+
+- `url` — page to load (ignored when `html` is given)
+- `html` — inline HTML markup
+- `on_load` — callback `(url) -> None` when a page finishes loading
+- `on_message` — callback `(str) -> None` for messages posted from page JS
+- `on_navigation_state_change` — callback `(url) -> None` on navigation
+- `inject_javascript` — JS evaluated after each page load
+- `scroll_enabled` — allow scrolling within the web content
 
 ## Spacer
 
@@ -219,11 +275,122 @@ Wraps any child element with tap/long-press handling.
 ## Modal
 
 ```python
-pn.Modal(*children, visible=show_modal, on_dismiss=handler, title="Confirm",
+pn.Modal(*children, visible=show_modal, on_dismiss=handler, on_show=shown,
+         title="Confirm", animation_type="slide", transparent=False,
+         presentation_style="page_sheet", dismiss_on_backdrop=True,
          style={"background_color": "#FFF"})
 ```
 
 Overlay dialog shown when `visible=True`.
+
+- `on_dismiss` — callback `() -> None` when dismissed via gesture
+- `on_show` — callback `() -> None` once the modal finishes presenting
+- `animation_type` — `"slide"` (default), `"fade"`, `"none"`
+- `transparent` — dim the underlying view instead of fully covering it
+- `presentation_style` — `"page_sheet"` (default), `"form_sheet"`,
+  `"full_screen"`, `"overlay"`
+- `dismiss_on_backdrop` — tapping the dimmed backdrop dismisses the modal
+
+## TouchableOpacity
+
+```python
+pn.TouchableOpacity(child, on_press=handler, on_long_press=handler,
+                    active_opacity=0.2, disabled=False)
+```
+
+Tappable wrapper that dips to `active_opacity` while pressed (a thin alias
+over [`Pressable`](#pressable)). `disabled=True` ignores presses and dims the
+content.
+
+## ImageBackground
+
+```python
+pn.ImageBackground(child, source="bg.png", scale_type="cover",
+                   style={"width": 320, "height": 180, "padding": 16})
+```
+
+Renders `child` content layered over a background image. Composed from an
+absolutely-filled `Image` plus a content `View`.
+
+- `source` — image resource name or URL
+- `scale_type` — `"cover"` (default), `"contain"`, `"stretch"`, `"center"`
+
+## Checkbox
+
+```python
+pn.Checkbox(value=accepted, on_change=set_accepted, label="Accept terms",
+            disabled=False, color="#007AFF")
+```
+
+- `value` — checked state (`bool`)
+- `on_change` — callback `(bool) -> None`
+- `label` — optional inline label (also tappable)
+- `disabled` — grey out and ignore input
+- `color` — tint for the checked box
+
+| Platform | Native view              |
+|----------|--------------------------|
+| Android  | `android.widget.CheckBox` |
+| iOS      | checkmark `UIButton`     |
+
+## SegmentedControl
+
+```python
+pn.SegmentedControl(segments=["Day", "Week", "Month"], selected_index=0,
+                    on_change=handler, tint_color="#007AFF")
+```
+
+- `segments` — list of segment label strings
+- `selected_index` — index of the selected segment
+- `on_change` — callback `(int) -> None` with the new index
+- `tint_color` — accent color for the selected segment
+
+| Platform | Native view              |
+|----------|--------------------------|
+| Android  | toggle row (`LinearLayout` of buttons) |
+| iOS      | `UISegmentedControl`     |
+
+## DatePicker
+
+```python
+pn.DatePicker(value="2026-05-31", mode="date", on_change=handler,
+              minimum="2026-01-01", maximum="2026-12-31")
+```
+
+ISO-8601 string values: `"YYYY-MM-DD"` (date), `"HH:MM"` (time),
+`"YYYY-MM-DDTHH:MM"` (datetime).
+
+- `value` — current selection (ISO-8601 string)
+- `mode` — `"date"` (default), `"time"`, `"datetime"`
+- `on_change` — callback `(str) -> None` with the new ISO-8601 string
+- `minimum` / `maximum` — selectable bounds
+
+| Platform | Native view              |
+|----------|--------------------------|
+| Android  | `DatePickerDialog` / `TimePickerDialog` |
+| iOS      | `UIDatePicker`           |
+
+## Picker
+
+```python
+pn.Picker(value=selected, items=[{"value": "a", "label": "Apple"}],
+          on_change=handler, placeholder="Select…")
+```
+
+Native dropdown / select. `items` is a list of `{"value": Any, "label": str}`.
+
+## RefreshControl
+
+```python
+pn.ScrollView(child, refresh_control=pn.RefreshControl(
+    refreshing=loading, on_refresh=reload, tint_color="#007AFF"))
+```
+
+Pull-to-refresh spec (a plain dict) passed to a `ScrollView` or `FlatList`.
+
+- `refreshing` — drive the spinner from state
+- `on_refresh` — callback `() -> None` when pulled past threshold
+- `tint_color` — spinner color
 
 ## TabBar
 
@@ -253,10 +420,26 @@ Native tab bar — typically created automatically by `Tab.Navigator`.
 
 ```python
 pn.FlatList(data=items, render_item=render_fn, key_extractor=key_fn,
-            separator_height=1, style={"background_color": "#FFF"})
+            item_height=44, separator_height=1,
+            horizontal=False, num_columns=1,
+            list_header=pn.Text("Header"), list_footer=pn.Text("Footer"),
+            list_empty=pn.Text("Nothing here"),
+            on_end_reached=load_more, on_end_reached_threshold=0.5,
+            refresh_control=pn.RefreshControl(refreshing=loading, on_refresh=reload),
+            content_container_style={"padding": 8},
+            style={"background_color": "#FFF"})
 ```
 
 - `data` — list of items
 - `render_item` — `(item, index) -> Element` function
 - `key_extractor` — `(item, index) -> str` for stable keys
+- `item_height` — fixed row height; enables native virtualization
 - `separator_height` — spacing between items
+- `horizontal` — lay rows out left-to-right (eager backend)
+- `num_columns` — render as a grid of N columns (eager backend)
+- `list_header` / `list_footer` — elements rendered once above / below rows
+- `list_empty` — element rendered when `data` is empty
+- `on_end_reached` — callback `() -> None` near the end (virtualized)
+- `on_end_reached_threshold` — fraction-of-viewport trigger distance
+- `content_container_style` — style for the inner content wrapper
+- `refresh_control` — pull-to-refresh spec (see [`RefreshControl`](#refreshcontrol))

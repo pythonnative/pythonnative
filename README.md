@@ -31,6 +31,8 @@ PythonNative is a cross-platform toolkit for building native Android and iOS app
 ## Features
 
 - **Declarative UI:** Describe *what* your UI should look like with element functions (`Text`, `Button`, `Column`, `Row`, etc.). PythonNative creates and updates native views automatically.
+- **Rich component library:** 25+ built-in components backed by real native widgets — `TextInput`, `Image` / `ImageBackground`, `ScrollView`, `FlatList` / `SectionList`, `Modal`, `Pressable` / `TouchableOpacity`, `Switch` / `Checkbox`, `Slider`, `SegmentedControl`, `Picker`, `DatePicker`, `ProgressBar` / `ActivityIndicator`, `WebView`, and more.
+- **Device APIs:** Cross-platform modules for `Camera`, `Location`, `FileSystem`, `Notifications`, `Clipboard`, `Share`, `Linking`, `Permissions`, `AppState`, `NetInfo`, `SecureStore`, `Battery`, `Haptics` / `Vibration`, and `Biometrics` — plus reactive `use_app_state` and `use_net_info` hooks.
 - **Hooks and function components:** Manage state with `use_state`, side effects with `use_effect`, and navigation with `use_navigation`, all through one consistent pattern.
 - **Typed `style` prop:** Pass all visual and layout properties through a single `style` dict, fully described by the `pn.Style` `TypedDict` and the ergonomic `pn.style(...)` helper for IDE autocomplete and static checking. Compose reusable styles with `StyleSheet`.
 - **Cross-platform flexbox engine:** A pure-Python, Yoga-style layout engine computes frames once and applies them to native views, so `flex`, `padding`, `aspect_ratio`, and `position: "absolute"` produce the same geometry on Android and iOS.

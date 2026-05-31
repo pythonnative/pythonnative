@@ -151,6 +151,12 @@ class TextInputProps(Props):
     return_key_type: Optional[ReturnKeyType] = None
     max_length: Optional[int] = None
     placeholder_color: Optional[Color] = None
+    editable: bool = True
+    clear_button: bool = False
+    on_focus: Optional[Callable[[], None]] = None
+    on_blur: Optional[Callable[[], None]] = None
+    selection_color: Optional[Color] = None
+    text_content_type: Optional[str] = None
     accessibility_label: Optional[str] = None
     accessibility_hint: Optional[str] = None
     accessible: Optional[bool] = None
@@ -181,6 +187,9 @@ class ProgressBarProps(Props):
     """Props for [`ProgressBar`][pythonnative.ProgressBar]."""
 
     value: float = 0.0
+    color: Optional[Color] = None
+    track_color: Optional[Color] = None
+    indeterminate: bool = False
 
 
 @dataclass(frozen=True)
@@ -188,6 +197,8 @@ class ActivityIndicatorProps(Props):
     """Props for [`ActivityIndicator`][pythonnative.ActivityIndicator]."""
 
     animating: bool = True
+    color: Optional[Color] = None
+    size: Literal["small", "large"] = "small"
 
 
 @dataclass(frozen=True)
@@ -195,6 +206,12 @@ class WebViewProps(Props):
     """Props for [`WebView`][pythonnative.WebView]."""
 
     url: Optional[str] = None
+    html: Optional[str] = None
+    on_load: Optional[Callable[[str], None]] = None
+    on_message: Optional[Callable[[str], None]] = None
+    on_navigation_state_change: Optional[Callable[[str], None]] = None
+    inject_javascript: Optional[str] = None
+    scroll_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -231,6 +248,12 @@ class ScrollViewProps(Props):
 
     refresh_control: Optional[Dict[str, Any]] = None
     scroll_axis: Optional[Literal["vertical", "horizontal"]] = None
+    on_scroll: Optional[Callable[[float, float], None]] = None
+    shows_scroll_indicator: bool = True
+    paging_enabled: bool = False
+    bounces: bool = True
+    content_container_style: StyleProp = None
+    keyboard_dismiss_mode: Optional[Literal["none", "on_drag", "interactive"]] = None
 
 
 @dataclass(frozen=True)
@@ -244,9 +267,12 @@ class ModalProps(Props):
 
     visible: bool = False
     on_dismiss: Optional[Callable[[], None]] = None
+    on_show: Optional[Callable[[], None]] = None
     title: Optional[str] = None
     animation_type: Literal["slide", "fade", "none"] = "slide"
     transparent: bool = False
+    presentation_style: Literal["page_sheet", "form_sheet", "full_screen", "overlay"] = "page_sheet"
+    dismiss_on_backdrop: bool = True
 
 
 @dataclass(frozen=True)
@@ -293,6 +319,77 @@ class PickerProps(Props):
     placeholder: str = "Select…"
     accessibility_label: Optional[str] = None
     accessibility_hint: Optional[str] = None
+    accessible: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class TouchableOpacityProps(Props):
+    """Props for [`TouchableOpacity`][pythonnative.TouchableOpacity]."""
+
+    on_press: Optional[Callable[[], None]] = None
+    on_long_press: Optional[Callable[[], None]] = None
+    active_opacity: float = 0.2
+    disabled: bool = False
+    accessibility_label: Optional[str] = None
+    accessibility_hint: Optional[str] = None
+    accessibility_role: Optional[str] = None
+    accessible: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class ImageBackgroundProps(Props):
+    """Props for [`ImageBackground`][pythonnative.ImageBackground]."""
+
+    source: Optional[str] = None
+    scale_type: Optional[ScaleType] = None
+    accessibility_label: Optional[str] = None
+    accessible: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class CheckboxProps(Props):
+    """Props for [`Checkbox`][pythonnative.Checkbox]."""
+
+    value: bool = False
+    on_change: Optional[Callable[[bool], None]] = None
+    label: Optional[str] = None
+    disabled: bool = False
+    color: Optional[Color] = None
+    accessibility_label: Optional[str] = None
+    accessibility_hint: Optional[str] = None
+    accessible: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class SegmentedControlProps(Props):
+    """Props for [`SegmentedControl`][pythonnative.SegmentedControl]."""
+
+    segments: List[str] = field(default_factory=list)
+    selected_index: int = 0
+    on_change: Optional[Callable[[int], None]] = None
+    enabled: bool = True
+    tint_color: Optional[Color] = None
+    accessibility_label: Optional[str] = None
+    accessible: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class DatePickerProps(Props):
+    """Props for [`DatePicker`][pythonnative.DatePicker].
+
+    ``value`` and the value passed to ``on_change`` are ISO-8601
+    strings (``"2026-05-31"`` for ``mode="date"``, ``"14:30"`` for
+    ``mode="time"``, ``"2026-05-31T14:30"`` for ``mode="datetime"``),
+    so the schema stays JSON-serializable and platform-agnostic.
+    """
+
+    value: Optional[str] = None
+    mode: Literal["date", "time", "datetime"] = "date"
+    on_change: Optional[Callable[[str], None]] = None
+    minimum: Optional[str] = None
+    maximum: Optional[str] = None
+    enabled: bool = True
+    accessibility_label: Optional[str] = None
     accessible: Optional[bool] = None
 
 
@@ -416,6 +513,12 @@ def TextInput(
     return_key_type: Optional[ReturnKeyType] = None,
     max_length: Optional[int] = None,
     placeholder_color: Optional[Color] = None,
+    editable: bool = True,
+    clear_button: bool = False,
+    on_focus: Optional[Callable[[], None]] = None,
+    on_blur: Optional[Callable[[], None]] = None,
+    selection_color: Optional[Color] = None,
+    text_content_type: Optional[str] = None,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
@@ -446,6 +549,16 @@ def TextInput(
             ``"next"``, ``"send"``, ``"search"``.
         max_length: Maximum number of characters allowed.
         placeholder_color: Color used for the placeholder string.
+        editable: When ``False``, the field is read-only (still
+            selectable).
+        clear_button: When ``True``, shows a clear ("x") button while
+            editing (iOS ``clearButtonMode``; an inline button on
+            Android).
+        on_focus: Callback invoked when the field gains focus.
+        on_blur: Callback invoked when the field loses focus.
+        selection_color: Cursor / selection highlight color.
+        text_content_type: Semantic content hint for autofill (e.g.
+            ``"username"``, ``"password"``, ``"one_time_code"``).
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
@@ -474,6 +587,12 @@ def TextInput(
         return_key_type=return_key_type,
         max_length=max_length,
         placeholder_color=placeholder_color,
+        editable=False if editable is False else None,
+        clear_button=clear_button or None,
+        on_focus=on_focus,
+        on_blur=on_blur,
+        selection_color=selection_color,
+        text_content_type=text_content_type,
         accessibility_label=accessibility_label,
         accessibility_hint=accessibility_hint,
         accessible=accessible,
@@ -563,17 +682,25 @@ def Switch(
 def ProgressBar(
     *,
     value: float = 0.0,
+    color: Optional[Color] = None,
+    track_color: Optional[Color] = None,
+    indeterminate: bool = False,
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """Show determinate progress as a value between ``0.0`` and ``1.0``.
 
-    For indeterminate progress, use
-    [`ActivityIndicator`][pythonnative.ActivityIndicator] instead.
+    For a spinner instead of a bar, use
+    [`ActivityIndicator`][pythonnative.ActivityIndicator]; for an
+    indeterminate *bar* pass ``indeterminate=True``.
 
     Args:
         value: Fraction complete (clamped to ``[0.0, 1.0]`` by the
             platform handler).
+        color: Color of the filled portion of the bar.
+        track_color: Color of the unfilled track behind the fill.
+        indeterminate: When ``True``, the bar animates continuously and
+            ``value`` is ignored.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
 
@@ -585,12 +712,17 @@ def ProgressBar(
         style=style,
         key=key,
         value=value,
+        color=color,
+        track_color=track_color,
+        indeterminate=indeterminate or None,
     )
 
 
 def ActivityIndicator(
     *,
     animating: bool = True,
+    color: Optional[Color] = None,
+    size: Literal["small", "large"] = "small",
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -598,6 +730,8 @@ def ActivityIndicator(
 
     Args:
         animating: When ``False``, the spinner is hidden.
+        color: Spinner color.
+        size: ``"small"`` (default) or ``"large"``.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
 
@@ -610,19 +744,40 @@ def ActivityIndicator(
         style=style,
         key=key,
         animating=animating,
+        color=color,
+        size=size,
     )
 
 
 def WebView(
     *,
     url: str = "",
+    html: Optional[str] = None,
+    on_load: Optional[Callable[[str], None]] = None,
+    on_message: Optional[Callable[[str], None]] = None,
+    on_navigation_state_change: Optional[Callable[[str], None]] = None,
+    inject_javascript: Optional[str] = None,
+    scroll_enabled: bool = True,
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Embed web content from a URL.
+    """Embed web content from a URL or an inline HTML string.
 
     Args:
-        url: HTTP(S) URL to load.
+        url: HTTP(S) URL to load. Ignored when ``html`` is given.
+        html: Inline HTML markup to render instead of loading a URL.
+        on_load: Callback invoked with the final URL once a page
+            finishes loading.
+        on_message: Callback invoked with the string payload whenever
+            page JavaScript calls
+            ``window.pythonnative.postMessage(...)``.
+        on_navigation_state_change: Callback invoked with the URL each
+            time the top-level document begins navigating.
+        inject_javascript: JavaScript evaluated after each page load
+            (useful for installing the ``postMessage`` bridge or
+            tweaking the DOM).
+        scroll_enabled: When ``False``, disables scrolling inside the
+            web content.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
 
@@ -634,6 +789,12 @@ def WebView(
         style=style,
         key=key,
         url=url or None,
+        html=html,
+        on_load=on_load,
+        on_message=on_message,
+        on_navigation_state_change=on_navigation_state_change,
+        inject_javascript=inject_javascript,
+        scroll_enabled=False if scroll_enabled is False else None,
     )
 
 
@@ -833,6 +994,12 @@ def ScrollView(
     *children: Element,
     refresh_control: Optional[Dict[str, Any]] = None,
     scroll_axis: Optional[Literal["vertical", "horizontal"]] = None,
+    on_scroll: Optional[Callable[[float, float], None]] = None,
+    shows_scroll_indicator: bool = True,
+    paging_enabled: bool = False,
+    bounces: bool = True,
+    content_container_style: StyleProp = None,
+    keyboard_dismiss_mode: Optional[Literal["none", "on_drag", "interactive"]] = None,
     style: StyleProp = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
@@ -852,6 +1019,18 @@ def ScrollView(
             must have ``refreshing`` (bool) and ``on_refresh``
             (callable).
         scroll_axis: ``"vertical"`` (default) or ``"horizontal"``.
+        on_scroll: Callback invoked with ``(x, y)`` content offsets as
+            the user scrolls.
+        shows_scroll_indicator: When ``False``, hides the scroll bar.
+        paging_enabled: When ``True``, the scroll view snaps to
+            multiples of its own size (carousel behavior).
+        bounces: When ``False``, disables the iOS rubber-band overscroll.
+        content_container_style: Style applied to the inner content
+            wrapper (padding, alignment, spacing of the scrollable
+            content), distinct from ``style`` (the scroll view frame).
+        keyboard_dismiss_mode: ``"none"`` (default), ``"on_drag"``, or
+            ``"interactive"`` — controls whether scrolling dismisses
+            the keyboard.
         style: Style dict (or list of dicts).
         ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
@@ -867,6 +1046,12 @@ def ScrollView(
         key=key,
         refresh_control=refresh_control,
         scroll_axis=scroll_axis,
+        on_scroll=on_scroll,
+        shows_scroll_indicator=False if shows_scroll_indicator is False else None,
+        paging_enabled=paging_enabled or None,
+        bounces=False if bounces is False else None,
+        content_container_style=resolve_style(content_container_style) or None,
+        keyboard_dismiss_mode=keyboard_dismiss_mode,
     )
 
 
@@ -897,9 +1082,12 @@ def Modal(
     *children: Element,
     visible: bool = False,
     on_dismiss: Optional[Callable[[], None]] = None,
+    on_show: Optional[Callable[[], None]] = None,
     title: Optional[str] = None,
     animation_type: Literal["slide", "fade", "none"] = "slide",
     transparent: bool = False,
+    presentation_style: Literal["page_sheet", "form_sheet", "full_screen", "overlay"] = "page_sheet",
+    dismiss_on_backdrop: bool = True,
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -919,10 +1107,20 @@ def Modal(
         visible: Controls whether the modal is presented.
         on_dismiss: Callback invoked when the user dismisses the modal
             via system gesture.
+        on_show: Callback invoked once the modal has finished
+            presenting.
         title: Optional title-bar text.
         animation_type: ``"slide"`` (default), ``"fade"``, or ``"none"``.
         transparent: When ``True``, the underlying view is dimmed
             instead of fully covered.
+        presentation_style: iOS presentation style —
+            ``"page_sheet"`` (default), ``"form_sheet"``,
+            ``"full_screen"``, or ``"overlay"`` (custom dimmed
+            overlay). On Android, ``"overlay"`` keeps the dialog
+            non-fullscreen.
+        dismiss_on_backdrop: When ``True`` (default) and
+            ``transparent`` / ``"overlay"``, tapping the dimmed
+            backdrop dismisses the modal.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
 
@@ -937,7 +1135,10 @@ def Modal(
         visible=visible,
         animation_type=animation_type,
         transparent=transparent,
+        presentation_style=presentation_style,
+        dismiss_on_backdrop=False if dismiss_on_backdrop is False else None,
         on_dismiss=on_dismiss,
+        on_show=on_show,
         title=title,
     )
 
@@ -989,6 +1190,264 @@ def Pressable(
         accessibility_label=accessibility_label,
         accessibility_hint=accessibility_hint,
         accessibility_role=accessibility_role,
+        accessible=accessible,
+        _defaults={"accessibility_role": "button"},
+    )
+
+
+# ======================================================================
+# Touchables & controls
+# ======================================================================
+
+
+def TouchableOpacity(
+    *children: Element,
+    on_press: Optional[Callable[[], None]] = None,
+    on_long_press: Optional[Callable[[], None]] = None,
+    active_opacity: float = 0.2,
+    disabled: bool = False,
+    style: StyleProp = None,
+    accessibility_label: Optional[str] = None,
+    accessibility_hint: Optional[str] = None,
+    accessibility_role: Optional[str] = None,
+    accessible: Optional[bool] = None,
+    key: Optional[str] = None,
+) -> Element:
+    """Wrap children so they fade to ``active_opacity`` while pressed.
+
+    A thin ergonomic alias over [`Pressable`][pythonnative.Pressable]
+    that mirrors React Native's ``TouchableOpacity``: the only visual
+    feedback is an opacity dip on touch-down. When ``disabled`` is set,
+    the press callbacks are dropped so the wrapper is inert.
+
+    Args:
+        *children: Elements to make tappable.
+        on_press: Callback invoked on a normal tap.
+        on_long_press: Callback invoked on a sustained press.
+        active_opacity: Opacity (0–1) applied while the finger is down.
+        disabled: When ``True``, ignores presses and renders at reduced
+            opacity.
+        style: Style dict applied to the wrapper.
+        accessibility_label: Spoken description for screen readers.
+        accessibility_hint: Spoken extra detail (iOS only).
+        accessibility_role: Override the default ``"button"`` role.
+        accessible: Override whether the element is exposed to AT.
+        key: Stable identity for keyed reconciliation.
+
+    Returns:
+        An [`Element`][pythonnative.Element] of type ``"Pressable"``.
+    """
+    merged_style: StyleProp
+    if disabled:
+        base = resolve_style(style)
+        base.setdefault("opacity", 0.4)
+        merged_style = base
+    else:
+        merged_style = style
+    return Pressable(
+        *children,
+        on_press=None if disabled else on_press,
+        on_long_press=None if disabled else on_long_press,
+        pressed_opacity=active_opacity,
+        style=merged_style,
+        accessibility_label=accessibility_label,
+        accessibility_hint=accessibility_hint,
+        accessibility_role=accessibility_role,
+        accessible=accessible,
+        key=key,
+    )
+
+
+def ImageBackground(
+    *children: Element,
+    source: str = "",
+    scale_type: Optional[ScaleType] = None,
+    style: StyleProp = None,
+    accessibility_label: Optional[str] = None,
+    accessible: Optional[bool] = None,
+    key: Optional[str] = None,
+) -> Element:
+    """Render ``children`` layered on top of a background image.
+
+    Composed entirely from existing primitives: an absolutely-filled
+    [`Image`][pythonnative.Image] sits behind a content
+    [`View`][pythonnative.View] holding ``children``. The container's
+    ``style`` controls sizing/padding; the image stretches to fill it
+    via ``position: "absolute"`` and zeroed insets.
+
+    Args:
+        *children: Foreground content drawn over the image.
+        source: Image resource name or URL.
+        scale_type: Background fit mode (``"cover"`` is the most common
+            for backgrounds).
+        style: Style dict for the container (size, padding, alignment).
+        accessibility_label: Spoken description of the background image.
+        accessible: Override whether the image is exposed to AT.
+        key: Stable identity for keyed reconciliation.
+
+    Returns:
+        An [`Element`][pythonnative.Element] of type ``"View"`` wrapping
+        the background image and foreground content.
+    """
+    fill = {"position": "absolute", "top": 0, "left": 0, "right": 0, "bottom": 0}
+    background = Image(
+        source,
+        scale_type=scale_type or "cover",
+        style=fill,
+        accessibility_label=accessibility_label,
+        accessible=accessible,
+    )
+    content = View(*children, style={"flex": 1})
+    return View(
+        background,
+        content,
+        style=[{"overflow": "hidden"}, resolve_style(style)],
+        key=key,
+    )
+
+
+def Checkbox(
+    *,
+    value: bool = False,
+    on_change: Optional[Callable[[bool], None]] = None,
+    label: Optional[str] = None,
+    disabled: bool = False,
+    color: Optional[Color] = None,
+    style: StyleProp = None,
+    accessibility_label: Optional[str] = None,
+    accessibility_hint: Optional[str] = None,
+    accessible: Optional[bool] = None,
+    key: Optional[str] = None,
+) -> Element:
+    """A boolean checkbox with an optional inline label.
+
+    Backed by ``android.widget.CheckBox`` on Android and a checkmark
+    ``UIButton`` on iOS. Tapping the control (or its label) toggles the
+    value and fires ``on_change(new_value)``.
+
+    Args:
+        value: Current checked state.
+        on_change: Callback invoked with the new boolean state.
+        label: Optional text shown beside the box (also tappable).
+        disabled: When ``True``, the control is greyed out and inert.
+        color: Tint applied to the checked box.
+        style: Style dict (or list of dicts).
+        accessibility_label: Spoken description for screen readers.
+        accessibility_hint: Spoken extra detail (iOS only).
+        accessible: Override whether the element is exposed to AT.
+        key: Stable identity for keyed reconciliation.
+
+    Returns:
+        An [`Element`][pythonnative.Element] of type ``"Checkbox"``.
+    """
+    return _make_element(
+        "Checkbox",
+        style=style,
+        key=key,
+        value=value,
+        on_change=on_change,
+        label=label,
+        disabled=disabled or None,
+        color=color,
+        accessibility_label=accessibility_label,
+        accessibility_hint=accessibility_hint,
+        accessible=accessible,
+        _defaults={"accessibility_role": "checkbox"},
+    )
+
+
+def SegmentedControl(
+    *,
+    segments: Optional[List[str]] = None,
+    selected_index: int = 0,
+    on_change: Optional[Callable[[int], None]] = None,
+    enabled: bool = True,
+    tint_color: Optional[Color] = None,
+    style: StyleProp = None,
+    accessibility_label: Optional[str] = None,
+    accessible: Optional[bool] = None,
+    key: Optional[str] = None,
+) -> Element:
+    """A horizontal multi-choice control (one selected segment at a time).
+
+    Backed by ``UISegmentedControl`` on iOS and a styled toggle row on
+    Android. Selecting a segment fires ``on_change(index)``.
+
+    Args:
+        segments: Ordered list of segment labels.
+        selected_index: Index of the currently selected segment.
+        on_change: Callback invoked with the newly selected index.
+        enabled: When ``False``, the control is disabled.
+        tint_color: Accent color for the selected segment.
+        style: Style dict (or list of dicts).
+        accessibility_label: Spoken description for screen readers.
+        accessible: Override whether the element is exposed to AT.
+        key: Stable identity for keyed reconciliation.
+
+    Returns:
+        An [`Element`][pythonnative.Element] of type
+        ``"SegmentedControl"``.
+    """
+    return _make_element(
+        "SegmentedControl",
+        style=style,
+        key=key,
+        segments=list(segments) if segments is not None else [],
+        selected_index=selected_index,
+        on_change=on_change,
+        enabled=False if enabled is False else None,
+        tint_color=tint_color,
+        accessibility_label=accessibility_label,
+        accessible=accessible,
+    )
+
+
+def DatePicker(
+    *,
+    value: Optional[str] = None,
+    mode: Literal["date", "time", "datetime"] = "date",
+    on_change: Optional[Callable[[str], None]] = None,
+    minimum: Optional[str] = None,
+    maximum: Optional[str] = None,
+    enabled: bool = True,
+    style: StyleProp = None,
+    accessibility_label: Optional[str] = None,
+    accessible: Optional[bool] = None,
+    key: Optional[str] = None,
+) -> Element:
+    """A native date / time picker.
+
+    Backed by ``UIDatePicker`` on iOS and a trigger button that opens
+    the platform ``DatePickerDialog`` / ``TimePickerDialog`` on
+    Android. ``value`` and the value reported to ``on_change`` are
+    ISO-8601 strings (see [`DatePickerProps`][pythonnative.DatePickerProps]).
+
+    Args:
+        value: Currently selected value as an ISO-8601 string.
+        mode: ``"date"`` (default), ``"time"``, or ``"datetime"``.
+        on_change: Callback invoked with the new ISO-8601 string.
+        minimum: Earliest selectable value (ISO-8601), if any.
+        maximum: Latest selectable value (ISO-8601), if any.
+        enabled: When ``False``, the picker is disabled.
+        style: Style dict (or list of dicts).
+        accessibility_label: Spoken description for screen readers.
+        accessible: Override whether the element is exposed to AT.
+        key: Stable identity for keyed reconciliation.
+
+    Returns:
+        An [`Element`][pythonnative.Element] of type ``"DatePicker"``.
+    """
+    return _make_element(
+        "DatePicker",
+        style=style,
+        key=key,
+        value=value,
+        mode=mode,
+        on_change=on_change,
+        minimum=minimum,
+        maximum=maximum,
+        enabled=False if enabled is False else None,
+        accessibility_label=accessibility_label,
         accessible=accessible,
         _defaults={"accessibility_role": "button"},
     )
@@ -1108,6 +1567,14 @@ def FlatList(
     separator_height: float = 0,
     refresh_control: Optional[Dict[str, Any]] = None,
     on_item_press: Optional[Callable[[int], None]] = None,
+    horizontal: bool = False,
+    num_columns: int = 1,
+    list_header: Optional[Element] = None,
+    list_footer: Optional[Element] = None,
+    list_empty: Optional[Element] = None,
+    on_end_reached: Optional[Callable[[], None]] = None,
+    on_end_reached_threshold: float = 0.5,
+    content_container_style: StyleProp = None,
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -1141,6 +1608,20 @@ def FlatList(
             [`RefreshControl`][pythonnative.RefreshControl].
         on_item_press: Callback invoked with the row index when the
             user taps a row (virtualized backend only).
+        horizontal: Lay rows out left-to-right instead of top-to-bottom
+            (forces the eager backend).
+        num_columns: Render items in a grid of this many columns
+            (forces the eager backend). ``1`` (default) is a plain list.
+        list_header: Optional element rendered once above all rows.
+        list_footer: Optional element rendered once below all rows.
+        list_empty: Optional element rendered when ``data`` is empty.
+        on_end_reached: Callback invoked when the user scrolls within
+            ``on_end_reached_threshold`` of the end (virtualized
+            backend).
+        on_end_reached_threshold: Fraction of the viewport from the end
+            at which ``on_end_reached`` fires.
+        content_container_style: Style applied to the inner content
+            wrapper (forces the eager backend).
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation of the list
             itself.
@@ -1165,16 +1646,70 @@ def FlatList(
     """
     items_list = list(data or [])
 
-    if item_height is None:
-        # Eager fallback for short lists.
-        items_eager: List[Element] = []
+    has_ornaments = (
+        num_columns > 1
+        or horizontal
+        or list_header is not None
+        or list_footer is not None
+        or content_container_style is not None
+        or (not items_list and list_empty is not None)
+    )
+
+    if item_height is None or has_ornaments:
+        # Eager fallback for short lists, grids, and lists with
+        # header/footer/empty ornaments (which the fixed-height
+        # virtualizer can't express).
+        rendered: List[Element] = []
         for i, item in enumerate(items_list):
             el = render_item(item, i) if render_item else Text(str(item))
             if key_extractor is not None:
                 el = Element(el.type, el.props, el.children, key=key_extractor(item, i))
-            items_eager.append(el)
-        inner = Column(*items_eager, style={"spacing": separator_height} if separator_height else None)
-        return ScrollView(inner, refresh_control=refresh_control, style=style, key=key)
+            rendered.append(el)
+
+        sep = separator_height or None
+
+        if not has_ornaments:
+            # Backward-compatible shape: ScrollView wrapping a single
+            # Column of the rendered rows.
+            inner = Column(*rendered, style={"spacing": sep} if sep else None)
+            return ScrollView(inner, refresh_control=refresh_control, style=style, key=key)
+
+        if not rendered and list_empty is not None:
+            content: List[Element] = [list_empty]
+        elif num_columns > 1:
+            rows: List[Element] = []
+            for start in range(0, len(rendered), num_columns):
+                chunk = rendered[start : start + num_columns]
+                rows.append(
+                    Row(
+                        *chunk,
+                        style={"spacing": separator_height, "flex": 1} if separator_height else {"flex": 1},
+                        key=f"row-{start}",
+                    )
+                )
+            content = rows
+        elif horizontal:
+            content = [Row(*rendered, style={"spacing": sep} if sep else None)]
+        else:
+            content = [Column(*rendered, style={"spacing": sep} if sep else None)]
+
+        body: List[Element] = []
+        if list_header is not None:
+            body.append(list_header)
+        body.extend(content)
+        if list_footer is not None:
+            body.append(list_footer)
+
+        axis: Literal["vertical", "horizontal"] = "horizontal" if horizontal else "vertical"
+        wrapper = Row if horizontal else Column
+        inner = wrapper(*body, style=content_container_style)
+        return ScrollView(
+            inner,
+            refresh_control=refresh_control,
+            scroll_axis=axis,
+            style=style,
+            key=key,
+        )
 
     # Virtualized path: render_item is invoked lazily by the native
     # cell mount callback when each row scrolls into view.
@@ -1223,6 +1758,8 @@ def FlatList(
         row_height=row_h,
         mount_row=_mount_row,
         on_row_press=on_item_press,
+        on_end_reached=on_end_reached,
+        on_end_reached_threshold=on_end_reached_threshold,
         refresh_control=refresh_control,
     )
 

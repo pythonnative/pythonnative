@@ -1,0 +1,16 @@
+# Tests ImageBackground renders foreground content over a background image.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/image_background.py
+# Source under test: src/pythonnative/components.py :: ImageBackground
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: ImageBackground
+- assertVisible: "On top"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components
