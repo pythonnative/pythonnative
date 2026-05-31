@@ -1445,13 +1445,22 @@ class ModalHandler(AndroidViewHandler):
         return
 
     def _apply(self, placeholder: Any, props: Dict[str, Any], *, mounting: bool) -> None:
-        visible = bool(props.get("visible", False))
         state = _pn_modal_states.get(id(placeholder))
-        if visible and state is None:
-            self._present(placeholder, props)
-        elif not visible and state is not None:
-            self._dismiss(placeholder)
-        elif visible and state is not None:
+        # ``update`` only delivers the *changed* props. When ``visible`` is
+        # not among them the presentation state must be left untouched: a
+        # re-render that happens while the modal is open (e.g. an
+        # ``on_show`` callback bumping some state) must NOT be read as
+        # ``visible=False`` and tear the dialog down. So only react to an
+        # explicitly supplied ``visible`` value.
+        if "visible" in props:
+            visible = bool(props["visible"])
+            if visible and state is None:
+                self._present(placeholder, props)
+            elif not visible and state is not None:
+                self._dismiss(placeholder)
+        # Forward live prop updates to an already-presented dialog.
+        state = _pn_modal_states.get(id(placeholder))
+        if state is not None:
             if "on_dismiss" in props:
                 state["on_dismiss"] = props.get("on_dismiss")
             dialog = state.get("dialog")
