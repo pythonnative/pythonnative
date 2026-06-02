@@ -27,7 +27,7 @@ import os
 import sys
 from typing import Any, Dict, Optional
 
-from .utils import IS_ANDROID, IS_IOS
+from .utils import IS_ANDROID, IS_DESKTOP, IS_IOS
 
 
 def _detect_os() -> str:
@@ -35,6 +35,8 @@ def _detect_os() -> str:
         return "android"
     if IS_IOS:
         return "ios"
+    if IS_DESKTOP:
+        return "desktop"
     return "test"
 
 
@@ -72,12 +74,13 @@ class Platform:
     """Platform-aware constants and the ``select`` dispatcher.
 
     All attributes are read at import time. ``OS`` is one of
-    ``"ios"``, ``"android"``, or ``"test"`` (the latter when running
-    off-device, e.g., in unit tests).
+    ``"ios"``, ``"android"``, ``"desktop"`` (the Tkinter preview
+    backend), or ``"test"`` (when running off-device, e.g., in unit
+    tests).
     """
 
     OS: str = _detect_os()
-    """``"ios"``, ``"android"``, or ``"test"``."""
+    """``"ios"``, ``"android"``, ``"desktop"``, or ``"test"``."""
 
     Version: str = _detect_version()
     """Best-effort OS version string (``"17.4"``, ``"14"``, ``"python-3.11"``)."""
@@ -88,6 +91,9 @@ class Platform:
     is_android: bool = IS_ANDROID
     """``True`` when running inside an Android process."""
 
+    is_desktop: bool = IS_DESKTOP
+    """``True`` when running the desktop (Tkinter) preview backend."""
+
     is_test: bool = OS == "test"
     """``True`` when running off-device (no native runtime)."""
 
@@ -96,13 +102,14 @@ class Platform:
         """Pick the value matching the current platform.
 
         Looks up ``spec[Platform.OS]``, then falls back to
-        ``spec["native"]`` (matches both iOS and Android), then to
-        ``spec["default"]``, then to the explicit ``default`` argument.
+        ``spec["native"]`` (matches iOS and Android — *not* desktop,
+        which is a development surface), then to ``spec["default"]``,
+        then to the explicit ``default`` argument.
 
         Args:
             spec: Mapping from platform name to value. Recognized keys:
-                ``"ios"``, ``"android"``, ``"test"``, ``"native"``,
-                ``"default"``.
+                ``"ios"``, ``"android"``, ``"desktop"``, ``"test"``,
+                ``"native"``, ``"default"``.
             default: Value returned when ``spec`` has no matching key
                 and no ``"default"`` entry.
 
@@ -144,9 +151,11 @@ def _set_platform_for_test(name: Optional[str]) -> None:
         Platform.OS = _detect_os()
         Platform.is_ios = IS_IOS
         Platform.is_android = IS_ANDROID
+        Platform.is_desktop = IS_DESKTOP
         Platform.is_test = Platform.OS == "test"
         return
     Platform.OS = name
     Platform.is_ios = name == "ios"
     Platform.is_android = name == "android"
+    Platform.is_desktop = name == "desktop"
     Platform.is_test = name == "test"

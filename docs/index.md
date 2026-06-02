@@ -53,6 +53,10 @@ produce identical frames on both platforms.
 - **Fast Refresh hot reload.** `pn run --hot-reload` watches `app/`
   and patches the running app in place, preserving component state
   across most edits.
+- **Instant desktop preview.** `pn preview` renders your app in a
+  desktop window with Fast Refresh, so you can iterate on UI, state,
+  and navigation in milliseconds — no simulator boot required. See the
+  [Desktop preview guide](guides/desktop-preview.md).
 - **An extension SDK.** [`pythonnative.sdk`](api/sdk.md) lets you
   wrap any platform widget as a first-class element with
   type-checked props, and PyPI plugins auto-register through the
@@ -63,6 +67,8 @@ produce identical frames on both platforms.
 ## Quick links
 
 - New here? Start with [Getting started](getting-started.md).
+- Want to see it run right now? Try the
+  [Desktop preview](guides/desktop-preview.md).
 - Want the bigger picture? Read [Mental model](concepts/mental-model.md).
 - Looking up an API? [Package overview](api/pythonnative.md).
 - Wrapping a custom widget? Read

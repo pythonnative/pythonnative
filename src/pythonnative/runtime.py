@@ -290,6 +290,27 @@ def create_future() -> "asyncio.Future[Any]":
 # bridge back when it needs to talk to native UI.
 
 
+# Desktop (Tkinter) main-thread dispatcher, installed by
+# ``pythonnative.preview`` while a ``pn preview`` session is live. Tk is
+# not thread-safe, so UI work scheduled from the asyncio worker thread
+# (animations, alerts) must hop onto the Tk main thread; the preview's
+# poll loop drains whatever this dispatcher enqueues. When no preview is
+# running (plain scripts / tests) the dispatcher stays ``None`` and work
+# runs inline.
+_desktop_main_dispatch: Optional[Callable[[Callable[[], None]], None]] = None
+
+
+def set_desktop_main_dispatch(dispatch: Optional[Callable[[Callable[[], None]], None]]) -> None:
+    """Install (or clear) the desktop main-thread dispatcher.
+
+    Called by ``pythonnative.preview`` with a
+    function that marshals ``fn`` onto the Tk main thread, and with
+    ``None`` when the preview window closes.
+    """
+    global _desktop_main_dispatch
+    _desktop_main_dispatch = dispatch
+
+
 def call_on_main_thread(fn: Callable[[], None]) -> None:
     """Run ``fn()`` on the platform UI thread.
 
@@ -299,7 +320,9 @@ def call_on_main_thread(fn: Callable[[], None]) -> None:
       ``_ios_call_on_main`` comment block for why this matters).
     - **Android**: posts a ``Runnable`` to
       ``Handler(Looper.getMainLooper())``.
-    - **Desktop / tests**: runs ``fn()`` inline.
+    - **Desktop**: enqueues ``fn`` for the ``pn preview`` poll loop to
+      run on the Tk main thread (or runs inline if no preview is live).
+    - **Tests**: runs ``fn()`` inline.
 
     Exceptions raised by ``fn`` are caught and printed; they must not
     propagate into UIKit / the Android Looper. If you need to surface
@@ -317,6 +340,8 @@ def call_on_main_thread(fn: Callable[[], None]) -> None:
         _ios_call_on_main(fn)
     elif Platform.is_android:
         _android_call_on_main(fn)
+    elif Platform.is_desktop and _desktop_main_dispatch is not None:
+        _desktop_main_dispatch(fn)
     else:
         fn()
 

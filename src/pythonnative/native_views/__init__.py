@@ -238,18 +238,31 @@ _registry: Optional[NativeViewRegistry] = None
 
 
 def _active_platform_name() -> str:
-    """Return ``"android"`` or ``"ios"`` for the active runtime."""
-    from ..utils import IS_ANDROID
+    """Return ``"android"``, ``"desktop"``, or ``"ios"`` for the active runtime."""
+    from ..utils import IS_ANDROID, IS_DESKTOP
 
-    return "android" if IS_ANDROID else "ios"
+    if IS_ANDROID:
+        return "android"
+    if IS_DESKTOP:
+        return "desktop"
+    return "ios"
 
 
 def _register_builtin_handlers(registry: NativeViewRegistry) -> None:
-    """Register every built-in handler for the active platform."""
-    from ..utils import IS_ANDROID
+    """Register every built-in handler for the active platform.
+
+    The desktop (Tkinter) backend is selected when ``pn preview`` sets
+    ``PN_PLATFORM=desktop``; otherwise this picks Android (on device) or
+    iOS (the default off-device path, exercised by the iOS templates and
+    by tests that install the ``[ios]`` extra). Off-device unit tests
+    typically inject a mock registry via ``set_registry`` instead.
+    """
+    from ..utils import IS_ANDROID, IS_DESKTOP
 
     if IS_ANDROID:
         from .android import register_handlers
+    elif IS_DESKTOP:
+        from .desktop import register_handlers
     else:
         from .ios import register_handlers
     register_handlers(registry)

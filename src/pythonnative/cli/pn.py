@@ -1,9 +1,12 @@
 """`pn` CLI: scaffold, run, and clean PythonNative projects.
 
 The console script `pn` (declared in `pyproject.toml` under
-`[project.scripts]`) dispatches to one of three subcommands:
+`[project.scripts]`) dispatches to one of four subcommands:
 
 - `pn init [name]`: scaffold a new project in the current directory.
+- `pn preview [component]`: render the app in a desktop (Tkinter)
+  window with instant Fast Refresh — the fast inner dev loop, no
+  device or simulator required.
 - `pn run android|ios`: stage code into a native template, build it,
   install it, and stream logs back to the terminal.
 - `pn clean`: remove the local `build/` directory.
@@ -1119,6 +1122,90 @@ def _run_hot_reload(platform: str, project_dir: str, build_dir: str, show_logs: 
         print("\n[hot-reload] Stopped.")
 
 
+def _entrypoint_to_module(entry_point: str) -> str:
+    """Convert a config ``entryPoint`` path into an importable module path.
+
+    ``"app/main.py"`` → ``"app.main"``. Returns ``"app.main"`` for
+    empty / unusable input so ``pn preview`` always has a sane default.
+    """
+    normalized = entry_point.strip().replace("\\", "/")
+    if normalized.endswith(".py"):
+        normalized = normalized[:-3]
+    normalized = normalized.strip("/").replace("/", ".")
+    return normalized or "app.main"
+
+
+def preview_project(args: argparse.Namespace) -> None:
+    """Render the project in a desktop preview window (Tkinter).
+
+    Sets ``PN_PLATFORM=desktop`` (so PythonNative selects the Tkinter
+    backend) and hands off to ``pythonnative.preview.run_preview``,
+    which opens a window, mounts the app, and Fast Refreshes on every
+    file save until the window is closed.
+
+    Args:
+        args: Parsed argparse namespace. Recognized attributes:
+
+            - `component` (`str`, optional): Module path like
+              ``"app.main"`` (its ``App`` is used) or a dotted
+              ``module.Component`` path. Defaults to the project's
+              configured ``entryPoint``.
+            - `width` / `height` (`int`): Initial window size in points.
+            - `title` (`str`): Window title.
+            - `no_hot_reload` (`bool`): Disable file watching.
+    """
+    # The desktop backend is selected at *import time* from the
+    # ``PN_PLATFORM`` environment variable (see ``pythonnative.utils`` and
+    # the host selection in ``pythonnative.screen``). Because the ``pn``
+    # console entry point lives inside the ``pythonnative`` package,
+    # importing it already loaded the package under the default,
+    # non-desktop platform before this handler ever runs. Re-exec a fresh
+    # interpreter with the variable set so every module binds to the
+    # Tkinter backend; the re-execed child sees ``PN_PLATFORM=desktop`` and
+    # skips this branch, so there is no exec loop.
+    if os.environ.get("PN_PLATFORM") != "desktop":
+        try:
+            completed = subprocess.run(
+                [sys.executable, "-m", "pythonnative.cli.pn", *sys.argv[1:]],
+                env={**os.environ, "PN_PLATFORM": "desktop"},
+            )
+        except KeyboardInterrupt:
+            sys.exit(130)
+        sys.exit(completed.returncode)
+
+    project_dir = os.getcwd()
+    component: Optional[str] = getattr(args, "component", None)
+    if not component:
+        config = _read_project_config()
+        component = _entrypoint_to_module(config.get("entryPoint", "app/main.py"))
+
+    try:
+        from pythonnative.preview import run_preview
+    except Exception as exc:  # pragma: no cover - environment dependent
+        print(f"Error: could not start the desktop preview: {exc}")
+        print(
+            "The desktop preview needs Tkinter (Python's standard GUI toolkit).\n"
+            "On macOS:        brew install python-tk\n"
+            "On Debian/Ubuntu: sudo apt-get install python3-tk\n"
+            "On Windows:      reinstall Python with the 'tcl/tk' option checked."
+        )
+        sys.exit(1)
+
+    print(f"Starting PythonNative preview for {component} (Ctrl+C or close the window to stop).")
+    try:
+        run_preview(
+            component,
+            project_root=project_dir,
+            width=getattr(args, "width", 390),
+            height=getattr(args, "height", 844),
+            title=getattr(args, "title", "PythonNative Preview"),
+            hot_reload=not getattr(args, "no_hot_reload", False),
+        )
+    except RuntimeError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
+
+
 def clean_project(args: argparse.Namespace) -> None:
     """Remove the local `build/` directory.
 
@@ -1151,6 +1238,25 @@ def main() -> None:
     parser_init.add_argument("name", nargs="?", help="Project name (defaults to current directory name)")
     parser_init.add_argument("--force", action="store_true", help="Overwrite existing files if present")
     parser_init.set_defaults(func=init_project)
+
+    # Create a new command 'preview' that calls preview_project
+    parser_preview = subparsers.add_parser("preview")
+    parser_preview.add_argument(
+        "component",
+        nargs="?",
+        help="Module path (e.g. app.main) or dotted component path; defaults to the project entry point",
+    )
+    parser_preview.add_argument("--width", type=int, default=390, help="Initial window width in points (default: 390)")
+    parser_preview.add_argument(
+        "--height", type=int, default=844, help="Initial window height in points (default: 844)"
+    )
+    parser_preview.add_argument("--title", default="PythonNative Preview", help="Preview window title")
+    parser_preview.add_argument(
+        "--no-hot-reload",
+        action="store_true",
+        help="Disable file watching / Fast Refresh",
+    )
+    parser_preview.set_defaults(func=preview_project)
 
     # Create a new command 'run' that calls run_project
     parser_run = subparsers.add_parser("run")

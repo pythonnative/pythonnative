@@ -46,12 +46,22 @@ a small Python factory that returns
 
 ## Does PythonNative work on the desktop?
 
-The core (components, hooks, reconciler) is platform-agnostic and runs
-on the desktop with a [mock registry](../guides/testing.md#a-minimal-mock-registry).
-That's how the test suite works. There is no built-in *desktop* widget
-backend; if you need one, plug a Tk or Qt-backed
-[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
-in.
+Yes — for **previewing**. `pn preview` renders your app in a native
+desktop window using a built-in Tkinter backend, with instant Fast
+Refresh on every save. It's the fastest inner-loop: see your real UI
+and iterate in seconds without booting a simulator or deploying to a
+device. The same flex layout engine and reconciler drive it, so what
+you see closely matches the device. See the
+[Desktop preview guide](../guides/desktop-preview.md).
+
+The desktop backend is a **development tool**, not a production target:
+chrome like rounded corners, shadows, and overflow clipping are
+approximated, and there's no app packaging for desktop. Ship to devices
+with `pn run android` / `pn run ios`.
+
+The core (components, hooks, reconciler) is also platform-agnostic and
+runs headless with a [mock registry](../guides/testing.md#a-minimal-mock-registry) —
+that's how the unit-test suite works.
 
 ## How do I package and distribute my app?
 

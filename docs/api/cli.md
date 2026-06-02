@@ -8,6 +8,10 @@ the documented behavior never drifts from the code.
 
 - `pn init [name]`: scaffold a new project (creates `app/`,
   `pythonnative.json`, `requirements.txt`, `.gitignore`).
+- `pn preview [component]`: render the app in a desktop (Tkinter) window
+  with Fast Refresh — the fastest way to iterate on UI. Flags:
+  `--width`, `--height`, `--title`, `--no-hot-reload`. See the
+  [Desktop preview guide](../guides/desktop-preview.md).
 - `pn run android|ios`: build and run on a connected device or
   simulator. Flags: `--prepare-only`, `--hot-reload`, `--no-logs`.
 - `pn clean`: remove the local `build/` directory.

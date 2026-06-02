@@ -19,6 +19,10 @@ Attributes:
         `PN_PLATFORM=ios`, `sys.platform == "ios"`, or a Simulator
         `HOME` path). Importing `rubicon-objc` alone is intentionally
         not enough to trigger this flag.
+    IS_DESKTOP: `True` when running the desktop preview backend
+        (signaled by `PN_PLATFORM=desktop`, set by ``pn preview``).
+        This drives the Tkinter native-view registry so a PythonNative
+        app can render in a real OS window for fast local iteration.
 """
 
 import os
@@ -31,6 +35,7 @@ from typing import Any, Optional
 
 _is_android: Optional[bool] = None
 _is_ios: Optional[bool] = None
+_is_desktop: Optional[bool] = None
 
 
 def _detect_android() -> bool:
@@ -75,13 +80,29 @@ def _detect_ios() -> bool:
     return False
 
 
+def _detect_desktop() -> bool:
+    """Detect whether we're running the desktop (Tkinter) preview backend.
+
+    The only signal is the explicit ``PN_PLATFORM=desktop`` env var,
+    set by ``pn preview`` before importing PythonNative. Desktop is a
+    *development* target: it renders the app in a native OS window via
+    the pure-Python Tkinter registry so the inner dev loop doesn't
+    require a device build. Off-device unit tests deliberately leave
+    this flag ``False`` so they keep using an injected mock registry
+    and ``Platform.OS == "test"``.
+    """
+    return os.environ.get("PN_PLATFORM") == "desktop"
+
+
 def _ensure_platform_detection() -> None:
-    """Populate `_is_android` / `_is_ios` once, then reuse."""
-    global _is_android, _is_ios
+    """Populate `_is_android` / `_is_ios` / `_is_desktop` once, then reuse."""
+    global _is_android, _is_ios, _is_desktop
     if _is_android is None:
         _is_android = _detect_android()
     if _is_ios is None:
         _is_ios = (not _is_android) and _detect_ios()
+    if _is_desktop is None:
+        _is_desktop = (not _is_android) and (not _is_ios) and _detect_desktop()
 
 
 def _get_is_android() -> bool:
@@ -98,6 +119,13 @@ def _get_is_ios() -> bool:
     return _is_ios
 
 
+def _get_is_desktop() -> bool:
+    """Return the cached desktop-detection result."""
+    _ensure_platform_detection()
+    assert _is_desktop is not None
+    return _is_desktop
+
+
 IS_ANDROID: bool = _get_is_android()
 """``True`` when running inside an Android process.
 
@@ -111,6 +139,14 @@ IS_IOS: bool = _get_is_ios()
 The flag is computed once at import time, by checking
 `PN_PLATFORM=ios`, `sys.platform == "ios"`, and the iOS Simulator
 `HOME` path.
+"""
+
+IS_DESKTOP: bool = _get_is_desktop()
+"""``True`` when running the desktop (Tkinter) preview backend.
+
+Set by ``pn preview`` via ``PN_PLATFORM=desktop``. Mutually exclusive
+with `IS_ANDROID` / `IS_IOS`. Off-device unit tests leave this
+``False`` and inject a mock registry instead.
 """
 
 # ======================================================================

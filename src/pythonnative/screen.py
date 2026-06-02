@@ -50,7 +50,7 @@ import sys
 import threading
 from typing import Any, Dict, Optional, Sequence
 
-from .utils import IS_ANDROID, IS_IOS, set_android_context
+from .utils import IS_ANDROID, IS_DESKTOP, IS_IOS, set_android_context
 
 _MAX_RENDER_PASSES = 25
 _DEBUG_ENV = "PYTHONNATIVE_DEBUG"
@@ -87,6 +87,20 @@ def _resolve_component_path(component_ref: Any) -> str:
     raise ValueError(f"Cannot resolve component path for {component_ref!r}")
 
 
+def _missing_module_is_target(exc: ModuleNotFoundError, dotted: str) -> bool:
+    """Return ``True`` when ``exc`` means ``dotted`` itself is absent.
+
+    Distinguishes "the component module/package cannot be found" (so the
+    caller should fall through to the next resolution strategy) from "the
+    module exists but raised :class:`ModuleNotFoundError` while importing
+    one of *its own* dependencies". The latter must propagate so the
+    developer sees the real missing import (e.g. ``No module named
+    'emoji'``) instead of a misleading "could not resolve component".
+    """
+    missing = exc.name or ""
+    return missing == dotted or dotted.startswith(missing + ".")
+
+
 def _import_component(component_path: str) -> Any:
     """Import a component by module or dotted-attribute path.
 
@@ -117,11 +131,16 @@ def _import_component(component_path: str) -> Any:
         The resolved component callable.
 
     Raises:
-        ImportError: If neither resolution path succeeds.
+        ImportError: If the module or dotted path cannot be found.
+            Errors raised *inside* a resolvable module (such as a
+            missing third-party dependency it imports) propagate
+            unchanged so the real cause stays visible.
     """
     try:
         module = importlib.import_module(component_path)
-    except ModuleNotFoundError:
+    except ModuleNotFoundError as exc:
+        if not _missing_module_is_target(exc, component_path):
+            raise
         module = None
     if module is not None:
         component = getattr(module, "App", None)
@@ -132,7 +151,9 @@ def _import_component(component_path: str) -> Any:
         module_path, attr = component_path.rsplit(".", 1)
         try:
             parent = importlib.import_module(module_path)
-        except ModuleNotFoundError:
+        except ModuleNotFoundError as exc:
+            if not _missing_module_is_target(exc, module_path):
+                raise
             parent = None
         if parent is not None:
             component = getattr(parent, attr, None)
@@ -866,6 +887,165 @@ if IS_ANDROID:
 
         def set_viewport_size(self, width: float, height: float) -> None:
             """Public hook for native code to push viewport sizes (Maestro/tests)."""
+            _push_viewport_size(self, width, height)
+
+elif IS_DESKTOP:
+    # ------------------------------------------------------------------
+    # Desktop preview host (Tkinter), driven by ``pn preview``.
+    #
+    # The screen host owns the reconciler + lifecycle just like the
+    # device hosts; placement of the root view and the navigation stack
+    # are delegated to the ``DesktopApp`` controller in
+    # ``pythonnative.preview`` (passed in as ``native_instance``). The
+    # controller runs the Tk event loop on the main thread and polls
+    # ``drain_desktop_scheduled_renders`` so renders requested from the
+    # asyncio worker thread are applied on the main thread.
+    # ------------------------------------------------------------------
+
+    _DESKTOP_SCHEDULED_RENDER_HOSTS: Dict[int, Any] = {}
+    _desktop_render_lock = threading.Lock()
+
+    def _schedule_render_async(host: Any) -> bool:
+        """Queue an off-main-thread render for the Tk poll loop to drain.
+
+        Renders requested on the Tk main thread (button handlers, etc.)
+        run synchronously (returns ``False``); requests from the asyncio
+        worker thread are queued and applied by
+        [`drain_desktop_scheduled_renders`][pythonnative.screen.drain_desktop_scheduled_renders].
+        """
+        if not IS_DESKTOP:
+            return False
+        if threading.current_thread() is threading.main_thread():
+            return False
+        if getattr(host, "_render_scheduled", False):
+            return True
+        host._render_scheduled = True
+        with _desktop_render_lock:
+            _DESKTOP_SCHEDULED_RENDER_HOSTS[id(host)] = host
+        return True
+
+    def drain_desktop_scheduled_renders() -> None:
+        """Apply renders queued from worker threads (called on the main thread)."""
+        with _desktop_render_lock:
+            hosts = list(_DESKTOP_SCHEDULED_RENDER_HOSTS.values())
+            _DESKTOP_SCHEDULED_RENDER_HOSTS.clear()
+        _flush_scheduled_renders(hosts)
+
+    class _ScreenHost:
+        """Desktop host backed by a Tk window and an in-process nav stack.
+
+        Created by ``pythonnative.preview`` for
+        each screen on the navigation stack. ``native_instance`` is the
+        ``DesktopApp`` controller, which provides the stage frame,
+        viewport size, and push/pop primitives.
+        """
+
+        def __init__(self, native_instance: Any = None, component_path: str = "", component_func: Any = None) -> None:
+            self.native_instance = native_instance
+            _init_host_common(self, component_path, component_func)
+
+        def on_create(self) -> None:
+            _on_create(self)
+
+        def on_start(self) -> None:
+            pass
+
+        def on_resume(self) -> None:
+            _set_host_focused(self, True)
+
+        def on_layout(self) -> None:
+            pass
+
+        def on_pause(self) -> None:
+            _set_host_focused(self, False)
+
+        def on_stop(self) -> None:
+            pass
+
+        def on_destroy(self) -> None:
+            pass
+
+        def enable_hot_reload(self, manifest_path: str, source_root: Optional[str] = None) -> None:
+            _enable_hot_reload(self, manifest_path)
+
+        def hot_reload_tick(self) -> bool:
+            return _hot_reload_tick(self)
+
+        def reload(self, changed_modules: Optional[Sequence[str]] = None) -> None:
+            _reload_host(self, changed_modules)
+
+        def on_restart(self) -> None:
+            pass
+
+        def on_save_instance_state(self) -> None:
+            pass
+
+        def on_restore_instance_state(self) -> None:
+            pass
+
+        def set_args(self, args: Any) -> None:
+            _set_args(self, args)
+
+        def _get_nav_args(self) -> Dict[str, Any]:
+            return self._args
+
+        def _push(self, component: Any, args: Optional[Dict[str, Any]] = None) -> None:
+            screen_path = _resolve_component_path(component)
+            app = self.native_instance
+            if app is None or not hasattr(app, "push_screen"):
+                raise RuntimeError("desktop navigation requires a running `pn preview` session")
+            app.push_screen(screen_path, args)
+
+        def _pop(self) -> None:
+            app = self.native_instance
+            if app is not None and hasattr(app, "pop_screen"):
+                app.pop_screen()
+
+        def _reset_to_root(self) -> None:
+            app = self.native_instance
+            if app is not None and hasattr(app, "reset_to_root"):
+                try:
+                    app.reset_to_root()
+                except Exception:
+                    pass
+
+        def _set_screen_options(self, options: Dict[str, Any]) -> None:
+            title = options.get("title") if isinstance(options, dict) else None
+            app = self.native_instance
+            if title and app is not None and hasattr(app, "set_title"):
+                try:
+                    app.set_title(str(title))
+                except Exception:
+                    pass
+
+        def _attach_root(self, native_view: Any) -> None:
+            from .native_views import desktop as _desktop_backend
+
+            stage = _desktop_backend.get_root_container()
+            if stage is not None and native_view is not None:
+                try:
+                    native_view.place(in_=stage, x=0, y=0, relwidth=1.0, relheight=1.0)
+                    native_view.lift()
+                except Exception:
+                    pass
+            app = self.native_instance
+            if app is not None and hasattr(app, "viewport_size"):
+                try:
+                    width, height = app.viewport_size()
+                    if width > 0 and height > 0:
+                        _push_viewport_size(self, float(width), float(height))
+                except Exception:
+                    pass
+
+        def _detach_root(self, native_view: Any) -> None:
+            if native_view is not None:
+                try:
+                    native_view.place_forget()
+                except Exception:
+                    pass
+
+        def set_viewport_size(self, width: float, height: float) -> None:
+            """Push a viewport-size change (called on window resize)."""
             _push_viewport_size(self, width, height)
 
 else:

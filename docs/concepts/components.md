@@ -324,9 +324,19 @@ if pn.Platform.is_ios:
     margin = 16
 ```
 
-`pn.Platform.OS` is `"ios"`, `"android"`, or `"test"` (the latter
-when running off-device, e.g., in unit tests). The lower-level
-`utils.IS_ANDROID` / `utils.IS_IOS` constants are still available.
+`pn.Platform.OS` is `"ios"`, `"android"`, `"desktop"` (the `pn preview`
+backend — see the [Desktop preview guide](../guides/desktop-preview.md)),
+or `"test"` (off-device, e.g. in unit tests). The lower-level
+`utils.IS_ANDROID` / `utils.IS_IOS` / `utils.IS_DESKTOP` constants are
+still available.
+
+`Platform.select` matches on the exact key; a `"native"` key is shared
+by iOS **and** Android (but not desktop), and a `"default"` key catches
+anything unmatched:
+
+```python
+pad = pn.Platform.select({"native": 16, "desktop": 12, "default": 8})
+```
 
 ## Next steps
 

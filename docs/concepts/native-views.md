@@ -66,9 +66,13 @@ is a dict-like object that maps element type strings to handler
   populates the registry with Chaquopy-backed handlers.
 - On iOS, `pythonnative.native_views.ios.register_handlers` does the
   same with rubicon-objc handlers.
-- On the desktop (during tests), the registry is replaced with a mock
-  via [`set_registry`][pythonnative.native_views.set_registry] before
-  any element is rendered.
+- On the desktop (`pn preview`, with `PN_PLATFORM=desktop`),
+  `pythonnative.native_views.desktop.register_handlers` populates the
+  registry with Tkinter-backed handlers. See the
+  [Desktop preview guide](../guides/desktop-preview.md).
+- Off-device under `pytest`, the registry is replaced with a mock via
+  [`set_registry`][pythonnative.native_views.set_registry] before any
+  element is rendered.
 
 Custom widgets follow the same pattern: register a handler under a
 unique type string, then construct elements with that type and the

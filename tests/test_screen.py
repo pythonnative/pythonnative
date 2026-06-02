@@ -187,3 +187,46 @@ def test_ios_register_screen_makes_forward_lifecycle_succeed() -> None:
         assert host.received == ["on_layout"]
     finally:
         registry.clear()
+
+
+def test_import_component_propagates_real_dependency_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failing import *inside* the app must not be masked.
+
+    Regression: ``_import_component`` caught every ``ModuleNotFoundError``
+    and reported a generic "could not resolve component", hiding the real
+    cause (e.g. a dependency the developer forgot to install). The actual
+    error must propagate, while a genuinely absent path still yields the
+    friendly resolve error. This is what makes ``pn preview`` surface
+    ``No module named 'emoji'`` instead of a misleading message.
+    """
+    from pythonnative.screen import _import_component
+
+    pkg = tmp_path / "resolver_app"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    (pkg / "good.py").write_text("def App():\n    return None\n", encoding="utf-8")
+    (pkg / "bad.py").write_text(
+        "import a_dependency_that_is_not_installed_xyz\n\ndef App():\n    return None\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.syspath_prepend(os.fspath(tmp_path))
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    for name in ("resolver_app", "resolver_app.good", "resolver_app.bad"):
+        sys.modules.pop(name, None)
+
+    # A resolvable module returns its ``App``.
+    assert callable(_import_component("resolver_app.good"))
+
+    # The module exists but imports a missing dependency: the real
+    # ``ModuleNotFoundError`` (naming that dependency) must propagate.
+    with pytest.raises(ModuleNotFoundError) as excinfo:
+        _import_component("resolver_app.bad")
+    assert excinfo.value.name == "a_dependency_that_is_not_installed_xyz"
+
+    # A genuinely absent path still gives the friendly resolve error.
+    with pytest.raises(ImportError, match="Could not resolve component"):
+        _import_component("resolver_app.nope_does_not_exist")

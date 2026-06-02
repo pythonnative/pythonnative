@@ -117,6 +117,7 @@ ignore = ["D107", "D105", "D203", "D213"]
 # docstrings would only add boilerplate that repeats the ABC.
 "src/pythonnative/native_views/android.py" = ["D101", "D102"]
 "src/pythonnative/native_views/ios.py" = ["D101", "D102"]
+"src/pythonnative/native_views/desktop.py" = ["D101", "D102"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

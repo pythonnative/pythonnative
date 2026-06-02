@@ -66,6 +66,38 @@ Key ideas:
 
 When the root `Stack.Navigator` is rendered inside the host's first screen, `navigate(...)` and `go_back()` drive the **native** navigation controller (UINavigationController on iOS, AndroidX Navigation Component on Android). Each pushed screen runs in its own reconciler host, so state on the previous screen is preserved by the platform stack.
 
+## Preview on your desktop
+
+The fastest way to iterate is `pn preview`, which renders your app in a
+desktop window and **Fast Refreshes on every save** — no simulator, no
+device build:
+
+```bash
+pn preview
+```
+
+This opens a phone-sized window, mounts your project's `App`, and
+watches `app/` for changes. Edit a component, hit save, and the window
+updates in place while keeping component state (counters, form input,
+scroll position). Navigation, hooks, async, and the flex layout engine
+all run exactly as they do on device, because the desktop backend reuses
+the same reconciler and layout engine — only the leaf widgets differ
+(Tkinter instead of UIKit / Android views).
+
+```bash
+pn preview                 # preview the project's entry point (app/main.py → App)
+pn preview app.main.Detail # preview a specific component
+pn preview --width 768 --height 1024   # tablet-sized window
+pn preview --no-hot-reload # disable file watching
+```
+
+The preview needs Tkinter, which ships with most Python installs. If
+it's missing, install it (`brew install python-tk` on macOS,
+`sudo apt-get install python3-tk` on Debian/Ubuntu). The desktop backend
+is a **development** surface for layout and logic — some visual chrome is
+approximated, and there's no desktop packaging. Ship to devices with
+`pn run`. See the [Desktop preview guide](guides/desktop-preview.md).
+
 ## Run on a platform
 
 ```bash

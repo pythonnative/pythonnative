@@ -20,12 +20,16 @@ project scaffolded with `pn init`.
 pn init my-app
 cd my-app
 # Edit app/main.py and paste any of the snippets below.
+pn preview       # fast desktop preview with Fast Refresh
 pn run android   # or: pn run ios
 ```
 
 The `app/main.py` that `pn init` writes already returns a small
 counter; replace it with one of the snippets to try a different
-example.
+example. The quickest way to iterate is
+[`pn preview`](guides/desktop-preview.md), which renders the app in a
+desktop window and reloads on every save; use `pn run` when you want it
+on a real device or simulator.
 
 ## Snippets
 
