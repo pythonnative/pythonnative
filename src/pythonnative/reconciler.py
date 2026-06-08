@@ -30,7 +30,7 @@ Supports:
 
 import os
 import sys
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .element import Element
 from .layout import LayoutNode, calculate_layout, extract_layout_style
@@ -106,19 +106,44 @@ class VNode:
             or an iOS `UIView`). May be `None` for purely virtual
             wrappers such as providers and error boundaries.
         children: Ordered list of child `VNode` instances.
+        parent: The owning `VNode`, or `None` for the tree root. Used
+            by local (component-scoped) re-renders to bubble a changed
+            native view up to the nearest native container.
         hook_state: The component's
             [`HookState`][pythonnative.hooks.HookState] when the node
             wraps a function component, otherwise `None`.
+        mounted: `False` once the node has been destroyed, so stale
+            entries in the reconciler's dirty set are skipped.
     """
 
-    __slots__ = ("element", "native_view", "children", "hook_state", "_rendered")
+    __slots__ = (
+        "element",
+        "native_view",
+        "children",
+        "parent",
+        "hook_state",
+        "mounted",
+        "_rendered",
+        "_measure_cache",
+    )
 
     def __init__(self, element: Element, native_view: Any, children: List["VNode"]) -> None:
         self.element = element
         self.native_view = native_view
         self.children = children
+        self.parent: Optional["VNode"] = None
         self.hook_state: Any = None
+        self.mounted: bool = True
         self._rendered: Optional[Element] = None
+        # Cache for the leaf intrinsic-size measure callback:
+        # ``(element, max_w, max_h, width, height)``. Lets the layout
+        # pass skip native ``measure_intrinsic`` calls for leaves whose
+        # element *object* (compared by identity) and constraints are
+        # unchanged since the last measure. Because untouched components
+        # keep their exact ``Element`` instances across a local
+        # re-render, this turns "re-measure everything every layout pass"
+        # into "re-measure only what actually re-rendered".
+        self._measure_cache: Optional[Tuple[Any, float, float, float, float]] = None
 
 
 class Reconciler:
@@ -142,6 +167,11 @@ class Reconciler:
         self._screen_re_render: Optional[Any] = None
         self._viewport_size: Tuple[float, float] = (0.0, 0.0)
         self._layout_pass = 0
+        # Function-component VNodes whose own state changed since the
+        # last flush, keyed by ``id`` to dedupe while keeping a strong
+        # reference. Drained by
+        # [`flush_dirty`][pythonnative.reconciler.Reconciler.flush_dirty].
+        self._dirty_nodes: Dict[int, VNode] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -160,6 +190,7 @@ class Reconciler:
         self._log_viewport(
             f"mount: start type={self._type_label(element.type)!r} props={self._props_debug(element.props)}"
         )
+        self._dirty_nodes.clear()
         self._tree = self._create_tree(element)
         self._log_viewport(f"mount: tree created root={self._node_debug(self._tree)}")
         self._flush_effects()
@@ -181,6 +212,9 @@ class Reconciler:
             f"(have_tree={self._tree is not None}) new_type={self._type_label(new_element.type)!r} "
             f"new_props={self._props_debug(new_element.props)}"
         )
+        # A full reconcile rebuilds the whole tree from the root, so any
+        # pending per-component dirty marks are now obsolete.
+        self._dirty_nodes.clear()
         if self._tree is None:
             self._tree = self._create_tree(new_element)
             self._log_viewport(f"reconcile: created initial root={self._node_debug(self._tree)}")
@@ -194,6 +228,221 @@ class Reconciler:
         self._run_layout()
         self._log_viewport("reconcile: done")
         return self._tree.native_view
+
+    def root_view(self) -> Any:
+        """Return the current root native view, or ``None`` before mount."""
+        return self._tree.native_view if self._tree is not None else None
+
+    def mark_dirty(self, vnode: "VNode") -> None:
+        """Queue ``vnode`` (a function component) for a local re-render.
+
+        Called by a component's ``use_state`` / ``use_reducer`` setter
+        when its own state changes. The node is re-rendered on the next
+        [`flush_dirty`][pythonnative.reconciler.Reconciler.flush_dirty]
+        pass, which the screen host schedules. Marking is idempotent and
+        cheap; the actual render is deferred so several setters (e.g.
+        inside [`batch_updates`][pythonnative.batch_updates]) coalesce
+        into a single pass.
+        """
+        if vnode is None or vnode.hook_state is None or not vnode.mounted:
+            return
+        self._dirty_nodes[id(vnode)] = vnode
+
+    def flush_dirty(self) -> Any:
+        """Re-render only the component subtrees marked dirty since the last pass.
+
+        This is the hot path for state-driven updates: instead of
+        re-running the whole app from the root, each dirty function
+        component re-runs its own body (reusing its
+        [`HookState`][pythonnative.hooks.HookState]) and reconciles just
+        its subtree. Nodes are processed shallowest-first so that when a
+        dirty ancestor's re-render already covers a dirty descendant, the
+        descendant is skipped (its ``_dirty`` flag is cleared by the
+        ancestor pass).
+
+        Returns:
+            The (possibly replaced) root native view, so the host can
+            re-attach it if the root changed.
+        """
+        if self._tree is None:
+            return None
+        if not self._dirty_nodes:
+            return self._tree.native_view
+
+        pending = list(self._dirty_nodes.values())
+        self._dirty_nodes.clear()
+        pending.sort(key=self._node_depth)
+        for vnode in pending:
+            if not vnode.mounted:
+                continue
+            hook_state = vnode.hook_state
+            if hook_state is None or not hook_state._dirty:
+                # Already re-rendered as part of a dirty ancestor's pass.
+                continue
+            try:
+                self._update_component(vnode)
+            except Exception as exc:
+                # A local re-render starts below any enclosing
+                # ``ErrorBoundary``, so route the failure to the nearest
+                # boundary ancestor (re-rendering its subtree through the
+                # boundary, which mounts the fallback). With no boundary
+                # the exception propagates, matching a full render.
+                self._handle_local_render_error(vnode, exc)
+
+        self._flush_effects()
+        self._run_layout()
+        return self._tree.native_view
+
+    @staticmethod
+    def _node_depth(vnode: "VNode") -> int:
+        depth = 0
+        node = vnode.parent
+        while node is not None:
+            depth += 1
+            node = node.parent
+        return depth
+
+    def _update_component(self, vnode: "VNode") -> None:
+        """Re-run one function component's body and reconcile its subtree in place.
+
+        Unlike a full reconcile from the root, a local update starts in
+        the *middle* of the tree, so the context stack of every
+        ``__Provider__`` ancestor must be re-established before the body
+        runs (otherwise [`use_context`][pythonnative.use_context] — and
+        therefore [`use_navigation`][pythonnative.use_navigation] — would
+        read the context default instead of the provided value). Nested
+        providers *inside* this subtree are pushed/popped normally by the
+        recursive reconcile beneath us.
+        """
+        from .hooks import _set_hook_state
+
+        new_el = vnode.element
+        if not callable(new_el.type):
+            return
+        hook_state = vnode.hook_state
+        if hook_state is None:
+            return
+
+        providers = self._ancestor_providers(vnode)
+        for context, value in providers:
+            context._stack.append(value)
+        try:
+            hook_state.reset_index()
+            hook_state._trigger_render = self._screen_re_render
+            hook_state._vnode = vnode
+            hook_state._reconciler = self
+            _set_hook_state(hook_state)
+            try:
+                rendered = new_el.type(**new_el.props)
+            finally:
+                _set_hook_state(None)
+                hook_state._dirty = False
+
+            old_native = vnode.native_view
+            if vnode.children:
+                child = self._reconcile_node(vnode.children[0], rendered)
+            else:
+                child = self._create_tree(rendered)
+        finally:
+            for context, _value in reversed(providers):
+                context._stack.pop()
+
+        child.parent = vnode
+        vnode.children = [child]
+        vnode.native_view = child.native_view
+        vnode._rendered = rendered
+
+        if child.native_view is not old_native:
+            self._bubble_native_view_change(vnode, old_native, child.native_view)
+
+    def _handle_local_render_error(self, vnode: "VNode", exc: Exception) -> None:
+        """Route a local re-render failure to the nearest ``ErrorBoundary`` ancestor.
+
+        Re-reconciles the boundary against its own element so the throw
+        is re-triggered *inside*
+        [`_reconcile_error_boundary`][pythonnative.reconciler.Reconciler._reconcile_error_boundary],
+        which destroys the failed subtree and mounts the boundary's
+        fallback. If no boundary encloses ``vnode`` the exception
+        propagates, exactly as it would during a full render.
+        """
+        node = vnode.parent
+        while node is not None:
+            if isinstance(node.element.type, str) and node.element.type == "__ErrorBoundary__":
+                old_native = node.native_view
+                # Like a local component update, this re-reconcile starts
+                # mid-tree, so restore the boundary's own ancestor
+                # provider context first.
+                providers = self._ancestor_providers(node)
+                for context, value in providers:
+                    context._stack.append(value)
+                try:
+                    self._reconcile_node(node, node.element)
+                finally:
+                    for context, _value in reversed(providers):
+                        context._stack.pop()
+                if node.native_view is not old_native:
+                    self._bubble_native_view_change(node, old_native, node.native_view)
+                return
+            node = node.parent
+        raise exc
+
+    @staticmethod
+    def _ancestor_providers(vnode: "VNode") -> List[Tuple[Any, Any]]:
+        """Collect ``(context, value)`` for every ``__Provider__`` above ``vnode``.
+
+        Returned outermost-first so that pushing them in order leaves the
+        nearest provider on top of each context's stack (nearest wins,
+        matching React).
+        """
+        chain: List[Tuple[Any, Any]] = []
+        node = vnode.parent
+        while node is not None:
+            el = node.element
+            if isinstance(el.type, str) and el.type == "__Provider__":
+                chain.append((el.props["__context__"], el.props["__value__"]))
+            node = node.parent
+        chain.reverse()
+        return chain
+
+    def _bubble_native_view_change(self, vnode: "VNode", old_native: Any, new_native: Any) -> None:
+        """Propagate a changed subtree-root native view up to its native parent.
+
+        A local re-render starts below the real native container, so when
+        the dirty component's root native view is swapped (e.g. its output
+        changed type), the change must be reflected in (a) every
+        transparent ancestor that delegated its ``native_view`` to this
+        subtree and (b) the nearest native-container ancestor's child list.
+        """
+        child = vnode
+        node = vnode.parent
+        while node is not None:
+            if self._is_native_container(node):
+                try:
+                    idx: Optional[int] = node.children.index(child)
+                except ValueError:
+                    idx = None
+                if old_native is not None:
+                    self.backend.remove_child(node.native_view, old_native, node.element.type)
+                if new_native is not None:
+                    if idx is None:
+                        self.backend.add_child(node.native_view, new_native, node.element.type)
+                    else:
+                        self.backend.insert_child(node.native_view, new_native, node.element.type, idx)
+                return
+            # Transparent ancestor (component / provider / error boundary /
+            # fragment) delegates its native view to this subtree.
+            if node.native_view is old_native:
+                node.native_view = new_native
+            child = node
+            node = node.parent
+        # Reached the root with no native container above: the root's
+        # ``native_view`` was already updated in the loop. The host
+        # detects the change by comparing ``root_view()`` after the flush.
+
+    @staticmethod
+    def _is_native_container(node: "VNode") -> bool:
+        t = node.element.type
+        return isinstance(t, str) and t not in ("__Provider__", "__ErrorBoundary__", "__Fragment__")
 
     def set_viewport_size(self, width: float, height: float) -> None:
         """Update the viewport size and re-run layout if it changed.
@@ -288,12 +537,24 @@ class Reconciler:
     # ------------------------------------------------------------------
 
     def _flush_effects(self) -> None:
-        """Walk the committed tree and flush pending effects (depth-first)."""
+        """Walk the committed tree and flush pending effects (depth-first).
+
+        This post-commit walk doubles as the single source of truth for
+        ``VNode.parent``: every live node's parent pointer is re-linked
+        here so that local re-renders
+        ([`flush_dirty`][pythonnative.reconciler.Reconciler.flush_dirty])
+        can compute node depth and bubble native-view changes upward
+        without each reconcile path having to maintain parent links by
+        hand. The cost is folded into a walk the reconciler already runs
+        after every commit.
+        """
         if self._tree is not None:
+            self._tree.parent = None
             self._flush_tree_effects(self._tree)
 
     def _flush_tree_effects(self, node: VNode) -> None:
         for child in node.children:
+            child.parent = node
             self._flush_tree_effects(child)
         if node.hook_state is not None:
             node.hook_state.flush_pending_effects()
@@ -347,6 +608,8 @@ class Reconciler:
             vnode = VNode(element, child_node.native_view, [child_node])
             vnode.hook_state = hook_state
             vnode._rendered = rendered
+            hook_state._vnode = vnode
+            hook_state._reconciler = self
             return vnode
 
         # Native element
@@ -478,6 +741,8 @@ class Reconciler:
             old.element = new_el
             old.hook_state = hook_state
             old._rendered = rendered
+            hook_state._vnode = old
+            hook_state._reconciler = self
             return old
 
         # Native element
@@ -667,13 +932,25 @@ class Reconciler:
         )
 
     def _destroy_tree(self, node: VNode) -> None:
+        node.mounted = False
+        # Drop the node from the pending-render set so a setter that
+        # fired moments before unmount can't resurrect a dead subtree.
+        self._dirty_nodes.pop(id(node), None)
         if node.hook_state is not None:
             node.hook_state.cleanup_all_effects()
+            # Break the back-references so the unmounted component's hook
+            # state (and the closures it captured) can be freed by plain
+            # refcounting — important on iOS, where the cyclic GC is
+            # disabled.
+            node.hook_state._vnode = None
+            node.hook_state._reconciler = None
+            node.hook_state._trigger_render = None
         if node.element is not None:
             self._detach_ref(node.element)
         for child in node.children:
             self._destroy_tree(child)
         node.children = []
+        node.parent = None
 
     @staticmethod
     def _strip_reconciler_props(props: dict) -> dict:
@@ -935,6 +1212,10 @@ class Reconciler:
         node_label = self._node_debug(vnode)
 
         def measure(max_w: float, max_h: float) -> Tuple[float, float]:
+            cache = vnode._measure_cache
+            if cache is not None and cache[0] is vnode.element and cache[1] == max_w and cache[2] == max_h:
+                self._log_viewport(f"measure: cache hit type={type_name!r} result=({cache[3]!r},{cache[4]!r})")
+                return (cache[3], cache[4])
             try:
                 self._log_viewport(
                     "measure: before backend.measure_intrinsic " f"{node_label} max=({max_w!r},{max_h!r})"
@@ -942,6 +1223,7 @@ class Reconciler:
                 w, h = backend.measure_intrinsic(view, type_name, max_w, max_h)
                 result = (float(w), float(h))
                 self._log_viewport(f"measure: after backend.measure_intrinsic type={type_name!r} result={result!r}")
+                vnode._measure_cache = (vnode.element, max_w, max_h, result[0], result[1])
                 return result
             except Exception as e:
                 self._log_viewport(

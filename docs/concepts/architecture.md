@@ -19,9 +19,14 @@ platform APIs synchronously from Python.
 3. **Reconciler.** On first render, the
    [`Reconciler`][pythonnative.reconciler.Reconciler] walks the tree
    and creates real native views via the platform backend. On
-   subsequent renders (triggered by hook state changes), it diffs the
-   new tree against the previous one and applies the minimal set of
-   native mutations.
+   subsequent renders it diffs against the previous tree and applies
+   the minimal set of native mutations. State-driven renders are
+   **local**: a setter marks only its own component subtree dirty, and
+   [`flush_dirty`][pythonnative.reconciler.Reconciler.flush_dirty]
+   re-runs just those components instead of the whole app from the
+   root (the full tree is only rebuilt on mount, navigation, and hot
+   reload). Sibling and ancestor components whose state did not change
+   are left untouched.
 4. **Post-render effects.** Effects queued via
    [`use_effect`][pythonnative.use_effect] are flushed **after** the
    reconciler commits native mutations, matching React semantics.
@@ -78,15 +83,29 @@ and a new one is created.
 
 ### Render lifecycle
 
-1. **Render phase**: component functions execute. Hooks record state
-   reads, queue effects, and register memos. No native mutations
-   happen yet.
-2. **Commit phase**: the reconciler applies the diff to native views,
-   creating, updating, and removing views as needed.
-3. **Effect phase**: pending effects are flushed in depth-first order
+1. **Schedule phase**: a `use_state` / `use_reducer` setter that
+   actually changes a value marks its owning component dirty (adding
+   the component's node to the reconciler's dirty set) and asks the
+   screen host to schedule a flush. Several setters coalesce into one
+   flush.
+2. **Render phase**: only the dirty components execute, shallowest
+   first so a dirty ancestor's re-render subsumes any dirty descendant.
+   Each dirty component re-runs its body against its preserved hook
+   state, with the context stack of every enclosing `Provider` restored
+   so [`use_context`][pythonnative.use_context] still resolves. Hooks
+   record state reads, queue effects, and register memos. No native
+   mutations happen yet.
+3. **Commit phase**: the reconciler applies the diff for each
+   re-rendered subtree to native views, creating, updating, and
+   removing views as needed, and bubbles any swapped subtree-root view
+   up to its nearest native container.
+4. **Layout phase**: a layout pass recomputes frames. Leaves whose
+   `Element` is unchanged reuse a cached intrinsic measurement, so
+   untouched subtrees skip native `measure_intrinsic` calls.
+5. **Effect phase**: pending effects are flushed in depth-first order
    (children before parents). Cleanup functions from the previous
    render run before new effect callbacks.
-4. **Drain phase**: if effects set state, a new render pass is
+6. **Drain phase**: if effects set state, another flush is
    automatically triggered and the cycle repeats (up to a safety
    limit to prevent infinite loops).
 

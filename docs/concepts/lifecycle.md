@@ -15,15 +15,22 @@ A render pass is triggered by:
 - A navigation event (`navigate`, `go_back`, `replace`).
 - A hot-reload module swap (see [Hot reload guide](../guides/hot-reload.md)).
 
+A `use_state` / `use_reducer` setter re-renders **locally**: only the
+component that owns the changed state (and the subtree it returns) is
+re-run, not the whole app. The full tree is rebuilt from the root only
+on initial mount, navigation, and hot reload. Sibling and ancestor
+components keep their existing native views and hook state untouched.
+
 The phases:
 
-1. **Render**. Your `@component` function runs. Hooks register state,
+1. **Render**. The affected `@component` function(s) run — for a state
+   change, just the component whose setter fired. Hooks register state,
    queue effects, and capture closures. No native widgets change yet,
    so this phase is cheap and pure (modulo `use_state` updates).
 2. **Commit**. The
-   [`Reconciler`][pythonnative.reconciler.Reconciler] diffs the new
-   tree against the previous one and applies the smallest set of
-   native mutations through the registered
+   [`Reconciler`][pythonnative.reconciler.Reconciler] diffs the
+   re-rendered subtree against the previous one and applies the
+   smallest set of native mutations through the registered
    [`ViewHandler`][pythonnative.native_views.base.ViewHandler]s.
 3. **Effects**. Cleanup callbacks from the *previous* render run
    first; new [`use_effect`][pythonnative.use_effect] callbacks run

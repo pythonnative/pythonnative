@@ -322,28 +322,35 @@ def _request_render(host: Any) -> None:
 
 
 def _re_render(host: Any) -> None:
-    """Run one render pass, then drain any renders queued during it."""
-    from .hooks import Provider, _NavigationContext
+    """Run one *local* render pass, then drain any renders queued during it.
 
-    _log_pn("_re_render: starting render pass")
+    State setters mark only their own component subtree dirty (see
+    [`mark_dirty`][pythonnative.reconciler.Reconciler.mark_dirty]), so
+    this drains the reconciler's dirty set via
+    [`flush_dirty`][pythonnative.reconciler.Reconciler.flush_dirty]
+    instead of re-running the whole ``App`` from the root. The app's
+    element tree is only rebuilt from scratch on mount, navigation, and
+    hot reload.
+    """
+    _log_pn("_re_render: starting local render pass")
     host._is_rendering = True
     try:
         host._render_queued = False
-
-        app_element = _render_app(host)
-        provider_element = Provider(_NavigationContext, host._nav_handle, app_element)
-
-        new_root = host._reconciler.reconcile(provider_element)
-        if new_root is not host._root_native_view:
-            _log_pn(f"_re_render: ROOT VIEW CHANGED ({id(host._root_native_view)} -> {id(new_root)}); reattaching")
-            host._detach_root(host._root_native_view)
-            host._root_native_view = new_root
-            host._attach_root(new_root)
-
+        _commit_dirty(host)
         _drain_renders(host)
     finally:
         host._is_rendering = False
     _log_pn("_re_render: done")
+
+
+def _commit_dirty(host: Any) -> None:
+    """Flush the reconciler's dirty components and re-attach the root if it changed."""
+    new_root = host._reconciler.flush_dirty()
+    if new_root is not host._root_native_view:
+        _log_pn(f"_commit_dirty: ROOT VIEW CHANGED ({id(host._root_native_view)} -> {id(new_root)}); reattaching")
+        host._detach_root(host._root_native_view)
+        host._root_native_view = new_root
+        host._attach_root(new_root)
 
 
 def _drain_renders(host: Any) -> None:
@@ -352,23 +359,12 @@ def _drain_renders(host: Any) -> None:
     Capped at `_MAX_RENDER_PASSES` to break runaway feedback loops
     (e.g., an effect that unconditionally calls a setter).
     """
-    from .hooks import Provider, _NavigationContext
-
     for i in range(_MAX_RENDER_PASSES):
         if not host._render_queued:
             break
         _log_pn(f"_drain_renders: draining pass #{i + 1}")
         host._render_queued = False
-
-        app_element = _render_app(host)
-        provider_element = Provider(_NavigationContext, host._nav_handle, app_element)
-
-        new_root = host._reconciler.reconcile(provider_element)
-        if new_root is not host._root_native_view:
-            _log_pn(f"_drain_renders: ROOT VIEW CHANGED ({id(host._root_native_view)} -> {id(new_root)}); reattaching")
-            host._detach_root(host._root_native_view)
-            host._root_native_view = new_root
-            host._attach_root(new_root)
+        _commit_dirty(host)
 
 
 def _set_args(host: Any, args: Any) -> None:

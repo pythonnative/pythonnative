@@ -76,6 +76,8 @@ class HookState:
         "_trigger_render",
         "_pending_effects",
         "_dirty",
+        "_vnode",
+        "_reconciler",
     )
 
     def __init__(self) -> None:
@@ -95,6 +97,13 @@ class HookState:
         # knows that a memoized component still needs to re-render even
         # when its props didn't change.
         self._dirty: bool = False
+        # Back-references wired by the reconciler so a state setter can
+        # mark *its own* component subtree dirty for a local re-render
+        # (instead of forcing a whole-app re-render from the root). Both
+        # stay ``None`` until the component is mounted, and are cleared
+        # again when it unmounts.
+        self._vnode: Any = None
+        self._reconciler: Any = None
 
     def reset_index(self) -> None:
         """Reset every per-hook cursor to ``0``.
@@ -180,6 +189,25 @@ def _schedule_trigger(trigger: Callable[[], None]) -> None:
         _batch_context.pending_trigger = trigger
     else:
         trigger()
+
+
+def _notify_state_changed(ctx: "HookState") -> None:
+    """Mark ``ctx``'s component dirty and schedule a render after a state change.
+
+    Enqueuing the owning ``VNode`` in the reconciler's dirty set is what
+    makes the subsequent render *local*: the screen host's trigger calls
+    ``flush_dirty``, which re-renders only the components marked here
+    rather than the whole app. The dirty mark is eager (so several
+    setters coalesce), while the render trigger respects
+    [`batch_updates`][pythonnative.batch_updates].
+    """
+    ctx._dirty = True
+    reconciler = ctx._reconciler
+    vnode = ctx._vnode
+    if reconciler is not None and vnode is not None:
+        reconciler.mark_dirty(vnode)
+    if ctx._trigger_render:
+        _schedule_trigger(ctx._trigger_render)
 
 
 @contextmanager
@@ -272,9 +300,7 @@ def use_state(initial: Any = None) -> Tuple[Any, Callable]:
             new_value = new_value(ctx.states[idx])
         if ctx.states[idx] is not new_value and ctx.states[idx] != new_value:
             ctx.states[idx] = new_value
-            ctx._dirty = True
-            if ctx._trigger_render:
-                _schedule_trigger(ctx._trigger_render)
+            _notify_state_changed(ctx)
 
     return current, setter
 
@@ -339,9 +365,7 @@ def use_reducer(reducer: Callable[[Any, Any], Any], initial_state: Any) -> Tuple
         new_state = reducer(ctx.states[idx], action)
         if ctx.states[idx] is not new_state and ctx.states[idx] != new_state:
             ctx.states[idx] = new_state
-            ctx._dirty = True
-            if ctx._trigger_render:
-                _schedule_trigger(ctx._trigger_render)
+            _notify_state_changed(ctx)
 
     return current, dispatch
 
