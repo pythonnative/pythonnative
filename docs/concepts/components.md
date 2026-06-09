@@ -187,8 +187,8 @@ def App():
 The entry point [`create_screen`][pythonnative.create_screen] is called
 internally by native templates to bootstrap your root component. You
 don't call it directly: name your top-level component `App` (so the
-templates can find it by convention) and `pythonnative.json` points
-at the module that defines it.
+templates can find it by convention) and `app.entry_point` in
+`pythonnative.toml` points at the module that defines it.
 
 ## State and re-rendering
 

@@ -26,10 +26,11 @@ pn preview
 ```
 
 `pn preview` runs your real app code, so install your project's
-dependencies in the same environment first (for example
-`pip install -r requirements.txt`). If an import fails, the preview shows
-the traceback in the window instead of crashing — install the missing
-package or fix the code and save to recover.
+dependencies in the same environment first — `pip install` whatever you
+declared in `[requirements].packages` in `pythonnative.toml`. If an
+import fails, the preview shows the traceback in the window instead of
+crashing — install the missing package or fix the code and save to
+recover.
 
 This opens a phone-sized window, mounts your `App`, and starts watching
 `app/` for changes. Edit any component and save — the window updates in

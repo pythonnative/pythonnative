@@ -77,10 +77,13 @@ Play Console / App Store Connect).
 
 ## Can I use any Python package?
 
-Pure-Python packages, mostly yes. The `pn` CLI installs your
-`requirements.txt` into the bundled site:
+Pure-Python packages, mostly yes. List them in
+`[requirements].packages` in `pythonnative.toml` and the `pn` CLI
+bundles them into the app:
 
-- **Android**: Chaquopy installs them into the APK at build time.
+- **Android**: the packages are written to the staged template's
+  `requirements.txt` and Chaquopy installs them into the APK at build
+  time.
 - **iOS**: pure-Python packages are copied into the app bundle's
   `platform-site/`.
 
@@ -90,7 +93,7 @@ platform / architecture (`armeabi-v7a` and `arm64-v8a` on Android,
 extensions (numpy, Pillow) have no upstream iOS wheels yet, so you'd
 need to build them locally.
 
-Don't put `pythonnative` itself in `requirements.txt`; the CLI
+Don't put `pythonnative` itself in `[requirements].packages`; the CLI
 bundles the installed copy directly.
 
 ## Where do `flex`, `padding`, and `position: "absolute"` actually run?

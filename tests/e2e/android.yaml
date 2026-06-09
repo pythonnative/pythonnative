@@ -8,9 +8,9 @@
 # Run with:
 #     cd examples/e2e-suite && pn run android --no-logs
 #     cd ../.. && maestro test tests/e2e/android.yaml
-appId: com.pythonnative.android_template
+appId: com.pythonnative.e2e
 env:
-  APP_ID: com.pythonnative.android_template
+  APP_ID: com.pythonnative.e2e
 ---
 - runFlow: flows/components/text.yaml
 - runFlow: flows/components/button.yaml

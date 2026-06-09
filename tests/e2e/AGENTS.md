@@ -34,7 +34,7 @@ examples/e2e-suite/
 │       ├── runtime/           # run_async demo
 │       ├── platform/          # Platform info demo
 │       └── sdk/               # SDK surface demo
-└── pythonnative.json
+└── pythonnative.toml
 
 tests/e2e/
 ├── AGENTS.md                  # (this file)
@@ -77,7 +77,7 @@ You can also run a single flow directly. Useful when iterating on one demo:
 
 ```bash
 maestro test \
-  -e APP_ID=com.pythonnative.android_template \
+  -e APP_ID=com.pythonnative.e2e \
   tests/e2e/flows/hooks/use_state.yaml
 ```
 
@@ -158,7 +158,7 @@ Diagnostic procedure:
 3. **Re-run the single flow** to confirm the failure is reproducible:
 
    ```bash
-   maestro test -e APP_ID=com.pythonnative.android_template tests/e2e/flows/hooks/use_state.yaml
+   maestro test -e APP_ID=com.pythonnative.e2e tests/e2e/flows/hooks/use_state.yaml
    ```
 
 4. **Inspect logs**: `pn run android` streams `print()` calls from the device. `print("[use_state] count -> ...")` style debug statements from the demo screen surface here, which is usually the fastest way to localize a regression.

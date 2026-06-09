@@ -48,6 +48,26 @@ def _ctx() -> Any:
     return get_android_context()
 
 
+def _pn_runtime_class(class_name: str) -> Any:
+    """Resolve a PythonNative Android helper class for the running app.
+
+    The Android template's helper classes (e.g. ``PNVirtualListView``)
+    live in the app's own package, which the ``pn`` CLI relocates to the
+    configured ``application_id`` at build time. Deriving the package from
+    the runtime ``Context`` (rather than hardcoding the template package)
+    keeps these lookups correct for any app id.
+
+    Args:
+        class_name: The class name within the app package, e.g.
+            ``"PNVirtualListView"`` or ``"PNVirtualListView$Delegate"``.
+
+    Returns:
+        The resolved Java class.
+    """
+    package = _ctx().getPackageName()
+    return jclass(f"{package}.{class_name}")
+
+
 def _density() -> float:
     return float(_ctx().getResources().getDisplayMetrics().density)
 
@@ -1942,7 +1962,7 @@ def _java_id(jobj: Any) -> int:
 
 
 def _make_recyclerview_delegate(props: Dict[str, Any]) -> Any:
-    Delegate = jclass("com.pythonnative.android_template.PNVirtualListView$Delegate")
+    Delegate = _pn_runtime_class("PNVirtualListView$Delegate")
 
     class _Delegate(dynamic_proxy(Delegate)):
         def __init__(self, initial: Dict[str, Any]) -> None:
@@ -2003,7 +2023,7 @@ class VirtualListHandler(AndroidViewHandler):
 
     def create(self, props: Dict[str, Any]) -> Any:
         try:
-            PNVirtualListView = jclass("com.pythonnative.android_template.PNVirtualListView")
+            PNVirtualListView = _pn_runtime_class("PNVirtualListView")
             delegate = _make_recyclerview_delegate(props)
             rv = PNVirtualListView(_ctx(), delegate)
             if "background_color" in props and props["background_color"] is not None:

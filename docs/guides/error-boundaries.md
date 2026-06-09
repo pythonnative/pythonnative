@@ -121,8 +121,8 @@ def reporting_fallback(exc: BaseException):
 
 Most crash reporters (Sentry, Bugsnag, etc.) ship Python clients that
 work fine inside the Chaquopy or rubicon-objc runtime, although you'll
-need to install them via `requirements.txt` so the bundler picks them
-up.
+need to declare them in `[requirements].packages` so the bundler picks
+them up.
 
 ## Boundaries vs `use_effect` cleanup
 

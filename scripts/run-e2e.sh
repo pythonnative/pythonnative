@@ -74,10 +74,13 @@ if ! command -v maestro > /dev/null; then
   exit 2
 fi
 
-case "$PLATFORM" in
-  android) APP_ID="com.pythonnative.android_template" ;;
-  ios)     APP_ID="com.pythonnative.ios-template" ;;
-esac
+# Resolve the app/bundle id straight from the example's pythonnative.toml so
+# this stays correct no matter what id the config declares.
+APP_ID="$(cd examples/e2e-suite && pn app-id "$PLATFORM")"
+if [[ -z "$APP_ID" ]]; then
+  echo "Error: could not resolve APP_ID via 'pn app-id $PLATFORM'." >&2
+  exit 2
+fi
 
 # Resolve each requested suite to a Maestro YAML target. ``full`` expands
 # to the platform's master aggregate; the category names map to the

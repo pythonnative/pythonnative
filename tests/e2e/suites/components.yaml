@@ -1,7 +1,7 @@
 # Component category suite — Maestro entry-point for component-only runs.
 #
 # Usage:
-#     maestro test tests/e2e/suites/components.yaml -e APP_ID=com.pythonnative.android_template
+#     maestro test tests/e2e/suites/components.yaml -e APP_ID=com.pythonnative.e2e
 #
 # Useful for AI agents iterating on a component fix: only the relevant
 # flows run, keeping the feedback loop tight.

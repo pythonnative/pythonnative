@@ -14,8 +14,9 @@ pn init MyApp
 This scaffolds:
 
 - `app/` with a minimal `main.py`
-- `pythonnative.json` project config
-- `requirements.txt`
+- `pythonnative.toml` — your project configuration: app id, version,
+  permissions, assets, and signing. See
+  [Configuration](guides/configuration.md).
 - `.gitignore`
 
 A minimal `app/main.py` looks like:
@@ -65,6 +66,34 @@ Key ideas:
 - Element functions like `pn.Text(...)`, `pn.Button(...)`, `pn.Column(...)` create lightweight descriptions, not native objects.
 
 When the root `Stack.Navigator` is rendered inside the host's first screen, `navigate(...)` and `go_back()` drive the **native** navigation controller (UINavigationController on iOS, AndroidX Navigation Component on Android). Each pushed screen runs in its own reconciler host, so state on the previous screen is preserved by the platform stack.
+
+## Configure your app
+
+Everything about your app's *identity* — its bundle/application id,
+display name, version, the device permissions it requests, its icon and
+splash, third-party packages, and signing — lives in a single
+`pythonnative.toml` at the project root:
+
+```toml
+[app]
+id = "com.example.myapp"
+name = "myapp"
+display_name = "My App"
+version = "1.0.0"
+build = 1
+
+[permissions]
+camera = "Scan receipts with your camera."
+notifications = true
+
+[assets]
+icon = "assets/icon.png"
+```
+
+The build system reads this file for every command, so `pn run`,
+`pn build`, `pn doctor`, and `pn app-id` all stay in sync. See the full
+[Configuration reference](guides/configuration.md) and the
+[Permissions guide](guides/permissions.md).
 
 ## Preview on your desktop
 
@@ -176,6 +205,36 @@ Pass `--no-logs` if you'd rather run fire-and-forget:
 pn run android --no-logs
 pn run ios --no-logs
 ```
+
+## Check your toolchain
+
+Before your first build, run `pn doctor` to verify the local toolchain
+(Java/Android SDK for Android; Xcode/Simulator and a signing team for
+iOS) and validate your `pythonnative.toml`:
+
+```bash
+pn doctor            # check everything
+pn doctor android    # only Android-relevant checks
+pn doctor ios        # only iOS-relevant checks
+```
+
+It prints `[ok]` / `[!]` / `[x]` for each check and exits non-zero when
+something will block a build, so it's safe to run in CI.
+
+## Build for release
+
+When you're ready to ship, `pn build` produces signed, distributable
+artifacts:
+
+```bash
+pn build android     # release APK + AAB
+pn build ios         # signed .ipa via xcodebuild archive/export
+```
+
+Release builds need signing configured in `pythonnative.toml` (a
+keystore for Android, a development team for iOS). See
+[Building for release](guides/building-for-release.md) for the full
+walkthrough.
 
 ## Clean
 

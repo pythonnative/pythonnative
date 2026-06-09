@@ -15,7 +15,7 @@ The native Android template uses
 [`create_screen`][pythonnative.create_screen] internally to bootstrap your
 root component inside a `ScreenFragment`. You don't call `create_screen`
 directly; just export your component and configure the entry point in
-`pythonnative.json`.
+`pythonnative.toml` (`app.entry_point`).
 
 ## Run
 

@@ -23,16 +23,16 @@ If `python -c ...` works but `which pn` returns nothing, your shell
 is finding a different Python. Reactivate the venv or run
 `python -m pythonnative.cli.pn ...` directly.
 
-### `Refusing to overwrite existing: app/, pythonnative.json, ...`
+### `Refusing to overwrite existing: app/, pythonnative.toml, ...`
 
 `pn init` won't clobber existing project files. Pass `--force` or
 remove the listed files first.
 
-### `Error: 'pythonnative' must not be in requirements.txt`
+### `Do not list 'pythonnative' in [requirements].packages`
 
 The CLI bundles the installed `pythonnative` package directly into
-your app, so listing it in `requirements.txt` would install a second
-copy and confuse imports. Remove the line and re-run `pn run`.
+your app, so listing it in `[requirements].packages` would install a
+second copy and confuse imports. Remove the line and re-run `pn run`.
 
 ### `Could not find bundled template directory ...`
 

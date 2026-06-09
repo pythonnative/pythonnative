@@ -1,80 +1,52 @@
-"""`pn` CLI: scaffold, run, and clean PythonNative projects.
+"""`pn` CLI: scaffold, diagnose, preview, run, and build PythonNative apps.
 
-The console script `pn` (declared in `pyproject.toml` under
-`[project.scripts]`) dispatches to one of four subcommands:
+The console script `pn` (declared in `pyproject.toml`) dispatches to:
 
-- `pn init [name]`: scaffold a new project in the current directory.
-- `pn preview [component]`: render the app in a desktop (Tkinter)
-  window with instant Fast Refresh — the fast inner dev loop, no
-  device or simulator required.
-- `pn run android|ios`: stage code into a native template, build it,
-  install it, and stream logs back to the terminal.
+- `pn init [name]`: scaffold a new project (``pythonnative.toml`` + ``app/``).
+- `pn doctor [platform]`: diagnose the local toolchain and config.
+- `pn preview [component]`: render the app in a desktop (Tkinter) window
+  with Fast Refresh — the fast inner dev loop, no device required.
+- `pn run android|ios`: stage + build + install + launch on a device or
+  simulator, with optional on-device hot reload.
+- `pn build android|ios`: produce standalone artifacts (signed APK/AAB,
+  or an iOS archive/IPA).
+- `pn app-id android|ios`: print the resolved application/bundle id
+  (handy for scripts and CI).
 - `pn clean`: remove the local `build/` directory.
 
-The implementation here is intentionally side-effect heavy: it shells
-out to `gradle`, `xcodebuild`, `adb`, and `xcrun simctl`. Errors from
-those tools are usually surfaced inline so the developer sees the
-underlying message.
+The heavy lifting lives in the ``pythonnative.project`` package; this
+module is a thin, side-effect-y shell that wires arguments to it and
+handles the device-facing steps (simulator boot, log streaming, hot
+reload) that can't be unit tested.
 """
 
+from __future__ import annotations
+
 import argparse
-import hashlib
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
-import sysconfig
 import time
-import urllib.request
-from importlib import resources
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..project import builder as builder_mod
+from ..project import doctor as doctor_mod
+from ..project.android import collect_logcat_filters
+from ..project.config import CONFIG_FILENAME, AppConfig, ConfigError, render_default_toml
 
-def init_project(args: argparse.Namespace) -> None:
-    """Scaffold a new PythonNative project in the current directory.
+HOT_RELOAD_DEV_ROOT = "pythonnative_dev"
+"""Subdirectory (under the app's writable storage) for hot-reload overlays."""
 
-    Creates `app/main.py`, `pythonnative.json`, `requirements.txt`,
-    and `.gitignore`. Refuses to overwrite existing files unless
-    `--force` is passed.
 
-    Args:
-        args: The parsed argparse namespace. Recognized attributes:
+# ======================================================================
+# init
+# ======================================================================
 
-            - `name` (`str`, optional): Project name (defaults to the
-              current directory name).
-            - `force` (`bool`): Overwrite existing files.
-    """
-    project_name: str = getattr(args, "name", None) or os.path.basename(os.getcwd())
-    cwd: str = os.getcwd()
-
-    app_dir = os.path.join(cwd, "app")
-    config_path = os.path.join(cwd, "pythonnative.json")
-    requirements_path = os.path.join(cwd, "requirements.txt")
-    gitignore_path = os.path.join(cwd, ".gitignore")
-
-    # Prevent accidental overwrite unless --force is provided
-    if not getattr(args, "force", False):
-        exists = []
-        if os.path.exists(app_dir):
-            exists.append("app/")
-        if os.path.exists(config_path):
-            exists.append("pythonnative.json")
-        if os.path.exists(requirements_path):
-            exists.append("requirements.txt")
-        if os.path.exists(gitignore_path):
-            exists.append(".gitignore")
-        if exists:
-            print(f"Refusing to overwrite existing: {', '.join(exists)}. Use --force to overwrite.")
-            sys.exit(1)
-
-    os.makedirs(app_dir, exist_ok=True)
-
-    main_py = os.path.join(app_dir, "main.py")
-    if not os.path.exists(main_py) or args.force:
-        with open(main_py, "w", encoding="utf-8") as f:
-            f.write("""import pythonnative as pn
+_MAIN_TEMPLATE = """import pythonnative as pn
 
 Stack = pn.create_stack_navigator()
 
@@ -113,1056 +85,113 @@ def App():
             Stack.Screen("Detail", component=DetailScreen, options={"title": "Detail"}),
         )
     )
-""")
+"""
 
-    # Create config
-    config = {
-        "name": project_name,
-        "appId": "com.example." + project_name.replace(" ", "").lower(),
-        "entryPoint": "app/main.py",
-        "pythonVersion": "3.11",
-        "ios": {},
-        "android": {},
-    }
-    with open(config_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2)
-
-    # Requirements (third-party packages only; pythonnative itself is bundled by the CLI)
-    if not os.path.exists(requirements_path) or args.force:
-        with open(requirements_path, "w", encoding="utf-8") as f:
-            f.write("")
-
-    # .gitignore
-    default_gitignore = "# PythonNative\n" "__pycache__/\n" "*.pyc\n" ".venv/\n" "build/\n" ".DS_Store\n"
-    if not os.path.exists(gitignore_path) or args.force:
-        with open(gitignore_path, "w", encoding="utf-8") as f:
-            f.write(default_gitignore)
-
-    print("Initialized PythonNative project.")
+_GITIGNORE = "# PythonNative\n__pycache__/\n*.pyc\n.venv/\nbuild/\n.DS_Store\n"
 
 
-def _copy_dir(src: str, dst: str) -> None:
-    """Recursively copy `src` into `dst`, creating parents as needed."""
-    os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copytree(src, dst, dirs_exist_ok=True)
+def _app_id_from_name(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9_]", "", name.lower())
+    if not slug or not slug[0].isalpha():
+        slug = "app" + slug
+    return f"com.example.{slug}"
 
 
-def _copy_bundled_template_dir(template_dir: str, destination: str) -> None:
-    """Copy a bundled template directory into `destination`.
+def init_project(args: argparse.Namespace) -> None:
+    """Scaffold a new PythonNative project in the current directory.
 
-    Search order:
-
-    1. Local source checkout (`src/pythonnative/templates/<name>`).
-    2. Repository `templates/<name>` (used when running from a clone).
-    3. Installed package data via `importlib.resources`.
-    4. `sysconfig` data/site directories (last resort).
+    Creates ``app/main.py``, ``pythonnative.toml``, and ``.gitignore``.
+    Refuses to overwrite existing files unless ``--force`` is passed.
 
     Args:
-        template_dir: The bundled template subdirectory to copy
-            (e.g., `"android_template"`).
-        destination: Parent directory; the template lands at
-            `<destination>/<template_dir>`.
-
-    Raises:
-        FileNotFoundError: If no bundled copy can be located.
+        args: Parsed namespace with ``name`` (optional) and ``force``.
     """
-    dest_path = os.path.join(destination, template_dir)
+    cwd = Path.cwd()
+    project_name: str = getattr(args, "name", None) or cwd.name
+    force: bool = getattr(args, "force", False)
 
-    # Dev-first: prefer local source templates if running from a checkout (avoid stale packaged data)
-    try:
-        # __file__ -> src/pythonnative/cli/pn.py, so go up to src/, then to repo root
-        src_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        # Check templates located inside the source package tree
-        local_pkg_templates = os.path.join(src_dir, "pythonnative", "templates", template_dir)
-        if os.path.isdir(local_pkg_templates):
-            _copy_dir(local_pkg_templates, dest_path)
-            return
-        repo_root = os.path.abspath(os.path.join(src_dir, ".."))
-        repo_templates = os.path.join(repo_root, "templates")
-        candidate_dir = os.path.join(repo_templates, template_dir)
-        if os.path.isdir(candidate_dir):
-            _copy_dir(candidate_dir, dest_path)
-            return
-    except Exception:
-        pass
+    app_dir = cwd / "app"
+    config_path = cwd / CONFIG_FILENAME
+    gitignore_path = cwd / ".gitignore"
 
-    # Try to load from installed package resources (templates packaged inside the module)
-    try:
-        cand = resources.files("pythonnative").joinpath("templates").joinpath(template_dir)
-        with resources.as_file(cand) as p:
-            resource_path = str(p)
-            if os.path.isdir(resource_path):
-                _copy_dir(resource_path, dest_path)
-                return
-    except Exception:
-        pass
-
-    # Last resort: check typical data-file locations
-    try:
-        data_paths = sysconfig.get_paths()
-        search_bases = [
-            data_paths.get("data"),
-            data_paths.get("purelib"),
-            data_paths.get("platlib"),
+    if not force:
+        existing = [
+            label
+            for label, path in (("app/", app_dir), (CONFIG_FILENAME, config_path), (".gitignore", gitignore_path))
+            if path.exists()
         ]
-        for base in filter(None, search_bases):
-            candidate_dir = os.path.join(base, "pythonnative", "templates", template_dir)
-            if os.path.isdir(candidate_dir):
-                _copy_dir(candidate_dir, dest_path)
-                return
-    except Exception:
-        pass
-
-    raise FileNotFoundError(f"Could not find bundled template directory {template_dir}. Ensure templates are packaged.")
-
-
-def _github_json(url: str) -> Any:
-    """Fetch a GitHub JSON endpoint, optionally authenticated.
-
-    Reads `GITHUB_TOKEN` or `GH_TOKEN` from the environment to raise
-    the unauthenticated rate limit.
-    """
-    headers: dict[str, str] = {"User-Agent": "pythonnative-cli"}
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req) as r:
-        return json.loads(r.read().decode("utf-8"))
-
-
-def _resolve_python_apple_support_asset(
-    py_major_minor: str = "3.11", preferred_name: str = "Python-3.11-iOS-support.b7.tar.gz"
-) -> Optional[str]:
-    """Resolve a download URL for a `Python-Apple-support` release asset.
-
-    Prefers an exact name match for `preferred_name`; otherwise falls
-    back to the newest asset whose name contains
-    `Python-{py_major_minor}-iOS-support` and ends with `.tar.gz`.
-
-    Args:
-        py_major_minor: Python version string used in the asset name
-            (e.g., `"3.11"`).
-        preferred_name: Exact filename to prefer when multiple matching
-            assets exist.
-
-    Returns:
-        A `browser_download_url` string, or `None` if the GitHub API
-        call fails or no matching asset is found.
-    """
-    try:
-        releases = _github_json("https://api.github.com/repos/beeware/Python-Apple-support/releases?per_page=100")
-        # Search all releases for preferred_name first
-        for rel in releases:
-            for a in rel.get("assets", []) or []:
-                name = a.get("name") or ""
-                if name == preferred_name:
-                    return a.get("browser_download_url")
-        # Fallback: any matching Python-{version}-iOS-support*.tar.gz (take first encountered)
-        needle = f"Python-{py_major_minor}-iOS-support"
-        for rel in releases:
-            for a in rel.get("assets", []) or []:
-                name = a.get("name") or ""
-                if needle in name and name.endswith(".tar.gz"):
-                    return a.get("browser_download_url")
-    except Exception:
-        pass
-    return None
-
-
-def create_android_project(project_name: str, destination: str) -> None:
-    """Stage the bundled Android template into `destination`.
-
-    Args:
-        project_name: Project name (currently informational; the
-            template uses fixed package IDs).
-        destination: Directory to receive the staged project.
-    """
-    _copy_bundled_template_dir("android_template", destination)
-
-
-def create_ios_project(project_name: str, destination: str) -> None:
-    """Stage the bundled iOS template into `destination`.
-
-    Args:
-        project_name: Project name (currently informational; the
-            template uses fixed bundle IDs).
-        destination: Directory to receive the staged project.
-    """
-    _copy_bundled_template_dir("ios_template", destination)
-
-
-def _read_project_config() -> dict:
-    """Read `pythonnative.json` from the current working directory.
-
-    Returns:
-        The parsed config dict, or `{}` if the file is missing.
-    """
-    config_path = os.path.join(os.getcwd(), "pythonnative.json")
-    if os.path.exists(config_path):
-        with open(config_path, encoding="utf-8") as f:
-            return json.load(f)
-    return {}
-
-
-def _read_requirements(requirements_path: str) -> list[str]:
-    """Read a requirements file and return non-empty, non-comment lines.
-
-    Exits with an error if `pythonnative` is listed: the CLI bundles
-    it directly, so it must not be installed separately via pip or
-    Chaquopy.
-
-    Args:
-        requirements_path: Path to a `requirements.txt` file.
-
-    Returns:
-        A list of requirement specifier strings, in file order.
-    """
-    if not os.path.exists(requirements_path):
-        return []
-    with open(requirements_path, encoding="utf-8") as f:
-        lines = f.readlines()
-    result: list[str] = []
-    for line in lines:
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or stripped.startswith("-"):
-            continue
-        pkg_name = re.split(r"[\[><=!;]", stripped)[0].strip()
-        if pkg_name.lower().replace("-", "_") == "pythonnative":
-            print(
-                "Error: 'pythonnative' must not be in requirements.txt.\n"
-                "The pn CLI automatically bundles the installed pythonnative into your app.\n"
-                "requirements.txt is for third-party packages only (e.g. humanize, requests).\n"
-                "Remove the pythonnative line from requirements.txt and try again."
-            )
+        if existing:
+            print(f"Refusing to overwrite existing: {', '.join(existing)}. Use --force to overwrite.")
             sys.exit(1)
-        result.append(stripped)
-    return result
 
+    app_dir.mkdir(parents=True, exist_ok=True)
+    main_py = app_dir / "main.py"
+    if force or not main_py.exists():
+        main_py.write_text(_MAIN_TEMPLATE, encoding="utf-8")
 
-ANDROID_PACKAGE_ID: str = "com.pythonnative.android_template"
-HOT_RELOAD_DEV_ROOT: str = "pythonnative_dev"
-
-ANDROID_LOGCAT_FILTERS: list[str] = [
-    "python.stdout:V",
-    "python.stderr:V",
-    "MainActivity:V",
-    "ScreenFragment:V",
-    "Navigator:V",
-    "PythonNative:V",
-    "AndroidRuntime:E",
-    "System.err:W",
-    "*:S",
-]
-
-IOS_BUNDLE_ID: str = "com.pythonnative.ios-template"
-
-
-def _start_android_log_stream() -> Optional[subprocess.Popen]:
-    """Clear logcat and stream Python-relevant log tags to the terminal.
-
-    Python's `print()` output reaches logcat via Chaquopy, which
-    redirects `sys.stdout`/`sys.stderr` to the `python.stdout` and
-    `python.stderr` tags.
-
-    Returns:
-        The `adb logcat` subprocess, or `None` when `adb` is
-        unavailable on `PATH`.
-    """
-    try:
-        subprocess.run(["adb", "logcat", "-c"], check=False, capture_output=True)
-    except FileNotFoundError:
-        print("Note: 'adb' not found on PATH; skipping log streaming.")
-        return None
-    try:
-        proc = subprocess.Popen(["adb", "logcat", *ANDROID_LOGCAT_FILTERS])
-    except FileNotFoundError:
-        return None
-    print("Streaming Python logs from device (Ctrl+C to stop)...")
-    return proc
-
-
-def _booted_ios_udid() -> Optional[str]:
-    """Return a booted iOS Simulator's UDID, or `None` if none is booted.
-
-    Used by `_start_ios_log_stream` so the hot-reload path doesn't
-    need to thread the UDID through from the install step.
-    """
-    try:
-        result = subprocess.run(
-            ["xcrun", "simctl", "list", "devices", "booted", "--json"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        return None
-    try:
-        data = json.loads(result.stdout or "{}")
-    except json.JSONDecodeError:
-        return None
-    for _runtime, devices in (data.get("devices") or {}).items():
-        for device in devices or []:
-            if device.get("state") == "Booted":
-                udid = device.get("udid")
-                if udid:
-                    return str(udid)
-    return None
-
-
-def _start_ios_log_stream() -> Optional[subprocess.Popen]:
-    """Re-launch the iOS app with a console PTY so its stdio streams here.
-
-    Mirrors the approach `pn run ios` (without `--hot-reload`) takes:
-    ``xcrun simctl launch --console-pty`` attaches the parent
-    terminal to the app's stderr, which is where Python ``print()``
-    output is routed (see `pythonnative._ios_log`) and where Swift
-    ``NSLog`` calls land. Unlike ``log stream``, this *only*
-    surfaces what the app writes itself — none of UIKit's verbose
-    ``os_log`` chatter.
-
-    Returns:
-        The launched subprocess (output inherits the parent
-        terminal), or `None` when no simulator is booted or
-        `xcrun` is unavailable.
-    """
-    udid = _booted_ios_udid()
-    if udid is None:
-        print("Note: no booted iOS Simulator found; skipping log streaming.")
-        return None
-    sim_env = os.environ.copy()
-    sim_env["SIMCTL_CHILD_PYTHONUNBUFFERED"] = "1"
-    try:
-        proc = subprocess.Popen(
-            [
-                "xcrun",
-                "simctl",
-                "launch",
-                "--console-pty",
-                "--terminate-running-process",
-                udid,
-                IOS_BUNDLE_ID,
-            ],
-            env=sim_env,
-        )
-    except FileNotFoundError:
-        print("Note: 'xcrun' not found on PATH; skipping iOS log streaming.")
-        return None
-    print("Streaming iOS app logs from the simulator (Ctrl+C to stop)...")
-    return proc
-
-
-def _terminate_subprocess(proc: Optional[subprocess.Popen]) -> None:
-    """Politely stop a subprocess, escalating to `SIGKILL` if needed.
-
-    A no-op when `proc` is `None` or has already exited.
-    """
-    if proc is None:
-        return
-    if proc.poll() is not None:
-        return
-    proc.terminate()
-    try:
-        proc.wait(timeout=3)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-
-
-def _hot_reload_manifest_payload(
-    changed_files: List[str],
-    project_dir: str,
-    *,
-    version: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Build the reload manifest consumed by the running app."""
-    from pythonnative.hot_reload import ModuleReloader
-
-    rel_files = sorted(os.path.relpath(path, project_dir) for path in changed_files)
-    return {
-        "version": version or str(time.time_ns()),
-        "files": rel_files,
-        "modules": ModuleReloader.modules_from_files(rel_files),
-    }
-
-
-def _write_hot_reload_manifest(changed_files: List[str], project_dir: str, build_dir: str) -> str:
-    """Write a local hot-reload manifest and return its path."""
-    manifest_dir = os.path.join(build_dir, "hot_reload")
-    os.makedirs(manifest_dir, exist_ok=True)
-    manifest_path = os.path.join(manifest_dir, "reload.json")
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(_hot_reload_manifest_payload(changed_files, project_dir), f)
-    return manifest_path
-
-
-def _android_hot_reload_dest(rel_path: str) -> str:
-    """Return a `run-as` relative destination for an app source file."""
-    return os.path.join("files", HOT_RELOAD_DEV_ROOT, rel_path)
-
-
-def _push_android_hot_reload_file(local_path: str, rel_path: str) -> bool:
-    """Push one file into the Android app's writable hot-reload overlay."""
-    tmp_path = f"/data/local/tmp/pythonnative-hot-reload-{os.getpid()}-{os.path.basename(local_path)}"
-    dest_path = _android_hot_reload_dest(rel_path)
-    dest_dir = os.path.dirname(dest_path)
-    push = subprocess.run(["adb", "push", local_path, tmp_path], check=False, capture_output=True)
-    if push.returncode != 0:
-        return False
-    subprocess.run(
-        ["adb", "shell", "run-as", ANDROID_PACKAGE_ID, "mkdir", "-p", dest_dir],
-        check=False,
-        capture_output=True,
+    config_path.write_text(
+        render_default_toml(name=project_name, app_id=_app_id_from_name(project_name)),
+        encoding="utf-8",
     )
-    copy = subprocess.run(
-        ["adb", "shell", "run-as", ANDROID_PACKAGE_ID, "cp", tmp_path, dest_path],
-        check=False,
-        capture_output=True,
-    )
-    subprocess.run(["adb", "shell", "rm", "-f", tmp_path], check=False, capture_output=True)
-    return copy.returncode == 0
+    if force or not gitignore_path.exists():
+        gitignore_path.write_text(_GITIGNORE, encoding="utf-8")
+
+    print(f"Initialized PythonNative project in {cwd}.")
+    print("Next: pn preview   (desktop)   |   pn run android   |   pn run ios")
 
 
-def _ios_data_container() -> Optional[str]:
-    """Return the booted simulator's app data container, if available."""
-    try:
-        result = subprocess.run(
-            ["xcrun", "simctl", "get_app_container", "booted", IOS_BUNDLE_ID, "data"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        return None
-    if result.returncode != 0:
-        return None
-    container = result.stdout.strip()
-    return container or None
+# ======================================================================
+# doctor / app-id
+# ======================================================================
 
 
-def _push_ios_hot_reload_file(local_path: str, rel_path: str) -> bool:
-    """Copy one file into the booted iOS Simulator's hot-reload overlay."""
-    container = _ios_data_container()
-    if container is None:
-        return False
-    dest_path = os.path.join(container, "Documents", HOT_RELOAD_DEV_ROOT, rel_path)
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-    shutil.copy2(local_path, dest_path)
-    return True
-
-
-def _clear_android_hot_reload_overlay() -> bool:
-    """Remove stale Android hot-reload files before launching."""
-    result = subprocess.run(
-        ["adb", "shell", "run-as", ANDROID_PACKAGE_ID, "rm", "-rf", f"files/{HOT_RELOAD_DEV_ROOT}"],
-        check=False,
-        capture_output=True,
-    )
-    return result.returncode == 0
-
-
-def _clear_ios_hot_reload_overlay() -> bool:
-    """Remove stale iOS Simulator hot-reload files before launching."""
-    container = _ios_data_container()
-    if container is None:
-        return False
-    shutil.rmtree(os.path.join(container, "Documents", HOT_RELOAD_DEV_ROOT), ignore_errors=True)
-    return True
-
-
-def _clear_hot_reload_overlay(platform: str) -> bool:
-    """Remove stale hot-reload overlay files for `platform`."""
-    if platform == "android":
-        return _clear_android_hot_reload_overlay()
-    if platform == "ios":
-        return _clear_ios_hot_reload_overlay()
-    return False
-
-
-def _push_hot_reload_file(platform: str, local_path: str, rel_path: str) -> bool:
-    """Push a changed source file to the running app."""
-    if platform == "android":
-        return _push_android_hot_reload_file(local_path, rel_path)
-    if platform == "ios":
-        return _push_ios_hot_reload_file(local_path, rel_path)
-    return False
-
-
-def run_project(args: argparse.Namespace) -> None:
-    """Build and run the project on the requested platform.
-
-    Stages templates, copies the user's `app/` into the platform
-    project, optionally installs Python requirements, and (unless
-    `--prepare-only` is set) builds and launches the app on a
-    connected device or simulator. With `--hot-reload`, also watches
-    `app/` for changes and pushes updates to the device.
+def doctor_command(args: argparse.Namespace) -> None:
+    """Run toolchain/config diagnostics and exit non-zero on errors.
 
     Args:
-        args: Parsed argparse namespace. Recognized attributes:
-
-            - `platform` (`"android"` | `"ios"`): Build target.
-            - `prepare_only` (`bool`): Stage files but skip the build.
-            - `hot_reload` (`bool`): Watch `app/` and push changes.
-            - `no_logs` (`bool`): Don't stream device logs after launch.
+        args: Parsed namespace with optional ``platform``.
     """
-    # Determine the platform
-    platform: str = args.platform
-    prepare_only: bool = getattr(args, "prepare_only", False)
-    hot_reload: bool = getattr(args, "hot_reload", False)
-    show_logs: bool = not getattr(args, "no_logs", False)
-
-    # Read project configuration and save project root before any chdir
-    project_dir: str = os.getcwd()
-    config = _read_project_config()
-    python_version: str = config.get("pythonVersion", "3.11")
-
-    # Define the build directory
-    build_dir: str = os.path.join(project_dir, "build", platform)
-
-    # Create the build directory if it doesn't exist
-    os.makedirs(build_dir, exist_ok=True)
-
-    # Generate the required project files
-    if platform == "android":
-        create_android_project("MyApp", build_dir)
-    elif platform == "ios":
-        create_ios_project("MyApp", build_dir)
-
-    # Copy the user's Python code into the project
-    src_dir: str = os.path.join(os.getcwd(), "app")
-
-    # Adjust the destination directory for Android project
-    if platform == "android":
-        dest_dir: str = os.path.join(build_dir, "android_template", "app", "src", "main", "python", "app")
+    platform: Optional[str] = getattr(args, "platform", None)
+    results = doctor_mod.run_doctor(Path.cwd(), platform=platform)
+    print("PythonNative doctor\n")
+    for result in results:
+        print(result.format())
+    level = doctor_mod.worst_level(results)
+    print()
+    if level == doctor_mod.ERROR:
+        print("Found problems that will block builds. Address the [x] items above.")
+        sys.exit(1)
+    if level == doctor_mod.WARN:
+        print("Ready, with warnings. Review the [!] items above.")
     else:
-        # For iOS, stage the Python app in a top-level folder for later integration scripts
-        dest_dir = os.path.join(build_dir, "app")
-
-    # Create the destination directory if it doesn't exist
-    os.makedirs(dest_dir, exist_ok=True)
-    shutil.copytree(src_dir, dest_dir, dirs_exist_ok=True)
-
-    # During local development (running from repository), also bundle the
-    # local library sources so the app uses the in-repo version instead of
-    # the PyPI package. This provides faster inner-loop iteration and avoids
-    # version skew during development.
-    try:
-        # __file__ -> src/pythonnative/cli/pn.py, so repo root is one up from src/
-        src_root = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".."))
-        local_lib = os.path.join(src_root, "pythonnative")
-        if os.path.isdir(local_lib):
-            if platform == "android":
-                python_root = os.path.join(build_dir, "android_template", "app", "src", "main", "python")
-            else:
-                python_root = os.path.join(build_dir)  # staged at build/ios/app for iOS below
-            os.makedirs(python_root, exist_ok=True)
-            shutil.copytree(local_lib, os.path.join(python_root, "pythonnative"), dirs_exist_ok=True)
-    except Exception:
-        # Non-fatal; fallback to the packaged PyPI dependency if present
-        pass
-
-    # Validate and read the user's requirements.txt
-    requirements_path = os.path.join(project_dir, "requirements.txt")
-    pip_reqs = _read_requirements(requirements_path)
-
-    if platform == "android":
-        # Patch the Android build.gradle with the configured Python version
-        app_build_gradle = os.path.join(build_dir, "android_template", "app", "build.gradle")
-        if os.path.exists(app_build_gradle):
-            with open(app_build_gradle, encoding="utf-8") as f:
-                content = f.read()
-            content = content.replace('version "3.11"', f'version "{python_version}"')
-            with open(app_build_gradle, "w", encoding="utf-8") as f:
-                f.write(content)
-        # Copy requirements.txt into the Android project for Chaquopy
-        android_reqs_path = os.path.join(build_dir, "android_template", "app", "requirements.txt")
-        if os.path.exists(requirements_path):
-            shutil.copy2(requirements_path, android_reqs_path)
-        else:
-            with open(android_reqs_path, "w", encoding="utf-8") as f:
-                f.write("")
-
-    # Install any necessary Python packages into the host environment
-    # Skip installation during prepare-only to avoid network access and speed up scaffolding
-    if not prepare_only:
-        if os.path.exists(requirements_path):
-            subprocess.run([sys.executable, "-m", "pip", "install", "-r", requirements_path], check=False)
-
-    # Run the project
-    if prepare_only:
-        print("Prepared project in build/ without building (prepare-only).")
-        return
-
-    if platform == "android":
-        # Change to the Android project directory
-        android_project_dir: str = os.path.join(build_dir, "android_template")
-        os.chdir(android_project_dir)
-
-        # Add executable permissions to the gradlew script
-        gradlew_path: str = os.path.join(android_project_dir, "gradlew")
-        os.chmod(gradlew_path, 0o755)  # this makes the file executable for the user
-
-        # Build the Android project and install it on the device
-        env: dict[str, str] = os.environ.copy()
-        # Respect JAVA_HOME if set; otherwise, attempt a best-effort on macOS via Homebrew
-        if sys.platform == "darwin" and not env.get("JAVA_HOME"):
-            try:
-                jdk_path: str = subprocess.check_output(["brew", "--prefix", "openjdk@17"]).decode().strip()
-                env["JAVA_HOME"] = jdk_path
-            except Exception:
-                pass
-        subprocess.run(["./gradlew", "installDebug"], check=True, env=env)
-
-        _clear_hot_reload_overlay(platform)
-
-        # Run the Android app
-        # Assumes that the package name of your app is "com.example.myapp" and the main activity is "MainActivity"
-        # Replace "com.example.myapp" and ".MainActivity" with your actual package name and main activity
-        subprocess.run(
-            [
-                "adb",
-                "shell",
-                "am",
-                "start",
-                "-n",
-                f"{ANDROID_PACKAGE_ID}/.MainActivity",
-            ],
-            check=True,
-        )
-
-        # Stream Python logs from logcat unless the user opted out or requested
-        # hot-reload (hot-reload handles its own log tailing below).
-        if show_logs and not hot_reload:
-            logcat_proc = _start_android_log_stream()
-            if logcat_proc is not None:
-                try:
-                    logcat_proc.wait()
-                except KeyboardInterrupt:
-                    print()
-                    _terminate_subprocess(logcat_proc)
-                    print("Stopped log streaming.")
-    elif platform == "ios":
-        # Attempt to build and run on iOS Simulator (best-effort)
-        ios_project_dir: str = os.path.join(build_dir, "ios_template")
-        if os.path.isdir(ios_project_dir):
-            # Stage embedded Python runtime inputs by downloading pinned assets
-            try:
-                assets_dir = os.path.join(build_dir, "ios_runtime")
-                os.makedirs(assets_dir, exist_ok=True)
-                # Pinned preferred asset name and checksum (b7)
-                preferred_name = "Python-3.11-iOS-support.b7.tar.gz"
-                sha256 = "2b7d8589715b9890e8dd7e1bce91c210bb5287417e17b9af120fc577675ed28e"
-                # Resolve a working download URL from GitHub Releases
-                url = _resolve_python_apple_support_asset("3.11", preferred_name=preferred_name)
-                if not url:
-                    raise RuntimeError("Could not resolve Python-Apple-support asset URL from GitHub Releases.")
-                tar_path = os.path.join(assets_dir, os.path.basename(url))
-                if not os.path.exists(tar_path):
-                    print("Downloading Python-Apple-support (3.11 iOS)")
-                    req = urllib.request.Request(url, headers={"User-Agent": "pythonnative-cli"})
-                    with urllib.request.urlopen(req) as r, open(tar_path, "wb") as f:
-                        f.write(r.read())
-                # Verify checksum
-                h = hashlib.sha256()
-                with open(tar_path, "rb") as f:
-                    for chunk in iter(lambda: f.read(1024 * 1024), b""):
-                        h.update(chunk)
-                if h.hexdigest() != sha256:
-                    raise RuntimeError("SHA256 mismatch for Python-Apple-support tarball")
-                # Extract only once
-                extract_root = os.path.join(assets_dir, "extracted")
-                if not os.path.isdir(extract_root):
-                    os.makedirs(extract_root, exist_ok=True)
-                    subprocess.run(["tar", "-xzf", tar_path, "-C", extract_root], check=True)
-                # Provide Python.xcframework to the Xcode project and stdlib for bundling
-                # Try both common layouts
-                cand_frameworks = [
-                    os.path.join(extract_root, "Python.xcframework"),
-                    os.path.join(extract_root, "support", "Python.xcframework"),
-                ]
-                xc_src = next((p for p in cand_frameworks if os.path.isdir(p)), None)
-                if xc_src:
-                    shutil.copytree(xc_src, os.path.join(ios_project_dir, "Python.xcframework"), dirs_exist_ok=True)
-                # Stdlib path
-                cand_stdlib = [
-                    os.path.join(extract_root, "Python.xcframework", "ios-arm64_x86_64-simulator", "lib", "python3.11"),
-                    os.path.join(
-                        extract_root, "support", "Python.xcframework", "ios-arm64_x86_64-simulator", "lib", "python3.11"
-                    ),
-                ]
-                stdlib_src = next((p for p in cand_stdlib if os.path.isdir(p)), None)
-            except Exception as e:
-                print(f"Warning: failed to prepare Python runtime: {e}")
-
-            os.chdir(ios_project_dir)
-            derived_data = os.path.join(ios_project_dir, "build")
-            try:
-                # Detect a simulator UDID to target: prefer Booted; else any iPhone
-                sim_udid: Optional[str] = None
-                try:
-                    import json as _json
-
-                    devices_out = subprocess.run(
-                        ["xcrun", "simctl", "list", "devices", "available", "--json"],
-                        check=False,
-                        capture_output=True,
-                        text=True,
-                    )
-                    devs = _json.loads(devices_out.stdout or "{}").get("devices") or {}
-                    all_devs = [d for lst in devs.values() for d in (lst or [])]
-                    for d in all_devs:
-                        if d.get("state") == "Booted":
-                            sim_udid = d.get("udid")
-                            break
-                    if not sim_udid:
-                        for d in all_devs:
-                            if (d.get("isAvailable") or d.get("availability")) and (
-                                d.get("name") or ""
-                            ).lower().startswith("iphone"):
-                                sim_udid = d.get("udid")
-                                break
-                except Exception:
-                    pass
-
-                xcode_dest = (
-                    ["-destination", f"id={sim_udid}"] if sim_udid else ["-destination", "platform=iOS Simulator"]
-                )
-
-                # Provide header and lib paths for CPython (Simulator slice) ONLY if the
-                # XCFramework is not already added to the Xcode project. When the project
-                # contains `Python.xcframework`, Xcode manages headers and linking to avoid
-                # duplicate module.modulemap definitions.
-                extra_xcode_settings: list[str] = []
-                try:
-                    xc_present = os.path.isdir(os.path.join(ios_project_dir, "Python.xcframework"))
-                    if not xc_present and "extract_root" in locals():
-                        sim_headers = os.path.join(
-                            extract_root, "Python.xcframework", "ios-arm64_x86_64-simulator", "Headers"
-                        )
-                        sim_lib = os.path.join(
-                            extract_root, "Python.xcframework", "ios-arm64_x86_64-simulator", "libPython3.11.a"
-                        )
-                        if os.path.isdir(sim_headers):
-                            extra_xcode_settings.extend(
-                                [
-                                    f"HEADER_SEARCH_PATHS={sim_headers}",
-                                    f"SWIFT_INCLUDE_PATHS={sim_headers}",
-                                ]
-                            )
-                        if os.path.exists(sim_lib):
-                            extra_xcode_settings.append(f"OTHER_LDFLAGS=-force_load {sim_lib}")
-                except Exception:
-                    pass
-
-                subprocess.run(
-                    [
-                        "xcodebuild",
-                        "-project",
-                        "ios_template.xcodeproj",
-                        "-scheme",
-                        "ios_template",
-                        "-configuration",
-                        "Debug",
-                        *xcode_dest,
-                        "-derivedDataPath",
-                        derived_data,
-                        "build",
-                        *extra_xcode_settings,
-                    ],
-                    check=False,
-                )
-            except FileNotFoundError:
-                print("xcodebuild not found. Skipping iOS build step.")
-                return
-
-            # Locate built app
-            app_path = os.path.join(derived_data, "Build", "Products", "Debug-iphonesimulator", "ios_template.app")
-            if not os.path.isdir(app_path):
-                print("Could not locate built .app; open the project in Xcode to run.")
-                return
-
-            # Copy staged Python app and optional embedded runtime into the .app bundle
-            try:
-                staged_app_src = os.path.join(build_dir, "app")
-                if os.path.isdir(staged_app_src):
-                    shutil.copytree(staged_app_src, os.path.join(app_path, "app"), dirs_exist_ok=True)
-                # Also copy local library sources if present for dev flow
-                src_root = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".."))
-                local_lib = os.path.join(src_root, "pythonnative")
-                if os.path.isdir(local_lib):
-                    shutil.copytree(local_lib, os.path.join(app_path, "pythonnative"), dirs_exist_ok=True)
-                # Copy stdlib from downloaded support if available
-                if "stdlib_src" in locals() and stdlib_src and os.path.isdir(stdlib_src):
-                    shutil.copytree(stdlib_src, os.path.join(app_path, "python-stdlib"), dirs_exist_ok=True)
-                # Embed Python.framework for Simulator so PythonKit can dlopen it (from downloaded XCFramework)
-                sim_fw = None
-                if "extract_root" in locals():
-                    cand_fw = [
-                        os.path.join(
-                            extract_root, "Python.xcframework", "ios-arm64_x86_64-simulator", "Python.framework"
-                        ),
-                        os.path.join(
-                            extract_root,
-                            "support",
-                            "Python.xcframework",
-                            "ios-arm64_x86_64-simulator",
-                            "Python.framework",
-                        ),
-                    ]
-                    sim_fw = next((p for p in cand_fw if os.path.isdir(p)), None)
-                fw_dest_dir = os.path.join(app_path, "Frameworks")
-                os.makedirs(fw_dest_dir, exist_ok=True)
-                if sim_fw and os.path.isdir(sim_fw):
-                    shutil.copytree(sim_fw, os.path.join(fw_dest_dir, "Python.framework"), dirs_exist_ok=True)
-                # Install rubicon-objc into platform-site
-
-                # Ensure importlib.metadata finds package metadata for rubicon-objc by
-                # installing it into a site-like dir that is on sys.path (platform-site).
-                try:
-                    tmp_site = os.path.join(build_dir, "ios_site")
-                    if os.path.isdir(tmp_site):
-                        shutil.rmtree(tmp_site)
-                    os.makedirs(tmp_site, exist_ok=True)
-                    # Install pure-Python rubicon-objc distribution metadata and package
-                    subprocess.run(
-                        [
-                            sys.executable,
-                            "-m",
-                            "pip",
-                            "install",
-                            "--no-deps",
-                            "--upgrade",
-                            "rubicon-objc",
-                            "-t",
-                            tmp_site,
-                        ],
-                        check=False,
-                    )
-                    platform_site_dir = os.path.join(app_path, "platform-site")
-                    os.makedirs(platform_site_dir, exist_ok=True)
-                    for entry in os.listdir(tmp_site):
-                        src_entry = os.path.join(tmp_site, entry)
-                        dst_entry = os.path.join(platform_site_dir, entry)
-                        if os.path.isdir(src_entry):
-                            shutil.copytree(src_entry, dst_entry, dirs_exist_ok=True)
-                        else:
-                            shutil.copy2(src_entry, dst_entry)
-                except Exception:
-                    # Non-fatal; if metadata isn't present, rubicon import may fail and fallback UI will appear
-                    pass
-                # Install user's pip requirements (pure-Python packages) into the app bundle
-                if pip_reqs:
-                    try:
-                        reqs_tmp = os.path.join(build_dir, "ios_requirements.txt")
-                        with open(reqs_tmp, "w", encoding="utf-8") as f:
-                            f.write("\n".join(pip_reqs) + "\n")
-                        tmp_reqs_dir = os.path.join(build_dir, "ios_user_packages")
-                        if os.path.isdir(tmp_reqs_dir):
-                            shutil.rmtree(tmp_reqs_dir)
-                        os.makedirs(tmp_reqs_dir, exist_ok=True)
-                        subprocess.run(
-                            [sys.executable, "-m", "pip", "install", "-t", tmp_reqs_dir, "-r", reqs_tmp],
-                            check=False,
-                        )
-                        for entry in os.listdir(tmp_reqs_dir):
-                            src_entry = os.path.join(tmp_reqs_dir, entry)
-                            dst_entry = os.path.join(platform_site_dir, entry)
-                            if os.path.isdir(src_entry):
-                                shutil.copytree(src_entry, dst_entry, dirs_exist_ok=True)
-                            else:
-                                shutil.copy2(src_entry, dst_entry)
-                    except Exception:
-                        pass
-                # Note: Python.xcframework provides a static library for Simulator; it must be linked at build time.
-                # We copy the XCFramework into the project directory above so Xcode can link it.
-            except Exception:
-                # Non-fatal; fallback UI will appear if import fails
-                pass
-
-            # Find an available simulator and boot it
-            try:
-                import json as _json
-
-                result = subprocess.run(
-                    ["xcrun", "simctl", "list", "devices", "available", "--json"],
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
-                devices_json = _json.loads(result.stdout or "{}")
-                all_devices: List[Dict[str, Any]] = []
-                for _runtime, devices in (devices_json.get("devices") or {}).items():
-                    all_devices.extend(devices or [])
-                # Prefer iPhone 15/15 Pro names; else first available iPhone
-                preferred = None
-                for d in all_devices:
-                    name = (d.get("name") or "").lower()
-                    if "iphone 15" in name and d.get("isAvailable"):
-                        preferred = d
-                        break
-                if not preferred:
-                    for d in all_devices:
-                        if d.get("isAvailable") and (d.get("name") or "").lower().startswith("iphone"):
-                            preferred = d
-                            break
-                if not preferred:
-                    print("No available iOS Simulators found; open the project in Xcode to run.")
-                    return
-
-                udid = preferred.get("udid")
-                # Boot (no-op if already booted). simctl returns non-zero and
-                # prints to stderr when the device is already Booted; we
-                # don't care about that case, so swallow its output.
-                subprocess.run(["xcrun", "simctl", "boot", udid], check=False, capture_output=True)
-                # Install
-                subprocess.run(["xcrun", "simctl", "install", udid, app_path], check=False)
-                _clear_hot_reload_overlay(platform)
-                if show_logs and not hot_reload:
-                    # Attach the app's stdout/stderr to this terminal so Python
-                    # print() calls and exceptions are visible. SIMCTL_CHILD_*
-                    # env vars are forwarded to the launched process.
-                    sim_env = os.environ.copy()
-                    sim_env["SIMCTL_CHILD_PYTHONUNBUFFERED"] = "1"
-                    print("Launched iOS app on Simulator. Streaming logs (Ctrl+C to stop)...")
-                    try:
-                        subprocess.run(
-                            [
-                                "xcrun",
-                                "simctl",
-                                "launch",
-                                "--console-pty",
-                                "--terminate-running-process",
-                                udid,
-                                IOS_BUNDLE_ID,
-                            ],
-                            env=sim_env,
-                            check=False,
-                        )
-                    except KeyboardInterrupt:
-                        print()
-                        subprocess.run(
-                            ["xcrun", "simctl", "terminate", udid, IOS_BUNDLE_ID],
-                            check=False,
-                            capture_output=True,
-                        )
-                        print("Stopped log streaming.")
-                elif hot_reload:
-                    # Skip launching here; ``_run_hot_reload`` will
-                    # spawn the app via ``simctl launch --console-pty``
-                    # so its ``print()`` / ``NSLog`` output streams to
-                    # the parent terminal alongside the file watcher.
-                    pass
-                else:
-                    subprocess.run(["xcrun", "simctl", "launch", udid, IOS_BUNDLE_ID], check=False)
-                    print("Launched iOS app on Simulator (best-effort).")
-            except Exception:
-                print("Failed to auto-run on Simulator; open the project in Xcode to run.")
-
-    # Hot-reload file watcher
-    if hot_reload and not prepare_only:
-        _run_hot_reload(platform, project_dir, build_dir, show_logs=show_logs)
+        print("Everything looks good.")
 
 
-def _run_hot_reload(platform: str, project_dir: str, build_dir: str, show_logs: bool = True) -> None:
-    """Watch `app/` for changes and push updated files to the device.
-
-    When `show_logs` is true and targeting Android, `adb logcat` is
-    streamed in parallel so Python print and exception output stays
-    visible alongside hot-reload notifications.
+def app_id_command(args: argparse.Namespace) -> None:
+    """Print the resolved application id (Android) or bundle id (iOS).
 
     Args:
-        platform: Either `"android"` or `"ios"`.
-        project_dir: Absolute path to the user's project root.
-        build_dir: Absolute path to the staged build directory.
-        show_logs: Whether to stream device logs in parallel.
+        args: Parsed namespace with ``platform``.
     """
-    from ..hot_reload import FileWatcher
-
-    app_dir = os.path.join(project_dir, "app")
-
-    def on_change(changed_files: List[str]) -> None:
-        pushed: List[str] = []
-        for fpath in changed_files:
-            rel = os.path.relpath(fpath, project_dir)
-            print(f"[hot-reload] Changed: {rel}")
-            if _push_hot_reload_file(platform, fpath, rel):
-                pushed.append(fpath)
-            else:
-                print(f"[hot-reload] Failed to push {rel}")
-        if pushed:
-            manifest = _write_hot_reload_manifest(pushed, project_dir, build_dir)
-            if _push_hot_reload_file(platform, manifest, "reload.json"):
-                print(f"[hot-reload] Signaled reload for {len(pushed)} file(s).")
-            else:
-                print("[hot-reload] Failed to signal reload; app will not refresh automatically.")
-
-    print("[hot-reload] Watching app/ for changes. Press Ctrl+C to stop.")
-    watcher = FileWatcher(app_dir, on_change, interval=1.0)
-    watcher.start()
-
-    log_proc: Optional[subprocess.Popen] = None
-    if show_logs:
-        if platform == "android":
-            log_proc = _start_android_log_stream()
-        elif platform == "ios":
-            log_proc = _start_ios_log_stream()
-
-    try:
-        if log_proc is not None:
-            log_proc.wait()
-        else:
-            import time
-
-            while True:
-                time.sleep(1)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        _terminate_subprocess(log_proc)
-        watcher.stop()
-        print("\n[hot-reload] Stopped.")
+    config = _load_config_or_exit()
+    print(config.application_id if args.platform == "android" else config.bundle_id)
 
 
-def _entrypoint_to_module(entry_point: str) -> str:
-    """Convert a config ``entryPoint`` path into an importable module path.
-
-    ``"app/main.py"`` → ``"app.main"``. Returns ``"app.main"`` for
-    empty / unusable input so ``pn preview`` always has a sane default.
-    """
-    normalized = entry_point.strip().replace("\\", "/")
-    if normalized.endswith(".py"):
-        normalized = normalized[:-3]
-    normalized = normalized.strip("/").replace("/", ".")
-    return normalized or "app.main"
+# ======================================================================
+# preview
+# ======================================================================
 
 
 def preview_project(args: argparse.Namespace) -> None:
     """Render the project in a desktop preview window (Tkinter).
 
-    Sets ``PN_PLATFORM=desktop`` (so PythonNative selects the Tkinter
-    backend) and hands off to ``pythonnative.preview.run_preview``,
-    which opens a window, mounts the app, and Fast Refreshes on every
-    file save until the window is closed.
+    Re-execs under ``PN_PLATFORM=desktop`` so every module binds to the
+    Tkinter backend, then hands off to ``pythonnative.preview.run_preview``.
 
     Args:
-        args: Parsed argparse namespace. Recognized attributes:
-
-            - `component` (`str`, optional): Module path like
-              ``"app.main"`` (its ``App`` is used) or a dotted
-              ``module.Component`` path. Defaults to the project's
-              configured ``entryPoint``.
-            - `width` / `height` (`int`): Initial window size in points.
-            - `title` (`str`): Window title.
-            - `no_hot_reload` (`bool`): Disable file watching.
+        args: Parsed namespace (``component``, ``width``, ``height``,
+            ``title``, ``no_hot_reload``).
     """
-    # The desktop backend is selected at *import time* from the
-    # ``PN_PLATFORM`` environment variable (see ``pythonnative.utils`` and
-    # the host selection in ``pythonnative.screen``). Because the ``pn``
-    # console entry point lives inside the ``pythonnative`` package,
-    # importing it already loaded the package under the default,
-    # non-desktop platform before this handler ever runs. Re-exec a fresh
-    # interpreter with the variable set so every module binds to the
-    # Tkinter backend; the re-execed child sees ``PN_PLATFORM=desktop`` and
-    # skips this branch, so there is no exec loop.
     if os.environ.get("PN_PLATFORM") != "desktop":
         try:
             completed = subprocess.run(
@@ -1173,11 +202,10 @@ def preview_project(args: argparse.Namespace) -> None:
             sys.exit(130)
         sys.exit(completed.returncode)
 
-    project_dir = os.getcwd()
+    project_dir = Path.cwd()
     component: Optional[str] = getattr(args, "component", None)
     if not component:
-        config = _read_project_config()
-        component = _entrypoint_to_module(config.get("entryPoint", "app/main.py"))
+        component = _preview_entry(project_dir)
 
     try:
         from pythonnative.preview import run_preview
@@ -1195,7 +223,7 @@ def preview_project(args: argparse.Namespace) -> None:
     try:
         run_preview(
             component,
-            project_root=project_dir,
+            project_root=str(project_dir),
             width=getattr(args, "width", 390),
             height=getattr(args, "height", 844),
             title=getattr(args, "title", "PythonNative Preview"),
@@ -1206,41 +234,506 @@ def preview_project(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-def clean_project(args: argparse.Namespace) -> None:
-    """Remove the local `build/` directory.
+def _preview_entry(project_dir: Path) -> str:
+    try:
+        return AppConfig.load(project_dir).entry_module
+    except ConfigError:
+        return "app.main"
+
+
+# ======================================================================
+# run
+# ======================================================================
+
+
+def run_project(args: argparse.Namespace) -> None:
+    """Stage, build, install, and launch the app on a device/simulator.
 
     Args:
-        args: Parsed argparse namespace (unused; accepted for the
-            `set_defaults(func=...)` dispatch shape).
+        args: Parsed namespace (``platform``, ``prepare_only``,
+            ``hot_reload``, ``no_logs``).
     """
-    # Define the build directory
-    build_dir: str = os.path.join(os.getcwd(), "build")
+    platform: str = args.platform
+    prepare_only: bool = getattr(args, "prepare_only", False)
+    hot_reload: bool = getattr(args, "hot_reload", False)
+    show_logs: bool = not getattr(args, "no_logs", False)
 
-    # Check if the build directory exists
-    if os.path.exists(build_dir):
+    config = _load_config_or_exit()
+    builder = builder_mod.Builder(config, log=print)
+
+    try:
+        prepared = builder.prepare(platform)
+    except builder_mod.BuildError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
+
+    if prepare_only:
+        print(f"Prepared {platform} project in {prepared.project_dir} (prepare-only).")
+        return
+
+    try:
+        if platform == "android":
+            _run_android(builder, prepared, hot_reload=hot_reload, show_logs=show_logs)
+        else:
+            _run_ios(builder, prepared, hot_reload=hot_reload, show_logs=show_logs)
+    except builder_mod.BuildError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
+
+    if hot_reload:
+        _run_hot_reload(
+            platform,
+            str(config.project_root),
+            str(prepared.build_dir),
+            app_id=config.application_id,
+            bundle_id=config.bundle_id,
+            show_logs=show_logs,
+        )
+
+
+def _run_android(
+    builder: builder_mod.Builder,
+    prepared: builder_mod.PreparedProject,
+    *,
+    hot_reload: bool,
+    show_logs: bool,
+) -> None:
+    builder.install_android_debug(prepared)
+    _clear_android_hot_reload_overlay(prepared.app_id)
+    subprocess.run(
+        ["adb", "shell", "am", "start", "-n", f"{prepared.app_id}/.MainActivity"],
+        check=True,
+    )
+    if show_logs and not hot_reload:
+        proc = _start_android_log_stream()
+        if proc is not None:
+            try:
+                proc.wait()
+            except KeyboardInterrupt:
+                print()
+                _terminate_subprocess(proc)
+                print("Stopped log streaming.")
+
+
+def _run_ios(
+    builder: builder_mod.Builder,
+    prepared: builder_mod.PreparedProject,
+    *,
+    hot_reload: bool,
+    show_logs: bool,
+) -> None:
+    app_path = builder.build_ios_simulator(prepared)
+    udid = _select_ios_simulator()
+    if udid is None:
+        print("No available iOS Simulators found; open the project in Xcode to run.")
+        return
+    subprocess.run(["xcrun", "simctl", "boot", udid], check=False, capture_output=True)
+    subprocess.run(["xcrun", "simctl", "install", udid, str(app_path)], check=False)
+    _clear_ios_hot_reload_overlay(prepared.app_id)
+
+    if hot_reload:
+        # The hot-reload loop launches the app with a console PTY itself.
+        return
+    if show_logs:
+        env = {**os.environ, "SIMCTL_CHILD_PYTHONUNBUFFERED": "1"}
+        print("Launched iOS app on Simulator. Streaming logs (Ctrl+C to stop)...")
+        try:
+            subprocess.run(
+                ["xcrun", "simctl", "launch", "--console-pty", "--terminate-running-process", udid, prepared.app_id],
+                env=env,
+                check=False,
+            )
+        except KeyboardInterrupt:
+            print()
+            subprocess.run(["xcrun", "simctl", "terminate", udid, prepared.app_id], check=False, capture_output=True)
+            print("Stopped log streaming.")
+    else:
+        subprocess.run(["xcrun", "simctl", "launch", udid, prepared.app_id], check=False)
+        print("Launched iOS app on Simulator.")
+
+
+# ======================================================================
+# build
+# ======================================================================
+
+
+def build_project(args: argparse.Namespace) -> None:
+    """Build standalone, distributable artifacts for ``platform``.
+
+    Args:
+        args: Parsed namespace (``platform``, ``debug``).
+    """
+    platform: str = args.platform
+    debug: bool = getattr(args, "debug", False)
+
+    config = _load_config_or_exit()
+    builder = builder_mod.Builder(config, log=print)
+
+    try:
+        prepared = builder.prepare(platform)
+        if platform == "android":
+            artifacts = builder.build_android(prepared, debug=debug)
+        else:
+            if debug:
+                app_path = builder.build_ios_simulator(prepared)
+                artifacts = builder_mod.BuildArtifacts(paths=[app_path])
+            else:
+                artifacts = builder.build_ios_archive(prepared)
+    except builder_mod.BuildError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
+
+    if not artifacts.paths:
+        print("Build completed, but no artifacts were found. Check the build output above.")
+        return
+    print("\nBuilt artifacts:")
+    for path in artifacts.paths:
+        print(f"  {path}")
+
+
+# ======================================================================
+# clean
+# ======================================================================
+
+
+def clean_project(args: argparse.Namespace) -> None:
+    """Remove the local ``build/`` directory.
+
+    Args:
+        args: Parsed namespace (unused).
+    """
+    build_dir = Path.cwd() / "build"
+    if build_dir.exists():
         shutil.rmtree(build_dir)
         print("Removed build/ directory.")
     else:
         print("No build/ directory to remove.")
 
 
-def main() -> None:
-    """Entry point for the `pn` console script.
+# ======================================================================
+# Config helpers
+# ======================================================================
 
-    Wires up the `init`, `run`, and `clean` subcommands and dispatches
-    to the corresponding handler.
+
+def _load_config_or_exit(project_dir: Optional[Path] = None) -> AppConfig:
+    try:
+        return AppConfig.load(project_dir or Path.cwd())
+    except ConfigError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
+
+
+# ======================================================================
+# Device log streaming
+# ======================================================================
+
+
+def _start_android_log_stream() -> Optional[subprocess.Popen]:
+    """Clear logcat and stream Python-relevant tags to the terminal.
+
+    Returns:
+        The ``adb logcat`` process, or ``None`` if ``adb`` is missing.
     """
+    try:
+        subprocess.run(["adb", "logcat", "-c"], check=False, capture_output=True)
+    except FileNotFoundError:
+        print("Note: 'adb' not found on PATH; skipping log streaming.")
+        return None
+    try:
+        proc = subprocess.Popen(["adb", "logcat", *collect_logcat_filters()])
+    except FileNotFoundError:
+        return None
+    print("Streaming Python logs from device (Ctrl+C to stop)...")
+    return proc
+
+
+def _booted_ios_udid() -> Optional[str]:
+    """Return a booted iOS Simulator's UDID, or ``None`` if none is booted."""
+    try:
+        result = subprocess.run(
+            ["xcrun", "simctl", "list", "devices", "booted", "--json"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return None
+    try:
+        data = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return None
+    for _runtime, devices in (data.get("devices") or {}).items():
+        for device in devices or []:
+            if device.get("state") == "Booted" and device.get("udid"):
+                return str(device["udid"])
+    return None
+
+
+def _select_ios_simulator() -> Optional[str]:
+    """Return a simulator UDID to target (booted first, else an iPhone)."""
+    booted = _booted_ios_udid()
+    if booted:
+        return booted
+    try:
+        result = subprocess.run(
+            ["xcrun", "simctl", "list", "devices", "available", "--json"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return None
+    try:
+        data = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return None
+    devices: List[Dict[str, Any]] = [d for lst in (data.get("devices") or {}).values() for d in (lst or [])]
+    for device in devices:
+        if "iphone 15" in (device.get("name") or "").lower() and device.get("isAvailable"):
+            return device.get("udid")
+    for device in devices:
+        if device.get("isAvailable") and (device.get("name") or "").lower().startswith("iphone"):
+            return device.get("udid")
+    return None
+
+
+def _start_ios_log_stream(bundle_id: str) -> Optional[subprocess.Popen]:
+    """Re-launch the iOS app with a console PTY so its stdio streams here.
+
+    Args:
+        bundle_id: The app's bundle identifier.
+
+    Returns:
+        The launched process, or ``None`` when no simulator is booted.
+    """
+    udid = _booted_ios_udid()
+    if udid is None:
+        print("Note: no booted iOS Simulator found; skipping log streaming.")
+        return None
+    env = {**os.environ, "SIMCTL_CHILD_PYTHONUNBUFFERED": "1"}
+    try:
+        proc = subprocess.Popen(
+            ["xcrun", "simctl", "launch", "--console-pty", "--terminate-running-process", udid, bundle_id],
+            env=env,
+        )
+    except FileNotFoundError:
+        print("Note: 'xcrun' not found on PATH; skipping iOS log streaming.")
+        return None
+    print("Streaming iOS app logs from the simulator (Ctrl+C to stop)...")
+    return proc
+
+
+def _terminate_subprocess(proc: Optional[subprocess.Popen]) -> None:
+    """Politely stop a subprocess, escalating to ``SIGKILL`` if needed."""
+    if proc is None or proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+
+# ======================================================================
+# Hot reload
+# ======================================================================
+
+
+def _hot_reload_manifest_payload(
+    changed_files: List[str],
+    project_dir: str,
+    *,
+    version: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Build the reload manifest consumed by the running app.
+
+    Args:
+        changed_files: Absolute paths to changed source files.
+        project_dir: The project root, used to relativize paths.
+        version: Optional explicit version stamp (defaults to a timestamp).
+
+    Returns:
+        The manifest dict (``version``, ``files``, ``modules``).
+    """
+    from pythonnative.hot_reload import ModuleReloader
+
+    rel_files = sorted(os.path.relpath(path, project_dir) for path in changed_files)
+    return {
+        "version": version or str(time.time_ns()),
+        "files": rel_files,
+        "modules": ModuleReloader.modules_from_files(rel_files),
+    }
+
+
+def _write_hot_reload_manifest(changed_files: List[str], project_dir: str, build_dir: str) -> str:
+    """Write a local hot-reload manifest and return its path."""
+    manifest_dir = os.path.join(build_dir, "hot_reload")
+    os.makedirs(manifest_dir, exist_ok=True)
+    manifest_path = os.path.join(manifest_dir, "reload.json")
+    with open(manifest_path, "w", encoding="utf-8") as handle:
+        json.dump(_hot_reload_manifest_payload(changed_files, project_dir), handle)
+    return manifest_path
+
+
+def _android_hot_reload_dest(rel_path: str) -> str:
+    """Return a ``run-as`` relative destination for an app source file."""
+    return os.path.join("files", HOT_RELOAD_DEV_ROOT, rel_path)
+
+
+def _push_android_hot_reload_file(local_path: str, rel_path: str, app_id: str) -> bool:
+    """Push one file into the Android app's writable hot-reload overlay."""
+    tmp_path = f"/data/local/tmp/pythonnative-hot-reload-{os.getpid()}-{os.path.basename(local_path)}"
+    dest_path = _android_hot_reload_dest(rel_path)
+    dest_dir = os.path.dirname(dest_path)
+    push = subprocess.run(["adb", "push", local_path, tmp_path], check=False, capture_output=True)
+    if push.returncode != 0:
+        return False
+    subprocess.run(["adb", "shell", "run-as", app_id, "mkdir", "-p", dest_dir], check=False, capture_output=True)
+    copy = subprocess.run(
+        ["adb", "shell", "run-as", app_id, "cp", tmp_path, dest_path], check=False, capture_output=True
+    )
+    subprocess.run(["adb", "shell", "rm", "-f", tmp_path], check=False, capture_output=True)
+    return copy.returncode == 0
+
+
+def _ios_data_container(bundle_id: str) -> Optional[str]:
+    """Return the booted simulator's app data container, if available."""
+    try:
+        result = subprocess.run(
+            ["xcrun", "simctl", "get_app_container", "booted", bundle_id, "data"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def _push_ios_hot_reload_file(local_path: str, rel_path: str, bundle_id: str) -> bool:
+    """Copy one file into the booted iOS Simulator's hot-reload overlay."""
+    container = _ios_data_container(bundle_id)
+    if container is None:
+        return False
+    dest_path = os.path.join(container, "Documents", HOT_RELOAD_DEV_ROOT, rel_path)
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    shutil.copy2(local_path, dest_path)
+    return True
+
+
+def _clear_android_hot_reload_overlay(app_id: str) -> bool:
+    """Remove stale Android hot-reload files before launching."""
+    result = subprocess.run(
+        ["adb", "shell", "run-as", app_id, "rm", "-rf", f"files/{HOT_RELOAD_DEV_ROOT}"],
+        check=False,
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
+def _clear_ios_hot_reload_overlay(bundle_id: str) -> bool:
+    """Remove stale iOS Simulator hot-reload files before launching."""
+    container = _ios_data_container(bundle_id)
+    if container is None:
+        return False
+    shutil.rmtree(os.path.join(container, "Documents", HOT_RELOAD_DEV_ROOT), ignore_errors=True)
+    return True
+
+
+def _push_hot_reload_file(platform: str, local_path: str, rel_path: str, *, app_id: str, bundle_id: str) -> bool:
+    """Push a changed source file to the running app."""
+    if platform == "android":
+        return _push_android_hot_reload_file(local_path, rel_path, app_id)
+    if platform == "ios":
+        return _push_ios_hot_reload_file(local_path, rel_path, bundle_id)
+    return False
+
+
+def _run_hot_reload(
+    platform: str,
+    project_dir: str,
+    build_dir: str,
+    *,
+    app_id: str,
+    bundle_id: str,
+    show_logs: bool = True,
+) -> None:
+    """Watch ``app/`` for changes and push updated files to the device.
+
+    Args:
+        platform: ``"android"`` or ``"ios"``.
+        project_dir: Absolute path to the user's project root.
+        build_dir: Absolute path to the staged build directory.
+        app_id: The Android application id (for ``run-as``).
+        bundle_id: The iOS bundle id (for the data container / launch).
+        show_logs: Whether to stream device logs in parallel.
+    """
+    from ..hot_reload import FileWatcher
+
+    app_dir = os.path.join(project_dir, "app")
+
+    def on_change(changed_files: List[str]) -> None:
+        pushed: List[str] = []
+        for fpath in changed_files:
+            rel = os.path.relpath(fpath, project_dir)
+            print(f"[hot-reload] Changed: {rel}")
+            if _push_hot_reload_file(platform, fpath, rel, app_id=app_id, bundle_id=bundle_id):
+                pushed.append(fpath)
+            else:
+                print(f"[hot-reload] Failed to push {rel}")
+        if pushed:
+            manifest = _write_hot_reload_manifest(pushed, project_dir, build_dir)
+            if _push_hot_reload_file(platform, manifest, "reload.json", app_id=app_id, bundle_id=bundle_id):
+                print(f"[hot-reload] Signaled reload for {len(pushed)} file(s).")
+            else:
+                print("[hot-reload] Failed to signal reload; app will not refresh automatically.")
+
+    print("[hot-reload] Watching app/ for changes. Press Ctrl+C to stop.")
+    watcher = FileWatcher(app_dir, on_change, interval=1.0)
+    watcher.start()
+
+    log_proc: Optional[subprocess.Popen] = None
+    if show_logs:
+        if platform == "android":
+            log_proc = _start_android_log_stream()
+        elif platform == "ios":
+            log_proc = _start_ios_log_stream(bundle_id)
+
+    try:
+        if log_proc is not None:
+            log_proc.wait()
+        else:
+            while True:
+                time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        _terminate_subprocess(log_proc)
+        watcher.stop()
+        print("\n[hot-reload] Stopped.")
+
+
+# ======================================================================
+# Argument parsing
+# ======================================================================
+
+
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pn", description="PythonNative CLI")
     subparsers = parser.add_subparsers()
 
-    # Create a new command 'init' that calls init_project
-    parser_init = subparsers.add_parser("init")
+    parser_init = subparsers.add_parser("init", help="Scaffold a new project")
     parser_init.add_argument("name", nargs="?", help="Project name (defaults to current directory name)")
     parser_init.add_argument("--force", action="store_true", help="Overwrite existing files if present")
     parser_init.set_defaults(func=init_project)
 
-    # Create a new command 'preview' that calls preview_project
-    parser_preview = subparsers.add_parser("preview")
+    parser_doctor = subparsers.add_parser("doctor", help="Diagnose the local toolchain and config")
+    parser_doctor.add_argument("platform", nargs="?", choices=["android", "ios"], help="Restrict checks to a platform")
+    parser_doctor.set_defaults(func=doctor_command)
+
+    parser_preview = subparsers.add_parser("preview", help="Render the app in a desktop window")
     parser_preview.add_argument(
         "component",
         nargs="?",
@@ -1251,39 +744,40 @@ def main() -> None:
         "--height", type=int, default=844, help="Initial window height in points (default: 844)"
     )
     parser_preview.add_argument("--title", default="PythonNative Preview", help="Preview window title")
-    parser_preview.add_argument(
-        "--no-hot-reload",
-        action="store_true",
-        help="Disable file watching / Fast Refresh",
-    )
+    parser_preview.add_argument("--no-hot-reload", action="store_true", help="Disable file watching / Fast Refresh")
     parser_preview.set_defaults(func=preview_project)
 
-    # Create a new command 'run' that calls run_project
-    parser_run = subparsers.add_parser("run")
+    parser_run = subparsers.add_parser("run", help="Build, install, and launch on a device/simulator")
     parser_run.add_argument("platform", choices=["android", "ios"])
-    parser_run.add_argument(
-        "--prepare-only",
-        action="store_true",
-        help="Extract templates and stage app without building",
-    )
-    parser_run.add_argument(
-        "--hot-reload",
-        action="store_true",
-        help="Watch app/ for changes and push updates to the running app",
-    )
-    parser_run.add_argument(
-        "--no-logs",
-        action="store_true",
-        help="Don't attach to the app's stdout/stderr after launching (default: stream logs)",
-    )
+    parser_run.add_argument("--prepare-only", action="store_true", help="Stage + configure without building")
+    parser_run.add_argument("--hot-reload", action="store_true", help="Watch app/ and push updates to the running app")
+    parser_run.add_argument("--no-logs", action="store_true", help="Don't stream device logs after launch")
     parser_run.set_defaults(func=run_project)
 
-    # Create a new command 'clean' that calls clean_project
-    parser_clean = subparsers.add_parser("clean")
+    parser_build = subparsers.add_parser("build", help="Build distributable artifacts")
+    parser_build.add_argument("platform", choices=["android", "ios"])
+    parser_build.add_argument("--debug", action="store_true", help="Build the debug variant instead of release")
+    parser_build.set_defaults(func=build_project)
+
+    parser_app_id = subparsers.add_parser("app-id", help="Print the resolved application/bundle id")
+    parser_app_id.add_argument("platform", choices=["android", "ios"])
+    parser_app_id.set_defaults(func=app_id_command)
+
+    parser_clean = subparsers.add_parser("clean", help="Remove the local build/ directory")
     parser_clean.set_defaults(func=clean_project)
 
+    return parser
+
+
+def main() -> None:
+    """Entry point for the ``pn`` console script."""
+    parser = _build_parser()
     args = parser.parse_args()
-    args.func(args)
+    func = getattr(args, "func", None)
+    if func is None:
+        parser.print_help()
+        sys.exit(1)
+    func(args)
 
 
 if __name__ == "__main__":

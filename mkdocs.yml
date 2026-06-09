@@ -89,6 +89,10 @@ nav:
     - Hot Reload: guides/hot-reload.md
     - Error Boundaries: guides/error-boundaries.md
     - Testing: guides/testing.md
+  - Building:
+    - Configuration: guides/configuration.md
+    - Permissions: guides/permissions.md
+    - Building for Release: guides/building-for-release.md
   - Examples:
     - Overview: examples.md
     - Hello World: examples/hello-world.md

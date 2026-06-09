@@ -6,10 +6,11 @@ screen.
 ## Preview it on your desktop (fastest)
 
 From this directory, install the example's dependencies (the preview
-imports your real app code), then launch it:
+imports your real app code), then launch it. This app declares `emoji`
+in `[requirements].packages`, so install it locally for the preview:
 
 ```bash
-pip install -r requirements.txt
+pip install emoji
 pn preview
 ```
 

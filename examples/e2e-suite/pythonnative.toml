@@ -1,0 +1,35 @@
+# PythonNative E2E suite app configuration.
+# This app exercises the full public surface via Maestro (see tests/e2e).
+
+[app]
+id = "com.pythonnative.e2e"
+name = "e2e_suite"
+display_name = "PythonNative E2E"
+version = "1.0.0"
+build = 1
+python_version = "3.11"
+orientation = "portrait"
+entry_point = "app/main.py"
+
+# A representative permission set so the manifest/Info.plist generation is
+# exercised end-to-end alongside the UI flows.
+[permissions]
+camera = "Demo: capture a photo."
+microphone = "Demo: record audio."
+photo_library = "Demo: pick an image."
+location_when_in_use = "Demo: show your location."
+contacts = "Demo: read a contact."
+face_id = "Demo: authenticate with biometrics."
+notifications = true
+vibration = true
+
+[requirements]
+packages = []
+
+[ios]
+deployment_target = "13.0"
+
+[android]
+min_sdk = 24
+target_sdk = 34
+abi_filters = ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]

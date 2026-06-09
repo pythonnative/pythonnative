@@ -8,9 +8,9 @@
 # Run with:
 #     cd examples/e2e-suite && pn run ios --no-logs
 #     cd ../.. && maestro --platform ios test tests/e2e/ios.yaml
-appId: com.pythonnative.ios-template
+appId: com.pythonnative.e2e
 env:
-  APP_ID: com.pythonnative.ios-template
+  APP_ID: com.pythonnative.e2e
 ---
 - runFlow: flows/components/text.yaml
 - runFlow: flows/components/button.yaml
