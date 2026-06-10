@@ -40,7 +40,7 @@ import math
 import threading
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from rubicon.objc import SEL, ObjCClass, objc_method
+from rubicon.objc import SEL, ObjCClass, ObjCInstance, objc_method
 
 from ..events import dispatch_event, event_names
 from . import _tripwire_log
@@ -668,9 +668,78 @@ def _set_recognizer_delegate(recognizer: Any) -> None:
 # ======================================================================
 # Native gesture wiring (UIGestureRecognizer -> dispatch_event)
 # ======================================================================
+#
+# Recognizer *actions* must not go through rubicon's ``@objc_method``
+# bridge: on iOS 18.x the action invocation dies inside UIKit/rubicon
+# marshaling (``NSMapGet: map table argument is NULL``) and never
+# reaches Python. Exactly like the scroll/tab-bar delegates, we route
+# every action through one raw libobjc target class whose CFUNCTYPE IMP
+# receives the recognizer *pointer* and looks up a Python closure keyed
+# by that pointer. The closure then reads state/location off the
+# retained rubicon recognizer object (outbound rubicon calls are fine).
 
-# Maps ``id(target)`` -> {"view", "index", "kind", "config"}.
-_pn_gesture_targets: Dict[int, Dict[str, Any]] = {}
+# Maps recognizer ptr -> zero-arg Python handler closure.
+_pn_action_handlers: Dict[int, Any] = {}
+
+_ACTION_IMP_TYPE = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
+
+
+def _action_imp(_self_ptr: int, _cmd_ptr: int, sender_ptr: int) -> None:
+    """Raw C callback for every PythonNative recognizer action."""
+    handler = _pn_action_handlers.get(int(sender_ptr or 0))
+    if handler is None:
+        return
+    try:
+        handler()
+    except Exception:
+        pass
+
+
+_action_imp_ref = _ACTION_IMP_TYPE(_action_imp)
+
+_SEL_ON_ACTION = _sel_reg(b"onPNAction:")
+
+_PN_ACTION_TARGET_CLS = _alloc_cls(_NS_OBJECT_CLS, b"_PNActionTargetCTypes", 0)
+if _PN_ACTION_TARGET_CLS:
+    _add_method(
+        _PN_ACTION_TARGET_CLS,
+        _SEL_ON_ACTION,
+        _ct.cast(_action_imp_ref, _ct.c_void_p),
+        b"v@:@",
+    )
+    _reg_cls(_PN_ACTION_TARGET_CLS)
+
+_pn_action_target_ptr: Any = None
+
+
+def _shared_action_target_ptr() -> Any:
+    global _pn_action_target_ptr
+    if _pn_action_target_ptr is None and _PN_ACTION_TARGET_CLS:
+        _objc_msgSend.restype = _ct.c_void_p
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
+        raw = _objc_msgSend(_PN_ACTION_TARGET_CLS, _SEL_ALLOC)
+        raw = _objc_msgSend(raw, _SEL_INIT)
+        raw = _objc_msgSend(raw, _SEL_RETAIN)
+        _pn_action_target_ptr = raw
+    return _pn_action_target_ptr
+
+
+def _recognizer_ptr(rec: Any) -> int:
+    ptr = rec.ptr if hasattr(rec, "ptr") else rec
+    return int(getattr(ptr, "value", ptr) or 0)
+
+
+def _register_action(rec: Any, handler: Any) -> None:
+    """Bind ``handler`` to ``rec`` via the shared raw action target."""
+    target_ptr = _shared_action_target_ptr()
+    if target_ptr is None:
+        return
+    _objc_msgSend.restype = None
+    _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p]
+    rec_ptr = rec.ptr if hasattr(rec, "ptr") else rec
+    _objc_msgSend(rec_ptr, _sel_reg(b"addTarget:action:"), target_ptr, _SEL_ON_ACTION)
+    _pn_action_handlers[_recognizer_ptr(rec)] = handler
+
 
 # UIGestureRecognizerState -> GestureEvent.state
 _GSTATE = {1: "began", 2: "changed", 3: "ended", 4: "cancelled", 5: "cancelled"}
@@ -678,19 +747,18 @@ _GSTATE = {1: "began", 2: "changed", 3: "ended", 4: "cancelled", 5: "cancelled"}
 _SWIPE_DIRECTIONS = {"right": 1, "left": 2, "up": 4, "down": 8}
 
 
-class _PNGestureTarget(NSObject):  # type: ignore[valid-type]
-    """Receives recognizer callbacks and emits ``gesture:<i>`` payloads."""
+def _make_gesture_handler(
+    rec: Any,
+    view: Any,
+    kind: str,
+    index: int,
+    direction: Optional[str] = None,
+) -> Any:
+    """Build the action closure emitting one ``gesture:<i>`` payload."""
 
-    @objc_method
-    def onGesture_(self, sender: object) -> None:
-        info = _pn_gesture_targets.get(id(self))
-        if info is None:
-            return
-        view = info["view"]
-        kind = info["kind"]
-        index = info["index"]
+    def handler() -> None:
         try:
-            raw_state = int(sender.state)
+            raw_state = int(rec.state)
         except Exception:
             raw_state = 3
         state = _GSTATE.get(raw_state)
@@ -699,90 +767,94 @@ class _PNGestureTarget(NSObject):  # type: ignore[valid-type]
 
         payload: Dict[str, Any] = {"kind": kind, "state": state}
         try:
-            location = sender.locationInView_(view)
+            location = rec.locationInView_(view)
             payload["x"] = float(location.x)
             payload["y"] = float(location.y)
         except Exception:
             pass
         try:
-            payload["pointer_count"] = int(sender.numberOfTouches)
+            payload["pointer_count"] = int(rec.numberOfTouches)
         except Exception:
             pass
 
         if kind == "pan":
             try:
-                translation = sender.translationInView_(view)
+                translation = rec.translationInView_(view)
                 payload["translation_x"] = float(translation.x)
                 payload["translation_y"] = float(translation.y)
-                velocity = sender.velocityInView_(view)
+                velocity = rec.velocityInView_(view)
                 payload["velocity_x"] = float(velocity.x)
                 payload["velocity_y"] = float(velocity.y)
             except Exception:
                 pass
         elif kind == "pinch":
             try:
-                payload["scale"] = float(sender.scale)
+                payload["scale"] = float(rec.scale)
             except Exception:
                 pass
         elif kind == "rotation":
             try:
-                payload["rotation"] = float(sender.rotation)
+                payload["rotation"] = float(rec.rotation)
             except Exception:
                 pass
         elif kind == "swipe":
-            # Discrete: UIKit only calls us on recognition.
+            # Discrete: UIKit only calls us on recognition, and only the
+            # recognizer whose direction matched fires — so the bound
+            # per-recognizer direction is the actual swipe direction.
             payload["state"] = "ended"
-            payload["direction"] = info.get("direction")
+            payload["direction"] = direction
         elif kind == "tap":
             payload["state"] = "ended"
 
         _fire(view, f"gesture:{index}", payload)
 
+    return handler
 
-def _make_recognizer(kind: str, spec: Dict[str, Any], target: Any) -> List[Any]:
+
+def _make_recognizer(kind: str, spec: Dict[str, Any]) -> List[Tuple[Any, Optional[str]]]:
     """Build the UIGestureRecognizer(s) for one serialized gesture spec.
 
     Swipe with ``direction="any"`` needs one recognizer per direction
-    (UIKit constraint), so this returns a list.
+    (UIKit constraint), so this returns ``(recognizer, direction)``
+    pairs; ``direction`` is ``None`` for non-swipe kinds.
     """
-    action = SEL("onGesture:")
-    out: List[Any] = []
+    out: List[Tuple[Any, Optional[str]]] = []
     if kind == "tap":
-        rec = ObjCClass("UITapGestureRecognizer").alloc().initWithTarget_action_(target, action)
+        rec = ObjCClass("UITapGestureRecognizer").alloc().init()
         try:
             rec.setNumberOfTapsRequired_(max(1, int(spec.get("n_taps", 1))))
         except Exception:
             pass
-        out.append(rec)
+        out.append((rec, None))
     elif kind == "long_press":
-        rec = ObjCClass("UILongPressGestureRecognizer").alloc().initWithTarget_action_(target, action)
+        rec = ObjCClass("UILongPressGestureRecognizer").alloc().init()
         try:
             rec.setMinimumPressDuration_(float(spec.get("min_duration_ms", 500.0)) / 1000.0)
             rec.setAllowableMovement_(float(spec.get("max_distance", 12.0)))
         except Exception:
             pass
-        out.append(rec)
+        out.append((rec, None))
     elif kind == "pan":
-        rec = ObjCClass("UIPanGestureRecognizer").alloc().initWithTarget_action_(target, action)
+        rec = ObjCClass("UIPanGestureRecognizer").alloc().init()
         try:
             rec.setMinimumNumberOfTouches_(max(1, int(spec.get("min_pointers", 1))))
         except Exception:
             pass
-        out.append(rec)
+        out.append((rec, None))
     elif kind == "swipe":
         direction = str(spec.get("direction", "any"))
         directions = [direction] if direction in _SWIPE_DIRECTIONS else list(_SWIPE_DIRECTIONS)
         for d in directions:
-            rec = ObjCClass("UISwipeGestureRecognizer").alloc().initWithTarget_action_(target, action)
+            rec = ObjCClass("UISwipeGestureRecognizer").alloc().init()
             try:
                 rec.setDirection_(_SWIPE_DIRECTIONS[d])
             except Exception:
                 pass
-            out.append(rec)
+            out.append((rec, d))
     elif kind == "pinch":
-        out.append(ObjCClass("UIPinchGestureRecognizer").alloc().initWithTarget_action_(target, action))
+        out.append((ObjCClass("UIPinchGestureRecognizer").alloc().init(), None))
     elif kind == "rotation":
-        out.append(ObjCClass("UIRotationGestureRecognizer").alloc().initWithTarget_action_(target, action))
+        out.append((ObjCClass("UIRotationGestureRecognizer").alloc().init(), None))
     return out
 
 
@@ -799,10 +871,8 @@ def _wire_gestures(view: Any, specs: Any) -> None:
             view.removeGestureRecognizer_(rec)
         except Exception:
             pass
-    for target in state.get("gesture_targets") or []:
-        _pn_gesture_targets.pop(id(target), None)
+        _pn_action_handlers.pop(_recognizer_ptr(rec), None)
     state["gesture_recognizers"] = []
-    state["gesture_targets"] = []
     if not isinstance(specs, (list, tuple)) or not specs:
         return
 
@@ -812,22 +882,13 @@ def _wire_gestures(view: Any, specs: Any) -> None:
         pass
 
     recognizers: List[Any] = []
-    targets: List[Any] = []
     for i, spec in enumerate(specs):
         if not isinstance(spec, dict):
             continue
         kind = str(spec.get("kind", ""))
         if not kind:
             continue
-        target = _PNGestureTarget.new()
-        target.retain()
-        _pn_retained_views.append(target)
-        info: Dict[str, Any] = {"view": view, "index": i, "kind": kind, "config": dict(spec)}
-        if kind == "swipe":
-            info["direction"] = str(spec.get("direction", "any"))
-        _pn_gesture_targets[id(target)] = info
-        targets.append(target)
-        for rec in _make_recognizer(kind, spec, target):
+        for rec, direction in _make_recognizer(kind, spec):
             try:
                 rec.setCancelsTouchesInView_(False)
             except Exception:
@@ -838,15 +899,10 @@ def _wire_gestures(view: Any, specs: Any) -> None:
                 rec.retain()
                 recognizers.append(rec)
             except Exception:
-                pass
-        if kind == "swipe" and len(_make_recognizer("noop", {}, target)) == 0:
-            # Direction is resolved per-recognizer; for "any" the shared
-            # target reports the spec direction, which is fine because
-            # UIKit only fires the recognizer whose direction matched.
-            pass
+                continue
+            _register_action(rec, _make_gesture_handler(rec, view, kind, i, direction))
 
     state["gesture_recognizers"] = recognizers
-    state["gesture_targets"] = targets
 
 
 # ======================================================================
@@ -1012,8 +1068,8 @@ class IOSViewHandler(ViewHandler):
     def destroy(self, native_view: Any) -> None:
         self._teardown(native_view)
         state = _state_of(native_view)
-        for target in state.get("gesture_targets") or []:
-            _pn_gesture_targets.pop(id(target), None)
+        for rec in state.get("gesture_recognizers") or []:
+            _pn_action_handlers.pop(_recognizer_ptr(rec), None)
         try:
             native_view.removeFromSuperview()
         except Exception:
@@ -2186,25 +2242,41 @@ class PressableHandler(IOSViewHandler):
         return v
 
     def _wire_press(self, view: Any) -> None:
-        target = _PNPressTarget.new()
-        target.retain()
-        _pn_retained_views.append(target)
-        _pn_press_targets[id(target)] = view
-
-        recognizers = []
         UITap = ObjCClass("UITapGestureRecognizer")
-        tap = UITap.alloc().initWithTarget_action_(target, SEL("onPress:"))
-        recognizers.append(tap)
-
         UILong = ObjCClass("UILongPressGestureRecognizer")
-        longp = UILong.alloc().initWithTarget_action_(target, SEL("onLong:"))
-        recognizers.append(longp)
 
-        touch = UILong.alloc().initWithTarget_action_(target, SEL("onTouch:"))
+        tap = UITap.alloc().init()
+        longp = UILong.alloc().init()
+        # Zero-duration long press == raw touch-down / touch-up tracking.
+        touch = UILong.alloc().init()
         touch.setMinimumPressDuration_(0.0)
-        recognizers.append(touch)
 
-        for rec in recognizers:
+        def on_tap() -> None:
+            _fire(view, "on_press")
+
+        def on_long() -> None:
+            # UILongPressGestureRecognizer fires on every state
+            # transition; only Began (1) counts as the trigger.
+            try:
+                state = int(longp.state)
+            except Exception:
+                state = 1
+            if state == 1:
+                _fire(view, "on_long_press")
+
+        def on_touch() -> None:
+            try:
+                state = int(touch.state)
+            except Exception:
+                return
+            if state == 1:  # began
+                _press_feedback(view, True)
+                _fire(view, "on_press_in")
+            elif state in (3, 4, 5):  # ended / cancelled / failed
+                _press_feedback(view, False)
+                _fire(view, "on_press_out")
+
+        for rec, handler in ((tap, on_tap), (longp, on_long), (touch, on_touch)):
             try:
                 rec.setCancelsTouchesInView_(False)
             except Exception:
@@ -2212,6 +2284,7 @@ class PressableHandler(IOSViewHandler):
             _set_recognizer_delegate(rec)
             view.addGestureRecognizer_(rec)
             rec.retain()
+            _register_action(rec, handler)
 
     def _apply(self, view: Any, props: Dict[str, Any], initial: bool) -> None:
         _apply_common_visual(view, props)
@@ -2269,11 +2342,8 @@ def _ui_text_content_type(name: str) -> Any:
 
 
 # ----------------------------------------------------------------------
-# Pressable target
+# Pressable feedback
 # ----------------------------------------------------------------------
-
-# Maps ``id(target)`` -> owning Pressable view.
-_pn_press_targets: Dict[int, Any] = {}
 
 
 def _press_feedback(view: Any, pressed: bool) -> None:
@@ -2291,47 +2361,6 @@ def _press_feedback(view: Any, pressed: bool) -> None:
         UIView.animateWithDuration_animations_(duration, lambda: view.setAlpha_(opacity))
     except Exception:
         pass
-
-
-class _PNPressTarget(NSObject):  # type: ignore[valid-type]
-    """Recognizer target firing Pressable's four press events."""
-
-    @objc_method
-    def onPress_(self, sender: object) -> None:
-        view = _pn_press_targets.get(id(self))
-        if view is not None:
-            _fire(view, "on_press")
-
-    @objc_method
-    def onLong_(self, sender: object) -> None:
-        view = _pn_press_targets.get(id(self))
-        if view is None:
-            return
-        # UILongPressGestureRecognizer fires on every state transition;
-        # only Began (1) counts as the long-press trigger.
-        try:
-            state = int(sender.state)
-        except Exception:
-            state = 1
-        if state == 1:
-            _fire(view, "on_long_press")
-
-    @objc_method
-    def onTouch_(self, sender: object) -> None:
-        """Zero-duration long press == raw touch-down / touch-up tracking."""
-        view = _pn_press_targets.get(id(self))
-        if view is None:
-            return
-        try:
-            state = int(sender.state)
-        except Exception:
-            return
-        if state == 1:  # began
-            _press_feedback(view, True)
-            _fire(view, "on_press_in")
-        elif state in (3, 4, 5):  # ended / cancelled / failed
-            _press_feedback(view, False)
-            _fire(view, "on_press_out")
 
 
 # ======================================================================
@@ -2415,8 +2444,6 @@ class ProgressBarHandler(IOSViewHandler):
 # WebView — WKWebView with navigation + script-message delegates
 # ======================================================================
 
-# Maps ``id(delegate)`` -> {"view": WKWebView, "inject_js": str | None}.
-_pn_webview_state: Dict[int, Dict[str, Any]] = {}
 # WKWebView.scrollView isn't auto-detected as a property by rubicon, so it
 # must be declared once (lazily, to avoid forcing a WebKit load at import).
 _pn_wkwebview_declared = False
@@ -2433,54 +2460,98 @@ def _webview_url(webview: Any) -> str:
         return ""
 
 
-class _PNWebViewDelegate(NSObject):  # type: ignore[valid-type]
-    """WKNavigationDelegate + WKScriptMessageHandler bridge.
+# WKNavigationDelegate + WKScriptMessageHandler bridge. WebKit passes
+# object arguments (``WKNavigation*`` / ``WKScriptMessage*``) to these
+# delegate callbacks, which rubicon's ``@objc_method`` FFI bridge
+# mismarshals on iOS 18.x — the app dies with EXC_BAD_ACCESS inside
+# ``objc_msgSend`` (see the module header note). Like the scroll and
+# tab-bar delegates we therefore build the class with raw libobjc and
+# CFUNCTYPE IMPs, keep per-delegate state keyed by the delegate
+# *pointer*, and only touch the retained rubicon webview from Python.
 
-    Forwards page-load / navigation events to ``on_load`` /
-    ``on_navigation_state_change``, runs ``inject_javascript`` after
-    each load, and surfaces ``window.webkit.messageHandlers.pythonnative``
-    posts through ``on_message``.
-    """
+# Maps delegate ptr -> {"view": rubicon WKWebView, "inject_js": str|None}.
+_pn_webview_state: Dict[int, Dict[str, Any]] = {}
 
-    @objc_method
-    def webView_didFinishNavigation_(self, webview: object, navigation: object) -> None:
-        info = _pn_webview_state.get(id(self))
-        if not info:
-            return
-        wv = info.get("view")
-        js = info.get("inject_js")
-        if js and wv is not None:
-            try:
-                wv.evaluateJavaScript_completionHandler_(str(js), None)
-            except Exception:
-                pass
-        if wv is not None:
-            _fire(wv, "on_load", _webview_url(wv))
+_WEBVIEW_IMP_TYPE = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
 
-    @objc_method
-    def webView_didStartProvisionalNavigation_(self, webview: object, navigation: object) -> None:
-        info = _pn_webview_state.get(id(self))
-        if not info:
-            return
-        wv = info.get("view")
-        if wv is not None:
-            _fire(wv, "on_navigation_state_change", _webview_url(wv))
 
-    @objc_method
-    def userContentController_didReceiveScriptMessage_(self, controller: object, message: object) -> None:
-        info = _pn_webview_state.get(id(self))
-        if not info:
-            return
-        wv = info.get("view")
-        if wv is None:
-            return
-        body = ""
+def _webview_did_finish_imp(self_ptr: int, _cmd_ptr: int, _webview_ptr: int, _nav_ptr: int) -> None:
+    """Raw C callback for ``webView:didFinishNavigation:``."""
+    info = _pn_webview_state.get(int(self_ptr or 0))
+    if not info:
+        return
+    wv = info.get("view")
+    if wv is None:
+        return
+    js = info.get("inject_js")
+    if js:
         try:
-            raw = message.body
-            body = str(raw) if raw is not None else ""
+            wv.evaluateJavaScript_completionHandler_(str(js), None)
         except Exception:
-            body = ""
-        _fire(wv, "on_message", body)
+            pass
+    _fire(wv, "on_load", _webview_url(wv))
+
+
+def _webview_did_start_imp(self_ptr: int, _cmd_ptr: int, _webview_ptr: int, _nav_ptr: int) -> None:
+    """Raw C callback for ``webView:didStartProvisionalNavigation:``."""
+    info = _pn_webview_state.get(int(self_ptr or 0))
+    if not info:
+        return
+    wv = info.get("view")
+    if wv is not None:
+        _fire(wv, "on_navigation_state_change", _webview_url(wv))
+
+
+def _webview_script_message_imp(self_ptr: int, _cmd_ptr: int, _controller_ptr: int, message_ptr: int) -> None:
+    """Raw C callback for ``userContentController:didReceiveScriptMessage:``."""
+    info = _pn_webview_state.get(int(self_ptr or 0))
+    if not info:
+        return
+    wv = info.get("view")
+    if wv is None:
+        return
+    body = ""
+    try:
+        # Wrapping the raw pointer ourselves (outbound rubicon call) is
+        # safe; it's the @objc_method *callback* marshaling that breaks.
+        message = ObjCInstance(_ct.c_void_p(message_ptr))
+        raw = message.body
+        body = str(raw) if raw is not None else ""
+    except Exception:
+        body = ""
+    _fire(wv, "on_message", body)
+
+
+_webview_did_finish_imp_ref = _WEBVIEW_IMP_TYPE(_webview_did_finish_imp)
+_webview_did_start_imp_ref = _WEBVIEW_IMP_TYPE(_webview_did_start_imp)
+_webview_script_message_imp_ref = _WEBVIEW_IMP_TYPE(_webview_script_message_imp)
+
+_PN_WEBVIEW_DELEGATE_CLS = _alloc_cls(_NS_OBJECT_CLS, b"_PNWebViewDelegateCTypes", 0)
+if _PN_WEBVIEW_DELEGATE_CLS:
+    for sel_name, imp_ref in (
+        (b"webView:didFinishNavigation:", _webview_did_finish_imp_ref),
+        (b"webView:didStartProvisionalNavigation:", _webview_did_start_imp_ref),
+        (b"userContentController:didReceiveScriptMessage:", _webview_script_message_imp_ref),
+    ):
+        _add_method(
+            _PN_WEBVIEW_DELEGATE_CLS,
+            _sel_reg(sel_name),
+            _ct.cast(imp_ref, _ct.c_void_p),
+            b"v@:@@",
+        )
+    _reg_cls(_PN_WEBVIEW_DELEGATE_CLS)
+
+
+def _new_webview_delegate_ptr() -> Optional[int]:
+    """Alloc/init/retain one raw ``_PNWebViewDelegateCTypes`` instance."""
+    if not _PN_WEBVIEW_DELEGATE_CLS:
+        return None
+    _objc_msgSend.restype = _ct.c_void_p
+    _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
+    d = _objc_msgSend(_PN_WEBVIEW_DELEGATE_CLS, _SEL_ALLOC)
+    d = _objc_msgSend(d, _SEL_INIT)
+    d = _objc_msgSend(d, _SEL_RETAIN)
+    return int(d) if d else None
 
 
 class WebViewHandler(IOSViewHandler):
@@ -2504,24 +2575,26 @@ class WebViewHandler(IOSViewHandler):
                     pass
             _pn_wkwebview_declared = True
         config = WKWebViewConfiguration.alloc().init()
-        delegate = _PNWebViewDelegate.new()
-        delegate.retain()
-        _pn_retained_views.append(delegate)
+        delegate_ptr = _new_webview_delegate_ptr()
+        delegate = ObjCInstance(_ct.c_void_p(delegate_ptr)) if delegate_ptr else None
         # Register the message handler up front so page JS calling
         # ``window.webkit.messageHandlers.pythonnative.postMessage(x)``
         # can reach ``on_message`` even if it's wired in a later render.
-        try:
-            config.userContentController.addScriptMessageHandler_name_(delegate, "pythonnative")
-        except Exception:
-            pass
+        if delegate is not None:
+            try:
+                config.userContentController.addScriptMessageHandler_name_(delegate, "pythonnative")
+            except Exception:
+                pass
         wv = WKWebView.alloc().initWithFrame_configuration_(((0, 0), (0, 0)), config)
         wv.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        try:
-            wv.setNavigationDelegate_(delegate)
-        except Exception:
-            pass
-        _pn_webview_state[id(delegate)] = {"view": wv, "inject_js": None}
-        self._delegate_ids[_objc_ptr(wv) or 0] = id(delegate)
+        if delegate is not None:
+            try:
+                wv.setNavigationDelegate_(delegate)
+            except Exception:
+                pass
+        if delegate_ptr:
+            _pn_webview_state[delegate_ptr] = {"view": wv, "inject_js": None}
+            self._delegate_ids[_objc_ptr(wv) or 0] = delegate_ptr
         return wv
 
     _delegate_ids: Dict[int, int] = {}

@@ -1,4 +1,7 @@
-# Tests AsyncStorage write / read / delete round-trip.
+# Tests AsyncStorage write / read / delete round-trip. Each async op
+# flips the readout on *completion* ("(written)" / "(cleared)"), and the
+# flow waits for that transition before tapping the next button — taps
+# must not race the storage I/O on slow CI runners.
 #
 # Demo screen: examples/e2e-suite/app/screens/storage/async_storage_demo.py
 # Source under test: src/pythonnative/storage.py :: AsyncStorage
@@ -10,14 +13,21 @@ appId: ${APP_ID}
       CATEGORY: Storage
       DEMO_TITLE: AsyncStorage
 - tapOn: "Clear"
-- assertVisible: "Read value: (unread)"
+- extendedWaitUntil:
+    visible: "Read value: (cleared)"
+    timeout: 5000
 - tapOn: "Write"
-- assertVisible: "Read value: (unread)"
+- extendedWaitUntil:
+    visible: "Read value: (written)"
+    timeout: 5000
 - tapOn: "Read"
 - extendedWaitUntil:
     visible: "Read value: stored-value"
     timeout: 5000
 - tapOn: "Clear"
+- extendedWaitUntil:
+    visible: "Read value: (cleared)"
+    timeout: 5000
 - tapOn: "Read"
 - extendedWaitUntil:
     visible: "Read value: (none)"

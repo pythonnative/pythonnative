@@ -241,6 +241,40 @@ def test_use_animated_value_default_initial_zero() -> None:
     assert captured[0].value == 0.0
 
 
+def test_animated_components_mount_through_reconciler() -> None:
+    """Regression: ``@component`` packs positional children into the
+    ``children`` prop; the Animated wrappers must unpack it instead of
+    forwarding it to ``View()`` (pre-fix this raised ``TypeError:
+    View() got an unexpected keyword argument 'children'``)."""
+    from pythonnative.components import Column, Text
+    from pythonnative.native_views import set_registry
+
+    backend = _StubBackend()
+    set_registry(backend)  # type: ignore[arg-type]
+    try:
+
+        @component
+        def app() -> Element:
+            v = use_animated_value(0.25)
+            return Column(
+                Animated.View(Text("boxed"), style={"opacity": v, "padding": 4}),
+                Animated.Text("fading", style={"opacity": v}),
+                Animated.Image("https://example.com/i.png", style={"opacity": v}),
+            )
+
+        rec = Reconciler(backend)
+        rec.mount(app())
+
+        texts = {view.props.get("text") for view in backend.views.values()}
+        assert {"boxed", "fading"} <= texts
+        # Each wrapper attached its binding and pushed the initial value.
+        opacity_pushes = [(tag, val) for tag, prop, val in backend.animated if prop == "opacity"]
+        assert len(opacity_pushes) == 3
+        assert all(val == 0.25 for _tag, val in opacity_pushes)
+    finally:
+        set_registry(None)
+
+
 # ======================================================================
 # Native driver
 # ======================================================================

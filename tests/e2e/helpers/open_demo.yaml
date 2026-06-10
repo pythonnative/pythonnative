@@ -70,6 +70,7 @@ appId: ${APP_ID}
           element:
             text: "Back to home"
           direction: DOWN
+          timeout: 45000
       - tapOn: "Back to home"
       - scrollUntilVisible:
           element:
@@ -104,19 +105,43 @@ appId: ${APP_ID}
           element:
             text: "Open ${CATEGORY}"
           direction: DOWN
+          timeout: 45000
       - tapOn: "Open ${CATEGORY}"
       - extendedWaitUntil:
           visible: "Demos in ${CATEGORY}"
           timeout: 15000
 
 # 5. We're now guaranteed to be on the right category list. Open the
-# requested demo.
-- scrollUntilVisible:
-    element:
-      text: "Open: ${DEMO_TITLE}"
-    direction: DOWN
-- tapOn:
-    text: "Open: ${DEMO_TITLE}"
-- extendedWaitUntil:
-    visible: "Demo: ${DEMO_TITLE}"
-    timeout: 15000
+# requested demo. The Components category has ~28 rows, so reaching the
+# deepest demos takes many swipes — give the scroll a generous budget
+# for slow (software-rendered) emulators, and let the UI settle between
+# swipes so a laggy emulator doesn't compress a swipe into a stray tap
+# on one of the list's buttons.
+#
+# A stray tap can still slip through on a badly lagging emulator and
+# open the wrong demo mid-scroll, which would otherwise strand the
+# scroll loop on a demo screen. Wrap the whole step in a retry whose
+# first command pops any accidentally-opened demo, so a second attempt
+# starts from the category list again.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible: "Back to list"
+          commands:
+            - tapOn: "Back to list"
+            - extendedWaitUntil:
+                notVisible: "Back to list"
+                timeout: 15000
+      - scrollUntilVisible:
+          element:
+            text: "Open: ${DEMO_TITLE}"
+          direction: DOWN
+          timeout: 60000
+          waitToSettleTimeoutMs: 500
+      - tapOn:
+          text: "Open: ${DEMO_TITLE}"
+      - extendedWaitUntil:
+          visible: "Demo: ${DEMO_TITLE}"
+          timeout: 15000

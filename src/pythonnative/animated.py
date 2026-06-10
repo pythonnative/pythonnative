@@ -822,6 +822,12 @@ def _make_animated_factory(
         from .components import Text as _Text
         from .components import View as _View
 
+        # ``@component`` packs positional children into the ``children``
+        # prop (this function declares ``*args``), and the reconciler
+        # re-invokes it with keyword props only — so at render time the
+        # payload arrives in ``kwargs``, never in ``args``.
+        children = list(args) or list(kwargs.pop("children", ()) or ())
+
         style = kwargs.pop("style", None)
         plain_style, bindings = _resolve_style_with_values(style)
 
@@ -846,12 +852,13 @@ def _make_animated_factory(
         use_effect(_attach_bindings, [tuple(sorted((k, id(v)) for k, v in bindings.items()))])
 
         if element_type == "Text":
-            text = args[0] if args else kwargs.pop("text", "")
+            text = children[0] if children else kwargs.pop("text", "")
             return _Text(text, style=plain_style, ref=ref, **kwargs)
         if element_type == "Image":
-            source = args[0] if args else kwargs.pop("source", "")
+            source = children[0] if children else kwargs.pop("source", "")
             return _Image(source, style=plain_style, ref=ref, **kwargs)
-        children = list(args) if accept_children else []
+        if not accept_children:
+            children = []
         return _View(*children, style=plain_style, ref=ref, **kwargs)
 
     return _animated

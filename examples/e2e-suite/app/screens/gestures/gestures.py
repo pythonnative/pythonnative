@@ -32,8 +32,10 @@ def GesturesDemo() -> pn.Element:
             result_text("Long presses", presses),
             result_text("Swipe", swipe),
             pn.View(
+                # Label deliberately differs from the "Gesture area" section
+                # title — Maestro taps by text and must match only the box.
                 pn.Text(
-                    "Gesture area",
+                    "Gesture target",
                     style=pn.style(color="#FFFFFF", font_weight="700"),
                 ),
                 style=pn.style(

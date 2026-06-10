@@ -1,7 +1,9 @@
 """Demo screen for [`pn.AsyncStorage`][pythonnative.AsyncStorage].
 
 Saves a value under a stable key, then reads it back into a result
-line. Maestro taps "Write", taps "Read", and asserts the read value.
+line. Every async operation flips the readout when it *completes*
+("(written)" / "(cleared)") so Maestro can await each transition
+instead of racing the storage I/O on slow CI runners.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ def AsyncStorageDemo() -> pn.Element:
 
     async def _write() -> None:
         await pn.AsyncStorage.set(_KEY, "stored-value")
-        set_value("(unread)")
+        set_value("(written)")
 
     async def _read() -> None:
         v = await pn.AsyncStorage.get(_KEY)
@@ -27,7 +29,7 @@ def AsyncStorageDemo() -> pn.Element:
 
     async def _clear() -> None:
         await pn.AsyncStorage.delete(_KEY)
-        set_value("(unread)")
+        set_value("(cleared)")
 
     return demo_screen(
         "AsyncStorage",

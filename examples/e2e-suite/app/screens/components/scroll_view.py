@@ -17,8 +17,9 @@ def ScrollViewDemo() -> pn.Element:
     rows = list(range(1, 31))
     scrolled, set_scrolled = pn.use_state(False)
 
-    def on_scroll(x: float, y: float) -> None:
-        # Flip once on the first scroll event. After the re-render the
+    def on_scroll(payload: dict) -> None:
+        # Flip once on the first scroll event (payload carries the
+        # ``{"x", "y"}`` content offset). After the re-render the
         # reconciler swaps in this fresh callback (now closing over
         # ``scrolled=True``), so subsequent events are cheap no-ops.
         if not scrolled:

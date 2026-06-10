@@ -42,8 +42,8 @@ jobs:
         include:
           - name: components
             suites: components
-          - name: hooks-nav
-            suites: hooks navigation
+          - name: hooks-nav-gestures
+            suites: hooks navigation gestures
           - name: layout-styling-anim-misc
             suites: layout styling animations misc
 
@@ -104,8 +104,8 @@ jobs:
         include:
           - name: components
             suites: components
-          - name: hooks-nav
-            suites: hooks navigation
+          - name: hooks-nav-gestures
+            suites: hooks navigation gestures
           - name: layout-styling-anim-misc
             suites: layout styling animations misc
 

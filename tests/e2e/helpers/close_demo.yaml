@@ -23,9 +23,25 @@
 appId: ${APP_ID}
 ---
 - tapOn: "Back to list"
-- scrollUntilVisible:
-    element:
-      text: "Demos in ${CATEGORY}"
-    direction: UP
-    timeout: 15000
-- assertVisible: "Demos in ${CATEGORY}"
+# Scrolling back to the top can take many swipes after a deep demo, and
+# a badly lagging emulator can compress one of those swipes into a
+# stray tap that opens another demo mid-scroll. Wrap the scroll in a
+# retry whose first command pops any accidentally-opened demo.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible: "Back to list"
+          commands:
+            - tapOn: "Back to list"
+            - extendedWaitUntil:
+                notVisible: "Back to list"
+                timeout: 15000
+      - scrollUntilVisible:
+          element:
+            text: "Demos in ${CATEGORY}"
+          direction: UP
+          timeout: 45000
+          waitToSettleTimeoutMs: 500
+      - assertVisible: "Demos in ${CATEGORY}"

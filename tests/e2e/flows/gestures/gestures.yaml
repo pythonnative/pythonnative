@@ -12,14 +12,16 @@ appId: ${APP_ID}
 - assertVisible: "Taps: 0"
 - assertVisible: "Long presses: 0"
 - assertVisible: "Swipe: none"
-- tapOn: "Gesture area"
+# "Gesture target" is the box's label; the section header is titled
+# "Gesture area", so tapping by that text would hit the header instead.
+- tapOn: "Gesture target"
 - assertVisible: "Taps: 1"
-- longPressOn: "Gesture area"
+- longPressOn: "Gesture target"
 - assertVisible: "Long presses: 1"
 # Horizontal swipe so the page ScrollView doesn't steal the motion.
 - swipe:
     from:
-      text: "Gesture area"
+      text: "Gesture target"
     direction: LEFT
 - assertVisible: "Swipe: left"
 - runFlow:
