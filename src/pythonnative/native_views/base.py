@@ -21,20 +21,32 @@ from typing import Any, Dict, Tuple, Union
 class ViewHandler:
     """Protocol implemented by every native-view handler.
 
-    A `ViewHandler` knows how to create, update, and re-parent native
-    views of one element type. The reconciler dispatches through the
-    [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry];
-    handlers never need to know about `Element` or `VNode`.
+    A `ViewHandler` knows how to create, update, re-parent, and destroy
+    native views of one element type. The reconciler never calls a
+    handler directly — it emits a batch of mutation ops
+    (`pythonnative.mutations`) that the
+    [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
+    applies by dispatching to handlers. Handlers never need to know
+    about `Element` or `VNode`.
 
-    Subclasses must override [`create`][pythonnative.native_views.base.ViewHandler.create]
-    and [`update`][pythonnative.native_views.base.ViewHandler.update].
-    Container handlers override the child-management methods; leaf
-    handlers can leave them as no-ops. Handlers whose intrinsic size
-    depends on content (text, buttons, images) override
+    Event contract: props delivered to
+    [`create`][pythonnative.native_views.base.ViewHandler.create] /
+    [`update`][pythonnative.native_views.base.ViewHandler.update]
+    contain **no Python callables**. The set of event names wired on
+    the element arrives under the ``_pn_events`` key (see
+    [`event_names`][pythonnative.events.event_names]); handlers wire
+    platform listeners once at create time and forward firings through
+    [`dispatch_event`][pythonnative.events.dispatch_event] using the
+    tag passed to ``create``.
+
+    Subclasses must override ``create`` and ``update``. Container
+    handlers override the child-management methods; leaf handlers can
+    leave them as no-ops. Handlers whose intrinsic size depends on
+    content (text, buttons, images) override
     [`measure_intrinsic`][pythonnative.native_views.base.ViewHandler.measure_intrinsic].
     """
 
-    def create(self, props: Dict[str, Any]) -> Any:
+    def create(self, tag: int, props: Dict[str, Any]) -> Any:
         """Create a fresh native view and apply initial *visual* props.
 
         Layout-related props (``width``, ``height``, ``flex``, ``padding``,
@@ -43,7 +55,10 @@ class ViewHandler:
         so handlers should ignore them here.
 
         Args:
-            props: Initial props dict.
+            tag: The reconciler-assigned identity for this view. Used
+                when dispatching events back into Python.
+            props: Initial props dict (callable-free; event names under
+                ``_pn_events``).
 
         Returns:
             The platform-native view object.
@@ -66,15 +81,26 @@ class ViewHandler:
         """
         raise NotImplementedError
 
-    def add_child(self, parent: Any, child: Any) -> None:
-        """Append `child` to `parent`. No-op for leaf handlers."""
+    def insert_child(self, parent: Any, child: Any, index: int) -> None:
+        """Ensure `child` sits at `index` among `parent`'s children.
+
+        Must be **move-aware**: when `child` is already attached to
+        `parent`, reposition it instead of attaching twice. Handlers
+        should clamp `index` to the current child count. No-op for
+        leaf handlers.
+        """
 
     def remove_child(self, parent: Any, child: Any) -> None:
-        """Remove `child` from `parent`. No-op for leaf handlers."""
+        """Remove `child` from `parent` without destroying it. No-op for leaf handlers."""
 
-    def insert_child(self, parent: Any, child: Any, index: int) -> None:
-        """Insert `child` at `index`. Defaults to appending."""
-        self.add_child(parent, child)
+    def destroy(self, native_view: Any) -> None:
+        """Release platform resources owned by ``native_view``.
+
+        Called exactly once when the reconciler unmounts the view.
+        The default is a no-op; override to detach listeners, cancel
+        in-flight work, or destroy widgets that the platform doesn't
+        garbage-collect.
+        """
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
         """Position and size ``native_view`` relative to its parent.
@@ -118,6 +144,70 @@ class ViewHandler:
             ``(width, height)`` in points.
         """
         return (0.0, 0.0)
+
+    def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
+        """Execute an imperative command (e.g. ``"scroll_to_offset"``).
+
+        Commands are the escape hatch for one-shot imperative actions
+        that don't fit declarative props — scrolling, focusing,
+        flashing indicators. Unknown commands should be ignored.
+
+        Args:
+            native_view: The platform-native view.
+            name: Command name.
+            args: Command arguments.
+
+        Returns:
+            An optional command-specific result.
+        """
+        return None
+
+    def set_animated_property(self, native_view: Any, prop_name: str, value: Any) -> None:
+        """Apply one frame of a Python-driven animation immediately.
+
+        This is the fallback path used by the desktop preview and by
+        animations the platform cannot drive natively. ``prop_name``
+        is one of ``opacity``, ``background_color``, ``translate_x``,
+        ``translate_y``, ``scale``, ``scale_x``, ``scale_y``,
+        ``rotate``.
+        """
+
+    def start_animation(
+        self,
+        native_view: Any,
+        anim_id: int,
+        prop_name: str,
+        spec: Dict[str, Any],
+    ) -> bool:
+        """Start a natively-driven animation, if the platform supports it.
+
+        ``spec`` describes the animation::
+
+            {"kind": "timing", "from": 0.0, "to": 1.0,
+             "duration_ms": 300.0, "easing": "ease_in_out"}
+            {"kind": "spring", "from": ..., "to": ...,
+             "stiffness": 100.0, "damping": 10.0, "mass": 1.0,
+             "initial_velocity": 0.0}
+
+        Implementations must invoke
+        ``pythonnative.animated.native_animation_completed(anim_id, finished)``
+        when the animation completes or is cancelled.
+
+        Returns:
+            ``True`` when the animation was started natively. ``False``
+            tells the caller to fall back to the Python ticker (the
+            default).
+        """
+        return False
+
+    def cancel_animation(self, native_view: Any, anim_id: int) -> Any:
+        """Cancel a natively-driven animation.
+
+        Returns:
+            The property's current (presentation) value when the
+            platform can read it, else ``None``.
+        """
+        return None
 
 
 # ======================================================================

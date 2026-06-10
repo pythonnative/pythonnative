@@ -7,8 +7,8 @@ project for a specific [`AppConfig`][pythonnative.project.config.AppConfig]:
   ``com.pythonnative.android_template``; this module rewrites and moves
   it to the app's own ``application_id`` so each app ships a distinct
   package. The PythonNative Android runtime resolves its helper classes
-  (``Navigator``, ``PNVirtualListView``) via ``getPackageName()``, so the
-  relocation needs no runtime configuration.
+  (``Navigator``) via ``getPackageName()``, so the relocation needs no
+  runtime configuration.
 - **Identity & SDKs.** ``applicationId``, ``versionCode``/``versionName``,
   ``minSdk``/``targetSdk``/``compileSdk``, ABI filters, and the embedded
   CPython version are written into ``app/build.gradle``.

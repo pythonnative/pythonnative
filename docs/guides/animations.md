@@ -18,12 +18,33 @@ without re-rendering the component tree on every frame.
    - `await handle` runs the animation and suspends until it
      completes. Cancelling the awaiting task stops the animation.
 
-The animated component captures a `ref` to the underlying native view
-(via the same [`use_ref`][pythonnative.use_ref] mechanism users have
-access to). The animation driver then invokes the platform's native
-animation API (`UIView.animate` on iOS, `ViewPropertyAnimator` on
-Android) directly on that view, so per-frame updates skip the
-reconciler.
+The animated component attaches the value to its native view's
+animation bindings after mount. From there, the **native driver**
+takes over whenever it can.
+
+## The native driver
+
+When you `start()` (or await) an animation whose value is attached to
+mounted views, PythonNative first offers the animation to the
+platform: Core Animation (`CABasicAnimation` / `CASpringAnimation`)
+on iOS, `ViewPropertyAnimator` / `DynamicAnimation` on Android. If
+the platform accepts, the animation runs entirely natively at the
+display's refresh rate — **no Python code executes per frame** — and
+Python receives exactly one completion callback, which settles the
+`AnimatedValue` at its final number.
+
+The Python-ticked fallback (a ~60 Hz loop) is used automatically
+when:
+
+- the value isn't attached to any mounted view (pure data animation),
+- a Python listener is registered via `add_listener` (listeners want
+  per-frame values, and only the ticker provides those),
+- a callable `easing` is supplied (custom curves can't cross the
+  bridge), or
+- the platform declines the animation.
+
+Either way the API and the observable end state are identical, so you
+never have to opt in or out manually.
 
 ## Fade in on mount
 
@@ -111,6 +132,19 @@ awaitable.
 
 `Animated.timing` accepts an `easing` argument: `"linear"`,
 `"ease_in"`, `"ease_out"`, `"ease_in_out"`, or `"bounce"`.
+
+## Decay (fling)
+
+`Animated.decay` decelerates a value from an initial velocity —
+the standard ending for a pan gesture:
+
+```python
+def on_pan_end(event):
+    pn.Animated.decay(tx, velocity=event.velocity_x / 1000.0).start()
+```
+
+See the [Gestures guide](gestures.md) for the full drag-and-release
+pattern.
 
 ## Stopping an animation
 

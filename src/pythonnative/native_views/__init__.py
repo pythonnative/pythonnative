@@ -5,8 +5,15 @@ This package provides the
 that maps element type names (e.g., `"Text"`, `"Button"`) to
 platform-specific
 [`ViewHandler`][pythonnative.native_views.base.ViewHandler]
-implementations. The reconciler calls the registry to create, update,
-and re-parent native views.
+implementations, and owns the **tag table** mapping each
+reconciler-assigned integer tag to its live native view.
+
+The reconciler communicates exclusively through
+[`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]:
+one ordered batch of create/update/insert/remove/destroy/frame ops per
+commit (see `pythonnative.mutations`). Imperative escape hatches
+(commands, animation control, intrinsic measurement) resolve views
+through the same tag table.
 
 Platform handlers live in dedicated submodules:
 
@@ -15,6 +22,7 @@ Platform handlers live in dedicated submodules:
 - `pythonnative.native_views.android`: Android handlers
   (Chaquopy / Java bridge).
 - `pythonnative.native_views.ios`: iOS handlers (rubicon-objc).
+- `pythonnative.native_views.desktop`: Tkinter preview handlers.
 
 All platform-branching is handled at registration time via lazy
 imports, so this package can be imported on any platform for testing.
@@ -27,8 +35,9 @@ import math
 import sys
 import threading
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple
 
+from ..mutations import CreateOp, DestroyOp, InsertOp, Mutation, RemoveOp, SetFrameOp, UpdateOp
 from .base import ViewHandler
 
 # ======================================================================
@@ -85,17 +94,30 @@ def _tripwire_log(label: str, message: str) -> None:
         pass
 
 
-class NativeViewRegistry:
-    """Map element type names to platform-specific view handlers.
+class ViewRecord:
+    """One live native view tracked by the tag table."""
 
-    The reconciler depends only on this protocol:
-    `create_view`, `update_view`, `add_child`, `remove_child`,
-    `insert_child`, `set_frame`, `measure_intrinsic`. Implementations
-    may be real (Android/iOS) or mocked for tests.
+    __slots__ = ("tag", "type_name", "view", "handler")
+
+    def __init__(self, tag: int, type_name: str, view: Any, handler: ViewHandler) -> None:
+        self.tag = tag
+        self.type_name = type_name
+        self.view = view
+        self.handler = handler
+
+
+class NativeViewRegistry:
+    """Map element type names to handlers and tags to live native views.
+
+    The reconciler depends only on this protocol: ``apply_mutations``,
+    ``resolve_view``, ``measure_intrinsic``, and ``command``.
+    Implementations may host real platform handlers (Android/iOS/
+    desktop) or mocks for tests.
     """
 
     def __init__(self) -> None:
         self._handlers: Dict[str, ViewHandler] = {}
+        self._records: Dict[int, ViewRecord] = {}
 
     def register(self, type_name: str, handler: ViewHandler) -> None:
         """Register `handler` to service elements of type `type_name`.
@@ -106,116 +128,115 @@ class NativeViewRegistry:
         """
         self._handlers[type_name] = handler
 
-    def create_view(self, type_name: str, props: Dict[str, Any]) -> Any:
-        """Create a native view for `type_name` and apply initial props.
+    def handler_for(self, type_name: str) -> Optional[ViewHandler]:
+        """Return the handler registered for ``type_name``, if any."""
+        return self._handlers.get(type_name)
+
+    # ------------------------------------------------------------------
+    # Tag table
+    # ------------------------------------------------------------------
+
+    def resolve_view(self, tag: int) -> Any:
+        """Return the native view registered under ``tag``, or ``None``."""
+        record = self._records.get(tag)
+        return record.view if record is not None else None
+
+    def record_for(self, tag: int) -> Optional[ViewRecord]:
+        """Return the full [`ViewRecord`][pythonnative.native_views.ViewRecord] for ``tag``."""
+        return self._records.get(tag)
+
+    def live_view_count(self) -> int:
+        """Number of views currently tracked (test/diagnostic helper)."""
+        return len(self._records)
+
+    # ------------------------------------------------------------------
+    # The commit channel
+    # ------------------------------------------------------------------
+
+    def apply_mutations(self, ops: Sequence[Mutation]) -> None:
+        """Apply one commit transaction.
+
+        Ops are applied strictly in order. Failures are isolated per
+        op: a handler exception is logged (rate-limited) and the
+        remaining ops still apply, so one bad prop can't desync the
+        whole native tree.
 
         Args:
-            type_name: The element type name.
-            props: Initial props dict.
-
-        Returns:
-            The platform-native view object.
-
-        Raises:
-            ValueError: If no handler is registered for `type_name`.
+            ops: Ordered mutations emitted by the reconciler.
         """
-        handler = self._handlers.get(type_name)
-        if handler is None:
-            raise ValueError(f"Unknown element type: {type_name!r}")
-        return handler.create(props)
+        for op in ops:
+            try:
+                self._apply_one(op)
+            except Exception as exc:
+                _tripwire_log(
+                    f"apply:{type(op).__name__}",
+                    f"[PN] apply_mutations: {type(op).__name__} failed: {type(exc).__name__}: {exc!r}",
+                )
 
-    def update_view(self, native_view: Any, type_name: str, changed_props: Dict[str, Any]) -> None:
-        """Apply `changed_props` to an existing native view.
+    def _apply_one(self, op: Mutation) -> None:
+        if isinstance(op, CreateOp):
+            handler = self._handlers.get(op.type_name)
+            if handler is None:
+                raise ValueError(f"Unknown element type: {op.type_name!r}")
+            view = handler.create(op.tag, op.props)
+            self._records[op.tag] = ViewRecord(op.tag, op.type_name, view, handler)
+            return
+        if isinstance(op, UpdateOp):
+            record = self._records.get(op.tag)
+            if record is not None:
+                record.handler.update(record.view, op.changed_props)
+            return
+        if isinstance(op, InsertOp):
+            parent = self._records.get(op.parent_tag)
+            child = self._records.get(op.child_tag)
+            if parent is not None and child is not None:
+                parent.handler.insert_child(parent.view, child.view, op.index)
+            return
+        if isinstance(op, RemoveOp):
+            parent = self._records.get(op.parent_tag)
+            child = self._records.get(op.child_tag)
+            if parent is not None and child is not None:
+                parent.handler.remove_child(parent.view, child.view)
+            return
+        if isinstance(op, DestroyOp):
+            record = self._records.pop(op.tag, None)
+            if record is not None:
+                record.handler.destroy(record.view)
+            return
+        if isinstance(op, SetFrameOp):
+            self._apply_frame(op)
+            return
+        raise TypeError(f"Unknown mutation op: {op!r}")
 
-        Silently ignored if no handler is registered for `type_name`.
-
-        Args:
-            native_view: The platform-native view.
-            type_name: The element type name.
-            changed_props: A dict containing only props whose values
-                changed since the previous render. Removed props are
-                signaled with a value of `None`.
-        """
-        handler = self._handlers.get(type_name)
-        if handler is not None:
-            handler.update(native_view, changed_props)
-
-    def add_child(self, parent: Any, child: Any, parent_type: str) -> None:
-        """Append `child` to `parent`.
-
-        Args:
-            parent: Parent native view.
-            child: Native view to append.
-            parent_type: Element type of the parent (for handler lookup).
-        """
-        handler = self._handlers.get(parent_type)
-        if handler is not None:
-            handler.add_child(parent, child)
-
-    def remove_child(self, parent: Any, child: Any, parent_type: str) -> None:
-        """Remove `child` from `parent`.
-
-        Args:
-            parent: Parent native view.
-            child: Child native view to remove.
-            parent_type: Element type of the parent.
-        """
-        handler = self._handlers.get(parent_type)
-        if handler is not None:
-            handler.remove_child(parent, child)
-
-    def insert_child(self, parent: Any, child: Any, parent_type: str, index: int) -> None:
-        """Insert `child` into `parent` at `index`.
-
-        Args:
-            parent: Parent native view.
-            child: Child native view to insert.
-            parent_type: Element type of the parent.
-            index: Zero-based insertion position among `parent`'s
-                existing children.
-        """
-        handler = self._handlers.get(parent_type)
-        if handler is not None:
-            handler.insert_child(parent, child, index)
-
-    def set_frame(
-        self,
-        native_view: Any,
-        type_name: str,
-        x: float,
-        y: float,
-        width: float,
-        height: float,
-    ) -> None:
-        """Position and size a native view via the appropriate handler.
-
-        Called by the reconciler's layout pass after every commit, with
-        coordinates computed by ``pythonnative.layout`` in points
-        relative to the parent's content origin.
-        """
+    def _apply_frame(self, op: SetFrameOp) -> None:
+        record = self._records.get(op.tag)
+        if record is None:
+            return
         # Tripwire: log non-finite layout values so we can diagnose
         # crashes like iOS `CALayerInvalidGeometry` without losing the
         # repro. Handlers are responsible for clamping before applying.
-        # Rate-limited via ``_tripwire_log`` to avoid 60 Hz floods when
-        # an animated value is stuck at NaN.
+        # Rate-limited via ``_tripwire_log`` to avoid floods when an
+        # animated value is stuck at NaN.
         try:
-            finite = math.isfinite(x) and math.isfinite(y) and math.isfinite(width) and math.isfinite(height)
+            finite = (
+                math.isfinite(op.x) and math.isfinite(op.y) and math.isfinite(op.width) and math.isfinite(op.height)
+            )
         except (TypeError, ValueError):
             finite = False
         if not finite:
             _tripwire_log(
                 "set_frame:nan",
-                f"[set_frame:nan] type={type_name!r} " f"x={x!r} y={y!r} w={width!r} h={height!r}",
+                f"[set_frame:nan] type={record.type_name!r} " f"x={op.x!r} y={op.y!r} w={op.width!r} h={op.height!r}",
             )
+        record.handler.set_frame(record.view, op.x, op.y, op.width, op.height)
 
-        handler = self._handlers.get(type_name)
-        if handler is not None:
-            handler.set_frame(native_view, x, y, width, height)
+    # ------------------------------------------------------------------
+    # Imperative escape hatches (resolved through the tag table)
+    # ------------------------------------------------------------------
 
     def measure_intrinsic(
         self,
-        native_view: Any,
-        type_name: str,
+        tag: int,
         max_width: float,
         max_height: float,
     ) -> Tuple[float, float]:
@@ -224,10 +245,53 @@ class NativeViewRegistry:
         Used by the layout engine for leaves whose intrinsic size
         depends on their content (text, buttons, images).
         """
-        handler = self._handlers.get(type_name)
-        if handler is None:
+        record = self._records.get(tag)
+        if record is None:
             return (0.0, 0.0)
-        return handler.measure_intrinsic(native_view, max_width, max_height)
+        return record.handler.measure_intrinsic(record.view, max_width, max_height)
+
+    def command(self, tag: int, name: str, args: Optional[Dict[str, Any]] = None) -> Any:
+        """Execute an imperative command against the view for ``tag``.
+
+        Args:
+            tag: Target view tag.
+            name: Command name (handler-specific, e.g.
+                ``"scroll_to_offset"``).
+            args: Optional command arguments.
+
+        Returns:
+            The handler's command result, or ``None`` when the tag is
+            unknown.
+        """
+        record = self._records.get(tag)
+        if record is None:
+            return None
+        return record.handler.command(record.view, name, args or {})
+
+    def set_animated_property(self, tag: int, prop_name: str, value: Any) -> None:
+        """Apply one Python-driven animation frame to the view for ``tag``."""
+        record = self._records.get(tag)
+        if record is not None:
+            record.handler.set_animated_property(record.view, prop_name, value)
+
+    def start_animation(self, tag: int, anim_id: int, prop_name: str, spec: Dict[str, Any]) -> bool:
+        """Start a natively-driven animation on the view for ``tag``.
+
+        Returns:
+            Whether the platform accepted the animation (``False``
+            means the caller should drive it from the Python ticker).
+        """
+        record = self._records.get(tag)
+        if record is None:
+            return False
+        return bool(record.handler.start_animation(record.view, anim_id, prop_name, spec))
+
+    def cancel_animation(self, tag: int, anim_id: int) -> Any:
+        """Cancel a natively-driven animation; returns the presentation value if known."""
+        record = self._records.get(tag)
+        if record is None:
+            return None
+        return record.handler.cancel_animation(record.view, anim_id)
 
 
 # ======================================================================

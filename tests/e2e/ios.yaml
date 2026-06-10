@@ -71,6 +71,7 @@ env:
 - runFlow: flows/animations/spring_animation.yaml
 - runFlow: flows/animations/parallel_animation.yaml
 - runFlow: flows/animations/sequence_animation.yaml
+- runFlow: flows/gestures/gestures.yaml
 - runFlow: flows/alerts/simple_alert.yaml
 - runFlow: flows/alerts/confirm_alert.yaml
 - runFlow: flows/storage/async_storage.yaml

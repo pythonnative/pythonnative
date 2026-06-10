@@ -67,7 +67,7 @@ pn.ErrorBoundary(child, fallback=render_error)
   render.
 - Exceptions raised inside a child
   [`ViewHandler`][pythonnative.native_views.base.ViewHandler]'s
-  `create_view` or `update_view` while the boundary is reconciling
+  `create` or `update` while the boundary is reconciling
   that subtree.
 
 ## What doesn't get caught

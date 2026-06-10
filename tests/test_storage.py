@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Generator
 
 import pytest
+from fake_backend import FakeBackend as _StubBackend
 
 from pythonnative.element import Element
 from pythonnative.hooks import component
@@ -115,30 +116,6 @@ def test_desktop_backend_persists_to_disk(tmp_path: Path) -> None:
 # ======================================================================
 # use_persisted_state
 # ======================================================================
-
-
-class _Stub:
-    def __init__(self, type_name: str, props: dict) -> None:
-        self.type_name = type_name
-        self.props = props
-        self.children: list = []
-
-
-class _StubBackend:
-    def create_view(self, type_name: str, props: dict) -> _Stub:
-        return _Stub(type_name, props)
-
-    def update_view(self, view: _Stub, type_name: str, changed: dict) -> None:
-        view.props.update(changed)
-
-    def add_child(self, parent: _Stub, child: _Stub, parent_type: str) -> None:
-        parent.children.append(child)
-
-    def remove_child(self, parent: _Stub, child: _Stub, parent_type: str) -> None:
-        parent.children = [c for c in parent.children if c is not child]
-
-    def insert_child(self, parent: _Stub, child: _Stub, parent_type: str, index: int) -> None:
-        parent.children.insert(index, child)
 
 
 def test_use_persisted_state_starts_with_initial() -> None:

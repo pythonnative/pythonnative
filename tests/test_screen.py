@@ -22,7 +22,7 @@ class StubView:
 class TextHandler(ViewHandler):
     """Minimal text handler for mounting screen roots on desktop."""
 
-    def create(self, props: Dict[str, Any]) -> StubView:
+    def create(self, tag: int, props: Dict[str, Any]) -> StubView:
         return StubView(props)
 
     def update(self, native_view: StubView, changed_props: Dict[str, Any]) -> None:

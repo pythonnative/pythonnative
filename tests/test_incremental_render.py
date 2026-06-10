@@ -10,63 +10,12 @@ the measurement cache that lets untouched leaves skip native
 
 from typing import Any, Dict, List, Tuple
 
+from fake_backend import FakeBackend as MockBackend
+
 from pythonnative.components import ErrorBoundary
 from pythonnative.element import Element
 from pythonnative.hooks import Provider, component, create_context, use_context, use_state
 from pythonnative.reconciler import Reconciler
-
-
-class MockView:
-    _next_id = 0
-
-    def __init__(self, type_name: str, props: Dict[str, Any]) -> None:
-        MockView._next_id += 1
-        self.id = MockView._next_id
-        self.type_name = type_name
-        self.props = dict(props)
-        self.children: List["MockView"] = []
-        self.frame: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
-
-
-class MockBackend:
-    """Records operations and counts intrinsic measurements per view."""
-
-    _LEAF_INTRINSIC = {
-        "Text": (60.0, 16.0),
-        "Button": (80.0, 32.0),
-    }
-
-    def __init__(self) -> None:
-        self.ops: List[Any] = []
-        self.measure_calls: List[int] = []
-
-    def create_view(self, type_name: str, props: Dict[str, Any]) -> MockView:
-        view = MockView(type_name, props)
-        self.ops.append(("create", type_name, view.id))
-        return view
-
-    def update_view(self, view: MockView, type_name: str, changed: Dict[str, Any]) -> None:
-        view.props.update(changed)
-        self.ops.append(("update", type_name, view.id, tuple(sorted(changed.keys()))))
-
-    def add_child(self, parent: MockView, child: MockView, parent_type: str) -> None:
-        parent.children.append(child)
-        self.ops.append(("add_child", parent.id, child.id))
-
-    def remove_child(self, parent: MockView, child: MockView, parent_type: str) -> None:
-        parent.children = [c for c in parent.children if c.id != child.id]
-        self.ops.append(("remove_child", parent.id, child.id))
-
-    def insert_child(self, parent: MockView, child: MockView, parent_type: str, index: int) -> None:
-        parent.children.insert(index, child)
-        self.ops.append(("insert_child", parent.id, child.id, index))
-
-    def set_frame(self, view: MockView, type_name: str, x: float, y: float, w: float, h: float) -> None:
-        view.frame = (x, y, w, h)
-
-    def measure_intrinsic(self, view: MockView, type_name: str, max_w: float, max_h: float) -> Tuple[float, float]:
-        self.measure_calls.append(view.id)
-        return self._LEAF_INTRINSIC.get(type_name, (0.0, 0.0))
 
 
 def _make_reconciler() -> Tuple[Reconciler, MockBackend]:

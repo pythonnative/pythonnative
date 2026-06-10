@@ -84,9 +84,9 @@ pn.Column(
 **Lists:**
 
 - [`FlatList(data, render_item, key_extractor, item_height, ...)`][pythonnative.FlatList]:
-  scrollable data list. Pass `item_height=` to enable native
-  virtualization (`UITableView` / `RecyclerView`); rows are mounted
-  lazily as they scroll into view.
+  virtualized scrollable data list. Rows are mounted lazily as they
+  scroll into view; pass `item_height=` (or `get_item_height=`) for
+  exact extents, or let rows be measured on screen.
 - [`SectionList(sections, render_item, render_section_header, item_height, ...)`][pythonnative.SectionList]:
   virtualized list with section headers.
 

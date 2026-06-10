@@ -93,10 +93,10 @@ identifier that's part of the data, not the position.
 
 ## Performance notes
 
-- `FlatList` lazily mounts rows that are visible (or near visible) on
-  iOS via `UITableView` and on Android via `RecyclerView`. For long
-  lists it scales much better than wrapping a `Column` in a
-  `ScrollView`.
+- `FlatList` lazily mounts only the rows that are visible (or near
+  visible); off-screen rows are represented by spacers and the window
+  shifts as the user scrolls. For long lists it scales much better
+  than wrapping a `Column` in a `ScrollView`.
 - Avoid recomputing `data` on every render. If you derive it from
   another piece of state, wrap it in
   [`use_memo`][pythonnative.use_memo].

@@ -8,6 +8,7 @@ import time
 from typing import Any
 
 import pytest
+from fake_backend import FakeBackend as _StubBackend
 
 from pythonnative.element import Element
 from pythonnative.hooks import (
@@ -20,30 +21,6 @@ from pythonnative.hooks import (
     use_state,
 )
 from pythonnative.reconciler import Reconciler
-
-
-class _Stub:
-    def __init__(self, type_name: str, props: dict) -> None:
-        self.type_name = type_name
-        self.props = props
-        self.children: list = []
-
-
-class _StubBackend:
-    def create_view(self, type_name: str, props: dict) -> _Stub:
-        return _Stub(type_name, props)
-
-    def update_view(self, view: _Stub, type_name: str, changed: dict) -> None:
-        view.props.update(changed)
-
-    def add_child(self, parent: _Stub, child: _Stub, parent_type: str) -> None:
-        parent.children.append(child)
-
-    def remove_child(self, parent: _Stub, child: _Stub, parent_type: str) -> None:
-        parent.children = [c for c in parent.children if c is not child]
-
-    def insert_child(self, parent: _Stub, child: _Stub, parent_type: str, index: int) -> None:
-        parent.children.insert(index, child)
 
 
 def _wait_for(predicate: Any, timeout: float = 2.0) -> bool:

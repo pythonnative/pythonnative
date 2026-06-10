@@ -188,8 +188,8 @@ reload. Restart the app to clear `sys.modules`.
 
 ### Tests fail with `RuntimeError: No handler registered for type ...`
 
-Install the mock registry from
-[Testing guide](../guides/testing.md#a-minimal-mock-registry) before
+Install the fake backend from the
+[Testing guide](../guides/testing.md#a-minimal-fake-backend) before
 the first render. A session-scoped fixture is the easiest place.
 
 ### `mkdocs build --strict` fails on PR with autorefs warnings

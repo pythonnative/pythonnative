@@ -41,7 +41,7 @@ Example:
 
     @native_component("Badge", props=BadgeProps, platforms=("ios",))
     class IOSBadgeHandler(ViewHandler):
-        def create(self, props):
+        def create(self, tag, props):
             ...
 
         def update(self, view, changed):
@@ -162,7 +162,7 @@ def native_component(
 
         @native_component("Badge", props=BadgeProps, platforms=("ios",))
         class IOSBadgeHandler(ViewHandler):
-            def create(self, props):
+            def create(self, tag, props):
                 ...
         ```
     """

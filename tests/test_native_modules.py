@@ -10,9 +10,10 @@ hooks, none of which need a real device.
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, Generator, List
+from typing import Dict, Generator, List
 
 import pytest
+from fake_backend import FakeBackend as MockBackend
 
 from pythonnative import (
     AppState,
@@ -33,34 +34,6 @@ from pythonnative.element import Element
 from pythonnative.hooks import component
 from pythonnative.native_modules import app_state, battery, linking, net_info, secure_store
 from pythonnative.reconciler import Reconciler
-
-
-class MockView:
-    _next_id = 0
-
-    def __init__(self, type_name: str, props: Dict[str, Any]) -> None:
-        MockView._next_id += 1
-        self.id = MockView._next_id
-        self.type_name = type_name
-        self.props = dict(props)
-        self.children: List["MockView"] = []
-
-
-class MockBackend:
-    def create_view(self, type_name: str, props: Dict[str, Any]) -> MockView:
-        return MockView(type_name, props)
-
-    def update_view(self, view: MockView, type_name: str, changed: Dict[str, Any]) -> None:
-        view.props.update(changed)
-
-    def add_child(self, parent: MockView, child: MockView, parent_type: str) -> None:
-        parent.children.append(child)
-
-    def remove_child(self, parent: MockView, child: MockView, parent_type: str) -> None:
-        parent.children = [c for c in parent.children if c.id != child.id]
-
-    def insert_child(self, parent: MockView, child: MockView, parent_type: str, index: int) -> None:
-        parent.children.insert(index, child)
 
 
 @pytest.fixture(autouse=True)

@@ -555,8 +555,11 @@ def _full_remount(host: Any, reloaded_modules: Sequence[str]) -> None:
     finally:
         host._is_rendering = False
 
-    if old_reconciler is not None and old_reconciler._tree is not None:
-        old_reconciler._destroy_tree(old_reconciler._tree)
+    if old_reconciler is not None:
+        # ``unmount`` queues the DestroyOps *and* flushes them to the
+        # backend in one batch (releasing native views and their event
+        # registrations).
+        old_reconciler.unmount()
     if old_root is not None:
         host._detach_root(old_root)
 

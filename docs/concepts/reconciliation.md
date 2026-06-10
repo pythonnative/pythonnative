@@ -14,30 +14,47 @@ Re-running a `@component` function returns a brand-new
 widgets every render would be slow (Auto Layout passes, JNI roundtrips)
 and would lose user state (text selections, scroll position, focus).
 
-The reconciler instead asks: what is the *minimal* sequence of native
-calls that turns the previous tree into the new one? It maintains a
+The reconciler instead asks: what is the *minimal* list of native
+mutations that turns the previous tree into the new one? It maintains a
 parallel virtual tree of [`VNode`][pythonnative.reconciler.VNode]s, each
-of which holds the native handle returned by a
-[`ViewHandler`][pythonnative.native_views.base.ViewHandler] and the props
-last applied.
+of which holds an integer **tag** (the view's stable identity on the
+native side) and the props last applied.
 
 ## The diff algorithm in one paragraph
 
 For each pair of (previous, next) elements at the same position in the
 tree:
 
-- If their `type` matches, **update**: hand the native view back to the
-  handler with `update_view(view, prev_props, next_props)`.
-- If their `type` differs, **replace**: ask the handler to remove the
-  old view, mount a new one, and recurse into its children.
+- If their `type` matches, **update**: emit an
+  [`UpdateOp`][pythonnative.mutations.UpdateOp] carrying only the
+  props that changed (removed props arrive as `None`).
+- If their `type` differs, **replace**: emit destroy ops for the old
+  subtree, create ops for the new one, and recurse into its children.
 - For container elements, match children by `key` first and by
   position only if no key was provided. Reorder, mount, and unmount
-  as needed using `insert_child` / `add_child` / `remove_child`.
+  as needed using [`InsertOp`][pythonnative.mutations.InsertOp] /
+  [`RemoveOp`][pythonnative.mutations.RemoveOp] /
+  [`DestroyOp`][pythonnative.mutations.DestroyOp].
 
 That's it. There is no "fiber tree", no time slicing, and no priority
-lanes. The reconciler runs synchronously to completion on the main
-thread; if a render is heavy, you'll feel it as a frame drop, not a
-deferred update.
+lanes. The reconciler runs synchronously to completion; if a render is
+heavy, you'll feel it as a frame drop, not a deferred update.
+
+## Commits are transactions
+
+The diff phase is pure: it only accumulates ops. At the end of the
+pass the whole list — including the `SetFrameOp`s produced by the
+layout pass — is applied through a single
+[`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]
+call. The native side sees one coherent transaction per commit
+(mirroring React Native's Fabric mounting layer), which is also what
+makes `flush_dirty` batches cheap: several dirty components re-render,
+and their combined mutations land as one batch.
+
+Callable props never enter the transaction at all. They're registered
+in the [`EventRegistry`][pythonnative.events.EventRegistry] keyed by
+`(tag, event name)`, so a render that only changes callback identities
+emits **zero** ops.
 
 ## Keyed children
 
@@ -125,11 +142,14 @@ for usage patterns.
 For animation-driven values that change every frame (60+ Hz), going
 through `set_state` is wasteful. Two ways to bypass:
 
+- Use the [`Animated`][pythonnative.Animated] API: an
+  [`AnimatedValue`][pythonnative.AnimatedValue] bound into an
+  `Animated.View` style drives the native property directly — and
+  when the platform can run the animation natively, no Python code
+  runs per frame at all. See the
+  [Animations guide](../guides/animations.md).
 - Use [`use_ref`][pythonnative.use_ref] to hold a reference to a
-  native view and mutate it directly (`view.setText(...)` from inside
-  an effect callback).
-- Implement a custom widget that internally manages an animation; the
-  reconciler only sees the static element wrapping it.
+  native view and mutate it directly from inside an effect callback.
 
 Reach for these only when profiling tells you that re-rendering is the
 bottleneck.

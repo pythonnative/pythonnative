@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 import pytest
+from fake_backend import FakeBackend as _StubBackend
 
 from pythonnative.animated import Animated, AnimatedValue, use_animated_value
 from pythonnative.element import Element
@@ -195,30 +196,6 @@ async def test_cancelling_await_stops_animation() -> None:
 # ======================================================================
 
 
-class _Stub:
-    def __init__(self, type_name: str, props: dict) -> None:
-        self.type_name = type_name
-        self.props = props
-        self.children: list = []
-
-
-class _StubBackend:
-    def create_view(self, type_name: str, props: dict) -> _Stub:
-        return _Stub(type_name, props)
-
-    def update_view(self, view: _Stub, type_name: str, changed: dict) -> None:
-        view.props.update(changed)
-
-    def add_child(self, parent: _Stub, child: _Stub, parent_type: str) -> None:
-        parent.children.append(child)
-
-    def remove_child(self, parent: _Stub, child: _Stub, parent_type: str) -> None:
-        parent.children = [c for c in parent.children if c is not child]
-
-    def insert_child(self, parent: _Stub, child: _Stub, parent_type: str, index: int) -> None:
-        parent.children.insert(index, child)
-
-
 def test_use_animated_value_returns_animated_value() -> None:
     captured: list = []
 
@@ -262,6 +239,196 @@ def test_use_animated_value_default_initial_zero() -> None:
     rec = Reconciler(_StubBackend())
     rec.mount(view())
     assert captured[0].value == 0.0
+
+
+# ======================================================================
+# Native driver
+# ======================================================================
+
+
+class _NativeBackend(_StubBackend):
+    """FakeBackend that accepts native animations for chosen tags."""
+
+    def __init__(self, accept_tags: Any = None) -> None:
+        super().__init__()
+        self.accept_tags = accept_tags  # None => accept everything
+        self.native_started: list = []  # (tag, anim_id, prop, spec)
+        self.native_cancelled: list = []  # (tag, anim_id)
+        self.presentation_value: Any = None
+
+    def start_animation(self, tag: int, anim_id: int, prop_name: str, spec: dict) -> bool:
+        if self.accept_tags is not None and tag not in self.accept_tags:
+            return False
+        self.native_started.append((tag, anim_id, prop_name, dict(spec)))
+        return True
+
+    def cancel_animation(self, tag: int, anim_id: int) -> Any:
+        self.native_cancelled.append((tag, anim_id))
+        return self.presentation_value
+
+
+@pytest.fixture
+def native_backend():  # type: ignore[no-untyped-def]
+    from pythonnative.native_views import set_registry
+
+    backend = _NativeBackend()
+    set_registry(backend)
+    try:
+        yield backend
+    finally:
+        set_registry(None)
+
+
+def test_attach_pushes_current_value_natively(native_backend: _NativeBackend) -> None:
+    v = AnimatedValue(0.25)
+    v.attach(7, "opacity")
+    assert native_backend.animated[-1] == (7, "opacity", 0.25)
+
+    v.set_value(0.75)
+    assert native_backend.animated[-1] == (7, "opacity", 0.75)
+
+
+def test_native_driver_offloads_attached_animation(native_backend: _NativeBackend) -> None:
+    from pythonnative.animated import native_animation_completed
+
+    v = AnimatedValue(0.0)
+    v.attach(7, "opacity")
+    Animated.timing(v, to=1.0, duration=5000, easing="linear").start()
+
+    assert len(native_backend.native_started) == 1
+    tag, anim_id, prop, spec = native_backend.native_started[0]
+    assert (tag, prop) == (7, "opacity")
+    assert spec["kind"] == "timing" and spec["to"] == 1.0 and spec["from"] == 0.0
+
+    # No Python ticker is driving the value while the platform animates.
+    time.sleep(0.05)
+    assert v.value == 0.0
+
+    # The platform's completion callback settles the Python cell.
+    native_animation_completed(anim_id, finished=True)
+    assert v.value == 1.0
+
+
+def test_native_driver_fans_out_to_every_binding(native_backend: _NativeBackend) -> None:
+    from pythonnative.animated import native_animation_completed
+
+    v = AnimatedValue(0.0)
+    v.attach(1, "opacity")
+    v.attach(2, "opacity")
+    Animated.timing(v, to=1.0, duration=5000).start()
+
+    assert len(native_backend.native_started) == 2
+    ids = [entry[1] for entry in native_backend.native_started]
+
+    # The group settles only after *all* targets complete.
+    native_animation_completed(ids[0])
+    assert v.value == 0.0
+    native_animation_completed(ids[1])
+    assert v.value == 1.0
+
+
+def test_python_listeners_force_python_driver(native_backend: _NativeBackend) -> None:
+    v = AnimatedValue(0.0)
+    v.attach(7, "opacity")
+    v.add_listener("opacity", lambda _x: None)
+
+    handle = Animated.timing(v, to=1.0, duration=30, easing="linear")
+    handle.start()
+    assert native_backend.native_started == []
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and v.value < 0.99:
+        time.sleep(0.01)
+    assert abs(v.value - 1.0) < 0.05
+
+
+def test_unattached_value_uses_python_driver(native_backend: _NativeBackend) -> None:
+    v = AnimatedValue(0.0)
+    handle = Animated.timing(v, to=1.0, duration=30, easing="linear")
+    handle.start()
+    assert native_backend.native_started == []
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and v.value < 0.99:
+        time.sleep(0.01)
+    assert abs(v.value - 1.0) < 0.05
+
+
+def test_partial_native_acceptance_rolls_back_and_falls_back() -> None:
+    from pythonnative.native_views import set_registry
+
+    backend = _NativeBackend(accept_tags={1})
+    set_registry(backend)  # type: ignore[arg-type]
+    try:
+        v = AnimatedValue(0.0)
+        v.attach(1, "opacity")
+        v.attach(2, "opacity")  # the backend rejects tag 2
+        Animated.timing(v, to=1.0, duration=30, easing="linear").start()
+
+        # The accepted target was cancelled so views can't drift apart.
+        assert len(backend.native_started) == 1
+        assert backend.native_cancelled == [(1, backend.native_started[0][1])]
+
+        # And the Python ticker still finishes the job.
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline and v.value < 0.99:
+            time.sleep(0.01)
+        assert abs(v.value - 1.0) < 0.05
+    finally:
+        set_registry(None)
+
+
+def test_native_stop_syncs_to_presentation_value(native_backend: _NativeBackend) -> None:
+    native_backend.presentation_value = 0.42
+
+    v = AnimatedValue(0.0)
+    v.attach(7, "opacity")
+    handle = Animated.timing(v, to=1.0, duration=5000).start()
+    assert len(native_backend.native_started) == 1
+
+    handle.stop()
+    assert len(native_backend.native_cancelled) == 1
+    # The value lands wherever the view visually was mid-flight.
+    assert v.value == 0.42
+
+
+def test_set_value_cancels_inflight_native_animation(native_backend: _NativeBackend) -> None:
+    v = AnimatedValue(0.0)
+    v.attach(7, "opacity")
+    Animated.timing(v, to=1.0, duration=5000).start()
+    assert len(native_backend.native_started) == 1
+
+    v.stop_animation()
+    assert len(native_backend.native_cancelled) == 1
+
+
+def test_decay_settles_at_projected_final_value(native_backend: _NativeBackend) -> None:
+    from pythonnative.animated import native_animation_completed
+
+    v = AnimatedValue(10.0)
+    v.attach(7, "translate_x")
+    Animated.decay(v, velocity=500.0, deceleration=0.997).start()
+
+    assert len(native_backend.native_started) == 1
+    _tag, anim_id, _prop, spec = native_backend.native_started[0]
+    assert spec["kind"] == "decay"
+
+    native_animation_completed(anim_id)
+    # x_final = from + v0 / (k * 1000)
+    assert abs(v.value - (10.0 + 500.0 / (0.997 * 1000.0))) < 1e-6
+
+
+def test_unfinished_native_completion_keeps_python_value(native_backend: _NativeBackend) -> None:
+    from pythonnative.animated import native_animation_completed
+
+    v = AnimatedValue(0.0)
+    v.attach(7, "opacity")
+    Animated.timing(v, to=1.0, duration=5000).start()
+    _tag, anim_id, _prop, _spec = native_backend.native_started[0]
+
+    # finished=False means the platform interrupted the animation; the
+    # value must not jump to the target.
+    native_animation_completed(anim_id, finished=False)
+    assert v.value == 0.0
 
 
 # Suppress unused-import lint for the typing helper.

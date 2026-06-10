@@ -6,6 +6,7 @@ helper, ``element_factory`` constructors, and the entry-point discovery
 hook used to import third-party PyPI plugins.
 """
 
+import itertools
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -14,6 +15,7 @@ import pytest
 import pythonnative as pn
 import pythonnative.sdk._components as nc_internals
 from pythonnative.element import Element
+from pythonnative.mutations import CreateOp
 from pythonnative.native_views import NativeViewRegistry, set_registry
 from pythonnative.sdk import (
     ENTRY_POINT_GROUP,
@@ -32,6 +34,15 @@ from pythonnative.sdk import (
 # Test fixtures
 # ---------------------------------------------------------------------------
 
+_tags = itertools.count(1_000_000)
+
+
+def _create_view(reg: NativeViewRegistry, type_name: str, props: Dict[str, Any]) -> Any:
+    """Create one view through the batched commit channel and resolve it."""
+    tag = next(_tags)
+    reg.apply_mutations([CreateOp(tag, type_name, props)])
+    return reg.resolve_view(tag)
+
 
 @dataclass(frozen=True)
 class BadgeProps(Props):
@@ -46,8 +57,8 @@ class StubBadgeHandler(ViewHandler):
     def __init__(self) -> None:
         self.created: list = []
 
-    def create(self, props: Dict[str, Any]) -> Dict[str, Any]:
-        view = {"props": dict(props), "type": "badge"}
+    def create(self, tag: int, props: Dict[str, Any]) -> Dict[str, Any]:
+        view = {"props": dict(props), "type": "badge", "tag": tag}
         self.created.append(view)
         return view
 
@@ -264,7 +275,7 @@ def test_install_copies_handlers_for_active_platform() -> None:
     reg = NativeViewRegistry()
     install_into_registry(reg, "ios")
 
-    view = reg.create_view("Badge", {"text": "hi"})
+    view = _create_view(reg, "Badge", {"text": "hi"})
     assert view["type"] == "badge"
     assert view["props"]["text"] == "hi"
 
@@ -275,8 +286,9 @@ def test_install_skips_handlers_not_targeting_platform() -> None:
     reg = NativeViewRegistry()
     install_into_registry(reg, "android")
 
-    with pytest.raises(ValueError, match="Unknown element type"):
-        reg.create_view("IOSOnly", {})
+    assert reg.handler_for("IOSOnly") is None
+    # A CreateOp for the missing type is isolated; no view materializes.
+    assert _create_view(reg, "IOSOnly", {}) is None
 
 
 def test_install_supports_multiple_components() -> None:
@@ -286,8 +298,8 @@ def test_install_supports_multiple_components() -> None:
     reg = NativeViewRegistry()
     install_into_registry(reg, "ios")
 
-    reg.create_view("A", {})
-    reg.create_view("B", {})
+    assert _create_view(reg, "A", {}) is not None
+    assert _create_view(reg, "B", {}) is not None
 
 
 # ---------------------------------------------------------------------------
@@ -380,7 +392,7 @@ def test_get_registry_runs_sdk_install(monkeypatch: pytest.MonkeyPatch) -> None:
 
     try:
         reg = nv.get_registry()
-        view = reg.create_view("Badge", {"text": "hi"})
+        view = _create_view(reg, "Badge", {"text": "hi"})
         assert view["type"] == "badge"
     finally:
         set_registry(None)
@@ -397,7 +409,7 @@ class RecordingHandler(ViewHandler):
         self.creates: list = []
         self.updates: list = []
 
-    def create(self, props: Dict[str, Any]) -> Dict[str, Any]:
+    def create(self, tag: int, props: Dict[str, Any]) -> Dict[str, Any]:
         self.creates.append(dict(props))
         return {"props": dict(props), "kids": []}
 

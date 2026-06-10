@@ -26,7 +26,16 @@ Key building blocks:
   PythonNative ships a fully-typed [`Style`][pythonnative.style.Style]
   TypedDict so editors and ``mypy`` validate every key as you type.
 - **Animations** use the ``Animated`` namespace, modeled on React
-  Native's animation API.
+  Native's animation API. Animations are driven natively (Core
+  Animation / ``ViewPropertyAnimator``) whenever possible.
+- **Gestures** attach to any view via the ``gestures=`` prop using
+  descriptors from ``pythonnative.gestures``
+  ([`Tap`][pythonnative.gestures.Tap],
+  [`LongPress`][pythonnative.gestures.LongPress],
+  [`Pan`][pythonnative.gestures.Pan],
+  [`Swipe`][pythonnative.gestures.Swipe],
+  [`Pinch`][pythonnative.gestures.Pinch],
+  [`Rotation`][pythonnative.gestures.Rotation]).
 - **Custom native components** can be authored with the
   ``pythonnative.sdk`` package: define a typed
   [`Props`][pythonnative.sdk.Props] dataclass, implement a
@@ -53,7 +62,7 @@ Example:
 
 __version__ = "0.21.0"
 
-from . import runtime, sdk
+from . import gestures, runtime, sdk
 from .alerts import Alert
 from .animated import Animated, AnimatedValue, use_animated_value
 from .components import (
@@ -321,6 +330,8 @@ __all__ = [
     "Animated",
     "AnimatedValue",
     "use_animated_value",
+    # Gestures
+    "gestures",
     # Imperative
     "Alert",
     # Native modules

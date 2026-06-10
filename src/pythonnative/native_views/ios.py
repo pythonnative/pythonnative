@@ -6,14 +6,28 @@ frame application. Handlers are registered with the
 [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry] by
 [`register_handlers`][pythonnative.native_views.ios.register_handlers].
 
-Layout is owned by the pure-Python flex engine in
-[`pythonnative.layout`][pythonnative.layout]: container handlers create
-plain `UIView`s, the engine computes per-child frames in points, and
+**Batched protocol**: the registry applies the reconciler's mutation
+ops; handlers receive callable-free props. User callbacks never reach
+this module — every interaction (taps, text edits, scrolls, gestures)
+is forwarded through
+[`dispatch_event`][pythonnative.events.dispatch_event] keyed by the
+view's reconciler-assigned tag.
+
+**Layout** is owned by the pure-Python flex engine in
+`pythonnative.layout`: container handlers create plain `UIView`s, the
+engine computes per-child frames in points, and
 [`set_frame`][pythonnative.native_views.ios.IOSViewHandler.set_frame]
 applies those frames via UIKit's classic ``frame`` property (with Auto
-Layout disabled). Handlers therefore only deal with *visual* props and
-ignore everything in
-[`pythonnative.layout.LAYOUT_STYLE_KEYS`][pythonnative.layout.LAYOUT_STYLE_KEYS].
+Layout disabled).
+
+**Gestures** attach real ``UIGestureRecognizer`` instances (pan, pinch,
+rotation, tap, long-press, swipe) configured from the serialized
+gesture specs, so recognition runs fully natively.
+
+**Animations**: ``timing`` and ``spring`` specs are driven by UIKit
+block animations with completion callbacks reported back through
+``pythonnative.animated.native_animation_completed``; ``decay`` falls
+back to the Python ticker.
 
 This module is only imported on iOS at runtime. Desktop tests inject a
 mock registry via
@@ -28,6 +42,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from rubicon.objc import SEL, ObjCClass, objc_method
 
+from ..events import dispatch_event, event_names
 from . import _tripwire_log
 from .base import ViewHandler, _safe_max, parse_color_int
 
@@ -92,6 +107,66 @@ def _objc_ptr(obj: Any) -> Optional[int]:
 
 
 # ======================================================================
+# Tag table (ObjC pointer -> reconciler tag -> per-view state)
+# ======================================================================
+
+_view_tags: Dict[int, int] = {}
+_view_state: Dict[int, Dict[str, Any]] = {}
+
+
+def _remember(view: Any, tag: int) -> None:
+    ptr = _objc_ptr(view)
+    if ptr is not None:
+        _view_tags[ptr] = tag
+    _view_state[tag] = {"props": {}}
+
+
+def _tag_of(view: Any) -> Optional[int]:
+    ptr = _objc_ptr(view)
+    if ptr is None:
+        return None
+    return _view_tags.get(ptr)
+
+
+def _state_of(view: Any) -> Dict[str, Any]:
+    tag = _tag_of(view)
+    if tag is None:
+        return {}
+    return _view_state.setdefault(tag, {"props": {}})
+
+
+def _forget(view: Any) -> None:
+    ptr = _objc_ptr(view)
+    if ptr is None:
+        return
+    tag = _view_tags.pop(ptr, None)
+    if tag is not None:
+        _view_state.pop(tag, None)
+
+
+def _fire(view: Any, name: str, *args: Any) -> bool:
+    """Dispatch event ``name`` for ``view`` through the tag registry."""
+    tag = _tag_of(view)
+    if tag is None:
+        return False
+    return dispatch_event(tag, name, *args)
+
+
+def _fire_ptr(view_ptr: int, name: str, *args: Any) -> bool:
+    """Dispatch event ``name`` for the raw ObjC pointer ``view_ptr``."""
+    tag = _view_tags.get(int(view_ptr or 0))
+    if tag is None:
+        return False
+    return dispatch_event(tag, name, *args)
+
+
+def _has_event(view: Any, name: str) -> bool:
+    """Whether the element wired a callback named ``name`` this render."""
+    merged = _state_of(view).get("props") or {}
+    return name in event_names(merged)
+
+
+# ======================================================================
 # Raw libobjc helpers
 # ======================================================================
 #
@@ -105,8 +180,8 @@ def _objc_ptr(obj: Any) -> Optional[int]:
 # new ObjC class via ``objc_allocateClassPair``, attach plain
 # CFUNCTYPE-wrapped Python functions as ``IMP``s, and dispatch via
 # ``objc_msgSend``. Every delegate that takes ObjC object arguments
-# beyond ``UITableView*`` / plain integers should use this pattern
-# (UITabBar's selection delegate and UITableView's data source both do).
+# beyond plain integers should use this pattern (UITabBar's selection
+# delegate and UIScrollView's scroll delegate both do).
 
 _libobjc = _ct.cdll.LoadLibrary("libobjc.A.dylib")
 
@@ -135,10 +210,7 @@ _SEL_ALLOC = _sel_reg(b"alloc")
 _SEL_INIT = _sel_reg(b"init")
 _SEL_RETAIN = _sel_reg(b"retain")
 _SEL_SET_DELEGATE = _sel_reg(b"setDelegate:")
-_SEL_SET_DATA_SOURCE = _sel_reg(b"setDataSource:")
 _SEL_TAG = _sel_reg(b"tag")
-_SEL_ROW = _sel_reg(b"row")
-_SEL_DESELECT_ROW = _sel_reg(b"deselectRowAtIndexPath:animated:")
 _SEL_TEXT = _sel_reg(b"text")
 _SEL_UTF8STRING = _sel_reg(b"UTF8String")
 _SEL_ADD_TARGET_ACTION_EVENTS = _sel_reg(b"addTarget:action:forControlEvents:")
@@ -150,6 +222,7 @@ _SEL_TEXT_FIELD_DID_BEGIN = _sel_reg(b"textFieldDidBeginEditing:")
 _SEL_TEXT_FIELD_DID_END = _sel_reg(b"textFieldDidEndEditing:")
 _SEL_TEXT_VIEW_DID_BEGIN = _sel_reg(b"textViewDidBeginEditing:")
 _SEL_TEXT_VIEW_DID_END = _sel_reg(b"textViewDidEndEditing:")
+_SEL_TEXT_VIEW_DID_CHANGE = _sel_reg(b"textViewDidChange:")
 
 _NS_OBJECT_CLS = _get_cls(b"NSObject")
 
@@ -309,14 +382,7 @@ def _make_transform(spec: Any) -> Any:
     Each dict has exactly one of ``rotate`` (degrees), ``scale`` (uniform),
     ``scale_x``, ``scale_y``, ``translate_x``, ``translate_y``.
     """
-    try:
-        from rubicon.objc.api import objc_const  # noqa: F401
-    except Exception:
-        pass
-    # rubicon-objc doesn't expose CGAffineTransformIdentity directly;
-    # we reconstruct it via the C struct.
     ct = _ct
-    libc = ct.cdll.LoadLibrary("/usr/lib/libobjc.A.dylib")  # noqa: F841
 
     class CGAffineTransform(ct.Structure):
         _fields_ = [
@@ -331,14 +397,10 @@ def _make_transform(spec: Any) -> Any:
     coregraphics = ct.cdll.LoadLibrary(
         "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics",
     )
-    coregraphics.CGAffineTransformMakeIdentity = getattr(coregraphics, "CGAffineTransformMakeIdentity", None)
-    coregraphics.CGAffineTransformRotate = coregraphics.CGAffineTransformRotate
     coregraphics.CGAffineTransformRotate.restype = CGAffineTransform
     coregraphics.CGAffineTransformRotate.argtypes = [CGAffineTransform, ct.c_double]
-    coregraphics.CGAffineTransformScale = coregraphics.CGAffineTransformScale
     coregraphics.CGAffineTransformScale.restype = CGAffineTransform
     coregraphics.CGAffineTransformScale.argtypes = [CGAffineTransform, ct.c_double, ct.c_double]
-    coregraphics.CGAffineTransformTranslate = coregraphics.CGAffineTransformTranslate
     coregraphics.CGAffineTransformTranslate.restype = CGAffineTransform
     coregraphics.CGAffineTransformTranslate.argtypes = [CGAffineTransform, ct.c_double, ct.c_double]
 
@@ -409,7 +471,7 @@ def _apply_transform(view: Any, props: Dict[str, Any]) -> None:
             # running.
             _tripwire_log(
                 "set_transform:nan",
-                f"[set_transform:nan] spec={spec!r} -> " f"(a={a!r}, b={b!r}, c={c!r}, d={d!r}, tx={tx!r}, ty={ty!r})",
+                f"[set_transform:nan] spec={spec!r} -> (a={a!r}, b={b!r}, c={c!r}, d={d!r}, tx={tx!r}, ty={ty!r})",
             )
             view.setTransform_((1.0, 0.0, 0.0, 1.0, 0.0, 0.0))
             return
@@ -481,33 +543,514 @@ def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
     _apply_accessibility(view, props)
 
 
-# Properties that handlers can animate via
-# [`set_animated_property`][pythonnative.native_views.ios.IOSViewHandler.set_animated_property].
-_ANIMATABLE_PROPS = {
-    "opacity",
-    "translate_x",
-    "translate_y",
-    "scale",
-    "scale_x",
-    "scale_y",
-    "rotate",  # degrees
-    "background_color",
-}
+# ======================================================================
+# Retention + shared targets
+# ======================================================================
+
+_pn_retained_views: list = []
+
+# Maps ``id(target)`` -> the owning native view, so shared NSObject
+# targets can route control events into the tag-based event channel.
+_pn_target_owner: Dict[int, Any] = {}
+
+
+class _PNActionTarget(NSObject):  # type: ignore[valid-type]
+    """Generic target-action receiver that fires a configured event name."""
+
+    @objc_method
+    def onTap_(self, sender: object) -> None:
+        # Do not introspect ``sender`` here. On rubicon-objc 0.5.x the
+        # selector trampoline can hand this callback a raw ObjC pointer;
+        # calling ``getattr(sender, "ptr", ...)`` has been observed to
+        # segfault before the user's callback runs.
+        info = _pn_target_owner.get(id(self))
+        if info is not None:
+            view, event = info
+            _fire(view, event)
+
+
+class _PNSwitchTarget(NSObject):  # type: ignore[valid-type]
+    @objc_method
+    def onToggle_(self, sender: object) -> None:
+        info = _pn_target_owner.get(id(self))
+        if info is None:
+            return
+        view, event = info
+        if _state_of(view).get("suppress"):
+            return
+        try:
+            _fire(view, event, bool(sender.isOn()))
+        except Exception:
+            pass
+
+
+class _PNSliderTarget(NSObject):  # type: ignore[valid-type]
+    @objc_method
+    def onSlide_(self, sender: object) -> None:
+        info = _pn_target_owner.get(id(self))
+        if info is None:
+            return
+        view, event = info
+        if _state_of(view).get("suppress"):
+            return
+        try:
+            _fire(view, event, float(sender.value))
+        except Exception:
+            pass
+
+
+def _make_action_target(cls: Any, view: Any, event: str) -> Any:
+    """Allocate, retain, and register a target bound to ``(view, event)``."""
+    target = cls.new()
+    target.retain()
+    _pn_retained_views.append(target)
+    _pn_target_owner[id(target)] = (view, event)
+    return target
 
 
 # ======================================================================
-# Base class with shared frame/measure implementations
+# Simultaneous-recognition gesture delegate (raw libobjc)
+# ======================================================================
+#
+# All PythonNative recognizers on a view should recognize together
+# (press feedback + pan + pinch...), matching the GestureArbiter's
+# semantics on Android/desktop. UIKit defaults to exclusivity, so every
+# recognizer we create gets this delegate, which answers YES to
+# ``gestureRecognizer:shouldRecognizeSimultaneouslyWithGestureRecognizer:``.
+
+_GESTURE_SIMUL_TYPE = _ct.CFUNCTYPE(_ct.c_bool, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
+
+
+def _gesture_simul_imp(self_ptr: int, cmd_ptr: int, g1_ptr: int, g2_ptr: int) -> bool:
+    return True
+
+
+_gesture_simul_imp_ref = _GESTURE_SIMUL_TYPE(_gesture_simul_imp)
+
+_PN_GESTURE_DELEGATE_CLS = _alloc_cls(_NS_OBJECT_CLS, b"_PNGestureDelegateCTypes", 0)
+if _PN_GESTURE_DELEGATE_CLS:
+    _add_method(
+        _PN_GESTURE_DELEGATE_CLS,
+        _sel_reg(b"gestureRecognizer:shouldRecognizeSimultaneouslyWithGestureRecognizer:"),
+        _ct.cast(_gesture_simul_imp_ref, _ct.c_void_p),
+        b"c@:@@",
+    )
+    _reg_cls(_PN_GESTURE_DELEGATE_CLS)
+
+_pn_gesture_delegate_ptr: Any = None
+
+
+def _shared_gesture_delegate_ptr() -> Any:
+    global _pn_gesture_delegate_ptr
+    if _pn_gesture_delegate_ptr is None and _PN_GESTURE_DELEGATE_CLS:
+        _objc_msgSend.restype = _ct.c_void_p
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
+        raw = _objc_msgSend(_PN_GESTURE_DELEGATE_CLS, _SEL_ALLOC)
+        raw = _objc_msgSend(raw, _SEL_INIT)
+        raw = _objc_msgSend(raw, _SEL_RETAIN)
+        _pn_gesture_delegate_ptr = raw
+    return _pn_gesture_delegate_ptr
+
+
+def _set_recognizer_delegate(recognizer: Any) -> None:
+    delegate = _shared_gesture_delegate_ptr()
+    if delegate is None:
+        return
+    try:
+        _objc_msgSend.restype = None
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p]
+        rec_ptr = recognizer.ptr if hasattr(recognizer, "ptr") else recognizer
+        _objc_msgSend(rec_ptr, _SEL_SET_DELEGATE, delegate)
+    except Exception:
+        pass
+
+
+# ======================================================================
+# Native gesture wiring (UIGestureRecognizer -> dispatch_event)
+# ======================================================================
+
+# Maps ``id(target)`` -> {"view", "index", "kind", "config"}.
+_pn_gesture_targets: Dict[int, Dict[str, Any]] = {}
+
+# UIGestureRecognizerState -> GestureEvent.state
+_GSTATE = {1: "began", 2: "changed", 3: "ended", 4: "cancelled", 5: "cancelled"}
+
+_SWIPE_DIRECTIONS = {"right": 1, "left": 2, "up": 4, "down": 8}
+
+
+class _PNGestureTarget(NSObject):  # type: ignore[valid-type]
+    """Receives recognizer callbacks and emits ``gesture:<i>`` payloads."""
+
+    @objc_method
+    def onGesture_(self, sender: object) -> None:
+        info = _pn_gesture_targets.get(id(self))
+        if info is None:
+            return
+        view = info["view"]
+        kind = info["kind"]
+        index = info["index"]
+        try:
+            raw_state = int(sender.state)
+        except Exception:
+            raw_state = 3
+        state = _GSTATE.get(raw_state)
+        if state is None:
+            return
+
+        payload: Dict[str, Any] = {"kind": kind, "state": state}
+        try:
+            location = sender.locationInView_(view)
+            payload["x"] = float(location.x)
+            payload["y"] = float(location.y)
+        except Exception:
+            pass
+        try:
+            payload["pointer_count"] = int(sender.numberOfTouches)
+        except Exception:
+            pass
+
+        if kind == "pan":
+            try:
+                translation = sender.translationInView_(view)
+                payload["translation_x"] = float(translation.x)
+                payload["translation_y"] = float(translation.y)
+                velocity = sender.velocityInView_(view)
+                payload["velocity_x"] = float(velocity.x)
+                payload["velocity_y"] = float(velocity.y)
+            except Exception:
+                pass
+        elif kind == "pinch":
+            try:
+                payload["scale"] = float(sender.scale)
+            except Exception:
+                pass
+        elif kind == "rotation":
+            try:
+                payload["rotation"] = float(sender.rotation)
+            except Exception:
+                pass
+        elif kind == "swipe":
+            # Discrete: UIKit only calls us on recognition.
+            payload["state"] = "ended"
+            payload["direction"] = info.get("direction")
+        elif kind == "tap":
+            payload["state"] = "ended"
+
+        _fire(view, f"gesture:{index}", payload)
+
+
+def _make_recognizer(kind: str, spec: Dict[str, Any], target: Any) -> List[Any]:
+    """Build the UIGestureRecognizer(s) for one serialized gesture spec.
+
+    Swipe with ``direction="any"`` needs one recognizer per direction
+    (UIKit constraint), so this returns a list.
+    """
+    action = SEL("onGesture:")
+    out: List[Any] = []
+    if kind == "tap":
+        rec = ObjCClass("UITapGestureRecognizer").alloc().initWithTarget_action_(target, action)
+        try:
+            rec.setNumberOfTapsRequired_(max(1, int(spec.get("n_taps", 1))))
+        except Exception:
+            pass
+        out.append(rec)
+    elif kind == "long_press":
+        rec = ObjCClass("UILongPressGestureRecognizer").alloc().initWithTarget_action_(target, action)
+        try:
+            rec.setMinimumPressDuration_(float(spec.get("min_duration_ms", 500.0)) / 1000.0)
+            rec.setAllowableMovement_(float(spec.get("max_distance", 12.0)))
+        except Exception:
+            pass
+        out.append(rec)
+    elif kind == "pan":
+        rec = ObjCClass("UIPanGestureRecognizer").alloc().initWithTarget_action_(target, action)
+        try:
+            rec.setMinimumNumberOfTouches_(max(1, int(spec.get("min_pointers", 1))))
+        except Exception:
+            pass
+        out.append(rec)
+    elif kind == "swipe":
+        direction = str(spec.get("direction", "any"))
+        directions = [direction] if direction in _SWIPE_DIRECTIONS else list(_SWIPE_DIRECTIONS)
+        for d in directions:
+            rec = ObjCClass("UISwipeGestureRecognizer").alloc().initWithTarget_action_(target, action)
+            try:
+                rec.setDirection_(_SWIPE_DIRECTIONS[d])
+            except Exception:
+                pass
+            out.append(rec)
+    elif kind == "pinch":
+        out.append(ObjCClass("UIPinchGestureRecognizer").alloc().initWithTarget_action_(target, action))
+    elif kind == "rotation":
+        out.append(ObjCClass("UIRotationGestureRecognizer").alloc().initWithTarget_action_(target, action))
+    return out
+
+
+def _wire_gestures(view: Any, specs: Any) -> None:
+    """Attach native recognizers for the serialized gesture specs.
+
+    Re-wiring on update removes previously attached PythonNative
+    recognizers first (configuration changes are rare; correctness
+    beats incremental patching here).
+    """
+    state = _state_of(view)
+    for rec in state.get("gesture_recognizers") or []:
+        try:
+            view.removeGestureRecognizer_(rec)
+        except Exception:
+            pass
+    for target in state.get("gesture_targets") or []:
+        _pn_gesture_targets.pop(id(target), None)
+    state["gesture_recognizers"] = []
+    state["gesture_targets"] = []
+    if not isinstance(specs, (list, tuple)) or not specs:
+        return
+
+    try:
+        view.setUserInteractionEnabled_(True)
+    except Exception:
+        pass
+
+    recognizers: List[Any] = []
+    targets: List[Any] = []
+    for i, spec in enumerate(specs):
+        if not isinstance(spec, dict):
+            continue
+        kind = str(spec.get("kind", ""))
+        if not kind:
+            continue
+        target = _PNGestureTarget.new()
+        target.retain()
+        _pn_retained_views.append(target)
+        info: Dict[str, Any] = {"view": view, "index": i, "kind": kind, "config": dict(spec)}
+        if kind == "swipe":
+            info["direction"] = str(spec.get("direction", "any"))
+        _pn_gesture_targets[id(target)] = info
+        targets.append(target)
+        for rec in _make_recognizer(kind, spec, target):
+            try:
+                rec.setCancelsTouchesInView_(False)
+            except Exception:
+                pass
+            _set_recognizer_delegate(rec)
+            try:
+                view.addGestureRecognizer_(rec)
+                rec.retain()
+                recognizers.append(rec)
+            except Exception:
+                pass
+        if kind == "swipe" and len(_make_recognizer("noop", {}, target)) == 0:
+            # Direction is resolved per-recognizer; for "any" the shared
+            # target reports the spec direction, which is fine because
+            # UIKit only fires the recognizer whose direction matched.
+            pass
+
+    state["gesture_recognizers"] = recognizers
+    state["gesture_targets"] = targets
+
+
+# ======================================================================
+# Native-driven animations (UIView block animations)
+# ======================================================================
+
+_native_anims: Dict[int, Dict[str, Any]] = {}
+
+
+def _is_main_thread() -> bool:
+    return threading.current_thread() is threading.main_thread()
+
+
+def _animated_applier_for(prop: str, value: Any) -> Optional[Callable[[Any], None]]:
+    if prop == "opacity":
+        v = float(value)
+
+        def _apply(view: Any) -> None:
+            view.setAlpha_(v)
+
+        return _apply
+    if prop == "background_color":
+
+        def _apply(view: Any) -> None:
+            view.setBackgroundColor_(_uicolor(value))
+
+        return _apply
+    if prop in ("translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate"):
+        spec = {prop: value}
+
+        def _apply(view: Any) -> None:
+            _apply_transform(view, {"transform": [spec]})
+
+        return _apply
+    return None
+
+
+def _spring_parameters(spec: Dict[str, Any]) -> Tuple[float, float, float]:
+    """Translate physics params into UIKit's (duration, damping_ratio, velocity).
+
+    UIKit's spring API takes a damping *ratio* (0..1) and a velocity
+    normalized to the total travel distance. We derive both from the
+    stiffness/damping/mass spec and approximate the settle duration
+    from the envelope decay.
+    """
+    stiffness = max(1e-3, float(spec.get("stiffness", 100.0)))
+    damping = max(1e-3, float(spec.get("damping", 10.0)))
+    mass = max(1e-3, float(spec.get("mass", 1.0)))
+    omega0 = math.sqrt(stiffness / mass)
+    zeta = damping / (2.0 * math.sqrt(stiffness * mass))
+    damping_ratio = max(0.05, min(1.0, zeta))
+    if zeta < 1.0:
+        duration = min(10.0, max(0.15, 4.0 / max(0.05, zeta * omega0)))
+    else:
+        duration = min(10.0, max(0.15, 4.0 / omega0))
+    distance = abs(float(spec.get("to", 0.0)) - float(spec.get("from", 0.0)))
+    v0 = float(spec.get("initial_velocity", 0.0))
+    norm_velocity = (v0 / distance) if distance > 1e-9 else 0.0
+    return duration, damping_ratio, norm_velocity
+
+
+_EASING_OPTIONS = {
+    "linear": 1 << 16,  # UIViewAnimationOptionCurveLinear
+    "ease_in": 1 << 17,
+    "ease_out": 1 << 18,
+    "ease_in_out": 0,
+    "ease": 0,
+}
+
+
+def _start_native_animation(view: Any, anim_id: int, prop_name: str, spec: Dict[str, Any]) -> bool:
+    """Run a ``timing`` / ``spring`` spec as a UIView block animation."""
+    applier_from = _animated_applier_for(prop_name, spec.get("from"))
+    applier_to = _animated_applier_for(prop_name, spec.get("to"))
+    if applier_to is None:
+        return False
+    UIView = ObjCClass("UIView")
+    kind = str(spec.get("kind", "timing"))
+
+    def _completion(finished: bool) -> None:
+        _native_anims.pop(anim_id, None)
+        try:
+            from ..animated import native_animation_completed
+
+            native_animation_completed(anim_id, bool(finished))
+        except Exception:
+            pass
+
+    def _animations() -> None:
+        try:
+            applier_to(view)
+        except Exception:
+            pass
+
+    try:
+        # Snap to the starting value so the animation covers the full
+        # declared range even if the view was somewhere else.
+        if applier_from is not None:
+            applier_from(view)
+        _native_anims[anim_id] = {"view": view, "prop": prop_name}
+        if kind == "spring":
+            duration, damping_ratio, velocity = _spring_parameters(spec)
+            UIView.animateWithDuration_delay_usingSpringWithDamping_initialSpringVelocity_options_animations_completion_(
+                duration,
+                0.0,
+                damping_ratio,
+                velocity,
+                1 << 1,  # AllowUserInteraction
+                _animations,
+                _completion,
+            )
+        else:
+            duration = max(0.0, float(spec.get("duration_ms", 300.0))) / 1000.0
+            options = _EASING_OPTIONS.get(str(spec.get("easing", "ease_in_out")), 0) | (1 << 1)
+            UIView.animateWithDuration_delay_options_animations_completion_(
+                duration,
+                float(spec.get("delay_ms", 0.0) or 0.0) / 1000.0,
+                options,
+                _animations,
+                _completion,
+            )
+        return True
+    except Exception:
+        _native_anims.pop(anim_id, None)
+        return False
+
+
+# ======================================================================
+# Base class with shared frame/measure/animation implementations
 # ======================================================================
 
 
 class IOSViewHandler(ViewHandler):
-    """Base class providing the shared `set_frame` / measure contract.
+    """Base class providing the shared protocol implementation.
 
-    All iOS handlers go through `set_frame` to apply the layout
-    engine's computed frames via classic ``CGRect`` positioning (Auto
-    Layout off). Child management defaults to UIKit's
-    `addSubview_:` / `removeFromSuperview` API.
+    Subclasses implement
+    [`_build`][pythonnative.native_views.ios.IOSViewHandler._build]
+    (construct the UIKit view) and
+    [`_apply`][pythonnative.native_views.ios.IOSViewHandler._apply]
+    (apply visual props); the base class owns tag registration,
+    gesture wiring, frame application via classic ``CGRect``
+    positioning (Auto Layout off), intrinsic measurement via
+    ``sizeThatFits:``, and the animation hooks.
     """
+
+    def create(self, tag: int, props: Dict[str, Any]) -> Any:
+        view = self._build(props)
+        _remember(view, tag)
+        _state_of(view)["props"] = dict(props)
+        self._apply(view, props, initial=True)
+        if props.get("gestures"):
+            _wire_gestures(view, props.get("gestures"))
+        return view
+
+    def update(self, native_view: Any, changed_props: Dict[str, Any]) -> None:
+        state = _state_of(native_view)
+        merged = state.setdefault("props", {})
+        merged.update(changed_props)
+        self._apply(native_view, changed_props, initial=False)
+        if "gestures" in changed_props:
+            _wire_gestures(native_view, changed_props.get("gestures"))
+
+    def destroy(self, native_view: Any) -> None:
+        self._teardown(native_view)
+        state = _state_of(native_view)
+        for target in state.get("gesture_targets") or []:
+            _pn_gesture_targets.pop(id(target), None)
+        try:
+            native_view.removeFromSuperview()
+        except Exception:
+            pass
+        _forget(native_view)
+
+    def _build(self, props: Dict[str, Any]) -> Any:
+        raise NotImplementedError
+
+    def _apply(self, view: Any, props: Dict[str, Any], initial: bool) -> None:
+        _apply_common_visual(view, props)
+
+    def _teardown(self, native_view: Any) -> None:
+        """Subclass hook for extra cleanup before the view is released."""
+
+    def insert_child(self, parent: Any, child: Any, index: int) -> None:
+        try:
+            child.setTranslatesAutoresizingMaskIntoConstraints_(True)
+        except Exception:
+            pass
+        try:
+            count = len(list(parent.subviews or []))
+        except Exception:
+            count = index
+        try:
+            parent.insertSubview_atIndex_(child, max(0, min(index, count)))
+        except Exception:
+            try:
+                parent.addSubview_(child)
+            except Exception:
+                pass
+
+    def remove_child(self, parent: Any, child: Any) -> None:
+        try:
+            child.removeFromSuperview()
+        except Exception:
+            pass
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
         if native_view is None:
@@ -562,34 +1105,8 @@ class IOSViewHandler(ViewHandler):
         except Exception:
             return (0.0, 0.0)
 
-    def set_animated_property(
-        self,
-        native_view: Any,
-        prop_name: str,
-        value: Any,
-        duration_ms: float = 0.0,
-        easing: str = "linear",
-    ) -> None:
-        """Apply ``prop_name`` to ``native_view`` immediately or animated.
-
-        Used by ``Animated.View`` to bypass the reconciler when the
-        bound `Animated.Value` ticks. When
-        ``duration_ms > 0``, the change is wrapped in
-        ``UIView.animate(withDuration:)`` so UIKit interpolates between
-        the current and target value at 60 FPS without further Python
-        involvement.
-
-        Args:
-            native_view: The target ``UIView``-derived instance.
-            prop_name: One of ``opacity``, ``translate_x``,
-                ``translate_y``, ``scale``, ``scale_x``, ``scale_y``,
-                ``rotate`` (degrees), ``background_color``.
-            value: The new property value.
-            duration_ms: Optional UIKit animation duration in ms; ``0``
-                applies the change immediately.
-            easing: Easing curve name (``linear``, ``ease_in``,
-                ``ease_out``, ``ease_in_out``).
-        """
+    def set_animated_property(self, native_view: Any, prop_name: str, value: Any) -> None:
+        """Apply one Python-driven animation frame immediately."""
         if native_view is None:
             return
         try:
@@ -598,407 +1115,50 @@ class IOSViewHandler(ViewHandler):
             return
         if applier is None:
             return
-        if duration_ms <= 0:
-            try:
-                applier(native_view)
-            except Exception:
-                pass
-            return
         try:
-            UIView = ObjCClass("UIView")
-            options = {
-                "linear": 1 << 16,
-                "ease_in": 1 << 17,
-                "ease_out": 1 << 18,
-                "ease_in_out": 0,
-            }.get(easing, 0)
-            UIView.animateWithDuration_delay_options_animations_completion_(
-                duration_ms / 1000.0,
-                0.0,
-                options,
-                lambda: applier(native_view),
-                None,
-            )
+            applier(native_view)
         except Exception:
-            try:
-                applier(native_view)
-            except Exception:
-                pass
+            pass
 
+    def start_animation(
+        self,
+        native_view: Any,
+        anim_id: int,
+        prop_name: str,
+        spec: Dict[str, Any],
+    ) -> bool:
+        """Drive ``timing`` / ``spring`` specs with UIKit block animations.
 
-def _animated_applier_for(prop: str, value: Any) -> Optional[Callable[[Any], None]]:
-    if prop == "opacity":
-        v = float(value)
+        ``decay`` (and any unknown kind) returns ``False`` so the Python
+        ticker integrates the exact physics. Off-main-thread starts also
+        fall back — UIKit animation APIs are main-thread-only.
+        """
+        if native_view is None or not isinstance(spec, dict):
+            return False
+        if str(spec.get("kind", "")) not in ("timing", "spring"):
+            return False
+        if not _is_main_thread():
+            return False
+        return _start_native_animation(native_view, anim_id, prop_name, spec)
 
-        def _apply(view: Any) -> None:
-            view.setAlpha_(v)
-
-        return _apply
-    if prop == "background_color":
-
-        def _apply(view: Any) -> None:
-            view.setBackgroundColor_(_uicolor(value))
-
-        return _apply
-    if prop in ("translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate"):
-        spec = {prop: value} if prop != "rotate" else {"rotate": value}
-
-        def _apply(view: Any) -> None:
-            _apply_transform(view, {"transform": [spec]})
-
-        return _apply
-    return None
-
-
-# ======================================================================
-# ObjC callback targets (retained at module level)
-# ======================================================================
-
-_pn_btn_handler_map: dict = {}
-_pn_btn_callback_map: dict = {}
-_pn_retained_views: list = []
-
-
-class _PNButtonTarget(NSObject):  # type: ignore[valid-type]
-    @objc_method
-    def onTap_(self, sender: object) -> None:
-        # Do not introspect ``sender`` here. On rubicon-objc 0.5.x the
-        # selector trampoline can hand this callback a raw ObjC pointer;
-        # calling ``getattr(sender, "ptr", ...)`` has been observed to
-        # segfault before the user's callback runs.
-        cb = _pn_btn_callback_map.get(id(self))
-        if cb is not None:
-            cb()
-
-
-_pn_tf_change_callback_map: dict = {}
-_pn_tf_submit_callback_map: dict = {}
-_pn_tf_focus_callback_map: dict = {}
-_pn_tf_blur_callback_map: dict = {}
-_pn_tf_raw_target_map: dict = {}
-_pn_tv_raw_target_map: dict = {}
-_PN_TEXTFIELD_TARGET_CLS: Optional[int] = None
-_textfield_edit_imp_ref: Any = None
-_textfield_submit_imp_ref: Any = None
-_textfield_should_return_imp_ref: Any = None
-_textfield_did_begin_imp_ref: Any = None
-_textfield_did_end_imp_ref: Any = None
-
-
-def _textfield_text(sender_ptr: int) -> str:
-    if not sender_ptr:
-        return ""
-    try:
-        _objc_msgSend.restype = _ct.c_void_p
-        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
-        nsstring_ptr = _objc_msgSend(_ct.c_void_p(sender_ptr), _SEL_TEXT)
-        if not nsstring_ptr:
-            return ""
-        _objc_msgSend.restype = _ct.c_char_p
-        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
-        raw = _objc_msgSend(_ct.c_void_p(nsstring_ptr), _SEL_UTF8STRING)
-        if not raw:
-            return ""
-        return raw.decode("utf-8", errors="replace")
-    except Exception:
-        return ""
-
-
-def _textfield_on_edit_imp(self_ptr: int, _cmd: int, sender_ptr: int) -> None:
-    cb = _pn_tf_change_callback_map.get(int(self_ptr))
-    if cb is None:
-        return
-    text = _textfield_text(int(sender_ptr or 0))
-    try:
-        cb(text)
-    except Exception:
-        pass
-
-
-def _textfield_on_submit_imp(self_ptr: int, _cmd: int, sender_ptr: int) -> None:
-    cb = _pn_tf_submit_callback_map.get(int(self_ptr))
-    if cb is None:
-        return
-    text = _textfield_text(int(sender_ptr or 0))
-    try:
-        cb(text)
-    except Exception:
-        pass
-
-
-def _textfield_should_return_imp(self_ptr: int, _cmd: int, tf_ptr: int) -> bool:
-    """``UITextFieldDelegate.textFieldShouldReturn:`` — dismiss the keyboard.
-
-    iOS doesn't dismiss the keyboard on Return by default; the standard
-    pattern is for the delegate to call ``resignFirstResponder`` and
-    return ``YES``. Matching that here brings PythonNative's
-    ``TextInput`` in line with React Native's default behavior and with
-    what users expect from a ``return_key_type="done"`` style.
-    """
-    try:
-        _objc_msgSend.restype = None
-        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
-        _objc_msgSend(_ct.c_void_p(int(tf_ptr or 0)), _SEL_RESIGN_FIRST_RESPONDER)
-    except Exception:
-        pass
-    return True
-
-
-def _textfield_did_begin_imp(self_ptr: int, _cmd: int, sender_ptr: int) -> None:
-    """``textFieldDidBeginEditing:`` / ``textViewDidBeginEditing:`` -> ``on_focus``."""
-    cb = _pn_tf_focus_callback_map.get(int(self_ptr))
-    if cb is None:
-        return
-    try:
-        cb()
-    except Exception:
-        pass
-
-
-def _textfield_did_end_imp(self_ptr: int, _cmd: int, sender_ptr: int) -> None:
-    """``textFieldDidEndEditing:`` / ``textViewDidEndEditing:`` -> ``on_blur``."""
-    cb = _pn_tf_blur_callback_map.get(int(self_ptr))
-    if cb is None:
-        return
-    try:
-        cb()
-    except Exception:
-        pass
-
-
-def _ensure_textfield_target_class() -> Optional[int]:
-    global _PN_TEXTFIELD_TARGET_CLS
-    global _textfield_edit_imp_ref, _textfield_submit_imp_ref, _textfield_should_return_imp_ref
-    global _textfield_did_begin_imp_ref, _textfield_did_end_imp_ref
-    if _PN_TEXTFIELD_TARGET_CLS is not None:
-        return _PN_TEXTFIELD_TARGET_CLS
-    existing = _get_cls(b"PNTextFieldActionTarget")
-    if existing:
-        _PN_TEXTFIELD_TARGET_CLS = int(existing)
-        return _PN_TEXTFIELD_TARGET_CLS
-    cls = _alloc_cls(_NS_OBJECT_CLS, b"PNTextFieldActionTarget", 0)
-    if not cls:
-        return None
-    action_type = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
-    bool_type = _ct.CFUNCTYPE(_ct.c_bool, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
-    _textfield_edit_imp_ref = action_type(_textfield_on_edit_imp)
-    _textfield_submit_imp_ref = action_type(_textfield_on_submit_imp)
-    _textfield_should_return_imp_ref = bool_type(_textfield_should_return_imp)
-    _textfield_did_begin_imp_ref = action_type(_textfield_did_begin_imp)
-    _textfield_did_end_imp_ref = action_type(_textfield_did_end_imp)
-    _add_method(cls, _SEL_ON_EDIT, _ct.cast(_textfield_edit_imp_ref, _ct.c_void_p), b"v@:@")
-    _add_method(cls, _SEL_ON_SUBMIT, _ct.cast(_textfield_submit_imp_ref, _ct.c_void_p), b"v@:@")
-    _add_method(
-        cls,
-        _SEL_TEXT_FIELD_SHOULD_RETURN,
-        _ct.cast(_textfield_should_return_imp_ref, _ct.c_void_p),
-        b"c@:@",
-    )
-    # ``textFieldDidBeginEditing:`` / ``textViewDidBeginEditing:`` both
-    # share the focus IMP; the end-editing pair shares the blur IMP. The
-    # same target object is wired as both UITextFieldDelegate and
-    # UITextViewDelegate so on_focus / on_blur work for single- and
-    # multi-line inputs alike.
-    _add_method(cls, _SEL_TEXT_FIELD_DID_BEGIN, _ct.cast(_textfield_did_begin_imp_ref, _ct.c_void_p), b"v@:@")
-    _add_method(cls, _SEL_TEXT_FIELD_DID_END, _ct.cast(_textfield_did_end_imp_ref, _ct.c_void_p), b"v@:@")
-    _add_method(cls, _SEL_TEXT_VIEW_DID_BEGIN, _ct.cast(_textfield_did_begin_imp_ref, _ct.c_void_p), b"v@:@")
-    _add_method(cls, _SEL_TEXT_VIEW_DID_END, _ct.cast(_textfield_did_end_imp_ref, _ct.c_void_p), b"v@:@")
-    _reg_cls(cls)
-    _PN_TEXTFIELD_TARGET_CLS = int(cls)
-    return _PN_TEXTFIELD_TARGET_CLS
-
-
-def _new_textfield_target() -> Optional[int]:
-    cls = _ensure_textfield_target_class()
-    if not cls:
-        return None
-    _objc_msgSend.restype = _ct.c_void_p
-    _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
-    raw = _objc_msgSend(_ct.c_void_p(cls), _SEL_ALLOC)
-    raw = _objc_msgSend(_ct.c_void_p(raw), _SEL_INIT)
-    raw = _objc_msgSend(_ct.c_void_p(raw), _SEL_RETAIN)
-    return int(raw) if raw else None
-
-
-def _attach_textfield_raw_target(tf: Any, props: Dict[str, Any]) -> None:
-    tf_ptr = _objc_ptr(tf)
-    if not tf_ptr:
-        return
-    target_ptr = _pn_tf_raw_target_map.get(id(tf))
-    if target_ptr is None:
-        target_ptr = _new_textfield_target()
-        if not target_ptr:
-            return
-        _pn_tf_raw_target_map[id(tf)] = target_ptr
-        _pn_retained_views.append(target_ptr)
-        _objc_msgSend.restype = None
-        _objc_msgSend.argtypes = [
-            _ct.c_void_p,
-            _ct.c_void_p,
-            _ct.c_void_p,
-            _ct.c_void_p,
-            _ct.c_ulong,
-        ]
-        _objc_msgSend(
-            _ct.c_void_p(tf_ptr),
-            _SEL_ADD_TARGET_ACTION_EVENTS,
-            _ct.c_void_p(target_ptr),
-            _SEL_ON_EDIT,
-            1 << 17,
-        )
-        _objc_msgSend(
-            _ct.c_void_p(tf_ptr),
-            _SEL_ADD_TARGET_ACTION_EVENTS,
-            _ct.c_void_p(target_ptr),
-            _SEL_ON_SUBMIT,
-            1 << 6,
-        )
-        # Wire the same object as the UITextFieldDelegate so its
-        # ``textFieldShouldReturn:`` runs and resigns first responder
-        # — without this iOS keeps the keyboard up after Return.
-        _objc_msgSend.restype = None
-        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p]
-        _objc_msgSend(
-            _ct.c_void_p(tf_ptr),
-            _SEL_SET_DELEGATE,
-            _ct.c_void_p(target_ptr),
-        )
-    if "on_change" in props:
-        _pn_tf_change_callback_map[int(target_ptr)] = props["on_change"]
-    if "on_submit" in props:
-        _pn_tf_submit_callback_map[int(target_ptr)] = props["on_submit"]
-    if "on_focus" in props:
-        _pn_tf_focus_callback_map[int(target_ptr)] = props["on_focus"]
-    if "on_blur" in props:
-        _pn_tf_blur_callback_map[int(target_ptr)] = props["on_blur"]
-
-
-def _attach_textview_raw_target(tv: Any, props: Dict[str, Any]) -> None:
-    """Wire ``tv`` as a UITextViewDelegate for ``on_focus`` / ``on_blur``.
-
-    Unlike ``UITextField`` (a ``UIControl`` driven by target-action), a
-    ``UITextView`` only exposes focus/blur through its delegate's
-    ``textViewDidBeginEditing:`` / ``textViewDidEndEditing:``. We reuse
-    the same raw ``PNTextFieldActionTarget`` class — it implements those
-    selectors too — and set it as the text view's delegate.
-    """
-    tv_ptr = _objc_ptr(tv)
-    if not tv_ptr:
-        return
-    target_ptr = _pn_tv_raw_target_map.get(id(tv))
-    if target_ptr is None:
-        target_ptr = _new_textfield_target()
-        if not target_ptr:
-            return
-        _pn_tv_raw_target_map[id(tv)] = target_ptr
-        _pn_retained_views.append(target_ptr)
-        _objc_msgSend.restype = None
-        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p]
-        _objc_msgSend(_ct.c_void_p(tv_ptr), _SEL_SET_DELEGATE, _ct.c_void_p(target_ptr))
-    if "on_focus" in props:
-        _pn_tf_focus_callback_map[int(target_ptr)] = props["on_focus"]
-    if "on_blur" in props:
-        _pn_tf_blur_callback_map[int(target_ptr)] = props["on_blur"]
-
-
-_pn_switch_handler_map: dict = {}
-
-
-class _PNSwitchTarget(NSObject):  # type: ignore[valid-type]
-    _callback: Optional[Callable[[bool], None]] = None
-
-    @objc_method
-    def onToggle_(self, sender: object) -> None:
-        if self._callback is not None:
-            try:
-                self._callback(bool(sender.isOn()))
-            except Exception:
-                pass
-
-
-_pn_slider_handler_map: dict = {}
-
-
-class _PNSliderTarget(NSObject):  # type: ignore[valid-type]
-    _callback: Optional[Callable[[float], None]] = None
-
-    @objc_method
-    def onSlide_(self, sender: object) -> None:
-        if self._callback is not None:
-            try:
-                self._callback(float(sender.value))
-            except Exception:
-                pass
-
-
-_pn_pressable_state: dict = {}
-
-
-class _PNPressableTarget(NSObject):  # type: ignore[valid-type]
-    @objc_method
-    def onTouchDown_(self, sender: object) -> None:
-        info = _pn_pressable_state.get(id(self))
-        if not info:
-            return
-        view = info.get("view")
-        opacity = info.get("pressed_opacity", 0.6)
-        if view is not None:
-            try:
-                UIView = ObjCClass("UIView")
-                UIView.animateWithDuration_animations_(0.05, lambda: view.setAlpha_(float(opacity)))
-            except Exception:
-                pass
-
-    @objc_method
-    def onTouchUp_(self, sender: object) -> None:
-        info = _pn_pressable_state.get(id(self))
-        if not info:
-            return
-        view = info.get("view")
-        cb = info.get("on_press")
-        if view is not None:
-            try:
-                UIView = ObjCClass("UIView")
-                UIView.animateWithDuration_animations_(0.1, lambda: view.setAlpha_(1.0))
-            except Exception:
-                pass
-        if cb is not None:
-            try:
-                cb()
-            except Exception:
-                pass
-
-    @objc_method
-    def onTouchCancel_(self, sender: object) -> None:
-        info = _pn_pressable_state.get(id(self))
-        if not info:
-            return
-        view = info.get("view")
-        if view is not None:
-            try:
-                UIView = ObjCClass("UIView")
-                UIView.animateWithDuration_animations_(0.1, lambda: view.setAlpha_(1.0))
-            except Exception:
-                pass
-
-    @objc_method
-    def onLongPress_(self, sender: object) -> None:
-        info = _pn_pressable_state.get(id(self))
-        if not info:
-            return
-        # UILongPressGestureRecognizer fires on state Began (state==1).
+    def cancel_animation(self, native_view: Any, anim_id: int) -> Any:
+        entry = _native_anims.pop(anim_id, None)
+        if entry is None:
+            return None
+        view = entry.get("view")
+        prop = str(entry.get("prop", ""))
+        value: Any = None
         try:
-            state = int(sender.state)
+            presentation = view.layer.presentationLayer()
+            if presentation is not None and prop == "opacity":
+                value = float(presentation.opacity)
         except Exception:
-            state = 1
-        if state != 1:
-            return
-        cb = info.get("on_long_press")
-        if cb is not None:
-            try:
-                cb()
-            except Exception:
-                pass
+            value = None
+        try:
+            view.layer.removeAllAnimations()
+        except Exception:
+            pass
+        return value
 
 
 # ======================================================================
@@ -1014,31 +1174,10 @@ class FlexContainerHandler(IOSViewHandler):
     [`set_frame`][pythonnative.native_views.ios.IOSViewHandler.set_frame].
     """
 
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         v = ObjCClass("UIView").alloc().init()
         v.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        _apply_common_visual(v, props)
         return v
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        _apply_common_visual(native_view, changed)
-
-    def add_child(self, parent: Any, child: Any) -> None:
-        try:
-            child.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        except Exception:
-            pass
-        parent.addSubview_(child)
-
-    def remove_child(self, parent: Any, child: Any) -> None:
-        child.removeFromSuperview()
-
-    def insert_child(self, parent: Any, child: Any, index: int) -> None:
-        try:
-            child.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        except Exception:
-            pass
-        parent.insertSubview_atIndex_(child, index)
 
 
 # ======================================================================
@@ -1047,15 +1186,11 @@ class FlexContainerHandler(IOSViewHandler):
 
 
 class TextHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         label = ObjCClass("UILabel").alloc().init()
         label.setNumberOfLines_(0)
         label.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        self._apply(label, props)
         return label
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
 
     def _font_for(self, size: float, weight: Any, family: Optional[str], italic: bool) -> Any:
         """Resolve a UIFont from family/weight/italic/size keys."""
@@ -1113,23 +1248,24 @@ class TextHandler(IOSViewHandler):
                 pass
         return font
 
-    def _apply(self, label: Any, props: Dict[str, Any]) -> None:
+    def _apply(self, label: Any, props: Dict[str, Any], initial: bool) -> None:
         if "text" in props:
             label.setText_(str(props["text"]) if props["text"] is not None else "")
         # Font requires combining size + weight + family + italic + bold.
         font_keys_present = any(k in props for k in ("font_size", "font_weight", "font_family", "italic", "bold"))
         if font_keys_present:
+            merged = _state_of(label).get("props") or props
             current = label.font
             try:
                 current_size = float(current.pointSize) if current is not None else 17.0
             except Exception:
                 current_size = 17.0
-            size = float(props.get("font_size", current_size)) if props.get("font_size") is not None else current_size
-            weight = props.get("font_weight")
-            if weight is None and props.get("bold"):
+            size = float(merged.get("font_size", current_size)) if merged.get("font_size") is not None else current_size
+            weight = merged.get("font_weight")
+            if weight is None and merged.get("bold"):
                 weight = "bold"
-            family = props.get("font_family")
-            italic = bool(props.get("italic"))
+            family = merged.get("font_family")
+            italic = bool(merged.get("italic"))
             label.setFont_(self._font_for(size, weight, family, italic))
         if "color" in props and props["color"] is not None:
             label.setTextColor_(_uicolor(props["color"]))
@@ -1141,7 +1277,8 @@ class TextHandler(IOSViewHandler):
             mapping = {"left": 0, "center": 1, "right": 2, "natural": 4, "justify": 3}
             label.setTextAlignment_(mapping.get(props["text_align"], 0))
         if "letter_spacing" in props or "line_height" in props or "text_decoration" in props:
-            self._apply_attributed(label, props)
+            merged = _state_of(label).get("props") or props
+            self._apply_attributed(label, merged)
         _apply_view_border(label, props)
         _apply_shadow(label, props)
         _apply_transform(label, props)
@@ -1199,7 +1336,7 @@ class TextHandler(IOSViewHandler):
 
 
 class ButtonHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         # ``UIButtonTypeSystem`` (1) gives us a properly-sized button
         # with intrinsicContentSize derived from the title; the default
         # ``UIButtonTypeCustom`` returns CGSizeZero from sizeThatFits_,
@@ -1208,11 +1345,9 @@ class ButtonHandler(IOSViewHandler):
         btn.setTranslatesAutoresizingMaskIntoConstraints_(True)
         btn.retain()
         _pn_retained_views.append(btn)
-        self._apply(btn, props)
+        target = _make_action_target(_PNActionTarget, btn, "on_click")
+        btn.addTarget_action_forControlEvents_(target, SEL("onTap:"), 1 << 6)  # TouchUpInside
         return btn
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
 
     def measure_intrinsic(
         self,
@@ -1232,7 +1367,7 @@ class ButtonHandler(IOSViewHandler):
         except Exception:
             return (44.0, 32.0)
 
-    def _apply(self, btn: Any, props: Dict[str, Any]) -> None:
+    def _apply(self, btn: Any, props: Dict[str, Any], initial: bool) -> None:
         if "title" in props:
             btn.setTitle_forState_(str(props["title"]) if props["title"] is not None else "", 0)
         if "font_size" in props and props["font_size"] is not None:
@@ -1255,15 +1390,6 @@ class ButtonHandler(IOSViewHandler):
                 btn.setAlpha_(float(props["opacity"]))
             except Exception:
                 pass
-        if "on_click" in props:
-            existing = _pn_btn_handler_map.get(id(btn))
-            if existing is not None:
-                _pn_btn_callback_map[id(existing)] = props["on_click"]
-            else:
-                handler = _PNButtonTarget.new()
-                _pn_btn_handler_map[id(btn)] = handler
-                _pn_btn_callback_map[id(handler)] = props["on_click"]
-                btn.addTarget_action_forControlEvents_(handler, SEL("onTap:"), 1 << 6)
 
 
 # ``scrollViewDidScroll:`` hands the delegate a ``UIScrollView*``. rubicon's
@@ -1288,9 +1414,8 @@ def _scroll_did_scroll_imp(self_ptr: int, _cmd_ptr: int, _scroll_view_ptr: int) 
     info = _pn_scroll_imp_map.get(self_ptr)
     if not info:
         return
-    cb = info.get("on_scroll")
     sv = info.get("sv")
-    if cb is None or sv is None:
+    if sv is None:
         return
     try:
         offset = sv.contentOffset
@@ -1298,10 +1423,7 @@ def _scroll_did_scroll_imp(self_ptr: int, _cmd_ptr: int, _scroll_view_ptr: int) 
         y = float(offset.y)
     except Exception:
         return
-    try:
-        cb(x, y)
-    except Exception:
-        pass
+    _fire(sv, "on_scroll", {"x": x, "y": y})
 
 
 _scroll_imp_ref = _SCROLL_IMP_TYPE(_scroll_did_scroll_imp)
@@ -1325,36 +1447,25 @@ class ScrollViewHandler(IOSViewHandler):
     `UIScrollView.contentSize` whenever a child frame extends beyond
     the visible bounds.
 
-    When ``refresh_control`` is provided in props (a dict with
-    ``refreshing`` + ``on_refresh``), a ``UIRefreshControl`` is
-    attached to the scroll view.
+    Scroll offsets are reported as ``on_scroll`` events with a
+    ``{"x": pts, "y": pts}`` payload. Imperative commands:
+    ``scroll_to_offset`` / ``scroll_to_end`` / ``get_scroll_offset``.
+
+    When ``refresh_control`` is provided in props, a
+    ``UIRefreshControl`` is attached and pull-to-refresh fires the
+    ``on_refresh`` event.
     """
 
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         sv = ObjCClass("UIScrollView").alloc().init()
         sv.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        _apply_common_visual(sv, props)
-        self._apply_refresh(sv, props)
-        self._apply_scroll_props(sv, props)
+        self._wire_scroll(sv)
         return sv
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        _apply_common_visual(native_view, changed)
-        if "refresh_control" in changed:
-            self._apply_refresh(native_view, changed)
-        self._apply_scroll_props(native_view, changed)
-
-    def add_child(self, parent: Any, child: Any) -> None:
-        try:
-            child.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        except Exception:
-            pass
-        parent.addSubview_(child)
-
-    def remove_child(self, parent: Any, child: Any) -> None:
-        child.removeFromSuperview()
-
-    def _apply_scroll_props(self, sv: Any, props: Dict[str, Any]) -> None:
+    def _apply(self, sv: Any, props: Dict[str, Any], initial: bool) -> None:
+        _apply_common_visual(sv, props)
+        if "refresh_control" in props:
+            self._apply_refresh(sv, props)
         # ``shows_scroll_indicator`` is present only when False; a removed
         # prop (None) restores both indicators.
         if "shows_scroll_indicator" in props:
@@ -1382,30 +1493,54 @@ class ScrollViewHandler(IOSViewHandler):
                 sv.setKeyboardDismissMode_(mapping.get(props["keyboard_dismiss_mode"], 0))
             except Exception:
                 pass
-        if "on_scroll" in props:
-            self._wire_scroll(sv, props["on_scroll"])
 
-    def _wire_scroll(self, sv: Any, on_scroll: Any) -> None:
-        delegate_ptr = getattr(sv, "_pn_scroll_delegate_ptr", None)
-        if delegate_ptr is None:
-            if not _PN_SCROLL_DELEGATE_CLS:
-                return
-            _objc_msgSend.restype = _ct.c_void_p
-            _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
-            d = _objc_msgSend(_PN_SCROLL_DELEGATE_CLS, _SEL_ALLOC)
-            d = _objc_msgSend(d, _SEL_INIT)
-            d = _objc_msgSend(d, _SEL_RETAIN)
-            delegate_ptr = int(d)
-            sv._pn_scroll_delegate_ptr = delegate_ptr
-            _pn_scroll_imp_map[delegate_ptr] = {"on_scroll": on_scroll, "sv": sv}
-            _objc_msgSend.restype = None
-            _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p]
-            sv_ptr = sv.ptr if hasattr(sv, "ptr") else sv
-            _objc_msgSend(sv_ptr, _SEL_SET_DELEGATE, _ct.c_void_p(delegate_ptr))
-        else:
-            info = _pn_scroll_imp_map.setdefault(delegate_ptr, {})
-            info["on_scroll"] = on_scroll
-            info["sv"] = sv
+    def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
+        if name == "scroll_to_offset":
+            x = float(args.get("x", 0.0) or 0.0)
+            y = float(args.get("y", 0.0) or 0.0)
+            animated = args.get("animated", True) is not False
+            try:
+                native_view.setContentOffset_animated_((x, y), animated)
+            except Exception:
+                pass
+            return None
+        if name == "scroll_to_end":
+            animated = args.get("animated", True) is not False
+            try:
+                content = native_view.contentSize
+                bounds = native_view.bounds
+                target_y = max(0.0, float(content.height) - float(bounds.size.height))
+                target_x = max(0.0, float(content.width) - float(bounds.size.width))
+                horizontal = float(content.width) > float(bounds.size.width) and float(content.height) <= float(
+                    bounds.size.height
+                )
+                offset = (target_x, 0.0) if horizontal else (0.0, target_y)
+                native_view.setContentOffset_animated_(offset, animated)
+            except Exception:
+                pass
+            return None
+        if name == "get_scroll_offset":
+            try:
+                offset = native_view.contentOffset
+                return {"x": float(offset.x), "y": float(offset.y)}
+            except Exception:
+                return {"x": 0.0, "y": 0.0}
+        return None
+
+    def _wire_scroll(self, sv: Any) -> None:
+        if not _PN_SCROLL_DELEGATE_CLS:
+            return
+        _objc_msgSend.restype = _ct.c_void_p
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
+        d = _objc_msgSend(_PN_SCROLL_DELEGATE_CLS, _SEL_ALLOC)
+        d = _objc_msgSend(d, _SEL_INIT)
+        d = _objc_msgSend(d, _SEL_RETAIN)
+        delegate_ptr = int(d)
+        _pn_scroll_imp_map[delegate_ptr] = {"sv": sv}
+        _objc_msgSend.restype = None
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p]
+        sv_ptr = sv.ptr if hasattr(sv, "ptr") else sv
+        _objc_msgSend(sv_ptr, _SEL_SET_DELEGATE, _ct.c_void_p(delegate_ptr))
 
     def _apply_refresh(self, sv: Any, props: Dict[str, Any]) -> None:
         spec = props.get("refresh_control")
@@ -1418,16 +1553,9 @@ class ScrollViewHandler(IOSViewHandler):
                 rc.retain()
                 _pn_retained_views.append(rc)
                 sv.setRefreshControl_(rc)
-                target = _PNButtonTarget.new()
-                target.retain()
-                _pn_retained_views.append(target)
-                _pn_btn_handler_map[id(rc)] = target
+                target = _make_action_target(_PNActionTarget, sv, "on_refresh")
                 rc.addTarget_action_forControlEvents_(target, SEL("onTap:"), 1 << 12)  # ValueChanged
                 existing = rc
-            cb = spec.get("on_refresh") if isinstance(spec, dict) else None
-            target = _pn_btn_handler_map.get(id(existing))
-            if target is not None and cb is not None:
-                _pn_btn_callback_map[id(target)] = cb
             refreshing = bool(spec.get("refreshing")) if isinstance(spec, dict) else False
             if refreshing:
                 existing.beginRefreshing()
@@ -1437,101 +1565,377 @@ class ScrollViewHandler(IOSViewHandler):
             pass
 
 
-# Public ``text_content_type`` names -> the documented ``UITextContentType*``
-# symbol names. The constants' raw NSString values are *not* derivable from
-# the symbol (e.g. ``UITextContentTypeOneTimeCode`` == ``"one-time-code"``),
-# so we read the real constants out of UIKit via ``objc_const`` instead of
-# hardcoding their string values.
-_TEXT_CONTENT_TYPE_SYMBOLS = {
-    "username": "UITextContentTypeUsername",
-    "password": "UITextContentTypePassword",
-    "new_password": "UITextContentTypeNewPassword",
-    "one_time_code": "UITextContentTypeOneTimeCode",
-    "email": "UITextContentTypeEmailAddress",
-    "email_address": "UITextContentTypeEmailAddress",
-    "name": "UITextContentTypeName",
-    "url": "UITextContentTypeURL",
-    "telephone": "UITextContentTypeTelephoneNumber",
-    "telephone_number": "UITextContentTypeTelephoneNumber",
-    "phone": "UITextContentTypeTelephoneNumber",
-    "phone_number": "UITextContentTypeTelephoneNumber",
-}
-_pn_text_content_type_cache: Dict[str, Any] = {}
+class ImageHandler(IOSViewHandler):
+    """`UIImageView` with async URL loading via NSURLSession."""
+
+    def _build(self, props: Dict[str, Any]) -> Any:
+        iv = ObjCClass("UIImageView").alloc().init()
+        iv.setTranslatesAutoresizingMaskIntoConstraints_(True)
+        iv.setClipsToBounds_(True)
+        iv.setContentMode_(1)  # ScaleAspectFit
+        return iv
+
+    def _apply(self, iv: Any, props: Dict[str, Any], initial: bool) -> None:
+        if "tint_color" in props and props["tint_color"] is not None:
+            try:
+                iv.setTintColor_(_uicolor(props["tint_color"]))
+            except Exception:
+                pass
+        if "source" in props and props["source"]:
+            self._load_source(iv, str(props["source"]))
+        if "scale_type" in props and props["scale_type"]:
+            # UIViewContentMode: ScaleToFill=0, ScaleAspectFit=1,
+            # ScaleAspectFill=2, Center=4.
+            mapping = {"cover": 2, "contain": 1, "stretch": 0, "center": 4}
+            iv.setContentMode_(mapping.get(props["scale_type"], 1))
+        _apply_common_visual(iv, props)
+
+    def measure_intrinsic(
+        self,
+        native_view: Any,
+        max_width: float,
+        max_height: float,
+    ) -> Tuple[float, float]:
+        try:
+            img = native_view.image
+            if img is not None:
+                size = img.size
+                w, h = float(size.width), float(size.height)
+                if math.isfinite(max_width) and w > max_width > 0:
+                    scale = max_width / w
+                    w, h = max_width, h * scale
+                return (w, h)
+        except Exception:
+            pass
+        return (0.0, 0.0)
+
+    def _load_source(self, iv: Any, source: str) -> None:
+        try:
+            if source.startswith(("http://", "https://")):
+                self._load_async(iv, source)
+            else:
+                # Bundle resource or absolute file path.
+                UIImage = ObjCClass("UIImage")
+                image = UIImage.imageNamed_(source)
+                if image is None:
+                    image = UIImage.imageWithContentsOfFile_(source)
+                if image:
+                    iv.setImage_(image)
+        except Exception:
+            pass
+
+    def _load_async(self, iv: Any, source: str) -> None:
+        """Asynchronously load a remote image off the main thread.
+
+        Uses ``NSURLSession.sharedSession.dataTaskWithURL:completionHandler:``
+        so the main thread is never blocked. The completion handler
+        runs on a background queue; the image is set back on the main
+        queue so UIKit accepts it without threading warnings. The
+        latest requested URI wins if several loads race.
+        """
+        state = _state_of(iv)
+        state["pending_uri"] = source
+        try:
+            iv.retain()
+            _pn_retained_views.append(iv)
+            NSURL = ObjCClass("NSURL")
+            NSURLSession = ObjCClass("NSURLSession")
+            UIImage = ObjCClass("UIImage")
+            url = NSURL.URLWithString_(source)
+            session = NSURLSession.sharedSession
+
+            def completion(data: Any, response: Any, error: Any) -> None:
+                if error is not None or data is None:
+                    return
+                try:
+                    image = UIImage.imageWithData_(data)
+                    if image is None:
+                        return
+
+                    def apply() -> None:
+                        try:
+                            if _state_of(iv).get("pending_uri") == source:
+                                iv.setImage_(image)
+                        except Exception:
+                            pass
+
+                    from ..runtime import call_on_main_thread
+
+                    call_on_main_thread(apply)
+                except Exception:
+                    pass
+
+            task = session.dataTaskWithURL_completionHandler_(url, completion)
+            task.resume()
+        except Exception:
+            pass
 
 
-def _ui_text_content_type(name: str) -> Any:
-    """Resolve a content-type name to its UIKit ``UITextContentType`` constant.
+# ----------------------------------------------------------------------
+# TextInput — raw libobjc target/delegate
+# ----------------------------------------------------------------------
+#
+# UITextField control events and UITextField/UITextView delegate
+# callbacks all pass ObjC object arguments, which rubicon's
+# ``@objc_method`` trampoline handles unreliably on arm64 (see the
+# module header). The change/submit/focus/blur path is therefore built
+# on a raw ``PNTextFieldActionTarget`` class registered with libobjc,
+# exactly like the scroll and tab-bar delegates.
+#
+# One target instance is allocated per input view; ``_pn_tf_target_map``
+# maps the target's raw pointer (the ``self`` of every IMP) back to the
+# owning input view so the IMPs can consult per-view state (suppress
+# flag, max_length) and fire through the tag-based event channel.
 
-    Returns the NSString constant (an ``ObjCInstance``) for a known name,
-    or ``None`` for an unknown name / lookup failure (in which case the
-    caller should simply leave the content type unset).
-    """
-    symbol = _TEXT_CONTENT_TYPE_SYMBOLS.get(name.strip().lower())
-    if not symbol:
-        return None
-    if symbol in _pn_text_content_type_cache:
-        return _pn_text_content_type_cache[symbol]
-    value = None
+_pn_tf_target_map: Dict[int, Any] = {}
+_PN_TEXTFIELD_TARGET_CLS: Optional[int] = None
+_textfield_imp_refs: List[Any] = []
+
+
+def _input_text(view_ptr: int) -> str:
+    """Read ``text`` from a UITextField/UITextView via raw objc_msgSend."""
+    if not view_ptr:
+        return ""
     try:
-        from rubicon.objc.api import objc_const
-
-        uikit = _ct.cdll.LoadLibrary("/System/Library/Frameworks/UIKit.framework/UIKit")
-        value = objc_const(uikit, symbol)
+        _objc_msgSend.restype = _ct.c_void_p
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
+        nsstring_ptr = _objc_msgSend(_ct.c_void_p(view_ptr), _SEL_TEXT)
+        if not nsstring_ptr:
+            return ""
+        _objc_msgSend.restype = _ct.c_char_p
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
+        raw = _objc_msgSend(_ct.c_void_p(nsstring_ptr), _SEL_UTF8STRING)
+        if not raw:
+            return ""
+        return raw.decode("utf-8", errors="replace")
     except Exception:
-        value = None
-    _pn_text_content_type_cache[symbol] = value
-    return value
+        return ""
+
+
+def _input_state_for_target(self_ptr: int) -> Tuple[Optional[Any], Dict[str, Any]]:
+    view = _pn_tf_target_map.get(int(self_ptr))
+    if view is None:
+        return None, {}
+    return view, _state_of(view)
+
+
+def _tf_on_change_imp(self_ptr: int, _cmd: int, sender_ptr: int) -> None:
+    view, state = _input_state_for_target(self_ptr)
+    if view is None or state.get("suppress"):
+        return
+    text = _input_text(int(sender_ptr or 0))
+    max_length = state.get("max_length")
+    if isinstance(max_length, int) and max_length >= 0 and len(text) > max_length:
+        text = text[:max_length]
+        state["suppress"] = True
+        try:
+            view.setText_(text)
+        except Exception:
+            pass
+        finally:
+            state["suppress"] = False
+    _fire(view, "on_change", text)
+
+
+def _tf_on_submit_imp(self_ptr: int, _cmd: int, sender_ptr: int) -> None:
+    view, state = _input_state_for_target(self_ptr)
+    if view is None:
+        return
+    _fire(view, "on_submit", _input_text(int(sender_ptr or 0)))
+
+
+def _tf_should_return_imp(self_ptr: int, _cmd: int, tf_ptr: int) -> bool:
+    """``textFieldShouldReturn:`` — dismiss the keyboard on Return.
+
+    iOS doesn't dismiss the keyboard on Return by default; the standard
+    pattern is for the delegate to resign first responder and return
+    YES, matching React Native's TextInput behavior.
+    """
+    try:
+        _objc_msgSend.restype = None
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
+        _objc_msgSend(_ct.c_void_p(int(tf_ptr or 0)), _SEL_RESIGN_FIRST_RESPONDER)
+    except Exception:
+        pass
+    return True
+
+
+def _tf_did_begin_imp(self_ptr: int, _cmd: int, sender_ptr: int) -> None:
+    view, _state = _input_state_for_target(self_ptr)
+    if view is not None:
+        _fire(view, "on_focus")
+
+
+def _tf_did_end_imp(self_ptr: int, _cmd: int, sender_ptr: int) -> None:
+    view, _state = _input_state_for_target(self_ptr)
+    if view is not None:
+        _fire(view, "on_blur")
+
+
+def _ensure_textfield_target_class() -> Optional[int]:
+    global _PN_TEXTFIELD_TARGET_CLS
+    if _PN_TEXTFIELD_TARGET_CLS is not None:
+        return _PN_TEXTFIELD_TARGET_CLS
+    existing = _get_cls(b"PNTextFieldActionTarget")
+    if existing:
+        _PN_TEXTFIELD_TARGET_CLS = int(existing)
+        return _PN_TEXTFIELD_TARGET_CLS
+    cls = _alloc_cls(_NS_OBJECT_CLS, b"PNTextFieldActionTarget", 0)
+    if not cls:
+        return None
+    action_type = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
+    bool_type = _ct.CFUNCTYPE(_ct.c_bool, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
+    change_imp = action_type(_tf_on_change_imp)
+    submit_imp = action_type(_tf_on_submit_imp)
+    should_return_imp = bool_type(_tf_should_return_imp)
+    begin_imp = action_type(_tf_did_begin_imp)
+    end_imp = action_type(_tf_did_end_imp)
+    # CFUNCTYPE objects must outlive the registered class.
+    _textfield_imp_refs.extend([change_imp, submit_imp, should_return_imp, begin_imp, end_imp])
+    _add_method(cls, _SEL_ON_EDIT, _ct.cast(change_imp, _ct.c_void_p), b"v@:@")
+    _add_method(cls, _SEL_ON_SUBMIT, _ct.cast(submit_imp, _ct.c_void_p), b"v@:@")
+    _add_method(cls, _SEL_TEXT_FIELD_SHOULD_RETURN, _ct.cast(should_return_imp, _ct.c_void_p), b"c@:@")
+    # ``textFieldDidBeginEditing:`` / ``textViewDidBeginEditing:`` share
+    # the focus IMP; the end-editing pair shares the blur IMP, and
+    # ``textViewDidChange:`` shares the change IMP. The same target is
+    # wired as both UITextFieldDelegate and UITextViewDelegate so every
+    # event works for single- and multi-line inputs alike.
+    _add_method(cls, _SEL_TEXT_FIELD_DID_BEGIN, _ct.cast(begin_imp, _ct.c_void_p), b"v@:@")
+    _add_method(cls, _SEL_TEXT_FIELD_DID_END, _ct.cast(end_imp, _ct.c_void_p), b"v@:@")
+    _add_method(cls, _SEL_TEXT_VIEW_DID_BEGIN, _ct.cast(begin_imp, _ct.c_void_p), b"v@:@")
+    _add_method(cls, _SEL_TEXT_VIEW_DID_END, _ct.cast(end_imp, _ct.c_void_p), b"v@:@")
+    _add_method(cls, _SEL_TEXT_VIEW_DID_CHANGE, _ct.cast(change_imp, _ct.c_void_p), b"v@:@")
+    _reg_cls(cls)
+    _PN_TEXTFIELD_TARGET_CLS = int(cls)
+    return _PN_TEXTFIELD_TARGET_CLS
+
+
+def _attach_input_target(view: Any, *, is_field: bool) -> None:
+    """Allocate the raw target and wire control events + delegate."""
+    cls = _ensure_textfield_target_class()
+    view_ptr = _objc_ptr(view)
+    if not cls or not view_ptr:
+        return
+    _objc_msgSend.restype = _ct.c_void_p
+    _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
+    raw = _objc_msgSend(_ct.c_void_p(cls), _SEL_ALLOC)
+    raw = _objc_msgSend(_ct.c_void_p(raw), _SEL_INIT)
+    raw = _objc_msgSend(_ct.c_void_p(raw), _SEL_RETAIN)
+    if not raw:
+        return
+    target_ptr = int(raw)
+    _pn_tf_target_map[target_ptr] = view
+    _pn_retained_views.append(target_ptr)
+    _state_of(view)["tf_target_ptr"] = target_ptr
+    if is_field:
+        _objc_msgSend.restype = None
+        _objc_msgSend.argtypes = [
+            _ct.c_void_p,
+            _ct.c_void_p,
+            _ct.c_void_p,
+            _ct.c_void_p,
+            _ct.c_ulong,
+        ]
+        # UIControlEventEditingChanged / UIControlEventEditingDidEndOnExit.
+        _objc_msgSend(
+            _ct.c_void_p(view_ptr),
+            _SEL_ADD_TARGET_ACTION_EVENTS,
+            _ct.c_void_p(target_ptr),
+            _SEL_ON_EDIT,
+            1 << 17,
+        )
+        _objc_msgSend(
+            _ct.c_void_p(view_ptr),
+            _SEL_ADD_TARGET_ACTION_EVENTS,
+            _ct.c_void_p(target_ptr),
+            _SEL_ON_SUBMIT,
+            1 << 19,
+        )
+    # The delegate carries shouldReturn / focus / blur for UITextField
+    # and change / focus / blur for UITextView.
+    _objc_msgSend.restype = None
+    _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p]
+    _objc_msgSend(_ct.c_void_p(view_ptr), _SEL_SET_DELEGATE, _ct.c_void_p(target_ptr))
 
 
 class TextInputHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    """Single-line `UITextField` or multiline `UITextView`.
+
+    The view class is chosen at creation time from the ``multiline``
+    prop. Programmatic ``value`` updates set a suppress flag so the
+    change events do not echo back into ``on_change``.
+    """
+
+    def _build(self, props: Dict[str, Any]) -> Any:
         if props.get("multiline"):
             tv = ObjCClass("UITextView").alloc().init()
             tv.setTranslatesAutoresizingMaskIntoConstraints_(True)
+            tv.setFont_(UIFont.systemFontOfSize_(17.0))
             tv.setBackgroundColor_(_uicolor("#FFFFFF"))
-            self._apply_textview(tv, props)
             return tv
         tf = ObjCClass("UITextField").alloc().init()
-        tf.setBorderStyle_(2)  # RoundedRect
         tf.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        self._apply_textfield(tf, props)
+        tf.setBorderStyle_(3)  # UITextBorderStyleRoundedRect
         return tf
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        # Detect whether the underlying view is a UITextView (multiline).
-        try:
-            cls_name = str(native_view.objc_class.name)
-        except Exception:
-            cls_name = ""
-        if "UITextView" in cls_name:
-            self._apply_textview(native_view, changed)
-        else:
-            self._apply_textfield(native_view, changed)
+    def create(self, tag: int, props: Dict[str, Any]) -> Any:
+        view = super().create(tag, props)
+        view.retain()
+        _pn_retained_views.append(view)
+        _attach_input_target(view, is_field=not props.get("multiline"))
+        return view
 
-    def _common_apply(self, view: Any, props: Dict[str, Any]) -> None:
+    def _teardown(self, native_view: Any) -> None:
+        target_ptr = _state_of(native_view).get("tf_target_ptr")
+        if target_ptr is not None:
+            _pn_tf_target_map.pop(int(target_ptr), None)
+
+    def _is_field(self, view: Any) -> bool:
+        try:
+            return bool(view.isKindOfClass_(ObjCClass("UITextField")))
+        except Exception:
+            return True
+
+    def _apply(self, view: Any, props: Dict[str, Any], initial: bool) -> None:
+        state = _state_of(view)
+        is_field = self._is_field(view)
+        if "max_length" in props:
+            state["max_length"] = props["max_length"] if props["max_length"] is None else int(props["max_length"])
+        if "value" in props and props["value"] is not None:
+            current = str(view.text) if view.text is not None else ""
+            new = str(props["value"])
+            if current != new:
+                state["suppress"] = True
+                try:
+                    view.setText_(new)
+                finally:
+                    state["suppress"] = False
+        if "placeholder" in props and is_field:
+            view.setPlaceholder_(str(props["placeholder"]) if props["placeholder"] is not None else "")
+        if "placeholder_color" in props and props["placeholder_color"] is not None and is_field:
+            try:
+                NSAttributedString = ObjCClass("NSAttributedString")
+                merged = state.get("props") or props
+                p = str(merged.get("placeholder", "") or "")
+                attr = NSAttributedString.alloc().initWithString_attributes_(
+                    p,
+                    {"NSColor": _uicolor(props["placeholder_color"])},
+                )
+                view.setAttributedPlaceholder_(attr)
+            except Exception:
+                pass
         if "font_size" in props and props["font_size"] is not None:
             view.setFont_(UIFont.systemFontOfSize_(float(props["font_size"])))
         if "color" in props and props["color"] is not None:
             view.setTextColor_(_uicolor(props["color"]))
         if "background_color" in props and props["background_color"] is not None:
             view.setBackgroundColor_(_uicolor(props["background_color"]))
-        if "secure" in props and props["secure"]:
+        if "secure" in props:
             try:
-                view.setSecureTextEntry_(True)
+                view.setSecureTextEntry_(bool(props["secure"]))
             except Exception:
                 pass
-        if "auto_capitalize" in props:
-            mapping = {"none": 0, "words": 1, "sentences": 2, "characters": 3}
-            try:
-                view.setAutocapitalizationType_(mapping.get(props["auto_capitalize"], 2))
-            except Exception:
-                pass
-        if "auto_correct" in props:
-            try:
-                view.setAutocorrectionType_(0 if not props["auto_correct"] else 1)
-            except Exception:
-                pass
-        if "keyboard_type" in props:
+        if "keyboard_type" in props and props["keyboard_type"] is not None:
             mapping = {
                 "default": 0,
                 "ascii": 1,
@@ -1546,7 +1950,19 @@ class TextInputHandler(IOSViewHandler):
                 view.setKeyboardType_(mapping.get(props["keyboard_type"], 0))
             except Exception:
                 pass
-        if "return_key_type" in props:
+        if "auto_capitalize" in props and props["auto_capitalize"] is not None:
+            # UITextAutocapitalizationType: none=0, words=1, sentences=2, all=3.
+            mapping = {"none": 0, "words": 1, "sentences": 2, "characters": 3}
+            try:
+                view.setAutocapitalizationType_(mapping.get(props["auto_capitalize"], 2))
+            except Exception:
+                pass
+        if "auto_correct" in props:
+            try:
+                view.setAutocorrectionType_(1 if props["auto_correct"] else 0)
+            except Exception:
+                pass
+        if "return_key_type" in props and props["return_key_type"] is not None:
             mapping = {
                 "default": 0,
                 "go": 1,
@@ -1574,6 +1990,28 @@ class TextInputHandler(IOSViewHandler):
                 view.setTextContentType_(_ui_text_content_type(str(tct)) if tct is not None else None)
             except Exception:
                 pass
+        if "clear_button" in props and is_field:
+            try:
+                view.setClearButtonMode_(1 if props["clear_button"] else 0)  # 1 = WhileEditing
+            except Exception:
+                pass
+        # ``editable`` is present only when False (read-only). A removed
+        # prop arrives as None on update, which means "editable again".
+        if "editable" in props:
+            editable = props["editable"]
+            resolved = True if editable is None else bool(editable)
+            try:
+                if is_field:
+                    view.setEnabled_(resolved)
+                else:
+                    view.setEditable_(resolved)
+            except Exception:
+                pass
+        if "auto_focus" in props and props["auto_focus"]:
+            try:
+                view.becomeFirstResponder()
+            except Exception:
+                pass
         _apply_view_border(view, props)
         _apply_shadow(view, props)
         _apply_transform(view, props)
@@ -1584,197 +2022,321 @@ class TextInputHandler(IOSViewHandler):
             except Exception:
                 pass
 
-    def _apply_textfield(self, tf: Any, props: Dict[str, Any]) -> None:
-        if "value" in props:
-            tf.setText_(str(props["value"]) if props["value"] is not None else "")
-        if "placeholder" in props:
-            tf.setPlaceholder_(str(props["placeholder"]) if props["placeholder"] is not None else "")
-        if "placeholder_color" in props and props["placeholder_color"] is not None:
+    def measure_intrinsic(
+        self,
+        native_view: Any,
+        max_width: float,
+        max_height: float,
+    ) -> Tuple[float, float]:
+        w, h = super().measure_intrinsic(native_view, max_width, max_height)
+        return (max(w, 100.0), max(h, 36.0))
+
+    def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
+        if name == "focus":
             try:
-                NSAttributedString = ObjCClass("NSAttributedString")
-                p = str(props.get("placeholder", "") or "")
-                attr = NSAttributedString.alloc().initWithString_attributes_(
-                    p,
-                    {"NSColor": _uicolor(props["placeholder_color"])},
-                )
-                tf.setAttributedPlaceholder_(attr)
+                native_view.becomeFirstResponder()
             except Exception:
                 pass
-        if "auto_focus" in props and props["auto_focus"]:
+            return None
+        if name == "blur":
             try:
-                tf.becomeFirstResponder()
+                native_view.resignFirstResponder()
             except Exception:
                 pass
-        if "max_length" in props:
+            return None
+        if name == "clear":
+            state = _state_of(native_view)
+            state["suppress"] = True
             try:
-                tf.setMaxLength_(int(props["max_length"]))  # custom; UIKit has no native max
-            except Exception:
-                pass
-        # ``editable`` is present only when False (read-only). A removed
-        # prop arrives as None on update, which we treat as "editable again".
-        if "editable" in props:
-            editable = props["editable"]
+                native_view.setText_("")
+            finally:
+                state["suppress"] = False
+            return None
+        if name == "get_value":
             try:
-                tf.setEnabled_(True if editable is None else bool(editable))
+                return str(native_view.text) if native_view.text is not None else ""
             except Exception:
-                pass
-        if "clear_button" in props:
-            try:
-                tf.setClearButtonMode_(1 if props["clear_button"] else 0)  # 1 = WhileEditing
-            except Exception:
-                pass
-        self._common_apply(tf, props)
-        # Always wire the action target — even without ``on_change`` /
-        # ``on_submit`` we want the textfield's delegate set so Return
-        # dismisses the keyboard (textFieldShouldReturn:) and focus/blur
-        # (textFieldDidBeginEditing: / textFieldDidEndEditing:) fire.
-        _attach_textfield_raw_target(tf, props)
-
-    def _apply_textview(self, tv: Any, props: Dict[str, Any]) -> None:
-        if "value" in props:
-            tv.setText_(str(props["value"]) if props["value"] is not None else "")
-        if "auto_focus" in props and props["auto_focus"]:
-            try:
-                tv.becomeFirstResponder()
-            except Exception:
-                pass
-        # ``editable`` (present only when False) maps to UITextView's own
-        # ``editable`` flag — there is no ``enabled`` on a non-UIControl.
-        if "editable" in props:
-            editable = props["editable"]
-            try:
-                tv.setEditable_(True if editable is None else bool(editable))
-            except Exception:
-                pass
-        self._common_apply(tv, props)
-        # NB: UITextView text-change events still go through the delegate's
-        # textViewDidChange: (deliberately left unwired — the multiline path
-        # is a pure display + manual `value` round-trip). We only set the
-        # delegate when on_focus / on_blur are requested so the begin/end
-        # editing callbacks can fire.
-        if "on_focus" in props or "on_blur" in props:
-            _attach_textview_raw_target(tv, props)
-
-
-class ImageHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
-        iv = ObjCClass("UIImageView").alloc().init()
-        iv.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        self._apply(iv, props)
-        return iv
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _apply(self, iv: Any, props: Dict[str, Any]) -> None:
-        if "background_color" in props and props["background_color"] is not None:
-            iv.setBackgroundColor_(_uicolor(props["background_color"]))
-        if "tint_color" in props and props["tint_color"] is not None:
-            try:
-                iv.setTintColor_(_uicolor(props["tint_color"]))
-            except Exception:
-                pass
-        if "source" in props and props["source"]:
-            self._load_source(iv, props["source"])
-        if "scale_type" in props and props["scale_type"]:
-            mapping = {"cover": 2, "contain": 1, "stretch": 0, "center": 4}
-            iv.setContentMode_(mapping.get(props["scale_type"], 1))
-        _apply_view_border(iv, props)
-        _apply_shadow(iv, props)
-        _apply_transform(iv, props)
-        _apply_accessibility(iv, props)
-        if "opacity" in props and props["opacity"] is not None:
-            try:
-                iv.setAlpha_(float(props["opacity"]))
-            except Exception:
-                pass
-
-    def _load_source(self, iv: Any, source: str) -> None:
-        try:
-            if source.startswith(("http://", "https://")):
-                self._load_async(iv, source)
-            else:
-                UIImage = ObjCClass("UIImage")
-                image = UIImage.imageNamed_(source)
-                if image:
-                    iv.setImage_(image)
-        except Exception:
-            pass
-
-    def _load_async(self, iv: Any, source: str) -> None:
-        """Asynchronously load a remote image off the main thread.
-
-        Uses ``NSURLSession.sharedSession.dataTaskWithURL:completionHandler:``
-        so the main thread is never blocked. The completion handler
-        runs on a background queue; the image is set back on the main
-        queue via ``dispatch_async`` so UIKit accepts it without
-        threading warnings.
-        """
-        try:
-            iv.retain()
-            _pn_retained_views.append(iv)
-            NSURL = ObjCClass("NSURL")
-            NSURLSession = ObjCClass("NSURLSession")
-            UIImage = ObjCClass("UIImage")
-            url = NSURL.URLWithString_(source)
-            session = NSURLSession.sharedSession
-
-            def completion(data: Any, response: Any, error: Any) -> None:
-                if error is not None or data is None:
-                    return
-                try:
-                    image = UIImage.imageWithData_(data)
-                    if image is None:
-                        return
-
-                    def apply() -> None:
-                        try:
-                            iv.setImage_(image)
-                        except Exception:
-                            pass
-
-                    # Marshal back to main thread.
-                    try:
-                        from rubicon.objc import dispatch_async, dispatch_get_main_queue
-
-                        dispatch_async(dispatch_get_main_queue(), apply)
-                    except Exception:
-                        try:
-                            apply()
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-
-            task = session.dataTaskWithURL_completionHandler_(url, completion)
-            task.resume()
-        except Exception:
-            pass
+                return ""
+        return None
 
 
 class SwitchHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         sw = ObjCClass("UISwitch").alloc().init()
         sw.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        self._apply(sw, props)
+        sw.retain()
+        _pn_retained_views.append(sw)
+        target = _make_action_target(_PNSwitchTarget, sw, "on_change")
+        sw.addTarget_action_forControlEvents_(target, SEL("onToggle:"), 1 << 12)  # ValueChanged
         return sw
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _apply(self, sw: Any, props: Dict[str, Any]) -> None:
+    def _apply(self, sw: Any, props: Dict[str, Any], initial: bool) -> None:
+        state = _state_of(sw)
         if "value" in props:
-            sw.setOn_animated_(bool(props["value"]), False)
+            new_val = bool(props["value"])
+            if bool(sw.isOn()) != new_val:
+                state["suppress"] = True
+                try:
+                    sw.setOn_animated_(new_val, not initial)
+                finally:
+                    state["suppress"] = False
         _apply_accessibility(sw, props)
-        if "on_change" in props:
-            existing = _pn_switch_handler_map.get(id(sw))
-            if existing is not None:
-                existing._callback = props["on_change"]
+
+    def measure_intrinsic(
+        self,
+        native_view: Any,
+        max_width: float,
+        max_height: float,
+    ) -> Tuple[float, float]:
+        return (51.0, 31.0)
+
+
+class SliderHandler(IOSViewHandler):
+    def _build(self, props: Dict[str, Any]) -> Any:
+        sl = ObjCClass("UISlider").alloc().init()
+        sl.setTranslatesAutoresizingMaskIntoConstraints_(True)
+        sl.retain()
+        _pn_retained_views.append(sl)
+        target = _make_action_target(_PNSliderTarget, sl, "on_change")
+        sl.addTarget_action_forControlEvents_(target, SEL("onSlide:"), 1 << 12)  # ValueChanged
+        return sl
+
+    def _apply(self, sl: Any, props: Dict[str, Any], initial: bool) -> None:
+        state = _state_of(sl)
+        if "min_value" in props and props["min_value"] is not None:
+            sl.setMinimumValue_(float(props["min_value"]))
+        if "max_value" in props and props["max_value"] is not None:
+            sl.setMaximumValue_(float(props["max_value"]))
+        if "value" in props and props["value"] is not None:
+            new_val = float(props["value"])
+            if abs(float(sl.value) - new_val) > 1e-9:
+                state["suppress"] = True
+                try:
+                    sl.setValue_animated_(new_val, not initial)
+                finally:
+                    state["suppress"] = False
+        _apply_accessibility(sl, props)
+
+    def measure_intrinsic(
+        self,
+        native_view: Any,
+        max_width: float,
+        max_height: float,
+    ) -> Tuple[float, float]:
+        w = max_width if math.isfinite(max_width) else 200.0
+        return (max(w, 100.0), 34.0)
+
+
+class ActivityIndicatorHandler(IOSViewHandler):
+    def _build(self, props: Dict[str, Any]) -> Any:
+        # Style: 100=medium, 101=large (iOS 13+).
+        style = 101 if props.get("size") == "large" else 100
+        ai = ObjCClass("UIActivityIndicatorView").alloc().initWithActivityIndicatorStyle_(style)
+        ai.setTranslatesAutoresizingMaskIntoConstraints_(True)
+        ai.setHidesWhenStopped_(True)
+        return ai
+
+    def _apply(self, ai: Any, props: Dict[str, Any], initial: bool) -> None:
+        if "size" in props and props["size"] is not None and not initial:
+            style = 101 if props["size"] == "large" else 100
+            try:
+                ai.setActivityIndicatorViewStyle_(style)
+            except Exception:
+                pass
+        if "color" in props and props["color"] is not None:
+            ai.setColor_(_uicolor(props["color"]))
+        animating = props.get("animating")
+        if "animating" in props or initial:
+            should_animate = True if animating is None else bool(animating)
+            if should_animate:
+                ai.startAnimating()
             else:
-                handler = _PNSwitchTarget.new()
-                handler._callback = props["on_change"]
-                _pn_switch_handler_map[id(sw)] = handler
-                sw.addTarget_action_forControlEvents_(handler, SEL("onToggle:"), 1 << 12)
+                ai.stopAnimating()
+        _apply_accessibility(ai, props)
+
+    def measure_intrinsic(
+        self,
+        native_view: Any,
+        max_width: float,
+        max_height: float,
+    ) -> Tuple[float, float]:
+        try:
+            size = native_view.intrinsicContentSize()
+            return (float(size.width), float(size.height))
+        except Exception:
+            return (20.0, 20.0)
+
+
+class PressableHandler(IOSViewHandler):
+    """Touchable container with press feedback.
+
+    A `UILongPressGestureRecognizer` with ``minimumPressDuration=0``
+    tracks the raw touch for ``on_press_in`` / ``on_press_out`` and the
+    pressed-opacity feedback; a tap recognizer fires ``on_press`` and a
+    standard long-press recognizer fires ``on_long_press``. All three
+    share the simultaneous-recognition delegate. Declarative
+    ``gestures`` from props are attached on top by the base class.
+    """
+
+    def _build(self, props: Dict[str, Any]) -> Any:
+        v = ObjCClass("UIView").alloc().init()
+        v.setTranslatesAutoresizingMaskIntoConstraints_(True)
+        v.setUserInteractionEnabled_(True)
+        self._wire_press(v)
+        return v
+
+    def _wire_press(self, view: Any) -> None:
+        target = _PNPressTarget.new()
+        target.retain()
+        _pn_retained_views.append(target)
+        _pn_press_targets[id(target)] = view
+
+        recognizers = []
+        UITap = ObjCClass("UITapGestureRecognizer")
+        tap = UITap.alloc().initWithTarget_action_(target, SEL("onPress:"))
+        recognizers.append(tap)
+
+        UILong = ObjCClass("UILongPressGestureRecognizer")
+        longp = UILong.alloc().initWithTarget_action_(target, SEL("onLong:"))
+        recognizers.append(longp)
+
+        touch = UILong.alloc().initWithTarget_action_(target, SEL("onTouch:"))
+        touch.setMinimumPressDuration_(0.0)
+        recognizers.append(touch)
+
+        for rec in recognizers:
+            try:
+                rec.setCancelsTouchesInView_(False)
+            except Exception:
+                pass
+            _set_recognizer_delegate(rec)
+            view.addGestureRecognizer_(rec)
+            rec.retain()
+
+    def _apply(self, view: Any, props: Dict[str, Any], initial: bool) -> None:
+        _apply_common_visual(view, props)
+        if "enabled" in props:
+            view.setUserInteractionEnabled_(props["enabled"] is not False)
+
+
+# ----------------------------------------------------------------------
+# UITextContentType constants
+# ----------------------------------------------------------------------
+#
+# ``textContentType`` powers iOS AutoFill (passwords, OTP codes, etc.).
+# The values are NSString *constants*, not literals, so we read the real
+# constants out of UIKit via ``objc_const`` instead of hardcoding their
+# string values.
+_TEXT_CONTENT_TYPE_SYMBOLS = {
+    "username": "UITextContentTypeUsername",
+    "password": "UITextContentTypePassword",
+    "new_password": "UITextContentTypeNewPassword",
+    "one_time_code": "UITextContentTypeOneTimeCode",
+    "email": "UITextContentTypeEmailAddress",
+    "email_address": "UITextContentTypeEmailAddress",
+    "name": "UITextContentTypeName",
+    "url": "UITextContentTypeURL",
+    "telephone": "UITextContentTypeTelephoneNumber",
+    "telephone_number": "UITextContentTypeTelephoneNumber",
+    "phone": "UITextContentTypeTelephoneNumber",
+    "phone_number": "UITextContentTypeTelephoneNumber",
+}
+_pn_text_content_type_cache: Dict[str, Any] = {}
+
+
+def _ui_text_content_type(name: str) -> Any:
+    """Resolve a content-type name to its ``UITextContentType`` constant.
+
+    Returns the NSString constant (an ``ObjCInstance``) for a known name,
+    or ``None`` for an unknown name / lookup failure (in which case the
+    caller should simply leave the content type unset).
+    """
+    symbol = _TEXT_CONTENT_TYPE_SYMBOLS.get(name.strip().lower())
+    if not symbol:
+        return None
+    if symbol in _pn_text_content_type_cache:
+        return _pn_text_content_type_cache[symbol]
+    value = None
+    try:
+        from rubicon.objc.api import objc_const
+
+        uikit = _ct.cdll.LoadLibrary("/System/Library/Frameworks/UIKit.framework/UIKit")
+        value = objc_const(uikit, symbol)
+    except Exception:
+        value = None
+    _pn_text_content_type_cache[symbol] = value
+    return value
+
+
+# ----------------------------------------------------------------------
+# Pressable target
+# ----------------------------------------------------------------------
+
+# Maps ``id(target)`` -> owning Pressable view.
+_pn_press_targets: Dict[int, Any] = {}
+
+
+def _press_feedback(view: Any, pressed: bool) -> None:
+    """Animate the pressed-opacity visual feedback."""
+    try:
+        merged = _state_of(view).get("props") or {}
+        if pressed:
+            opacity = float(merged.get("pressed_opacity", 0.6))
+            duration = 0.05
+        else:
+            raw = merged.get("opacity")
+            opacity = float(raw) if raw is not None else 1.0
+            duration = 0.1
+        UIView = ObjCClass("UIView")
+        UIView.animateWithDuration_animations_(duration, lambda: view.setAlpha_(opacity))
+    except Exception:
+        pass
+
+
+class _PNPressTarget(NSObject):  # type: ignore[valid-type]
+    """Recognizer target firing Pressable's four press events."""
+
+    @objc_method
+    def onPress_(self, sender: object) -> None:
+        view = _pn_press_targets.get(id(self))
+        if view is not None:
+            _fire(view, "on_press")
+
+    @objc_method
+    def onLong_(self, sender: object) -> None:
+        view = _pn_press_targets.get(id(self))
+        if view is None:
+            return
+        # UILongPressGestureRecognizer fires on every state transition;
+        # only Began (1) counts as the long-press trigger.
+        try:
+            state = int(sender.state)
+        except Exception:
+            state = 1
+        if state == 1:
+            _fire(view, "on_long_press")
+
+    @objc_method
+    def onTouch_(self, sender: object) -> None:
+        """Zero-duration long press == raw touch-down / touch-up tracking."""
+        view = _pn_press_targets.get(id(self))
+        if view is None:
+            return
+        try:
+            state = int(sender.state)
+        except Exception:
+            return
+        if state == 1:  # began
+            _press_feedback(view, True)
+            _fire(view, "on_press_in")
+        elif state in (3, 4, 5):  # ended / cancelled / failed
+            _press_feedback(view, False)
+            _fire(view, "on_press_out")
+
+
+# ======================================================================
+# ProgressBar
+# ======================================================================
 
 
 class ProgressBarHandler(IOSViewHandler):
@@ -1782,17 +2344,15 @@ class ProgressBarHandler(IOSViewHandler):
 
     ``UIProgressView`` has no indeterminate mode, so when
     ``indeterminate`` is set the handler instead creates an animating
-    ``UIActivityIndicatorView`` — the simplest, crash-free way to convey
-    open-ended progress. The view type is chosen at ``create`` time;
-    toggling ``indeterminate`` on an existing bar keeps the original
-    view (a deliberate, safe limitation).
+    ``UIActivityIndicatorView``. The view type is chosen at create
+    time; toggling ``indeterminate`` on an existing bar keeps the
+    original view (a deliberate, safe limitation).
     """
 
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         if props.get("indeterminate"):
             ai = ObjCClass("UIActivityIndicatorView").alloc().init()
             ai.setTranslatesAutoresizingMaskIntoConstraints_(True)
-            self._apply_indeterminate(ai, props)
             try:
                 ai.startAnimating()
             except Exception:
@@ -1800,86 +2360,63 @@ class ProgressBarHandler(IOSViewHandler):
             return ai
         pv = ObjCClass("UIProgressView").alloc().init()
         pv.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        self._apply_determinate(pv, props)
         return pv
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
+    def _apply(self, view: Any, props: Dict[str, Any], initial: bool) -> None:
+        try:
+            cls_name = str(view.objc_class.name)
+        except Exception:
+            cls_name = ""
+        if "UIActivityIndicatorView" in cls_name:
+            if "color" in props and props["color"] is not None:
+                try:
+                    view.setColor_(_uicolor(props["color"]))
+                except Exception:
+                    pass
+            try:
+                view.startAnimating()
+            except Exception:
+                pass
+        else:
+            if "value" in props and props["value"] is not None:
+                try:
+                    view.setProgress_(float(props["value"]))
+                except Exception:
+                    pass
+            if "color" in props and props["color"] is not None:
+                try:
+                    view.setProgressTintColor_(_uicolor(props["color"]))
+                except Exception:
+                    pass
+            if "track_color" in props and props["track_color"] is not None:
+                try:
+                    view.setTrackTintColor_(_uicolor(props["track_color"]))
+                except Exception:
+                    pass
+        _apply_accessibility(view, props)
+
+    def measure_intrinsic(
+        self,
+        native_view: Any,
+        max_width: float,
+        max_height: float,
+    ) -> Tuple[float, float]:
         try:
             cls_name = str(native_view.objc_class.name)
         except Exception:
             cls_name = ""
         if "UIActivityIndicatorView" in cls_name:
-            self._apply_indeterminate(native_view, changed)
-        else:
-            self._apply_determinate(native_view, changed)
-
-    def _apply_determinate(self, pv: Any, props: Dict[str, Any]) -> None:
-        if "value" in props and props["value"] is not None:
-            try:
-                pv.setProgress_(float(props["value"]))
-            except Exception:
-                pass
-        if "color" in props and props["color"] is not None:
-            try:
-                pv.setProgressTintColor_(_uicolor(props["color"]))
-            except Exception:
-                pass
-        if "track_color" in props and props["track_color"] is not None:
-            try:
-                pv.setTrackTintColor_(_uicolor(props["track_color"]))
-            except Exception:
-                pass
-
-    def _apply_indeterminate(self, ai: Any, props: Dict[str, Any]) -> None:
-        if "color" in props and props["color"] is not None:
-            try:
-                ai.setColor_(_uicolor(props["color"]))
-            except Exception:
-                pass
-        try:
-            ai.startAnimating()
-        except Exception:
-            pass
+            return (20.0, 20.0)
+        w = max_width if math.isfinite(max_width) else 200.0
+        return (max(w, 40.0), 4.0)
 
 
-class ActivityIndicatorHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
-        ai = ObjCClass("UIActivityIndicatorView").alloc().init()
-        ai.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        self._apply_style(ai, props)
-        self._apply_color(ai, props)
-        if props.get("animating", True):
-            ai.startAnimating()
-        return ai
+# ======================================================================
+# WebView — WKWebView with navigation + script-message delegates
+# ======================================================================
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply_style(native_view, changed)
-        self._apply_color(native_view, changed)
-        if "animating" in changed:
-            if changed["animating"]:
-                native_view.startAnimating()
-            else:
-                native_view.stopAnimating()
-
-    def _apply_style(self, ai: Any, props: Dict[str, Any]) -> None:
-        if "size" in props and props["size"] is not None:
-            # UIActivityIndicatorViewStyle (iOS 13+): medium = 100, large = 101.
-            style = 101 if props["size"] == "large" else 100
-            try:
-                ai.setActivityIndicatorViewStyle_(style)
-            except Exception:
-                pass
-
-    def _apply_color(self, ai: Any, props: Dict[str, Any]) -> None:
-        if "color" in props and props["color"] is not None:
-            try:
-                ai.setColor_(_uicolor(props["color"]))
-            except Exception:
-                pass
-
-
-# Maps ``id(delegate)`` -> ``{"on_load", "on_nav", "on_message", "inject_js"}``.
-_pn_webview_state: dict = {}
+# Maps ``id(delegate)`` -> {"view": WKWebView, "inject_js": str | None}.
+_pn_webview_state: Dict[int, Dict[str, Any]] = {}
 # WKWebView.scrollView isn't auto-detected as a property by rubicon, so it
 # must be declared once (lazily, to avoid forcing a WebKit load at import).
 _pn_wkwebview_declared = False
@@ -1900,8 +2437,8 @@ class _PNWebViewDelegate(NSObject):  # type: ignore[valid-type]
     """WKNavigationDelegate + WKScriptMessageHandler bridge.
 
     Forwards page-load / navigation events to ``on_load`` /
-    ``on_navigation_state_change``, runs ``inject_javascript`` after each
-    load, and surfaces ``window.webkit.messageHandlers.pythonnative``
+    ``on_navigation_state_change``, runs ``inject_javascript`` after
+    each load, and surfaces ``window.webkit.messageHandlers.pythonnative``
     posts through ``on_message``.
     """
 
@@ -1910,38 +2447,32 @@ class _PNWebViewDelegate(NSObject):  # type: ignore[valid-type]
         info = _pn_webview_state.get(id(self))
         if not info:
             return
+        wv = info.get("view")
         js = info.get("inject_js")
-        if js:
+        if js and wv is not None:
             try:
-                webview.evaluateJavaScript_completionHandler_(str(js), None)
+                wv.evaluateJavaScript_completionHandler_(str(js), None)
             except Exception:
                 pass
-        cb = info.get("on_load")
-        if cb is not None:
-            try:
-                cb(_webview_url(webview))
-            except Exception:
-                pass
+        if wv is not None:
+            _fire(wv, "on_load", _webview_url(wv))
 
     @objc_method
     def webView_didStartProvisionalNavigation_(self, webview: object, navigation: object) -> None:
         info = _pn_webview_state.get(id(self))
         if not info:
             return
-        cb = info.get("on_nav")
-        if cb is not None:
-            try:
-                cb(_webview_url(webview))
-            except Exception:
-                pass
+        wv = info.get("view")
+        if wv is not None:
+            _fire(wv, "on_navigation_state_change", _webview_url(wv))
 
     @objc_method
     def userContentController_didReceiveScriptMessage_(self, controller: object, message: object) -> None:
         info = _pn_webview_state.get(id(self))
         if not info:
             return
-        cb = info.get("on_message")
-        if cb is None:
+        wv = info.get("view")
+        if wv is None:
             return
         body = ""
         try:
@@ -1949,22 +2480,19 @@ class _PNWebViewDelegate(NSObject):  # type: ignore[valid-type]
             body = str(raw) if raw is not None else ""
         except Exception:
             body = ""
-        try:
-            cb(body)
-        except Exception:
-            pass
+        _fire(wv, "on_message", body)
 
 
 class WebViewHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         global _pn_wkwebview_declared
         WKWebView = ObjCClass("WKWebView")
         WKWebViewConfiguration = ObjCClass("WKWebViewConfiguration")
         if not _pn_wkwebview_declared:
             # Some WebKit @property declarations aren't auto-detected by
             # rubicon's runtime introspection (same class of issue as
-            # UIView.superview above); declare the ones we read so attribute
-            # access returns the object instead of a bound method.
+            # UIView.superview above); declare the ones we read so
+            # attribute access returns the object instead of a method.
             for cls, prop in (
                 (WKWebView, "scrollView"),
                 (WKWebView, "URL"),
@@ -1979,15 +2507,9 @@ class WebViewHandler(IOSViewHandler):
         delegate = _PNWebViewDelegate.new()
         delegate.retain()
         _pn_retained_views.append(delegate)
-        _pn_webview_state[id(delegate)] = {
-            "on_load": props.get("on_load"),
-            "on_nav": props.get("on_navigation_state_change"),
-            "on_message": props.get("on_message"),
-            "inject_js": props.get("inject_javascript"),
-        }
         # Register the message handler up front so page JS calling
-        # ``window.webkit.messageHandlers.pythonnative.postMessage(x)`` can
-        # reach ``on_message`` even if it is wired in a later update().
+        # ``window.webkit.messageHandlers.pythonnative.postMessage(x)``
+        # can reach ``on_message`` even if it's wired in a later render.
         try:
             config.userContentController.addScriptMessageHandler_name_(delegate, "pythonnative")
         except Exception:
@@ -1998,36 +2520,39 @@ class WebViewHandler(IOSViewHandler):
             wv.setNavigationDelegate_(delegate)
         except Exception:
             pass
-        wv._pn_webview_delegate_id = id(delegate)
-        self._apply_content(wv, props)
-        self._apply_scroll_enabled(wv, props)
+        _pn_webview_state[id(delegate)] = {"view": wv, "inject_js": None}
+        self._delegate_ids[_objc_ptr(wv) or 0] = id(delegate)
         return wv
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        delegate_id = getattr(native_view, "_pn_webview_delegate_id", None)
-        if delegate_id is not None and delegate_id in _pn_webview_state:
-            info = _pn_webview_state[delegate_id]
-            if "on_load" in changed:
-                info["on_load"] = changed["on_load"]
-            if "on_navigation_state_change" in changed:
-                info["on_nav"] = changed["on_navigation_state_change"]
-            if "on_message" in changed:
-                info["on_message"] = changed["on_message"]
-            if "inject_javascript" in changed:
-                info["inject_js"] = changed["inject_javascript"]
-        self._apply_content(native_view, changed)
-        if "scroll_enabled" in changed:
-            self._apply_scroll_enabled(native_view, changed)
+    _delegate_ids: Dict[int, int] = {}
 
-    def _apply_content(self, wv: Any, props: Dict[str, Any]) -> None:
+    def create(self, tag: int, props: Dict[str, Any]) -> Any:
+        view = super().create(tag, props)
+        delegate_id = self._delegate_ids.pop(_objc_ptr(view) or 0, None)
+        if delegate_id is not None:
+            _state_of(view)["webview_delegate_id"] = delegate_id
+            if props.get("inject_javascript"):
+                _pn_webview_state[delegate_id]["inject_js"] = props["inject_javascript"]
+        return view
+
+    def _teardown(self, native_view: Any) -> None:
+        delegate_id = _state_of(native_view).get("webview_delegate_id")
+        if delegate_id is not None:
+            _pn_webview_state.pop(delegate_id, None)
+
+    def _apply(self, wv: Any, props: Dict[str, Any], initial: bool) -> None:
+        delegate_id = _state_of(wv).get("webview_delegate_id")
+        if delegate_id is not None and "inject_javascript" in props:
+            info = _pn_webview_state.get(delegate_id)
+            if info is not None:
+                info["inject_js"] = props["inject_javascript"]
         # ``html`` wins over ``url`` (matches the component contract).
         if "html" in props and props["html"]:
             try:
                 wv.loadHTMLString_baseURL_(str(props["html"]), None)
-                return
             except Exception:
                 pass
-        if "url" in props and props["url"]:
+        elif "url" in props and props["url"]:
             try:
                 NSURL = ObjCClass("NSURL")
                 NSURLRequest = ObjCClass("NSURLRequest")
@@ -2035,14 +2560,44 @@ class WebViewHandler(IOSViewHandler):
                 wv.loadRequest_(NSURLRequest.requestWithURL_(url_obj))
             except Exception:
                 pass
-
-    def _apply_scroll_enabled(self, wv: Any, props: Dict[str, Any]) -> None:
         if "scroll_enabled" in props:
             enabled = props["scroll_enabled"]
             try:
                 wv.scrollView.setScrollEnabled_(True if enabled is None else bool(enabled))
             except Exception:
                 pass
+
+    def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
+        if name == "eval_js":
+            try:
+                native_view.evaluateJavaScript_completionHandler_(str(args.get("source", "")), None)
+            except Exception:
+                pass
+            return None
+        if name == "reload":
+            try:
+                native_view.reload()
+            except Exception:
+                pass
+            return None
+        if name == "go_back":
+            try:
+                native_view.goBack()
+            except Exception:
+                pass
+            return None
+        if name == "go_forward":
+            try:
+                native_view.goForward()
+            except Exception:
+                pass
+            return None
+        return None
+
+
+# ======================================================================
+# Spacer / SafeAreaView
+# ======================================================================
 
 
 class SpacerHandler(IOSViewHandler):
@@ -2052,34 +2607,22 @@ class SpacerHandler(IOSViewHandler):
     behaves identically to a `View` with the same style props.
     """
 
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         v = ObjCClass("UIView").alloc().init()
         v.setTranslatesAutoresizingMaskIntoConstraints_(True)
         return v
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
+    def _apply(self, view: Any, props: Dict[str, Any], initial: bool) -> None:
         pass
 
 
 class SafeAreaViewHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    """Plain container; safe-area insets are applied by the layout engine."""
+
+    def _build(self, props: Dict[str, Any]) -> Any:
         v = ObjCClass("UIView").alloc().init()
         v.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        _apply_common_visual(v, props)
         return v
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        _apply_common_visual(native_view, changed)
-
-    def add_child(self, parent: Any, child: Any) -> None:
-        try:
-            child.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        except Exception:
-            pass
-        parent.addSubview_(child)
-
-    def remove_child(self, parent: Any, child: Any) -> None:
-        child.removeFromSuperview()
 
 
 # ======================================================================
@@ -2091,88 +2634,76 @@ class ModalHandler(IOSViewHandler):
     """Real modal presentation backed by a presented `UIViewController`.
 
     The on-tree placeholder is a hidden ``UIView`` (so the layout
-    engine can ignore it). When ``visible`` flips to ``True``, a
-    fresh ``UIViewController`` is allocated, its view is configured
-    as the container into which the modal's children mount, and the
-    controller is presented from the topmost view controller.
+    engine can ignore it). When ``visible`` flips to ``True``, a fresh
+    ``UIViewController`` is allocated, its view is configured as the
+    container into which the modal's children mount, and the controller
+    is presented from the topmost view controller.
 
     Children are added to the *content view* of the presented
     controller, not the on-tree placeholder, so the reconciler's
-    ``add_child`` / ``insert_child`` calls are forwarded there.
+    ``insert_child`` / ``remove_child`` calls are forwarded there.
     """
 
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         v = ObjCClass("UIView").alloc().init()
         v.setHidden_(True)
-        v._pn_modal_state = None
-        self._apply(v, props, mounting=True)
         return v
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed, mounting=False)
+    def _apply(self, placeholder: Any, props: Dict[str, Any], initial: bool) -> None:
+        state = _state_of(placeholder)
+        merged = state.get("props") or props
+        visible = bool(merged.get("visible", False))
+        presented = state.get("modal") is not None
+        if visible and not presented:
+            self._present(placeholder, merged)
+        elif not visible and presented:
+            self._dismiss(placeholder)
 
-    def add_child(self, parent: Any, child: Any) -> None:
-        # Forward to the modal content view if present.
-        state = _pn_modal_states.get(id(parent))
-        if state and state.get("content_view") is not None:
+    def _teardown(self, native_view: Any) -> None:
+        if _state_of(native_view).get("modal") is not None:
+            self._dismiss(native_view)
+
+    def insert_child(self, parent: Any, child: Any, index: int) -> None:
+        state = _state_of(parent)
+        modal = state.get("modal")
+        if modal is not None:
             try:
                 child.setTranslatesAutoresizingMaskIntoConstraints_(True)
             except Exception:
                 pass
-            state["content_view"].addSubview_(child)
+            try:
+                content = modal["content_view"]
+                count = len(list(content.subviews or []))
+                content.insertSubview_atIndex_(child, max(0, min(index, count)))
+            except Exception:
+                pass
         else:
-            # Buffer for later, once the modal becomes visible.
-            buf = _pn_modal_pending.setdefault(id(parent), [])
-            buf.append(child)
+            buf = state.setdefault("pending_children", [])
+            buf.insert(max(0, min(index, len(buf))), child)
 
     def remove_child(self, parent: Any, child: Any) -> None:
         try:
             child.removeFromSuperview()
         except Exception:
             pass
-        buf = _pn_modal_pending.get(id(parent))
+        buf = _state_of(parent).get("pending_children")
         if buf and child in buf:
             buf.remove(child)
-
-    def insert_child(self, parent: Any, child: Any, index: int) -> None:
-        state = _pn_modal_states.get(id(parent))
-        if state and state.get("content_view") is not None:
-            try:
-                child.setTranslatesAutoresizingMaskIntoConstraints_(True)
-            except Exception:
-                pass
-            state["content_view"].insertSubview_atIndex_(child, index)
-        else:
-            buf = _pn_modal_pending.setdefault(id(parent), [])
-            buf.insert(index, child)
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
         # Modal is a virtual placeholder — not rendered inline.
         return
 
-    def _apply(self, placeholder: Any, props: Dict[str, Any], *, mounting: bool) -> None:
-        # Accumulate props across renders. Presentation is frequently
-        # triggered by an update whose ``changed`` dict carries only
-        # ``visible``; merging lets ``_present`` still see config props
-        # (presentation_style, on_show, dismiss_on_backdrop, on_dismiss)
-        # that were set on an earlier render.
-        merged = _pn_modal_props.setdefault(id(placeholder), {})
-        for key, value in props.items():
-            if value is None:
-                merged.pop(key, None)
-            else:
-                merged[key] = value
-        visible = bool(merged.get("visible", False))
-        state = _pn_modal_states.get(id(placeholder))
-        if visible and state is None:
-            self._present(placeholder, merged)
-        elif not visible and state is not None:
-            self._dismiss(placeholder)
-        elif visible and state is not None:
-            # Already presented; refresh the on_dismiss callback.
-            state["on_dismiss"] = merged.get("on_dismiss")
+    def measure_intrinsic(
+        self,
+        native_view: Any,
+        max_width: float,
+        max_height: float,
+    ) -> Tuple[float, float]:
+        return (0.0, 0.0)
 
     def _present(self, placeholder: Any, props: Dict[str, Any]) -> None:
+        state = _state_of(placeholder)
         try:
             UIViewController = ObjCClass("UIViewController")
             UIApplication = ObjCClass("UIApplication")
@@ -2190,7 +2721,6 @@ class ModalHandler(IOSViewHandler):
             content.setTranslatesAutoresizingMaskIntoConstraints_(True)
             controller.view.addSubview_(content)
             controller.view.setBackgroundColor_(_uicolor("#66000000" if is_overlay else "#FFFFFF"))
-            # Stretch the content view to the controller's view.
             try:
                 bounds = controller.view.bounds
                 content.setFrame_(((0, 0), (bounds.size.width, bounds.size.height)))
@@ -2199,165 +2729,56 @@ class ModalHandler(IOSViewHandler):
                 pass
 
             # UIModalPresentationStyle: fullScreen=0, pageSheet=1,
-            # formSheet=2, overCurrentContext=6 (used for the dimmed overlay).
+            # formSheet=2, overCurrentContext=6 (the dimmed overlay).
             style_map = {"full_screen": 0, "page_sheet": 1, "form_sheet": 2, "overlay": 6}
             style_int = 6 if is_overlay else style_map.get(presentation_style, 1)
             try:
                 controller.setModalPresentationStyle_(style_int)
             except Exception:
                 pass
-            # ``dismiss_on_backdrop`` is present only when False. For sheet
-            # styles, lock interactive (swipe / outside-tap) dismissal so
-            # the modal stays put until ``visible`` is driven back to False.
+            # For sheet styles, ``dismiss_on_backdrop=False`` locks
+            # interactive (swipe / outside-tap) dismissal so the modal
+            # stays put until ``visible`` is driven back to False.
             if not is_overlay and props.get("dismiss_on_backdrop") is False:
                 try:
                     controller.setModalInPresentation_(True)
                 except Exception:
                     pass
 
-            on_show = props.get("on_show")
-
             def _on_present_complete() -> None:
-                if on_show is not None:
-                    try:
-                        on_show()
-                    except Exception:
-                        pass
+                _fire(placeholder, "on_show")
 
-            _pn_modal_states[id(placeholder)] = {
+            state["modal"] = {
                 "controller": controller,
                 "content_view": content,
-                "on_dismiss": props.get("on_dismiss"),
                 # Keep the completion block alive past this call.
                 "on_show": _on_present_complete,
             }
-            # Drain any pending children.
-            for child in _pn_modal_pending.pop(id(placeholder), []):
+            for child in state.pop("pending_children", []):
                 try:
+                    child.setTranslatesAutoresizingMaskIntoConstraints_(True)
                     content.addSubview_(child)
                 except Exception:
                     pass
 
-            top = UIApplication.sharedApplication.keyWindow.rootViewController
-            while top is not None and top.presentedViewController is not None:
-                top = top.presentedViewController
+            top = _top_view_controller_for_alert(UIApplication.sharedApplication)
             if top is not None:
                 top.presentViewController_animated_completion_(controller, True, _on_present_complete)
         except Exception:
-            pass
+            state.pop("modal", None)
 
     def _dismiss(self, placeholder: Any) -> None:
-        state = _pn_modal_states.pop(id(placeholder), None)
-        if state is None:
+        state = _state_of(placeholder)
+        modal = state.pop("modal", None)
+        if modal is None:
             return
-        controller = state.get("controller")
-        on_dismiss = state.get("on_dismiss")
+        controller = modal.get("controller")
         if controller is not None:
             try:
                 controller.dismissViewControllerAnimated_completion_(True, None)
             except Exception:
                 pass
-        if on_dismiss is not None:
-            try:
-                on_dismiss()
-            except Exception:
-                pass
-
-
-_pn_modal_states: Dict[int, dict] = {}
-_pn_modal_pending: Dict[int, List[Any]] = {}
-# Accumulated (non-None) props per modal placeholder, so presentation can
-# read config props set on a render prior to the one that flips ``visible``.
-_pn_modal_props: Dict[int, dict] = {}
-
-
-class SliderHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
-        sl = ObjCClass("UISlider").alloc().init()
-        sl.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        self._apply(sl, props)
-        return sl
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _apply(self, sl: Any, props: Dict[str, Any]) -> None:
-        if "min_value" in props:
-            sl.setMinimumValue_(float(props["min_value"]))
-        if "max_value" in props:
-            sl.setMaximumValue_(float(props["max_value"]))
-        if "value" in props:
-            sl.setValue_(float(props["value"]))
-        _apply_accessibility(sl, props)
-        if "on_change" in props:
-            existing = _pn_slider_handler_map.get(id(sl))
-            if existing is not None:
-                existing._callback = props["on_change"]
-            else:
-                handler = _PNSliderTarget.new()
-                handler._callback = props["on_change"]
-                _pn_slider_handler_map[id(sl)] = handler
-                sl.addTarget_action_forControlEvents_(handler, SEL("onSlide:"), 1 << 12)
-
-
-# ======================================================================
-# Pressable — visual touch feedback + tap/long-press callbacks
-# ======================================================================
-
-
-class PressableHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
-        v = ObjCClass("UIView").alloc().init()
-        v.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        v.setUserInteractionEnabled_(True)
-        target = _PNPressableTarget.new()
-        target.retain()
-        _pn_retained_views.append(target)
-        # UITapGestureRecognizer for press (single tap) — provides
-        # touchDown/up via UIControl events on subclassed UIControl,
-        # but since this is a UIView we register a tap gesture for
-        # on_press and a long-press gesture for on_long_press.
-        try:
-            UITapGestureRecognizer = ObjCClass("UITapGestureRecognizer")
-            tap = UITapGestureRecognizer.alloc().initWithTarget_action_(target, SEL("onTouchUp:"))
-            v.addGestureRecognizer_(tap)
-            UILongPressGestureRecognizer = ObjCClass("UILongPressGestureRecognizer")
-            longp = UILongPressGestureRecognizer.alloc().initWithTarget_action_(target, SEL("onLongPress:"))
-            v.addGestureRecognizer_(longp)
-        except Exception:
-            pass
-        _pn_pressable_state[id(target)] = {
-            "view": v,
-            "on_press": props.get("on_press"),
-            "on_long_press": props.get("on_long_press"),
-            "pressed_opacity": float(props.get("pressed_opacity", 0.6)),
-        }
-        # Stash the target id so update() can reach it.
-        v._pn_press_target_id = id(target)
-        _apply_common_visual(v, props)
-        return v
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        target_id = getattr(native_view, "_pn_press_target_id", None)
-        if target_id is not None and target_id in _pn_pressable_state:
-            info = _pn_pressable_state[target_id]
-            if "on_press" in changed:
-                info["on_press"] = changed["on_press"]
-            if "on_long_press" in changed:
-                info["on_long_press"] = changed["on_long_press"]
-            if "pressed_opacity" in changed and changed["pressed_opacity"] is not None:
-                info["pressed_opacity"] = float(changed["pressed_opacity"])
-        _apply_common_visual(native_view, changed)
-
-    def add_child(self, parent: Any, child: Any) -> None:
-        try:
-            child.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        except Exception:
-            pass
-        parent.addSubview_(child)
-
-    def remove_child(self, parent: Any, child: Any) -> None:
-        child.removeFromSuperview()
+        _fire(placeholder, "on_dismiss")
 
 
 # ======================================================================
@@ -2368,42 +2789,45 @@ class PressableHandler(IOSViewHandler):
 class StatusBarHandler(IOSViewHandler):
     """Apply status-bar style/visibility to the key window.
 
-    Status bar configuration on iOS is a per-view-controller value;
-    we use the legacy UIApplication setters which still work on
-    iOS 13+ (with ``UIViewControllerBasedStatusBarAppearance`` set
-    to ``NO`` in Info.plist for full effect). The placeholder view
-    is hidden and contributes nothing to the layout.
+    Status bar configuration on iOS is a per-view-controller value; we
+    use the legacy UIApplication setters which still work on iOS 13+
+    (with ``UIViewControllerBasedStatusBarAppearance`` set to ``NO`` in
+    Info.plist for full effect). The placeholder view is hidden and
+    contributes nothing to the layout.
     """
 
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         v = ObjCClass("UIView").alloc().init()
         v.setHidden_(True)
-        self._apply(props)
         return v
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(changed)
-
-    def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
-        return
-
-    def _apply(self, props: Dict[str, Any]) -> None:
+    def _apply(self, view: Any, props: Dict[str, Any], initial: bool) -> None:
         try:
             UIApplication = ObjCClass("UIApplication")
             app = UIApplication.sharedApplication
             if "hidden" in props and props["hidden"] is not None:
                 app.setStatusBarHidden_animated_(bool(props["hidden"]), True)
             if "bar_style" in props and props["bar_style"] is not None:
-                # 0 = default (dark content on iOS 12-), 1 = lightContent,
-                # 3 = darkContent (iOS 13+).
+                # 1 = lightContent, 3 = darkContent (iOS 13+).
                 mapping = {"default": 3, "light": 1, "dark": 3}
                 app.setStatusBarStyle_animated_(mapping.get(props["bar_style"], 0), True)
         except Exception:
             pass
 
+    def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
+        return
+
+    def measure_intrinsic(
+        self,
+        native_view: Any,
+        max_width: float,
+        max_height: float,
+    ) -> Tuple[float, float]:
+        return (0.0, 0.0)
+
 
 # ======================================================================
-# KeyboardAvoidingView — wraps children and offsets them by the keyboard
+# KeyboardAvoidingView — publishes the keyboard height to Python
 # ======================================================================
 
 
@@ -2416,8 +2840,7 @@ class _PNKeyboardObserver(NSObject):  # type: ignore[valid-type]
         try:
             info = notification.userInfo
             kbd_frame = info.objectForKey_("UIKeyboardFrameEndUserInfoKey")
-            # Frame is wrapped in NSValue; the Python side reads
-            # CGRectValue() which returns a tuple of structs.
+            # Frame is wrapped in NSValue; CGRectValue unwraps the rect.
             rect = kbd_frame.CGRectValue
             height = float(rect.size.height)
         except Exception:
@@ -2441,8 +2864,7 @@ def _ensure_keyboard_observer() -> None:
         observer = _PNKeyboardObserver.new()
         observer.retain()
         _pn_keyboard_observer = observer
-        NSNotificationCenter = ObjCClass("NSNotificationCenter")
-        center = NSNotificationCenter.defaultCenter
+        center = ObjCClass("NSNotificationCenter").defaultCenter
         center.addObserver_selector_name_object_(
             observer,
             SEL("keyboardWillShow:"),
@@ -2464,375 +2886,25 @@ class KeyboardAvoidingViewHandler(IOSViewHandler):
 
     The actual layout shift is implemented in user-land by the
     [`KeyboardAvoidingView`][pythonnative.KeyboardAvoidingView]
-    component, which subscribes to ``platform_metrics.subscribe`` via
+    component, which subscribes via
     [`use_keyboard_height`][pythonnative.use_keyboard_height] and
-    applies the offset as bottom padding. The native handler is just
-    a vanilla UIView that ensures the observer is installed.
+    applies the offset as bottom padding. The native handler is just a
+    vanilla UIView that ensures the observer is installed.
     """
 
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         _ensure_keyboard_observer()
         v = ObjCClass("UIView").alloc().init()
         v.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        _apply_common_visual(v, props)
         return v
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        _apply_common_visual(native_view, changed)
-
-    def add_child(self, parent: Any, child: Any) -> None:
-        try:
-            child.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        except Exception:
-            pass
-        parent.addSubview_(child)
-
-    def remove_child(self, parent: Any, child: Any) -> None:
-        child.removeFromSuperview()
-
 
 # ======================================================================
-# VirtualList — UITableView-backed virtualized list
+# TabBar — UITabBar with a raw ctypes delegate
 # ======================================================================
 #
-# We register a raw libobjc class ``_PNTableSourceCTypes`` rather than
-# using rubicon-objc's ``@objc_method`` because UIKit invokes
-# ``tableView:cellForRowAtIndexPath:`` with a tagged-pointer
-# NSIndexPath that crashes inside CPython's ``_ctypes.O_get`` when
-# rubicon-objc's FFI closure tries to wrap it as a PyObject*.
-#
-# Each UITableView gets its own dataSource instance; per-instance
-# state lives in ``_pn_table_state`` keyed by the dataSource's raw
-# pointer (the integer value passed as ``self`` to every IMP).
-
-_pn_table_state: Dict[int, dict] = {}
-
-
-_PN_CELL_REUSE_ID = "PNCell"
-
-
-_TABLE_NUM_SECTIONS_TYPE = _ct.CFUNCTYPE(_ct.c_long, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
-_TABLE_NUM_ROWS_TYPE = _ct.CFUNCTYPE(_ct.c_long, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_long)
-_TABLE_HEIGHT_TYPE = _ct.CFUNCTYPE(_ct.c_double, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
-_TABLE_CELL_TYPE = _ct.CFUNCTYPE(_ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
-_TABLE_DID_SELECT_TYPE = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
-
-
-def _table_num_sections_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int) -> int:
-    return 1
-
-
-def _table_num_rows_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, section: int) -> int:
-    try:
-        info = _pn_table_state.get(int(self_ptr))
-        return int(info.get("count", 0)) if info else 0
-    except Exception:
-        import traceback as _tb
-
-        print("[VirtualList][iOS] _table_num_rows_imp raised:")
-        _tb.print_exc()
-        return 0
-
-
-def _table_height_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int) -> float:
-    try:
-        info = _pn_table_state.get(int(self_ptr))
-        return float(info.get("row_height", 44.0)) if info else 44.0
-    except Exception:
-        import traceback as _tb
-
-        print("[VirtualList][iOS] _table_height_imp raised:")
-        _tb.print_exc()
-        return 44.0
-
-
-def _table_cell_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int) -> int:
-    """Build (or reuse) a cell for ``tableView:cellForRowAtIndexPath:``.
-
-    ``ip_ptr`` is read raw via ``[indexPath row]`` to avoid the
-    rubicon-objc tagged-pointer crash. The table view itself is a
-    real heap object so we can wrap it as an ObjCInstance for the
-    convenience of dequeue / cell allocation. We retain the freshly
-    allocated cell explicitly so it survives past the Python wrapper
-    going out of scope at the end of this frame.
-    """
-    import traceback as _tb
-
-    try:
-        _objc_msgSend.restype = _ct.c_long
-        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
-        row = int(_objc_msgSend(_ct.c_void_p(ip_ptr), _SEL_ROW))
-    except Exception:
-        print("[VirtualList][iOS] _table_cell_imp: indexPath.row read raised:")
-        _tb.print_exc()
-        row = 0
-
-    try:
-        from rubicon.objc import ObjCInstance
-
-        UITableViewCell = ObjCClass("UITableViewCell")
-        tv = ObjCInstance(_ct.c_void_p(tv_ptr))
-        info = _pn_table_state.get(int(self_ptr))
-        row_h = float(info.get("row_height", 44.0)) if info else 44.0
-
-        try:
-            tv_bounds = tv.bounds
-            cell_w = float(tv_bounds.size.width)
-        except Exception:
-            cell_w = 0.0
-        if cell_w <= 0:
-            try:
-                screen = ObjCClass("UIScreen").mainScreen()
-                cell_w = float(screen.bounds.size.width)
-            except Exception:
-                cell_w = 320.0
-
-        cell = tv.dequeueReusableCellWithIdentifier_(_PN_CELL_REUSE_ID)
-        if cell is None or (hasattr(cell, "ptr") and cell.ptr.value == 0):
-            cell = UITableViewCell.alloc().initWithStyle_reuseIdentifier_(0, _PN_CELL_REUSE_ID)
-            transparent = _uicolor("#00000000")
-            cell.setBackgroundColor_(transparent)
-            cell.contentView.setBackgroundColor_(transparent)
-            cell.retain()  # offset the Python wrapper's release on __del__
-
-        try:
-            cell.setFrame_(((0, 0), (cell_w, row_h)))
-            cell.contentView.setFrame_(((0, 0), (cell_w, row_h)))
-        except Exception:
-            print("[VirtualList][iOS] _table_cell_imp: cell pre-size raised:")
-            _tb.print_exc()
-
-        try:
-            existing_subs = cell.contentView.subviews
-            if callable(existing_subs):
-                existing_subs = existing_subs()
-            for sub in list(existing_subs):
-                sub.removeFromSuperview()
-        except Exception:
-            print("[VirtualList][iOS] _table_cell_imp: strip prior subviews raised:")
-            _tb.print_exc()
-
-        if info is not None:
-            mount = info.get("mount_row")
-            if mount is not None:
-                try:
-                    mount(row, cell.contentView, cell_w, row_h)
-                except Exception:
-                    print(f"[VirtualList][iOS] _table_cell_imp mount_row({row}) raised:")
-                    _tb.print_exc()
-
-        cell_ptr = cell.ptr.value
-        return int(cell_ptr) if cell_ptr is not None else 0
-    except Exception:
-        print(f"[VirtualList][iOS] _table_cell_imp raised for row={row}:")
-        _tb.print_exc()
-        try:
-            UITableViewCell = ObjCClass("UITableViewCell")
-            cell = UITableViewCell.alloc().initWithStyle_reuseIdentifier_(0, _PN_CELL_REUSE_ID)
-            cell.retain()
-            return int(cell.ptr.value)
-        except Exception:
-            return 0
-
-
-def _table_did_select_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int) -> None:
-    try:
-        _objc_msgSend.restype = _ct.c_long
-        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
-        row = int(_objc_msgSend(_ct.c_void_p(ip_ptr), _SEL_ROW))
-    except Exception:
-        import traceback as _tb
-
-        print("[VirtualList][iOS] _table_did_select_imp: indexPath.row read raised:")
-        _tb.print_exc()
-        return
-
-    try:
-        _objc_msgSend.restype = None
-        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_bool]
-        _objc_msgSend(_ct.c_void_p(tv_ptr), _SEL_DESELECT_ROW, _ct.c_void_p(ip_ptr), True)
-    except Exception:
-        import traceback as _tb
-
-        print("[VirtualList][iOS] _table_did_select_imp: deselect raised:")
-        _tb.print_exc()
-
-    try:
-        info = _pn_table_state.get(int(self_ptr))
-        if info is None:
-            return
-        cb = info.get("on_row_press")
-        if cb is not None:
-            cb(row)
-    except Exception:
-        import traceback as _tb
-
-        print("[VirtualList][iOS] _table_did_select_imp: on_row_press raised:")
-        _tb.print_exc()
-
-
-_table_num_sections_imp_ref = _TABLE_NUM_SECTIONS_TYPE(_table_num_sections_imp)
-_table_num_rows_imp_ref = _TABLE_NUM_ROWS_TYPE(_table_num_rows_imp)
-_table_height_imp_ref = _TABLE_HEIGHT_TYPE(_table_height_imp)
-_table_cell_imp_ref = _TABLE_CELL_TYPE(_table_cell_imp)
-_table_did_select_imp_ref = _TABLE_DID_SELECT_TYPE(_table_did_select_imp)
-
-
-_PN_TABLE_SOURCE_CLS = _alloc_cls(_NS_OBJECT_CLS, b"_PNTableSourceCTypes", 0)
-if _PN_TABLE_SOURCE_CLS:
-    _add_method(
-        _PN_TABLE_SOURCE_CLS,
-        _sel_reg(b"numberOfSectionsInTableView:"),
-        _ct.cast(_table_num_sections_imp_ref, _ct.c_void_p),
-        b"q@:@",
-    )
-    _add_method(
-        _PN_TABLE_SOURCE_CLS,
-        _sel_reg(b"tableView:numberOfRowsInSection:"),
-        _ct.cast(_table_num_rows_imp_ref, _ct.c_void_p),
-        b"q@:@q",
-    )
-    _add_method(
-        _PN_TABLE_SOURCE_CLS,
-        _sel_reg(b"tableView:heightForRowAtIndexPath:"),
-        _ct.cast(_table_height_imp_ref, _ct.c_void_p),
-        b"d@:@@",
-    )
-    _add_method(
-        _PN_TABLE_SOURCE_CLS,
-        _sel_reg(b"tableView:cellForRowAtIndexPath:"),
-        _ct.cast(_table_cell_imp_ref, _ct.c_void_p),
-        b"@@:@@",
-    )
-    _add_method(
-        _PN_TABLE_SOURCE_CLS,
-        _sel_reg(b"tableView:didSelectRowAtIndexPath:"),
-        _ct.cast(_table_did_select_imp_ref, _ct.c_void_p),
-        b"v@:@@",
-    )
-    _reg_cls(_PN_TABLE_SOURCE_CLS)
-
-
-def _alloc_table_source_instance() -> int:
-    """Allocate and retain a fresh ``_PNTableSourceCTypes`` instance.
-
-    Returns the raw pointer (integer) for the new dataSource. Callers
-    must keep the pointer alive themselves — UITableView's dataSource
-    relationship is non-retaining.
-    """
-    if not _PN_TABLE_SOURCE_CLS:
-        raise RuntimeError("_PNTableSourceCTypes class registration failed")
-    _objc_msgSend.restype = _ct.c_void_p
-    _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
-    raw = _objc_msgSend(_PN_TABLE_SOURCE_CLS, _SEL_ALLOC)
-    raw = _objc_msgSend(raw, _SEL_INIT)
-    raw = _objc_msgSend(raw, _SEL_RETAIN)
-    return int(raw) if raw is not None else 0
-
-
-class VirtualListHandler(IOSViewHandler):
-    """Backed by ``UITableView``; rows are mounted on demand from Python.
-
-    Expects props:
-
-    - ``count``: total number of rows.
-    - ``row_height``: fixed row height in points (variable heights
-      would require a per-row measurement pass; out of scope for v1).
-    - ``mount_row``: callable ``(row_index, content_view) -> None``
-      that inserts the row's native view into ``content_view``. The
-      Python side computes this by mounting a fresh sub-tree using
-      its own reconciler, then calling ``add_child`` on the supplied
-      content view.
-    - ``on_row_press``: optional ``(row_index) -> None`` callback.
-    """
-
-    def create(self, props: Dict[str, Any]) -> Any:
-        import traceback as _tb
-
-        try:
-            UITableView = ObjCClass("UITableView")
-            tv = UITableView.alloc().initWithFrame_style_(((0, 0), (0, 0)), 0)
-        except Exception:
-            print("[VirtualList][iOS] UITableView alloc raised:")
-            _tb.print_exc()
-            raise
-        try:
-            tv.setTranslatesAutoresizingMaskIntoConstraints_(True)
-            tv.setBackgroundColor_(_uicolor(props.get("background_color") or "#FFFFFF"))
-        except Exception:
-            print("[VirtualList][iOS] tv basic setup raised:")
-            _tb.print_exc()
-        try:
-            tv.setSeparatorStyle_(0)  # None by default; users can opt in.
-        except Exception:
-            print("[VirtualList][iOS] setSeparatorStyle_ raised:")
-            _tb.print_exc()
-
-        try:
-            source_ptr = _alloc_table_source_instance()
-        except Exception:
-            print("[VirtualList][iOS] raw dataSource allocation raised:")
-            _tb.print_exc()
-            raise
-        if source_ptr == 0:
-            raise RuntimeError("[VirtualList][iOS] dataSource alloc returned NULL")
-
-        _pn_table_state[source_ptr] = {
-            "count": int(props.get("count", 0)),
-            "row_height": float(props.get("row_height", 44.0)),
-            "mount_row": props.get("mount_row"),
-            "on_row_press": props.get("on_row_press"),
-        }
-
-        try:
-            _objc_msgSend.restype = None
-            _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p]
-            tv_ptr = tv.ptr if hasattr(tv, "ptr") else tv
-            _objc_msgSend(tv_ptr, _SEL_SET_DATA_SOURCE, _ct.c_void_p(source_ptr))
-            _objc_msgSend(tv_ptr, _SEL_SET_DELEGATE, _ct.c_void_p(source_ptr))
-        except Exception:
-            print("[VirtualList][iOS] raw setDataSource:/setDelegate: raised:")
-            _tb.print_exc()
-            raise
-
-        try:
-            tv._pn_source_id = source_ptr
-        except Exception:
-            print("[VirtualList][iOS] attaching _pn_source_id raised:")
-            _tb.print_exc()
-        return tv
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        sid = getattr(native_view, "_pn_source_id", None)
-        if sid is None or sid not in _pn_table_state:
-            return
-        info = _pn_table_state[sid]
-        if "count" in changed:
-            info["count"] = int(changed["count"])
-        if "row_height" in changed and changed["row_height"] is not None:
-            info["row_height"] = float(changed["row_height"])
-        if "mount_row" in changed:
-            info["mount_row"] = changed["mount_row"]
-        if "on_row_press" in changed:
-            info["on_row_press"] = changed["on_row_press"]
-        if "background_color" in changed and changed["background_color"] is not None:
-            native_view.setBackgroundColor_(_uicolor(changed["background_color"]))
-        try:
-            native_view.reloadData()
-        except Exception:
-            pass
-
-
-# ======================================================================
-# UITabBar delegate via raw libobjc
-# ======================================================================
-#
-# Uses the shared raw-libobjc helpers above. See the section comment
-# there for why we sidestep rubicon-objc for delegate callbacks.
-
-_pn_tabbar_state: dict = {"callback": None, "items": []}
-_pn_tabbar_delegate_installed: bool = False
-_pn_tabbar_delegate_ptr: Any = None
+# ``tabBar:didSelectItem:`` passes the UITabBarItem as an ObjC object;
+# see the module header for why we sidestep rubicon-objc here.
 
 _DELEGATE_IMP_TYPE = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
 
@@ -2842,35 +2914,38 @@ def _tabbar_did_select_imp(self_ptr: int, cmd_ptr: int, tabbar_ptr: int, item_pt
     try:
         _objc_msgSend.restype = _ct.c_long
         _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
-        tag: int = _objc_msgSend(item_ptr, _SEL_TAG)
+        index: int = _objc_msgSend(item_ptr, _SEL_TAG)
 
-        cb = _pn_tabbar_state["callback"]
-        tab_items = _pn_tabbar_state["items"]
-        if cb is not None and tab_items and 0 <= tag < len(tab_items):
-            cb(tab_items[tag].get("name", ""))
+        tag = _view_tags.get(int(tabbar_ptr or 0))
+        state = _view_state.get(tag) if tag is not None else None
+        items = (state or {}).get("props", {}).get("items") or []
+        if 0 <= index < len(items):
+            _fire_ptr(int(tabbar_ptr), "on_tab_select", items[index].get("name", ""))
     except Exception:
         pass
 
 
 _tabbar_imp_ref = _DELEGATE_IMP_TYPE(_tabbar_did_select_imp)
 
-_PN_DELEGATE_CLS = _alloc_cls(_NS_OBJECT_CLS, b"_PNTabBarDelegateCTypes", 0)
-if _PN_DELEGATE_CLS:
+_PN_TABBAR_DELEGATE_CLS = _alloc_cls(_NS_OBJECT_CLS, b"_PNTabBarDelegateCTypes", 0)
+if _PN_TABBAR_DELEGATE_CLS:
     _add_method(
-        _PN_DELEGATE_CLS,
+        _PN_TABBAR_DELEGATE_CLS,
         _sel_reg(b"tabBar:didSelectItem:"),
         _ct.cast(_tabbar_imp_ref, _ct.c_void_p),
         b"v@:@@",
     )
-    _reg_cls(_PN_DELEGATE_CLS)
+    _reg_cls(_PN_TABBAR_DELEGATE_CLS)
+
+_pn_tabbar_delegate_ptr: Any = None
 
 
 def _ensure_tabbar_delegate(tab_bar: Any) -> None:
     global _pn_tabbar_delegate_ptr
-    if _pn_tabbar_delegate_ptr is None and _PN_DELEGATE_CLS:
+    if _pn_tabbar_delegate_ptr is None and _PN_TABBAR_DELEGATE_CLS:
         _objc_msgSend.restype = _ct.c_void_p
         _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
-        raw = _objc_msgSend(_PN_DELEGATE_CLS, _SEL_ALLOC)
+        raw = _objc_msgSend(_PN_TABBAR_DELEGATE_CLS, _SEL_ALLOC)
         raw = _objc_msgSend(raw, _SEL_INIT)
         raw = _objc_msgSend(raw, _SEL_RETAIN)
         _pn_tabbar_delegate_ptr = raw
@@ -2885,12 +2960,12 @@ def _ensure_tabbar_delegate(tab_bar: Any) -> None:
 class TabBarHandler(IOSViewHandler):
     """Native tab bar using ``UITabBar``.
 
-    Each tab is a ``UITabBarItem`` with a ``tag`` matching its index
-    in the items list. A raw ctypes delegate forwards selection
-    events back to the Python ``on_tab_select`` callback.
+    Each tab is a ``UITabBarItem`` with a ``tag`` matching its index in
+    the items list. A raw ctypes delegate forwards selection events
+    into the ``on_tab_select`` channel.
     """
 
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         from .. import platform_metrics
 
         initial_h = platform_metrics.ios_tab_bar_height()
@@ -2898,11 +2973,8 @@ class TabBarHandler(IOSViewHandler):
         tab_bar.setTranslatesAutoresizingMaskIntoConstraints_(True)
         tab_bar.retain()
         _pn_retained_views.append(tab_bar)
-        self._apply_full(tab_bar, props)
+        _ensure_tabbar_delegate(tab_bar)
         return tab_bar
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply_partial(native_view, changed)
 
     def measure_intrinsic(
         self,
@@ -2913,26 +2985,16 @@ class TabBarHandler(IOSViewHandler):
         from .. import platform_metrics
 
         w = max_width if math.isfinite(max_width) else 320.0
-        h = platform_metrics.ios_tab_bar_height()
-        return (w, h)
+        return (w, platform_metrics.ios_tab_bar_height())
 
-    def _apply_full(self, tab_bar: Any, props: Dict[str, Any]) -> None:
-        items = props.get("items", [])
-        self._set_bar_items(tab_bar, items)
-        self._set_active(tab_bar, props.get("active_tab"), items)
-        self._set_callback(tab_bar, props.get("on_tab_select"), items)
-
-    def _apply_partial(self, tab_bar: Any, changed: Dict[str, Any]) -> None:
-        prev_items = _pn_tabbar_state["items"]
-        if "items" in changed:
-            items = changed["items"]
+    def _apply(self, tab_bar: Any, props: Dict[str, Any], initial: bool) -> None:
+        merged = _state_of(tab_bar).get("props") or props
+        items = merged.get("items") or []
+        if "items" in props:
             self._set_bar_items(tab_bar, items)
-        else:
-            items = prev_items
-        if "active_tab" in changed:
-            self._set_active(tab_bar, changed["active_tab"], items)
-        if "on_tab_select" in changed:
-            self._set_callback(tab_bar, changed["on_tab_select"], items)
+        if "active_tab" in props or "items" in props:
+            self._set_active(tab_bar, merged.get("active_tab"), items)
+        _apply_accessibility(tab_bar, props)
 
     def _set_bar_items(self, tab_bar: Any, items: list) -> None:
         UITabBarItem = ObjCClass("UITabBarItem")
@@ -2943,14 +3005,16 @@ class TabBarHandler(IOSViewHandler):
             image = self._resolve_icon(UIImage, item.get("icon"))
             bar_item = UITabBarItem.alloc().initWithTitle_image_tag_(str(title), image, i)
             bar_items.append(bar_item)
-        tab_bar.setItems_animated_(bar_items, False)
+        try:
+            tab_bar.setItems_animated_(bar_items, False)
+        except Exception:
+            pass
 
     def _resolve_icon(self, UIImage: Any, icon: Any) -> Any:
         """Resolve a tab icon spec to a UIImage, or return None.
 
         Accepts a bare string (treated as an SF Symbol name) or a dict
-        of the form ``{"ios": "house.fill", "android": "..."}``. SF
-        Symbols are looked up via ``UIImage.systemImageNamed:``; names
+        of the form ``{"ios": "house.fill", "android": "..."}``. Names
         that don't resolve produce a text-only tab.
         """
         if icon is None:
@@ -2980,11 +3044,6 @@ class TabBarHandler(IOSViewHandler):
                 except Exception:
                     pass
                 break
-
-    def _set_callback(self, tab_bar: Any, cb: Any, items: list) -> None:
-        _pn_tabbar_state["callback"] = cb
-        _pn_tabbar_state["items"] = items
-        _ensure_tabbar_delegate(tab_bar)
 
 
 # ======================================================================
@@ -3028,8 +3087,8 @@ def _top_view_controller_for_alert(app: Any) -> Any:
     except Exception:
         return None
 
-    # If the root is a navigation controller, presenting from the visible
-    # controller gives UIKit the most specific presentation context.
+    # If the root is a navigation controller, presenting from the
+    # visible controller gives UIKit the most specific context.
     try:
         visible = getattr(top, "visibleViewController", None)
         if visible is not None:
@@ -3064,11 +3123,11 @@ def _present_alert(
     Returns immediately; the alert appears on the next main-loop tick.
 
     ``buttons`` is a list of ``{"label": str, "style":
-    "default"|"cancel"|"destructive"}`` dicts (no ``on_press``). When
-    the user picks button ``i`` the helper invokes ``on_result(i)``
-    exactly once. A dismiss (e.g. swipe-to-cancel on iPad) delivers
-    ``-1``. ``on_result`` always runs on the main thread; if it needs
-    to wake an asyncio.Future, use
+    "default"|"cancel"|"destructive"}`` dicts. When the user picks
+    button ``i`` the helper invokes ``on_result(i)`` exactly once. A
+    dismiss (e.g. swipe-to-cancel on iPad) delivers ``-1``.
+    ``on_result`` always runs on the main thread; if it needs to wake
+    an asyncio.Future, use
     [`pythonnative.runtime.resolve_future`][pythonnative.runtime.resolve_future]
     to hop back onto the loop thread.
     """
@@ -3126,20 +3185,16 @@ def _present_alert(
 
 
 # ======================================================================
-# Picker — native dropdown / select widget
+# Picker — action-sheet dropdown
 # ======================================================================
 #
-# The PythonNative `Picker` element renders as a `UIButton` whose tap
-# presents a native action sheet (``UIAlertController``) listing the
-# options. Selecting a row fires ``on_change(value)``. Action sheets
-# are the standard iOS dropdown pattern for a small-to-medium set of
-# choices; for very large lists, paginate or use a custom navigator.
+# The PythonNative `Picker` renders as a `UIButton` whose tap presents
+# a native action sheet (``UIAlertController``) listing the options.
+# Selecting a row fires ``on_change(value)``. Action sheets are the
+# standard iOS dropdown pattern for a small-to-medium set of choices.
 
-
-_pn_picker_state: dict = {}
-# Maps ``id(target)`` -> ``id(button)`` so the single shared
-# ``_PNPickerTarget`` class can look up per-instance picker state on tap.
-_pn_picker_target_to_button: dict = {}
+# Maps ``id(target)`` -> owning Picker button.
+_pn_picker_targets: Dict[int, Any] = {}
 
 
 def _picker_button_title(props: Dict[str, Any]) -> str:
@@ -3153,84 +3208,55 @@ def _picker_button_title(props: Dict[str, Any]) -> str:
 
 
 class _PNPickerTarget(NSObject):  # type: ignore[valid-type]
-    """Shared ObjC target for every Picker button.
-
-    Defined exactly once at module load. ``UIButton`` instances each
-    retain their own ``_PNPickerTarget.new()`` instance, and the per-
-    instance picker state is looked up in
-    :data:`_pn_picker_target_to_button` / :data:`_pn_picker_state`.
-    """
+    """Per-button tap target that presents the option sheet."""
 
     @objc_method
     def onTap_(self, sender: object) -> None:  # noqa: ARG002
-        bid = _pn_picker_target_to_button.get(id(self))
-        if bid is None:
+        btn = _pn_picker_targets.get(id(self))
+        if btn is None:
             return
-        state = _pn_picker_state.get(bid)
-        if not state:
-            return
-        items = list(state.get("items") or [])
-        on_change = state.get("on_change")
-        placeholder = state.get("placeholder") or "Select…"
+        merged = _state_of(btn).get("props") or {}
+        items = [item for item in (merged.get("items") or []) if isinstance(item, dict)]
+        placeholder = merged.get("placeholder") or "Select…"
 
-        def _make_press(value: Any) -> Callable[[], None]:
-            def _press() -> None:
-                if on_change is not None:
-                    try:
-                        on_change(value)
-                    except Exception:
-                        pass
-
-            return _press
-
-        buttons: List[Dict[str, Any]] = []
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            label = str(item.get("label", item.get("value", "")))
-            buttons.append({"label": label, "on_press": _make_press(item.get("value"))})
+        buttons: List[Dict[str, Any]] = [{"label": str(item.get("label", item.get("value", "")))} for item in items]
         buttons.append({"label": "Cancel", "style": "cancel"})
-        _present_alert(title=str(placeholder), message=None, buttons=buttons, style="action_sheet")
 
+        def _on_result(index: int) -> None:
+            if 0 <= index < len(items):
+                _fire(btn, "on_change", items[index].get("value"))
 
-def _picker_make_target(button_id: int) -> Any:
-    """Build a retained ObjC target wired to ``button_id``'s picker state."""
-    target = _PNPickerTarget.new()
-    target.retain()
-    _pn_retained_views.append(target)
-    _pn_picker_target_to_button[id(target)] = button_id
-    return target
+        _present_alert(
+            title=str(placeholder),
+            message=None,
+            buttons=buttons,
+            style="action_sheet",
+            on_result=_on_result,
+        )
 
 
 class PickerHandler(IOSViewHandler):
     """``Picker`` element handler — native action-sheet dropdown."""
 
-    def create(self, props: Dict[str, Any]) -> Any:
-        UIButton = ObjCClass("UIButton")
-        btn = UIButton.buttonWithType_(1)  # UIButtonTypeSystem
+    def _build(self, props: Dict[str, Any]) -> Any:
+        btn = ObjCClass("UIButton").buttonWithType_(1)  # UIButtonTypeSystem
         btn.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        bid = id(btn)
-        _pn_picker_state[bid] = {
-            "items": list(props.get("items") or []),
-            "on_change": props.get("on_change"),
-            "placeholder": props.get("placeholder") or "Select…",
-            "value": props.get("value"),
-        }
-        target = _picker_make_target(bid)
-        _pn_picker_state[bid]["target"] = target
-        btn.addTarget_action_forControlEvents_(target, SEL("onTap:"), 1 << 6)  # touchUpInside
-        btn.setTitle_forState_(_picker_button_title(props), 0)
-        _apply_accessibility(btn, props)
+        btn.retain()
+        _pn_retained_views.append(btn)
+        target = _PNPickerTarget.new()
+        target.retain()
+        _pn_retained_views.append(target)
+        _pn_picker_targets[id(target)] = btn
+        btn.addTarget_action_forControlEvents_(target, SEL("onTap:"), 1 << 6)  # TouchUpInside
         return btn
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        bid = id(native_view)
-        state = _pn_picker_state.setdefault(bid, {})
-        for key in ("items", "on_change", "placeholder", "value"):
-            if key in changed:
-                state[key] = changed[key]
-        native_view.setTitle_forState_(_picker_button_title(state), 0)
-        _apply_accessibility(native_view, changed)
+    def _apply(self, btn: Any, props: Dict[str, Any], initial: bool) -> None:
+        merged = _state_of(btn).get("props") or props
+        try:
+            btn.setTitle_forState_(_picker_button_title(merged), 0)
+        except Exception:
+            pass
+        _apply_accessibility(btn, props)
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
         try:
@@ -3246,14 +3272,14 @@ class PickerHandler(IOSViewHandler):
 # Checkbox — SF Symbol UIButton toggling checked / unchecked
 # ======================================================================
 
-
-_pn_checkbox_state: dict = {}
-# Maps ``id(target)`` -> ``id(button)`` for per-instance checkbox lookup.
-_pn_checkbox_target_to_button: dict = {}
+# Maps ``id(target)`` -> owning Checkbox button.
+_pn_checkbox_targets: Dict[int, Any] = {}
 
 
-def _checkbox_set_image(btn: Any, state: Dict[str, Any]) -> None:
+def _checkbox_set_image(btn: Any) -> None:
     """Set the box image from the current checked state (tinted when checked)."""
+    state = _state_of(btn)
+    merged = state.get("props") or {}
     checked = bool(state.get("value"))
     try:
         UIImage = ObjCClass("UIImage")
@@ -3261,7 +3287,7 @@ def _checkbox_set_image(btn: Any, state: Dict[str, Any]) -> None:
         image = UIImage.systemImageNamed_(name)
         if image is None:
             return
-        color = state.get("color")
+        color = merged.get("color")
         if checked and color is not None:
             try:
                 tinted = image.imageWithTintColor_(_uicolor(color))
@@ -3277,51 +3303,55 @@ def _checkbox_set_image(btn: Any, state: Dict[str, Any]) -> None:
 class _PNCheckboxTarget(NSObject):  # type: ignore[valid-type]
     @objc_method
     def onToggle_(self, sender: object) -> None:  # noqa: ARG002
-        bid = _pn_checkbox_target_to_button.get(id(self))
-        if bid is None:
+        btn = _pn_checkbox_targets.get(id(self))
+        if btn is None:
             return
-        state = _pn_checkbox_state.get(bid)
-        if not state or state.get("disabled"):
+        state = _state_of(btn)
+        merged = state.get("props") or {}
+        if merged.get("disabled"):
             return
         new_value = not bool(state.get("value"))
+        # Optimistic local flip so the box feels instant even if the
+        # app's re-render is a frame behind; the authoritative ``value``
+        # prop re-syncs it on the next update.
         state["value"] = new_value
-        btn = state.get("view")
-        if btn is not None:
-            _checkbox_set_image(btn, state)
-        cb = state.get("on_change")
-        if cb is not None:
-            try:
-                cb(new_value)
-            except Exception:
-                pass
+        _checkbox_set_image(btn)
+        _fire(btn, "on_change", new_value)
 
 
 class CheckboxHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
-        UIButton = ObjCClass("UIButton")
-        btn = UIButton.buttonWithType_(0)  # UIButtonTypeCustom
+    def _build(self, props: Dict[str, Any]) -> Any:
+        btn = ObjCClass("UIButton").buttonWithType_(0)  # UIButtonTypeCustom
         btn.setTranslatesAutoresizingMaskIntoConstraints_(True)
         btn.retain()
         _pn_retained_views.append(btn)
-        bid = id(btn)
-        _pn_checkbox_state[bid] = {
-            "value": bool(props.get("value")),
-            "on_change": props.get("on_change"),
-            "color": props.get("color"),
-            "disabled": bool(props.get("disabled")),
-            "view": btn,
-        }
         target = _PNCheckboxTarget.new()
         target.retain()
         _pn_retained_views.append(target)
-        _pn_checkbox_target_to_button[id(target)] = bid
-        _pn_checkbox_state[bid]["target"] = target
-        btn.addTarget_action_forControlEvents_(target, SEL("onToggle:"), 1 << 6)  # touchUpInside
-        self._apply(btn, props)
+        _pn_checkbox_targets[id(target)] = btn
+        btn.addTarget_action_forControlEvents_(target, SEL("onToggle:"), 1 << 6)  # TouchUpInside
         return btn
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
+    def _apply(self, btn: Any, props: Dict[str, Any], initial: bool) -> None:
+        state = _state_of(btn)
+        if "value" in props:
+            state["value"] = bool(props["value"])
+        if "label" in props:
+            label = props["label"]
+            try:
+                btn.setTitle_forState_(str(label) if label is not None else "", 0)
+            except Exception:
+                pass
+        if "disabled" in props:
+            # ``disabled`` is present only when True; a removed prop
+            # (None) re-enables the control.
+            disabled = bool(props["disabled"]) if props["disabled"] is not None else False
+            try:
+                btn.setEnabled_(not disabled)
+            except Exception:
+                pass
+        _checkbox_set_image(btn)
+        _apply_accessibility(btn, props)
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
         try:
@@ -3336,110 +3366,53 @@ class CheckboxHandler(IOSViewHandler):
         except Exception:
             return (28.0, 28.0)
 
-    def _apply(self, btn: Any, props: Dict[str, Any]) -> None:
-        state = _pn_checkbox_state.setdefault(id(btn), {"view": btn})
-        if "value" in props:
-            state["value"] = bool(props["value"])
-        if "on_change" in props:
-            state["on_change"] = props["on_change"]
-        if "color" in props:
-            state["color"] = props["color"]
-        if "label" in props:
-            label = props["label"]
-            btn.setTitle_forState_(str(label) if label is not None else "", 0)
-        if "disabled" in props:
-            # ``disabled`` is present only when True; a removed prop (None)
-            # re-enables the control.
-            disabled = bool(props["disabled"]) if props["disabled"] is not None else False
-            state["disabled"] = disabled
-            try:
-                btn.setEnabled_(not disabled)
-            except Exception:
-                pass
-        _checkbox_set_image(btn, state)
-        _apply_accessibility(btn, props)
-
 
 # ======================================================================
 # SegmentedControl — native UISegmentedControl
 # ======================================================================
 
-
-_pn_segmented_state: dict = {}
-# Maps ``id(target)`` -> ``id(control)`` for per-instance lookup on change.
-_pn_segmented_target_to_control: dict = {}
+# Maps ``id(target)`` -> owning UISegmentedControl.
+_pn_segmented_targets: Dict[int, Any] = {}
 
 
 class _PNSegmentedTarget(NSObject):  # type: ignore[valid-type]
     @objc_method
-    def onChange_(self, sender: object) -> None:
-        cid = _pn_segmented_target_to_control.get(id(self))
-        if cid is None:
+    def onChange_(self, sender: object) -> None:  # noqa: ARG002
+        control = _pn_segmented_targets.get(id(self))
+        if control is None:
             return
-        state = _pn_segmented_state.get(cid)
-        if not state or state.get("suppress"):
-            return
-        cb = state.get("on_change")
-        if cb is None:
+        state = _state_of(control)
+        if state.get("suppress"):
             return
         try:
-            index = int(sender.selectedSegmentIndex)
+            index = int(control.selectedSegmentIndex)
         except Exception:
             return
-        try:
-            cb(index)
-        except Exception:
-            pass
+        _fire(control, "on_change", index)
 
 
 class SegmentedControlHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         UISegmentedControl = ObjCClass("UISegmentedControl")
         segments = [str(s) for s in (props.get("segments") or [])]
         control = UISegmentedControl.alloc().initWithItems_(segments)
         control.setTranslatesAutoresizingMaskIntoConstraints_(True)
         control.retain()
         _pn_retained_views.append(control)
-        cid = id(control)
-        _pn_segmented_state[cid] = {
-            "segments": list(segments),
-            "selected_index": 0,
-            "on_change": props.get("on_change"),
-            "suppress": False,
-        }
         target = _PNSegmentedTarget.new()
         target.retain()
         _pn_retained_views.append(target)
-        _pn_segmented_target_to_control[id(target)] = cid
-        _pn_segmented_state[cid]["target"] = target
+        _pn_segmented_targets[id(target)] = control
         control.addTarget_action_forControlEvents_(target, SEL("onChange:"), 1 << 12)  # ValueChanged
-        self._apply(control, props)
         return control
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
-        try:
-            mw = _safe_max(max_width, fallback=10000.0)
-            mh = _safe_max(max_height, fallback=10000.0)
-            size = native_view.sizeThatFits_((mw, mh))
-            w = float(size.width)
-            if math.isfinite(max_width):
-                w = min(w, max_width)
-            return (max(w, 0.0), max(float(size.height), 0.0))
-        except Exception:
-            return (0.0, 0.0)
-
-    def _apply(self, control: Any, props: Dict[str, Any]) -> None:
-        state = _pn_segmented_state.setdefault(id(control), {"suppress": False, "segments": [], "selected_index": 0})
-        if "on_change" in props:
-            state["on_change"] = props["on_change"]
+    def _apply(self, control: Any, props: Dict[str, Any], initial: bool) -> None:
+        state = _state_of(control)
+        merged = state.get("props") or props
         rebuilt = False
-        if "segments" in props and props["segments"] is not None:
+        if "segments" in props and props["segments"] is not None and not initial:
             new_segments = [str(s) for s in props["segments"]]
             if new_segments != state.get("segments"):
-                state["segments"] = new_segments
                 state["suppress"] = True
                 try:
                     control.removeAllSegments()
@@ -3450,14 +3423,14 @@ class SegmentedControlHandler(IOSViewHandler):
                 finally:
                     state["suppress"] = False
                 rebuilt = True
-        if "selected_index" in props and props["selected_index"] is not None:
-            state["selected_index"] = int(props["selected_index"])
+        if "segments" in props and props["segments"] is not None:
+            state["segments"] = [str(s) for s in props["segments"]]
         # Apply the selection when it changed or after a segment rebuild
         # (rebuilding resets the control to "no segment selected").
-        if rebuilt or ("selected_index" in props and props["selected_index"] is not None):
+        if rebuilt or ("selected_index" in props and props["selected_index"] is not None) or initial:
             state["suppress"] = True
             try:
-                control.setSelectedSegmentIndex_(int(state.get("selected_index", 0)))
+                control.setSelectedSegmentIndex_(int(merged.get("selected_index", 0) or 0))
             except Exception:
                 pass
             finally:
@@ -3473,14 +3446,26 @@ class SegmentedControlHandler(IOSViewHandler):
             except Exception:
                 pass
         if "enabled" in props:
-            # ``enabled`` is present only when False; a removed prop (None)
-            # re-enables the control.
+            # ``enabled`` is present only when False; a removed prop
+            # (None) re-enables the control.
             enabled = props["enabled"]
             try:
                 control.setEnabled_(True if enabled is None else bool(enabled))
             except Exception:
                 pass
         _apply_accessibility(control, props)
+
+    def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
+        try:
+            mw = _safe_max(max_width, fallback=10000.0)
+            mh = _safe_max(max_height, fallback=10000.0)
+            size = native_view.sizeThatFits_((mw, mh))
+            w = float(size.width)
+            if math.isfinite(max_width):
+                w = min(w, max_width)
+            return (max(w, 0.0), max(float(size.height), 0.0))
+        except Exception:
+            return (0.0, 0.0)
 
 
 # ======================================================================
@@ -3489,10 +3474,9 @@ class SegmentedControlHandler(IOSViewHandler):
 
 
 _DATE_PICKER_FORMATS = {"date": "yyyy-MM-dd", "time": "HH:mm", "datetime": "yyyy-MM-dd'T'HH:mm"}
-_pn_date_formatters: dict = {}
-_pn_datepicker_state: dict = {}
-# Maps ``id(target)`` -> ``id(picker)`` for per-instance lookup on change.
-_pn_datepicker_target_to_picker: dict = {}
+_pn_date_formatters: Dict[str, Any] = {}
+# Maps ``id(target)`` -> owning UIDatePicker.
+_pn_datepicker_targets: Dict[int, Any] = {}
 
 
 def _date_formatter(mode: str) -> Any:
@@ -3501,8 +3485,7 @@ def _date_formatter(mode: str) -> Any:
     cached = _pn_date_formatters.get(fmt)
     if cached is not None:
         return cached
-    NSDateFormatter = ObjCClass("NSDateFormatter")
-    formatter = NSDateFormatter.alloc().init()
+    formatter = ObjCClass("NSDateFormatter").alloc().init()
     formatter.setDateFormat_(fmt)
     # A fixed POSIX locale keeps fixed-format parsing deterministic
     # (24-hour clock, no calendar/locale surprises) per Apple guidance.
@@ -3518,29 +3501,23 @@ def _date_formatter(mode: str) -> Any:
 
 class _PNDatePickerTarget(NSObject):  # type: ignore[valid-type]
     @objc_method
-    def onChange_(self, sender: object) -> None:
-        pid = _pn_datepicker_target_to_picker.get(id(self))
-        if pid is None:
+    def onChange_(self, sender: object) -> None:  # noqa: ARG002
+        picker = _pn_datepicker_targets.get(id(self))
+        if picker is None:
             return
-        state = _pn_datepicker_state.get(pid)
-        if not state or state.get("suppress"):
+        state = _state_of(picker)
+        if state.get("suppress"):
             return
-        cb = state.get("on_change")
-        if cb is None:
-            return
-        mode = state.get("mode", "date")
+        mode = (state.get("props") or {}).get("mode", "date")
         try:
-            iso = str(_date_formatter(mode).stringFromDate_(sender.date))
+            iso = str(_date_formatter(mode).stringFromDate_(picker.date))
         except Exception:
             return
-        try:
-            cb(iso)
-        except Exception:
-            pass
+        _fire(picker, "on_change", iso)
 
 
 class DatePickerHandler(IOSViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def _build(self, props: Dict[str, Any]) -> Any:
         picker = ObjCClass("UIDatePicker").alloc().init()
         picker.setTranslatesAutoresizingMaskIntoConstraints_(True)
         picker.retain()
@@ -3551,44 +3528,18 @@ class DatePickerHandler(IOSViewHandler):
             picker.setPreferredDatePickerStyle_(2)  # UIDatePickerStyleCompact
         except Exception:
             pass
-        pid = id(picker)
-        _pn_datepicker_state[pid] = {
-            "mode": props.get("mode", "date"),
-            "on_change": props.get("on_change"),
-            "suppress": False,
-        }
         target = _PNDatePickerTarget.new()
         target.retain()
         _pn_retained_views.append(target)
-        _pn_datepicker_target_to_picker[id(target)] = pid
-        _pn_datepicker_state[pid]["target"] = target
+        _pn_datepicker_targets[id(target)] = picker
         picker.addTarget_action_forControlEvents_(target, SEL("onChange:"), 1 << 12)  # ValueChanged
-        self._apply(picker, props)
         return picker
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
-        try:
-            mw = _safe_max(max_width, fallback=10000.0)
-            mh = _safe_max(max_height, fallback=10000.0)
-            size = native_view.sizeThatFits_((mw, mh))
-            w = float(size.width)
-            if math.isfinite(max_width):
-                w = min(w, max_width)
-            return (max(w, 0.0), max(float(size.height), 0.0))
-        except Exception:
-            return (0.0, 0.0)
-
-    def _apply(self, picker: Any, props: Dict[str, Any]) -> None:
-        state = _pn_datepicker_state.setdefault(id(picker), {"suppress": False, "mode": "date"})
-        if "on_change" in props:
-            state["on_change"] = props["on_change"]
-        mode = state.get("mode", "date")
+    def _apply(self, picker: Any, props: Dict[str, Any], initial: bool) -> None:
+        state = _state_of(picker)
+        merged = state.get("props") or props
+        mode = str(merged.get("mode", "date") or "date")
         if "mode" in props and props["mode"] is not None:
-            mode = str(props["mode"])
-            state["mode"] = mode
             mode_map = {"time": 0, "date": 1, "datetime": 2}
             try:
                 picker.setDatePickerMode_(mode_map.get(mode, 1))
@@ -3612,8 +3563,8 @@ class DatePickerHandler(IOSViewHandler):
                 finally:
                     state["suppress"] = False
         if "enabled" in props:
-            # ``enabled`` is present only when False; a removed prop (None)
-            # re-enables the picker.
+            # ``enabled`` is present only when False; a removed prop
+            # (None) re-enables the picker.
             enabled = props["enabled"]
             try:
                 picker.setEnabled_(True if enabled is None else bool(enabled))
@@ -3631,6 +3582,18 @@ class DatePickerHandler(IOSViewHandler):
         except Exception:
             pass
 
+    def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
+        try:
+            mw = _safe_max(max_width, fallback=10000.0)
+            mh = _safe_max(max_height, fallback=10000.0)
+            size = native_view.sizeThatFits_((mw, mh))
+            w = float(size.width)
+            if math.isfinite(max_width):
+                w = min(w, max_width)
+            return (max(w, 0.0), max(float(size.height), 0.0))
+        except Exception:
+            return (0.0, 0.0)
+
 
 # ======================================================================
 # Registration
@@ -3640,12 +3603,11 @@ class DatePickerHandler(IOSViewHandler):
 def register_handlers(registry: Any) -> None:
     """Register all iOS view handlers with the given registry."""
     flex = FlexContainerHandler()
-    registry.register("Text", TextHandler())
-    registry.register("Button", ButtonHandler())
+    registry.register("View", flex)
     registry.register("Column", flex)
     registry.register("Row", flex)
-    registry.register("View", flex)
-    registry.register("ScrollView", ScrollViewHandler())
+    registry.register("Text", TextHandler())
+    registry.register("Button", ButtonHandler())
     registry.register("TextInput", TextInputHandler())
     registry.register("Image", ImageHandler())
     registry.register("Switch", SwitchHandler())
@@ -3653,6 +3615,7 @@ def register_handlers(registry: Any) -> None:
     registry.register("ActivityIndicator", ActivityIndicatorHandler())
     registry.register("WebView", WebViewHandler())
     registry.register("Spacer", SpacerHandler())
+    registry.register("ScrollView", ScrollViewHandler())
     registry.register("SafeAreaView", SafeAreaViewHandler())
     registry.register("Modal", ModalHandler())
     registry.register("Slider", SliderHandler())
@@ -3660,7 +3623,6 @@ def register_handlers(registry: Any) -> None:
     registry.register("Pressable", PressableHandler())
     registry.register("StatusBar", StatusBarHandler())
     registry.register("KeyboardAvoidingView", KeyboardAvoidingViewHandler())
-    registry.register("VirtualList", VirtualListHandler())
     registry.register("Picker", PickerHandler())
     registry.register("Checkbox", CheckboxHandler())
     registry.register("SegmentedControl", SegmentedControlHandler())
@@ -3687,15 +3649,9 @@ __all__ = [
     "PressableHandler",
     "StatusBarHandler",
     "KeyboardAvoidingViewHandler",
-    "VirtualListHandler",
     "PickerHandler",
     "CheckboxHandler",
     "SegmentedControlHandler",
     "DatePickerHandler",
     "register_handlers",
 ]
-
-
-# Avoid an unused-import warning from threading; it's available for
-# future delegate use (e.g., Camera/Location callbacks).
-_ = threading

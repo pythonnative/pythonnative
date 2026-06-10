@@ -5,9 +5,10 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
+from fake_backend import FakeBackend as _MockBackend
 
 from pythonnative.element import Element
 from pythonnative.hot_reload import (
@@ -340,36 +341,6 @@ def test_reload_from_manifest_stashes_version_on_screen_instance(
 # ======================================================================
 # Fast Refresh: find_replacement_function / refresh_in_place
 # ======================================================================
-
-
-class _MockView:
-    """Minimal native-view stand-in for Reconciler tests."""
-
-    _next_id = 0
-
-    def __init__(self, type_name: str, props: Dict[str, Any]) -> None:
-        _MockView._next_id += 1
-        self.id = _MockView._next_id
-        self.type_name = type_name
-        self.props = dict(props)
-        self.children: List["_MockView"] = []
-
-
-class _MockBackend:
-    def create_view(self, type_name: str, props: Dict[str, Any]) -> _MockView:
-        return _MockView(type_name, props)
-
-    def update_view(self, native_view: _MockView, type_name: str, changed: Dict[str, Any]) -> None:
-        native_view.props.update(changed)
-
-    def add_child(self, parent: _MockView, child: _MockView, parent_type: str) -> None:
-        parent.children.append(child)
-
-    def remove_child(self, parent: _MockView, child: _MockView, parent_type: str) -> None:
-        parent.children = [c for c in parent.children if c.id != child.id]
-
-    def insert_child(self, parent: _MockView, child: _MockView, parent_type: str, index: int) -> None:
-        parent.children.insert(index, child)
 
 
 def test_find_replacement_function_returns_new_function_for_reloaded_module(

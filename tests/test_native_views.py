@@ -1,16 +1,19 @@
 """Unit tests for the native_views package.
 
-Tests the registry, base handler protocol, and shared utility functions.
+Tests the registry's batched ``apply_mutations`` commit channel, the tag
+table, the base handler protocol, and shared utility functions.
 Platform-specific handlers (android/ios) are not tested here since they
 require their respective runtime environments; they are exercised by
 E2E tests on device.
 """
 
+import itertools
 from typing import Any, Dict, Tuple
 
 import pytest
 
 from pythonnative.layout import LAYOUT_STYLE_KEYS
+from pythonnative.mutations import CreateOp, DestroyOp, InsertOp, RemoveOp, SetFrameOp, UpdateOp
 from pythonnative.native_views import NativeViewRegistry, set_registry
 from pythonnative.native_views.base import (
     ViewHandler,
@@ -66,9 +69,11 @@ def test_layout_style_keys_includes_flex_props() -> None:
         "flex_shrink",
         "flex_basis",
         "flex_direction",
+        "flex_wrap",
         "justify_content",
         "align_items",
         "align_self",
+        "align_content",
         "padding",
         "margin",
         "spacing",
@@ -91,7 +96,7 @@ def test_layout_style_keys_includes_flex_props() -> None:
 def test_view_handler_create_raises() -> None:
     handler = ViewHandler()
     with pytest.raises(NotImplementedError):
-        handler.create({})
+        handler.create(1, {})
 
 
 def test_view_handler_update_raises() -> None:
@@ -100,26 +105,11 @@ def test_view_handler_update_raises() -> None:
         handler.update(None, {})
 
 
-def test_view_handler_add_child_noop() -> None:
+def test_view_handler_child_ops_default_noop() -> None:
     handler = ViewHandler()
-    handler.add_child(None, None)
-
-
-def test_view_handler_remove_child_noop() -> None:
-    handler = ViewHandler()
+    handler.insert_child(None, None, 0)
     handler.remove_child(None, None)
-
-
-def test_view_handler_insert_child_delegates() -> None:
-    calls: list = []
-
-    class TestHandler(ViewHandler):
-        def add_child(self, parent: Any, child: Any) -> None:
-            calls.append(("add", parent, child))
-
-    handler = TestHandler()
-    handler.insert_child("parent", "child", 0)
-    assert calls == [("add", "parent", "child")]
+    handler.destroy(None)
 
 
 def test_view_handler_set_frame_default_noop() -> None:
@@ -134,24 +124,62 @@ def test_view_handler_measure_intrinsic_default_zero() -> None:
     assert handler.measure_intrinsic(None, 100.0, 100.0) == (0.0, 0.0)
 
 
+def test_view_handler_command_default_none() -> None:
+    handler = ViewHandler()
+    assert handler.command(None, "anything", {}) is None
+
+
+def test_view_handler_animation_defaults() -> None:
+    """Default animation hooks: no native driving, no presentation value."""
+    handler = ViewHandler()
+    handler.set_animated_property(None, "opacity", 0.5)
+    assert handler.start_animation(None, 1, "opacity", {"kind": "timing"}) is False
+    assert handler.cancel_animation(None, 1) is None
+
+
 # ======================================================================
-# NativeViewRegistry
+# NativeViewRegistry (tag table + apply_mutations)
 # ======================================================================
+
+_tags = itertools.count(1)
+
+
+def _next_tag() -> int:
+    return next(_tags)
 
 
 class StubView:
-    def __init__(self, type_name: str, props: Dict[str, Any]) -> None:
+    def __init__(self, tag: int, type_name: str, props: Dict[str, Any]) -> None:
+        self.tag = tag
         self.type_name = type_name
         self.props = dict(props)
+        self.children: list = []
         self.frame: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
+        self.destroyed = False
 
 
 class StubHandler(ViewHandler):
-    def create(self, props: Dict[str, Any]) -> StubView:
-        return StubView("Stub", props)
+    def __init__(self, type_name: str = "Stub") -> None:
+        self.type_name = type_name
+        self.commands: list = []
+
+    def create(self, tag: int, props: Dict[str, Any]) -> StubView:
+        return StubView(tag, self.type_name, props)
 
     def update(self, native_view: Any, changed_props: Dict[str, Any]) -> None:
         native_view.props.update(changed_props)
+
+    def insert_child(self, parent: Any, child: Any, index: int) -> None:
+        if child in parent.children:
+            parent.children.remove(child)
+        parent.children.insert(min(index, len(parent.children)), child)
+
+    def remove_child(self, parent: Any, child: Any) -> None:
+        if child in parent.children:
+            parent.children.remove(child)
+
+    def destroy(self, native_view: Any) -> None:
+        native_view.destroyed = True
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
         native_view.frame = (x, y, width, height)
@@ -160,66 +188,194 @@ class StubHandler(ViewHandler):
         # Pretend the stub view is 40x10 plus its content length.
         return (min(40.0 + len(native_view.props.get("text", "")), max_width), 10.0)
 
+    def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
+        self.commands.append((name, dict(args)))
+        return "ok"
 
-def test_registry_create_view() -> None:
+
+def _make_registry() -> NativeViewRegistry:
     reg = NativeViewRegistry()
-    reg.register("Text", StubHandler())
-    view = reg.create_view("Text", {"text": "hello"})
+    reg.register("Text", StubHandler("Text"))
+    reg.register("Column", StubHandler("Column"))
+    return reg
+
+
+def test_registry_create_registers_tag() -> None:
+    reg = _make_registry()
+    tag = _next_tag()
+    reg.apply_mutations([CreateOp(tag, "Text", {"text": "hello"})])
+    view = reg.resolve_view(tag)
     assert isinstance(view, StubView)
     assert view.props["text"] == "hello"
+    assert reg.live_view_count() == 1
 
 
-def test_registry_unknown_type_raises() -> None:
-    reg = NativeViewRegistry()
-    with pytest.raises(ValueError, match="Unknown element type"):
-        reg.create_view("NonExistent", {})
+def test_registry_unknown_type_is_isolated(capsys: pytest.CaptureFixture[str]) -> None:
+    """A CreateOp for an unknown type is logged but does not abort the batch."""
+    reg = _make_registry()
+    bad_tag, good_tag = _next_tag(), _next_tag()
+    reg.apply_mutations(
+        [
+            CreateOp(bad_tag, "NonExistent", {}),
+            CreateOp(good_tag, "Text", {"text": "still applied"}),
+        ]
+    )
+    captured = capsys.readouterr()
+    assert "CreateOp failed" in captured.err
+    assert reg.resolve_view(bad_tag) is None
+    assert reg.resolve_view(good_tag) is not None
 
 
 def test_registry_update_view() -> None:
-    reg = NativeViewRegistry()
-    reg.register("Text", StubHandler())
-    view = reg.create_view("Text", {"text": "old"})
-    reg.update_view(view, "Text", {"text": "new"})
-    assert view.props["text"] == "new"
+    reg = _make_registry()
+    tag = _next_tag()
+    reg.apply_mutations([CreateOp(tag, "Text", {"text": "old"})])
+    reg.apply_mutations([UpdateOp(tag, {"text": "new"})])
+    assert reg.resolve_view(tag).props["text"] == "new"
 
 
-def test_registry_update_unknown_type_noop() -> None:
-    reg = NativeViewRegistry()
-    reg.update_view(StubView("X", {}), "X", {"a": 1})
+def test_registry_update_unknown_tag_noop() -> None:
+    reg = _make_registry()
+    reg.apply_mutations([UpdateOp(999_999, {"a": 1})])
 
 
-def test_registry_child_ops_unknown_type_noop() -> None:
-    reg = NativeViewRegistry()
-    reg.add_child(None, None, "Unknown")
-    reg.remove_child(None, None, "Unknown")
-    reg.insert_child(None, None, "Unknown", 0)
+def test_registry_insert_and_remove_child() -> None:
+    reg = _make_registry()
+    parent_tag, child_tag = _next_tag(), _next_tag()
+    reg.apply_mutations(
+        [
+            CreateOp(parent_tag, "Column", {}),
+            CreateOp(child_tag, "Text", {"text": "x"}),
+            InsertOp(parent_tag, child_tag, 0),
+        ]
+    )
+    parent = reg.resolve_view(parent_tag)
+    child = reg.resolve_view(child_tag)
+    assert parent.children == [child]
+
+    reg.apply_mutations([RemoveOp(parent_tag, child_tag)])
+    assert parent.children == []
+    # Removed (not destroyed): the tag is still live.
+    assert reg.resolve_view(child_tag) is child
+
+
+def test_registry_child_ops_unknown_tags_noop() -> None:
+    reg = _make_registry()
+    reg.apply_mutations([InsertOp(111_111, 222_222, 0), RemoveOp(111_111, 222_222)])
+
+
+def test_registry_destroy_releases_tag_and_calls_handler() -> None:
+    reg = _make_registry()
+    tag = _next_tag()
+    reg.apply_mutations([CreateOp(tag, "Text", {"text": "x"})])
+    view = reg.resolve_view(tag)
+    reg.apply_mutations([DestroyOp(tag)])
+    assert view.destroyed is True
+    assert reg.resolve_view(tag) is None
+    assert reg.live_view_count() == 0
 
 
 def test_registry_set_frame_dispatches_to_handler() -> None:
-    reg = NativeViewRegistry()
-    reg.register("Text", StubHandler())
-    view = reg.create_view("Text", {"text": "x"})
-    reg.set_frame(view, "Text", 5.0, 10.0, 100.0, 50.0)
-    assert view.frame == (5.0, 10.0, 100.0, 50.0)
+    reg = _make_registry()
+    tag = _next_tag()
+    reg.apply_mutations(
+        [
+            CreateOp(tag, "Text", {"text": "x"}),
+            SetFrameOp(tag, 5.0, 10.0, 100.0, 50.0),
+        ]
+    )
+    assert reg.resolve_view(tag).frame == (5.0, 10.0, 100.0, 50.0)
 
 
-def test_registry_set_frame_unknown_type_noop() -> None:
-    reg = NativeViewRegistry()
-    reg.set_frame(None, "Unknown", 0, 0, 100, 50)
+def test_registry_set_frame_unknown_tag_noop() -> None:
+    reg = _make_registry()
+    reg.apply_mutations([SetFrameOp(999_999, 0, 0, 100, 50)])
+
+
+def test_registry_ops_apply_in_order() -> None:
+    """One transaction may create, attach, frame, and update in sequence."""
+    reg = _make_registry()
+    parent_tag, child_tag = _next_tag(), _next_tag()
+    reg.apply_mutations(
+        [
+            CreateOp(parent_tag, "Column", {}),
+            CreateOp(child_tag, "Text", {"text": "a"}),
+            InsertOp(parent_tag, child_tag, 0),
+            UpdateOp(child_tag, {"text": "b"}),
+            SetFrameOp(child_tag, 0.0, 0.0, 60.0, 16.0),
+        ]
+    )
+    child = reg.resolve_view(child_tag)
+    assert child.props["text"] == "b"
+    assert child.frame == (0.0, 0.0, 60.0, 16.0)
+    assert reg.resolve_view(parent_tag).children == [child]
 
 
 def test_registry_measure_intrinsic_dispatches() -> None:
-    reg = NativeViewRegistry()
-    reg.register("Text", StubHandler())
-    view = reg.create_view("Text", {"text": "abc"})
-    w, h = reg.measure_intrinsic(view, "Text", 1000.0, 1000.0)
+    reg = _make_registry()
+    tag = _next_tag()
+    reg.apply_mutations([CreateOp(tag, "Text", {"text": "abc"})])
+    w, h = reg.measure_intrinsic(tag, 1000.0, 1000.0)
     assert w == 43.0  # 40 + 3
     assert h == 10.0
 
 
-def test_registry_measure_intrinsic_unknown_type_zero() -> None:
+def test_registry_measure_intrinsic_unknown_tag_zero() -> None:
+    reg = _make_registry()
+    assert reg.measure_intrinsic(999_999, 1000.0, 1000.0) == (0.0, 0.0)
+
+
+def test_registry_command_dispatches_by_tag() -> None:
     reg = NativeViewRegistry()
-    assert reg.measure_intrinsic(None, "Unknown", 1000.0, 1000.0) == (0.0, 0.0)
+    handler = StubHandler("Text")
+    reg.register("Text", handler)
+    tag = _next_tag()
+    reg.apply_mutations([CreateOp(tag, "Text", {"text": "x"})])
+    result = reg.command(tag, "focus", {"select_all": True})
+    assert result == "ok"
+    assert handler.commands == [("focus", {"select_all": True})]
+
+
+def test_registry_command_unknown_tag_none() -> None:
+    reg = _make_registry()
+    assert reg.command(999_999, "focus") is None
+
+
+def test_registry_animation_hooks_resolve_through_tag_table() -> None:
+    class AnimHandler(StubHandler):
+        def __init__(self) -> None:
+            super().__init__("Text")
+            self.applied: list = []
+            self.started: list = []
+            self.cancelled: list = []
+
+        def set_animated_property(self, native_view: Any, prop_name: str, value: Any) -> None:
+            self.applied.append((prop_name, value))
+
+        def start_animation(self, native_view: Any, anim_id: int, prop_name: str, spec: Dict[str, Any]) -> bool:
+            self.started.append((anim_id, prop_name))
+            return True
+
+        def cancel_animation(self, native_view: Any, anim_id: int) -> Any:
+            self.cancelled.append(anim_id)
+            return 0.5
+
+    reg = NativeViewRegistry()
+    handler = AnimHandler()
+    reg.register("Text", handler)
+    tag = _next_tag()
+    reg.apply_mutations([CreateOp(tag, "Text", {})])
+
+    reg.set_animated_property(tag, "opacity", 0.7)
+    assert handler.applied == [("opacity", 0.7)]
+    assert reg.start_animation(tag, 1, "opacity", {"kind": "timing"}) is True
+    assert handler.started == [(1, "opacity")]
+    assert reg.cancel_animation(tag, 1) == 0.5
+
+    # Unknown tags: animation hooks are safe no-ops.
+    reg.set_animated_property(999_999, "opacity", 1.0)
+    assert reg.start_animation(999_999, 2, "opacity", {}) is False
+    assert reg.cancel_animation(999_999, 2) is None
 
 
 def test_set_registry_injects() -> None:
@@ -316,11 +472,15 @@ def test_tripwire_log_suffix_omitted_when_zero_suppressed(
 
 
 def test_registry_set_frame_nan_emits_tripwire(capsys: pytest.CaptureFixture[str], _tripwire_state: Any) -> None:
-    """``set_frame`` with a NaN dimension fires the rate-limited tripwire."""
-    reg = NativeViewRegistry()
-    reg.register("Text", StubHandler())
-    view = reg.create_view("Text", {"text": "x"})
-    reg.set_frame(view, "Text", 0.0, 0.0, float("nan"), 50.0)
+    """A ``SetFrameOp`` with a NaN dimension fires the rate-limited tripwire."""
+    reg = _make_registry()
+    tag = _next_tag()
+    reg.apply_mutations(
+        [
+            CreateOp(tag, "Text", {"text": "x"}),
+            SetFrameOp(tag, 0.0, 0.0, float("nan"), 50.0),
+        ]
+    )
     captured = capsys.readouterr()
     assert "[set_frame:nan]" in captured.err
     assert "type='Text'" in captured.err

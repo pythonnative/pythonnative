@@ -19,8 +19,12 @@ platform APIs synchronously from Python.
 3. **Reconciler.** On first render, the
    [`Reconciler`][pythonnative.reconciler.Reconciler] walks the tree
    and creates real native views via the platform backend. On
-   subsequent renders it diffs against the previous tree and applies
-   the minimal set of native mutations. State-driven renders are
+   subsequent renders it diffs against the previous tree and emits the
+   minimal list of mutation ops (create / update / insert / remove /
+   destroy / set-frame), applied as **one batched transaction** per
+   commit through
+   [`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations].
+   State-driven renders are
    **local**: a setter marks only its own component subtree dirty, and
    [`flush_dirty`][pythonnative.reconciler.Reconciler.flush_dirty]
    re-runs just those components instead of the whole app from the
@@ -95,11 +99,14 @@ and a new one is created.
    so [`use_context`][pythonnative.use_context] still resolves. Hooks
    record state reads, queue effects, and register memos. No native
    mutations happen yet.
-3. **Commit phase**: the reconciler applies the diff for each
-   re-rendered subtree to native views, creating, updating, and
-   removing views as needed, and bubbles any swapped subtree-root view
-   up to its nearest native container.
-4. **Layout phase**: a layout pass recomputes frames. Leaves whose
+3. **Commit phase**: the reconciler turns the diff for each
+   re-rendered subtree into mutation ops referencing view tags, and
+   flushes them all in a single `apply_mutations` transaction. Event
+   callbacks are routed to the Python-side
+   [`EventRegistry`][pythonnative.events.EventRegistry] instead of
+   crossing the bridge, so callback-identity churn costs nothing.
+4. **Layout phase**: a layout pass recomputes frames and emits
+   `SetFrameOp`s only for frames that changed. Leaves whose
    `Element` is unchanged reuse a cached intrinsic measurement, so
    untouched subtrees skip native `measure_intrinsic` calls.
 5. **Effect phase**: pending effects are flushed in depth-first order
@@ -256,8 +263,17 @@ Each handler class maps an element type name (e.g., `"Text"`,
 `"Button"`) to platform-native widget creation, property updates, and
 child management. The
 [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
+owns the tag-to-view table, applies each commit's mutation list, and
 lazily imports only the relevant platform module at runtime, so the
 package can be imported on any platform for testing.
+
+Native events flow back through a single channel: handlers wire their
+platform listeners once at view creation and call
+[`dispatch_event`][pythonnative.events.dispatch_event] with the view's
+tag; the [`EventRegistry`][pythonnative.events.EventRegistry] resolves
+the current Python callback. Gestures
+([`pythonnative.gestures`](../api/gestures.md)) and natively-driven
+animations (the `Animated` API) ride the same tag infrastructure.
 
 ## Comparisons
 

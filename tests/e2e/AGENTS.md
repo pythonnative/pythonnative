@@ -71,7 +71,7 @@ scripts/
 ./scripts/run-e2e.sh ios components
 ```
 
-Available category suites: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `misc`.
+Available category suites: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `gestures`, `misc`.
 
 You can also run a single flow directly. Useful when iterating on one demo:
 

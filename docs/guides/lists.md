@@ -2,16 +2,14 @@
 
 [`FlatList`][pythonnative.FlatList] and
 [`SectionList`][pythonnative.SectionList] are the two list components
-shipped with PythonNative. Both support **native virtualization**:
-when you supply `item_height`, the list is backed by `UITableView` on
-iOS and `RecyclerView` on Android, mounting rows lazily as they
-scroll into view.
-
-## When to virtualize
-
-Virtualize whenever the list might exceed the viewport. The
-non-virtualized fallback (`ScrollView` of every row) is only suitable
-for short, fixed lists (a settings page, a small menu).
+shipped with PythonNative. Both are **virtualized**: only the rows
+inside (and just beyond) the viewport are mounted as native views.
+Leading and trailing spacers stand in for everything off-screen, and
+the window of mounted rows shifts as the user scrolls. The windowing
+runs in Python on top of the platform's native scroll view, so the
+same behavior — including `on_end_reached`, viewability callbacks, and
+the imperative scroll controller — is identical on Android, iOS, and
+the desktop preview.
 
 ```python
 import pythonnative as pn
@@ -29,8 +27,21 @@ def Big():
     )
 ```
 
-The list never holds 10,000 native views — only the rows currently
-visible (plus a small reuse pool) ever exist.
+The list never holds 10,000 native views — only the window around the
+viewport ever exists.
+
+## Row heights
+
+Three ways to tell the list how tall rows are, in order of preference:
+
+- `item_height=44` — uniform rows. Offsets are exact and cheap.
+- `get_item_height=lambda item, i: ...` — exact per-row extents
+  without measurement.
+- Nothing at all — rows start at `estimated_item_height` (default 44)
+  and are corrected with their measured extent once they've been on
+  screen. Scroll positions stay stable as estimates converge.
+
+`separator_height=` adds a fixed gap below every row.
 
 ## Pull-to-refresh
 
@@ -59,18 +70,62 @@ def Pullable():
 
 ## Row taps
 
-Pass `on_item_press=` to receive the tapped row's index:
+Wrap the row in a [`Pressable`][pythonnative.Pressable] inside
+`render_item`:
+
+```python
+def render_row(item, index):
+    return pn.Pressable(
+        pn.Text(item["title"]),
+        on_press=lambda: open_detail(item["id"]),
+    )
+```
+
+## Infinite scroll
+
+`on_end_reached` fires once when the user scrolls within
+`on_end_reached_threshold` viewports of the end (re-arming when the
+data length changes), which is the hook for pagination:
 
 ```python
 pn.FlatList(
     data=items,
     item_height=44,
-    on_item_press=lambda index: print(f"tapped {items[index]['id']}"),
+    on_end_reached=load_next_page,
+    on_end_reached_threshold=0.5,  # half a viewport from the bottom
 )
 ```
 
-Inside `render_item` you can also wrap the row in a
-[`Pressable`][pythonnative.Pressable] for finer-grained control.
+`on_viewable_items_changed` reports the set of visible rows whenever
+it changes, as a list of `{"index", "key", "item"}` dicts.
+
+## Imperative scrolling
+
+Pass a [`use_ref`][pythonnative.use_ref] dict as `ref=` and the list
+attaches a scroll controller:
+
+```python
+@pn.component
+def JumpableList():
+    list_ref = pn.use_ref()
+
+    return pn.Column(
+        pn.Button("Jump to row 200", on_click=lambda: list_ref["scroll_to_index"](200)),
+        pn.FlatList(data=items, item_height=44, ref=list_ref, style={"flex": 1}),
+        style={"flex": 1},
+    )
+```
+
+The controller exposes `scroll_to_index(i, animated=True)`,
+`scroll_to_offset(points, animated=True)`, and
+`scroll_to_end(animated=True)`.
+
+## Grids, headers, and empty states
+
+- `num_columns=2` chunks items into grid rows.
+- `horizontal=True` scrolls on the x-axis (extents become widths).
+- `list_header=` / `list_footer=` render once before/after all rows.
+- `list_empty=` renders when `data` is empty.
 
 ## Section lists
 
@@ -94,17 +149,21 @@ pn.SectionList(
 )
 ```
 
-`item_height` and `section_header_height` are fixed; for variable-
-height rows the eager fallback (omit `item_height`) is currently the
-only option.
+Headers and items can have different extents, and variable-height
+rows work exactly as in `FlatList` (exact via `get_item_height`, or
+estimated and measured).
 
 ## Performance notes
 
-- Always provide a stable `key_extractor` so reused rows refresh in
-  place rather than tearing down and rebuilding their subtree.
+- Always provide a stable `key_extractor` so rows that stay inside
+  the window refresh in place rather than tearing down and rebuilding
+  their subtree as the window shifts.
+- Provide real extents (`item_height` / `get_item_height`) when you
+  can; measured estimation works but does more bookkeeping per
+  scroll.
 - Keep row subtrees shallow. The reconciler is fast, but mounting a
   hundred `Text`/`Image`/`Button` nodes per row is wasteful work
-  whenever a row recycles.
+  every time a row enters the window.
 - Move expensive computation out of `render_item` (use
   [`use_memo`][pythonnative.use_memo] in the parent component, or
   pre-compute once before constructing the data list).

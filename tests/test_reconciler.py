@@ -1,92 +1,14 @@
 """Unit tests for the reconciler using a mock native backend."""
 
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import pytest
+from fake_backend import FakeBackend as MockBackend
+from fake_backend import FakeView as MockView
 
 from pythonnative.element import Element
 from pythonnative.hooks import component
 from pythonnative.reconciler import Reconciler
-
-# ======================================================================
-# Mock backend
-# ======================================================================
-
-
-class MockView:
-    """Simulates a native view for testing."""
-
-    _next_id = 0
-
-    def __init__(self, type_name: str, props: Dict[str, Any]) -> None:
-        MockView._next_id += 1
-        self.id = MockView._next_id
-        self.type_name = type_name
-        self.props = dict(props)
-        self.children: List["MockView"] = []
-        self.frame: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
-
-    def __repr__(self) -> str:
-        return f"MockView({self.type_name}#{self.id})"
-
-
-class MockBackend:
-    """Records operations for assertions."""
-
-    # Default intrinsic size for content-bearing leaves (Text, Button, etc.).
-    _LEAF_INTRINSIC = {
-        "Text": (60.0, 16.0),
-        "Button": (80.0, 32.0),
-        "Image": (40.0, 40.0),
-        "TextInput": (120.0, 32.0),
-        "TabBar": (320.0, 49.0),
-    }
-
-    def __init__(self) -> None:
-        self.ops: List[Any] = []
-
-    def create_view(self, type_name: str, props: Dict[str, Any]) -> MockView:
-        view = MockView(type_name, props)
-        self.ops.append(("create", type_name, view.id))
-        return view
-
-    def update_view(self, native_view: MockView, type_name: str, changed_props: Dict[str, Any]) -> None:
-        native_view.props.update(changed_props)
-        self.ops.append(("update", type_name, native_view.id, tuple(sorted(changed_props.keys()))))
-
-    def add_child(self, parent: MockView, child: MockView, parent_type: str) -> None:
-        parent.children.append(child)
-        self.ops.append(("add_child", parent.id, child.id))
-
-    def remove_child(self, parent: MockView, child: MockView, parent_type: str) -> None:
-        parent.children = [c for c in parent.children if c.id != child.id]
-        self.ops.append(("remove_child", parent.id, child.id))
-
-    def insert_child(self, parent: MockView, child: MockView, parent_type: str, index: int) -> None:
-        parent.children.insert(index, child)
-        self.ops.append(("insert_child", parent.id, child.id, index))
-
-    def set_frame(
-        self,
-        native_view: MockView,
-        type_name: str,
-        x: float,
-        y: float,
-        width: float,
-        height: float,
-    ) -> None:
-        native_view.frame = (x, y, width, height)
-        self.ops.append(("set_frame", native_view.id, x, y, width, height))
-
-    def measure_intrinsic(
-        self,
-        native_view: MockView,
-        type_name: str,
-        max_width: float,
-        max_height: float,
-    ) -> Tuple[float, float]:
-        return self._LEAF_INTRINSIC.get(type_name, (0.0, 0.0))
-
 
 # ======================================================================
 # Tests: mount
@@ -246,25 +168,60 @@ def test_reconcile_root_type_change() -> None:
 
 
 # ======================================================================
-# Tests: callback props always counted as changed
+# Tests: callbacks live in the event registry, not the native layer
 # ======================================================================
 
 
-def test_reconcile_callback_always_updated() -> None:
+def test_reconcile_callback_swap_costs_no_native_traffic() -> None:
+    """Fresh closures re-route the event registry without an UpdateOp."""
+    from pythonnative.events import get_event_registry
+
     backend = MockBackend()
     rec = Reconciler(backend)
-    cb1 = lambda: None  # noqa: E731
-    cb2 = lambda: None  # noqa: E731
-    el1 = Element("Button", {"title": "x", "on_click": cb1}, [])
+    calls: list = []
+    el1 = Element("Button", {"title": "x", "on_click": lambda: calls.append("first")}, [])
     rec.mount(el1)
+    tag = rec.root_tag()
+    assert tag is not None
 
     backend.ops.clear()
-    el2 = Element("Button", {"title": "x", "on_click": cb2}, [])
+    el2 = Element("Button", {"title": "x", "on_click": lambda: calls.append("second")}, [])
     rec.reconcile(el2)
 
     update_ops = [op for op in backend.ops if op[0] == "update"]
-    assert len(update_ops) == 1
-    assert "on_click" in update_ops[0][3]
+    assert update_ops == [], "listener identity churn must not reach the native layer"
+    # The registry now routes to the latest closure.
+    assert get_event_registry().dispatch(tag, "on_click") is True
+    assert calls == ["second"]
+
+
+def test_callback_routed_through_event_registry_on_mount() -> None:
+    from pythonnative.events import get_event_registry
+
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    calls: list = []
+    root = rec.mount(Element("Button", {"title": "x", "on_click": lambda: calls.append(1)}, []))
+    tag = rec.root_tag()
+
+    # The callable never reaches the backend; only the event-name set does.
+    assert "on_click" not in root.props
+    assert "on_click" in root.props["_pn_events"]
+    get_event_registry().dispatch(tag, "on_click")
+    assert calls == [1]
+
+
+def test_event_registry_cleared_on_destroy() -> None:
+    from pythonnative.events import get_event_registry
+
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    rec.mount(Element("Button", {"title": "x", "on_click": lambda: None}, []))
+    tag = rec.root_tag()
+    assert get_event_registry().has(tag, "on_click")
+
+    rec.reconcile(Element("Text", {"text": "replaced"}, []))
+    assert not get_event_registry().has(tag, "on_click")
 
 
 # ======================================================================
@@ -915,7 +872,7 @@ def test_fragment_flattens_into_parent() -> None:
     # Find the Column view and assert it received 4 direct children.
     create_ops = [op for op in backend.ops if op[0] == "create"]
     column_id = next(op[2] for op in create_ops if op[1] == "Column")
-    add_to_column = [op for op in backend.ops if op[0] == "add_child" and op[1] == column_id]
+    add_to_column = [op for op in backend.ops if op[0] == "insert_child" and op[1] == column_id]
     assert len(add_to_column) == 4, "Fragment should be transparent and contribute 2 children directly"
 
 
@@ -944,6 +901,6 @@ def test_fragment_reconciles_keyed_siblings() -> None:
 
     create_ops_after = [op for op in backend.ops if op[0] == "create"]
     assert create_ops_after == [], "Reordering keyed children inside Fragment must not recreate views"
-    assert any(op[0] in ("insert_child", "add_child", "remove_child") for op in backend.ops)
+    assert any(op[0] in ("insert_child", "remove_child") for op in backend.ops)
     # Two Text views existed before; no new ones should have been added.
     assert sum(1 for op in create_ops_before if op[1] == "Text") == 2

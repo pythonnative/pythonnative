@@ -10,28 +10,41 @@ flex engine** in [`pythonnative.layout`][pythonnative.layout]: the
 reconciler computes each view's ``(x, y, width, height)`` in points and
 [`set_frame`][pythonnative.native_views.desktop.DesktopViewHandler.set_frame]
 applies it. Handlers therefore only deal with *visual* props (text,
-colors, fonts, callbacks) and ignore everything in
+colors, fonts) and ignore everything in
 [`LAYOUT_STYLE_KEYS`][pythonnative.layout.LAYOUT_STYLE_KEYS].
+
+Event contract
+--------------
+Handlers never see Python callables. Each view stores its reconciler
+tag (``widget._pn_tag``); Tk callbacks forward through
+[`dispatch_event`][pythonnative.events.dispatch_event] with that tag,
+and the Python-side [`EventRegistry`][pythonnative.events.EventRegistry]
+routes to whatever closure the current render registered. Views with a
+``gestures`` prop feed Tk pointer events into the shared pure-Python
+[`GestureArbiter`][pythonnative.gestures.GestureArbiter].
 
 Placement strategy
 ------------------
 Tkinter fixes a widget's master at construction time, but the
-reconciler creates a view *before* it knows the parent (``create`` then
-``add_child``). To bridge that, every widget is created under a single
+reconciler creates views before parents (``CreateOp`` before
+``InsertOp``). To bridge that, every widget is created under a single
 shared *stage* frame (see
 [`set_root_container`][pythonnative.native_views.desktop.set_root_container])
 and positioned with ``place(in_=parent, ...)``. Tk's ``-in`` option
 composes coordinates through nested parents, so the engine's
 parent-relative frames render correctly without reparenting.
+ScrollViews shift their children's placement by the current scroll
+offset, which yields real wheel scrolling in the preview.
 
 Scope
 -----
 This is a **preview** backend, not a production desktop target. It
 favors fidelity of layout and behavior over pixel-perfect chrome:
 rounded corners, shadows, per-widget opacity, and overflow clipping are
-approximated or omitted (Tkinter can't express them cheaply). Every one
-of the 25 built-in element types is handled so any app renders without
-errors.
+approximated or omitted (Tkinter can't express them cheaply). Native
+animation is declined (``start_animation`` returns ``False``), so the
+Python ticker drives previews of animations through
+``set_animated_property``.
 
 This module imports ``tkinter`` at import time, so it is only imported
 when ``PN_PLATFORM=desktop``. Off-device unit tests inject a mock
@@ -43,11 +56,14 @@ from __future__ import annotations
 
 import math
 import re
+import time
 import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import ttk
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..events import dispatch_event, event_names
+from ..gestures import make_arbiter
 from .base import ViewHandler
 
 # ======================================================================
@@ -67,12 +83,14 @@ _DEFAULT_FONT_SIZE = 15
 def set_root_container(container: Any) -> None:
     """Install the stage frame that every desktop view is created under.
 
-    Called by ``pythonnative.preview`` before the
-    first screen is mounted. ``container`` must be a Tk widget (a
-    ``Frame`` filling the preview window).
+    Called by ``pythonnative.preview`` before the first screen is
+    mounted. ``container`` must be a Tk widget (a ``Frame`` filling the
+    preview window). Also installs the global mouse-wheel binding that
+    powers ScrollView scrolling.
     """
     global _ROOT_CONTAINER
     _ROOT_CONTAINER = container
+    _install_wheel_bindings(container)
 
 
 def get_root_container() -> Any:
@@ -248,7 +266,25 @@ def _finite(value: Any, default: float = 0.0) -> float:
 
 
 # ======================================================================
-# Placement (ordering-independent)
+# Event dispatch helpers
+# ======================================================================
+
+
+def _fire(widget: Any, name: str, *args: Any) -> None:
+    """Dispatch event ``name`` for ``widget`` through the tag registry."""
+    tag = getattr(widget, "_pn_tag", None)
+    if tag is not None:
+        dispatch_event(tag, name, *args)
+
+
+def _has_event(widget: Any, name: str) -> bool:
+    """Whether the element wired a callback named ``name`` this render."""
+    merged = getattr(widget, "_pn_props", None) or {}
+    return name in event_names(merged)
+
+
+# ======================================================================
+# Placement (ordering-independent, scroll-aware)
 # ======================================================================
 
 
@@ -269,10 +305,11 @@ def _place(widget: Any) -> None:
     """Position ``widget`` inside its logical parent, if both are known.
 
     Idempotent and order-independent: ``set_frame`` records the frame
-    and ``add_child`` records the parent; whichever runs second triggers
-    the actual ``place``. Coordinates compose through nested ``-in``
-    parents, so a child's parent-relative frame lands at the right
-    absolute spot.
+    and ``insert_child`` records the parent; whichever runs second
+    triggers the actual ``place``. Coordinates compose through nested
+    ``-in`` parents, so a child's parent-relative frame lands at the
+    right absolute spot. A scrollable parent shifts every child by its
+    current scroll offset.
     """
     frame = getattr(widget, "_pn_frame", None)
     if frame is None:
@@ -283,11 +320,30 @@ def _place(widget: Any) -> None:
         return
     x, y, w, h = frame
     tx, ty = getattr(widget, "_pn_translate", (0.0, 0.0))
+    sx, sy = getattr(target, "_pn_scroll_offset", (0.0, 0.0)) if parent is not None else (0.0, 0.0)
     try:
-        widget.place(in_=target, x=x + tx, y=y + ty, width=max(0.0, w), height=max(0.0, h))
+        widget.place(in_=target, x=x + tx - sx, y=y + ty - sy, width=max(0.0, w), height=max(0.0, h))
         widget.lift()
     except Exception:
         pass
+
+
+def _register_child(parent: Any, child: Any, index: int) -> None:
+    """Track ``child`` in ``parent``'s ordered child list at ``index``."""
+    children: List[Any] = getattr(parent, "_pn_children", None) or []
+    if child in children:
+        children.remove(child)
+    children.insert(min(max(index, 0), len(children)), child)
+    parent._pn_children = children
+
+
+def _unregister_child(parent: Any, child: Any) -> None:
+    children: List[Any] = getattr(parent, "_pn_children", None) or []
+    try:
+        children.remove(child)
+    except ValueError:
+        pass
+    parent._pn_children = children
 
 
 def _set_translate_from_transform(widget: Any, spec: Any) -> None:
@@ -340,33 +396,228 @@ def _apply_common(widget: Any, props: Dict[str, Any]) -> None:
 
 
 # ======================================================================
+# Gesture wiring (pure-Python arbiter over Tk pointer events)
+# ======================================================================
+
+
+def _wire_gestures(widget: Any, specs: Any) -> None:
+    """Feed Tk pointer events on ``widget`` into a `GestureArbiter`.
+
+    The arbiter emits ``(gesture_index, payload)`` pairs which are
+    forwarded as ``gesture:<i>`` events for this widget's tag. Long
+    presses use Tk's ``after`` timer to poll the arbiter at its next
+    deadline.
+    """
+    if not isinstance(specs, (list, tuple)) or not specs:
+        widget._pn_arbiter = None
+        return
+
+    def _emit(index: int, payload: Dict[str, Any]) -> None:
+        _fire(widget, f"gesture:{index}", payload)
+
+    arbiter = make_arbiter([s for s in specs if isinstance(s, dict)], _emit)
+    widget._pn_arbiter = arbiter
+    if getattr(widget, "_pn_gestures_bound", False):
+        return
+    widget._pn_gestures_bound = True
+
+    def _schedule_poll() -> None:
+        current = getattr(widget, "_pn_arbiter", None)
+        if current is None:
+            return
+        deadline = current.next_deadline()
+        if deadline is None:
+            return
+        delay_ms = max(1, int((deadline - time.monotonic()) * 1000.0))
+
+        def _poll() -> None:
+            live = getattr(widget, "_pn_arbiter", None)
+            if live is not None:
+                live.poll(time.monotonic())
+                _schedule_poll()
+
+        try:
+            widget.after(delay_ms, _poll)
+        except Exception:
+            pass
+
+    def _on_down(event: Any) -> None:
+        current = getattr(widget, "_pn_arbiter", None)
+        if current is not None:
+            current.pointer_down(0, float(event.x), float(event.y), time.monotonic())
+            _schedule_poll()
+
+    def _on_move(event: Any) -> None:
+        current = getattr(widget, "_pn_arbiter", None)
+        if current is not None:
+            current.pointer_move(0, float(event.x), float(event.y), time.monotonic())
+
+    def _on_up(event: Any) -> None:
+        current = getattr(widget, "_pn_arbiter", None)
+        if current is not None:
+            current.pointer_up(0, float(event.x), float(event.y), time.monotonic())
+
+    try:
+        widget.bind("<ButtonPress-1>", _on_down, add="+")
+        widget.bind("<B1-Motion>", _on_move, add="+")
+        widget.bind("<ButtonRelease-1>", _on_up, add="+")
+    except Exception:
+        pass
+
+
+# ======================================================================
+# ScrollView wheel support
+# ======================================================================
+
+_WHEEL_BOUND = False
+
+
+def _install_wheel_bindings(container: Any) -> None:
+    """Install the global wheel handler that drives preview scrolling.
+
+    Tk pointer events don't bubble, so a single ``bind_all`` on the
+    toplevel hit-tests the widget under the cursor and walks the
+    logical ``_pn_parent`` chain to the nearest scrollable ancestor.
+    """
+    global _WHEEL_BOUND
+    if _WHEEL_BOUND:
+        return
+    try:
+        top = container.winfo_toplevel()
+    except Exception:
+        return
+
+    def _on_wheel(event: Any) -> None:
+        delta = getattr(event, "delta", 0)
+        if getattr(event, "num", None) == 4:
+            delta = 120
+        elif getattr(event, "num", None) == 5:
+            delta = -120
+        if not delta:
+            return
+        try:
+            under = event.widget.winfo_containing(event.x_root, event.y_root)
+        except Exception:
+            under = None
+        node = under
+        while node is not None:
+            if getattr(node, "_pn_scrollable", False):
+                _scroll_by(node, delta)
+                return
+            node = getattr(node, "_pn_parent", None)
+
+    try:
+        top.bind_all("<MouseWheel>", _on_wheel, add="+")
+        top.bind_all("<Button-4>", _on_wheel, add="+")
+        top.bind_all("<Button-5>", _on_wheel, add="+")
+        _WHEEL_BOUND = True
+    except Exception:
+        pass
+
+
+def _content_extent(widget: Any) -> Tuple[float, float]:
+    """Max (right, bottom) edge over the scroll container's children."""
+    max_x = 0.0
+    max_y = 0.0
+    for child in getattr(widget, "_pn_children", []) or []:
+        frame = getattr(child, "_pn_frame", None)
+        if frame is None:
+            continue
+        x, y, w, h = frame
+        max_x = max(max_x, x + w)
+        max_y = max(max_y, y + h)
+    return (max_x, max_y)
+
+
+def _scroll_to(widget: Any, x: float, y: float, fire_event: bool = True) -> None:
+    """Set a scroll container's offset, clamped to its content extent."""
+    frame = getattr(widget, "_pn_frame", None)
+    vw = frame[2] if frame else 0.0
+    vh = frame[3] if frame else 0.0
+    content_w, content_h = _content_extent(widget)
+    max_x = max(0.0, content_w - vw)
+    max_y = max(0.0, content_h - vh)
+    new_offset = (min(max(0.0, x), max_x), min(max(0.0, y), max_y))
+    if new_offset == getattr(widget, "_pn_scroll_offset", (0.0, 0.0)):
+        return
+    widget._pn_scroll_offset = new_offset
+    for child in getattr(widget, "_pn_children", []) or []:
+        _place(child)
+    if fire_event:
+        _fire(widget, "on_scroll", {"x": new_offset[0], "y": new_offset[1]})
+
+
+def _scroll_by(widget: Any, wheel_delta: float) -> None:
+    sx, sy = getattr(widget, "_pn_scroll_offset", (0.0, 0.0))
+    step = -wheel_delta  # natural direction: wheel up scrolls content up
+    horizontal = (getattr(widget, "_pn_props", {}) or {}).get("scroll_axis") == "horizontal"
+    if horizontal:
+        _scroll_to(widget, sx + step, sy)
+    else:
+        _scroll_to(widget, sx, sy + step)
+
+
+# ======================================================================
 # Base handler
 # ======================================================================
 
 
 class DesktopViewHandler(ViewHandler):
-    """Shared ``set_frame`` / child / measure behavior for Tk handlers.
+    """Shared create/update/frame/child behavior for Tk handlers.
 
-    Concrete handlers implement ``create`` / ``update`` (and optionally
-    ``measure_intrinsic``); child management and frame application are
-    inherited and route through the order-independent
-    [`_place`][pythonnative.native_views.desktop._place] helper.
+    Concrete handlers implement
+    [`build`][pythonnative.native_views.desktop.DesktopViewHandler.build]
+    (construct the widget) and optionally
+    [`apply`][pythonnative.native_views.desktop.DesktopViewHandler.apply]
+    (apply visual props); creation bookkeeping (tag stamping, prop
+    merging, gesture wiring) is inherited.
     """
 
-    def add_child(self, parent: Any, child: Any) -> None:
-        child._pn_parent = parent
-        _place(child)
+    def build(self, props: Dict[str, Any]) -> Any:
+        """Construct and return the bare Tk widget."""
+        return tk.Frame(_master(), highlightthickness=0, bd=0)
+
+    def apply(self, widget: Any, props: Dict[str, Any]) -> None:
+        """Apply changed visual props (`_merge_props` has already run)."""
+        _apply_common(widget, getattr(widget, "_pn_props", props))
+
+    def create(self, tag: int, props: Dict[str, Any]) -> Any:
+        widget = self.build(props)
+        widget._pn_tag = tag
+        _merge_props(widget, props)
+        self.apply(widget, props)
+        if "gestures" in props:
+            _wire_gestures(widget, props.get("gestures"))
+        return widget
+
+    def update(self, native_view: Any, changed_props: Dict[str, Any]) -> None:
+        _merge_props(native_view, changed_props)
+        self.apply(native_view, changed_props)
+        if "gestures" in changed_props:
+            _wire_gestures(native_view, changed_props.get("gestures"))
 
     def insert_child(self, parent: Any, child: Any, index: int) -> None:
         child._pn_parent = parent
+        _register_child(parent, child, index)
         _place(child)
 
     def remove_child(self, parent: Any, child: Any) -> None:
+        _unregister_child(parent, child)
         try:
             child.place_forget()
         except Exception:
             pass
         child._pn_parent = None
+
+    def destroy(self, native_view: Any) -> None:
+        parent = getattr(native_view, "_pn_parent", None)
+        if parent is not None:
+            _unregister_child(parent, native_view)
+        native_view._pn_arbiter = None
+        try:
+            native_view.destroy()
+        except Exception:
+            pass
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
         if native_view is None:
@@ -377,19 +628,12 @@ class DesktopViewHandler(ViewHandler):
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
         return (0.0, 0.0)
 
-    def set_animated_property(
-        self,
-        native_view: Any,
-        prop_name: str,
-        value: Any,
-        duration_ms: float = 0.0,
-        easing: str = "linear",
-    ) -> None:
-        """Apply the final value of an animated property (no tween).
+    def set_animated_property(self, native_view: Any, prop_name: str, value: Any) -> None:
+        """Apply one frame of a Python-driven animation.
 
-        The preview shows animation *end states* rather than smooth
-        interpolation. Translation maps onto placement; opacity, scale,
-        and rotation have no cheap Tk analogue and are skipped.
+        Translation maps onto placement; background color maps onto
+        ``configure``. Opacity, scale, and rotation have no cheap Tk
+        analogue and are skipped (a documented preview limitation).
         """
         if native_view is None:
             return
@@ -411,7 +655,7 @@ class DesktopViewHandler(ViewHandler):
 
 
 # ======================================================================
-# Containers (View / Column / Row / SafeAreaView / KeyboardAvoidingView)
+# Containers (View / SafeAreaView / KeyboardAvoidingView)
 # ======================================================================
 
 
@@ -421,23 +665,6 @@ class FlexContainerHandler(DesktopViewHandler):
     All flex semantics are computed by the layout engine and applied via
     ``set_frame``; the frame only carries visual chrome (background,
     border).
-    """
-
-    def create(self, props: Dict[str, Any]) -> Any:
-        frame = tk.Frame(_master(), highlightthickness=0, bd=0)
-        _apply_common(frame, _merge_props(frame, props))
-        return frame
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        _apply_common(native_view, _merge_props(native_view, changed))
-
-
-class ScrollViewHandler(FlexContainerHandler):
-    """Preview ScrollView — a plain frame.
-
-    The layout engine still lets the content grow past the viewport on
-    the scroll axis; the desktop preview renders that overflow without
-    interactive scrolling or clipping (a documented preview limitation).
     """
 
 
@@ -450,6 +677,51 @@ class KeyboardAvoidingViewHandler(FlexContainerHandler):
 
 
 # ======================================================================
+# ScrollView
+# ======================================================================
+
+
+class ScrollViewHandler(FlexContainerHandler):
+    """Preview ScrollView with real wheel scrolling.
+
+    The layout engine lets the content grow past the viewport on the
+    scroll axis; this handler offsets its children's placement by the
+    current scroll offset (overflow outside the frame is *not* clipped
+    — a documented preview limitation of the single-stage design).
+
+    Commands:
+        ``scroll_to_offset(x=…, y=…)``: jump to an offset.
+        ``scroll_to_end()``: jump to the end of the content.
+    """
+
+    def build(self, props: Dict[str, Any]) -> Any:
+        frame = tk.Frame(_master(), highlightthickness=0, bd=0)
+        frame._pn_scrollable = True
+        frame._pn_scroll_offset = (0.0, 0.0)
+        return frame
+
+    def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
+        if name == "scroll_to_offset":
+            sx, sy = getattr(native_view, "_pn_scroll_offset", (0.0, 0.0))
+            _scroll_to(native_view, _finite(args.get("x", sx)), _finite(args.get("y", sy)))
+            return True
+        if name == "scroll_to_end":
+            content_w, content_h = _content_extent(native_view)
+            _scroll_to(native_view, content_w, content_h)
+            return True
+        if name == "get_scroll_offset":
+            sx, sy = getattr(native_view, "_pn_scroll_offset", (0.0, 0.0))
+            return {"x": sx, "y": sy}
+        return None
+
+    def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
+        super().set_frame(native_view, x, y, width, height)
+        # Keep the offset clamped when the viewport grows.
+        sx, sy = getattr(native_view, "_pn_scroll_offset", (0.0, 0.0))
+        _scroll_to(native_view, sx, sy, fire_event=False)
+
+
+# ======================================================================
 # Text
 # ======================================================================
 
@@ -459,16 +731,11 @@ _JUSTIFY_FOR_ALIGN = {"left": "left", "center": "center", "right": "right"}
 
 
 class TextHandler(DesktopViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
-        label = tk.Label(_master(), highlightthickness=0, bd=0, padx=0, pady=0)
-        self._apply(label, props)
-        return label
+    def build(self, props: Dict[str, Any]) -> Any:
+        return tk.Label(_master(), highlightthickness=0, bd=0, padx=0, pady=0)
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _apply(self, label: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(label, props)
+    def apply(self, label: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(label, "_pn_props", props)
         text = merged.get("text")
         label._pn_text = "" if text is None else str(text)
         font = _make_font(merged)
@@ -513,16 +780,13 @@ class TextHandler(DesktopViewHandler):
 
 
 class ButtonHandler(DesktopViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def build(self, props: Dict[str, Any]) -> Any:
         button = tk.Button(_master(), highlightthickness=0, takefocus=0)
-        self._apply(button, props)
+        button.configure(command=lambda: _fire(button, "on_click"))
         return button
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _apply(self, button: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(button, props)
+    def apply(self, button: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(button, "_pn_props", props)
         title = merged.get("title")
         button._pn_text = "" if title is None else str(title)
         font = _make_font(merged)
@@ -541,20 +805,6 @@ class ButtonHandler(DesktopViewHandler):
             button.configure(**opts)
         except Exception:
             pass
-        if "on_click" in props:
-            callback = props["on_click"]
-
-            def _command() -> None:
-                if callable(callback):
-                    try:
-                        callback()
-                    except Exception:
-                        pass
-
-            try:
-                button.configure(command=_command if callable(callback) else "")
-            except Exception:
-                pass
         _apply_common(button, merged)
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
@@ -572,7 +822,7 @@ class ButtonHandler(DesktopViewHandler):
 
 
 class TextInputHandler(DesktopViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def build(self, props: Dict[str, Any]) -> Any:
         multiline = bool(props.get("multiline"))
         widget: Any
         if multiline:
@@ -581,12 +831,8 @@ class TextInputHandler(DesktopViewHandler):
             widget = tk.Entry(_master(), highlightthickness=1, bd=0)
         widget._pn_multiline = multiline
         widget._pn_suppress = False
-        self._bind(widget, props)
-        self._apply(widget, props)
+        self._bind(widget)
         return widget
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
 
     def _current_text(self, widget: Any) -> str:
         try:
@@ -610,39 +856,33 @@ class TextInputHandler(DesktopViewHandler):
         finally:
             widget._pn_suppress = False
 
-    def _bind(self, widget: Any, props: Dict[str, Any]) -> None:
+    def _bind(self, widget: Any) -> None:
         def _on_key(_event: Any = None) -> None:
             if getattr(widget, "_pn_suppress", False):
                 return
-            callback = getattr(widget, "_pn_on_change", None)
-            if callable(callback):
-                try:
-                    callback(self._current_text(widget))
-                except Exception:
-                    pass
+            _fire(widget, "on_change", self._current_text(widget))
 
         def _on_return(_event: Any = None) -> str:
-            callback = getattr(widget, "_pn_on_submit", None)
-            if callable(callback):
-                try:
-                    callback(self._current_text(widget))
-                except Exception:
-                    pass
+            _fire(widget, "on_submit", self._current_text(widget))
             return "break"
+
+        def _on_focus(_event: Any = None) -> None:
+            _fire(widget, "on_focus")
+
+        def _on_blur(_event: Any = None) -> None:
+            _fire(widget, "on_blur")
 
         try:
             widget.bind("<KeyRelease>", _on_key)
+            widget.bind("<FocusIn>", _on_focus)
+            widget.bind("<FocusOut>", _on_blur)
             if not getattr(widget, "_pn_multiline", False):
                 widget.bind("<Return>", _on_return)
         except Exception:
             pass
 
-    def _apply(self, widget: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(widget, props)
-        if "on_change" in props:
-            widget._pn_on_change = props["on_change"]
-        if "on_submit" in props:
-            widget._pn_on_submit = props["on_submit"]
+    def apply(self, widget: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(widget, "_pn_props", props)
         opts: Dict[str, Any] = {"font": _make_font(merged)}
         color = _tk_color(merged.get("color"))
         if color is not None:
@@ -668,6 +908,21 @@ class TextInputHandler(DesktopViewHandler):
         except Exception:
             pass
 
+    def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
+        if name == "focus":
+            try:
+                native_view.focus_set()
+            except Exception:
+                pass
+            return True
+        if name == "blur":
+            try:
+                native_view.winfo_toplevel().focus_set()
+            except Exception:
+                pass
+            return True
+        return None
+
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
         merged = getattr(native_view, "_pn_props", {}) or {}
         font = _make_font(merged)
@@ -692,16 +947,11 @@ class ImageHandler(DesktopViewHandler):
     ``PhotoImage`` (Tk garbage-collects images that aren't referenced).
     """
 
-    def create(self, props: Dict[str, Any]) -> Any:
-        label = tk.Label(_master(), highlightthickness=0, bd=0, background="#d1d1d6")
-        self._apply(label, props)
-        return label
+    def build(self, props: Dict[str, Any]) -> Any:
+        return tk.Label(_master(), highlightthickness=0, bd=0, background="#d1d1d6")
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _apply(self, label: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(label, props)
+    def apply(self, label: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(label, "_pn_props", props)
         if "source" in props:
             source = props.get("source")
             photo = None
@@ -737,35 +987,15 @@ class ImageHandler(DesktopViewHandler):
 
 
 class SwitchHandler(DesktopViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def build(self, props: Dict[str, Any]) -> Any:
         var = tk.IntVar(master=_master(), value=1 if props.get("value") else 0)
         check = tk.Checkbutton(_master(), variable=var, takefocus=0, highlightthickness=0, text="")
         check._pn_var = var
-        self._bind(check, props)
-        self._apply(check, props)
+        check.configure(command=lambda: _fire(check, "on_change", bool(var.get())))
         return check
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _bind(self, check: Any, props: Dict[str, Any]) -> None:
-        def _command() -> None:
-            callback = getattr(check, "_pn_on_change", None)
-            if callable(callback):
-                try:
-                    callback(bool(check._pn_var.get()))
-                except Exception:
-                    pass
-
-        try:
-            check.configure(command=_command)
-        except Exception:
-            pass
-
-    def _apply(self, check: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(check, props)
-        if "on_change" in props:
-            check._pn_on_change = props["on_change"]
+    def apply(self, check: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(check, "_pn_props", props)
         if "value" in props:
             try:
                 check._pn_var.set(1 if props.get("value") else 0)
@@ -778,35 +1008,15 @@ class SwitchHandler(DesktopViewHandler):
 
 
 class CheckboxHandler(DesktopViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def build(self, props: Dict[str, Any]) -> Any:
         var = tk.IntVar(master=_master(), value=1 if props.get("value") else 0)
         check = tk.Checkbutton(_master(), variable=var, takefocus=0, highlightthickness=0, anchor="w")
         check._pn_var = var
-        self._bind(check, props)
-        self._apply(check, props)
+        check.configure(command=lambda: _fire(check, "on_change", bool(var.get())))
         return check
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _bind(self, check: Any, props: Dict[str, Any]) -> None:
-        def _command() -> None:
-            callback = getattr(check, "_pn_on_change", None)
-            if callable(callback):
-                try:
-                    callback(bool(check._pn_var.get()))
-                except Exception:
-                    pass
-
-        try:
-            check.configure(command=_command)
-        except Exception:
-            pass
-
-    def _apply(self, check: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(check, props)
-        if "on_change" in props:
-            check._pn_on_change = props["on_change"]
+    def apply(self, check: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(check, "_pn_props", props)
         opts: Dict[str, Any] = {}
         if "label" in merged:
             opts["text"] = "" if merged.get("label") is None else str(merged["label"])
@@ -834,7 +1044,7 @@ class CheckboxHandler(DesktopViewHandler):
 
 
 class SliderHandler(DesktopViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def build(self, props: Dict[str, Any]) -> Any:
         scale = tk.Scale(
             _master(),
             orient="horizontal",
@@ -843,31 +1053,19 @@ class SliderHandler(DesktopViewHandler):
             bd=0,
             sliderlength=20,
         )
-        self._bind(scale, props)
-        self._apply(scale, props)
-        return scale
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _bind(self, scale: Any, props: Dict[str, Any]) -> None:
         def _command(_value: Any) -> None:
-            callback = getattr(scale, "_pn_on_change", None)
-            if callable(callback):
+            if not getattr(scale, "_pn_suppress", False):
                 try:
-                    callback(float(scale.get()))
+                    _fire(scale, "on_change", float(scale.get()))
                 except Exception:
                     pass
 
-        try:
-            scale.configure(command=_command)
-        except Exception:
-            pass
+        scale.configure(command=_command)
+        return scale
 
-    def _apply(self, scale: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(scale, props)
-        if "on_change" in props:
-            scale._pn_on_change = props["on_change"]
+    def apply(self, scale: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(scale, "_pn_props", props)
         opts: Dict[str, Any] = {
             "from_": _finite(merged.get("min_value", 0.0)),
             "to": _finite(merged.get("max_value", 1.0)),
@@ -894,16 +1092,11 @@ class SliderHandler(DesktopViewHandler):
 
 
 class ProgressBarHandler(DesktopViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
-        bar = ttk.Progressbar(_master(), orient="horizontal", maximum=1.0)
-        self._apply(bar, props)
-        return bar
+    def build(self, props: Dict[str, Any]) -> Any:
+        return ttk.Progressbar(_master(), orient="horizontal", maximum=1.0)
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _apply(self, bar: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(bar, props)
+    def apply(self, bar: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(bar, "_pn_props", props)
         if merged.get("indeterminate"):
             try:
                 bar.configure(mode="indeterminate")
@@ -922,16 +1115,11 @@ class ProgressBarHandler(DesktopViewHandler):
 
 
 class ActivityIndicatorHandler(DesktopViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
-        bar = ttk.Progressbar(_master(), orient="horizontal", mode="indeterminate", length=40)
-        self._apply(bar, props)
-        return bar
+    def build(self, props: Dict[str, Any]) -> Any:
+        return ttk.Progressbar(_master(), orient="horizontal", mode="indeterminate", length=40)
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _apply(self, bar: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(bar, props)
+    def apply(self, bar: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(bar, "_pn_props", props)
         try:
             if merged.get("animating", True):
                 bar.start(50)
@@ -952,42 +1140,31 @@ class ActivityIndicatorHandler(DesktopViewHandler):
 
 
 class SpacerHandler(DesktopViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
-        return tk.Frame(_master(), highlightthickness=0, bd=0)
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
+    def apply(self, widget: Any, props: Dict[str, Any]) -> None:
         pass
 
 
 class StatusBarHandler(DesktopViewHandler):
     """Desktop has no system status bar; render an inert zero-size frame."""
 
-    def create(self, props: Dict[str, Any]) -> Any:
-        return tk.Frame(_master(), highlightthickness=0, bd=0)
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
+    def apply(self, widget: Any, props: Dict[str, Any]) -> None:
         pass
 
 
 class WebViewHandler(DesktopViewHandler):
     """No embedded browser on desktop; show a labeled placeholder."""
 
-    def create(self, props: Dict[str, Any]) -> Any:
-        label = tk.Label(
+    def build(self, props: Dict[str, Any]) -> Any:
+        return tk.Label(
             _master(),
             background="#1c1c1e",
             foreground="#ffffff",
             highlightthickness=0,
             justify="center",
         )
-        self._apply(label, props)
-        return label
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _apply(self, label: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(label, props)
+    def apply(self, label: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(label, "_pn_props", props)
         target = merged.get("url") or ("inline HTML" if merged.get("html") else "")
         try:
             label.configure(text=f"\U0001f310 WebView\n{target}")
@@ -1002,62 +1179,51 @@ class WebViewHandler(DesktopViewHandler):
 
 
 class PressableHandler(DesktopViewHandler):
-    """A frame that forwards click / long-press to its callbacks."""
+    """A frame that forwards press / long-press / gestures."""
 
-    def create(self, props: Dict[str, Any]) -> Any:
+    def build(self, props: Dict[str, Any]) -> Any:
         frame = tk.Frame(_master(), highlightthickness=0, bd=0, cursor="hand2")
         self._bind(frame)
-        self._apply(frame, props)
         return frame
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
     def _bind(self, frame: Any) -> None:
-        def _on_press(_event: Any = None) -> None:
-            callback = getattr(frame, "_pn_on_press", None)
-            if callable(callback):
-                try:
-                    callback()
-                except Exception:
-                    pass
+        def _on_release(event: Any = None) -> None:
+            fired_long = getattr(frame, "_pn_long_fired", False)
+            frame._pn_long_fired = False
+            self._cancel_long(frame)
+            _fire(frame, "on_press_out")
+            if not fired_long:
+                _fire(frame, "on_press")
 
-        def _schedule_long(_event: Any = None) -> None:
-            callback = getattr(frame, "_pn_on_long_press", None)
-            if callable(callback):
+        def _on_press_down(_event: Any = None) -> None:
+            frame._pn_long_fired = False
+            _fire(frame, "on_press_in")
+            if _has_event(frame, "on_long_press"):
                 frame._pn_long_after = frame.after(500, _fire_long)
 
         def _fire_long() -> None:
-            callback = getattr(frame, "_pn_on_long_press", None)
-            if callable(callback):
-                try:
-                    callback()
-                except Exception:
-                    pass
+            frame._pn_long_fired = True
+            _fire(frame, "on_long_press")
 
-        def _cancel_long(_event: Any = None) -> None:
-            after_id = getattr(frame, "_pn_long_after", None)
-            if after_id is not None:
-                try:
-                    frame.after_cancel(after_id)
-                except Exception:
-                    pass
-                frame._pn_long_after = None
+        def _on_leave(_event: Any = None) -> None:
+            self._cancel_long(frame)
 
         try:
-            frame.bind("<ButtonRelease-1>", _on_press)
-            frame.bind("<ButtonPress-1>", _schedule_long)
-            frame.bind("<Leave>", _cancel_long)
+            frame.bind("<ButtonRelease-1>", _on_release, add="+")
+            frame.bind("<ButtonPress-1>", _on_press_down, add="+")
+            frame.bind("<Leave>", _on_leave, add="+")
         except Exception:
             pass
 
-    def _apply(self, frame: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(frame, props)
-        if "on_press" in props:
-            frame._pn_on_press = props["on_press"]
-        if "on_long_press" in props:
-            frame._pn_on_long_press = props["on_long_press"]
-        _apply_common(frame, merged)
+    @staticmethod
+    def _cancel_long(frame: Any) -> None:
+        after_id = getattr(frame, "_pn_long_after", None)
+        if after_id is not None:
+            try:
+                frame.after_cancel(after_id)
+            except Exception:
+                pass
+            frame._pn_long_after = None
 
 
 # ======================================================================
@@ -1074,21 +1240,11 @@ class ModalHandler(DesktopViewHandler):
     visibility and stacking.
     """
 
-    def create(self, props: Dict[str, Any]) -> Any:
-        frame = tk.Frame(_master(), highlightthickness=0, bd=0, background="#ffffff")
-        self._apply(frame, props)
-        return frame
+    def build(self, props: Dict[str, Any]) -> Any:
+        return tk.Frame(_master(), highlightthickness=0, bd=0, background="#ffffff")
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _apply(self, frame: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(frame, props)
-        if merged.get("transparent"):
-            try:
-                frame.configure(background="#33000000".replace("33", ""))  # solid fallback
-            except Exception:
-                pass
+    def apply(self, frame: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(frame, "_pn_props", props)
         visible = bool(merged.get("visible"))
         stage = get_root_container()
         try:
@@ -1099,9 +1255,16 @@ class ModalHandler(DesktopViewHandler):
                 frame.place_forget()
         except Exception:
             pass
+        if visible != getattr(frame, "_pn_was_visible", None):
+            frame._pn_was_visible = visible
+            if visible:
+                _fire(frame, "on_show")
+            elif getattr(frame, "_pn_was_visible_once", False):
+                _fire(frame, "on_dismiss")
+            frame._pn_was_visible_once = True
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
-        # Modal placement is driven by visibility in ``_apply``; the
+        # Modal placement is driven by visibility in ``apply``; the
         # engine never frames the placeholder itself.
         return
 
@@ -1114,24 +1277,19 @@ class ModalHandler(DesktopViewHandler):
 class TabBarHandler(DesktopViewHandler):
     """Bottom tab bar — a row of buttons laid out across its width."""
 
-    def create(self, props: Dict[str, Any]) -> Any:
+    def build(self, props: Dict[str, Any]) -> Any:
         frame = tk.Frame(_master(), highlightthickness=1, bd=0, background="#f2f2f7")
         try:
             frame.configure(highlightbackground="#c6c6c8", highlightcolor="#c6c6c8")
         except Exception:
             pass
         frame._pn_buttons = []
-        self._apply(frame, props)
         return frame
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _apply(self, frame: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(frame, props)
+    def apply(self, frame: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(frame, "_pn_props", props)
         items: List[Dict[str, Any]] = merged.get("items") or []
         active = merged.get("active_tab")
-        on_select = merged.get("on_tab_select")
         for button in getattr(frame, "_pn_buttons", []):
             try:
                 button.destroy()
@@ -1144,14 +1302,7 @@ class TabBarHandler(DesktopViewHandler):
             is_active = name == active
 
             def _make_cmd(tab_name: Any) -> Any:
-                def _cmd() -> None:
-                    if callable(on_select):
-                        try:
-                            on_select(tab_name)
-                        except Exception:
-                            pass
-
-                return _cmd
+                return lambda: _fire(frame, "on_tab_select", tab_name)
 
             button = tk.Button(
                 frame,
@@ -1200,35 +1351,23 @@ class TabBarHandler(DesktopViewHandler):
 
 
 class PickerHandler(DesktopViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def build(self, props: Dict[str, Any]) -> Any:
         combo = ttk.Combobox(_master(), state="readonly")
-        self._bind(combo)
-        self._apply(combo, props)
-        return combo
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _bind(self, combo: Any) -> None:
         def _on_select(_event: Any = None) -> None:
-            callback = getattr(combo, "_pn_on_change", None)
             items = getattr(combo, "_pn_items", [])
             idx = combo.current()
-            if callable(callback) and 0 <= idx < len(items):
-                try:
-                    callback(items[idx].get("value"))
-                except Exception:
-                    pass
+            if 0 <= idx < len(items):
+                _fire(combo, "on_change", items[idx].get("value"))
 
         try:
             combo.bind("<<ComboboxSelected>>", _on_select)
         except Exception:
             pass
+        return combo
 
-    def _apply(self, combo: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(combo, props)
-        if "on_change" in props:
-            combo._pn_on_change = props["on_change"]
+    def apply(self, combo: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(combo, "_pn_props", props)
         items: List[Dict[str, Any]] = merged.get("items") or []
         combo._pn_items = items
         labels = [str(item.get("label", item.get("value", ""))) for item in items]
@@ -1251,20 +1390,15 @@ class PickerHandler(DesktopViewHandler):
 
 
 class SegmentedControlHandler(DesktopViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def build(self, props: Dict[str, Any]) -> Any:
         frame = tk.Frame(_master(), highlightthickness=0, bd=0)
         frame._pn_buttons = []
-        self._apply(frame, props)
         return frame
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _apply(self, frame: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(frame, props)
+    def apply(self, frame: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(frame, "_pn_props", props)
         segments: List[str] = merged.get("segments") or []
         selected = int(merged.get("selected_index", 0) or 0)
-        on_change = merged.get("on_change")
         tint = _tk_color(merged.get("tint_color")) or "#007aff"
         for button in getattr(frame, "_pn_buttons", []):
             try:
@@ -1276,14 +1410,7 @@ class SegmentedControlHandler(DesktopViewHandler):
             is_active = i == selected
 
             def _make_cmd(index: int) -> Any:
-                def _cmd() -> None:
-                    if callable(on_change):
-                        try:
-                            on_change(index)
-                        except Exception:
-                            pass
-
-                return _cmd
+                return lambda: _fire(frame, "on_change", index)
 
             button = tk.Button(
                 frame,
@@ -1329,33 +1456,20 @@ class SegmentedControlHandler(DesktopViewHandler):
 class DatePickerHandler(DesktopViewHandler):
     """Preview DatePicker — a text entry for the ISO date/time string."""
 
-    def create(self, props: Dict[str, Any]) -> Any:
+    def build(self, props: Dict[str, Any]) -> Any:
         entry = tk.Entry(_master(), highlightthickness=1, bd=0)
-        self._bind(entry)
-        self._apply(entry, props)
-        return entry
 
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        self._apply(native_view, changed)
-
-    def _bind(self, entry: Any) -> None:
         def _on_key(_event: Any = None) -> None:
-            callback = getattr(entry, "_pn_on_change", None)
-            if callable(callback):
-                try:
-                    callback(entry.get())
-                except Exception:
-                    pass
+            _fire(entry, "on_change", entry.get())
 
         try:
             entry.bind("<KeyRelease>", _on_key)
         except Exception:
             pass
+        return entry
 
-    def _apply(self, entry: Any, props: Dict[str, Any]) -> None:
-        merged = _merge_props(entry, props)
-        if "on_change" in props:
-            entry._pn_on_change = props["on_change"]
+    def apply(self, entry: Any, props: Dict[str, Any]) -> None:
+        merged = getattr(entry, "_pn_props", props)
         if "enabled" in merged:
             try:
                 entry.configure(state="normal" if merged.get("enabled", True) else "disabled")
@@ -1379,78 +1493,6 @@ class DatePickerHandler(DesktopViewHandler):
 
 
 # ======================================================================
-# VirtualList (FlatList / SectionList)
-# ======================================================================
-
-
-class VirtualListHandler(DesktopViewHandler):
-    """Preview list — eagerly mounts a bounded window of rows.
-
-    The native iOS/Android backends recycle cells; the desktop preview
-    mounts up to [`_MAX_ROWS`][pythonnative.native_views.desktop.VirtualListHandler]
-    rows into per-row cells once its frame is known. Each cell is handed
-    to the ``mount_row`` callback supplied by
-    [`FlatList`][pythonnative.FlatList] / [`SectionList`][pythonnative.SectionList],
-    which mounts the row's element subtree through a nested reconciler.
-    """
-
-    _MAX_ROWS = 200
-
-    def create(self, props: Dict[str, Any]) -> Any:
-        frame = tk.Frame(_master(), highlightthickness=0, bd=0)
-        frame._pn_rows = []
-        frame._pn_mounted = False
-        self._apply(frame, props)
-        return frame
-
-    def update(self, native_view: Any, changed: Dict[str, Any]) -> None:
-        was_count = (getattr(native_view, "_pn_props", {}) or {}).get("count")
-        self._apply(native_view, changed)
-        if "count" in changed and changed.get("count") != was_count:
-            native_view._pn_mounted = False
-            self._mount_rows(native_view)
-
-    def _apply(self, frame: Any, props: Dict[str, Any]) -> Dict[str, Any]:
-        merged = _merge_props(frame, props)
-        _apply_common(frame, merged)
-        return merged
-
-    def _mount_rows(self, frame: Any) -> None:
-        if getattr(frame, "_pn_mounted", False):
-            return
-        merged = getattr(frame, "_pn_props", {}) or {}
-        count = int(merged.get("count", 0) or 0)
-        row_height = _finite(merged.get("row_height", 0.0))
-        mount_row = merged.get("mount_row")
-        frame_w, _frame_h = getattr(frame, "_pn_size", (0.0, 0.0))
-        if count <= 0 or row_height <= 0 or not callable(mount_row) or frame_w <= 0:
-            return
-        for cell in getattr(frame, "_pn_rows", []):
-            try:
-                cell.destroy()
-            except Exception:
-                pass
-        rows: List[Any] = []
-        for index in range(min(count, self._MAX_ROWS)):
-            cell = tk.Frame(_master(), highlightthickness=0, bd=0)
-            cell._pn_parent = frame
-            cell._pn_frame = (0.0, index * row_height, frame_w, row_height)
-            _place(cell)
-            rows.append(cell)
-            try:
-                mount_row(index, cell, frame_w, row_height)
-            except Exception:
-                pass
-        frame._pn_rows = rows
-        frame._pn_mounted = True
-
-    def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
-        native_view._pn_size = (max(0.0, _finite(width)), max(0.0, _finite(height)))
-        super().set_frame(native_view, x, y, width, height)
-        self._mount_rows(native_view)
-
-
-# ======================================================================
 # Registration
 # ======================================================================
 
@@ -1459,7 +1501,9 @@ def register_handlers(registry: Any) -> None:
     """Register every built-in desktop handler on ``registry``.
 
     Mirrors ``register_handlers`` in the iOS / Android backends so the
-    desktop registry services the same 25 element types.
+    desktop registry services the same element types. Lists
+    (``FlatList`` / ``SectionList``) need no handler: they are Python
+    components that virtualize on top of ``ScrollView``.
     """
     flex = FlexContainerHandler()
     registry.register("View", flex)
@@ -1482,7 +1526,6 @@ def register_handlers(registry: Any) -> None:
     registry.register("Pressable", PressableHandler())
     registry.register("StatusBar", StatusBarHandler())
     registry.register("KeyboardAvoidingView", KeyboardAvoidingViewHandler())
-    registry.register("VirtualList", VirtualListHandler())
     registry.register("Picker", PickerHandler())
     registry.register("Checkbox", CheckboxHandler())
     registry.register("SegmentedControl", SegmentedControlHandler())

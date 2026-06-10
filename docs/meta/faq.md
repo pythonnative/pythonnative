@@ -60,7 +60,7 @@ approximated, and there's no app packaging for desktop. Ship to devices
 with `pn run android` / `pn run ios`.
 
 The core (components, hooks, reconciler) is also platform-agnostic and
-runs headless with a [mock registry](../guides/testing.md#a-minimal-mock-registry) —
+runs headless with a [fake backend](../guides/testing.md#a-minimal-fake-backend) —
 that's how the unit-test suite works.
 
 ## How do I package and distribute my app?

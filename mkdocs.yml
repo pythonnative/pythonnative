@@ -81,6 +81,7 @@ nav:
     - Navigation: guides/navigation.md
     - Styling: guides/styling.md
     - Animations: guides/animations.md
+    - Gestures: guides/gestures.md
     - Lists: guides/lists.md
     - Async + Data: guides/async.md
     - Platform & Accessibility: guides/platform-accessibility.md
@@ -105,6 +106,7 @@ nav:
     - Components: api/components.md
     - Hooks: api/hooks.md
     - Animated: api/animated.md
+    - Gestures: api/gestures.md
     - Alerts: api/alerts.md
     - Async runtime: api/runtime.md
     - Network: api/net.md

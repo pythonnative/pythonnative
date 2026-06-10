@@ -3,6 +3,8 @@
 from typing import Any, Dict, List
 
 import pytest
+from fake_backend import FakeBackend as MockBackend
+from fake_backend import FakeView as MockView
 
 from pythonnative.element import Element
 from pythonnative.hooks import HookState, _NavigationContext, _set_hook_state, component, use_navigation
@@ -22,48 +24,6 @@ from pythonnative.navigation import (
     use_route,
 )
 from pythonnative.reconciler import Reconciler
-
-# ======================================================================
-# Mock backend (same as test_reconciler / test_hooks)
-# ======================================================================
-
-
-class MockView:
-    _next_id = 0
-
-    def __init__(self, type_name: str, props: Dict[str, Any]) -> None:
-        MockView._next_id += 1
-        self.id = MockView._next_id
-        self.type_name = type_name
-        self.props = dict(props)
-        self.children: List["MockView"] = []
-
-
-class MockBackend:
-    def __init__(self) -> None:
-        self.ops: List[Any] = []
-
-    def create_view(self, type_name: str, props: Dict[str, Any]) -> MockView:
-        view = MockView(type_name, props)
-        self.ops.append(("create", type_name, view.id))
-        return view
-
-    def update_view(self, view: MockView, type_name: str, changed: Dict[str, Any]) -> None:
-        view.props.update(changed)
-        self.ops.append(("update", type_name, view.id, tuple(sorted(changed.keys()))))
-
-    def add_child(self, parent: MockView, child: MockView, parent_type: str) -> None:
-        parent.children.append(child)
-        self.ops.append(("add_child", parent.id, child.id))
-
-    def remove_child(self, parent: MockView, child: MockView, parent_type: str) -> None:
-        parent.children = [c for c in parent.children if c.id != child.id]
-        self.ops.append(("remove_child", parent.id, child.id))
-
-    def insert_child(self, parent: MockView, child: MockView, parent_type: str, index: int) -> None:
-        parent.children.insert(index, child)
-        self.ops.append(("insert_child", parent.id, child.id, index))
-
 
 # ======================================================================
 # Data structures
@@ -626,7 +586,9 @@ def test_tab_navigator_renders_native_tab_bar() -> None:
         {"name": "TabB", "title": "Tab B"},
     ]
     assert tab_bar.props["active_tab"] == "TabA"
-    assert callable(tab_bar.props["on_tab_select"])
+    # The callback itself is routed to the event registry; the native
+    # payload only carries the wired event-name set.
+    assert "on_tab_select" in tab_bar.props["_pn_events"]
 
 
 def test_tab_navigator_forwards_tab_bar_icon() -> None:

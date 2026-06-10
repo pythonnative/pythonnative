@@ -24,10 +24,12 @@ Example:
     ```
 """
 
+import bisect
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Literal, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 
 from .element import Element
+from .hooks import component, use_effect, use_ref, use_state
 from .sdk import Props
 from .style import (
     AutoCapitalize,
@@ -236,6 +238,7 @@ class SliderProps(Props):
 class ViewProps(Props):
     """Props for [`View`][pythonnative.View], [`Column`][pythonnative.Column], and [`Row`][pythonnative.Row]."""
 
+    gestures: Optional[List[Any]] = None
     accessibility_label: Optional[str] = None
     accessibility_hint: Optional[str] = None
     accessibility_role: Optional[str] = None
@@ -244,11 +247,15 @@ class ViewProps(Props):
 
 @dataclass(frozen=True)
 class ScrollViewProps(Props):
-    """Props for [`ScrollView`][pythonnative.ScrollView]."""
+    """Props for [`ScrollView`][pythonnative.ScrollView].
+
+    ``on_scroll`` receives a single payload dict with ``"x"`` and
+    ``"y"`` content offsets in points.
+    """
 
     refresh_control: Optional[Dict[str, Any]] = None
     scroll_axis: Optional[Literal["vertical", "horizontal"]] = None
-    on_scroll: Optional[Callable[[float, float], None]] = None
+    on_scroll: Optional[Callable[[Dict[str, float]], None]] = None
     shows_scroll_indicator: bool = True
     paging_enabled: bool = False
     bounces: bool = True
@@ -281,7 +288,10 @@ class PressableProps(Props):
 
     on_press: Optional[Callable[[], None]] = None
     on_long_press: Optional[Callable[[], None]] = None
+    on_press_in: Optional[Callable[[], None]] = None
+    on_press_out: Optional[Callable[[], None]] = None
     pressed_opacity: float = 0.6
+    gestures: Optional[List[Any]] = None
     accessibility_label: Optional[str] = None
     accessibility_hint: Optional[str] = None
     accessibility_role: Optional[str] = None
@@ -875,6 +885,7 @@ def Slider(
 def View(
     *children: Element,
     style: StyleProp = None,
+    gestures: Optional[List[Any]] = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
@@ -890,20 +901,30 @@ def View(
 
     - ``flex_direction``: ``"column"`` (default), ``"row"``,
       ``"column_reverse"``, ``"row_reverse"``.
+    - ``flex_wrap``: ``"nowrap"`` (default), ``"wrap"``,
+      ``"wrap_reverse"`` — with ``align_content`` controlling how
+      wrapped lines share leftover cross-axis space.
     - ``justify_content``: main-axis distribution. Accepts
       ``"flex_start"`` (default), ``"center"``, ``"flex_end"``,
       ``"space_between"``, ``"space_around"``, ``"space_evenly"``.
     - ``align_items``: cross-axis alignment. Accepts ``"stretch"``
       (default), ``"flex_start"``, ``"center"``, ``"flex_end"``.
+    - ``direction``: ``"ltr"`` (default) or ``"rtl"`` — flips rows and
+      resolves ``margin_start`` / ``padding_end`` / absolute ``start``
+      / ``end`` insets.
     - ``overflow``: ``"visible"`` (default) or ``"hidden"``.
-    - ``spacing``, ``padding``, ``background_color``, ``border_radius``,
-      ``border_width``, ``border_color``, ``shadow_color``,
-      ``shadow_offset``, ``shadow_opacity``, ``shadow_radius``,
-      ``elevation``, ``opacity``, ``transform``.
+    - ``spacing`` (alias ``gap``; per-axis ``row_gap`` /
+      ``column_gap``), ``padding``, ``background_color``,
+      ``border_radius``, ``border_width``, ``border_color``,
+      ``shadow_color``, ``shadow_offset``, ``shadow_opacity``,
+      ``shadow_radius``, ``elevation``, ``opacity``, ``transform``.
 
     Args:
         *children: Child elements rendered inside the container.
         style: Style dict (or list of dicts).
+        gestures: Optional list of gesture descriptors from
+            `pythonnative.gestures` (e.g. ``[gestures.Pan(on_change=…)]``)
+            recognized natively on this view.
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
         accessibility_role: Semantic role for assistive tech.
@@ -920,6 +941,7 @@ def View(
         style=style,
         ref=ref,
         key=key,
+        gestures=gestures,
         accessibility_label=accessibility_label,
         accessibility_hint=accessibility_hint,
         accessibility_role=accessibility_role,
@@ -994,7 +1016,7 @@ def ScrollView(
     *children: Element,
     refresh_control: Optional[Dict[str, Any]] = None,
     scroll_axis: Optional[Literal["vertical", "horizontal"]] = None,
-    on_scroll: Optional[Callable[[float, float], None]] = None,
+    on_scroll: Optional[Callable[[Dict[str, float]], None]] = None,
     shows_scroll_indicator: bool = True,
     paging_enabled: bool = False,
     bounces: bool = True,
@@ -1019,8 +1041,8 @@ def ScrollView(
             must have ``refreshing`` (bool) and ``on_refresh``
             (callable).
         scroll_axis: ``"vertical"`` (default) or ``"horizontal"``.
-        on_scroll: Callback invoked with ``(x, y)`` content offsets as
-            the user scrolls.
+        on_scroll: Callback invoked with ``{"x": …, "y": …}`` content
+            offsets as the user scrolls.
         shows_scroll_indicator: When ``False``, hides the scroll bar.
         paging_enabled: When ``True``, the scroll view snaps to
             multiples of its own size (carousel behavior).
@@ -1147,15 +1169,19 @@ def Pressable(
     *children: Element,
     on_press: Optional[Callable[[], None]] = None,
     on_long_press: Optional[Callable[[], None]] = None,
+    on_press_in: Optional[Callable[[], None]] = None,
+    on_press_out: Optional[Callable[[], None]] = None,
     pressed_opacity: float = 0.6,
+    gestures: Optional[List[Any]] = None,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
+    ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Wrap children with tap and long-press handlers.
+    """Wrap children with tap / long-press / gesture handlers.
 
     Useful for making non-button elements (text, images, custom views)
     respond to user taps. The wrapper view fades to ``pressed_opacity``
@@ -1167,13 +1193,19 @@ def Pressable(
         *children: Elements to make pressable.
         on_press: Callback invoked on a normal tap.
         on_long_press: Callback invoked on a sustained press.
+        on_press_in: Callback invoked the moment the press starts.
+        on_press_out: Callback invoked when the press lifts or cancels.
         pressed_opacity: Opacity (0–1) applied while the user's finger
             is down. Set to ``1.0`` for no visual feedback.
+        gestures: Optional list of gesture descriptors from
+            `pythonnative.gestures` recognized natively on this view
+            (pan / swipe / pinch / rotation / multi-tap).
         style: Style dict applied to the wrapper.
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
         accessibility_role: Override the default ``"button"`` role.
         accessible: Override whether the element is exposed to AT.
+        ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -1183,10 +1215,14 @@ def Pressable(
         "Pressable",
         *children,
         style=style,
+        ref=ref,
         key=key,
         on_press=on_press,
         on_long_press=on_long_press,
+        on_press_in=on_press_in,
+        on_press_out=on_press_out,
         pressed_opacity=pressed_opacity,
+        gestures=gestures,
         accessibility_label=accessibility_label,
         accessibility_hint=accessibility_hint,
         accessibility_role=accessibility_role,
@@ -1554,8 +1590,245 @@ def ErrorBoundary(
 
 
 # ======================================================================
-# Lists
+# Lists (Python-windowed virtualization over ScrollView)
 # ======================================================================
+#
+# FlatList and SectionList are pure Python components, not native
+# elements. They render a windowed slice of rows into a ScrollView —
+# leading spacer, visible rows, trailing spacer — and shift the window
+# from scroll events (the same architecture as React Native's
+# VirtualizedList). Because every windowed row lives in the *main*
+# layout tree, rows may be any height: estimates only steer the spacer
+# sizes, and each row's measured extent is fed back from the layout
+# pass through its ref to correct the estimates over time.
+
+_DEFAULT_ROW_EXTENT = 44.0
+
+
+class _RowSpec:
+    """One virtualized row: a stable key, a lazy renderer, and an extent hint."""
+
+    __slots__ = ("key", "make", "extent", "item", "index")
+
+    def __init__(
+        self,
+        key: str,
+        make: Callable[[], Element],
+        extent: Optional[float],
+        item: Any = None,
+        index: int = 0,
+    ) -> None:
+        self.key = key
+        self.make = make
+        self.extent = extent
+        self.item = item
+        self.index = index
+
+
+def _dispatch_scroll_command(scroll_ref: Any, name: str, args: Dict[str, Any]) -> Any:
+    """Send an imperative command to the ScrollView under ``scroll_ref``."""
+    tag = scroll_ref.get("_pn_tag") if isinstance(scroll_ref, dict) else None
+    if tag is None:
+        return None
+    from .native_views import get_registry
+
+    try:
+        return get_registry().command(tag, name, args)
+    except Exception:
+        return None
+
+
+@component
+def _VirtualizedList(**p: Any) -> Element:
+    """Shared windowing engine behind FlatList and SectionList."""
+    rows: List[_RowSpec] = p.get("rows") or []
+    n = len(rows)
+    horizontal: bool = bool(p.get("horizontal"))
+    estimated: float = float(p.get("estimated_row_extent") or _DEFAULT_ROW_EXTENT)
+    overscan: float = float(p.get("overscan_extent") or 0.0)
+    initial_extent: float = float(p.get("initial_window_extent") or 800.0)
+
+    window, set_window = use_state((0, -1))
+    measured = use_ref({})  # row key -> measured extent (points)
+    row_refs = use_ref({})  # row key -> ref dict for live rows
+    end_latch = use_ref({"fired_for": -1})
+    viewable_ref = use_ref({"keys": ()})
+    scroll_pos = use_ref({"offset": 0.0})
+    sv_ref = use_ref(None)
+
+    # ------------------------------------------------------------------
+    # Extent model: measured > per-row hint > estimate. ``starts`` are
+    # prefix sums; ``starts[n]`` is the total content extent.
+    # ------------------------------------------------------------------
+    measured_map: Dict[str, float] = measured["current"]
+    starts: List[float] = [0.0] * (n + 1)
+    acc = 0.0
+    for i, spec in enumerate(rows):
+        starts[i] = acc
+        extent = measured_map.get(spec.key)
+        if extent is None:
+            extent = spec.extent if spec.extent is not None else estimated
+        acc += max(0.0, float(extent))
+    starts[n] = acc
+    total_extent = acc
+
+    def _viewport_extent() -> float:
+        frame = sv_ref.get("_pn_frame") if isinstance(sv_ref, dict) else None
+        if frame:
+            extent = frame[2] if horizontal else frame[3]
+            if extent and extent > 0:
+                return float(extent)
+        return initial_extent
+
+    def _window_for(offset: float, viewport: float) -> Tuple[int, int]:
+        if n == 0:
+            return (0, -1)
+        pad = overscan if overscan > 0 else viewport
+        lo = max(0.0, offset - pad)
+        hi = offset + viewport + pad
+        first = max(0, bisect.bisect_right(starts, lo, 0, n) - 1)
+        last = min(n - 1, bisect.bisect_left(starts, hi, 0, n))
+        return (first, last)
+
+    first, last = window
+    if last < 0 or first >= n:
+        first, last = _window_for(scroll_pos["current"]["offset"], _viewport_extent())
+    last = min(last, n - 1)
+    first = max(0, min(first, max(0, n - 1)))
+
+    # ------------------------------------------------------------------
+    # Scroll handling: sweep measured extents, shift the window, fire
+    # end-reached / viewability callbacks. State only changes when the
+    # window actually moves, so steady scrolling inside the overscan
+    # region costs no re-render.
+    # ------------------------------------------------------------------
+    on_end_reached = p.get("on_end_reached")
+    end_threshold = float(p.get("on_end_reached_threshold") or 0.5)
+    on_viewable = p.get("on_viewable_items_changed")
+    user_on_scroll = p.get("on_scroll")
+
+    def _sweep_measured() -> None:
+        for row_key, ref in row_refs["current"].items():
+            frame = ref.get("_pn_frame") if isinstance(ref, dict) else None
+            if frame:
+                extent = frame[2] if horizontal else frame[3]
+                if extent and extent > 0:
+                    measured_map[row_key] = float(extent)
+
+    def _handle_scroll(payload: Any) -> None:
+        if isinstance(payload, dict):
+            offset = float(payload.get("x" if horizontal else "y", 0.0) or 0.0)
+        else:
+            offset = float(payload or 0.0)
+        scroll_pos["current"]["offset"] = offset
+        _sweep_measured()
+        viewport = _viewport_extent()
+
+        new_window = _window_for(offset, viewport)
+        if new_window != (first, last):
+            set_window(new_window)
+
+        if on_end_reached is not None and total_extent > 0:
+            remaining = total_extent - (offset + viewport)
+            if remaining <= end_threshold * viewport:
+                if end_latch["current"]["fired_for"] != n:
+                    end_latch["current"]["fired_for"] = n
+                    on_end_reached()
+            elif remaining > end_threshold * viewport + viewport:
+                end_latch["current"]["fired_for"] = -1
+
+        if on_viewable is not None and n > 0:
+            v_first = max(0, bisect.bisect_right(starts, offset, 0, n) - 1)
+            v_last = min(n - 1, bisect.bisect_left(starts, offset + viewport, 0, n))
+            keys = tuple(rows[i].key for i in range(v_first, v_last + 1))
+            if keys != viewable_ref["current"]["keys"]:
+                viewable_ref["current"]["keys"] = keys
+                on_viewable(
+                    [
+                        {"index": rows[i].index, "key": rows[i].key, "item": rows[i].item}
+                        for i in range(v_first, v_last + 1)
+                    ]
+                )
+
+        if user_on_scroll is not None:
+            user_on_scroll(payload)
+
+    # ------------------------------------------------------------------
+    # Imperative controller (scroll_to_index / offset / end) exposed on
+    # the user's ref dict. Re-attached every render so the closures see
+    # fresh extents; the effect itself must run unconditionally to keep
+    # hook order stable.
+    # ------------------------------------------------------------------
+    controller = p.get("controller_ref")
+
+    def _attach_controller() -> None:
+        if not isinstance(controller, dict):
+            return
+
+        def scroll_to_offset(offset: float, animated: bool = True) -> None:
+            axis = "x" if horizontal else "y"
+            _dispatch_scroll_command(sv_ref, "scroll_to_offset", {axis: float(offset), "animated": animated})
+
+        def scroll_to_index(index: int, animated: bool = True) -> None:
+            idx = max(0, min(int(index), n - 1)) if n else 0
+            scroll_to_offset(starts[idx], animated)
+
+        def scroll_to_end(animated: bool = True) -> None:
+            scroll_to_offset(max(0.0, total_extent - _viewport_extent()), animated)
+
+        controller["scroll_to_offset"] = scroll_to_offset
+        controller["scroll_to_index"] = scroll_to_index
+        controller["scroll_to_end"] = scroll_to_end
+
+    use_effect(_attach_controller, None)
+
+    # ------------------------------------------------------------------
+    # Children: header, leading spacer, windowed rows, trailing spacer,
+    # footer. Rows keep per-key refs so their measured extents survive
+    # recycling.
+    # ------------------------------------------------------------------
+    spacer_key = "width" if horizontal else "height"
+    children: List[Element] = []
+    header = p.get("header")
+    footer = p.get("footer")
+    if header is not None:
+        children.append(View(header, key="__pn_header__"))
+
+    if n == 0:
+        empty = p.get("empty")
+        if empty is not None:
+            children.append(View(empty, key="__pn_empty__"))
+    else:
+        live_refs: Dict[str, Any] = {}
+        lead = starts[first]
+        if lead > 0:
+            lead_style: Dict[str, Any] = {spacer_key: lead}
+            children.append(View(style=lead_style, key="__pn_lead__"))
+        for i in range(first, last + 1):
+            spec = rows[i]
+            row_ref = row_refs["current"].get(spec.key) or {"current": None}
+            live_refs[spec.key] = row_ref
+            children.append(View(spec.make(), ref=row_ref, key=spec.key))
+        row_refs["current"] = live_refs
+        trail = total_extent - starts[last + 1]
+        if trail > 0:
+            trail_style: Dict[str, Any] = {spacer_key: trail}
+            children.append(View(style=trail_style, key="__pn_trail__"))
+
+    if footer is not None:
+        children.append(View(footer, key="__pn_footer__"))
+
+    wrapper = Row if horizontal else Column
+    inner = wrapper(*children, style=p.get("content_container_style"))
+    return ScrollView(
+        inner,
+        scroll_axis="horizontal" if horizontal else "vertical",
+        on_scroll=_handle_scroll,
+        refresh_control=p.get("refresh_control"),
+        shows_scroll_indicator=p.get("shows_scroll_indicator", True),
+        style=p.get("list_style"),
+        ref=sv_ref,
+    )
 
 
 def FlatList(
@@ -1564,9 +1837,10 @@ def FlatList(
     render_item: Optional[Callable[[Any, int], Element]] = None,
     key_extractor: Optional[Callable[[Any, int], str]] = None,
     item_height: Optional[float] = None,
+    get_item_height: Optional[Callable[[Any, int], float]] = None,
+    estimated_item_height: Optional[float] = None,
     separator_height: float = 0,
     refresh_control: Optional[Dict[str, Any]] = None,
-    on_item_press: Optional[Callable[[int], None]] = None,
     horizontal: bool = False,
     num_columns: int = 1,
     list_header: Optional[Element] = None,
@@ -1574,61 +1848,68 @@ def FlatList(
     list_empty: Optional[Element] = None,
     on_end_reached: Optional[Callable[[], None]] = None,
     on_end_reached_threshold: float = 0.5,
+    on_viewable_items_changed: Optional[Callable[[List[Dict[str, Any]]], None]] = None,
+    on_scroll: Optional[Callable[[Dict[str, float]], None]] = None,
+    shows_scroll_indicator: bool = True,
     content_container_style: StyleProp = None,
     style: StyleProp = None,
+    ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Virtualized scrollable list that renders items from ``data`` lazily.
 
-    Backed by ``UITableView`` on iOS and ``RecyclerView`` on Android via
-    the ``VirtualList`` element. Each visible row is mounted on demand
-    by a nested
-    [`Reconciler`][pythonnative.reconciler.Reconciler] when
-    ``item_height`` is specified.
+    Only the rows inside (and just beyond) the viewport are mounted;
+    leading and trailing spacers stand in for everything else, and the
+    window shifts as the user scrolls. Rows may have **variable
+    heights**: pass ``item_height`` when rows are uniform,
+    ``get_item_height`` for exact per-item extents, or nothing at all —
+    unknown rows start at ``estimated_item_height`` and are corrected
+    with their measured extent once they've been on screen.
 
-    When ``item_height`` is omitted the implementation falls back to an
-    eager (non-virtualized) ``ScrollView`` of every row — keep the data
-    set small in that mode (the fallback is convenient for short lists
-    where virtualization overhead would dominate).
+    The ``ref`` dict (from [`use_ref`][pythonnative.use_ref]) is
+    populated with an imperative controller:
+    ``ref["scroll_to_index"](i)``, ``ref["scroll_to_offset"](pts)``,
+    and ``ref["scroll_to_end"]()``.
 
     Args:
-        data: Iterable of arbitrary item values.
-        render_item: Function called per item, returning an
-            [`Element`][pythonnative.Element]. Defaults to wrapping
-            each item in a [`Text`][pythonnative.Text].
-        key_extractor: Function returning a stable key per item.
-        item_height: Fixed row height in layout units. Required to
-            enable native virtualization. When omitted, the list
-            falls back to an eager scroll of every row (not
-            recommended for long lists).
-        separator_height: Vertical gap between items, in layout units.
-            Combined with ``item_height`` for the virtualized case.
-        refresh_control: Optional ``{"refreshing": bool, "on_refresh":
-            callable}`` for pull-to-refresh; see
+        data: List of arbitrary item values.
+        render_item: ``render_item(item, index) -> Element``. Defaults
+            to wrapping each item in a [`Text`][pythonnative.Text].
+        key_extractor: Function returning a stable key per item
+            (recommended whenever ``data`` can reorder).
+        item_height: Uniform row extent in points, when known.
+        get_item_height: ``get_item_height(item, index) -> float`` for
+            exact variable extents without measurement.
+        estimated_item_height: Starting extent estimate for rows whose
+            true size isn't known yet (default 44).
+        separator_height: Gap below each row, in points.
+        refresh_control: Optional pull-to-refresh spec from
             [`RefreshControl`][pythonnative.RefreshControl].
-        on_item_press: Callback invoked with the row index when the
-            user taps a row (virtualized backend only).
-        horizontal: Lay rows out left-to-right instead of top-to-bottom
-            (forces the eager backend).
-        num_columns: Render items in a grid of this many columns
-            (forces the eager backend). ``1`` (default) is a plain list.
-        list_header: Optional element rendered once above all rows.
-        list_footer: Optional element rendered once below all rows.
-        list_empty: Optional element rendered when ``data`` is empty.
-        on_end_reached: Callback invoked when the user scrolls within
-            ``on_end_reached_threshold`` of the end (virtualized
-            backend).
-        on_end_reached_threshold: Fraction of the viewport from the end
-            at which ``on_end_reached`` fires.
+        horizontal: Scroll horizontally (extents become widths).
+        num_columns: Render items in a grid of this many columns.
+        list_header: Element rendered once before all rows.
+        list_footer: Element rendered once after all rows.
+        list_empty: Element rendered when ``data`` is empty.
+        on_end_reached: Called when the user scrolls within
+            ``on_end_reached_threshold`` viewports of the end (fires
+            once per data length).
+        on_end_reached_threshold: Distance from the end, in viewport
+            multiples, at which ``on_end_reached`` fires.
+        on_viewable_items_changed: Called with a list of
+            ``{"index", "key", "item"}`` dicts whenever the set of
+            visible rows changes.
+        on_scroll: Called with the raw scroll payload
+            (``{"x": …, "y": …}``).
+        shows_scroll_indicator: When ``False``, hides the scroll bar.
         content_container_style: Style applied to the inner content
-            wrapper (forces the eager backend).
-        style: Style dict (or list of dicts).
-        key: Stable identity for keyed reconciliation of the list
-            itself.
+            wrapper.
+        style: Style for the outer scroll container.
+        ref: Optional ``use_ref()`` dict; receives the scroll
+            controller functions.
+        key: Stable identity for keyed reconciliation of the list.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type ``"VirtualList"``
-        (virtualized) or ``"ScrollView"`` (eager fallback).
+        A virtualized list element (a function component instance).
 
     Example:
         ```python
@@ -1645,122 +1926,81 @@ def FlatList(
         ```
     """
     items_list = list(data or [])
+    sep = float(separator_height or 0.0)
 
-    has_ornaments = (
-        num_columns > 1
-        or horizontal
-        or list_header is not None
-        or list_footer is not None
-        or content_container_style is not None
-        or (not items_list and list_empty is not None)
-    )
-
-    if item_height is None or has_ornaments:
-        # Eager fallback for short lists, grids, and lists with
-        # header/footer/empty ornaments (which the fixed-height
-        # virtualizer can't express).
-        rendered: List[Element] = []
-        for i, item in enumerate(items_list):
-            el = render_item(item, i) if render_item else Text(str(item))
-            if key_extractor is not None:
-                el = Element(el.type, el.props, el.children, key=key_extractor(item, i))
-            rendered.append(el)
-
-        sep = separator_height or None
-
-        if not has_ornaments:
-            # Backward-compatible shape: ScrollView wrapping a single
-            # Column of the rendered rows.
-            inner = Column(*rendered, style={"spacing": sep} if sep else None)
-            return ScrollView(inner, refresh_control=refresh_control, style=style, key=key)
-
-        if not rendered and list_empty is not None:
-            content: List[Element] = [list_empty]
-        elif num_columns > 1:
-            rows: List[Element] = []
-            for start in range(0, len(rendered), num_columns):
-                chunk = rendered[start : start + num_columns]
-                rows.append(
-                    Row(
-                        *chunk,
-                        style={"spacing": separator_height, "flex": 1} if separator_height else {"flex": 1},
-                        key=f"row-{start}",
-                    )
-                )
-            content = rows
-        elif horizontal:
-            content = [Row(*rendered, style={"spacing": sep} if sep else None)]
-        else:
-            content = [Column(*rendered, style={"spacing": sep} if sep else None)]
-
-        body: List[Element] = []
-        if list_header is not None:
-            body.append(list_header)
-        body.extend(content)
-        if list_footer is not None:
-            body.append(list_footer)
-
-        axis: Literal["vertical", "horizontal"] = "horizontal" if horizontal else "vertical"
-        wrapper = Row if horizontal else Column
-        inner = wrapper(*body, style=content_container_style)
-        return ScrollView(
-            inner,
-            refresh_control=refresh_control,
-            scroll_axis=axis,
-            style=style,
-            key=key,
-        )
-
-    # Virtualized path: render_item is invoked lazily by the native
-    # cell mount callback when each row scrolls into view.
-    row_h = float(item_height) + float(separator_height)
-
-    def _mount_row(
-        index: int,
-        content_view: Any,
-        cell_width: float = 0.0,
-        cell_height: float = 0.0,
-    ) -> None:
-        # Imported lazily so the components module stays importable in
-        # off-device test environments.
-        from .native_views import get_registry
-        from .reconciler import Reconciler
-
-        try:
-            item = items_list[index]
-        except IndexError:
-            return
-
-        element = render_item(item, index) if render_item else Text(str(item))
-        backend = get_registry()
-        reconciler = Reconciler(backend)
-        native_root = reconciler.mount(element)
-
-        layout_w = float(cell_width) if cell_width and cell_width > 0 else 0.0
-        layout_h = float(cell_height) if cell_height and cell_height > 0 else float(item_height)
-        if layout_w <= 0:
+    def _row_key(item: Any, index: int) -> str:
+        if key_extractor is not None:
             try:
-                bounds = content_view.bounds
-                layout_w = float(bounds.size.width)
+                return str(key_extractor(item, index))
             except Exception:
-                layout_w = 0.0
-        if layout_w > 0 and layout_h > 0:
-            backend.set_frame(native_root, "View", 0.0, 0.0, layout_w, layout_h)
-            reconciler.set_viewport_size(layout_w, layout_h)
+                pass
+        return f"__pn_row_{index}__"
 
-        backend.add_child(content_view, native_root, "View")
+    def _row_extent(item: Any, index: int) -> Optional[float]:
+        if get_item_height is not None:
+            try:
+                return float(get_item_height(item, index)) + sep
+            except Exception:
+                return None
+        if item_height is not None:
+            return float(item_height) + sep
+        return None
 
-    return _make_element(
-        "VirtualList",
-        style=style,
-        key=key,
-        count=len(items_list),
-        row_height=row_h,
-        mount_row=_mount_row,
-        on_row_press=on_item_press,
+    def _make_row(item: Any, index: int) -> Callable[[], Element]:
+        def _make() -> Element:
+            el = render_item(item, index) if render_item else Text(str(item))
+            if sep > 0:
+                pad_style: Dict[str, Any] = {"padding_end" if horizontal else "padding_bottom": sep}
+                return View(el, style=pad_style)
+            return el
+
+        return _make
+
+    rows: List[_RowSpec] = []
+    if num_columns > 1 and not horizontal:
+        for start in range(0, len(items_list), num_columns):
+            chunk = items_list[start : start + num_columns]
+
+            def _make_group(group: List[Any] = chunk, base: int = start) -> Element:
+                cells = [
+                    View(
+                        render_item(it, base + j) if render_item else Text(str(it)),
+                        style={"flex": 1},
+                        key=_row_key(it, base + j),
+                    )
+                    for j, it in enumerate(group)
+                ]
+                row = Row(*cells)
+                if sep > 0:
+                    return View(row, style={"padding_bottom": sep})
+                return row
+
+            group_key = "__pn_grp_" + "|".join(_row_key(it, start + j) for j, it in enumerate(chunk))
+            extent = (float(item_height) + sep) if item_height is not None else None
+            rows.append(_RowSpec(group_key, _make_group, extent, item=chunk, index=start))
+    else:
+        for i, item in enumerate(items_list):
+            rows.append(_RowSpec(_row_key(item, i), _make_row(item, i), _row_extent(item, i), item=item, index=i))
+
+    estimated = estimated_item_height if estimated_item_height is not None else (item_height or _DEFAULT_ROW_EXTENT)
+
+    return _VirtualizedList(
+        rows=rows,
+        horizontal=horizontal,
+        estimated_row_extent=float(estimated) + sep,
+        header=list_header,
+        footer=list_footer,
+        empty=list_empty,
+        refresh_control=refresh_control,
         on_end_reached=on_end_reached,
         on_end_reached_threshold=on_end_reached_threshold,
-        refresh_control=refresh_control,
+        on_viewable_items_changed=on_viewable_items_changed,
+        on_scroll=on_scroll,
+        shows_scroll_indicator=shows_scroll_indicator,
+        content_container_style=resolve_style(content_container_style) or None,
+        list_style=resolve_style(style) or None,
+        controller_ref=ref,
+        key=key,
     )
 
 
@@ -1769,99 +2009,133 @@ def SectionList(
     sections: Optional[List[Dict[str, Any]]] = None,
     render_item: Optional[Callable[[Any, int, int], Element]] = None,
     render_section_header: Optional[Callable[[Dict[str, Any], int], Element]] = None,
+    key_extractor: Optional[Callable[[Any, int], str]] = None,
     item_height: Optional[float] = None,
-    section_header_height: float = 32.0,
+    get_item_height: Optional[Callable[[Any, int, int], float]] = None,
+    estimated_item_height: Optional[float] = None,
+    section_header_height: Optional[float] = None,
     separator_height: float = 0,
+    refresh_control: Optional[Dict[str, Any]] = None,
+    list_header: Optional[Element] = None,
+    list_footer: Optional[Element] = None,
+    list_empty: Optional[Element] = None,
+    on_end_reached: Optional[Callable[[], None]] = None,
+    on_end_reached_threshold: float = 0.5,
+    on_scroll: Optional[Callable[[Dict[str, float]], None]] = None,
     style: StyleProp = None,
+    ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Virtualized list that supports section headers.
+    """Virtualized list with section headers interleaved between row groups.
 
-    Internally flattens ``sections`` into a single virtualized list
-    where each row is either a section header or a section item. The
-    row mounter dispatches to ``render_section_header`` or
-    ``render_item`` depending on the row's type.
+    Flattens ``sections`` into a single virtualized sequence where each
+    entry is either a header or an item, then reuses the same windowing
+    engine as [`FlatList`][pythonnative.FlatList] — headers and items
+    may have different (and variable) heights.
 
     Args:
         sections: Each section is ``{"title": ..., "data": [...]}``.
         render_item: ``render_item(item, item_index, section_index) ->
             Element``.
         render_section_header: ``render_section_header(section,
-            section_index) -> Element``.
-        item_height: Fixed row height for items, in layout units.
-        section_header_height: Fixed header height in layout units.
-        separator_height: Gap appended below each item, in layout units.
-        style: Style dict (or list of dicts).
-        key: Stable identity for keyed reconciliation.
+            section_index) -> Element``. Defaults to a bold
+            [`Text`][pythonnative.Text] of the section title.
+        key_extractor: Stable key per item: ``key_extractor(item,
+            item_index) -> str``.
+        item_height: Uniform item extent in points, when known.
+        get_item_height: ``get_item_height(item, item_index,
+            section_index) -> float`` for exact variable extents.
+        estimated_item_height: Starting estimate for unmeasured rows.
+        section_header_height: Header extent in points, when known.
+        separator_height: Gap below each item, in points.
+        refresh_control: Optional pull-to-refresh spec.
+        list_header: Element rendered once before everything.
+        list_footer: Element rendered once after everything.
+        list_empty: Element rendered when there are no sections.
+        on_end_reached: Called near the end of the content.
+        on_end_reached_threshold: Distance from the end, in viewport
+            multiples, at which ``on_end_reached`` fires.
+        on_scroll: Called with the raw scroll payload.
+        style: Style for the outer scroll container.
+        ref: Optional ``use_ref()`` dict; receives the scroll
+            controller functions.
+        key: Stable identity for keyed reconciliation of the list.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type ``"VirtualList"``
-        (virtualized). When ``item_height`` is omitted the layout falls
-        back to an eager column.
+        A virtualized list element (a function component instance).
     """
     sections_list = list(sections or [])
+    sep = float(separator_height or 0.0)
 
-    flat: List[Dict[str, Any]] = []
+    def _header_el(section: Dict[str, Any], s_idx: int) -> Element:
+        if render_section_header is not None:
+            return render_section_header(section, s_idx)
+        return Text(str(section.get("title", "")), style={"bold": True, "padding": 8})
+
+    def _item_el(item: Any, i_idx: int, s_idx: int) -> Element:
+        if render_item is not None:
+            return render_item(item, i_idx, s_idx)
+        return Text(str(item))
+
+    rows: List[_RowSpec] = []
+    flat_index = 0
     for s_idx, section in enumerate(sections_list):
-        flat.append({"_kind": "header", "section": section, "section_index": s_idx})
+
+        def _make_header(sec: Dict[str, Any] = section, si: int = s_idx) -> Element:
+            return _header_el(sec, si)
+
+        rows.append(
+            _RowSpec(
+                f"__pn_sec_{s_idx}__",
+                _make_header,
+                float(section_header_height) if section_header_height is not None else None,
+                item=section,
+                index=flat_index,
+            )
+        )
+        flat_index += 1
         for i_idx, item in enumerate(section.get("data", []) or []):
-            flat.append({"_kind": "item", "item": item, "item_index": i_idx, "section_index": s_idx})
-
-    if item_height is None:
-        # Eager fallback.
-        children: List[Element] = []
-        for entry in flat:
-            if entry["_kind"] == "header":
-                if render_section_header is not None:
-                    children.append(render_section_header(entry["section"], entry["section_index"]))
-                else:
-                    children.append(Text(str(entry["section"].get("title", ""))))
+            if key_extractor is not None:
+                try:
+                    row_key = f"s{s_idx}:" + str(key_extractor(item, i_idx))
+                except Exception:
+                    row_key = f"__pn_row_{s_idx}_{i_idx}__"
             else:
-                if render_item is not None:
-                    children.append(render_item(entry["item"], entry["item_index"], entry["section_index"]))
-                else:
-                    children.append(Text(str(entry["item"])))
-        inner = Column(*children, style={"spacing": separator_height} if separator_height else None)
-        return ScrollView(inner, style=style, key=key)
+                row_key = f"__pn_row_{s_idx}_{i_idx}__"
 
-    # Virtualized: mixed row heights aren't supported in v1, so we
-    # use the larger of section_header_height and item_height + sep.
-    row_h = max(float(section_header_height), float(item_height) + float(separator_height))
+            def _make_item(it: Any = item, ii: int = i_idx, si: int = s_idx) -> Element:
+                el = _item_el(it, ii, si)
+                if sep > 0:
+                    return View(el, style={"padding_bottom": sep})
+                return el
 
-    def _mount_row(index: int, content_view: Any) -> None:
-        from .native_views import get_registry
-        from .reconciler import Reconciler
+            extent: Optional[float] = None
+            if get_item_height is not None:
+                try:
+                    extent = float(get_item_height(item, i_idx, s_idx)) + sep
+                except Exception:
+                    extent = None
+            elif item_height is not None:
+                extent = float(item_height) + sep
+            rows.append(_RowSpec(row_key, _make_item, extent, item=item, index=flat_index))
+            flat_index += 1
 
-        try:
-            entry = flat[index]
-        except IndexError:
-            return
-        if entry["_kind"] == "header":
-            if render_section_header is not None:
-                element = render_section_header(entry["section"], entry["section_index"])
-            else:
-                element = Text(str(entry["section"].get("title", "")))
-        else:
-            if render_item is not None:
-                element = render_item(entry["item"], entry["item_index"], entry["section_index"])
-            else:
-                element = Text(str(entry["item"]))
+    estimated = estimated_item_height if estimated_item_height is not None else (item_height or _DEFAULT_ROW_EXTENT)
 
-        backend = get_registry()
-        reconciler = Reconciler(backend)
-        native_root = reconciler.mount(element)
-        try:
-            backend.add_child(content_view, native_root, "View")
-        except Exception:
-            pass
-
-    return _make_element(
-        "VirtualList",
-        style=style,
+    return _VirtualizedList(
+        rows=rows,
+        horizontal=False,
+        estimated_row_extent=float(estimated) + sep,
+        header=list_header,
+        footer=list_footer,
+        empty=list_empty,
+        refresh_control=refresh_control,
+        on_end_reached=on_end_reached,
+        on_end_reached_threshold=on_end_reached_threshold,
+        on_scroll=on_scroll,
+        list_style=resolve_style(style) or None,
+        controller_ref=ref,
         key=key,
-        count=len(flat),
-        row_height=row_h,
-        mount_row=_mount_row,
     )
 
 

@@ -39,7 +39,7 @@ pytestmark = pytest.mark.skipif(
     reason=f"tkinter unavailable: {_DESKTOP_IMPORT_ERROR!r}",
 )
 
-# The 25 built-in element types every platform backend must service.
+# The 24 built-in element types every platform backend must service.
 _EXPECTED_TYPES = {
     "View",
     "Column",
@@ -61,7 +61,6 @@ _EXPECTED_TYPES = {
     "Pressable",
     "StatusBar",
     "KeyboardAvoidingView",
-    "VirtualList",
     "Picker",
     "Checkbox",
     "SegmentedControl",
@@ -254,7 +253,7 @@ _BACKEND_SCRIPT = """
     assert "changed" in texts and "Hi there" not in texts, texts
 
     handler = dk.TextHandler()
-    label = handler.create({"text": "hello world wrapping test", "font_size": 16})
+    label = handler.create(9999, {"text": "hello world wrapping test", "font_size": 16})
     wide_w, wide_h = handler.measure_intrinsic(label, 10000.0, 10000.0)
     narrow_w, narrow_h = handler.measure_intrinsic(label, 40.0, 10000.0)
     assert wide_w > 0 and wide_h > 0, (wide_w, wide_h)

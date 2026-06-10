@@ -61,6 +61,7 @@ from app.screens.components.text_input import TextInputDemo
 from app.screens.components.touchable_opacity import TouchableOpacityDemo
 from app.screens.components.view_column_row import ViewColumnRowDemo
 from app.screens.components.web_view import WebViewDemo
+from app.screens.gestures.gestures import GesturesDemo
 from app.screens.hooks.batch_updates_demo import BatchUpdatesDemo
 from app.screens.hooks.memo_demo import MemoDemo
 from app.screens.hooks.use_async_effect import UseAsyncEffectDemo
@@ -314,6 +315,10 @@ DEMOS: List[DemoEntry] = [
         "animated::sequence",
         SequenceAnimationDemo,
     ),
+    # ------------------------------------------------------------------
+    # Gestures
+    # ------------------------------------------------------------------
+    DemoEntry("gestures", "Gestures", "gestures", "gestures", GesturesDemo),
     # ------------------------------------------------------------------
     # Alerts, storage, runtime, platform, SDK
     # ------------------------------------------------------------------

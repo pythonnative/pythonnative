@@ -2,10 +2,10 @@
 
 PythonNative is built so that the bulk of your application logic can
 be tested without a device or simulator. The reconciler talks to
-native widgets exclusively through the
-[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry];
-swap that out for a mock and a render produces a tree of plain Python
-dicts that `pytest` can introspect.
+native widgets exclusively through the batched mutation protocol
+(see [Native views](../concepts/native-views.md)); swap the backend
+for an in-memory fake and a render produces a tree of plain Python
+objects that `pytest` can introspect.
 
 ## What to test
 
@@ -19,58 +19,71 @@ dicts that `pytest` can introspect.
   boundary.
 
 What *not* to test (or to test sparingly): the platform handler
-implementations themselves. Those run only on the device and benefit
-much more from manual smoke tests.
+implementations themselves. Those run only on the device and are
+covered by the Maestro E2E suite (`tests/e2e/`).
 
-## A minimal mock registry
+## A minimal fake backend
+
+A test backend implements the registry protocol: `apply_mutations`,
+`resolve_view`, `measure_intrinsic`, and `command`. PythonNative's own
+suite keeps a full-featured one in `tests/fake_backend.py` — copy it
+into your project or use this trimmed version:
 
 ```python
-from pythonnative.native_views import NativeViewRegistry, set_registry
+from pythonnative.mutations import (
+    CreateOp, UpdateOp, InsertOp, RemoveOp, DestroyOp, SetFrameOp,
+)
 
 
-class _MockHandler:
-    def create_view(self, props):
-        return {"props": dict(props), "children": [], "frame": (0, 0, 0, 0)}
+class FakeView:
+    def __init__(self, tag, type_name, props):
+        self.tag, self.type_name, self.props = tag, type_name, dict(props)
+        self.children, self.frame = [], (0, 0, 0, 0)
 
-    def update_view(self, view, prev, next):
-        view["props"] = dict(next)
+    def find_all(self, type_name):
+        out = [self] if self.type_name == type_name else []
+        for child in self.children:
+            out.extend(child.find_all(type_name))
+        return out
 
-    def add_child(self, parent, child, index):
-        parent["children"].insert(index, child)
 
-    def remove_child(self, parent, child):
-        parent["children"].remove(child)
+class FakeBackend:
+    def __init__(self):
+        self.views = {}
 
-    def insert_child(self, parent, child, index):
-        parent["children"].insert(index, child)
+    def apply_mutations(self, ops):
+        for op in ops:
+            if isinstance(op, CreateOp):
+                self.views[op.tag] = FakeView(op.tag, op.type_name, op.props)
+            elif isinstance(op, UpdateOp):
+                self.views[op.tag].props.update(op.changed_props)
+            elif isinstance(op, InsertOp):
+                child = self.views[op.child_tag]
+                self.views[op.parent_tag].children.insert(op.index, child)
+            elif isinstance(op, RemoveOp):
+                self.views[op.parent_tag].children.remove(self.views[op.child_tag])
+            elif isinstance(op, DestroyOp):
+                self.views.pop(op.tag, None)
+            elif isinstance(op, SetFrameOp):
+                self.views[op.tag].frame = op.frame
 
-    def set_frame(self, view, x, y, width, height):
-        view["frame"] = (x, y, width, height)
+    def resolve_view(self, tag):
+        return self.views.get(tag)
 
-    def measure_intrinsic(self, view, max_w, max_h):
+    def measure_intrinsic(self, tag, max_w, max_h):
         return (0.0, 0.0)
 
+    def command(self, tag, name, args=None):
+        return None
 
-def install_mock_registry():
-    reg = NativeViewRegistry()
-    for ty in (
-        "Text", "Button", "Column", "Row", "ScrollView",
-        "View", "TextInput", "Image", "Switch", "Spacer",
-        "Pressable", "FlatList",
-    ):
-        reg.register(ty, _MockHandler())
-    set_registry(reg)
+    def set_animated_property(self, tag, prop, value): ...
+    def start_animation(self, tag, anim_id, prop, spec): return False
+    def cancel_animation(self, tag, anim_id): return None
 ```
-
-Drop this into a `conftest.py` and call `install_mock_registry()` from
-a session-scoped fixture, or as a fixture parameterized on the
-component under test.
 
 ## Rendering a component in a test
 
-`create_screen` boots an `_ScreenHost` which is the same shape used at
-runtime. For tests we want a more direct path: invoke the reconciler
-with a known root and read its output.
+Construct the reconciler with the fake backend directly:
 
 ```python
 import pythonnative as pn
@@ -78,10 +91,12 @@ from pythonnative.reconciler import Reconciler
 
 
 def render(element):
-    """Mount `element` once with the mock registry and return the root."""
-    rec = Reconciler()
+    """Mount `element` and return (root FakeView, reconciler)."""
+    backend = FakeBackend()
+    rec = Reconciler(backend)
+    rec._screen_re_render = lambda: None  # no screen host in tests
     rec.mount(element)
-    return rec.root_view  # the mock dict for the root element
+    return backend.views[rec.root_tag()], rec
 ```
 
 (For a longer-running test (effects, navigation), use `create_screen` so
@@ -89,7 +104,14 @@ you get the full lifecycle plumbing.)
 
 ## Asserting on rendered output
 
+Event callbacks live in the event registry, not on the view — drive
+them with [`dispatch_event`][pythonnative.events.dispatch_event]
+exactly like a native listener would:
+
 ```python
+from pythonnative.events import dispatch_event
+
+
 def test_counter_increments():
     @pn.component
     def Counter():
@@ -99,15 +121,14 @@ def test_counter_increments():
             pn.Button("+", on_click=lambda: set_count(count + 1), key="b"),
         )
 
-    install_mock_registry()
-    root = render(Counter())
+    root, rec = render(Counter())
 
-    label, button = root["children"]
-    assert label["props"]["text"] == "Count: 0"
+    label, button = root.children
+    assert label.props["text"] == "Count: 0"
 
-    button["props"]["on_click"]()
-    # The reconciler re-renders synchronously; read the latest text.
-    assert root["children"][0]["props"]["text"] == "Count: 1"
+    dispatch_event(button.tag, "on_click")
+    rec.flush_dirty()  # state changes commit on the next flush
+    assert root.children[0].props["text"] == "Count: 1"
 ```
 
 Notes:
@@ -115,8 +136,9 @@ Notes:
 - `key="t"` and `key="b"` aren't required for a two-child column, but
   using them in tests makes assertions more robust as the component
   evolves.
-- Behavioural props (like `on_click`) are passed through unchanged, so
-  tests can call them directly.
+- Callable props never appear in `props` — the view carries a
+  `_pn_events` frozenset naming the wired events, and
+  `dispatch_event(tag, name, *args)` invokes the current callback.
 
 ## Testing hooks in isolation
 
@@ -135,10 +157,11 @@ def test_use_toggle():
         on, toggle = use_toggle()
         return pn.Text("on" if on else "off", on_click=toggle, key="t")
 
-    root = render(Probe())
-    assert root["props"]["text"] == "off"
-    root["props"]["on_click"]()
-    assert root["props"]["text"] == "on"
+    root, rec = render(Probe())
+    assert root.props["text"] == "off"
+    dispatch_event(root.tag, "on_click")
+    rec.flush_dirty()
+    assert root.props["text"] == "on"
 ```
 
 ## Testing layouts

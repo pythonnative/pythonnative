@@ -201,7 +201,7 @@ def test_text_input_editable_dropped_when_true() -> None:
 
 
 def test_scroll_view_new_props() -> None:
-    on_scroll = lambda _x, _y: None  # noqa: E731
+    on_scroll = lambda _payload: None  # noqa: E731
     el = ScrollView(
         Text("body"),
         on_scroll=on_scroll,
@@ -240,25 +240,43 @@ def test_modal_new_props() -> None:
 # ======================================================================
 
 
+def _mount(el):  # type: ignore[no-untyped-def]
+    from fake_backend import FakeBackend
+
+    from pythonnative.reconciler import Reconciler
+
+    backend = FakeBackend()
+    rec = Reconciler(backend)
+    rec._screen_re_render = lambda: None
+    root = rec.mount(el)
+    return root, rec, backend
+
+
 def test_flatlist_grid_chunks_into_rows() -> None:
     el = FlatList(
         data=list(range(5)),
         num_columns=2,
         render_item=lambda item, _i: Text(str(item)),
     )
-    assert el.type == "ScrollView"
-    outer = el.children[0]
-    # 3 rows: [0,1], [2,3], [4]
-    rows = [c for c in outer.children if c.type == "Row"]
+    # 3 virtual rows: [0,1], [2,3], [4]
+    assert len(el.props["rows"]) == 3
+
+    root, _rec, _backend = _mount(el)
+    rows = root.find_all("Row")
     assert len(rows) == 3
     assert len(rows[0].children) == 2
     assert len(rows[2].children) == 1
 
 
-def test_flatlist_horizontal_uses_row() -> None:
+def test_flatlist_horizontal_scrolls_on_x_axis() -> None:
     el = FlatList(data=[1, 2, 3], horizontal=True, render_item=lambda i, _i: Text(str(i)))
-    assert el.type == "ScrollView"
-    assert el.props["scroll_axis"] == "horizontal"
+    assert el.props["horizontal"] is True
+
+    root, _rec, _backend = _mount(el)
+    assert root.type_name == "ScrollView"
+    assert root.props["scroll_axis"] == "horizontal"
+    # The content wrapper lays rows out horizontally.
+    assert root.find_first("Row") is not None
 
 
 def test_flatlist_header_and_footer() -> None:
@@ -269,11 +287,11 @@ def test_flatlist_header_and_footer() -> None:
         list_header=Text("HEADER"),
         list_footer=Text("FOOTER"),
     )
-    # Header/footer force the eager backend.
-    assert el.type == "ScrollView"
-    outer = el.children[0]
-    assert outer.children[0].props["text"] == "HEADER"
-    assert outer.children[-1].props["text"] == "FOOTER"
+    root, _rec, _backend = _mount(el)
+    texts = [v.props["text"] for v in root.find_all("Text")]
+    assert texts[0] == "HEADER"
+    assert texts[-1] == "FOOTER"
+    assert texts[1:-1] == ["1", "2"]
 
 
 def test_flatlist_empty_state() -> None:
@@ -283,14 +301,35 @@ def test_flatlist_empty_state() -> None:
         render_item=lambda i, _i: Text(str(i)),
         list_empty=Text("Nothing here"),
     )
-    assert el.type == "ScrollView"
-    outer = el.children[0]
-    assert outer.children[0].props["text"] == "Nothing here"
+    root, _rec, _backend = _mount(el)
+    texts = [v.props["text"] for v in root.find_all("Text")]
+    assert texts == ["Nothing here"]
 
 
-def test_flatlist_on_end_reached_virtualized() -> None:
-    cb = lambda: None  # noqa: E731
-    el = FlatList(data=list(range(100)), item_height=30, on_end_reached=cb)
-    assert el.type == "VirtualList"
-    assert el.props["on_end_reached"] is cb
+def test_flatlist_on_end_reached_fires_near_the_end() -> None:
+    from pythonnative.events import dispatch_event
+
+    fired: list = []
+    el = FlatList(
+        data=list(range(100)),
+        item_height=30,
+        on_end_reached=lambda: fired.append(1),
+        on_end_reached_threshold=0.5,
+    )
     assert el.props["on_end_reached_threshold"] == 0.5
+
+    _root, rec, _backend = _mount(el)
+    tag = rec.root_tag()
+
+    # Far from the end: no callback.
+    dispatch_event(tag, "on_scroll", {"x": 0.0, "y": 0.0})
+    assert fired == []
+
+    # Content extent is 100 * 30 = 3000; the default viewport estimate is
+    # 800, so an offset near the bottom crosses the 0.5-viewport line.
+    dispatch_event(tag, "on_scroll", {"x": 0.0, "y": 3000.0 - 800.0 - 100.0})
+    assert fired == [1]
+
+    # The latch prevents refiring while still near the end.
+    dispatch_event(tag, "on_scroll", {"x": 0.0, "y": 3000.0 - 800.0 - 50.0})
+    assert fired == [1]

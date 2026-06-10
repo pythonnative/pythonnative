@@ -1,47 +1,77 @@
 # Native views
 
-The reconciler doesn't know what a `Text` or a `Button` is. It only
-knows how to call into a
-[`ViewHandler`][pythonnative.native_views.base.ViewHandler]: create,
-update, add child, remove child. The mapping from element types
-(`"Text"`, `"Button"`, `"Column"`, ...) to handlers lives in the
-[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry].
+The reconciler doesn't know what a `Text` or a `Button` is. It produces
+a flat list of **mutation ops** — create, update, insert, remove,
+destroy, set-frame — that reference views by integer **tag**, and hands
+the whole list to the
+[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry] in
+a single
+[`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]
+call per commit. The registry resolves each tag to a native view and
+dispatches each op to the right
+[`ViewHandler`][pythonnative.native_views.base.ViewHandler].
 
 This page describes that boundary, walks through what a handler
-actually does on each platform, and covers the testing-mode mock
-registry used by `pytest`.
+actually does on each platform, and covers the fake backend used by
+`pytest`.
+
+## The commit protocol
+
+Every commit is one transaction: an ordered list of ops from
+`pythonnative.mutations`, applied atomically from the perspective of
+the render loop.
+
+| Op | Meaning |
+|---|---|
+| `CreateOp(tag, type_name, props)` | Create a native view for `tag`. Props are already *clean* — callables have been routed to the event registry. |
+| `UpdateOp(tag, changed_props)` | Apply only the props that changed (removed props arrive as `None`). |
+| `InsertOp(parent_tag, child_tag, index)` | Place the child at `index` (move-aware: an attached child is repositioned, not duplicated). |
+| `RemoveOp(parent_tag, child_tag)` | Detach the child without destroying it. |
+| `DestroyOp(tag)` | Release the native view and drop the tag record. |
+| `SetFrameOp(tag, x, y, w, h)` | Apply a layout frame. Only emitted for frames that actually changed. |
+
+Tags matter because the diff phase is pure: it runs before any native
+view exists, so ops can't reference views directly. Tags also give the
+native side a stable identity for event routing and animation
+bookkeeping, and a flat op list is trivially serializable — the door
+stays open for applying mutations through a single JNI/ObjC crossing.
 
 ## The handler protocol
 
 Every native widget is implemented as a class that fulfils the
-[`ViewHandler`][pythonnative.native_views.base.ViewHandler] protocol.
-The hot-path methods are:
+[`ViewHandler`][pythonnative.native_views.base.ViewHandler] interface.
+The registry resolves tags to views; handlers receive native view
+objects:
 
 | Method | When it's called |
 |---|---|
-| `create_view(props)` | Once, when the element first mounts. Returns a native view object. |
-| `update_view(view, prev_props, next_props)` | On every commit where this element survives a diff. |
-| `add_child(parent, child, index)` | When a new child appears in this slot. |
-| `remove_child(parent, child)` | When a child is removed from this slot. |
-| `insert_child(parent, child, index)` | When a child moves to a new slot (keyed reconciliation). |
-| `set_frame(view, x, y, width, height)` | After every commit, to apply the frame computed by `pythonnative.layout`. |
+| `create(tag, props)` | Once, when the element first mounts. Returns a native view object. |
+| `update(view, changed_props)` | On commits where the element survived the diff with changed props. |
+| `insert_child(parent, child, index)` | When a child appears in (or moves to) a slot. |
+| `remove_child(parent, child)` | When a child is detached. |
+| `destroy(view)` | When the view is released — unhook listeners, cancel image loads, etc. |
+| `set_frame(view, x, y, width, height)` | When the layout engine computed a different frame than last pass. |
 | `measure_intrinsic(view, max_w, max_h)` | Called by the layout engine on leaf widgets that need a content-derived size. |
 
-The handler returns a native view object (a `UIView` on iOS, a
-`android.view.View` on Android). The reconciler holds onto that handle
-in its [`VNode`][pythonnative.reconciler.VNode] and passes it back to
-the handler on subsequent calls.
+Handlers receive the `tag` at creation so they can wire their platform
+listeners **once**, dispatching back through
+[`dispatch_event`][pythonnative.events.dispatch_event]:
 
 ```python
+from pythonnative.events import dispatch_event, event_names
+
+
 class MyHandler(ViewHandler):
-    def create_view(self, props):
+    def create(self, tag, props):
         v = NativeWidget()
-        self.update_view(v, {}, props)
+        if "on_change" in event_names(props):
+            v.addChangeListener(lambda value: dispatch_event(tag, "on_change", value))
+        self.update(v, props)
         return v
 
-    def update_view(self, view, prev, next):
-        if prev.get("text") != next.get("text"):
-            view.setText(next.get("text", ""))
+    def update(self, view, changed):
+        if "text" in changed:
+            view.setText(changed["text"] or "")
 
     def set_frame(self, view, x, y, width, height):
         view.setFrame(x, y, width, height)
@@ -53,30 +83,43 @@ class MyHandler(ViewHandler):
 
 Handlers do **not** read flex / margin / padding props themselves —
 those are interpreted by `pythonnative.layout` and turned into
-`set_frame` calls. A handler only needs to apply the frame it is
-given.
+`SetFrameOp`s. A handler only needs to apply the frame it is given.
+
+## Events never cross the bridge
+
+Callable props (`on_press`, `on_change`, …) are stripped before a
+`CreateOp`/`UpdateOp` is built and registered in the process-wide
+[`EventRegistry`][pythonnative.events.EventRegistry] keyed by
+`(tag, name)`. The native payload carries only `_pn_events` — a
+`frozenset` of the event names present — so handlers can wire expensive
+listeners (scroll delegates, gesture recognizers) conditionally.
+
+The payoff: a re-render that only changes a callback's identity (every
+lambda is a fresh object!) costs **zero** native calls. The registry
+swaps the Python-side callback and the already-wired native listener
+picks it up on the next dispatch.
 
 ## The registry
 
 The [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
-is a dict-like object that maps element type strings to handler
-*instances*. The registry is selected lazily by platform:
+maps element type strings to handler *instances* and owns the
+tag-to-view table. The registry is selected lazily by platform:
 
 - On Android, `pythonnative.native_views.android.register_handlers`
   populates the registry with Chaquopy-backed handlers.
 - On iOS, `pythonnative.native_views.ios.register_handlers` does the
-  same with rubicon-objc handlers.
+  same with handlers built on rubicon-objc plus raw `libobjc` bindings
+  for delegate-heavy widgets.
 - On the desktop (`pn preview`, with `PN_PLATFORM=desktop`),
   `pythonnative.native_views.desktop.register_handlers` populates the
   registry with Tkinter-backed handlers. See the
   [Desktop preview guide](../guides/desktop-preview.md).
-- Off-device under `pytest`, the registry is replaced with a mock via
-  [`set_registry`][pythonnative.native_views.set_registry] before any
-  element is rendered.
+- Off-device under `pytest`, the backend is replaced with a fake via
+  [`set_registry`][pythonnative.native_views.set_registry] (or by
+  constructing the `Reconciler` with the fake directly).
 
-Custom widgets follow the same pattern: register a handler under a
-unique type string, then construct elements with that type and the
-reconciler will pick it up.
+Per-op failures inside `apply_mutations` are isolated: a bad prop on
+one view logs a tripwire instead of desyncing the whole transaction.
 
 ## Layout and styling
 
@@ -88,11 +131,9 @@ The set of keys the layout engine consumes is exposed as
 `pythonnative.layout.LAYOUT_STYLE_KEYS`.
 
 Handlers only deal with **visual** properties — colours, fonts,
-borders, corner radii, image scaling, text content. The reconciler
-splits each element's style into "layout-only" keys (forwarded to the
-layout engine) and "visual" keys (forwarded to
-`update_view`). After each commit the reconciler runs the layout pass
-and calls `handler.set_frame(view, x, y, w, h)` for every node.
+borders, corner radii, image scaling, text content. After each commit
+the reconciler runs the layout pass and emits `SetFrameOp`s for every
+node whose frame changed.
 
 On each platform that boils down to:
 
@@ -117,58 +158,42 @@ geometry on Android and iOS — there is no "container-only" vs
 
 Children of a container element become subviews of the corresponding
 native view. The reconciler determines insertion order (and reorders
-on key change), but the handler is responsible for the actual native
-mutations:
+on key change) and expresses it as `InsertOp` / `RemoveOp` pairs; the
+handler performs the actual native mutations:
 
-- iOS containers use `addSubview_` and
-  `insertSubview_atIndex_` on a plain `UIView`.
+- iOS containers use `insertSubview_atIndex_` on a plain `UIView`.
 - Android containers use `addView(child, index)` /
   `removeView(child)` on a `FrameLayout`.
 
-For non-container elements (e.g., `Image`), the registry simply doesn't
-register `add_child` / `remove_child`, and the reconciler raises if
-the user tries to nest children inside one.
+`InsertOp` is move-aware: handlers reposition a child that is already
+attached rather than duplicating it, which is how keyed reorders avoid
+recreating views.
 
 ## Testing without a device
 
 Production handlers require Chaquopy (Android) or rubicon-objc (iOS),
 neither of which is available on a developer laptop. The test suite
-sidesteps this with a mock registry that records calls instead of
-creating real widgets:
+sidesteps this with `tests/fake_backend.py` — a shared in-memory
+backend implementing the same mutation protocol while keeping a real
+tree of `FakeView` objects:
 
 ```python
-from pythonnative.native_views import set_registry, NativeViewRegistry
+from fake_backend import FakeBackend
+from pythonnative.reconciler import Reconciler
 
-class _MockHandler:
-    def create_view(self, props):
-        return {"props": props, "children": [], "frame": (0, 0, 0, 0)}
+backend = FakeBackend()
+rec = Reconciler(backend)
+rec.mount(MyComponent())
 
-    def update_view(self, v, p, n):
-        v["props"] = n
-
-    def add_child(self, p, c, i):
-        p["children"].insert(i, c)
-
-    def remove_child(self, p, c):
-        p["children"].remove(c)
-
-    def insert_child(self, p, c, i):
-        p["children"].insert(i, c)
-
-    def set_frame(self, v, x, y, w, h):
-        v["frame"] = (x, y, w, h)
-
-    def measure_intrinsic(self, v, max_w, max_h):
-        return (0.0, 0.0)
-
-mock = NativeViewRegistry()
-for ty in ("Text", "Button", "View", "Column", "Row"):
-    mock.register(ty, _MockHandler())
-set_registry(mock)
+root = backend.views[rec.root_tag()]
+assert root.find_first("Text").props["text"] == "Hello"
+assert backend.ops_of("create")  # every applied op is recorded
 ```
 
-After that, a render produces a tree of plain dicts that test code can
-introspect.
+Unlike the production registry, the fake **raises** on malformed
+transactions (unknown tags, double-destroys), so reconciler bugs fail
+tests loudly instead of being swallowed. See the
+[Testing guide](../guides/testing.md).
 
 ## Custom widgets
 
@@ -202,7 +227,7 @@ class RatingProps(Props):
 
 @native_component("Rating", props=RatingProps, platforms=("ios",))
 class IOSRatingHandler(ViewHandler):
-    def create(self, props):
+    def create(self, tag, props):
         ...  # build a UIView wrapping star UIImageViews
     def update(self, view, changed):
         ...
@@ -225,6 +250,6 @@ distribution as a plugin, unit-testing — see the
 
 - Browse the API: [Native views](../api/native_views.md).
 - Read the [Layout engine](layout.md) concept page to understand how
-  `set_frame` calls are produced.
+  `SetFrameOp`s are produced.
 - See how the reconciler drives handlers: [Reconciliation](reconciliation.md).
 - Wrap a device API instead of a widget: [Native modules guide](../guides/native-modules.md).

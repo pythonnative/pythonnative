@@ -2,47 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict
+
+from fake_backend import FakeBackend as MockBackend
+from fake_backend import FakeView as MockView
 
 from pythonnative.element import Element
 from pythonnative.hooks import component, use_ref
 from pythonnative.reconciler import Reconciler
-
-
-class MockView:
-    _next_id = 0
-
-    def __init__(self, type_name: str, props: Dict[str, Any]) -> None:
-        MockView._next_id += 1
-        self.id = MockView._next_id
-        self.type_name = type_name
-        self.props = dict(props)
-        self.children: List["MockView"] = []
-
-
-class MockBackend:
-    def __init__(self) -> None:
-        self.last_create_props: Dict[str, Any] = {}
-        self.last_update_changes: Dict[str, Any] = {}
-
-    def create_view(self, type_name: str, props: Dict[str, Any]) -> MockView:
-        # Track props the backend was asked to apply on create — ref
-        # must NOT appear here; it's reconciler-owned.
-        self.last_create_props = dict(props)
-        return MockView(type_name, props)
-
-    def update_view(self, view: MockView, type_name: str, changed: Dict[str, Any]) -> None:
-        self.last_update_changes = dict(changed)
-        view.props.update(changed)
-
-    def add_child(self, parent: MockView, child: MockView, parent_type: str) -> None:
-        parent.children.append(child)
-
-    def remove_child(self, parent: MockView, child: MockView, parent_type: str) -> None:
-        parent.children = [c for c in parent.children if c.id != child.id]
-
-    def insert_child(self, parent: MockView, child: MockView, parent_type: str, index: int) -> None:
-        parent.children.insert(index, child)
 
 
 def test_ref_populated_on_mount() -> None:

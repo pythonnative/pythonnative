@@ -104,7 +104,7 @@ def _hex_to_uicolor(hex_str: str) -> Any:
 
 @native_component("Badge", props=BadgeProps, platforms=("ios",))
 class IOSBadgeHandler(ViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def create(self, tag: int, props: Dict[str, Any]) -> Any:
         view = UIView.alloc().init()
         view.layer.cornerRadius = 12
         label = UILabel.alloc().init()
@@ -155,7 +155,7 @@ Gravity = jclass("android.view.Gravity")
 
 @native_component("Badge", props=BadgeProps, platforms=("android",))
 class AndroidBadgeHandler(ViewHandler):
-    def create(self, props: Dict[str, Any]) -> Any:
+    def create(self, tag: int, props: Dict[str, Any]) -> Any:
         ctx = get_android_context()
         container = FrameLayout(ctx)
         bg = GradientDrawable()
@@ -182,6 +182,13 @@ class AndroidBadgeHandler(ViewHandler):
 The `set_frame` and `measure_intrinsic` shapes are identical to the
 built-in handlers; see
 [Native views](../concepts/native-views.md) for the full protocol.
+
+The `tag` argument is the view's stable identity in the mutation
+protocol. Handlers that fire events use it to dispatch back into
+Python — wire the platform listener once in `create` and call
+[`dispatch_event(tag, "on_change", value)`][pythonnative.events.dispatch_event];
+the reconciler keeps the `(tag, name) -> callback` registry up to date
+across re-renders without any further native calls.
 
 ### 4. Wire it into your project
 
@@ -299,7 +306,7 @@ from my_pkg.badge_props import BadgeProps
 
 
 class _StubHandler(ViewHandler):
-    def create(self, props): return {"props": props}
+    def create(self, tag, props): return {"props": dict(props)}
     def update(self, view, changed): view["props"].update(changed)
 
 

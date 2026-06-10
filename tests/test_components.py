@@ -1,5 +1,7 @@
 """Unit tests for the built-in element-creating functions."""
 
+from fake_backend import FakeBackend
+
 from pythonnative.components import (
     ActivityIndicator,
     Button,
@@ -338,17 +340,28 @@ def test_pressable() -> None:
     assert len(el.children) == 1
 
 
+def _mount(el):  # type: ignore[no-untyped-def]
+    from pythonnative.reconciler import Reconciler
+
+    backend = FakeBackend()
+    rec = Reconciler(backend)
+    rec._screen_re_render = lambda: None
+    root = rec.mount(el)
+    return root, rec, backend
+
+
 def test_flat_list_basic() -> None:
     el = FlatList(
         data=["a", "b", "c"],
         render_item=lambda item, i: Text(item),
     )
-    assert el.type == "ScrollView"
-    assert len(el.children) == 1
-    inner = el.children[0]
-    assert inner.type == "Column"
-    assert len(inner.children) == 3
-    assert inner.children[0].props["text"] == "a"
+    # FlatList is a virtualized function component; mounting it renders
+    # a ScrollView whose window contains every (small-list) row.
+    assert callable(el.type)
+    root, _rec, _backend = _mount(el)
+    assert root.type_name == "ScrollView"
+    texts = [v.props["text"] for v in root.find_all("Text")]
+    assert texts == ["a", "b", "c"]
 
 
 def test_flat_list_with_keys() -> None:
@@ -357,15 +370,14 @@ def test_flat_list_with_keys() -> None:
         render_item=lambda item, i: Text(item["name"]),
         key_extractor=lambda item, i: item["id"],
     )
-    inner = el.children[0]
-    assert inner.children[0].key == "x"
-    assert inner.children[1].key == "y"
+    rows = el.props["rows"]
+    assert [r.key for r in rows] == ["x", "y"]
 
 
 def test_flat_list_empty() -> None:
     el = FlatList(data=[], render_item=lambda item, i: Text(str(item)))
-    inner = el.children[0]
-    assert len(inner.children) == 0
+    root, _rec, _backend = _mount(el)
+    assert root.find_all("Text") == []
 
 
 def test_spacer_flex() -> None:
