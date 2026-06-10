@@ -1,0 +1,26 @@
+# Component category suite, first half (A) — see components.yaml.
+#
+# The components category is large enough (28 flows) that a single
+# GitHub-hosted Android emulator session can't reliably finish it: the
+# emulator grows unstable after ~15 minutes of sustained Maestro
+# driving and drops offline around the ~26th flow. CI therefore runs
+# the category as two halves, each on a freshly booted emulator.
+#
+# Usage:
+#     maestro test tests/e2e/suites/components-a.yaml -e APP_ID=com.pythonnative.e2e
+appId: ${APP_ID}
+---
+- runFlow: ../flows/components/text.yaml
+- runFlow: ../flows/components/button.yaml
+- runFlow: ../flows/components/text_input.yaml
+- runFlow: ../flows/components/image.yaml
+- runFlow: ../flows/components/switch.yaml
+- runFlow: ../flows/components/slider.yaml
+- runFlow: ../flows/components/progress_bar.yaml
+- runFlow: ../flows/components/activity_indicator.yaml
+- runFlow: ../flows/components/view_column_row.yaml
+- runFlow: ../flows/components/scroll_view.yaml
+- runFlow: ../flows/components/safe_area_view.yaml
+- runFlow: ../flows/components/modal.yaml
+- runFlow: ../flows/components/pressable.yaml
+- runFlow: ../flows/components/picker.yaml

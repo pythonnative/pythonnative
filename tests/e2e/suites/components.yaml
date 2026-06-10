@@ -5,33 +5,13 @@
 #
 # Useful for AI agents iterating on a component fix: only the relevant
 # flows run, keeping the feedback loop tight.
+#
+# The flow list lives in components-a.yaml and components-b.yaml; this
+# file just chains the halves. CI runs the halves as separate Android
+# shards (a GitHub-hosted emulator can't survive all 28 flows in one
+# session — see the half files), while iOS simulators and local runs
+# can use this aggregate directly.
 appId: ${APP_ID}
 ---
-- runFlow: ../flows/components/text.yaml
-- runFlow: ../flows/components/button.yaml
-- runFlow: ../flows/components/text_input.yaml
-- runFlow: ../flows/components/image.yaml
-- runFlow: ../flows/components/switch.yaml
-- runFlow: ../flows/components/slider.yaml
-- runFlow: ../flows/components/progress_bar.yaml
-- runFlow: ../flows/components/activity_indicator.yaml
-- runFlow: ../flows/components/view_column_row.yaml
-- runFlow: ../flows/components/scroll_view.yaml
-- runFlow: ../flows/components/safe_area_view.yaml
-- runFlow: ../flows/components/modal.yaml
-- runFlow: ../flows/components/pressable.yaml
-- runFlow: ../flows/components/picker.yaml
-- runFlow: ../flows/components/refresh_control.yaml
-- runFlow: ../flows/components/fragment.yaml
-- runFlow: ../flows/components/error_boundary.yaml
-- runFlow: ../flows/components/spacer.yaml
-- runFlow: ../flows/components/status_bar.yaml
-- runFlow: ../flows/components/keyboard_avoiding_view.yaml
-- runFlow: ../flows/components/flat_list.yaml
-- runFlow: ../flows/components/section_list.yaml
-- runFlow: ../flows/components/web_view.yaml
-- runFlow: ../flows/components/touchable_opacity.yaml
-- runFlow: ../flows/components/image_background.yaml
-- runFlow: ../flows/components/checkbox.yaml
-- runFlow: ../flows/components/segmented_control.yaml
-- runFlow: ../flows/components/date_picker.yaml
+- runFlow: components-a.yaml
+- runFlow: components-b.yaml

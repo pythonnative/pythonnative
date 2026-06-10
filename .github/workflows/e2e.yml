@@ -33,15 +33,18 @@ jobs:
     # ~35th flow. Sharding the run into a few balanced groups — each on
     # its own freshly booted emulator — keeps every session well under
     # the limit, and parallelizes the Android pass as a bonus. Groups are
-    # sized so none exceeds ~25 flows; ``components`` is the largest
-    # single category and runs alone. ``fail-fast: false`` so one shard's
-    # failure still lets the others report.
+    # sized so none exceeds ~15 flows; ``components`` (28 flows after the
+    # gesture/animated additions) crossed the ceiling at ~flow 26, so it
+    # runs as two halves. ``fail-fast: false`` so one shard's failure
+    # still lets the others report.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: components
-            suites: components
+          - name: components-a
+            suites: components-a
+          - name: components-b
+            suites: components-b
           - name: hooks-nav-gestures
             suites: hooks navigation gestures
           - name: layout-styling-anim-misc
