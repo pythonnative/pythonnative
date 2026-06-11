@@ -129,6 +129,20 @@ printf "\n==> Running Maestro suite(s): %s\n" "${MAESTRO_TARGETS[*]}"
 # driver flakes. A retry can also mask a genuine race in the suite, so
 # treat the "retrying..." line as a signal to investigate, not just to
 # trust the second pass.
+
+# Kill the app so the next Maestro attempt starts from a cold launch
+# (open_demo relaunches a dead app). A failed attempt can leave the app
+# mid-demo with dirty in-process state — e.g. module-level counters some
+# demos display — which would make a same-process retry fail assertions
+# that hold on a first visit.
+terminate_app() {
+  if [[ "$PLATFORM" == "ios" ]]; then
+    xcrun simctl terminate booted "$APP_ID" 2> /dev/null || true
+  else
+    adb shell am force-stop "$APP_ID" 2> /dev/null || true
+  fi
+}
+
 MAX_ATTEMPTS="${MAESTRO_MAX_ATTEMPTS:-2}"
 attempt=1
 while (( attempt <= MAX_ATTEMPTS )); do
@@ -139,8 +153,9 @@ while (( attempt <= MAX_ATTEMPTS )); do
     printf "\nMaestro suite failed after %d attempt(s).\n" "$attempt" >&2
     exit 1
   fi
-  printf "\n==> Maestro suite failed (attempt %d/%d); retrying...\n" \
+  printf "\n==> Maestro suite failed (attempt %d/%d); restarting app and retrying...\n" \
     "$attempt" "$MAX_ATTEMPTS" >&2
+  terminate_app
   attempt=$(( attempt + 1 ))
 done
 

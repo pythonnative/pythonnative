@@ -109,6 +109,8 @@ When adding a new flow that needs to scroll a non-fullscreen container, copy thi
 
 `scripts/run-e2e.sh` re-invokes the whole `maestro test` once if the first attempt exits non-zero. The retry exists to absorb Maestro's iOS XCUITest driver flake (transient `Application is not running` / `Request for viewHierarchy failed`) — not to paper over real failures.
 
+Between attempts the script force-kills the app (`simctl terminate` / `am force-stop`) so the retry starts from a cold launch (`open_demo` relaunches a dead app). Without this, in-process state from the failed attempt — module-level counters some demos display, scroll offsets, half-open nested navigators — leaks into the retry and fails assertions that hold on a first visit. The memo demo's `"MemoA render count: 1"` was the canonical victim. Demos should still avoid module-level state that changes what a flow asserts on a revisit *within* one attempt (the `open_demo`/`close_demo` recovery paths can re-enter a demo after a stray tap); if such state is unavoidable, reset it on mount the way `memo_demo.py` does.
+
 When the script prints:
 
 ```text
@@ -163,6 +165,7 @@ Diagnostic procedure:
 
 4. **Inspect logs**: `pn run android` streams `print()` calls from the device. `print("[use_state] count -> ...")` style debug statements from the demo screen surface here, which is usually the fastest way to localize a regression.
 5. **Reproduce in isolation**: many failures are state-related. Re-run `./scripts/run-e2e.sh android components` (or the relevant category) — if the flow passes there but fails in the full suite, the bug is most likely in cleanup between flows.
+6. **CI-only failures**: the E2E workflow uploads `~/.maestro/tests` (command log, view-hierarchy dumps, failure screenshots) as a `maestro-debug-<platform>-<shard>` artifact when a shard fails. Download it from the run page (or `gh run download <run-id>`) before trying to reproduce locally — the failure screenshot usually answers "what was actually on screen" immediately.
 
 ## Adding a new demo (and its flow)
 

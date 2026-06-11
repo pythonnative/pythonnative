@@ -88,6 +88,18 @@ jobs:
           arch: x86_64
           script: bash -lc "./scripts/run-e2e.sh android ${{ matrix.suites }}"
 
+      # Maestro writes per-flow debug output (command log, view-hierarchy
+      # dumps, failure screenshots) under ~/.maestro/tests. Surface it when
+      # a shard fails so CI-only failures are diagnosable without guesswork.
+      - name: Upload Maestro debug output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-debug-android-${{ matrix.name }}
+          path: ~/.maestro/tests/
+          if-no-files-found: ignore
+          retention-days: 7
+
   e2e-ios:
     needs: coverage
     runs-on: macos-latest
@@ -136,3 +148,15 @@ jobs:
         run: ./scripts/run-e2e.sh ios ${{ matrix.suites }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Maestro writes per-flow debug output (command log, view-hierarchy
+      # dumps, failure screenshots) under ~/.maestro/tests. Surface it when
+      # a shard fails so CI-only failures are diagnosable without guesswork.
+      - name: Upload Maestro debug output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-debug-ios-${{ matrix.name }}
+          path: ~/.maestro/tests/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -37,6 +37,16 @@ def MemoDemo() -> pn.Element:
     parent_count, set_parent_count = pn.use_state(0)
     b_label, set_b_label = pn.use_state("x")
 
+    # The counters are module-level, so they survive unmount/remount. Reset
+    # them on every fresh mount so the Maestro flow's absolute assertions
+    # ("MemoA render count: 1") hold on revisits too — e.g. when the suite
+    # retries after an unrelated failure and walks through this demo again.
+    mounted = pn.use_ref(False)
+    if not mounted["current"]:
+        mounted["current"] = True
+        _render_counts["a"] = 0
+        _render_counts["b"] = 0
+
     return demo_screen(
         "memo",
         "Memoized children stay still when parent state changes.",
@@ -52,6 +62,6 @@ def MemoDemo() -> pn.Element:
                     on_click=lambda: set_b_label("y" if b_label == "x" else "x"),
                 ),
             ),
-            hint("Bumping parent should NOT bump MemoA's count. " "Toggling B label DOES bump MemoB's count."),
+            hint("Bumping parent should NOT bump MemoA's count. Toggling B label DOES bump MemoB's count."),
         ),
     )

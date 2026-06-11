@@ -9,7 +9,12 @@ appId: ${APP_ID}
     env:
       CATEGORY: Navigation
       DEMO_TITLE: Tab Navigator
-- assertVisible: "Tab Alpha body"
+# The nested navigator's first screen renders through an extra
+# Provider/context hop, which can land a beat after the page header on
+# a slow CI runner — wait for it instead of asserting immediately.
+- extendedWaitUntil:
+    visible: "Tab Alpha body"
+    timeout: 30000
 - tapOn: "Beta"
 - assertVisible: "Tab Beta body"
 - tapOn: "Gamma"
