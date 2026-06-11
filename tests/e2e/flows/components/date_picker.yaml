@@ -1,5 +1,13 @@
 # Tests DatePicker updates its bound value when a button sets it programmatically.
 #
+# Known coverage gap, accepted deliberately: the *native* picker UI is
+# not driven here. Opening it presents a calendar popover (iOS compact
+# style) or a date dialog (Android) whose internals differ per
+# platform and OS version, making day-cell taps too brittle for a
+# shared flow. The control's value-changed wiring uses the same raw
+# target-action plumbing as Switch/SegmentedControl, which *are*
+# covered by direct interaction in their flows.
+#
 # Demo screen: examples/e2e-suite/app/screens/components/date_picker.py
 # Source under test: src/pythonnative/components.py :: DatePicker
 appId: ${APP_ID}

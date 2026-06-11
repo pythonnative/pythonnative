@@ -1,4 +1,10 @@
-# Tests Picker updates its bound value when buttons set it programmatically.
+# Tests Picker selection through the real control and via buttons.
+#
+# The real picker is opened first — tapping the control (its title is
+# the selected label, "Apple") presents the native chooser (action
+# sheet on iOS, Spinner dropdown on Android); tapping "Banana" selects
+# it. This exercises the native open/select event wiring that the
+# Pick buttons bypass entirely.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/picker.py
 # Source under test: src/pythonnative/components.py :: Picker
@@ -10,10 +16,20 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: Picker
 - assertVisible: "Picked: apple"
-- tapOn: "Pick banana"
-- assertVisible: "Picked: banana"
+# Real interaction: open the native picker and choose an option.
+- tapOn: "Apple"
+- extendedWaitUntil:
+    visible: "Banana"
+    timeout: 10000
+- tapOn: "Banana"
+- extendedWaitUntil:
+    visible: "Picked: banana"
+    timeout: 10000
+# Programmatic path: buttons drive the same value.
 - tapOn: "Pick cherry"
 - assertVisible: "Picked: cherry"
+- tapOn: "Pick apple"
+- assertVisible: "Picked: apple"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

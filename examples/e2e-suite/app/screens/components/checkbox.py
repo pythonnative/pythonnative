@@ -1,8 +1,8 @@
 """Demo screen for [`pn.Checkbox`][pythonnative.Checkbox].
 
-Maestro taps the Check/Uncheck buttons and asserts the "Checked"
-line flips between ON and OFF. Driving via buttons keeps the flow
-deterministic instead of tapping the native box directly.
+Maestro taps the native box directly (via its "Accept" label) to
+exercise the platform's toggle event wiring, then drives the same
+state through the Check/Uncheck buttons.
 """
 
 from __future__ import annotations
@@ -27,6 +27,6 @@ def CheckboxDemo() -> pn.Element:
                 pn.Button("Check", on_click=lambda: set_on(True)),
                 pn.Button("Uncheck", on_click=lambda: set_on(False)),
             ),
-            hint("Tapping the buttons must update the Checked line."),
+            hint("Maestro taps the box itself, then the buttons."),
         ),
     )

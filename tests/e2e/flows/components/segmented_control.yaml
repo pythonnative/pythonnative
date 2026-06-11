@@ -1,4 +1,9 @@
-# Tests SegmentedControl updates its selection when buttons set it programmatically.
+# Tests SegmentedControl selection from real segment taps and buttons.
+#
+# Real segments are tapped first ("Two", "Three" — segment titles are
+# accessibility elements on iOS and Button text on Android), which
+# exercises the native value-changed wiring that the Pick buttons
+# bypass entirely.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/segmented_control.py
 # Source under test: src/pythonnative/components.py :: SegmentedControl
@@ -10,12 +15,16 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: SegmentedControl
 - assertVisible: "Selected: One"
-- tapOn: "Pick Two"
+# Real interaction: tap the segments themselves.
+- tapOn: "Two"
 - assertVisible: "Selected: Two"
-- tapOn: "Pick Three"
+- tapOn: "Three"
 - assertVisible: "Selected: Three"
+# Programmatic path: buttons drive the same selection.
 - tapOn: "Pick One"
 - assertVisible: "Selected: One"
+- tapOn: "Pick Two"
+- assertVisible: "Selected: Two"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

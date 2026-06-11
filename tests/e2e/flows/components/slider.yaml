@@ -1,4 +1,10 @@
-# Tests Slider value updates via programmatic snap buttons.
+# Tests Slider value updates from a real drag and from snap buttons.
+#
+# The real drag exercises the platform's value-changed event wiring,
+# which the buttons bypass. The demo starts the slider at 0.5 so the
+# thumb sits at the control's center — element-anchored swipes start
+# from the element center, and iOS's UISlider only drags when the
+# gesture starts on the thumb. A right swipe rails the value to max.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/slider.py
 # Source under test: src/pythonnative/components.py :: Slider
@@ -9,13 +15,20 @@ appId: ${APP_ID}
     env:
       CATEGORY: Components
       DEMO_TITLE: Slider
+- assertVisible: "Value: 0.50"
+# Real interaction: drag the native slider thumb to the right rail.
+- swipe:
+    from:
+      text: "Demo slider"
+    direction: RIGHT
+- assertVisible: "Value: 1.00"
+# Programmatic path: snap buttons set exact values.
+- tapOn: "Set 0.0"
 - assertVisible: "Value: 0.00"
 - tapOn: "Set 0.5"
 - assertVisible: "Value: 0.50"
 - tapOn: "Set 1.0"
 - assertVisible: "Value: 1.00"
-- tapOn: "Set 0.0"
-- assertVisible: "Value: 0.00"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

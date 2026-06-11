@@ -182,6 +182,7 @@ class SwitchProps(Props):
 
     value: bool = False
     on_change: Optional[Callable[[bool], None]] = None
+    accessibility_label: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -232,6 +233,7 @@ class SliderProps(Props):
     min_value: float = 0.0
     max_value: float = 1.0
     on_change: Optional[Callable[[float], None]] = None
+    accessibility_label: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -666,6 +668,7 @@ def Switch(
     *,
     value: bool = False,
     on_change: Optional[Callable[[bool], None]] = None,
+    accessibility_label: Optional[str] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -674,6 +677,8 @@ def Switch(
     Args:
         value: Current on/off state.
         on_change: Callback invoked with the new boolean state.
+        accessibility_label: Label exposed to assistive technology (and
+            UI test drivers) for the switch.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
 
@@ -686,6 +691,7 @@ def Switch(
         key=key,
         value=value,
         on_change=on_change,
+        accessibility_label=accessibility_label,
     )
 
 
@@ -849,6 +855,7 @@ def Slider(
     min_value: float = 0.0,
     max_value: float = 1.0,
     on_change: Optional[Callable[[float], None]] = None,
+    accessibility_label: Optional[str] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -860,6 +867,8 @@ def Slider(
         max_value: Upper bound.
         on_change: Callback invoked with the new value as the user
             drags.
+        accessibility_label: Label exposed to assistive technology (and
+            UI test drivers) for the slider.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
 
@@ -874,6 +883,7 @@ def Slider(
         min_value=min_value,
         max_value=max_value,
         on_change=on_change,
+        accessibility_label=accessibility_label,
     )
 
 

@@ -212,6 +212,19 @@ When you add a new public symbol to `pythonnative`, follow this exact recipe:
 
 If a symbol is genuinely untestable through a UI flow (type-only alias, network-dependent, requires hardware), instead add it to `INTENTIONAL_EXEMPTIONS` in `scripts/check-e2e-coverage.py` with a comment explaining why.
 
+## Interactive controls must be driven natively
+
+Every flow for an interactive component must exercise the **real native control** at least once — tap the actual Switch/Checkbox/segment, drag the actual Slider, open the actual Picker, pull the actual page — before (or in addition to) driving state through proxy buttons.
+
+Proxy "Set X" / "Turn on" buttons all share one happy-path event route (`Button.on_click`). The per-control native event bridges — target-actions for `ValueChanged` on iOS, per-widget listeners on Android — are exactly where platform-specific breakage hides. A regression where tapping the real `UISwitch` crashed the app on iOS 18 was completely invisible to a buttons-only flow; the suite stayed green while the control was unusable. Real-control interaction also catches rendering bugs (a control that never gets laid out or draws white-on-white can still pass text-only assertions).
+
+Practical notes:
+
+- Give label-less controls an `accessibility_label` in the demo (exposed as the accessibility label on iOS and `contentDescription` on Android — Maestro matches both as text).
+- Element-anchored swipes start from the element's center. The Slider demo starts at `value=0.5` precisely so the thumb sits where the swipe begins (iOS only drags a `UISlider` from the thumb).
+- Keep the proxy-button path too: it pins down the programmatic prop-update direction (Python -> native), which real gestures don't cover.
+- Documented exception: `DatePicker`'s popover/dialog internals are platform-divergent and too brittle to script; its value-changed wiring is identical to the covered Switch/SegmentedControl paths. See the comment in `flows/components/date_picker.yaml`.
+
 ## Stable label conventions
 
 These conventions keep flows robust across platforms. Stick to them when authoring demo screens.

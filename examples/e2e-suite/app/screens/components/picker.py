@@ -1,8 +1,9 @@
 """Demo screen for [`pn.Picker`][pythonnative.Picker].
 
 A simple fruit picker plus a button row that selects each value
-programmatically. Programmatic selection is what Maestro drives,
-since wheel pickers are hard to operate via test scripts.
+programmatically. Maestro opens the real picker (action sheet on iOS,
+Spinner dropdown on Android) and picks an option, then uses the
+buttons for the programmatic path.
 """
 
 from __future__ import annotations
@@ -45,6 +46,6 @@ def PickerDemo() -> pn.Element:
                 pn.Button("Pick banana", on_click=lambda: set_fruit("banana")),
                 pn.Button("Pick cherry", on_click=lambda: set_fruit("cherry")),
             ),
-            hint("Maestro taps a 'Pick X' button and asserts 'Picked: X'."),
+            hint("Maestro opens the picker and selects, then taps the buttons."),
         ),
     )

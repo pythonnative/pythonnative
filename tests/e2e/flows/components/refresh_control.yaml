@@ -1,4 +1,13 @@
-# Tests RefreshControl fires its callback and resolves.
+# Tests RefreshControl fires from a real pull gesture and from a button.
+#
+# The RefreshControl is attached to the page scroll view, so a long
+# slow downward drag from near the top of the page performs a genuine
+# pull-to-refresh. This exercises the native refresh wiring
+# (UIRefreshControl ValueChanged on iOS, SwipeRefreshLayout's
+# OnRefreshListener on Android) that the trigger button bypasses
+# entirely. The drag needs enough travel to cross the platform
+# activation threshold even with rubber-band damping, hence the
+# explicit long swipe instead of a plain directional flick.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/refresh_control.py
 # Source under test: src/pythonnative/components.py :: RefreshControl
@@ -11,9 +20,19 @@ appId: ${APP_ID}
       DEMO_TITLE: RefreshControl
 - assertVisible: "Refreshing: no"
 - assertVisible: "Refresh runs: 0"
-- tapOn: "Trigger refresh"
+# Real interaction: pull the page down from near the top.
+- swipe:
+    start: "50%, 25%"
+    end: "50%, 90%"
+    duration: 1000
 - extendedWaitUntil:
     visible: "Refresh runs: 1"
+    timeout: 10000
+- assertVisible: "Refreshing: no"
+# Programmatic path: the button runs the same handler.
+- tapOn: "Trigger refresh"
+- extendedWaitUntil:
+    visible: "Refresh runs: 2"
     timeout: 10000
 - assertVisible: "Refreshing: no"
 - runFlow:

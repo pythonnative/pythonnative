@@ -1,8 +1,8 @@
 """Demo screen for [`pn.SegmentedControl`][pythonnative.SegmentedControl].
 
-Maestro taps the Pick buttons and asserts the "Selected" line shows
-the matching segment label. Driving via buttons keeps the flow
-deterministic instead of tapping the native control directly.
+Maestro taps real segments (their titles are accessible on both
+platforms) to exercise the native selection event wiring, then drives
+the same state through the Pick buttons.
 """
 
 from __future__ import annotations
@@ -34,6 +34,6 @@ def SegmentedControlDemo() -> pn.Element:
                 pn.Button("Pick Two", on_click=lambda: set_index(1)),
                 pn.Button("Pick Three", on_click=lambda: set_index(2)),
             ),
-            hint("Maestro taps a 'Pick X' button and asserts 'Selected: X'."),
+            hint("Maestro taps segments directly, then the 'Pick X' buttons."),
         ),
     )

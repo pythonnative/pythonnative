@@ -1045,6 +1045,9 @@ class Reconciler:
             "ActivityIndicator",
             "TabBar",
             "Picker",
+            "Checkbox",
+            "SegmentedControl",
+            "DatePicker",
         }
     )
 

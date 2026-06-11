@@ -870,8 +870,15 @@ class ScrollViewHandler(AndroidViewHandler):
             except Exception:
                 sv = jclass("android.widget.ScrollView")(_ctx())
 
+        # Vertical scroll views are *always* wrapped in a (disabled)
+        # SwipeRefreshLayout. Wrapping later is impossible — the
+        # reconciler may reuse this view for a screen that adds a
+        # ``refresh_control`` prop afterwards (e.g. navigation swapping
+        # screens of the same shape), and re-parenting a mounted view
+        # mid-update is not safe. ``_apply_refresh`` simply toggles the
+        # wrapper's enabled state as the prop comes and goes.
         outer = sv
-        if props.get("refresh_control") and not horizontal:
+        if not horizontal:
             wrapper = self._wrap_in_refresh(sv)
             if wrapper is not None:
                 outer = wrapper
@@ -884,6 +891,11 @@ class ScrollViewHandler(AndroidViewHandler):
         if outer is not sv:
             state["refresh"] = outer
             self._bind_refresh_listener(outer)
+            if not props.get("refresh_control"):
+                try:
+                    outer.setEnabled(False)
+                except Exception:
+                    pass
         self._bind_scroll_listener(outer, sv)
         self._apply(outer, props, initial=True)
         if props.get("gestures"):
@@ -1799,6 +1811,7 @@ class SliderHandler(AndroidViewHandler):
         if "value" in props and props["value"] is not None:
             normalized = (float(props["value"]) - min_val) / rng
             sb.setProgress(int(normalized * 1000))
+        _apply_accessibility(sb, props)
 
 
 class TabBarHandler(AndroidViewHandler):

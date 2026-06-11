@@ -1,4 +1,10 @@
-# Tests Switch flips between ON and OFF in response to button taps.
+# Tests Switch flips between ON and OFF.
+#
+# The native control is tapped directly (via its accessibility label)
+# *before* the proxy buttons: the direct tap exercises the platform's
+# value-changed event wiring, which the buttons bypass entirely. A
+# regression where toggling the real UISwitch crashed the app was
+# invisible to this flow while it only used the buttons.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/switch.py
 # Source under test: src/pythonnative/components.py :: Switch
@@ -10,6 +16,12 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: Switch
 - assertVisible: "State: OFF"
+# Real interaction: tap the native switch itself.
+- tapOn: "Demo switch"
+- assertVisible: "State: ON"
+- tapOn: "Demo switch"
+- assertVisible: "State: OFF"
+# Programmatic path: buttons drive the same state.
 - tapOn: "Turn on"
 - assertVisible: "State: ON"
 - tapOn: "Turn off"

@@ -549,64 +549,6 @@ def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
 
 _pn_retained_views: list = []
 
-# Maps ``id(target)`` -> the owning native view, so shared NSObject
-# targets can route control events into the tag-based event channel.
-_pn_target_owner: Dict[int, Any] = {}
-
-
-class _PNActionTarget(NSObject):  # type: ignore[valid-type]
-    """Generic target-action receiver that fires a configured event name."""
-
-    @objc_method
-    def onTap_(self, sender: object) -> None:
-        # Do not introspect ``sender`` here. On rubicon-objc 0.5.x the
-        # selector trampoline can hand this callback a raw ObjC pointer;
-        # calling ``getattr(sender, "ptr", ...)`` has been observed to
-        # segfault before the user's callback runs.
-        info = _pn_target_owner.get(id(self))
-        if info is not None:
-            view, event = info
-            _fire(view, event)
-
-
-class _PNSwitchTarget(NSObject):  # type: ignore[valid-type]
-    @objc_method
-    def onToggle_(self, sender: object) -> None:
-        info = _pn_target_owner.get(id(self))
-        if info is None:
-            return
-        view, event = info
-        if _state_of(view).get("suppress"):
-            return
-        try:
-            _fire(view, event, bool(sender.isOn()))
-        except Exception:
-            pass
-
-
-class _PNSliderTarget(NSObject):  # type: ignore[valid-type]
-    @objc_method
-    def onSlide_(self, sender: object) -> None:
-        info = _pn_target_owner.get(id(self))
-        if info is None:
-            return
-        view, event = info
-        if _state_of(view).get("suppress"):
-            return
-        try:
-            _fire(view, event, float(sender.value))
-        except Exception:
-            pass
-
-
-def _make_action_target(cls: Any, view: Any, event: str) -> Any:
-    """Allocate, retain, and register a target bound to ``(view, event)``."""
-    target = cls.new()
-    target.retain()
-    _pn_retained_views.append(target)
-    _pn_target_owner[id(target)] = (view, event)
-    return target
-
 
 # ======================================================================
 # Simultaneous-recognition gesture delegate (raw libobjc)
@@ -739,6 +681,28 @@ def _register_action(rec: Any, handler: Any) -> None:
     rec_ptr = rec.ptr if hasattr(rec, "ptr") else rec
     _objc_msgSend(rec_ptr, _sel_reg(b"addTarget:action:"), target_ptr, _SEL_ON_ACTION)
     _pn_action_handlers[_recognizer_ptr(rec)] = handler
+
+
+def _register_control_action(control: Any, events_mask: int, handler: Any) -> None:
+    """Bind ``handler`` to a ``UIControl`` event via the shared raw target.
+
+    The UIControl counterpart of ``_register_action``: control events
+    (TouchUpInside, ValueChanged, ...) must not be delivered through
+    rubicon's ``@objc_method`` bridge either — the trampoline's ``sender``
+    marshaling is what crashed UISwitch toggles on iOS 18.x (the action
+    fired, but touching the marshaled ``sender`` segfaulted). The raw IMP
+    receives only the sender *pointer*; ``handler`` closures read any
+    control state they need from the retained rubicon wrapper they
+    captured at wiring time (outbound rubicon calls are fine).
+    """
+    target_ptr = _shared_action_target_ptr()
+    if target_ptr is None:
+        return
+    _objc_msgSend.restype = None
+    _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_ulong]
+    ctl_ptr = control.ptr if hasattr(control, "ptr") else control
+    _objc_msgSend(ctl_ptr, _SEL_ADD_TARGET_ACTION_EVENTS, target_ptr, _SEL_ON_ACTION, events_mask)
+    _pn_action_handlers[_recognizer_ptr(control)] = handler
 
 
 # UIGestureRecognizerState -> GestureEvent.state
@@ -1070,6 +1034,9 @@ class IOSViewHandler(ViewHandler):
         state = _state_of(native_view)
         for rec in state.get("gesture_recognizers") or []:
             _pn_action_handlers.pop(_recognizer_ptr(rec), None)
+        # Controls register their own pointer as the action-handler key
+        # (see _register_control_action); drop it with the view.
+        _pn_action_handlers.pop(_recognizer_ptr(native_view), None)
         try:
             native_view.removeFromSuperview()
         except Exception:
@@ -1401,8 +1368,7 @@ class ButtonHandler(IOSViewHandler):
         btn.setTranslatesAutoresizingMaskIntoConstraints_(True)
         btn.retain()
         _pn_retained_views.append(btn)
-        target = _make_action_target(_PNActionTarget, btn, "on_click")
-        btn.addTarget_action_forControlEvents_(target, SEL("onTap:"), 1 << 6)  # TouchUpInside
+        _register_control_action(btn, 1 << 6, lambda: _fire(btn, "on_click"))  # TouchUpInside
         return btn
 
     def measure_intrinsic(
@@ -1601,6 +1567,18 @@ class ScrollViewHandler(IOSViewHandler):
     def _apply_refresh(self, sv: Any, props: Dict[str, Any]) -> None:
         spec = props.get("refresh_control")
         if not spec:
+            # Prop removed (screen reuse can recycle this scroll view
+            # for a refresh-less screen): detach so no phantom pull
+            # gesture survives.
+            try:
+                existing = sv.refreshControl
+                if existing is not None:
+                    existing.endRefreshing()
+                    _pn_action_handlers.pop(_recognizer_ptr(existing), None)
+                    sv.setRefreshControl_(None)
+                    sv.setAlwaysBounceVertical_(False)
+            except Exception:
+                pass
             return
         try:
             existing = sv.refreshControl
@@ -1609,8 +1587,15 @@ class ScrollViewHandler(IOSViewHandler):
                 rc.retain()
                 _pn_retained_views.append(rc)
                 sv.setRefreshControl_(rc)
-                target = _make_action_target(_PNActionTarget, sv, "on_refresh")
-                rc.addTarget_action_forControlEvents_(target, SEL("onTap:"), 1 << 12)  # ValueChanged
+                _register_control_action(rc, 1 << 12, lambda: _fire(sv, "on_refresh"))  # ValueChanged
+                # Without this, a scroll view whose content fits its
+                # bounds never engages the pan gesture, making the
+                # refresh control unreachable by a pull (RN's ScrollView
+                # bounces vertically by default for the same reason).
+                try:
+                    sv.setAlwaysBounceVertical_(True)
+                except Exception:
+                    pass
                 existing = rc
             refreshing = bool(spec.get("refreshing")) if isinstance(spec, dict) else False
             if refreshing:
@@ -2122,8 +2107,17 @@ class SwitchHandler(IOSViewHandler):
         sw.setTranslatesAutoresizingMaskIntoConstraints_(True)
         sw.retain()
         _pn_retained_views.append(sw)
-        target = _make_action_target(_PNSwitchTarget, sw, "on_change")
-        sw.addTarget_action_forControlEvents_(target, SEL("onToggle:"), 1 << 12)  # ValueChanged
+
+        def _on_toggle() -> None:
+            if _state_of(sw).get("suppress"):
+                return
+            try:
+                value = bool(sw.isOn())
+            except Exception:
+                return
+            _fire(sw, "on_change", value)
+
+        _register_control_action(sw, 1 << 12, _on_toggle)  # ValueChanged
         return sw
 
     def _apply(self, sw: Any, props: Dict[str, Any], initial: bool) -> None:
@@ -2153,8 +2147,17 @@ class SliderHandler(IOSViewHandler):
         sl.setTranslatesAutoresizingMaskIntoConstraints_(True)
         sl.retain()
         _pn_retained_views.append(sl)
-        target = _make_action_target(_PNSliderTarget, sl, "on_change")
-        sl.addTarget_action_forControlEvents_(target, SEL("onSlide:"), 1 << 12)  # ValueChanged
+
+        def _on_slide() -> None:
+            if _state_of(sl).get("suppress"):
+                return
+            try:
+                value = float(sl.value)
+            except Exception:
+                return
+            _fire(sl, "on_change", value)
+
+        _register_control_action(sl, 1 << 12, _on_slide)  # ValueChanged
         return sl
 
     def _apply(self, sl: Any, props: Dict[str, Any], initial: bool) -> None:
@@ -3266,10 +3269,8 @@ def _present_alert(
 # Selecting a row fires ``on_change(value)``. Action sheets are the
 # standard iOS dropdown pattern for a small-to-medium set of choices.
 
+
 # Maps ``id(target)`` -> owning Picker button.
-_pn_picker_targets: Dict[int, Any] = {}
-
-
 def _picker_button_title(props: Dict[str, Any]) -> str:
     """Render the selected label, falling back to the placeholder."""
     items = props.get("items") or []
@@ -3280,32 +3281,26 @@ def _picker_button_title(props: Dict[str, Any]) -> str:
     return str(props.get("placeholder") or "Select…")
 
 
-class _PNPickerTarget(NSObject):  # type: ignore[valid-type]
-    """Per-button tap target that presents the option sheet."""
+def _present_picker_sheet(btn: Any) -> None:
+    """Present the option action-sheet for a Picker button."""
+    merged = _state_of(btn).get("props") or {}
+    items = [item for item in (merged.get("items") or []) if isinstance(item, dict)]
+    placeholder = merged.get("placeholder") or "Select…"
 
-    @objc_method
-    def onTap_(self, sender: object) -> None:  # noqa: ARG002
-        btn = _pn_picker_targets.get(id(self))
-        if btn is None:
-            return
-        merged = _state_of(btn).get("props") or {}
-        items = [item for item in (merged.get("items") or []) if isinstance(item, dict)]
-        placeholder = merged.get("placeholder") or "Select…"
+    buttons: List[Dict[str, Any]] = [{"label": str(item.get("label", item.get("value", "")))} for item in items]
+    buttons.append({"label": "Cancel", "style": "cancel"})
 
-        buttons: List[Dict[str, Any]] = [{"label": str(item.get("label", item.get("value", "")))} for item in items]
-        buttons.append({"label": "Cancel", "style": "cancel"})
+    def _on_result(index: int) -> None:
+        if 0 <= index < len(items):
+            _fire(btn, "on_change", items[index].get("value"))
 
-        def _on_result(index: int) -> None:
-            if 0 <= index < len(items):
-                _fire(btn, "on_change", items[index].get("value"))
-
-        _present_alert(
-            title=str(placeholder),
-            message=None,
-            buttons=buttons,
-            style="action_sheet",
-            on_result=_on_result,
-        )
+    _present_alert(
+        title=str(placeholder),
+        message=None,
+        buttons=buttons,
+        style="action_sheet",
+        on_result=_on_result,
+    )
 
 
 class PickerHandler(IOSViewHandler):
@@ -3316,11 +3311,7 @@ class PickerHandler(IOSViewHandler):
         btn.setTranslatesAutoresizingMaskIntoConstraints_(True)
         btn.retain()
         _pn_retained_views.append(btn)
-        target = _PNPickerTarget.new()
-        target.retain()
-        _pn_retained_views.append(target)
-        _pn_picker_targets[id(target)] = btn
-        btn.addTarget_action_forControlEvents_(target, SEL("onTap:"), 1 << 6)  # TouchUpInside
+        _register_control_action(btn, 1 << 6, lambda: _present_picker_sheet(btn))  # TouchUpInside
         return btn
 
     def _apply(self, btn: Any, props: Dict[str, Any], initial: bool) -> None:
@@ -3344,9 +3335,6 @@ class PickerHandler(IOSViewHandler):
 # ======================================================================
 # Checkbox — SF Symbol UIButton toggling checked / unchecked
 # ======================================================================
-
-# Maps ``id(target)`` -> owning Checkbox button.
-_pn_checkbox_targets: Dict[int, Any] = {}
 
 
 def _checkbox_set_image(btn: Any) -> None:
@@ -3373,23 +3361,19 @@ def _checkbox_set_image(btn: Any) -> None:
         pass
 
 
-class _PNCheckboxTarget(NSObject):  # type: ignore[valid-type]
-    @objc_method
-    def onToggle_(self, sender: object) -> None:  # noqa: ARG002
-        btn = _pn_checkbox_targets.get(id(self))
-        if btn is None:
-            return
-        state = _state_of(btn)
-        merged = state.get("props") or {}
-        if merged.get("disabled"):
-            return
-        new_value = not bool(state.get("value"))
-        # Optimistic local flip so the box feels instant even if the
-        # app's re-render is a frame behind; the authoritative ``value``
-        # prop re-syncs it on the next update.
-        state["value"] = new_value
-        _checkbox_set_image(btn)
-        _fire(btn, "on_change", new_value)
+def _checkbox_toggle(btn: Any) -> None:
+    """Flip a Checkbox button's checked state and fire ``on_change``."""
+    state = _state_of(btn)
+    merged = state.get("props") or {}
+    if merged.get("disabled"):
+        return
+    new_value = not bool(state.get("value"))
+    # Optimistic local flip so the box feels instant even if the
+    # app's re-render is a frame behind; the authoritative ``value``
+    # prop re-syncs it on the next update.
+    state["value"] = new_value
+    _checkbox_set_image(btn)
+    _fire(btn, "on_change", new_value)
 
 
 class CheckboxHandler(IOSViewHandler):
@@ -3398,21 +3382,34 @@ class CheckboxHandler(IOSViewHandler):
         btn.setTranslatesAutoresizingMaskIntoConstraints_(True)
         btn.retain()
         _pn_retained_views.append(btn)
-        target = _PNCheckboxTarget.new()
-        target.retain()
-        _pn_retained_views.append(target)
-        _pn_checkbox_targets[id(target)] = btn
-        btn.addTarget_action_forControlEvents_(target, SEL("onToggle:"), 1 << 6)  # TouchUpInside
+        _register_control_action(btn, 1 << 6, lambda: _checkbox_toggle(btn))  # TouchUpInside
         return btn
 
     def _apply(self, btn: Any, props: Dict[str, Any], initial: bool) -> None:
         state = _state_of(btn)
+        if initial:
+            # UIButtonTypeCustom defaults to a white title and inherits
+            # no useful tint, so both the label and the SF Symbol box
+            # are invisible on light backgrounds without an explicit
+            # color.
+            try:
+                btn.setTitleColor_forState_(_uicolor("#111111"), 0)
+                btn.setTintColor_(_uicolor("#111111"))
+            except Exception:
+                pass
         if "value" in props:
             state["value"] = bool(props["value"])
         if "label" in props:
             label = props["label"]
             try:
                 btn.setTitle_forState_(str(label) if label is not None else "", 0)
+            except Exception:
+                pass
+            # An image-bearing custom button is not exposed to the
+            # accessibility tree by title alone; mirror the label
+            # explicitly (an accessibility_label prop still wins below).
+            try:
+                btn.setAccessibilityLabel_(str(label) if label is not None else "")
             except Exception:
                 pass
         if "disabled" in props:
@@ -3444,25 +3441,6 @@ class CheckboxHandler(IOSViewHandler):
 # SegmentedControl — native UISegmentedControl
 # ======================================================================
 
-# Maps ``id(target)`` -> owning UISegmentedControl.
-_pn_segmented_targets: Dict[int, Any] = {}
-
-
-class _PNSegmentedTarget(NSObject):  # type: ignore[valid-type]
-    @objc_method
-    def onChange_(self, sender: object) -> None:  # noqa: ARG002
-        control = _pn_segmented_targets.get(id(self))
-        if control is None:
-            return
-        state = _state_of(control)
-        if state.get("suppress"):
-            return
-        try:
-            index = int(control.selectedSegmentIndex)
-        except Exception:
-            return
-        _fire(control, "on_change", index)
-
 
 class SegmentedControlHandler(IOSViewHandler):
     def _build(self, props: Dict[str, Any]) -> Any:
@@ -3472,11 +3450,17 @@ class SegmentedControlHandler(IOSViewHandler):
         control.setTranslatesAutoresizingMaskIntoConstraints_(True)
         control.retain()
         _pn_retained_views.append(control)
-        target = _PNSegmentedTarget.new()
-        target.retain()
-        _pn_retained_views.append(target)
-        _pn_segmented_targets[id(target)] = control
-        control.addTarget_action_forControlEvents_(target, SEL("onChange:"), 1 << 12)  # ValueChanged
+
+        def _on_change() -> None:
+            if _state_of(control).get("suppress"):
+                return
+            try:
+                index = int(control.selectedSegmentIndex)
+            except Exception:
+                return
+            _fire(control, "on_change", index)
+
+        _register_control_action(control, 1 << 12, _on_change)  # ValueChanged
         return control
 
     def _apply(self, control: Any, props: Dict[str, Any], initial: bool) -> None:
@@ -3548,8 +3532,6 @@ class SegmentedControlHandler(IOSViewHandler):
 
 _DATE_PICKER_FORMATS = {"date": "yyyy-MM-dd", "time": "HH:mm", "datetime": "yyyy-MM-dd'T'HH:mm"}
 _pn_date_formatters: Dict[str, Any] = {}
-# Maps ``id(target)`` -> owning UIDatePicker.
-_pn_datepicker_targets: Dict[int, Any] = {}
 
 
 def _date_formatter(mode: str) -> Any:
@@ -3572,23 +3554,6 @@ def _date_formatter(mode: str) -> Any:
     return formatter
 
 
-class _PNDatePickerTarget(NSObject):  # type: ignore[valid-type]
-    @objc_method
-    def onChange_(self, sender: object) -> None:  # noqa: ARG002
-        picker = _pn_datepicker_targets.get(id(self))
-        if picker is None:
-            return
-        state = _state_of(picker)
-        if state.get("suppress"):
-            return
-        mode = (state.get("props") or {}).get("mode", "date")
-        try:
-            iso = str(_date_formatter(mode).stringFromDate_(picker.date))
-        except Exception:
-            return
-        _fire(picker, "on_change", iso)
-
-
 class DatePickerHandler(IOSViewHandler):
     def _build(self, props: Dict[str, Any]) -> Any:
         picker = ObjCClass("UIDatePicker").alloc().init()
@@ -3601,11 +3566,19 @@ class DatePickerHandler(IOSViewHandler):
             picker.setPreferredDatePickerStyle_(2)  # UIDatePickerStyleCompact
         except Exception:
             pass
-        target = _PNDatePickerTarget.new()
-        target.retain()
-        _pn_retained_views.append(target)
-        _pn_datepicker_targets[id(target)] = picker
-        picker.addTarget_action_forControlEvents_(target, SEL("onChange:"), 1 << 12)  # ValueChanged
+
+        def _on_change() -> None:
+            state = _state_of(picker)
+            if state.get("suppress"):
+                return
+            mode = (state.get("props") or {}).get("mode", "date")
+            try:
+                iso = str(_date_formatter(mode).stringFromDate_(picker.date))
+            except Exception:
+                return
+            _fire(picker, "on_change", iso)
+
+        _register_control_action(picker, 1 << 12, _on_change)  # ValueChanged
         return picker
 
     def _apply(self, picker: Any, props: Dict[str, Any], initial: bool) -> None:
