@@ -3,14 +3,10 @@
 # Demo screen: examples/e2e-suite/app/screens/navigation/tab_navigator.py
 # Source under test: src/pythonnative/navigation.py :: create_tab_navigator
 #
-# Switching tabs replaces the active screen's subtree, so a follow-up tap
-# fired into the brief post-swap window can be dropped on a loaded CI
-# simulator (see the drawer flow's note — same native tap-delivery race;
-# the logic itself is correct and covered headlessly in
-# tests/test_navigation.py). Tab labels persist in the bar regardless of
-# the active tab, so re-tapping the same label is a harmless no-op; each
-# switch is wrapped in a plain retry that re-taps until the tab's body
-# shows.
+# The tap target (the TabBar) is persistent across switches, so taps are
+# reliable. We `extendedWaitUntil` rather than assert immediately only
+# because a state-driven re-render is committed on the next run-loop turn,
+# so the new tab body appears a beat after the tap.
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -21,27 +17,18 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Tab Alpha body"
     timeout: 30000
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn: "Beta"
-      - extendedWaitUntil:
-          visible: "Tab Beta body"
-          timeout: 6000
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn: "Gamma"
-      - extendedWaitUntil:
-          visible: "Tab Gamma body"
-          timeout: 6000
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn: "Alpha"
-      - extendedWaitUntil:
-          visible: "Tab Alpha body"
-          timeout: 6000
+- tapOn: "Beta"
+- extendedWaitUntil:
+    visible: "Tab Beta body"
+    timeout: 10000
+- tapOn: "Gamma"
+- extendedWaitUntil:
+    visible: "Tab Gamma body"
+    timeout: 10000
+- tapOn: "Alpha"
+- extendedWaitUntil:
+    visible: "Tab Alpha body"
+    timeout: 10000
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

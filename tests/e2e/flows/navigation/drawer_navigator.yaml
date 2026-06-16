@@ -8,13 +8,9 @@
 # context). This mirrors the tab navigator's persistent TabBar: a control
 # that lives inside the screen being torn down destroys itself the instant it
 # fires, and on a loaded CI simulator that self-teardown drops the *next* tap
-# (the second navigation then silently no-ops — confirmed via the uploaded
-# failure screenshot: stuck on "screen Two"). Keeping the controls persistent
-# removes that race. The core navigation logic is covered headlessly by the
-# One->Two->One regression in tests/test_navigation.py.
-#
-# Each hop still uses a short retry so a single stray dropped tap (the buttons
-# are always present, so re-tapping is safe) cannot flake the suite.
+# (the second navigation then silently no-ops). Keeping the controls
+# persistent removes that race. The core navigation logic is covered
+# headlessly by the One->Two->One regression in tests/test_navigation.py.
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -25,22 +21,14 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Drawer screen One"
     timeout: 30000
-# One -> Two
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn: "Go to Two"
-      - extendedWaitUntil:
-          visible: "Drawer screen Two"
-          timeout: 6000
-# Two -> One
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn: "Go to One"
-      - extendedWaitUntil:
-          visible: "Drawer screen One"
-          timeout: 6000
+- tapOn: "Go to Two"
+- extendedWaitUntil:
+    visible: "Drawer screen Two"
+    timeout: 10000
+- tapOn: "Go to One"
+- extendedWaitUntil:
+    visible: "Drawer screen One"
+    timeout: 10000
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:
