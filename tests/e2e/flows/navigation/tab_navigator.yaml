@@ -2,6 +2,15 @@
 #
 # Demo screen: examples/e2e-suite/app/screens/navigation/tab_navigator.py
 # Source under test: src/pythonnative/navigation.py :: create_tab_navigator
+#
+# Switching tabs replaces the active screen's subtree, so a follow-up tap
+# fired into the brief post-swap window can be dropped on a loaded CI
+# simulator (see the drawer flow's note — same native tap-delivery race;
+# the logic itself is correct and covered headlessly in
+# tests/test_navigation.py). Tab labels persist in the bar regardless of
+# the active tab, so re-tapping the same label is a harmless no-op; each
+# switch is wrapped in a plain retry that re-taps until the tab's body
+# shows.
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -9,18 +18,30 @@ appId: ${APP_ID}
     env:
       CATEGORY: Navigation
       DEMO_TITLE: Tab Navigator
-# The nested navigator's first screen renders through an extra
-# Provider/context hop, which can land a beat after the page header on
-# a slow CI runner — wait for it instead of asserting immediately.
 - extendedWaitUntil:
     visible: "Tab Alpha body"
     timeout: 30000
-- tapOn: "Beta"
-- assertVisible: "Tab Beta body"
-- tapOn: "Gamma"
-- assertVisible: "Tab Gamma body"
-- tapOn: "Alpha"
-- assertVisible: "Tab Alpha body"
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn: "Beta"
+      - extendedWaitUntil:
+          visible: "Tab Beta body"
+          timeout: 6000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn: "Gamma"
+      - extendedWaitUntil:
+          visible: "Tab Gamma body"
+          timeout: 6000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn: "Alpha"
+      - extendedWaitUntil:
+          visible: "Tab Alpha body"
+          timeout: 6000
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

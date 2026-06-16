@@ -2,6 +2,22 @@
 #
 # Demo screen: examples/e2e-suite/app/screens/navigation/drawer_navigator.py
 # Source under test: src/pythonnative/navigation.py :: create_drawer_navigator
+#
+# Switching screens replaces the whole nested-screen subtree (the two
+# screens are distinct component types), so the freshly-created button
+# for the *next* hop appears a frame or two before it is reliably
+# hit-testable. On a loaded CI simulator Maestro can fire the follow-up
+# tap into that gap and have it silently dropped — the button sits there,
+# correctly laid out, but never received the touch (confirmed via the
+# uploaded failure screenshot: stuck on "screen Two" with "Go to One"
+# visible). The core navigation logic is correct and deterministic (see
+# the headless One->Two->One regression in tests/test_navigation.py); it
+# is purely a native tap-delivery race.
+#
+# Each hop is therefore a toggle-safe retry: tap the "from" button only
+# while it is still visible (so a re-attempt after a successful hop is a
+# no-op), then wait for the destination. A dropped tap leaves us on the
+# same screen with the same button still present, so the retry re-taps it.
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -9,16 +25,33 @@ appId: ${APP_ID}
     env:
       CATEGORY: Navigation
       DEMO_TITLE: Drawer Navigator
-# The nested navigator's first screen renders through an extra
-# Provider/context hop, which can land a beat after the page header on
-# a slow CI runner — wait for it instead of asserting immediately.
 - extendedWaitUntil:
     visible: "Drawer screen One"
     timeout: 30000
-- tapOn: "Go to Two"
-- assertVisible: "Drawer screen Two"
-- tapOn: "Go to One"
-- assertVisible: "Drawer screen One"
+# One -> Two
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible: "Go to Two"
+          commands:
+            - tapOn: "Go to Two"
+      - extendedWaitUntil:
+          visible: "Drawer screen Two"
+          timeout: 6000
+# Two -> One
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible: "Go to One"
+          commands:
+            - tapOn: "Go to One"
+      - extendedWaitUntil:
+          visible: "Drawer screen One"
+          timeout: 6000
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

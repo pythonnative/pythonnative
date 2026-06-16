@@ -707,6 +707,78 @@ def test_drawer_navigator_renders_initial_screen() -> None:
     assert "home" in texts
 
 
+def test_drawer_navigator_switches_screens_back_and_forth() -> None:
+    """Driving One->Two->One through the event registry re-renders correctly.
+
+    Regression for a CI E2E flake where the drawer demo got stuck on
+    "screen Two" after tapping "Go to One". The two screens are distinct
+    component types, so each ``navigate`` replaces the whole nested-screen
+    subtree; this exercises that replace path end-to-end (event dispatch ->
+    state setter -> ``flush_dirty`` -> reconcile) to prove the navigation
+    logic itself is deterministic. The on-device failure was a native
+    tap-delivery race, not a logic bug — but this guards the logic so a
+    real regression can't hide behind that flake.
+    """
+    from pythonnative.events import get_event_registry
+
+    Drawer = create_drawer_navigator()
+
+    @component
+    def One() -> Element:
+        nav = use_navigation()
+        return Element(
+            "View",
+            {},
+            [
+                Element("Text", {"text": "screen One"}, []),
+                Element("Button", {"title": "Go to Two", "on_click": lambda: nav.navigate("Two")}, []),
+            ],
+        )
+
+    @component
+    def Two() -> Element:
+        nav = use_navigation()
+        return Element(
+            "View",
+            {},
+            [
+                Element("Text", {"text": "screen Two"}, []),
+                Element("Button", {"title": "Go to One", "on_click": lambda: nav.navigate("One")}, []),
+            ],
+        )
+
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    # Wire the production render trigger so a state setter fired from an
+    # event callback actually re-renders, exactly as on device.
+    rec._screen_re_render = rec.flush_dirty
+
+    el = Drawer.Navigator(
+        Drawer.Screen("One", component=One, options={"title": "One"}),
+        Drawer.Screen("Two", component=Two, options={"title": "Two"}),
+    )
+    rec.mount(el)
+
+    def texts() -> set:
+        return {v.props.get("text") for v in backend.views.values() if v.type_name == "Text"}
+
+    def tag_of_button(title: str) -> int:
+        for v in backend.views.values():
+            if v.type_name == "Button" and v.props.get("title") == title:
+                return v.tag
+        raise AssertionError(f"button {title!r} not found; have {texts()}")
+
+    registry = get_event_registry()
+
+    assert "screen One" in texts()
+
+    registry.dispatch(tag_of_button("Go to Two"), "on_click")
+    assert texts() == {"screen Two"}, "navigate('Two') must show screen Two only"
+
+    registry.dispatch(tag_of_button("Go to One"), "on_click")
+    assert texts() == {"screen One"}, "navigate('One') must switch back to screen One"
+
+
 def test_drawer_navigator_empty_screens() -> None:
     Drawer = create_drawer_navigator()
 
