@@ -710,14 +710,18 @@ def test_drawer_navigator_renders_initial_screen() -> None:
 def test_drawer_navigator_switches_screens_back_and_forth() -> None:
     """Driving One->Two->One through the event registry re-renders correctly.
 
-    Regression for a CI E2E flake where the drawer demo got stuck on
+    Regression for a CI E2E failure where the drawer demo got stuck on
     "screen Two" after tapping "Go to One". The two screens are distinct
     component types, so each ``navigate`` replaces the whole nested-screen
     subtree; this exercises that replace path end-to-end (event dispatch ->
     state setter -> ``flush_dirty`` -> reconcile) to prove the navigation
-    logic itself is deterministic. The on-device failure was a native
-    tap-delivery race, not a logic bug — but this guards the logic so a
-    real regression can't hide behind that flake.
+    logic itself is deterministic. The on-device failure was native, not a
+    logic bug: the per-screen "Go to One" button lived inside the subtree
+    that ``navigate`` tore down, so it destroyed itself mid-tap and dropped
+    the follow-up touch on the loaded CI simulator. The demo now drives
+    navigation from a persistent control (see drawer_navigator.py); this
+    test guards the underlying logic so a real regression can't hide behind
+    that native quirk.
     """
     from pythonnative.events import get_event_registry
 

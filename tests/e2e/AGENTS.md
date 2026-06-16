@@ -228,6 +228,14 @@ Practical notes:
 - Keep the proxy-button path too: it pins down the programmatic prop-update direction (Python -> native), which real gestures don't cover.
 - Documented exception: `DatePicker`'s popover/dialog internals are platform-divergent and too brittle to script; its value-changed wiring is identical to the covered Switch/SegmentedControl paths. See the comment in `flows/components/date_picker.yaml`.
 
+### Controls that trigger their own teardown
+
+A control that, when tapped, unmounts the subtree it lives in destroys *itself* as part of handling its own tap. On some iOS simulators (notably the loaded, headless CI sim) that self-teardown leaves UIKit's touch delivery in a bad state and the **next** tap is silently dropped — so a "navigate away" button works the first time and then the following navigation no-ops.
+
+The drawer demo hit this: its per-screen "Go to One" / "Go to Two" buttons lived inside the screens the navigator swaps, so each tap tore down the button that fired it. The first hop worked and the second was dropped — deterministic on CI, invisible locally (the timing only bites on the slower sim) and invisible headlessly (the Python reconciler/layout are provably correct). The tab navigator never hit it because its `TabBar` is persistent.
+
+Rule: when a demo control causes the subtree it belongs to to be replaced (navigation between distinct screen components, conditionally-rendered branches, etc.), put the control **outside** that subtree. The drawer demo publishes its navigation handle on a context (`_NavBus`) and renders the nav buttons in the persistent demo body. Mirror the tab navigator, not an in-screen button.
+
 ## Stable label conventions
 
 These conventions keep flows robust across platforms. Stick to them when authoring demo screens.
