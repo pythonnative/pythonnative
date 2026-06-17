@@ -5,14 +5,14 @@ PythonNative navigation is **declarative** and **native-backed**:
 - You describe your screens once as a `Stack.Navigator` (or `Tab` /
   `Drawer`) tree.
 - At the root of your app, the stack delegates to the platform's
-  native navigation controller — `UINavigationController` on iOS and
+  native navigation controller: `UINavigationController` on iOS and
   the AndroidX Navigation Component on Android.
 - Each pushed screen runs in its own reconciler host, so the screen
   you came from is preserved by the platform (including scroll
   offsets, animations, gesture-driven back transitions).
 
 Nested navigators (tabs inside a stack, or stacks inside tabs) are
-managed entirely in Python — only the outermost stack delegates to
+managed entirely in Python; only the outermost stack delegates to
 the host. The same `pn.use_navigation()` and `pn.use_route()` hooks
 work everywhere.
 
@@ -152,7 +152,7 @@ automatically **forwards** the request to its parent navigator.
 Similarly, `go_back()` at the root of a child stack forwards to the
 parent.
 
-Nested navigators stay in Python — only the outermost stack delegates
+Nested navigators stay in Python; only the outermost stack delegates
 to the native navigation controller. This is the right default: tab
 switches should be cheap, in-process, and reuse already-mounted
 screens, while top-level pushes deserve a native navigation

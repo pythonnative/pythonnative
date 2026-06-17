@@ -351,7 +351,7 @@ def serialize_gestures(
 # guarantees identical semantics on both backends.
 
 EmitFn = Callable[[int, Dict[str, Any]], None]
-"""``emit(gesture_index, payload)`` — the arbiter's output channel."""
+"""``emit(gesture_index, payload)``: the arbiter's output channel."""
 
 
 class _VelocityTracker:
@@ -400,7 +400,7 @@ class _Recognizer:
     def kind(self) -> str:
         return str(self.config.get("kind", ""))
 
-    # Event hooks — ``pointers`` maps pointer id -> (x, y).
+    # Event hooks: ``pointers`` maps pointer id -> (x, y).
     def down(self, pointers: Dict[int, Tuple[float, float]], t: float) -> None:
         pass
 
@@ -805,7 +805,7 @@ class GestureArbiter:
 
     One arbiter serves one view. The host backend feeds it normalized
     pointer events (positions in the view's coordinate space, times in
-    seconds — any monotonic clock) and provides an ``emit`` callback
+    seconds, any monotonic clock) and provides an ``emit`` callback
     that forwards ``(gesture_index, payload)`` pairs to
     [`dispatch_event`][pythonnative.events.dispatch_event].
 

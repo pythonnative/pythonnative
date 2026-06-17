@@ -1,8 +1,8 @@
 # Native views
 
 The reconciler doesn't know what a `Text` or a `Button` is. It produces
-a flat list of **mutation ops** — create, update, insert, remove,
-destroy, set-frame — that reference views by integer **tag**, and hands
+a flat list of **mutation ops** (create, update, insert, remove,
+destroy, set-frame) that reference views by integer **tag**, and hands
 the whole list to the
 [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry] in
 a single
@@ -23,7 +23,7 @@ the render loop.
 
 | Op | Meaning |
 |---|---|
-| `CreateOp(tag, type_name, props)` | Create a native view for `tag`. Props are already *clean* — callables have been routed to the event registry. |
+| `CreateOp(tag, type_name, props)` | Create a native view for `tag`. Props are already *clean*: callables have been routed to the event registry. |
 | `UpdateOp(tag, changed_props)` | Apply only the props that changed (removed props arrive as `None`). |
 | `InsertOp(parent_tag, child_tag, index)` | Place the child at `index` (move-aware: an attached child is repositioned, not duplicated). |
 | `RemoveOp(parent_tag, child_tag)` | Detach the child without destroying it. |
@@ -33,7 +33,7 @@ the render loop.
 Tags matter because the diff phase is pure: it runs before any native
 view exists, so ops can't reference views directly. Tags also give the
 native side a stable identity for event routing and animation
-bookkeeping, and a flat op list is trivially serializable — the door
+bookkeeping, and a flat op list is trivially serializable; the door
 stays open for applying mutations through a single JNI/ObjC crossing.
 
 ## The handler protocol
@@ -49,7 +49,7 @@ objects:
 | `update(view, changed_props)` | On commits where the element survived the diff with changed props. |
 | `insert_child(parent, child, index)` | When a child appears in (or moves to) a slot. |
 | `remove_child(parent, child)` | When a child is detached. |
-| `destroy(view)` | When the view is released — unhook listeners, cancel image loads, etc. |
+| `destroy(view)` | When the view is released: unhook listeners, cancel image loads, etc. |
 | `set_frame(view, x, y, width, height)` | When the layout engine computed a different frame than last pass. |
 | `measure_intrinsic(view, max_w, max_h)` | Called by the layout engine on leaf widgets that need a content-derived size. |
 
@@ -81,7 +81,7 @@ class MyHandler(ViewHandler):
         return (size.width, size.height)
 ```
 
-Handlers do **not** read flex / margin / padding props themselves —
+Handlers do **not** read flex / margin / padding props themselves;
 those are interpreted by `pythonnative.layout` and turned into
 `SetFrameOp`s. A handler only needs to apply the frame it is given.
 
@@ -90,8 +90,8 @@ those are interpreted by `pythonnative.layout` and turned into
 Callable props (`on_press`, `on_change`, …) are stripped before a
 `CreateOp`/`UpdateOp` is built and registered in the process-wide
 [`EventRegistry`][pythonnative.events.EventRegistry] keyed by
-`(tag, name)`. The native payload carries only `_pn_events` — a
-`frozenset` of the event names present — so handlers can wire expensive
+`(tag, name)`. The native payload carries only `_pn_events` (a
+`frozenset` of the event names present) so handlers can wire expensive
 listeners (scroll delegates, gesture recognizers) conditionally.
 
 The payoff: a re-render that only changes a callback's identity (every
@@ -130,7 +130,7 @@ documented in [Component properties](../api/component-properties.md).
 The set of keys the layout engine consumes is exposed as
 `pythonnative.layout.LAYOUT_STYLE_KEYS`.
 
-Handlers only deal with **visual** properties — colours, fonts,
+Handlers only deal with **visual** properties: colours, fonts,
 borders, corner radii, image scaling, text content. After each commit
 the reconciler runs the layout pass and emits `SetFrameOp`s for every
 node whose frame changed.
@@ -151,7 +151,7 @@ On each platform that boils down to:
   `setTextColor`, `setTextSize`, etc.
 
 Because layout is centralised, the same `style` dict produces the same
-geometry on Android and iOS — there is no "container-only" vs
+geometry on Android and iOS; there's no "container-only" vs
 "child-only" trap to fall into.
 
 ## Children
@@ -173,7 +173,7 @@ recreating views.
 
 Production handlers require Chaquopy (Android) or rubicon-objc (iOS),
 neither of which is available on a developer laptop. The test suite
-sidesteps this with `tests/fake_backend.py` — a shared in-memory
+sidesteps this with `tests/fake_backend.py`, a shared in-memory
 backend implementing the same mutation protocol while keeping a real
 tree of `FakeView` objects:
 
@@ -242,8 +242,8 @@ the `pythonnative.handlers` entry-point group (see
 [`ENTRY_POINT_GROUP`][pythonnative.sdk._components.ENTRY_POINT_GROUP]),
 so users only have to `pip install` your package.
 
-For the full walkthrough — typed props, iOS handler, Android handler,
-distribution as a plugin, unit-testing — see the
+For the full walkthrough (typed props, iOS handler, Android handler,
+distribution as a plugin, unit-testing), see the
 [Custom native components guide](../guides/custom-native-components.md).
 
 ## Next steps

@@ -26,7 +26,7 @@ covered by the Maestro E2E suite (`tests/e2e/`).
 
 A test backend implements the registry protocol: `apply_mutations`,
 `resolve_view`, `measure_intrinsic`, and `command`. PythonNative's own
-suite keeps a full-featured one in `tests/fake_backend.py` — copy it
+suite keeps a full-featured one in `tests/fake_backend.py`; copy it
 into your project or use this trimmed version:
 
 ```python
@@ -104,7 +104,7 @@ you get the full lifecycle plumbing.)
 
 ## Asserting on rendered output
 
-Event callbacks live in the event registry, not on the view — drive
+Event callbacks live in the event registry, not on the view; drive
 them with [`dispatch_event`][pythonnative.events.dispatch_event]
 exactly like a native listener would:
 
@@ -136,7 +136,7 @@ Notes:
 - `key="t"` and `key="b"` aren't required for a two-child column, but
   using them in tests makes assertions more robust as the component
   evolves.
-- Callable props never appear in `props` — the view carries a
+- Callable props never appear in `props`; the view carries a
   `_pn_events` frozenset naming the wired events, and
   `dispatch_event(tag, name, *args)` invokes the current callback.
 

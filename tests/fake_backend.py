@@ -3,15 +3,15 @@
 Every unit test that drives a :class:`~pythonnative.reconciler.Reconciler`
 uses this module instead of defining its own mock. ``FakeBackend``
 implements the same protocol as
-:class:`~pythonnative.native_views.NativeViewRegistry` — ``apply_mutations``,
+:class:`~pythonnative.native_views.NativeViewRegistry` (``apply_mutations``,
 ``resolve_view``, ``measure_intrinsic``, ``command``, plus the animation
-hooks — while keeping a real tree of :class:`FakeView` objects so tests
+hooks) while keeping a real tree of :class:`FakeView` objects so tests
 can assert on structure, props, and frames.
 
 Unlike the production registry (which isolates per-op failures so a bad
 prop can't desync a device), the fake **raises** on malformed
-transactions — unknown tags, double-destroys, inserting into a destroyed
-parent — so reconciler bugs fail tests loudly instead of being swallowed.
+transactions (unknown tags, double-destroys, inserting into a destroyed
+parent) so reconciler bugs fail tests loudly instead of being swallowed.
 
 Recorded op shapes (in ``FakeBackend.ops``):
 

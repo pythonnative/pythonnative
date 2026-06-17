@@ -5,7 +5,7 @@ The console script `pn` (declared in `pyproject.toml`) dispatches to:
 - `pn init [name]`: scaffold a new project (``pythonnative.toml`` + ``app/``).
 - `pn doctor [platform]`: diagnose the local toolchain and config.
 - `pn preview [component]`: render the app in a desktop (Tkinter) window
-  with Fast Refresh — the fast inner dev loop, no device required.
+  with Fast Refresh, the fast inner dev loop, no device required.
 - `pn run android|ios`: stage + build + install + launch on a device or
   simulator, with optional on-device hot reload.
 - `pn build android|ios`: produce standalone artifacts (signed APK/AAB,

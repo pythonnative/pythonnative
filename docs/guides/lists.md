@@ -7,8 +7,8 @@ inside (and just beyond) the viewport are mounted as native views.
 Leading and trailing spacers stand in for everything off-screen, and
 the window of mounted rows shifts as the user scrolls. The windowing
 runs in Python on top of the platform's native scroll view, so the
-same behavior — including `on_end_reached`, viewability callbacks, and
-the imperative scroll controller — is identical on Android, iOS, and
+same behavior (including `on_end_reached`, viewability callbacks, and
+the imperative scroll controller) is identical on Android, iOS, and
 the desktop preview.
 
 ```python
@@ -27,17 +27,17 @@ def Big():
     )
 ```
 
-The list never holds 10,000 native views — only the window around the
+The list never holds 10,000 native views; only the window around the
 viewport ever exists.
 
 ## Row heights
 
 Three ways to tell the list how tall rows are, in order of preference:
 
-- `item_height=44` — uniform rows. Offsets are exact and cheap.
-- `get_item_height=lambda item, i: ...` — exact per-row extents
+- `item_height=44`: uniform rows. Offsets are exact and cheap.
+- `get_item_height=lambda item, i: ...`: exact per-row extents
   without measurement.
-- Nothing at all — rows start at `estimated_item_height` (default 44)
+- Nothing at all: rows start at `estimated_item_height` (default 44)
   and are corrected with their measured extent once they've been on
   screen. Scroll positions stay stable as estimates converge.
 

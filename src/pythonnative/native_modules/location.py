@@ -167,7 +167,7 @@ def _android_get(on_result: Callable[[Optional[Coords]], None]) -> None:
         Context = jclass("android.content.Context")
         lm = ctx.getSystemService(Context.LOCATION_SERVICE)
 
-        # Try the most recent known fix first — it's instant and avoids
+        # Try the most recent known fix first; it's instant and avoids
         # the GPS warm-up delay.
         try:
             for provider in ("gps", "network", "passive"):

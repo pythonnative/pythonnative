@@ -1,7 +1,7 @@
 """Built-in element factories and the typed prop schemas they share.
 
-Each ``@dataclass(frozen=True)`` class in this module — ``TextProps``,
-``ButtonProps``, etc. — is the canonical schema for one built-in
+Each ``@dataclass(frozen=True)`` class in this module (``TextProps``,
+``ButtonProps``, etc.) is the canonical schema for one built-in
 component. Each factory function (``Text``, ``Button``, …) is a thin
 ergonomic wrapper that builds an [`Element`][pythonnative.Element]
 through the shared :func:`_make_element` helper, so style resolution,
@@ -827,7 +827,7 @@ def Spacer(
 
     Args:
         size: Fixed gap in dp/pt along the parent's main axis. Mirrored
-            on both axes — whichever axis the parent's
+            on both axes: whichever axis the parent's
             ``flex_direction`` chooses as main becomes the actual gap.
         flex: Flex-grow weight; useful for pushing siblings to the
             opposite end of a [`Row`][pythonnative.Row] or
@@ -912,14 +912,14 @@ def View(
     - ``flex_direction``: ``"column"`` (default), ``"row"``,
       ``"column_reverse"``, ``"row_reverse"``.
     - ``flex_wrap``: ``"nowrap"`` (default), ``"wrap"``,
-      ``"wrap_reverse"`` — with ``align_content`` controlling how
+      ``"wrap_reverse"``, with ``align_content`` controlling how
       wrapped lines share leftover cross-axis space.
     - ``justify_content``: main-axis distribution. Accepts
       ``"flex_start"`` (default), ``"center"``, ``"flex_end"``,
       ``"space_between"``, ``"space_around"``, ``"space_evenly"``.
     - ``align_items``: cross-axis alignment. Accepts ``"stretch"``
       (default), ``"flex_start"``, ``"center"``, ``"flex_end"``.
-    - ``direction``: ``"ltr"`` (default) or ``"rtl"`` — flips rows and
+    - ``direction``: ``"ltr"`` (default) or ``"rtl"``. Flips rows and
       resolves ``margin_start`` / ``padding_end`` / absolute ``start``
       / ``end`` insets.
     - ``overflow``: ``"visible"`` (default) or ``"hidden"``.
@@ -1061,7 +1061,7 @@ def ScrollView(
             wrapper (padding, alignment, spacing of the scrollable
             content), distinct from ``style`` (the scroll view frame).
         keyboard_dismiss_mode: ``"none"`` (default), ``"on_drag"``, or
-            ``"interactive"`` — controls whether scrolling dismisses
+            ``"interactive"``. Controls whether scrolling dismisses
             the keyboard.
         style: Style dict (or list of dicts).
         ref: Optional ``use_ref()`` dict.
@@ -1145,7 +1145,7 @@ def Modal(
         animation_type: ``"slide"`` (default), ``"fade"``, or ``"none"``.
         transparent: When ``True``, the underlying view is dimmed
             instead of fully covered.
-        presentation_style: iOS presentation style —
+        presentation_style: iOS presentation style,
             ``"page_sheet"`` (default), ``"form_sheet"``,
             ``"full_screen"``, or ``"overlay"`` (custom dimmed
             overlay). On Android, ``"overlay"`` keeps the dialog
@@ -1604,8 +1604,8 @@ def ErrorBoundary(
 # ======================================================================
 #
 # FlatList and SectionList are pure Python components, not native
-# elements. They render a windowed slice of rows into a ScrollView —
-# leading spacer, visible rows, trailing spacer — and shift the window
+# elements. They render a windowed slice of rows into a ScrollView
+# (leading spacer, visible rows, trailing spacer) and shift the window
 # from scroll events (the same architecture as React Native's
 # VirtualizedList). Because every windowed row lives in the *main*
 # layout tree, rows may be any height: estimates only steer the spacer
@@ -1872,7 +1872,7 @@ def FlatList(
     leading and trailing spacers stand in for everything else, and the
     window shifts as the user scrolls. Rows may have **variable
     heights**: pass ``item_height`` when rows are uniform,
-    ``get_item_height`` for exact per-item extents, or nothing at all —
+    ``get_item_height`` for exact per-item extents, or nothing at all;
     unknown rows start at ``estimated_item_height`` and are corrected
     with their measured extent once they've been on screen.
 
@@ -2040,7 +2040,7 @@ def SectionList(
 
     Flattens ``sections`` into a single virtualized sequence where each
     entry is either a header or an item, then reuses the same windowing
-    engine as [`FlatList`][pythonnative.FlatList] — headers and items
+    engine as [`FlatList`][pythonnative.FlatList]; headers and items
     may have different (and variable) heights.
 
     Args:
@@ -2177,7 +2177,7 @@ def StatusBar(
             ``"dark"`` (dark icons over light backgrounds), or
             ``"default"`` (system default).
         background_color: Color of the status-bar background (Android
-            only — iOS draws the bar transparent over your content).
+            only; iOS draws the bar transparent over your content).
         hidden: When ``True``, the status bar is hidden.
         key: Stable identity for keyed reconciliation.
 

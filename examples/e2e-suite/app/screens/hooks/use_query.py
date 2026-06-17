@@ -1,7 +1,7 @@
 """Demo screen for [`pn.use_query`][pythonnative.use_query].
 
 A fake fetch resolves to a fixed string after ~300 ms. The demo shows
-loading, success, and refetch — all three pieces of the
+loading, success, and refetch, all three pieces of the
 [`QueryResult`][pythonnative.QueryResult] API.
 """
 

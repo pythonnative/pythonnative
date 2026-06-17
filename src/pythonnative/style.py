@@ -208,7 +208,7 @@ class Style(TypedDict, total=False):
     [`Literal`][typing.Literal]. ``Style`` is a `total=False` TypedDict
     so any subset of keys is valid at construction time.
 
-    Custom native components may accept additional, unlisted keys —
+    Custom native components may accept additional, unlisted keys;
     they are ignored by the built-in handlers but flow through the
     reconciler unmodified, so third-party handlers can read them.
 

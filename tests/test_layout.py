@@ -811,7 +811,7 @@ def test_scroll_axis_y_with_unbounded_parent_falls_back_to_natural() -> None:
 
     Matches React Native's behavior: an inner ``ScrollView`` whose
     parent doesn't provide a finite height is treated as a normal
-    column — it sizes to its content and isn't independently scrollable.
+    column; it sizes to its content and isn't independently scrollable.
     """
     inner = LayoutNode(style={"width": 100, "height": 600})
     scroll = LayoutNode(children=[inner])

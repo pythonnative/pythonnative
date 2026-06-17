@@ -3,7 +3,7 @@
 `pn preview` renders your app in a native desktop window with **instant
 Fast Refresh** on every save. It's the fastest way to build UI in
 PythonNative: edit a component, hit save, and see the result in a second
-— no simulator boot, no device deploy, no rebuild.
+(no simulator boot, no device deploy, no rebuild).
 
 ```bash
 pn preview
@@ -26,14 +26,14 @@ pn preview
 ```
 
 `pn preview` runs your real app code, so install your project's
-dependencies in the same environment first — `pip install` whatever you
+dependencies in the same environment first: `pip install` whatever you
 declared in `[requirements].packages` in `pythonnative.toml`. If an
 import fails, the preview shows the traceback in the window instead of
-crashing — install the missing package or fix the code and save to
+crashing; install the missing package or fix the code and save to
 recover.
 
 This opens a phone-sized window, mounts your `App`, and starts watching
-`app/` for changes. Edit any component and save — the window updates in
+`app/` for changes. Edit any component and save: the window updates in
 place while preserving component state (counters, text input, scroll
 position, navigation stack).
 
@@ -57,7 +57,7 @@ missing:
 - **Windows**: re-run the Python installer and enable the
   "tcl/tk and IDLE" optional feature.
 
-No other dependencies are required — the desktop backend is pure Python.
+No other dependencies are required; the desktop backend is pure Python.
 
 ## How it works
 
@@ -105,7 +105,7 @@ to a full remount so you're never stuck with a stale tree.
 
 If your component raises at import time (a syntax error you're mid-fix
 on), the preview shows the traceback as an overlay and recovers
-automatically on your next successful save — no restart needed.
+automatically on your next successful save (no restart needed).
 
 See the [Hot reload guide](hot-reload.md) for the underlying mechanics;
 the desktop preview shares the same Fast Refresh engine.
@@ -122,7 +122,7 @@ pad = pn.Platform.select({"desktop": 12, "ios": 16, "android": 16, "default": 12
 ```
 
 Note that `Platform.select`'s `"native"` key matches iOS and Android
-only — desktop is a development surface, so use an explicit `"desktop"`
+only; desktop is a development surface, so use an explicit `"desktop"`
 key (or `"default"`) for it. You can also check
 [`Platform.is_desktop`][pythonnative.Platform] or the
 `pythonnative.utils.IS_DESKTOP` flag directly.
@@ -145,7 +145,7 @@ Faithful:
 Approximated or omitted (Tkinter can't express these cheaply):
 
 - Rounded corners, shadows, gradients, and per-widget opacity.
-- Overflow **clipping** — a `ScrollView`'s content renders but isn't
+- Overflow **clipping**: a `ScrollView`'s content renders but isn't
   clipped to the viewport, and there's no interactive scrolling.
 - Animations show their **end state** rather than smooth interpolation
   (translations are applied; scale/rotate/opacity are skipped).
@@ -163,7 +163,7 @@ need:
 - Real device APIs (camera, location, notifications, biometrics, …).
 - To test packaging, permissions, or store builds.
 
-There is no desktop packaging target — ship to devices with
+There's no desktop packaging target; ship to devices with
 `pn run android` / `pn run ios`.
 
 ## Next steps

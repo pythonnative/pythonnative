@@ -9,7 +9,7 @@ The engine is invoked by the reconciler after each commit pass:
 
 1. The reconciler maintains a parallel
    [`LayoutNode`][pythonnative.layout.LayoutNode] tree (cached across
-   passes — clean subtrees keep their nodes, dirty ones are rebuilt).
+   passes: clean subtrees keep their nodes, dirty ones are rebuilt).
 2. [`calculate_layout`][pythonnative.layout.calculate_layout] is called
    with the viewport size; it recursively determines each node's
    ``(x, y, width, height)`` relative to its parent's coordinate space.
@@ -618,7 +618,7 @@ def _measure_node(
     resolved_direction = _resolve_direction(style, direction)
 
     # Incremental-layout memo: a clean node measured under identical
-    # inputs reuses its previous result without recursing — its whole
+    # inputs reuses its previous result without recursing; its whole
     # subtree keeps the sizes from the prior pass.
     memo = node._measure_memo
     if (
@@ -863,7 +863,7 @@ def _layout_flex_children(
     their line's cross size. The computed line structure is stored on
     ``parent._lines`` for the positioning pass.
 
-    Returns ``(used_main, used_cross)`` — the total content size used
+    Returns ``(used_main, used_cross)``, the total content size used
     by the in-flow children, including inter-child gaps but excluding
     the parent's own padding. The caller adds padding back in for the
     container's outer size.

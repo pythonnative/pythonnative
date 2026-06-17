@@ -134,7 +134,7 @@ def test_dispatch_swallows_callback_exceptions() -> None:
         raise RuntimeError("user bug")
 
     registry.set_events(5, {"on_press": boom})
-    # Returns True (a callback ran) without propagating — a buggy app
+    # Returns True (a callback ran) without propagating; a buggy app
     # callback must not crash the platform UI thread.
     assert registry.dispatch(5, "on_press") is True
 

@@ -38,7 +38,7 @@ def test_ref_cleared_on_unmount() -> None:
     rec.mount(el)
     assert ref["current"] is not None
 
-    # Replace with a different element type — destroys the old tree.
+    # Replace with a different element type; destroys the old tree.
     rec.reconcile(Element("Button", {"title": "ok"}, []))
     assert ref["current"] is None
 
@@ -60,7 +60,7 @@ def test_ref_repointed_when_ref_dict_swapped() -> None:
 
 
 def test_ref_ignored_when_not_a_dict() -> None:
-    """Non-dict ``ref`` values are silently ignored — no crashes."""
+    """Non-dict ``ref`` values are silently ignored, no crashes."""
     el = Element("Text", {"text": "hi", "ref": "not-a-dict"}, [])
     backend = MockBackend()
     Reconciler(backend).mount(el)

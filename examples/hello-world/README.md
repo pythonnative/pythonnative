@@ -15,8 +15,8 @@ pn preview
 ```
 
 A desktop window opens running `app/main.py`'s `App`. Edit any component
-under `app/`, save, and the window Fast Refreshes in place — no
-simulator or device needed. See the
+under `app/`, save, and the window Fast Refreshes in place (no
+simulator or device needed). See the
 [Desktop preview guide](../../docs/guides/desktop-preview.md).
 
 ## Run on a device or simulator

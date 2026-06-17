@@ -25,7 +25,7 @@ Stack navigators rendered as the root of an app host (i.e. the parent
 own handle) talk to the platform via that host's ``_push`` / ``_pop``
 methods, so the back stack matches what UIKit / AndroidX maintain.
 Nested stacks (e.g. a stack inside a tab) fall back to in-Python
-state — there is no second native navigation controller to push
+state; there's no second native navigation controller to push
 onto in that case.
 
 Example:
@@ -66,7 +66,7 @@ from .hooks import (
 
 # Defaults to True: components rendered outside any declarative
 # navigator (e.g. the root component of a screen pushed via the host's
-# native nav stack) are by definition focused — the host's own
+# native nav stack) are by definition focused; the host's own
 # ``on_resume`` / ``on_pause`` lifecycle drives the focus state for
 # those. Declarative navigators override this provider on the active
 # subtree (always True today; reserved for future inactive-screen
@@ -152,7 +152,7 @@ class _DeclarativeNavHandle:
 
     When ``parent`` is the host's own ``NavigationHandle`` (root
     Stack), ``navigate`` / ``go_back`` / ``reset`` drive the native
-    navigation controller and the in-Python stack is bypassed — the
+    navigation controller and the in-Python stack is bypassed; the
     OS owns the back-stack source of truth.
 
     When ``parent`` is another declarative handle (nested navigator),
@@ -212,7 +212,7 @@ class _DeclarativeNavHandle:
           untouched because the native controller is the source of
           truth.
         - **Nested stack / tab / drawer**: ``set_stack`` is called with
-          the new route — the parent reconciler re-renders the active
+          the new route; the parent reconciler re-renders the active
           screen subtree in place.
         - **Unknown route**: forwarded to ``parent`` if one exists,
           otherwise raises ``ValueError``.

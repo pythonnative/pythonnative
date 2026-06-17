@@ -3,10 +3,10 @@
 ``demo_screen`` renders a consistent structure so flows have a small,
 predictable set of strings to wait on:
 
-- ``"Demo: <title>"`` — anchor text marking that the demo loaded. Maestro
+- ``"Demo: <title>"``: anchor text marking that the demo loaded. Maestro
   flows start with ``extendedWaitUntil: visible: "Demo: <title>"`` so they
   wait for the screen to render before interacting.
-- ``"Back to list"`` — the bottom button that pops back to the category
+- ``"Back to list"``: the bottom button that pops back to the category
   list. Every demo has it in the same place, so cleanup is identical
   across flows.
 

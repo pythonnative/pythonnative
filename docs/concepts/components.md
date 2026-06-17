@@ -107,10 +107,10 @@ pn.Column(
 - [`Alert.show(title, message)`][pythonnative.alerts.Alert.show]:
   fire-and-forget single-button notice.
 - [`await Alert.confirm(title, message)`][pythonnative.alerts.Alert.confirm]:
-  awaitable two-button yes/no — resolves to a ``bool``.
+  awaitable two-button yes/no (resolves to a ``bool``).
 - [`await Alert.choose(title, options=[...])`][pythonnative.alerts.Alert.choose]:
-  awaitable multi-button picker / action sheet — resolves to the
-  selected label (or ``None``).
+  awaitable multi-button picker / action sheet (resolves to the
+  selected label, or ``None``).
 
 **Animations:**
 
@@ -325,7 +325,7 @@ if pn.Platform.is_ios:
 ```
 
 `pn.Platform.OS` is `"ios"`, `"android"`, `"desktop"` (the `pn preview`
-backend — see the [Desktop preview guide](../guides/desktop-preview.md)),
+backend, see the [Desktop preview guide](../guides/desktop-preview.md)),
 or `"test"` (off-device, e.g. in unit tests). The lower-level
 `utils.IS_ANDROID` / `utils.IS_IOS` / `utils.IS_DESKTOP` constants are
 still available.

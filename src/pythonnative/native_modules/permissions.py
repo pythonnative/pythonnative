@@ -3,9 +3,9 @@
 [`Permissions`][pythonnative.Permissions] normalizes the very different
 iOS and Android permission models behind two calls:
 
-- ``check(permission)`` — synchronous, returns a status string without
+- ``check(permission)``: synchronous, returns a status string without
   prompting.
-- ``request(permission)`` — a coroutine that shows the system prompt
+- ``request(permission)``: a coroutine that shows the system prompt
   (if needed) and resolves to the resulting status.
 
 Statuses are ``"granted"``, ``"denied"``, ``"blocked"`` (denied with

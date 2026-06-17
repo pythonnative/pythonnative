@@ -1,4 +1,4 @@
-# Hooks category suite — Maestro entry-point for hook-only runs.
+# Hooks category suite: Maestro entry-point for hook-only runs.
 appId: ${APP_ID}
 ---
 - runFlow: ../flows/hooks/use_state.yaml

@@ -17,14 +17,14 @@ slot across renders.
 For coroutines and data-driven UI, PythonNative ships dedicated
 async-aware hooks layered on top of `use_state` / `use_effect`:
 
-- [`use_async_effect`][pythonnative.use_async_effect] — async sibling
+- [`use_async_effect`][pythonnative.use_async_effect]: async sibling
   of `use_effect`; cancels the in-flight coroutine on re-run /
   unmount.
-- [`use_query`][pythonnative.use_query] — subscribes to an async
+- [`use_query`][pythonnative.use_query]: subscribes to an async
   fetcher and re-renders on data / error / refetch.
-- [`use_mutation`][pythonnative.use_mutation] — wraps an async
+- [`use_mutation`][pythonnative.use_mutation]: wraps an async
   mutator with loading / error state and a trigger.
-- [`use_persisted_state`][pythonnative.use_persisted_state] —
+- [`use_persisted_state`][pythonnative.use_persisted_state]:
   `use_state` backed by
   [`AsyncStorage`][pythonnative.AsyncStorage].
 
@@ -38,9 +38,9 @@ These hooks subscribe to values published by
 change. The screen host is the only code that updates the underlying
 values; user code consumes them.
 
-- [`use_window_dimensions`][pythonnative.use_window_dimensions] — viewport size.
-- [`use_safe_area_insets`][pythonnative.use_safe_area_insets] — top/bottom/left/right insets.
-- [`use_keyboard_height`][pythonnative.use_keyboard_height] — software keyboard height.
+- [`use_window_dimensions`][pythonnative.use_window_dimensions]: viewport size.
+- [`use_safe_area_insets`][pythonnative.use_safe_area_insets]: top/bottom/left/right insets.
+- [`use_keyboard_height`][pythonnative.use_keyboard_height]: software keyboard height.
 
 For most apps the dedicated
 [`KeyboardAvoidingView`][pythonnative.KeyboardAvoidingView] component

@@ -1,6 +1,6 @@
 # Tests Picker selection through the real control and via buttons.
 #
-# The real picker is opened first — tapping the control (its title is
+# The real picker is opened first; tapping the control (its title is
 # the selected label, "Apple") presents the native chooser (action
 # sheet on iOS, Spinner dropdown on Android); tapping "Banana" selects
 # it. This exercises the native open/select event wiring that the

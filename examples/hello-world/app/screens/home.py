@@ -1,6 +1,6 @@
 """Home tab: state hooks, a reusable child component, and a push to the showcase.
 
-Designed as the obvious "first thing a new user reads" — it shows
+Designed as the obvious "first thing a new user reads"; it shows
 ``use_state``, ``use_effect``, and an in-Python child component, plus
 the canonical ``nav.navigate(...)`` call that pushes a real native
 screen onto the stack.

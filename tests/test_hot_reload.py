@@ -437,7 +437,7 @@ def test_refresh_in_place_swaps_components_and_preserves_state(
     rec.reconcile(module.Counter())
     assert get_text(rec._tree.native_view) == "A:5"
 
-    # Edit the module — change the prefix from "A:" to "B:".
+    # Edit the module (change the prefix from "A:" to "B:").
     (pkg / "comp.py").write_text(
         "import pythonnative as pn\n"
         "from pythonnative.element import Element\n"
@@ -463,7 +463,7 @@ def test_refresh_in_place_swaps_components_and_preserves_state(
     refreshed = ModuleReloader.refresh_in_place(rec, ["rstate_pkg.comp"])
     assert refreshed is True
 
-    # Render with the reloaded module's Counter — the new function is
+    # Render with the reloaded module's Counter; the new function is
     # called against the same VNode (and HookState), so state survives.
     new_module = sys.modules["rstate_pkg.comp"]
     rec.reconcile(new_module.Counter())

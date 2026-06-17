@@ -1,7 +1,8 @@
 # Async runtime
 
 PythonNative runs a single framework-wide ``asyncio`` event loop on a
-dedicated daemon thread. Every awaitable surface in the framework —
+dedicated daemon thread. Every awaitable surface in the framework
+schedules its work on this loop:
 [`use_async_effect`][pythonnative.hooks.use_async_effect],
 [`use_query`][pythonnative.hooks.use_query],
 [`use_mutation`][pythonnative.hooks.use_mutation],
@@ -10,8 +11,7 @@ dedicated daemon thread. Every awaitable surface in the framework —
 modules ([`Camera`][pythonnative.native_modules.camera.Camera] /
 [`Location`][pythonnative.native_modules.location.Location] /
 [`Notifications`][pythonnative.native_modules.notifications.Notifications]),
-and [`Animated`][pythonnative.animated.Animated] composites — schedules
-its work on this loop.
+and [`Animated`][pythonnative.animated.Animated] composites.
 
 ::: pythonnative.runtime
     options:

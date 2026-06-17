@@ -9,7 +9,7 @@ The diff phase is *pure*: it never touches the native layer. Each pass
 appends ops (`pythonnative.mutations`) to a transaction list, and the
 commit applies them through a single
 ``backend.apply_mutations(ops)`` call. Event callbacks never cross into
-the native layer at all — they live in the Python-side
+the native layer at all; they live in the Python-side
 [`EventRegistry`][pythonnative.events.EventRegistry], keyed by tag, so
 re-renders that only produce fresh closures cost nothing natively.
 
@@ -66,7 +66,7 @@ def _shallow_equal_props(old: dict, new: dict) -> bool:
 
     Used by [`memo`][pythonnative.memo] to skip re-rendering when none
     of a component's props changed identity. Callables only count as
-    equal if they're the *same object* — fresh closures always invalidate
+    equal if they're the *same object*; fresh closures always invalidate
     the memo (matching React's behavior; pair with
     [`use_callback`][pythonnative.use_callback] when stability matters).
     """
@@ -173,7 +173,7 @@ class VNode:
         # node's props change, so unchanged leaves skip native
         # ``measure_intrinsic`` calls entirely.
         self._measure_cache: Optional[Tuple[float, float, float, float]] = None
-        # Last frame sent to the native side — frames that don't change
+        # Last frame sent to the native side; frames that don't change
         # are skipped (frame diffing).
         self._last_frame: Optional[Tuple[float, float, float, float]] = None
         # Cached LayoutNode reused across passes while the subtree is
@@ -444,8 +444,8 @@ class Reconciler:
         Unlike a full reconcile from the root, a local update starts in
         the *middle* of the tree, so the context stack of every
         ``__Provider__`` ancestor must be re-established before the body
-        runs (otherwise [`use_context`][pythonnative.use_context] — and
-        therefore [`use_navigation`][pythonnative.use_navigation] — would
+        runs (otherwise [`use_context`][pythonnative.use_context], and
+        therefore [`use_navigation`][pythonnative.use_navigation], would
         read the context default instead of the provided value). Nested
         providers *inside* this subtree are pushed/popped normally by the
         recursive reconcile beneath us.
@@ -939,7 +939,7 @@ class Reconciler:
             node.hook_state.cleanup_all_effects()
             # Break the back-references so the unmounted component's hook
             # state (and the closures it captured) can be freed by plain
-            # refcounting — important on iOS, where the cyclic GC is
+            # refcounting, important on iOS, where the cyclic GC is
             # disabled.
             node.hook_state._vnode = None
             node.hook_state._reconciler = None
@@ -983,7 +983,7 @@ class Reconciler:
 
         Event callables never appear here (they live in the event
         registry), so listener identity churn produces no native
-        traffic — only the ``_pn_events`` name set is compared.
+        traffic; only the ``_pn_events`` name set is compared.
         """
         changed = {}
         for key, new_val in new.items():
@@ -1056,7 +1056,7 @@ class Reconciler:
         """Whether ``changed`` props can alter the node's layout.
 
         Content-sized leaves re-measure on *any* prop change (text,
-        font, image source — almost everything affects their intrinsic
+        font, image source: almost everything affects their intrinsic
         size). Containers only care about the layout style keys.
         """
         if type_name in cls._INTRINSIC_TYPES:
@@ -1110,7 +1110,7 @@ class Reconciler:
         )
         viewport.dirty = True
         calculate_layout(viewport, viewport_w, viewport_h)
-        # Skip set_frame for the root itself — descendants are
+        # Skip set_frame for the root itself; descendants are
         # positioned relative to the root's local origin, which is
         # what they want regardless of where the host placed the
         # root in the screen.

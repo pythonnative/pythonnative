@@ -4,7 +4,7 @@
 # Source under test: src/pythonnative/components.py :: FlatList
 #
 # The demo sizes the FlatList (~400 dp) so it overlaps the vertical
-# center of the screen on both the iOS and Android CI emulators —
+# center of the screen on both the iOS and Android CI emulators,
 # letting us use Maestro's standard ``scrollUntilVisible`` (which
 # swipes from the screen center). See ``components/scroll_view.yaml``
 # for the full rationale.

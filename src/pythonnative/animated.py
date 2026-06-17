@@ -24,7 +24,7 @@ native view the value is attached to
 
 - **Accepted** (iOS Core Animation, Android ``ViewPropertyAnimator`` /
   ``DynamicAnimation``): the platform animates the property entirely
-  natively — no Python code runs per frame. Python receives exactly one
+  natively; no Python code runs per frame. Python receives exactly one
   callback when the animation settles, updates the
   [`AnimatedValue`][pythonnative.animated.AnimatedValue], and resolves
   any awaiting tasks.
@@ -135,7 +135,7 @@ class AnimatedValue:
     Animated components (``Animated.View`` et al.) **attach** the value
     to ``(tag, prop)`` bindings after mount. Setting the value pushes
     the new number to every attached native view through the registry's
-    ``set_animated_property`` — and when an animation can be driven
+    ``set_animated_property``, and when an animation can be driven
     natively, the platform animates those same bindings directly.
 
     Python-side listeners registered via
@@ -217,7 +217,7 @@ class AnimatedValue:
     def add_listener(self, prop: str, callback: Callable[[float], None]) -> Callable[[], None]:
         """Register ``callback`` for Python-driven changes to this value.
 
-        Returns an unsubscribe callable. ``prop`` is metadata only — it
+        Returns an unsubscribe callable. ``prop`` is metadata only; it
         lets the subscriber differentiate this binding from others on
         the same ``AnimatedValue``.
         """
@@ -686,7 +686,7 @@ class _AnimationHandle(_AwaitableAnimation):
 
     Each ``.start()`` call snapshots the value's current state, prefers
     the native driver, and falls back to a fresh Python-ticked
-    animation otherwise (matches React Native — the ``Animated.timing``
+    animation otherwise (matches React Native: the ``Animated.timing``
     return value is reusable).
     """
 
@@ -780,7 +780,7 @@ class _CompositeAnimation(_AwaitableAnimation):
         if item is None:
             return
         # ``_AwaitableAnimation`` and plain awaitables/coroutines are
-        # both supported — lets users mix in ``asyncio.sleep``.
+        # both supported: lets users mix in ``asyncio.sleep``.
         await item
 
 
@@ -824,7 +824,7 @@ def _make_animated_factory(
 
         # ``@component`` packs positional children into the ``children``
         # prop (this function declares ``*args``), and the reconciler
-        # re-invokes it with keyword props only — so at render time the
+        # re-invokes it with keyword props only, so at render time the
         # payload arrives in ``kwargs``, never in ``args``.
         children = list(args) or list(kwargs.pop("children", ()) or ())
 

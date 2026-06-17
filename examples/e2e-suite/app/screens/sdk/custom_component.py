@@ -6,7 +6,7 @@ than a screen-level demo can do safely. The demo limits itself to
 exercising the SDK surface: it confirms the headline exports are
 importable, builds a frozen [`Props`][pythonnative.sdk.Props]
 subclass, and reads back the registry. If any of those break, this
-screen will fail to import and the flow will error out during boot —
+screen will fail to import and the flow will error out during boot,
 which is exactly what we want.
 """
 

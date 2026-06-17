@@ -102,7 +102,7 @@ class Platform:
         """Pick the value matching the current platform.
 
         Looks up ``spec[Platform.OS]``, then falls back to
-        ``spec["native"]`` (matches iOS and Android — *not* desktop,
+        ``spec["native"]`` (matches iOS and Android, *not* desktop,
         which is a development surface), then to ``spec["default"]``,
         then to the explicit ``default`` argument.
 

@@ -1,6 +1,6 @@
 # Tests SegmentedControl selection from real segment taps and buttons.
 #
-# Real segments are tapped first ("Two", "Three" — segment titles are
+# Real segments are tapped first ("Two", "Three": segment titles are
 # accessibility elements on iOS and Button text on Android), which
 # exercises the native value-changed wiring that the Pick buttons
 # bypass entirely.

@@ -23,7 +23,7 @@ artifacts it requires:
 A capability's value may be either a string (used verbatim as the iOS
 usage description) or ``true`` (use the capability's
 [`default_reason`][pythonnative.project.permissions.Capability]). A value
-of ``false`` disables the capability — useful for switching one off
+of ``false`` disables the capability, useful for switching one off
 without deleting the line.
 
 The catalog is the single source of truth shared by the iOS and Android
@@ -284,7 +284,7 @@ def resolve_permissions(
     """Resolve a declared capability map into native permission artifacts.
 
     Args:
-        permissions: The ``[permissions]`` table — capability key to a
+        permissions: The ``[permissions]`` table, capability key to a
             reason string or boolean. ``false``/``None`` values are
             skipped (capability disabled).
         extra_android_permissions: Additional raw Android permission

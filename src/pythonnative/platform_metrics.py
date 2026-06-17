@@ -16,7 +16,7 @@ that state to size themselves correctly:
 Rather than threading those values through every
 [`measure_intrinsic`][pythonnative.native_views.base.ViewHandler.measure_intrinsic]
 call signature, the screen host writes them here and handlers read
-them on demand. Values are in **dp on Android** and **pt on iOS** —
+them on demand. Values are in **dp on Android** and **pt on iOS**,
 i.e., the same "layout units" the layout engine uses on each
 platform, so handlers can add them to other layout-unit values
 without further conversion. On iOS the screen host consumes the top
@@ -88,7 +88,7 @@ def subscribe(callback: Callable[[], None]) -> Callable[[], None]:
 
     Returns an unsubscribe function. Hooks pass a state setter so a
     component re-renders whenever the platform reports a new value.
-    Threadsafe — multiple subscribers may register/unregister
+    Threadsafe: multiple subscribers may register/unregister
     concurrently.
     """
     with _subscribers_lock:
@@ -138,7 +138,7 @@ def set_safe_area_insets(top: float, left: float, bottom: float, right: float) -
 def get_safe_area_insets() -> SafeAreaInsets:
     """Return the current safe-area insets.
 
-    The default value is ``(0, 0, 0, 0)`` — handlers should still
+    The default value is ``(0, 0, 0, 0)``; handlers should still
     function correctly on a desktop / unit-test environment where no
     screen host has published insets.
     """
@@ -217,7 +217,7 @@ def reset_keyboard_height() -> None:
 # trust ``UITabBar.sizeThatFits_`` (it has historically returned 0 in
 # some configurations) and the screen host deliberately extends the
 # root view past the bottom safe area so the bar reaches the home
-# indicator — both pieces conspire to require a single source of
+# indicator; both pieces conspire to require a single source of
 # truth for the height formula.
 #
 # Android intentionally has no equivalent: ``BottomNavigationView``
@@ -240,7 +240,7 @@ def ios_tab_bar_height() -> float:
     Equal to ``IOS_TAB_BAR_BASE_HEIGHT_PT + safe_area_insets.bottom``
     so the bar reaches the home indicator. The iOS screen host
     deliberately extends the root view past the bottom safe area for
-    this very reason — the tab bar absorbs the inset and UIKit
+    this very reason; the tab bar absorbs the inset and UIKit
     renders the pill with internal padding for the home indicator.
     Used by ``pythonnative.native_views.ios.TabBarHandler``; exposed
     here so the formula is testable without importing the iOS

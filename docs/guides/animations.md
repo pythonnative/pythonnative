@@ -29,7 +29,7 @@ mounted views, PythonNative first offers the animation to the
 platform: Core Animation (`CABasicAnimation` / `CASpringAnimation`)
 on iOS, `ViewPropertyAnimator` / `DynamicAnimation` on Android. If
 the platform accepts, the animation runs entirely natively at the
-display's refresh rate — **no Python code executes per frame** — and
+display's refresh rate (**no Python code executes per frame**), and
 Python receives exactly one completion callback, which settles the
 `AnimatedValue` at its final number.
 
@@ -135,7 +135,7 @@ awaitable.
 
 ## Decay (fling)
 
-`Animated.decay` decelerates a value from an initial velocity —
+`Animated.decay` decelerates a value from an initial velocity,
 the standard ending for a pan gesture:
 
 ```python

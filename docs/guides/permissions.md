@@ -1,7 +1,7 @@
 # Permissions
 
 iOS and Android describe the same device capability in very different
-ways — iOS wants *usage-description* strings in `Info.plist`, Android
+ways: iOS wants *usage-description* strings in `Info.plist`, Android
 wants `<uses-permission>` entries (and, since API 23, a runtime prompt).
 PythonNative lets you declare capabilities **once**, by name, in
 `pythonnative.toml`, and expands each into the correct native artifacts
@@ -23,7 +23,7 @@ Each capability's value can be:
 | --- | --- |
 | a **string** | The capability is enabled; the string is used verbatim as the iOS permission-prompt text (the usage description). |
 | **`true`** | The capability is enabled using its built-in default reason. |
-| **`false`** | The capability is disabled — useful for toggling one off without deleting the line. |
+| **`false`** | The capability is disabled, useful for toggling one off without deleting the line. |
 
 !!! tip "Write a real reason"
     On iOS, App Review rejects apps whose usage strings are vague or
@@ -94,10 +94,10 @@ permissions = ["com.android.alarm.permission.SET_ALARM"]
 
 When you run `pn run` or `pn build`, the configurators write:
 
-- **iOS** — each usage key/string pair into `Info.plist`, plus a
+- **iOS**: each usage key/string pair into `Info.plist`, plus a
   `UIBackgroundModes` array when any background-capable capability is
   declared.
-- **Android** — a `<uses-permission android:name="…"/>` element into
+- **Android**: a `<uses-permission android:name="…"/>` element into
   `AndroidManifest.xml` for every resolved permission.
 
 === "Info.plist (iOS)"
@@ -132,5 +132,5 @@ it does not, by itself, show a prompt:
 
 Use the relevant [native module](native-modules.md) to trigger the
 request at the right moment in your UX. Keep your `[permissions]` table
-to the minimum your app actually uses — both stores scrutinize
+to the minimum your app actually uses; both stores scrutinize
 over-broad permission requests.

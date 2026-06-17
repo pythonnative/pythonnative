@@ -6,7 +6,7 @@
 # The demo sizes the inner ScrollView (~400 dp) so it overlaps the
 # vertical center of the screen on both the iOS and Android CI
 # emulators. That lets us use Maestro's standard ``scrollUntilVisible``
-# (which always swipes from the screen center) — its built-in
+# (which always swipes from the screen center); its built-in
 # adaptive swiping handles per-platform fling differences automatically
 # and uses a single, viewport-aware visibility check, which avoids the
 # tree-vs-viewport mismatch we hit with a custom ``while: notVisible``

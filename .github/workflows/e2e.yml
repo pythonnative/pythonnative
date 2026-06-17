@@ -30,8 +30,8 @@ jobs:
     # sustained Maestro driving and start reporting "device offline" /
     # "device not found" mid-run (the emulator VM, not the app, dies).
     # The full 60-flow suite reliably crosses that threshold around the
-    # ~35th flow. Sharding the run into a few balanced groups — each on
-    # its own freshly booted emulator — keeps every session well under
+    # ~35th flow. Sharding the run into a few balanced groups, each on
+    # its own freshly booted emulator, keeps every session well under
     # the limit, and parallelizes the Android pass as a bonus. Groups are
     # sized so none exceeds ~15 flows; ``components`` (28 flows after the
     # gesture/animated additions) crossed the ceiling at ~flow 26, so it
@@ -105,7 +105,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 40
     # iOS simulators are stable for the full suite (unlike the Android
-    # emulator — see the e2e-android note), so this split is purely a
+    # emulator; see the e2e-android note), so this split is purely a
     # speed optimization: the iOS Maestro run is ~22 minutes and is the
     # critical path for the whole E2E workflow. Sharding it across three
     # simulators (same balanced groups as Android) runs them in parallel

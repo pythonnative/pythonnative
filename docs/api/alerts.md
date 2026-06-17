@@ -29,7 +29,7 @@ There are three entry points:
   returns the selected label.
 - **Pickers**: the built-in
   [`Picker`][pythonnative.components.Picker] component is
-  implemented on top of action sheets — use it for select/dropdown
+  implemented on top of action sheets; use it for select/dropdown
   widgets.
 
 ## Testing

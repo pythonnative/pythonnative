@@ -173,7 +173,7 @@ def test_platform_select_desktop() -> None:
         assert Platform.is_desktop is True
         assert Platform.is_test is False
         assert Platform.select({"desktop": "d", "ios": "i", "default": "x"}) == "d"
-        # ``native`` matches iOS/Android only — desktop is a dev surface.
+        # ``native`` matches iOS/Android only; desktop is a dev surface.
         assert Platform.select({"native": "n", "default": "x"}) == "x"
     finally:
         _set_platform_for_test(None)

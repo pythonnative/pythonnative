@@ -4,7 +4,7 @@
 # Source under test: src/pythonnative/components.py :: Modal
 #
 # The intermediate ``Modal: open`` text from the outer screen is
-# *not* asserted while the modal is presented — on iOS the modal
+# *not* asserted while the modal is presented; on iOS the modal
 # sheet covers the outer screen so its accessibility elements are
 # offscreen for the duration. Instead we verify the toggle by
 # checking that ``Modal body text`` becomes / stops being visible

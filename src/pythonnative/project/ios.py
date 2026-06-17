@@ -3,7 +3,7 @@
 Adapts the bundled ``ios_template`` Xcode project to a specific
 [`AppConfig`][pythonnative.project.config.AppConfig]. Unlike Android, the
 iOS bundle identifier, version, team, and deployment target are *not*
-baked into files — they're passed to ``xcodebuild`` as build-setting
+baked into files; they're passed to ``xcodebuild`` as build-setting
 overrides (see [`build_settings`][pythonnative.project.ios.build_settings]),
 which avoids fragile ``project.pbxproj`` edits. This module owns the
 parts that must live on disk:

@@ -46,8 +46,8 @@ produce identical frames on both platforms.
   [`pn.style(...)`][pythonnative.style.style] helper makes the
   call sites tidy.
 - **Native-backed navigation.** The root `Stack.Navigator` drives
-  the platform's real navigation controller — Android Navigation
-  Component fragments on Android, `UINavigationController` on iOS —
+  the platform's real navigation controller (Android Navigation
+  Component fragments on Android, `UINavigationController` on iOS),
   so transitions, back gestures, and state preservation are exactly
   what users expect from a first-class native app.
 - **Fast Refresh hot reload.** `pn run --hot-reload` watches `app/`
@@ -55,7 +55,7 @@ produce identical frames on both platforms.
   across most edits.
 - **Instant desktop preview.** `pn preview` renders your app in a
   desktop window with Fast Refresh, so you can iterate on UI, state,
-  and navigation in milliseconds — no simulator boot required. See the
+  and navigation in milliseconds (no simulator boot required). See the
   [Desktop preview guide](guides/desktop-preview.md).
 - **An extension SDK.** [`pythonnative.sdk`](api/sdk.md) lets you
   wrap any platform widget as a first-class element with

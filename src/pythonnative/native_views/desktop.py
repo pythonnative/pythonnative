@@ -74,7 +74,7 @@ from .base import ViewHandler
 # ``pn preview`` installs it before mounting the app; the placement
 # logic (``_place``) positions widgets *inside* their logical parent via
 # Tk's ``-in`` option, which only works when both windows share a
-# top-level — guaranteed by the single-stage design.
+# top-level, guaranteed by the single-stage design.
 
 _ROOT_CONTAINER: Any = None
 _DEFAULT_FONT_SIZE = 15
@@ -125,7 +125,7 @@ def _tk_color(value: Any) -> Optional[str]:
     """Convert a PythonNative color into a Tk color string.
 
     Accepts ``#rgb`` / ``#rrggbb`` / ``#aarrggbb`` hex (alpha is
-    dropped — Tk has no per-color alpha), ``rgb()`` / ``rgba()``
+    dropped; Tk has no per-color alpha), ``rgb()`` / ``rgba()``
     functional notation, ``(r, g, b)`` tuples, packed integers, and
     named colors (passed through for Tk to resolve). Returns ``None``
     for ``transparent`` / unparseable values so callers can leave the
@@ -686,8 +686,8 @@ class ScrollViewHandler(FlexContainerHandler):
 
     The layout engine lets the content grow past the viewport on the
     scroll axis; this handler offsets its children's placement by the
-    current scroll offset (overflow outside the frame is *not* clipped
-    — a documented preview limitation of the single-stage design).
+    current scroll offset (overflow outside the frame is *not* clipped,
+    a documented preview limitation of the single-stage design).
 
     Commands:
         ``scroll_to_offset(x=…, y=…)``: jump to an offset.
@@ -1232,7 +1232,7 @@ class PressableHandler(DesktopViewHandler):
 
 
 class ModalHandler(DesktopViewHandler):
-    """Overlay modal — a frame that fills the stage when ``visible``.
+    """Overlay modal, a frame that fills the stage when ``visible``.
 
     The reconciler lays the modal's content out against the full
     viewport (see ``Reconciler._layout_visible_modals``) and applies
@@ -1275,7 +1275,7 @@ class ModalHandler(DesktopViewHandler):
 
 
 class TabBarHandler(DesktopViewHandler):
-    """Bottom tab bar — a row of buttons laid out across its width."""
+    """Bottom tab bar, a row of buttons laid out across its width."""
 
     def build(self, props: Dict[str, Any]) -> Any:
         frame = tk.Frame(_master(), highlightthickness=1, bd=0, background="#f2f2f7")
@@ -1454,7 +1454,7 @@ class SegmentedControlHandler(DesktopViewHandler):
 
 
 class DatePickerHandler(DesktopViewHandler):
-    """Preview DatePicker — a text entry for the ISO date/time string."""
+    """Preview DatePicker, a text entry for the ISO date/time string."""
 
     def build(self, props: Dict[str, Any]) -> Any:
         entry = tk.Entry(_master(), highlightthickness=1, bd=0)

@@ -186,7 +186,7 @@ def _init_host_common(host: Any, component_path: str, component_func: Any) -> No
     host._hot_reload_manifest_path = None
     host._hot_reload_last_version = None
     host._layout_listener = None  # retained on Android to prevent GC
-    # Focus state — drives ``use_focus_effect``. Starts focused because
+    # Focus state: drives ``use_focus_effect``. Starts focused because
     # a host is only created when the screen is being presented; the
     # platform lifecycle hooks (``on_resume`` / ``on_pause``) flip this
     # when the user navigates to / from another screen.
@@ -276,14 +276,14 @@ def _on_create(host: Any) -> None:
     # Android the FragmentManager destroys and recreates a screen's
     # view every time the user pops back to it, and the platform
     # template calls ``screen.on_create()`` again from
-    # ``onViewCreated`` — but the Python screen object (and therefore
+    # ``onViewCreated``, but the Python screen object (and therefore
     # the reconciler, hook state, focus subscribers, etc.) persists
     # across that. Re-running the full mount path here would reset
     # use_state, clobber use_focus_effect subscriptions, and break
     # navigation handles held by existing components, which is why
     # the focus counter never advanced past ``1`` before this guard.
     # If we're already mounted, just re-attach the existing root view
-    # to the (newly created) native container — ``on_resume`` will
+    # to the (newly created) native container; ``on_resume`` will
     # fire the focus subscribers separately.
     if host._reconciler is not None and host._root_native_view is not None:
         host._attach_root(host._root_native_view)
@@ -728,7 +728,7 @@ if IS_ANDROID:
             # Publish insets first so the very first layout pass sees
             # them. Otherwise handlers reading insets at first paint
             # would get ``(0, 0, 0, 0)`` and re-measure once the
-            # ``OnLayoutChangeListener`` fires moments later — a
+            # ``OnLayoutChangeListener`` fires moments later, a
             # measurable flicker (~50–200 ms on a stock Pixel
             # emulator).
             _android_publish_window_insets(view)
@@ -1089,7 +1089,7 @@ else:
         the concrete type varies between releases:
 
         - On rubicon-objc 0.5.x ``ptr`` is ``bytes`` (the raw 8-byte,
-          little-endian address) — ``int(ptr)`` raises ``ValueError``
+          little-endian address); ``int(ptr)`` raises ``ValueError``
           because Python tries to parse the bytes as a decimal string.
         - Older releases return a ``c_void_p`` for which ``int(ptr)``
           works.

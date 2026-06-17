@@ -3,7 +3,7 @@
 The page content depends on the runner having network access, which
 isn't guaranteed in CI. We render inline markup via the ``html=``
 prop so the demo is hermetic (no network) and exercises the inline
-HTML code path. Maestro only asserts the surrounding labels — there's
+HTML code path. Maestro only asserts the surrounding labels; there's
 no reliable cross-platform way to assert text *inside* a native
 WebView via the accessibility tree.
 """

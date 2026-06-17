@@ -8,7 +8,7 @@ and frame application. Handlers are registered with the
 
 **Batched protocol**: the registry applies the reconciler's mutation
 ops; handlers receive callable-free props. User callbacks never reach
-this module — every interaction (clicks, text changes, scrolls,
+this module; every interaction (clicks, text changes, scrolls,
 gestures) is forwarded through
 [`dispatch_event`][pythonnative.events.dispatch_event] keyed by the
 view's reconciler-assigned tag.
@@ -244,7 +244,7 @@ def _apply_accessibility(view: Any, props: Dict[str, Any]) -> None:
         except Exception:
             pass
     # Android's accessibility role / hint mostly comes through
-    # AccessibilityNodeInfo — full plumbing is non-trivial. We keep
+    # AccessibilityNodeInfo; full plumbing is non-trivial. We keep
     # the API surface symmetrical with iOS but apply only the label
     # for now.
 
@@ -689,7 +689,7 @@ class AndroidViewHandler(ViewHandler):
 
 
 class FlexContainerHandler(AndroidViewHandler):
-    """Container for flex layout — a bare `FrameLayout`.
+    """Container for flex layout, a bare `FrameLayout`.
 
     All flex semantics (direction, alignment, distribution, padding)
     are computed by the layout engine and applied via
@@ -844,7 +844,7 @@ class ButtonHandler(AndroidViewHandler):
 
 
 class ScrollViewHandler(AndroidViewHandler):
-    """Scroll container — wraps a single child whose height is unbounded.
+    """Scroll container: wraps a single child whose height is unbounded.
 
     Uses ``androidx.core.widget.NestedScrollView`` (vertical) or
     ``android.widget.HorizontalScrollView`` so nested scroll views
@@ -871,7 +871,7 @@ class ScrollViewHandler(AndroidViewHandler):
                 sv = jclass("android.widget.ScrollView")(_ctx())
 
         # Vertical scroll views are *always* wrapped in a (disabled)
-        # SwipeRefreshLayout. Wrapping later is impossible — the
+        # SwipeRefreshLayout. Wrapping later is impossible; the
         # reconciler may reuse this view for a screen that adds a
         # ``refresh_control`` prop afterwards (e.g. navigation swapping
         # screens of the same shape), and re-parenting a mounted view
@@ -1214,7 +1214,7 @@ class TextInputHandler(AndroidViewHandler):
             # Map the cross-platform ``return_key_type`` to Android's
             # ``EditorInfo.IME_ACTION_*`` so the soft keyboard renders the
             # right action key. iOS has a richer set (Google / Yahoo /
-            # Join / Route) with no direct AOSP equivalents — fall back
+            # Join / Route) with no direct AOSP equivalents; fall back
             # to ``IME_ACTION_DONE`` for those.
             try:
                 EditorInfo = jclass("android.view.inputmethod.EditorInfo")
@@ -1244,7 +1244,7 @@ class TextInputHandler(AndroidViewHandler):
         Single-line inputs always dismiss the keyboard on the action
         key (matching React Native's Android default) and fire
         ``on_submit`` first. Multi-line inputs only consume the action
-        when an ``on_submit`` handler exists — otherwise Enter inserts
+        when an ``on_submit`` handler exists; otherwise Enter inserts
         a newline.
         """
         try:
@@ -1616,7 +1616,7 @@ class WebViewHandler(AndroidViewHandler):
 class SpacerHandler(AndroidViewHandler):
     """Empty layout placeholder used as a flexible gap.
 
-    All sizing semantics live in the layout engine — ``Spacer``
+    All sizing semantics live in the layout engine; ``Spacer``
     behaves identically to a `View` with the same style props (e.g.,
     ``flex: 1`` for an expanding spacer, ``size`` for a fixed gap).
     """
@@ -1638,7 +1638,7 @@ class SafeAreaViewHandler(FlexContainerHandler):
 
 
 # ======================================================================
-# Modal — actually presents a Dialog with the children inside
+# Modal: actually presents a Dialog with the children inside
 # ======================================================================
 
 
@@ -1959,7 +1959,7 @@ class TabBarHandler(AndroidViewHandler):
 
 
 # ======================================================================
-# Pressable — visual feedback + tap callbacks + gestures
+# Pressable: visual feedback + tap callbacks + gestures
 # ======================================================================
 
 
@@ -2073,7 +2073,7 @@ class PressableHandler(FlexContainerHandler):
 
 
 # ======================================================================
-# StatusBar — global side effect
+# StatusBar: global side effect
 # ======================================================================
 
 
@@ -2131,7 +2131,7 @@ def _present_alert(
 ) -> None:
     """Present an AlertDialog or BottomSheet (``style='action_sheet'``).
 
-    Safe to call from any thread — the AlertDialog work is automatically
+    Safe to call from any thread; the AlertDialog work is automatically
     marshalled to the main looper via
     [`pythonnative.runtime.call_on_main_thread`][pythonnative.runtime.call_on_main_thread].
     Returns immediately; the dialog appears on the next main-loop tick.
@@ -2227,12 +2227,12 @@ def _present_alert(
 
 
 # ======================================================================
-# Picker — native dropdown / select widget
+# Picker: native dropdown / select widget
 # ======================================================================
 
 
 class PickerHandler(AndroidViewHandler):
-    """``Picker`` element handler — native ``Spinner`` dropdown."""
+    """``Picker`` element handler, native ``Spinner`` dropdown."""
 
     def _build(self, props: Dict[str, Any]) -> Any:
         sp = jclass("android.widget.Spinner")(_ctx())
@@ -2300,12 +2300,12 @@ class PickerHandler(AndroidViewHandler):
 
 
 # ======================================================================
-# Checkbox — native CheckBox with an optional inline label
+# Checkbox: native CheckBox with an optional inline label
 # ======================================================================
 
 
 class CheckboxHandler(AndroidViewHandler):
-    """``Checkbox`` element handler — native ``CheckBox`` widget.
+    """``Checkbox`` element handler, native ``CheckBox`` widget.
 
     Programmatic ``value`` updates are wrapped in a per-view
     "suppress" guard so pushing a new state via ``setChecked`` never
@@ -2348,12 +2348,12 @@ class CheckboxHandler(AndroidViewHandler):
 
 
 # ======================================================================
-# SegmentedControl — horizontal toggle row (no UISegmentedControl on AOSP)
+# SegmentedControl: horizontal toggle row (no UISegmentedControl on AOSP)
 # ======================================================================
 
 
 class SegmentedControlHandler(AndroidViewHandler):
-    """``SegmentedControl`` element — a horizontal row of toggle buttons.
+    """``SegmentedControl`` element, a horizontal row of toggle buttons.
 
     Android has no ``UISegmentedControl`` equivalent, so the control is
     built from a horizontal ``LinearLayout`` holding one ``Button`` per
@@ -2492,12 +2492,12 @@ class SegmentedControlHandler(AndroidViewHandler):
 
 
 # ======================================================================
-# DatePicker — trigger button opening native date/time dialogs
+# DatePicker: trigger button opening native date/time dialogs
 # ======================================================================
 
 
 class DatePickerHandler(AndroidViewHandler):
-    """``DatePicker`` element — a trigger ``Button`` opening native dialogs.
+    """``DatePicker`` element, a trigger ``Button`` opening native dialogs.
 
     The button text reflects the current ISO ``value`` (or a
     placeholder). Tapping it opens a ``DatePickerDialog`` (``mode``

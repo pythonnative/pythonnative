@@ -6,11 +6,11 @@ category.
 
 Stable labels used by Maestro:
 
-- ``"E2E Suite home"`` — present whenever the home screen is on top
+- ``"E2E Suite home"``: present whenever the home screen is on top
   of the stack. Maestro flows start with
   ``extendedWaitUntil: visible: "E2E Suite home"`` so they wait for
   the app to boot before tapping.
-- ``"Open <name>"`` — buttons that open each category. Flows tap
+- ``"Open <name>"``: buttons that open each category. Flows tap
   them by name (e.g. ``tapOn: "Open Hooks"``).
 """
 

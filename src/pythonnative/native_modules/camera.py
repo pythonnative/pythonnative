@@ -152,7 +152,7 @@ def _ios_launch_picker(on_result: Callable[[Optional[str]], None], source: str) 
             _pending_delegates.pop(id(delegate), None)
             on_result(None)
 
-        # Reference SEL/objc_method so the lint pass keeps the import —
+        # Reference SEL/objc_method so the lint pass keeps the import;
         # they're needed for the delegate class above.
         _ = (SEL, objc_method)
     except Exception:

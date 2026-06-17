@@ -9,8 +9,8 @@ paths the [`ios`][pythonnative.project.ios] configurator needs:
 ``Python.xcframework``, the simulator ``Python.framework``, the standard
 library, and the simulator headers/static lib.
 
-Android doesn't need any of this — Chaquopy ships its own CPython via
-Gradle — so there's no Android equivalent here.
+Android doesn't need any of this: Chaquopy ships its own CPython via
+Gradle, so there's no Android equivalent here.
 """
 
 from __future__ import annotations
@@ -238,7 +238,7 @@ def prepare_ios_runtime(
         try:
             return _locate_runtime(extract_root, python_version)
         except RuntimeError:
-            # Stale/partial extraction — re-extract below.
+            # Stale/partial extraction: re-extract below.
             pass
 
     url = resolve_asset_url(python_version, preferred_name=preferred_name)

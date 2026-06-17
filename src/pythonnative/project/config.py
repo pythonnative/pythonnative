@@ -113,7 +113,7 @@ class IOSSigning:
     """iOS code-signing / export configuration (``[ios.signing]``).
 
     Attributes:
-        export_method: How the archive is exported — one of
+        export_method: How the archive is exported, one of
             ``development``, ``ad-hoc``, ``app-store``, ``enterprise``.
         provisioning_profile: Optional provisioning profile name or UUID
             for manual signing.

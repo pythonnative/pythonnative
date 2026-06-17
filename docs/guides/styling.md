@@ -43,9 +43,9 @@ Why use `pn.style()` over a raw dict?
 
 - **IDE autocomplete** for every supported key (`flex_direction`,
   `align_items`, `transform`, `shadow_offset`, …).
-- **Type-checked literals** — typos like `align_items="centre"` are
+- **Type-checked literals**: typos like `align_items="centre"` are
   flagged before you ever run the app.
-- **Self-documenting code** — the `pn.Style` annotation tells readers
+- **Self-documenting code**: the `pn.Style` annotation tells readers
   this dict is meant to flow into the `style` prop.
 
 Because `Style` is `total=False`, every key is optional; you only

@@ -46,7 +46,7 @@ a small Python factory that returns
 
 ## Does PythonNative work on the desktop?
 
-Yes — for **previewing**. `pn preview` renders your app in a native
+Yes, for **previewing**. `pn preview` renders your app in a native
 desktop window using a built-in Tkinter backend, with instant Fast
 Refresh on every save. It's the fastest inner-loop: see your real UI
 and iterate in seconds without booting a simulator or deploying to a
@@ -60,7 +60,7 @@ approximated, and there's no app packaging for desktop. Ship to devices
 with `pn run android` / `pn run ios`.
 
 The core (components, hooks, reconciler) is also platform-agnostic and
-runs headless with a [fake backend](../guides/testing.md#a-minimal-fake-backend) —
+runs headless with a [fake backend](../guides/testing.md#a-minimal-fake-backend);
 that's how the unit-test suite works.
 
 ## How do I package and distribute my app?
@@ -102,8 +102,8 @@ In Python. PythonNative ships its own pure-Python flexbox engine
 (`pythonnative.layout`) and runs it after every commit. The engine produces an absolute frame for every element, and
 the reconciler hands those frames to the platform handlers via
 `set_frame`. Containers on both platforms are simple
-`UIView` / `FrameLayout` instances — there is no `UIStackView` or
-`LinearLayout` in the picture, so there is no platform drift between
+`UIView` / `FrameLayout` instances; there's no `UIStackView` or
+`LinearLayout` in the picture, so there's no platform drift between
 the two backends. See [Layout engine](../concepts/layout.md) for
 details.
 

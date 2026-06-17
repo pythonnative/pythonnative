@@ -49,7 +49,7 @@ class CreateOp:
     Attributes:
         tag: Unique integer identity assigned by the reconciler.
         type_name: Element type name (e.g. ``"Text"``).
-        props: Initial *clean* props — callables have already been
+        props: Initial *clean* props; callables have already been
             routed to the [`EventRegistry`][pythonnative.events.EventRegistry]
             and replaced by the ``_pn_events`` name set.
     """

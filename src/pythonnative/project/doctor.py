@@ -1,7 +1,7 @@
 """Environment diagnostics for ``pn doctor``.
 
 Inspects the local toolchain and the project's ``pythonnative.toml`` and
-reports what's ready and what's missing for building on each platform —
+reports what's ready and what's missing for building on each platform,
 analogous to ``flutter doctor`` / ``npx react-native doctor``. The checks
 are deliberately read-only and fast; they shell out only to ask tools for
 their versions.
@@ -44,7 +44,7 @@ class CheckResult:
     def format(self) -> str:
         """Return a single aligned line for terminal output."""
         symbol = _SYMBOLS.get(self.level, "[?]")
-        suffix = f" — {self.detail}" if self.detail else ""
+        suffix = f": {self.detail}" if self.detail else ""
         return f"  {symbol} {self.name}{suffix}"
 
 

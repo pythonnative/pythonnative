@@ -9,7 +9,7 @@ Why not put the buttons inside the screens? Navigating tears down the
 currently mounted screen subtree. A control that lives *inside* that subtree
 therefore destroys itself the moment it fires. On some iOS simulators that
 self-teardown leaves UIKit's touch delivery in a bad state and the *next*
-tap is dropped — so the second navigation silently no-ops. The tab navigator
+tap is dropped, so the second navigation silently no-ops. The tab navigator
 never hits this because its `TabBar` is persistent; this demo mirrors that by
 keeping the navigation controls persistent too. See
 ``tests/e2e/AGENTS.md`` ("Controls that trigger their own teardown").

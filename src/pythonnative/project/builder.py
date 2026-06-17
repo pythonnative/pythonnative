@@ -3,7 +3,7 @@
 The [`Builder`][pythonnative.project.builder.Builder] ties the pieces
 together: it stages the bundled native template, runs the platform
 [`configurators`][pythonnative.project.android], invokes the native
-toolchains (Gradle / Xcode), and—on iOS—embeds the CPython runtime into
+toolchains (Gradle / Xcode), and, on iOS, embeds the CPython runtime into
 the built app.
 
 All shell-outs go through a small

@@ -113,7 +113,7 @@ def test_objc_addr_handles_bytes_pointer() -> None:
     must decode the address with ``int.from_bytes``. Without this,
     the iOS screen host failed to register itself and every
     ``forward_lifecycle`` call (``on_layout`` / ``on_resume`` /
-    ``on_pause``) silently dropped on the floor — which was exactly
+    ``on_pause``) silently dropped on the floor, which was exactly
     the bug surfaced by the missing ``[PN] on_layout`` log lines on
     iPhone 17 Pro.
     """

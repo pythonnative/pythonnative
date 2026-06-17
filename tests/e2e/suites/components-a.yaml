@@ -1,4 +1,4 @@
-# Component category suite, first half (A) — see components.yaml.
+# Component category suite, first half (A); see components.yaml.
 #
 # The components category is large enough (28 flows) that a single
 # GitHub-hosted Android emulator session can't reliably finish it: the

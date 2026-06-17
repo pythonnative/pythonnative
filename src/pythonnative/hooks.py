@@ -613,7 +613,7 @@ def use_query(
     Args:
         fetcher: Zero-arg ``async`` callable that resolves to the
             current data.
-        deps: Dependency list — refetches whenever any entry changes.
+        deps: Dependency list. Refetches whenever any entry changes.
         initial: Optional starting value for ``data`` before the
             first fetch completes.
 
@@ -698,7 +698,7 @@ class MutationCall(Generic[T]):
     Returned by the second element of the
     [`use_mutation`][pythonnative.use_mutation] tuple. Awaiting the
     handle resolves to the mutator's return value (or re-raises its
-    exception); discarding the handle is safe — Python won't warn
+    exception); discarding the handle is safe. Python won't warn
     about an unawaited coroutine because this is a plain object.
 
     Example:
@@ -1068,7 +1068,7 @@ class NavigationHandle:
     Wraps the host's push/pop primitives so screens can navigate
     without knowing the underlying native navigation stack. The
     typical user-facing surface is the declarative handle returned by
-    a [`Stack`][pythonnative.create_stack_navigator] — this class is
+    a [`Stack`][pythonnative.create_stack_navigator]; this class is
     the lower-level fallback used when no navigator is rendered (and
     as the bridge that declarative navigators delegate to when they
     need to push real native screens).

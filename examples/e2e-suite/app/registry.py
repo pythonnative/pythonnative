@@ -5,7 +5,7 @@ The registry is the single source of truth that maps a stable demo
 
 - the navigation title shown in the platform nav bar,
 - the category bucket (used to group demos on the home screen),
-- the ``feature`` string — the PythonNative public symbol the demo
+- the ``feature`` string, the PythonNative public symbol the demo
   exercises (used by ``scripts/check-e2e-coverage.py``),
 - the component function that renders the demo.
 

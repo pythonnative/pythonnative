@@ -34,7 +34,7 @@ def ScrollViewDemo() -> pn.Element:
             # The ScrollView is intentionally large enough to overlap
             # the screen's vertical center on both the iOS and Android
             # CI emulators. Maestro's ``scrollUntilVisible`` always
-            # swipes from the screen center — a smaller (e.g. 200 dp)
+            # swipes from the screen center; a smaller (e.g. 200 dp)
             # container near the top of the page leaves screen center
             # outside its bounds, and the swipe scrolls the outer page
             # ScrollView instead of this one. Keep this >= ~350 dp so

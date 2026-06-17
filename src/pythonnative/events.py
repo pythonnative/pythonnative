@@ -10,7 +10,7 @@ the bridge. This module replaces that with a single dispatch channel:
 - Handlers wire their platform listener **once** at view creation; the
   listener calls [`dispatch_event`][pythonnative.events.dispatch_event]
   with the view's tag and the event name.
-- Re-renders only mutate this Python-side registry — no native call is
+- Re-renders only mutate this Python-side registry; no native call is
   made when just a callback identity changes.
 
 The set of event names present on an element is forwarded to handlers
@@ -78,7 +78,7 @@ class EventRegistry:
 
         Returns:
             ``True`` when a callback existed and was invoked (even if
-            it raised — exceptions are swallowed so a buggy app
+            it raised: exceptions are swallowed so a buggy app
             callback can't crash the platform's UI thread), ``False``
             when nothing is registered.
         """
@@ -115,7 +115,7 @@ def dispatch_event(tag: int, name: str, *args: Any) -> bool:
 
     Args:
         tag: The view's reconciler-assigned tag.
-        name: Event name — the original prop name (``"on_click"``,
+        name: Event name, the original prop name (``"on_click"``,
             ``"on_change"``, …) or a gesture channel (``"gesture:0"``).
         *args: Positional arguments forwarded to the user callback,
             preserving each prop's documented signature.
@@ -144,8 +144,8 @@ def extract_events(props: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Cal
     - ``gestures`` lists of gesture descriptors are serialized to plain
       dicts (handlers wire recognizers from them) while their callbacks
       are folded into per-gesture ``"gesture:<i>"`` routers.
-    - The resulting payload carries ``_pn_events`` — a frozenset of the
-      event names present — so handlers can wire listeners
+    - The resulting payload carries ``_pn_events`` (a frozenset of the
+      event names present), so handlers can wire listeners
       conditionally and the prop differ can detect listener
       addition/removal without comparing closures.
 

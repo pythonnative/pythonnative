@@ -4,7 +4,7 @@ A small, dependency-free coroutine wrapper around
 :mod:`urllib.request`. Operates on bytes internally and exposes a
 :class:`Response` with `text()`, `json()`, and `bytes` accessors.
 
-The implementation is deliberately minimal — it covers the
+The implementation is deliberately minimal; it covers the
 "call a JSON API" path that's overwhelmingly the use case for mobile
 apps. For streaming, multipart uploads, or HTTP/2, integrate
 ``httpx`` / ``aiohttp`` directly; this module won't try to compete.
@@ -161,7 +161,7 @@ async def fetch(
         TimeoutError: If the request doesn't complete within
             ``timeout`` seconds.
         OSError: For network errors (DNS failure, connection refused,
-            etc.) — re-raised from ``urllib``.
+            etc.), re-raised from ``urllib``.
 
     Example:
         ```python
@@ -223,7 +223,7 @@ def _dispatch_request(request: urllib.request.Request, timeout: float) -> Respon
                 content=content,
             )
     except urllib.error.HTTPError as exc:
-        # HTTPError is itself a response object — propagate the body
+        # HTTPError is itself a response object; propagate the body
         # so callers can inspect it before deciding to raise.
         body = exc.read() if hasattr(exc, "read") else b""
         return Response(

@@ -2,7 +2,8 @@
 
 PythonNative runs a single, framework-wide ``asyncio`` event loop on
 a dedicated daemon thread. Every awaitable surface in the framework
-— the async hooks
+schedules its work on this loop via
+[`run_async`][pythonnative.runtime.run_async]: the async hooks
 ([`use_async_effect`][pythonnative.hooks.use_async_effect],
 [`use_query`][pythonnative.hooks.use_query],
 [`use_mutation`][pythonnative.hooks.use_mutation]), the
@@ -12,8 +13,7 @@ native modules
 ([`Camera`][pythonnative.native_modules.camera.Camera] /
 [`Location`][pythonnative.native_modules.location.Location] /
 [`Notifications`][pythonnative.native_modules.notifications.Notifications]),
-and awaited animations — schedules its work on this loop via
-[`run_async`][pythonnative.runtime.run_async].
+and awaited animations.
 
 The reconciler is **not** asyncio-aware; it still runs synchronously on
 the platform main thread. Coroutines that want to mutate component
@@ -66,7 +66,7 @@ _lock = threading.Lock()
 # ======================================================================
 #
 # By default ``threading.Thread`` lands at a low QoS class on Apple
-# platforms, which iOS subjects to wake-up coalescing — the asyncio
+# platforms, which iOS subjects to wake-up coalescing; the asyncio
 # loop only gets ~2 timeslices per second (~500ms granularity). Bumping
 # the thread to ``QOS_CLASS_USER_INTERACTIVE`` is *necessary* for it to
 # be treated as foreground work, but on the simulator it's not
@@ -85,7 +85,7 @@ def _apply_apple_thread_qos() -> None:
     No-op on other platforms or if the symbol can't be loaded. Must be
     called from inside the target thread (the underlying syscall is
     ``pthread_set_qos_class_self_np``). Empirically ``USER_INTERACTIVE``
-    is required on iOS — anything lower triggers wake-up coalescing on
+    is required on iOS; anything lower triggers wake-up coalescing on
     the background asyncio thread, which adds ~500ms latency to every
     cross-thread dispatch.
     """
@@ -151,7 +151,7 @@ def _shutdown_for_tests() -> None:
     Cancels every pending task, stops the loop, joins the thread, and
     clears the module-level state so the next call to
     [`get_loop`][pythonnative.runtime.get_loop] starts a fresh loop.
-    Production code should not call this — the loop is a daemon and
+    Production code should not call this; the loop is a daemon and
     will be torn down with the process.
     """
     global _loop, _thread
@@ -316,7 +316,7 @@ def call_on_main_thread(fn: Callable[[], None]) -> None:
 
     - **iOS**: dispatches ``fn`` onto the main dispatch queue via
       ``libdispatch.dispatch_async_f`` (called through
-      :class:`ctypes.PyDLL` to keep the GIL held — see the
+      :class:`ctypes.PyDLL` to keep the GIL held; see the
       ``_ios_call_on_main`` comment block for why this matters).
     - **Android**: posts a ``Runnable`` to
       ``Handler(Looper.getMainLooper())``.
@@ -469,7 +469,7 @@ def _ios_call_on_main(fn: Callable[[], None]) -> None:
         _main_next_id += 1
         key = _main_next_id
         _main_pending[key] = fn
-    # dispatch_async_f(queue, context, work) — non-blocking; just
+    # dispatch_async_f(queue, context, work): non-blocking; just
     # enqueues the work onto the main queue and returns.
     assert _dispatch_async_f_c is not None
     _dispatch_async_f_c(_dispatch_main_q_ptr, key, _main_trampoline_c)

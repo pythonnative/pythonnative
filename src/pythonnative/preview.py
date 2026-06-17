@@ -1,4 +1,4 @@
-"""Desktop preview runtime — the engine behind ``pn preview``.
+"""Desktop preview runtime, the engine behind ``pn preview``.
 
 ``pn preview`` renders a PythonNative app in a real OS window using the
 Tkinter backend ([`pythonnative.native_views.desktop`][pythonnative.native_views.desktop]),
@@ -50,7 +50,7 @@ class DesktopApp:
     [`screen`][pythonnative.screen] host as the ``native_instance`` so
     hosts can drive navigation (``push_screen`` / ``pop_screen`` /
     ``reset_to_root``), report the viewport size, and set the window
-    title — mirroring the role a ``UIViewController`` / ``Activity``
+    title, mirroring the role a ``UIViewController`` / ``Activity``
     plays on device.
     """
 
@@ -424,7 +424,7 @@ def run_preview(
 
     root.protocol("WM_DELETE_WINDOW", _on_close)
     root.after(_POLL_INTERVAL_MS, _poll)
-    print(f"[pn preview] {component_path} — {int(width)}x{int(height)}", file=sys.stderr)
+    print(f"[pn preview] {component_path} ({int(width)}x{int(height)})", file=sys.stderr)
     try:
         root.mainloop()
     except KeyboardInterrupt:

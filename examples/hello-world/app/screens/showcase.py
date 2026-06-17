@@ -1,4 +1,4 @@
-"""Showcase screen: visual primitives — Animated, typography, borders, chips.
+"""Showcase screen: visual primitives (Animated, typography, borders, chips).
 
 Pushed onto the native stack by tapping "View Showcase" on the Home
 tab. Receives a ``message`` param via ``nav.get_params()`` to

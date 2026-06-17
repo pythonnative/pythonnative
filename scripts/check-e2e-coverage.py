@@ -45,7 +45,7 @@ FLOWS_DIR = ROOT / "tests" / "e2e" / "flows"
 # justify themselves in the same way.
 INTENTIONAL_EXEMPTIONS: Set[str] = {
     # --------------------------------------------------------------
-    # Type-only re-exports — statically checkable, no UI surface.
+    # Type-only re-exports: statically checkable, no UI surface.
     # --------------------------------------------------------------
     "Element",
     "AlignItems",
@@ -74,7 +74,7 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "MutationCall",  # observed via use_mutation demo
     "MutationState",  # observed via use_mutation demo
     # --------------------------------------------------------------
-    # Built-in Props dataclasses — exercised indirectly via their
+    # Built-in Props dataclasses: exercised indirectly via their
     # corresponding component demos.
     # --------------------------------------------------------------
     "ActivityIndicatorProps",
@@ -105,7 +105,7 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # app + rendering any screen invokes them, so a dedicated demo
     # would be redundant).
     # --------------------------------------------------------------
-    "component",  # @pn.component decorator — every screen uses it
+    "component",  # @pn.component decorator, every screen uses it
     "Column",  # used everywhere; co-tested with View in ViewColumnRowDemo
     "Row",  # used everywhere; co-tested with View in ViewColumnRowDemo
     "NavigationContainer",  # wraps the root navigator; used by main.py
@@ -151,7 +151,7 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "Share",
     "Vibration",
     # --------------------------------------------------------------
-    # SDK re-exports — module-level names mirroring submodule content.
+    # SDK re-exports: module-level names mirroring submodule content.
     # --------------------------------------------------------------
     "runtime",  # module re-export; run_async demo covers it
     "sdk",  # module re-export; custom_component demo covers it

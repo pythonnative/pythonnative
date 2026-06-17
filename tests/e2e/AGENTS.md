@@ -38,8 +38,8 @@ examples/e2e-suite/
 
 tests/e2e/
 ├── AGENTS.md                  # (this file)
-├── android.yaml               # Full Android suite — runs every flow
-├── ios.yaml                   # Full iOS suite — runs every flow
+├── android.yaml               # Full Android suite, runs every flow
+├── ios.yaml                   # Full iOS suite, runs every flow
 ├── helpers/
 │   ├── open_demo.yaml         # Reusable: launch + nav to a demo
 │   └── close_demo.yaml        # Reusable: pop back to home
@@ -85,31 +85,31 @@ The build step (`pn run <platform> --no-logs`) only needs to run once per change
 
 ### How `open_demo.yaml` decides what to do
 
-`helpers/open_demo.yaml` is *state-aware* — it inspects the current screen and runs only the steps it needs to land on `Demo: <DEMO_TITLE>`. Same-category consecutive flows stay on the category screen between demos (no detour through home, no `launchApp`); cross-category transitions go via home; a dead app gets relaunched. The companion `helpers/close_demo.yaml` only pops one level (back to the category list) so the next flow's `open_demo` can pick up cheaply.
+`helpers/open_demo.yaml` is *state-aware*; it inspects the current screen and runs only the steps it needs to land on `Demo: <DEMO_TITLE>`. Same-category consecutive flows stay on the category screen between demos (no detour through home, no `launchApp`); cross-category transitions go via home; a dead app gets relaunched. The companion `helpers/close_demo.yaml` only pops one level (back to the category list) so the next flow's `open_demo` can pick up cheaply.
 
-This is intentional and the source of the suite's speed. When debugging a flow, **don't** "simplify" `open_demo` to always `launchApp` + go home + go to category — that's the slow path the smart logic was written to avoid (about 15 min vs. 3 min of pure navigation overhead across the full iOS suite). If a flow needs a guaranteed clean app launch, set up that state in the flow itself.
+This is intentional and the source of the suite's speed. When debugging a flow, **don't** "simplify" `open_demo` to always `launchApp` + go home + go to category; that's the slow path the smart logic was written to avoid (about 15 min vs. 3 min of pure navigation overhead across the full iOS suite). If a flow needs a guaranteed clean app launch, set up that state in the flow itself.
 
 Gate conditions in `open_demo` deliberately use signals that work on **both** platforms. The two cross-platform asymmetries that matter here:
 
 - **Scroll preservation.** iOS preserves a ScrollView's offset across navigation; Android resets it to the top. A condition like `visible: "Back to home"` (button at the bottom of a category list) works on iOS after a return-from-demo but fails on Android because the list is back at the top. The helper gates on `"Demos in .*"` (top of the list, visible on both) and `notVisible: "Back to list"` (i.e. we left the demo screen) instead.
-- **Native-view recreation on Android.** The Android FragmentManager destroys and rebuilds a screen's view tree on pop-back; `pythonnative.screen._on_create` short-circuits the second call so hook state, `use_focus_effect` subscriptions, and `use_navigation` handles persist. If a future change to `screen.py` or `ScreenFragment.kt` breaks that idempotency, `flows/navigation/focus_effect.yaml` is the canary — it'll regress to `Focus count: 1` on pop-back.
+- **Native-view recreation on Android.** The Android FragmentManager destroys and rebuilds a screen's view tree on pop-back; `pythonnative.screen._on_create` short-circuits the second call so hook state, `use_focus_effect` subscriptions, and `use_navigation` handles persist. If a future change to `screen.py` or `ScreenFragment.kt` breaks that idempotency, `flows/navigation/focus_effect.yaml` is the canary; it'll regress to `Focus count: 1` on pop-back.
 
 ### Scrolling fixed-height containers (ScrollView / FlatList)
 
-Maestro's `scrollUntilVisible` always swipes from the screen center. That works for the outer page ScrollView (which fills the screen) but **not** for small in-page containers like the 200 dp `ScrollView` / `FlatList` demos — the screen center sits below those containers, so the swipe lands outside them and never moves the contents.
+Maestro's `scrollUntilVisible` always swipes from the screen center. That works for the outer page ScrollView (which fills the screen) but **not** for small in-page containers like the 200 dp `ScrollView` / `FlatList` demos; the screen center sits below those containers, so the swipe lands outside them and never moves the contents.
 
 `flows/components/scroll_view.yaml` and `flows/components/flat_list.yaml` work around this with an explicit-coordinate swipe loop wrapped in `repeat: while: notVisible: ...`. Two reasons for the loop rather than a fixed `times: N`:
 
-- Per-swipe scroll travel is platform-dependent — Android's `NestedScrollView` flings more aggressively than iOS's `UIScrollView`, so a count tuned for one platform overshoots on the other.
+- Per-swipe scroll travel is platform-dependent: Android's `NestedScrollView` flings more aggressively than iOS's `UIScrollView`, so a count tuned for one platform overshoots on the other.
 - iOS preserves the inner ScrollView's offset across navigation, so a re-entry into the demo may already have the target row in view; `while: notVisible` exits the loop immediately in that case.
 
 When adding a new flow that needs to scroll a non-fullscreen container, copy this pattern (small swipes ~10% of screen height, ~500 ms each, `times` cap as a safety net) rather than calling `scrollUntilVisible`.
 
 ### Suite-level retry
 
-`scripts/run-e2e.sh` re-invokes the whole `maestro test` once if the first attempt exits non-zero. The retry exists to absorb Maestro's iOS XCUITest driver flake (transient `Application is not running` / `Request for viewHierarchy failed`) — not to paper over real failures.
+`scripts/run-e2e.sh` re-invokes the whole `maestro test` once if the first attempt exits non-zero. The retry exists to absorb Maestro's iOS XCUITest driver flake (transient `Application is not running` / `Request for viewHierarchy failed`), not to paper over real failures.
 
-Between attempts the script force-kills the app (`simctl terminate` / `am force-stop`) so the retry starts from a cold launch (`open_demo` relaunches a dead app). Without this, in-process state from the failed attempt — module-level counters some demos display, scroll offsets, half-open nested navigators — leaks into the retry and fails assertions that hold on a first visit. The memo demo's `"MemoA render count: 1"` was the canonical victim. Demos should still avoid module-level state that changes what a flow asserts on a revisit *within* one attempt (the `open_demo`/`close_demo` recovery paths can re-enter a demo after a stray tap); if such state is unavoidable, reset it on mount the way `memo_demo.py` does.
+Between attempts the script force-kills the app (`simctl terminate` / `am force-stop`) so the retry starts from a cold launch (`open_demo` relaunches a dead app). Without this, in-process state from the failed attempt (module-level counters some demos display, scroll offsets, half-open nested navigators) leaks into the retry and fails assertions that hold on a first visit. The memo demo's `"MemoA render count: 1"` was the canonical victim. Demos should still avoid module-level state that changes what a flow asserts on a revisit *within* one attempt (the `open_demo`/`close_demo` recovery paths can re-enter a demo after a stray tap); if such state is unavoidable, reset it on mount the way `memo_demo.py` does.
 
 When the script prints:
 
@@ -140,9 +140,9 @@ appId: ${APP_ID}
 
 When a flow fails, **start by reading these three files in order**:
 
-1. The flow yaml — see what assertion failed.
-2. The demo screen — see what the demo expected to render.
-3. The source under test — see the implementation that's responsible.
+1. The flow yaml: see what assertion failed.
+2. The demo screen: see what the demo expected to render.
+3. The source under test: see the implementation that's responsible.
 
 ## When a flow fails
 
@@ -164,8 +164,8 @@ Diagnostic procedure:
    ```
 
 4. **Inspect logs**: `pn run android` streams `print()` calls from the device. `print("[use_state] count -> ...")` style debug statements from the demo screen surface here, which is usually the fastest way to localize a regression.
-5. **Reproduce in isolation**: many failures are state-related. Re-run `./scripts/run-e2e.sh android components` (or the relevant category) — if the flow passes there but fails in the full suite, the bug is most likely in cleanup between flows.
-6. **CI-only failures**: the E2E workflow uploads `~/.maestro/tests` (command log, view-hierarchy dumps, failure screenshots) as a `maestro-debug-<platform>-<shard>` artifact when a shard fails. Download it from the run page (or `gh run download <run-id>`) before trying to reproduce locally — the failure screenshot usually answers "what was actually on screen" immediately.
+5. **Reproduce in isolation**: many failures are state-related. Re-run `./scripts/run-e2e.sh android components` (or the relevant category). If the flow passes there but fails in the full suite, the bug is most likely in cleanup between flows.
+6. **CI-only failures**: the E2E workflow uploads `~/.maestro/tests` (command log, view-hierarchy dumps, failure screenshots) as a `maestro-debug-<platform>-<shard>` artifact when a shard fails. Download it from the run page (or `gh run download <run-id>`) before trying to reproduce locally; the failure screenshot usually answers "what was actually on screen" immediately.
 
 ## Adding a new demo (and its flow)
 
@@ -217,22 +217,22 @@ If a symbol is genuinely untestable through a UI flow (type-only alias, network-
 
 ## Interactive controls must be driven natively
 
-Every flow for an interactive component must exercise the **real native control** at least once — tap the actual Switch/Checkbox/segment, drag the actual Slider, open the actual Picker, pull the actual page — before (or in addition to) driving state through proxy buttons.
+Every flow for an interactive component must exercise the **real native control** at least once (tap the actual Switch/Checkbox/segment, drag the actual Slider, open the actual Picker, pull the actual page) before (or in addition to) driving state through proxy buttons.
 
-Proxy "Set X" / "Turn on" buttons all share one happy-path event route (`Button.on_click`). The per-control native event bridges — target-actions for `ValueChanged` on iOS, per-widget listeners on Android — are exactly where platform-specific breakage hides. A regression where tapping the real `UISwitch` crashed the app on iOS 18 was completely invisible to a buttons-only flow; the suite stayed green while the control was unusable. Real-control interaction also catches rendering bugs (a control that never gets laid out or draws white-on-white can still pass text-only assertions).
+Proxy "Set X" / "Turn on" buttons all share one happy-path event route (`Button.on_click`). The per-control native event bridges (target-actions for `ValueChanged` on iOS, per-widget listeners on Android) are exactly where platform-specific breakage hides. A regression where tapping the real `UISwitch` crashed the app on iOS 18 was completely invisible to a buttons-only flow; the suite stayed green while the control was unusable. Real-control interaction also catches rendering bugs (a control that never gets laid out or draws white-on-white can still pass text-only assertions).
 
 Practical notes:
 
-- Give label-less controls an `accessibility_label` in the demo (exposed as the accessibility label on iOS and `contentDescription` on Android — Maestro matches both as text).
+- Give label-less controls an `accessibility_label` in the demo (exposed as the accessibility label on iOS and `contentDescription` on Android; Maestro matches both as text).
 - Element-anchored swipes start from the element's center. The Slider demo starts at `value=0.5` precisely so the thumb sits where the swipe begins (iOS only drags a `UISlider` from the thumb).
 - Keep the proxy-button path too: it pins down the programmatic prop-update direction (Python -> native), which real gestures don't cover.
 - Documented exception: `DatePicker`'s popover/dialog internals are platform-divergent and too brittle to script; its value-changed wiring is identical to the covered Switch/SegmentedControl paths. See the comment in `flows/components/date_picker.yaml`.
 
 ### Controls that trigger their own teardown
 
-A control that, when tapped, unmounts the subtree it lives in destroys *itself* as part of handling its own tap. On some iOS simulators (notably the loaded, headless CI sim) that self-teardown leaves UIKit's touch delivery in a bad state and the **next** tap is silently dropped — so a "navigate away" button works the first time and then the following navigation no-ops.
+A control that, when tapped, unmounts the subtree it lives in destroys *itself* as part of handling its own tap. On some iOS simulators (notably the loaded, headless CI sim) that self-teardown leaves UIKit's touch delivery in a bad state and the **next** tap is silently dropped, so a "navigate away" button works the first time and then the following navigation no-ops.
 
-The drawer demo hit this: its per-screen "Go to One" / "Go to Two" buttons lived inside the screens the navigator swaps, so each tap tore down the button that fired it. The first hop worked and the second was dropped — deterministic on CI, invisible locally (the timing only bites on the slower sim) and invisible headlessly (the Python reconciler/layout are provably correct). The tab navigator never hit it because its `TabBar` is persistent.
+The drawer demo hit this: its per-screen "Go to One" / "Go to Two" buttons lived inside the screens the navigator swaps, so each tap tore down the button that fired it. The first hop worked and the second was dropped: deterministic on CI, invisible locally (the timing only bites on the slower sim) and invisible headlessly (the Python reconciler/layout are provably correct). The tab navigator never hit it because its `TabBar` is persistent.
 
 Rule: when a demo control causes the subtree it belongs to to be replaced (navigation between distinct screen components, conditionally-rendered branches, etc.), put the control **outside** that subtree. The drawer demo publishes its navigation handle on a context (`_NavBus`) and renders the nav buttons in the persistent demo body. Mirror the tab navigator, not an in-screen button.
 
@@ -250,7 +250,7 @@ These conventions keep flows robust across platforms. Stick to them when authori
 | Result line | `"<Prefix>: <Value>"` | `"Counter: 2"` |
 | Back button | `"Back to list"` | (same on every demo) |
 
-Avoid emoji and platform-specific glyphs in labels — Maestro's text matching is much happier with plain ASCII.
+Avoid emoji and platform-specific glyphs in labels; Maestro's text matching is much happier with plain ASCII.
 
 ## When tests fail because the demo, not the library, is wrong
 
@@ -258,7 +258,7 @@ It happens. The fix is to update the flow + demo together so the test reflects i
 
 - mark a flow as `flaky` or wrap it in retries without first finding the root cause,
 - change a `result_text` value to silence the test if the library returns something genuinely incorrect,
-- delete a flow because it's hard to fix on one platform — gate it with `runFlow` from one of the platform-specific suites instead (we don't have these yet, but `flows/<category>/<feature>_android.yaml` is the established naming if needed).
+- delete a flow because it's hard to fix on one platform; gate it with `runFlow` from one of the platform-specific suites instead (we don't have these yet, but `flows/<category>/<feature>_android.yaml` is the established naming if needed).
 
 When you do change a demo or flow, update its header comment so it still accurately documents what's being tested.
 

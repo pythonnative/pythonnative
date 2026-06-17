@@ -2,7 +2,7 @@
 #
 # The real drag exercises the platform's value-changed event wiring,
 # which the buttons bypass. The demo starts the slider at 0.5 so the
-# thumb sits at the control's center — element-anchored swipes start
+# thumb sits at the control's center; element-anchored swipes start
 # from the element center, and iOS's UISlider only drags when the
 # gesture starts on the thumb. A right swipe rails the value to max.
 #

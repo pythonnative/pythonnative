@@ -77,7 +77,7 @@ def _circular(img: "object") -> "object":
 def generate_ios_icons(source: Path, appiconset_dir: Path) -> bool:
     """Generate a single-size iOS ``AppIcon.appiconset``.
 
-    Writes ``icon-1024.png`` (a flattened, opaque 1024x1024 image — the
+    Writes ``icon-1024.png`` (a flattened, opaque 1024x1024 image; the
     App Store rejects icons with alpha) and a ``Contents.json`` that
     declares it as the universal iOS app icon. Xcode derives every other
     size at build time.

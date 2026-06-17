@@ -1,4 +1,4 @@
-# Component category suite — Maestro entry-point for component-only runs.
+# Component category suite: Maestro entry-point for component-only runs.
 #
 # Usage:
 #     maestro test tests/e2e/suites/components.yaml -e APP_ID=com.pythonnative.e2e
@@ -9,7 +9,7 @@
 # The flow list lives in components-a.yaml and components-b.yaml; this
 # file just chains the halves. CI runs the halves as separate Android
 # shards (a GitHub-hosted emulator can't survive all 28 flows in one
-# session — see the half files), while iOS simulators and local runs
+# session; see the half files), while iOS simulators and local runs
 # can use this aggregate directly.
 appId: ${APP_ID}
 ---

@@ -23,7 +23,7 @@ class ViewHandler:
 
     A `ViewHandler` knows how to create, update, re-parent, and destroy
     native views of one element type. The reconciler never calls a
-    handler directly — it emits a batch of mutation ops
+    handler directly; it emits a batch of mutation ops
     (`pythonnative.mutations`) that the
     [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
     applies by dispatching to handlers. Handlers never need to know
@@ -132,7 +132,7 @@ class ViewHandler:
 
         The default implementation returns ``(0, 0)``; override for
         leaves whose size depends on their content. Container handlers
-        leave this alone — the engine sizes containers by laying out
+        leave this alone; the engine sizes containers by laying out
         their children.
 
         Args:
@@ -149,7 +149,7 @@ class ViewHandler:
         """Execute an imperative command (e.g. ``"scroll_to_offset"``).
 
         Commands are the escape hatch for one-shot imperative actions
-        that don't fit declarative props — scrolling, focusing,
+        that don't fit declarative props: scrolling, focusing,
         flashing indicators. Unknown commands should be ignored.
 
         Args:

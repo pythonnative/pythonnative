@@ -1,4 +1,4 @@
-# Gestures category suite — Maestro entry-point for gesture-only runs.
+# Gestures category suite: Maestro entry-point for gesture-only runs.
 #
 # Usage:
 #     maestro test tests/e2e/suites/gestures.yaml -e APP_ID=com.pythonnative.e2e

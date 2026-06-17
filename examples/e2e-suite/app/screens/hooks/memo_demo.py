@@ -39,7 +39,7 @@ def MemoDemo() -> pn.Element:
 
     # The counters are module-level, so they survive unmount/remount. Reset
     # them on every fresh mount so the Maestro flow's absolute assertions
-    # ("MemoA render count: 1") hold on revisits too — e.g. when the suite
+    # ("MemoA render count: 1") hold on revisits too, e.g. when the suite
     # retries after an unrelated failure and walks through this demo again.
     mounted = pn.use_ref(False)
     if not mounted["current"]:

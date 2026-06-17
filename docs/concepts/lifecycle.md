@@ -23,8 +23,8 @@ components keep their existing native views and hook state untouched.
 
 The phases:
 
-1. **Render**. The affected `@component` function(s) run — for a state
-   change, just the component whose setter fired. Hooks register state,
+1. **Render**. The affected `@component` function(s) run (for a state
+   change, just the component whose setter fired). Hooks register state,
    queue effects, and capture closures. No native widgets change yet,
    so this phase is cheap and pure (modulo `use_state` updates).
 2. **Commit**. The

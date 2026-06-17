@@ -2,11 +2,11 @@
 
 Two interfaces live here:
 
-- [`Haptics`][pythonnative.Haptics] — semantic, iOS-style feedback
+- [`Haptics`][pythonnative.Haptics]: semantic, iOS-style feedback
   (impact / notification / selection) backed by
   ``UIFeedbackGenerator`` on iOS and ``VibrationEffect`` patterns on
   Android.
-- [`Vibration`][pythonnative.Vibration] — a blunt "buzz for N
+- [`Vibration`][pythonnative.Vibration]: a blunt "buzz for N
   milliseconds" interface for cases where you want an explicit
   duration.
 

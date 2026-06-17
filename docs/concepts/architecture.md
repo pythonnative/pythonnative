@@ -169,7 +169,7 @@ PythonNative ships its own **pure-Python flexbox engine** (a small,
 React-Native-compatible re-implementation of Yoga's algorithm). All
 layout decisions are made in Python and then pushed to native views as
 absolute frames via `set_frame`. This means the *exact same* layout
-rules apply on Android and iOS — there is no platform drift between
+rules apply on Android and iOS; there's no platform drift between
 `LinearLayout` and `UIStackView`.
 
 The engine is implemented in `pythonnative.layout` and runs as a
@@ -247,9 +247,9 @@ submodules:
 
 Every handler implements two layout-facing methods:
 
-- `set_frame(view, x, y, width, height)` — apply an absolute frame
+- `set_frame(view, x, y, width, height)`: apply an absolute frame
   computed by the layout engine.
-- `measure_intrinsic(view, max_width, max_height)` — return the
+- `measure_intrinsic(view, max_width, max_height)`: return the
   natural content size for leaf widgets (used as a hint by the layout
   engine).
 
@@ -361,7 +361,7 @@ PythonNative navigation is **declarative** and **native-backed**:
   it.
 - The outermost `Stack.Navigator` delegates `navigate(...)`,
   `go_back()`, and `reset(...)` to the platform's native navigation
-  controller — `UINavigationController` on iOS and the AndroidX
+  controller: `UINavigationController` on iOS and the AndroidX
   Navigation Component on Android. Nested navigators (tabs inside a
   stack, stacks inside tabs) stay in Python and reuse the existing
   reconciler.

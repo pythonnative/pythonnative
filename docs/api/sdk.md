@@ -6,7 +6,7 @@ widgets to PythonNative. It re-exports the
 [`ViewHandler`][pythonnative.native_views.base.ViewHandler] protocol,
 and the typed style primitives so plugin authors only need a single
 import path. The reference here documents the symbols that are
-*unique* to the SDK module — the re-exports are documented on their
+*unique* to the SDK module; the re-exports are documented on their
 canonical pages and linked below.
 
 The full walkthrough lives in

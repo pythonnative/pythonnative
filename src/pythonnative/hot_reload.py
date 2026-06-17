@@ -17,7 +17,7 @@ Two strategies share the device-side surface:
   the reconciler tree is walked and every component function whose
   module was reloaded is swapped in place. Hook state, navigation
   state, and even scroll positions survive because the underlying
-  ``VNode`` objects are reused — the next render simply calls the
+  ``VNode`` objects are reused; the next render simply calls the
   new function bodies through the old slots.
 - **Full remount**: when the in-place swap fails (e.g. the new
   module raised at import time, or a render exception bubbled out
@@ -197,8 +197,8 @@ class ModuleReloader:
 
     Designed to be invoked from device-side glue when a hot-reload
     push completes. All public methods are static; the class holds a
-    single piece of process-wide state — the manifest version that
-    has most recently been applied to ``sys.modules`` — so that
+    single piece of process-wide state (the manifest version that
+    has most recently been applied to ``sys.modules``) so that
     multiple screen hosts polling the same manifest do not each
     re-execute the user-app modules. The first host to see a new
     version pays the ``reload_modules`` cost; subsequent hosts on the
@@ -302,7 +302,7 @@ class ModuleReloader:
 
         Returns:
             The list of module names that are currently fresh in
-            ``sys.modules`` — either freshly reloaded by this call, or
+            ``sys.modules``, either freshly reloaded by this call, or
             already reloaded by an earlier host for the same version.
         """
         with ModuleReloader._reload_lock:

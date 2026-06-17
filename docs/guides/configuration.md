@@ -51,7 +51,7 @@ abi_filters = ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
 
 Paths (icon, splash, keystore) are resolved relative to the project
 root. Invalid configuration fails fast with a specific, actionable
-error — run [`pn doctor`](../api/cli.md) to validate at any time.
+error; run [`pn doctor`](../api/cli.md) to validate at any time.
 
 ---
 
@@ -111,7 +111,7 @@ catalog and how each capability maps to native artifacts.
 Asset generation requires [Pillow](https://python-pillow.org/), the
 `pythonnative[build]` optional dependency (`pip install
 'pythonnative[build]'`). If Pillow isn't installed, the template's
-default assets are kept and the build still succeeds — `pn doctor`
+default assets are kept and the build still succeeds; `pn doctor`
 reports whether Pillow is available. See
 [Building for release](building-for-release.md#app-icon-and-splash).
 
@@ -214,5 +214,5 @@ flowchart LR
 
 Because parsing and validation happen once, up front, the platform
 configurators and builder always work from a fully-defaulted, valid
-config — so `pn run` and `pn build` behave consistently. For the build
+config, so `pn run` and `pn build` behave consistently. For the build
 mechanics, continue to [Building for release](building-for-release.md).

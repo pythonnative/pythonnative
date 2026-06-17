@@ -1,7 +1,7 @@
 """Encrypted key/value storage for secrets (tokens, credentials).
 
 [`SecureStore`][pythonnative.SecureStore] persists small string values
-in the iOS Keychain and Android ``EncryptedSharedPreferences`` — the
+in the iOS Keychain and Android ``EncryptedSharedPreferences``, the
 right place for auth tokens and other secrets that
 [`AsyncStorage`][pythonnative.AsyncStorage] (plain, unencrypted) should
 never hold.

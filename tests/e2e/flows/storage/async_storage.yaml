@@ -1,6 +1,6 @@
 # Tests AsyncStorage write / read / delete round-trip. Each async op
 # flips the readout on *completion* ("(written)" / "(cleared)"), and the
-# flow waits for that transition before tapping the next button — taps
+# flow waits for that transition before tapping the next button; taps
 # must not race the storage I/O on slow CI runners.
 #
 # Demo screen: examples/e2e-suite/app/screens/storage/async_storage_demo.py

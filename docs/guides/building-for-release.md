@@ -30,8 +30,8 @@ pn doctor ios
 ```
 
 `pn doctor` validates `pythonnative.toml` and checks the platform
-toolchain — for Android: `adb`, a JDK, and whether release signing is
-configured; for iOS: macOS, Xcode, `simctl`, and a development team. It
+toolchain: for Android, `adb`, a JDK, and whether release signing is
+configured; for iOS, macOS, Xcode, `simctl`, and a development team. It
 exits non-zero on anything that will block a build, so you can gate CI
 on it.
 
@@ -51,7 +51,7 @@ build/android/android_template/app/build/outputs/bundle/release/app-release.aab
 ### Signing
 
 Without signing configured, Gradle emits an **unsigned** release APK
-(`app-release-unsigned.apk`) — fine for inspection, not for the store.
+(`app-release-unsigned.apk`), fine for inspection, not for the store.
 To produce signed artifacts, create a keystore once:
 
 ```bash
@@ -69,7 +69,7 @@ key_alias = "myapp"
 # PN_ANDROID_KEYSTORE_PASSWORD / PN_ANDROID_KEY_PASSWORD
 ```
 
-Passwords are **never** stored in the config — only the names of the
+Passwords are **never** stored in the config, only the names of the
 environment variables that hold them. Provide the secrets at build time:
 
 ```bash
@@ -148,9 +148,9 @@ icon = "assets/icon.png"      # 1024x1024 PNG
 splash = "assets/splash.png"
 ```
 
-- **iOS** — a universal `AppIcon.appiconset` (Xcode resizes the rest)
+- **iOS**: a universal `AppIcon.appiconset` (Xcode resizes the rest)
   and a `Splash` image set referenced by the generated launch screen.
-- **Android** — `mipmap-*` launcher icons at every density plus a round
+- **Android**: `mipmap-*` launcher icons at every density plus a round
   variant, and a centered icon for the Android 12+ splash screen.
 
 Image processing needs [Pillow](https://python-pillow.org/), an optional
@@ -160,7 +160,7 @@ dependency:
 pip install 'pythonnative[build]'
 ```
 
-If Pillow isn't installed the build still succeeds — it just keeps the
+If Pillow isn't installed the build still succeeds; it just keeps the
 template's default assets. `pn doctor` reports whether Pillow is
 available.
 
@@ -212,5 +212,5 @@ pn run ios --prepare-only
 
 This writes a fully configured project (identity, permissions, icons,
 relocated Android package) under `build/`, which you can open and build
-with the native IDE — useful for debugging signing or build issues with
+with the native IDE, useful for debugging signing or build issues with
 the platform's own tooling.

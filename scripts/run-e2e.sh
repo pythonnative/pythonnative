@@ -20,7 +20,7 @@
 # Multiple category suites can be passed at once; they run sequentially in
 # a single Maestro session (and against a single emulator/simulator boot).
 # CI uses this to shard the Android run into a few balanced groups so no
-# single emulator session has to survive the entire 60-flow marathon —
+# single emulator session has to survive the entire 60-flow marathon;
 # GitHub-hosted Android emulators grow unstable under ~15 minutes of
 # sustained Maestro driving and start reporting "device offline". See
 # .github/workflows/e2e.yml and tests/e2e/AGENTS.md.
@@ -132,8 +132,8 @@ printf "\n==> Running Maestro suite(s): %s\n" "${MAESTRO_TARGETS[*]}"
 
 # Kill the app so the next Maestro attempt starts from a cold launch
 # (open_demo relaunches a dead app). A failed attempt can leave the app
-# mid-demo with dirty in-process state — e.g. module-level counters some
-# demos display — which would make a same-process retry fail assertions
+# mid-demo with dirty in-process state (e.g. module-level counters some
+# demos display), which would make a same-process retry fail assertions
 # that hold on a first visit.
 terminate_app() {
   if [[ "$PLATFORM" == "ios" ]]; then

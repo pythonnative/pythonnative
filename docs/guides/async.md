@@ -2,7 +2,7 @@
 
 PythonNative is built on Python's `asyncio`. Animations, native
 modules, alerts, the network client, and persistent storage are all
-coroutines — and there are dedicated hooks
+coroutines, and there are dedicated hooks
 ([`use_async_effect`][pythonnative.hooks.use_async_effect],
 [`use_query`][pythonnative.hooks.use_query],
 [`use_mutation`][pythonnative.hooks.use_mutation],
@@ -122,7 +122,7 @@ def NewPostForm():
 ```
 
 The handle returned by `mutate(...)` is a
-[`MutationCall`][pythonnative.hooks.MutationCall] — awaitable,
+[`MutationCall`][pythonnative.hooks.MutationCall], awaitable,
 cancellable, and safe to ignore if you only care about the state
 transitions.
 
@@ -143,7 +143,7 @@ data = resp.json()
 
 `resp.text()`, `resp.json()`, and `resp.content` cover the common
 cases. For multipart uploads, HTTP/2, or streaming, integrate
-`httpx` / `aiohttp` directly — `pn.fetch` deliberately stays small.
+`httpx` / `aiohttp` directly; `pn.fetch` deliberately stays small.
 
 ## Key/value persistence: `AsyncStorage`
 
@@ -251,5 +251,5 @@ def PostsScreen(user_id: int):
     )
 ```
 
-Each piece — fetch, animation, persistence, mutation — is its own
+Each piece (fetch, animation, persistence, mutation) is its own
 hook with its own lifecycle, and `asyncio` is the glue.

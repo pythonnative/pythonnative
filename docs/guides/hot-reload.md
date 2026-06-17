@@ -62,7 +62,7 @@ place:
 2. Look up each function's replacement by `__module__` +
    `__qualname__` in the freshly reloaded module (unwrapping the
    `@pn.component` decorator).
-3. Rewrite the `Element.type` references on every VNode in place —
+3. Rewrite the `Element.type` references on every VNode in place;
    the next reconcile sees the new function with the same
    `HookState`, so state survives.
 
@@ -72,9 +72,9 @@ just like a normal re-render, so layout and native views are
 updated incrementally. Component state (`use_state`, `use_reducer`,
 refs) is preserved across the swap.
 
-If Fast Refresh can't find a clean swap — for example, a
+If Fast Refresh can't find a clean swap (for example, a
 component's `__qualname__` changed, a new module was added that the
-tree doesn't reference yet, or the swap raises — the host
+tree doesn't reference yet, or the swap raises), the host
 **falls back** to a full remount of its root component so you never
 get stuck with a stale tree. Hook state is reset in that case.
 

@@ -3,7 +3,7 @@
 # Each flow ends with this helper so the next flow's ``open_demo.yaml``
 # can pick up from a known state. ``open_demo`` is state-aware and will
 # handle category-to-category or home-to-category transitions itself,
-# so this helper only needs to take a single step out of the demo —
+# so this helper only needs to take a single step out of the demo;
 # the suite stays in the category screen between consecutive demos in
 # the same category, which is most of the suite by volume and the main
 # source of the suite-wide speedup.
@@ -19,7 +19,7 @@
 #
 # iOS preserves a parent ScrollView's offset across navigation, so the
 # category title can start above the visible fold after returning from
-# a deep demo — we scroll up to it before asserting.
+# a deep demo; we scroll up to it before asserting.
 appId: ${APP_ID}
 ---
 - tapOn: "Back to list"

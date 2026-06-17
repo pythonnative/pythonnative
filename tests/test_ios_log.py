@@ -131,7 +131,7 @@ class TestInstall:
         install()
         install()
 
-        # Second+ install() calls must be no-ops — the same objects remain.
+        # Second+ install() calls must be no-ops; the same objects remain.
         assert sys.stdout is first_stdout
         assert sys.stderr is first_stderr
 

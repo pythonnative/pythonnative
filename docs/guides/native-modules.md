@@ -6,8 +6,8 @@ share sheet, deep links, permissions, connectivity, secure storage,
 battery, haptics, and biometrics. Each module is implemented twice
 (once per platform) and dispatches at runtime based on
 `utils.IS_ANDROID` / `utils.IS_IOS`, so app code stays single-source.
-Off-device (desktop), each module falls back to a safe default —
-in-memory buffers, `"unknown"` states, no-op feedback — so the same
+Off-device (desktop), each module falls back to a safe default
+(in-memory buffers, `"unknown"` states, no-op feedback) so the same
 code runs in the desktop mock and in unit tests.
 
 Both synchronous and coroutine APIs exist, chosen to match the
@@ -120,7 +120,7 @@ to `CLLocationManagerDelegate` (iOS) or `LocationManager.requestUpdates`
 [`FileSystem`][pythonnative.native_modules.file_system.FileSystem] is
 scoped to your app's documents directory; relative paths are resolved
 inside that sandbox automatically. Unlike the other modules, the file
-system surface is synchronous — local disk reads are typically
+system surface is synchronous; local disk reads are typically
 faster than the cost of hopping onto the asyncio loop. For large
 files you can opt into a worker thread:
 
@@ -128,17 +128,17 @@ files you can opt into a worker thread:
 import asyncio
 import pythonnative as pn
 
-# Sync — fine for small files (preferences, JSON state, etc.)
+# Sync: fine for small files (preferences, JSON state, etc.)
 pn.FileSystem.write_text("notes.txt", "hello")
 text = pn.FileSystem.read_text("notes.txt")
 
-# Async — explicitly offload to a worker thread for big payloads.
+# Async: explicitly offload to a worker thread for big payloads.
 text = await asyncio.to_thread(pn.FileSystem.read_text, "big.txt")
 ```
 
 !!! tip "Need just a key-value store?"
     Prefer [`AsyncStorage`][pythonnative.storage.AsyncStorage] over
-    serialising JSON into a file by hand — it's the native
+    serialising JSON into a file by hand; it's the native
     `NSUserDefaults` / `SharedPreferences` API and is async-first.
 
 ## Notifications
@@ -257,7 +257,7 @@ def Banner():
 ## Secure storage
 
 [`SecureStore`][pythonnative.SecureStore] persists secrets in the iOS
-Keychain / Android `EncryptedSharedPreferences`. Use it for tokens —
+Keychain / Android `EncryptedSharedPreferences`. Use it for tokens,
 not [`AsyncStorage`][pythonnative.storage.AsyncStorage], which is
 unencrypted.
 

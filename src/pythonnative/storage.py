@@ -321,7 +321,7 @@ class AsyncStorage:
         """Return the JSON-decoded value stored at ``key``, or ``None``.
 
         If the stored value isn't valid JSON, returns ``None`` rather
-        than raising — assume the entry was written by another
+        than raising; assume the entry was written by another
         process or an older version of the app.
         """
         raw = await AsyncStorage.get(key)
@@ -347,7 +347,7 @@ def use_persisted_state(
     Backed by [`AsyncStorage`][pythonnative.storage.AsyncStorage]:
     behaves like ``use_state`` but loads the prior value (if any) on
     mount and persists every subsequent update. Until the load
-    completes the value is ``initial`` — the same fallback React
+    completes the value is ``initial``, the same fallback React
     Native users get with ``AsyncStorage.getItem``.
 
     The setter accepts either a value or a ``current -> new``
@@ -362,7 +362,7 @@ def use_persisted_state(
         initial: Value used before the first load completes.
 
     Returns:
-        ``(value, setter)`` — same shape as
+        ``(value, setter)``, same shape as
         [`use_state`][pythonnative.use_state].
 
     Example:

@@ -361,7 +361,7 @@ def element_factory(name: str) -> Callable[..., Element]:
       arguments matching the registered props dataclass.
 
     If no ``props`` dataclass was registered for ``name``, kwargs flow
-    through unmodified — useful when iterating before locking down a
+    through unmodified, useful when iterating before locking down a
     prop schema.
 
     Args:

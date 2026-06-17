@@ -41,7 +41,7 @@ appId: ${APP_ID}
 # resets the category ScrollView's offset to the top after navigation,
 # so ``Back to home`` (at the bottom of the category list) starts
 # below the visible fold and isn't a reliable post-tap signal. iOS
-# preserves the offset so the latter would work there — but the
+# preserves the offset so the latter would work there, but the
 # former works on both.
 - runFlow:
     when:
@@ -113,7 +113,7 @@ appId: ${APP_ID}
 
 # 5. We're now guaranteed to be on the right category list. Open the
 # requested demo. The Components category has ~28 rows, so reaching the
-# deepest demos takes many swipes — give the scroll a generous budget
+# deepest demos takes many swipes; give the scroll a generous budget
 # for slow (software-rendered) emulators, and let the UI settle between
 # swipes so a laggy emulator doesn't compress a swipe into a stray tap
 # on one of the list's buttons.

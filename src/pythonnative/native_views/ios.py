@@ -8,7 +8,7 @@ frame application. Handlers are registered with the
 
 **Batched protocol**: the registry applies the reconciler's mutation
 ops; handlers receive callable-free props. User callbacks never reach
-this module — every interaction (taps, text edits, scrolls, gestures)
+this module; every interaction (taps, text edits, scrolls, gestures)
 is forwarded through
 [`dispatch_event`][pythonnative.events.dispatch_event] keyed by the
 view's reconciler-assigned tag.
@@ -171,7 +171,7 @@ def _has_event(view: Any, name: str) -> bool:
 # ======================================================================
 #
 # rubicon-objc's ``@objc_method`` FFI bridge is unreliable on iOS arm64
-# for some delegate callback shapes — in particular when UIKit passes
+# for some delegate callback shapes, in particular when UIKit passes
 # tagged pointers (e.g. NSIndexPath) or invokes selectors that return
 # objects, the FFI closure ends up in CPython's ``_ctypes.O_get`` and
 # crashes on bogus PyObject* dereferences.
@@ -688,7 +688,7 @@ def _register_control_action(control: Any, events_mask: int, handler: Any) -> No
 
     The UIControl counterpart of ``_register_action``: control events
     (TouchUpInside, ValueChanged, ...) must not be delivered through
-    rubicon's ``@objc_method`` bridge either — the trampoline's ``sender``
+    rubicon's ``@objc_method`` bridge either; the trampoline's ``sender``
     marshaling is what crashed UISwitch toggles on iOS 18.x (the action
     fired, but touching the marshaled ``sender`` segfaulted). The raw IMP
     receives only the sender *pointer*; ``handler`` closures read any
@@ -763,7 +763,7 @@ def _make_gesture_handler(
                 pass
         elif kind == "swipe":
             # Discrete: UIKit only calls us on recognition, and only the
-            # recognizer whose direction matched fires — so the bound
+            # recognizer whose direction matched fires, so the bound
             # per-recognizer direction is the actual swipe direction.
             payload["state"] = "ended"
             payload["direction"] = direction
@@ -1154,7 +1154,7 @@ class IOSViewHandler(ViewHandler):
 
         ``decay`` (and any unknown kind) returns ``False`` so the Python
         ticker integrates the exact physics. Off-main-thread starts also
-        fall back — UIKit animation APIs are main-thread-only.
+        fall back; UIKit animation APIs are main-thread-only.
         """
         if native_view is None or not isinstance(spec, dict):
             return False
@@ -1190,7 +1190,7 @@ class IOSViewHandler(ViewHandler):
 
 
 class FlexContainerHandler(IOSViewHandler):
-    """Container for flex layout — a bare `UIView`.
+    """Container for flex layout, a bare `UIView`.
 
     All flex semantics (direction, alignment, distribution, padding)
     are computed by the layout engine and applied via
@@ -1416,7 +1416,7 @@ class ButtonHandler(IOSViewHandler):
 
 # ``scrollViewDidScroll:`` hands the delegate a ``UIScrollView*``. rubicon's
 # ``@objc_method`` FFI bridge is unreliable for delegate callbacks that take
-# ObjC object arguments on arm64 (see the module header note) — on the arm64
+# ObjC object arguments on arm64 (see the module header note); on the arm64
 # simulator the callback simply never reaches Python, so ``on_scroll`` would
 # silently never fire. Exactly like the UITabBar delegate, we therefore build
 # the delegate class with raw libobjc and dispatch through a CFUNCTYPE IMP.
@@ -1462,7 +1462,7 @@ if _PN_SCROLL_DELEGATE_CLS:
 
 
 class ScrollViewHandler(IOSViewHandler):
-    """Scroll container — wraps a single child whose height is unbounded.
+    """Scroll container: wraps a single child whose height is unbounded.
 
     The child is positioned by the layout engine using its natural
     content height. The shared frame applier expands the parent
@@ -1713,7 +1713,7 @@ class ImageHandler(IOSViewHandler):
 
 
 # ----------------------------------------------------------------------
-# TextInput — raw libobjc target/delegate
+# TextInput: raw libobjc target/delegate
 # ----------------------------------------------------------------------
 #
 # UITextField control events and UITextField/UITextView delegate
@@ -1786,7 +1786,7 @@ def _tf_on_submit_imp(self_ptr: int, _cmd: int, sender_ptr: int) -> None:
 
 
 def _tf_should_return_imp(self_ptr: int, _cmd: int, tf_ptr: int) -> bool:
-    """``textFieldShouldReturn:`` — dismiss the keyboard on Return.
+    """Dismiss the keyboard on Return (``textFieldShouldReturn:``).
 
     iOS doesn't dismiss the keyboard on Return by default; the standard
     pattern is for the delegate to resign first responder and return
@@ -2444,7 +2444,7 @@ class ProgressBarHandler(IOSViewHandler):
 
 
 # ======================================================================
-# WebView — WKWebView with navigation + script-message delegates
+# WebView: WKWebView with navigation + script-message delegates
 # ======================================================================
 
 # WKWebView.scrollView isn't auto-detected as a property by rubicon, so it
@@ -2466,7 +2466,7 @@ def _webview_url(webview: Any) -> str:
 # WKNavigationDelegate + WKScriptMessageHandler bridge. WebKit passes
 # object arguments (``WKNavigation*`` / ``WKScriptMessage*``) to these
 # delegate callbacks, which rubicon's ``@objc_method`` FFI bridge
-# mismarshals on iOS 18.x — the app dies with EXC_BAD_ACCESS inside
+# mismarshals on iOS 18.x; the app dies with EXC_BAD_ACCESS inside
 # ``objc_msgSend`` (see the module header note). Like the scroll and
 # tab-bar delegates we therefore build the class with raw libobjc and
 # CFUNCTYPE IMPs, keep per-delegate state keyed by the delegate
@@ -2702,7 +2702,7 @@ class SafeAreaViewHandler(IOSViewHandler):
 
 
 # ======================================================================
-# Modal — actually presents a UIViewController
+# Modal: actually presents a UIViewController
 # ======================================================================
 
 
@@ -2767,7 +2767,7 @@ class ModalHandler(IOSViewHandler):
             buf.remove(child)
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
-        # Modal is a virtual placeholder — not rendered inline.
+        # Modal is a virtual placeholder, not rendered inline.
         return
 
     def measure_intrinsic(
@@ -2858,7 +2858,7 @@ class ModalHandler(IOSViewHandler):
 
 
 # ======================================================================
-# StatusBar — global side effect, no view in the tree
+# StatusBar: global side effect, no view in the tree
 # ======================================================================
 
 
@@ -2903,7 +2903,7 @@ class StatusBarHandler(IOSViewHandler):
 
 
 # ======================================================================
-# KeyboardAvoidingView — publishes the keyboard height to Python
+# KeyboardAvoidingView: publishes the keyboard height to Python
 # ======================================================================
 
 
@@ -2976,7 +2976,7 @@ class KeyboardAvoidingViewHandler(IOSViewHandler):
 
 
 # ======================================================================
-# TabBar — UITabBar with a raw ctypes delegate
+# TabBar: UITabBar with a raw ctypes delegate
 # ======================================================================
 #
 # ``tabBar:didSelectItem:`` passes the UITabBarItem as an ObjC object;
@@ -3193,7 +3193,7 @@ def _present_alert(
 ) -> None:
     """Present a UIAlertController of the given style.
 
-    Safe to call from any thread — the UIKit work is automatically
+    Safe to call from any thread; the UIKit work is automatically
     marshalled to the main thread via
     [`pythonnative.runtime.call_on_main_thread`][pythonnative.runtime.call_on_main_thread].
     Returns immediately; the alert appears on the next main-loop tick.
@@ -3261,7 +3261,7 @@ def _present_alert(
 
 
 # ======================================================================
-# Picker — action-sheet dropdown
+# Picker: action-sheet dropdown
 # ======================================================================
 #
 # The PythonNative `Picker` renders as a `UIButton` whose tap presents
@@ -3304,7 +3304,7 @@ def _present_picker_sheet(btn: Any) -> None:
 
 
 class PickerHandler(IOSViewHandler):
-    """``Picker`` element handler — native action-sheet dropdown."""
+    """``Picker`` element handler, native action-sheet dropdown."""
 
     def _build(self, props: Dict[str, Any]) -> Any:
         btn = ObjCClass("UIButton").buttonWithType_(1)  # UIButtonTypeSystem
@@ -3333,7 +3333,7 @@ class PickerHandler(IOSViewHandler):
 
 
 # ======================================================================
-# Checkbox — SF Symbol UIButton toggling checked / unchecked
+# Checkbox: SF Symbol UIButton toggling checked / unchecked
 # ======================================================================
 
 
@@ -3438,7 +3438,7 @@ class CheckboxHandler(IOSViewHandler):
 
 
 # ======================================================================
-# SegmentedControl — native UISegmentedControl
+# SegmentedControl: native UISegmentedControl
 # ======================================================================
 
 
@@ -3526,7 +3526,7 @@ class SegmentedControlHandler(IOSViewHandler):
 
 
 # ======================================================================
-# DatePicker — native UIDatePicker (compact style on iOS 13.4+)
+# DatePicker: native UIDatePicker (compact style on iOS 13.4+)
 # ======================================================================
 
 

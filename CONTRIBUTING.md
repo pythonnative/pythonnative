@@ -32,24 +32,24 @@ cd examples/hello-world && pn run android
 
 ## Project layout (high‑level)
 
-- `src/pythonnative/` – installable library and CLI
-  - `pythonnative/` – core cross‑platform UI components and utilities
-  - `cli/` – `pn` command
-- `tests/` – unit tests for the library, plus the Maestro E2E suite
-  - `e2e/` – the comprehensive E2E suite (see [E2E tests](#e2e-tests-maestro) below and `tests/e2e/AGENTS.md`)
-- `templates/` – Android/iOS project templates and zips
-- `examples/` – runnable example apps
-  - `hello-world/` – minimal marketing demo
-  - `e2e-suite/` – comprehensive feature catalog that drives the Maestro E2E suite
-- `scripts/` – helper scripts (`check.sh`, `run-e2e.sh`, `check-e2e-coverage.py`)
-- `README.md`, `pyproject.toml` – repo docs and packaging
+- `src/pythonnative/`: installable library and CLI
+  - `pythonnative/`: core cross‑platform UI components and utilities
+  - `cli/`: `pn` command
+- `tests/`: unit tests for the library, plus the Maestro E2E suite
+  - `e2e/`: the comprehensive E2E suite (see [E2E tests](#e2e-tests-maestro) below and `tests/e2e/AGENTS.md`)
+- `templates/`: Android/iOS project templates and zips
+- `examples/`: runnable example apps
+  - `hello-world/`: minimal marketing demo
+  - `e2e-suite/`: comprehensive feature catalog that drives the Maestro E2E suite
+- `scripts/`: helper scripts (`check.sh`, `run-e2e.sh`, `check-e2e-coverage.py`)
+- `README.md`, `pyproject.toml`: repo docs and packaging
 
 ## Coding guidelines
 
 - Style: Black; lint: Ruff; typing where useful. Keep APIs stable.
 - Prefer explicit, descriptive names; keep platform abstractions clean.
 - Add/extend tests under `tests/` for new behavior.
-- Do not commit generated artifacts or large binaries; templates live under `templates/`.
+- Don't commit generated artifacts or large binaries; templates live under `templates/`.
 - Docstrings: Google style throughout. Ruff is configured with the Google
   convention (`pydocstyle.convention = "google"`) and enforces the `D` rule
   set on `src/pythonnative/`. See the
@@ -84,57 +84,57 @@ This project uses Conventional Commits. Use the form:
 
 Accepted types (standard):
 
-- `build` – build system or external dependencies (e.g., requirements, packaging)
-- `chore` – maintenance (no library behavior change)
-- `ci` – continuous integration configuration (workflows, pipelines)
-- `docs` – documentation only
-- `feat` – user‑facing feature or capability
-- `fix` – bug fix
-- `perf` – performance improvements
-- `refactor` – code change that neither fixes a bug nor adds a feature
-- `revert` – revert of a previous commit
-- `style` – formatting/whitespace (no code behavior)
-- `test` – add/adjust tests only
+- `build`: build system or external dependencies (e.g., requirements, packaging)
+- `chore`: maintenance (no library behavior change)
+- `ci`: continuous integration configuration (workflows, pipelines)
+- `docs`: documentation only
+- `feat`: user‑facing feature or capability
+- `fix`: bug fix
+- `perf`: performance improvements
+- `refactor`: code change that neither fixes a bug nor adds a feature
+- `revert`: revert of a previous commit
+- `style`: formatting/whitespace (no code behavior)
+- `test`: add/adjust tests only
 
 Recommended scopes (choose the smallest, most accurate unit; prefer module/directory names):
 
 - Module/directory scopes:
-  - `alerts` – imperative Alert/Picker helpers (`alerts.py`)
-  - `animated` – Animated namespace and animation primitives (`animated.py`)
-  - `cli` – CLI tool and `pn` command (`src/pythonnative/cli/`)
-  - `components` – declarative element-creating functions (`components.py`)
-  - `element` – Element descriptor class (`element.py`)
-  - `events` – tag-based event routing between native views and Python callbacks (`events.py`)
-  - `gestures` – gesture descriptors and the pure-Python recognition arbiter (`gestures.py`)
-  - `hooks` – function components and hooks (`hooks.py`)
-  - `hot_reload` – file watcher and module reloader (`hot_reload.py`)
-  - `layout` – pure-Python flexbox engine (`layout.py`)
-  - `mutations` – batched mutation ops between reconciler and native backends (`mutations.py`)
-  - `native_modules` – native API modules for device capabilities (`native_modules/`)
-  - `native_views` – platform-specific native view creation and updates (`native_views/`)
-  - `navigation` – navigation containers and stack/tab/drawer navigators (`navigation.py`)
-  - `net` – awaitable HTTP client (`net.py`)
-  - `package` – `src/pythonnative/__init__.py` exports and package boundary
-  - `platform` – `Platform.OS`/`Platform.select` and version detection (`platform.py`)
-  - `platform_metrics` – platform-reported metrics like safe-area insets and bar heights (`platform_metrics.py`)
-  - `reconciler` – virtual view tree diffing and reconciliation (`reconciler.py`)
-  - `runtime` – framework-wide asyncio loop and thread-safe future helpers (`runtime.py`)
-  - `screen` – screen host, native lifecycle bridge, and render scheduling (`screen.py`)
-  - `sdk` – public extension SDK for custom native components (`sdk/`)
-  - `storage` – AsyncStorage key/value persistence and `use_persisted_state` (`storage.py`)
-  - `style` – StyleSheet and theming (`style.py`)
-  - `utils` – shared utilities (`utils.py`)
+  - `alerts`: imperative Alert/Picker helpers (`alerts.py`)
+  - `animated`: Animated namespace and animation primitives (`animated.py`)
+  - `cli`: CLI tool and `pn` command (`src/pythonnative/cli/`)
+  - `components`: declarative element-creating functions (`components.py`)
+  - `element`: Element descriptor class (`element.py`)
+  - `events`: tag-based event routing between native views and Python callbacks (`events.py`)
+  - `gestures`: gesture descriptors and the pure-Python recognition arbiter (`gestures.py`)
+  - `hooks`: function components and hooks (`hooks.py`)
+  - `hot_reload`: file watcher and module reloader (`hot_reload.py`)
+  - `layout`: pure-Python flexbox engine (`layout.py`)
+  - `mutations`: batched mutation ops between reconciler and native backends (`mutations.py`)
+  - `native_modules`: native API modules for device capabilities (`native_modules/`)
+  - `native_views`: platform-specific native view creation and updates (`native_views/`)
+  - `navigation`: navigation containers and stack/tab/drawer navigators (`navigation.py`)
+  - `net`: awaitable HTTP client (`net.py`)
+  - `package`: `src/pythonnative/__init__.py` exports and package boundary
+  - `platform`: `Platform.OS`/`Platform.select` and version detection (`platform.py`)
+  - `platform_metrics`: platform-reported metrics like safe-area insets and bar heights (`platform_metrics.py`)
+  - `reconciler`: virtual view tree diffing and reconciliation (`reconciler.py`)
+  - `runtime`: framework-wide asyncio loop and thread-safe future helpers (`runtime.py`)
+  - `screen`: screen host, native lifecycle bridge, and render scheduling (`screen.py`)
+  - `sdk`: public extension SDK for custom native components (`sdk/`)
+  - `storage`: AsyncStorage key/value persistence and `use_persisted_state` (`storage.py`)
+  - `style`: StyleSheet and theming (`style.py`)
+  - `utils`: shared utilities (`utils.py`)
 
 - Other scopes:
-  - `deps` – dependency updates and version pins
-  - `examples` – example apps under `examples/`
-  - `mkdocs` – documentation site (MkDocs/Material) configuration and content under `docs/`
-  - `pyproject` – `pyproject.toml` packaging/build metadata
-  - `repo` – repository metadata and top‑level files (`README.md`, `CONTRIBUTING.md`, `.gitignore`, licenses)
-  - `scripts` – developer scripts under `scripts/` (e.g., `check.sh`)
-  - `templates` – Android/iOS project templates under `src/pythonnative/templates/`
-  - `tests` – unit/integration/E2E tests under `tests/`
-  - `workflows` – CI pipelines under `.github/workflows/`
+  - `deps`: dependency updates and version pins
+  - `examples`: example apps under `examples/`
+  - `mkdocs`: documentation site (MkDocs/Material) configuration and content under `docs/`
+  - `pyproject`: `pyproject.toml` packaging/build metadata
+  - `repo`: repository metadata and top‑level files (`README.md`, `CONTRIBUTING.md`, `.gitignore`, licenses)
+  - `scripts`: developer scripts under `scripts/` (e.g., `check.sh`)
+  - `templates`: Android/iOS project templates under `src/pythonnative/templates/`
+  - `tests`: unit/integration/E2E tests under `tests/`
+  - `workflows`: CI pipelines under `.github/workflows/`
 
 Note: Avoid redundant type==scope pairs (e.g., `docs(docs)`). Prefer a module scope (e.g., `docs(core)`) or `docs(repo)` for top‑level updates.
 
@@ -194,7 +194,7 @@ feat(templates,cli): add ios template and wire pn init
   - Imperative mood; no trailing period; ≤ 72 chars; `!` for breaking changes.
 - PR description: include brief sections: What, Why, How (brief), Testing, Risks/Impact, Docs/Follow‑ups.
   - Link issues with keywords (e.g., `Closes #123`).
-- Merging: prefer “Squash and merge” with “Pull request title and description”.
+- Merging: prefer "Squash and merge" with "Pull request title and description".
 - Keep PRs focused; avoid unrelated changes in the same PR.
 
 Recommended PR template:
@@ -244,7 +244,7 @@ Co-authored-by: Name <email>
 - **Draft / published toggle**: the `DRAFT_RELEASE` variable at the top of `.github/workflows/release.yml` controls release mode. Set to `"true"` (the default) for draft GitHub Releases with PyPI publishing skipped; flip to `"false"` to publish releases and upload to PyPI immediately.
 - Commit types that trigger a release: `feat` (minor), `fix` and `perf` (patch), `BREAKING CHANGE` (major). All other types (`build`, `chore`, `ci`, `docs`, `refactor`, `revert`, `style`, `test`) are recorded in the changelog but do **not** trigger a release on their own.
 - Tag format: `v`-prefixed (e.g., `v0.4.0`).
-- Manual version bumps are no longer needed — just merge PRs with valid Conventional Commit titles. For ad-hoc runs, use the workflow's **Run workflow** button (`workflow_dispatch`).
+- Manual version bumps are no longer needed: just merge PRs with valid Conventional Commit titles. For ad-hoc runs, use the workflow's **Run workflow** button (`workflow_dispatch`).
 
 ### Branch naming (suggested)
 
@@ -277,7 +277,7 @@ fix/cli-regression
 
 End-to-end tests use [Maestro](https://maestro.dev/) to drive the dedicated `examples/e2e-suite` app on real emulators and simulators. That app contains one screen per public symbol in `pythonnative.__all__`; every flow under `tests/e2e/flows/<category>/` exercises one symbol.
 
-The dedicated `examples/hello-world` app is left in place as a small marketing demo; it is **not** the E2E target.
+The dedicated `examples/hello-world` app is left in place as a small marketing demo; it's **not** the E2E target.
 
 ```bash
 # Install Maestro (one-time)
@@ -333,4 +333,4 @@ When you add a new public symbol you must also:
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the repository’s MIT License.
+By contributing, you agree that your contributions are licensed under the repository's MIT License.

@@ -36,15 +36,15 @@ tree:
   [`RemoveOp`][pythonnative.mutations.RemoveOp] /
   [`DestroyOp`][pythonnative.mutations.DestroyOp].
 
-That's it. There is no "fiber tree", no time slicing, and no priority
+That's it. There's no "fiber tree", no time slicing, and no priority
 lanes. The reconciler runs synchronously to completion; if a render is
 heavy, you'll feel it as a frame drop, not a deferred update.
 
 ## Commits are transactions
 
 The diff phase is pure: it only accumulates ops. At the end of the
-pass the whole list — including the `SetFrameOp`s produced by the
-layout pass — is applied through a single
+pass the whole list (including the `SetFrameOp`s produced by the
+layout pass) is applied through a single
 [`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]
 call. The native side sees one coherent transaction per commit
 (mirroring React Native's Fabric mounting layer), which is also what
@@ -144,7 +144,7 @@ through `set_state` is wasteful. Two ways to bypass:
 
 - Use the [`Animated`][pythonnative.Animated] API: an
   [`AnimatedValue`][pythonnative.AnimatedValue] bound into an
-  `Animated.View` style drives the native property directly — and
+  `Animated.View` style drives the native property directly, and
   when the platform can run the animation natively, no Python code
   runs per frame at all. See the
   [Animations guide](../guides/animations.md).

@@ -14,8 +14,8 @@ pn init MyApp
 This scaffolds:
 
 - `app/` with a minimal `main.py`
-- `pythonnative.toml` — your project configuration: app id, version,
-  permissions, assets, and signing. See
+- `pythonnative.toml`: your project configuration (app id, version,
+  permissions, assets, and signing). See
   [Configuration](guides/configuration.md).
 - `.gitignore`
 
@@ -69,9 +69,9 @@ When the root `Stack.Navigator` is rendered inside the host's first screen, `nav
 
 ## Configure your app
 
-Everything about your app's *identity* — its bundle/application id,
+Everything about your app's *identity* (its bundle/application id,
 display name, version, the device permissions it requests, its icon and
-splash, third-party packages, and signing — lives in a single
+splash, third-party packages, and signing) lives in a single
 `pythonnative.toml` at the project root:
 
 ```toml
@@ -98,8 +98,8 @@ The build system reads this file for every command, so `pn run`,
 ## Preview on your desktop
 
 The fastest way to iterate is `pn preview`, which renders your app in a
-desktop window and **Fast Refreshes on every save** — no simulator, no
-device build:
+desktop window and **Fast Refreshes on every save** (no simulator, no
+device build):
 
 ```bash
 pn preview
@@ -110,7 +110,7 @@ watches `app/` for changes. Edit a component, hit save, and the window
 updates in place while keeping component state (counters, form input,
 scroll position). Navigation, hooks, async, and the flex layout engine
 all run exactly as they do on device, because the desktop backend reuses
-the same reconciler and layout engine — only the leaf widgets differ
+the same reconciler and layout engine; only the leaf widgets differ
 (Tkinter instead of UIKit / Android views).
 
 ```bash
@@ -123,7 +123,7 @@ pn preview --no-hot-reload # disable file watching
 The preview needs Tkinter, which ships with most Python installs. If
 it's missing, install it (`brew install python-tk` on macOS,
 `sudo apt-get install python3-tk` on Debian/Ubuntu). The desktop backend
-is a **development** surface for layout and logic — some visual chrome is
+is a **development** surface for layout and logic; some visual chrome is
 approximated, and there's no desktop packaging. Ship to devices with
 `pn run`. See the [Desktop preview guide](guides/desktop-preview.md).
 
@@ -166,8 +166,8 @@ qualified name across the reloaded module, the live VNode tree's
 function references are swapped in place, and the next render reuses
 the existing hook state. So edits to the body of a component preserve
 in-memory state (counters, scroll positions, etc.). When Fast Refresh
-cannot find a clean swap — for example, after deeper structural
-edits — PythonNative falls back to a full remount of the active page
+can't find a clean swap (for example, after deeper structural
+edits), PythonNative falls back to a full remount of the active page
 so you never get stuck with a stale tree.
 
 This works best for Python UI changes; native template changes

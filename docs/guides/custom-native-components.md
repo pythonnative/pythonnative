@@ -2,8 +2,8 @@
 
 PythonNative ships a public extension SDK,
 [`pythonnative.sdk`](../api/sdk.md), that lets you wrap a real
-platform widget — a `UIView` subclass on iOS, a `View` subclass on
-Android — and expose it to user code as a first-class element with
+platform widget (a `UIView` subclass on iOS, a `View` subclass on
+Android) and expose it to user code as a first-class element with
 type-checked props. Custom components participate in reconciliation,
 flex layout, and Fast Refresh exactly like the built-ins.
 
@@ -38,7 +38,7 @@ The SDK fixes that:
 ## A worked example: `Badge`
 
 We'll build a small widget that draws a coloured pill with a centred
-label — useful for unread counts, status chips, etc. The same
+label, useful for unread counts, status chips, etc. The same
 project layout works for anything from a chart view to a camera
 preview.
 
@@ -185,7 +185,7 @@ built-in handlers; see
 
 The `tag` argument is the view's stable identity in the mutation
 protocol. Handlers that fire events use it to dispatch back into
-Python — wire the platform listener once in `create` and call
+Python: wire the platform listener once in `create` and call
 [`dispatch_event(tag, "on_change", value)`][pythonnative.events.dispatch_event];
 the reconciler keeps the `(tag, name) -> callback` registry up to date
 across re-renders without any further native calls.

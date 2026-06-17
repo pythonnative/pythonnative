@@ -2,7 +2,7 @@
 
 `pythonnative.gestures` attaches native gesture recognition to any
 view-like element through the `gestures=` prop. Six recognizers ship
-out of the box — [`Tap`][pythonnative.gestures.Tap],
+out of the box: [`Tap`][pythonnative.gestures.Tap],
 [`LongPress`][pythonnative.gestures.LongPress],
 [`Pan`][pythonnative.gestures.Pan],
 [`Swipe`][pythonnative.gestures.Swipe],
@@ -83,7 +83,7 @@ def Draggable():
 
 `Pan` activates once the pointer travels `min_distance` points (10 by
 default), reports `on_change` with translation measured from the
-activation point, and `on_end` with release velocity — ready to feed
+activation point, and `on_end` with release velocity, ready to feed
 into [`Animated.decay`][pythonnative.Animated] for a fling.
 
 ## Callback slots
@@ -119,15 +119,15 @@ share one handler across slots.
 
 [`Pressable`][pythonnative.Pressable] (and `on_press`) remains the
 right tool for plain buttons: it adds pressed-state feedback and
-accessibility semantics. Reach for `gestures=` when you need motion —
-drags, flicks, pinches — or multi-tap/long-press recognition on an
+accessibility semantics. Reach for `gestures=` when you need motion
+(drags, flicks, pinches) or multi-tap/long-press recognition on an
 arbitrary view.
 
 ## Testing
 
 The arbiter that powers Android and desktop recognition is pure
 Python, so gesture logic is unit-testable with scripted pointer
-streams — see `tests/test_gestures.py` for ready-made patterns.
+streams; see `tests/test_gestures.py` for ready-made patterns.
 
 ## Next steps
 
