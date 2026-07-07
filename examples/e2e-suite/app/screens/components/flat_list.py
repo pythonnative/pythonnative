@@ -2,6 +2,12 @@
 
 Renders a virtualized list of 100 rows. Maestro asserts the first
 row, scrolls down, and asserts a row further into the list.
+
+Because the demo passes a fixed ``item_height`` (with no header,
+footer, or refresh control), on Android and iOS this list takes the
+**native** virtualization path: a ``RecyclerView`` / ``UITableView``
+whose rows are nested PythonNative subtrees mounted on demand. The
+scroll assertion therefore exercises native cell recycling end to end.
 """
 
 from __future__ import annotations

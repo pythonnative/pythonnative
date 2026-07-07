@@ -37,7 +37,7 @@ import threading
 import time
 from typing import Any, Dict, Optional, Sequence, Tuple
 
-from ..mutations import CreateOp, DestroyOp, InsertOp, Mutation, RemoveOp, SetFrameOp, UpdateOp
+from ..mutations import CreateOp, DestroyOp, InsertOp, Mutation, SetFrameOp, UpdateOp
 from .base import ViewHandler
 
 # ======================================================================
@@ -191,12 +191,6 @@ class NativeViewRegistry:
             child = self._records.get(op.child_tag)
             if parent is not None and child is not None:
                 parent.handler.insert_child(parent.view, child.view, op.index)
-            return
-        if isinstance(op, RemoveOp):
-            parent = self._records.get(op.parent_tag)
-            child = self._records.get(op.child_tag)
-            if parent is not None and child is not None:
-                parent.handler.remove_child(parent.view, child.view)
             return
         if isinstance(op, DestroyOp):
             record = self._records.pop(op.tag, None)

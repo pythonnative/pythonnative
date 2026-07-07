@@ -376,10 +376,27 @@ def _apply_common(widget: Any, props: Dict[str, Any]) -> None:
                 widget.configure(background=color)
             except Exception:
                 pass
-    if any(k in props for k in ("border_width", "border_color")):
+    side_width_keys = (
+        "border_left_width",
+        "border_top_width",
+        "border_right_width",
+        "border_bottom_width",
+    )
+    if any(k in props for k in ("border_width", "border_color", *side_width_keys)):
         try:
             width = props.get("border_width")
             color = _tk_color(props.get("border_color")) or "#3c3c43"
+            # Tk highlight borders are uniform, so per-side borders are
+            # approximated with the widest side's width and its color.
+            side_widths = [props.get(k) for k in side_width_keys]
+            if any(w is not None for w in side_widths):
+                width = max(float(w) for w in side_widths if w is not None)
+                for side, w in zip(("left", "top", "right", "bottom"), side_widths):
+                    if w is not None and float(w) > 0:
+                        side_color = _tk_color(props.get(f"border_{side}_color"))
+                        if side_color is not None:
+                            color = side_color
+                        break
             if width:
                 widget.configure(
                     highlightthickness=int(round(_finite(width))),
@@ -390,6 +407,10 @@ def _apply_common(widget: Any, props: Dict[str, Any]) -> None:
                 widget.configure(highlightthickness=0)
         except Exception:
             pass
+    if "test_id" in props and props["test_id"] is not None:
+        # Stamped for introspection so preview-level tooling and tests
+        # can locate widgets the same way Maestro does on device.
+        widget._pn_test_id = str(props["test_id"])
     if "transform" in props:
         _set_translate_from_transform(widget, props["transform"])
         _place(widget)
@@ -941,10 +962,13 @@ class TextInputHandler(DesktopViewHandler):
 class ImageHandler(DesktopViewHandler):
     """Best-effort image preview.
 
-    Tk's ``PhotoImage`` loads PNG/GIF/PPM from local paths; network URLs
-    and JPEG aren't supported without Pillow, so those fall back to a
-    labeled placeholder. The handler keeps a reference to the
-    ``PhotoImage`` (Tk garbage-collects images that aren't referenced).
+    Tk's ``PhotoImage`` loads PNG/GIF/PPM from local paths; JPEG isn't
+    supported without Pillow, so undecodable formats fall back to a
+    labeled placeholder. Network URLs are fetched through the shared
+    image pipeline (`pythonnative.images`), so caching and ``on_load``
+    / ``on_error`` behave like the mobile backends. The handler keeps
+    a reference to the ``PhotoImage`` (Tk garbage-collects images that
+    aren't referenced).
     """
 
     def build(self, props: Dict[str, Any]) -> Any:
@@ -952,24 +976,59 @@ class ImageHandler(DesktopViewHandler):
 
     def apply(self, label: Any, props: Dict[str, Any]) -> None:
         merged = getattr(label, "_pn_props", props)
+        if "placeholder_color" in props:
+            color = _tk_color(props.get("placeholder_color"))
+            if color is not None:
+                try:
+                    label.configure(background=color)
+                except Exception:
+                    pass
         if "source" in props:
             source = props.get("source")
-            photo = None
-            if source and "://" not in str(source):
-                try:
-                    photo = tk.PhotoImage(file=str(source))
-                except Exception:
-                    photo = None
-            label._pn_photo = photo  # keep a reference alive
-            try:
-                if photo is not None:
-                    label.configure(image=photo, text="")
-                else:
-                    name = str(source).rsplit("/", 1)[-1] if source else "image"
-                    label.configure(image="", text=f"\U0001f5bc\n{name}", compound="center")
-            except Exception:
-                pass
+            label._pn_pending_source = source
+            if source and "://" in str(source):
+                from ..images import fetch
+
+                def _on_ready(path: str, src: Any = source) -> None:
+                    if getattr(label, "_pn_pending_source", None) == src:
+                        self._show_file(label, path, src)
+
+                def _on_error(message: str, src: Any = source) -> None:
+                    if getattr(label, "_pn_pending_source", None) == src:
+                        self._show_fallback(label, src)
+                        _fire(label, "on_error", message)
+
+                self._show_fallback(label, source)
+                fetch(str(source), _on_ready, _on_error)
+            else:
+                self._show_file(label, str(source) if source else None, source)
         _apply_common(label, merged)
+
+    def _show_file(self, label: Any, path: Optional[str], source: Any) -> None:
+        photo = None
+        if path:
+            try:
+                photo = tk.PhotoImage(file=path)
+            except Exception:
+                photo = None
+        label._pn_photo = photo  # keep a reference alive
+        try:
+            if photo is not None:
+                label.configure(image=photo, text="")
+                _fire(label, "on_load")
+            else:
+                self._show_fallback(label, source)
+                if path:
+                    _fire(label, "on_error", "decode failed")
+        except Exception:
+            pass
+
+    def _show_fallback(self, label: Any, source: Any) -> None:
+        name = str(source).rsplit("/", 1)[-1] if source else "image"
+        try:
+            label.configure(image="", text=f"\U0001f5bc\n{name}", compound="center")
+        except Exception:
+            pass
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
         photo = getattr(native_view, "_pn_photo", None)

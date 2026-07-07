@@ -41,4 +41,14 @@ def TextDemo() -> pn.Element:
                 style=pn.style(font_size=14, color="#1F2937", line_height=20),
             ),
         ),
+        section(
+            "Rich text (nested spans)",
+            pn.Text(
+                "Rich start ",
+                pn.Text("bold middle", style=pn.style(bold=True)),
+                pn.Text(" red end", style=pn.style(color="#DC2626")),
+                style=pn.style(font_size=15),
+            ),
+            hint("One native label built from three styled spans."),
+        ),
     )

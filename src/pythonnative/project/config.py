@@ -321,15 +321,7 @@ class AppConfig:
         root = Path(project_root) if project_root is not None else Path.cwd()
         config_path = root / CONFIG_FILENAME
         if not config_path.is_file():
-            legacy = root / "pythonnative.json"
-            hint = ""
-            if legacy.is_file():
-                hint = (
-                    "\nFound a legacy 'pythonnative.json'. PythonNative now uses "
-                    "'pythonnative.toml'.\nRun 'pn init --force' to scaffold one, then "
-                    "port your settings over."
-                )
-            raise ConfigError(f"No {CONFIG_FILENAME} found in {root}.{hint}")
+            raise ConfigError(f"No {CONFIG_FILENAME} found in {root}.")
         try:
             with open(config_path, "rb") as handle:
                 data = _toml.load(handle)

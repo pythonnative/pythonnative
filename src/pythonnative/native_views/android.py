@@ -45,7 +45,26 @@ from ..gestures import make_arbiter
 from ..utils import get_android_context
 from .base import ViewHandler, _safe_max, parse_color_int
 
-_DRAWABLE_STYLE_KEYS = ("background_color", "border_radius", "border_width", "border_color")
+_SIDE_BORDER_WIDTH_KEYS = (
+    "border_left_width",
+    "border_top_width",
+    "border_right_width",
+    "border_bottom_width",
+)
+_SIDE_BORDER_COLOR_KEYS = (
+    "border_left_color",
+    "border_top_color",
+    "border_right_color",
+    "border_bottom_color",
+)
+_DRAWABLE_STYLE_KEYS = (
+    "background_color",
+    "border_radius",
+    "border_width",
+    "border_color",
+    *_SIDE_BORDER_WIDTH_KEYS,
+    *_SIDE_BORDER_COLOR_KEYS,
+)
 
 
 # ======================================================================
@@ -55,6 +74,35 @@ _DRAWABLE_STYLE_KEYS = ("background_color", "border_radius", "border_width", "bo
 
 def _ctx() -> Any:
     return get_android_context()
+
+
+def _pn_runtime_class(class_name: str) -> Any:
+    """Resolve a PythonNative Android helper class for the running app.
+
+    The Android template's helper classes (e.g.
+    ``PNAccessibilityDelegate``, ``PNBorderDrawable``) live in the
+    app's own package, which the ``pn`` CLI relocates to the configured
+    ``application_id`` at build time. Deriving the package from the
+    runtime ``Context`` (rather than hardcoding the template package)
+    keeps these lookups correct for any app id.
+
+    Args:
+        class_name: The class name within the app package, e.g.
+            ``"PNBorderDrawable"``.
+
+    Returns:
+        The resolved Java class.
+    """
+    package = _ctx().getPackageName()
+    return jclass(f"{package}.{class_name}")
+
+
+def _signed_color(value: int) -> int:
+    """Clamp a Python color int into Java's signed 32-bit range."""
+    value &= 0xFFFFFFFF
+    if value >= 0x80000000:
+        value -= 0x100000000
+    return value
 
 
 def _density() -> float:
@@ -118,6 +166,52 @@ def _has_event(view: Any, name: str) -> bool:
     return name in event_names(merged)
 
 
+def _apply_side_border(view: Any, props: Dict[str, Any]) -> bool:
+    """Apply per-side borders via the template's ``PNBorderDrawable``.
+
+    Activated when any ``border_<side>_width`` key is present. In that
+    mode the drawable owns all four edges: each side's width falls
+    back to the uniform ``border_width`` (else 0) and its color to
+    ``border_color`` (else black), and the background fill and corner
+    radius are baked into the same drawable.
+
+    Returns:
+        ``True`` if the drawable was applied; ``False`` when no
+        per-side key is present or the helper class is unavailable
+        (older generated projects), in which case the caller falls
+        back to the uniform ``GradientDrawable`` path.
+    """
+    if not any(props.get(k) is not None for k in _SIDE_BORDER_WIDTH_KEYS):
+        return False
+    try:
+        PNBorderDrawable = _pn_runtime_class("PNBorderDrawable")
+    except Exception:
+        return False
+    try:
+        base_width = float(props.get("border_width") or 0.0)
+        base_color = props.get("border_color") or "#000000"
+        widths = [
+            float(_dp(float(props[k]))) if props.get(k) is not None else float(_dp(base_width))
+            for k in _SIDE_BORDER_WIDTH_KEYS
+        ]
+        colors = [
+            _signed_color(parse_color_int(props[k] if props.get(k) is not None else base_color))
+            for k in _SIDE_BORDER_COLOR_KEYS
+        ]
+        has_bg = props.get("background_color") is not None
+        bg = _signed_color(parse_color_int(props["background_color"])) if has_bg else 0
+        radius = float(_dp(float(props.get("border_radius") or 0.0)))
+        drawable = PNBorderDrawable(has_bg, bg, radius, widths, colors)
+        view.setBackground(drawable)
+        try:
+            view.invalidate()
+        except Exception:
+            pass
+        return True
+    except Exception:
+        return False
+
+
 def _apply_border(view: Any, props: Dict[str, Any]) -> None:
     """Apply border_radius / border_width / border_color via a GradientDrawable.
 
@@ -126,7 +220,12 @@ def _apply_border(view: Any, props: Dict[str, Any]) -> None:
     background to a ``GradientDrawable`` (the "shape" XML primitive)
     that renders the corner radius and stroke. We preserve any
     existing ``background_color`` by re-baking it into the drawable.
+    Per-side borders route through
+    [`_apply_side_border`][pythonnative.native_views.android._apply_side_border]
+    instead.
     """
+    if _apply_side_border(view, props):
+        return
     has_border = any(k in props for k in ("border_radius", "border_width", "border_color"))
     has_bg = "background_color" in props and props["background_color"] is not None
     if not has_border and not has_bg:
@@ -170,14 +269,44 @@ def _apply_border(view: Any, props: Dict[str, Any]) -> None:
 
 
 def _apply_shadow(view: Any, props: Dict[str, Any]) -> None:
-    """Apply elevation as a Material-style shadow approximation."""
+    """Apply shadow props via elevation plus tinted outline shadows.
+
+    Android renders view shadows from ``elevation``; iOS-style
+    ``shadow_radius`` maps onto it so cross-platform styles work.
+    On API 28+ the ambient/spot shadow colors are tinted with
+    ``shadow_color`` (with ``shadow_opacity`` baked into the alpha
+    channel), which is as close to iOS's layer shadows as the
+    platform allows. ``shadow_offset`` has no Android equivalent and
+    is ignored.
+    """
     elevation = props.get("elevation")
     if elevation is None and "shadow_radius" in props:
         elevation = props.get("shadow_radius")
+    if elevation is None and (props.get("shadow_color") is not None or props.get("shadow_opacity") is not None):
+        # Shadow requested without an explicit size: use a Material
+        # card-like default so the shadow is actually visible.
+        elevation = 4.0
     if elevation is None:
         return
     try:
         view.setElevation(float(_dp(float(elevation))))
+    except Exception:
+        pass
+    color = props.get("shadow_color")
+    if color is None:
+        return
+    try:
+        Build = jclass("android.os.Build")
+        if int(Build.VERSION.SDK_INT) < 28:
+            return
+        argb = parse_color_int(color) & 0xFFFFFFFF
+        opacity = props.get("shadow_opacity")
+        if opacity is not None:
+            alpha = int(max(0.0, min(1.0, float(opacity))) * 255)
+            argb = (argb & 0x00FFFFFF) | (alpha << 24)
+        signed = _signed_color(argb)
+        view.setOutlineAmbientShadowColor(signed)
+        view.setOutlineSpotShadowColor(signed)
     except Exception:
         pass
 
@@ -228,7 +357,7 @@ def _apply_transform(view: Any, props: Dict[str, Any]) -> None:
 
 
 def _apply_accessibility(view: Any, props: Dict[str, Any]) -> None:
-    """Apply accessibility_label / hint / accessible to a view."""
+    """Apply accessibility props (label / accessible / state / live region / test_id)."""
     if "accessible" in props:
         try:
             View = jclass("android.view.View")
@@ -243,10 +372,48 @@ def _apply_accessibility(view: Any, props: Dict[str, Any]) -> None:
             view.setContentDescription(str(label) if label is not None else None)
         except Exception:
             pass
-    # Android's accessibility role / hint mostly comes through
-    # AccessibilityNodeInfo; full plumbing is non-trivial. We keep
-    # the API surface symmetrical with iOS but apply only the label
-    # for now.
+    if "accessibility_live_region" in props:
+        try:
+            mode = {"none": 0, "polite": 1, "assertive": 2}.get(
+                str(props["accessibility_live_region"] or "none").lower(), 0
+            )
+            view.setAccessibilityLiveRegion(mode)
+        except Exception:
+            pass
+
+    state = props.get("accessibility_state")
+    if isinstance(state, dict) and "selected" in state:
+        try:
+            view.setSelected(bool(state["selected"]))
+        except Exception:
+            pass
+    test_id = props.get("test_id")
+    if test_id is None and not isinstance(state, dict):
+        return
+    # test_id (exposed as `resource-id` to UI Automator tools) and the
+    # remaining state flags need an AccessibilityDelegate, which Python
+    # can't subclass directly (Chaquopy proxies interfaces only); the
+    # template ships PNAccessibilityDelegate for this. Older generated
+    # projects without the class simply skip these props.
+    try:
+        vs = _state_of(view)
+        delegate = vs.get("a11y_delegate")
+        if delegate is None:
+            PNAccessibilityDelegate = _pn_runtime_class("PNAccessibilityDelegate")
+            delegate = PNAccessibilityDelegate()
+            view.setAccessibilityDelegate(delegate)
+            vs["a11y_delegate"] = delegate
+        if test_id is not None:
+            delegate.setTestId(str(test_id))
+            view.setTag(str(test_id))
+        if isinstance(state, dict):
+            delegate.setStateDisabled(state.get("disabled"))
+            delegate.setStateSelected(state.get("selected"))
+            delegate.setStateChecked(state.get("checked"))
+            delegate.setStateBusy(state.get("busy"))
+            delegate.setStateExpanded(state.get("expanded"))
+    except Exception:
+        pass
 
 
 def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
@@ -758,13 +925,93 @@ def _typeface_for(weight: Any, italic: bool) -> Any:
     return style
 
 
+def _build_spannable(spans: Any) -> Any:
+    """Build a ``SpannableStringBuilder`` from a rich-text span list.
+
+    Each span dict carries ``text`` plus optional per-span overrides
+    (``color``, ``background_color``, ``font_size``, ``font_family``,
+    ``bold`` / ``italic`` / ``font_weight``, ``text_decoration``).
+    Spans without overrides inherit the TextView's base styling.
+    """
+    SpannableStringBuilder = jclass("android.text.SpannableStringBuilder")
+    Typeface = jclass("android.graphics.Typeface")
+    FLAG = 33  # Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+
+    builder = SpannableStringBuilder()
+    for span in spans:
+        if not isinstance(span, dict):
+            continue
+        text = str(span.get("text", ""))
+        if not text:
+            continue
+        start = builder.length()
+        builder.append(text)
+        end = builder.length()
+
+        def _set(obj: Any) -> None:
+            builder.setSpan(obj, start, end, FLAG)
+
+        try:
+            if span.get("color") is not None:
+                ForegroundColorSpan = jclass("android.text.style.ForegroundColorSpan")
+                _set(ForegroundColorSpan(parse_color_int(span["color"])))
+            if span.get("background_color") is not None:
+                BackgroundColorSpan = jclass("android.text.style.BackgroundColorSpan")
+                _set(BackgroundColorSpan(parse_color_int(span["background_color"])))
+            if span.get("font_size") is not None:
+                AbsoluteSizeSpan = jclass("android.text.style.AbsoluteSizeSpan")
+                _set(AbsoluteSizeSpan(int(float(span["font_size"])), True))  # dip units
+            bold = bool(span.get("bold"))
+            weight = span.get("font_weight")
+            if not bold and weight is not None:
+                try:
+                    bold = str(weight) in ("bold", "600", "700", "800", "900")
+                except Exception:
+                    bold = False
+            italic = bool(span.get("italic"))
+            if bold or italic:
+                StyleSpan = jclass("android.text.style.StyleSpan")
+                if bold and italic:
+                    _set(StyleSpan(Typeface.BOLD_ITALIC))
+                elif bold:
+                    _set(StyleSpan(Typeface.BOLD))
+                else:
+                    _set(StyleSpan(Typeface.ITALIC))
+            if span.get("font_family"):
+                TypefaceSpan = jclass("android.text.style.TypefaceSpan")
+                _set(TypefaceSpan(str(span["font_family"])))
+            decoration = span.get("text_decoration")
+            if decoration == "underline":
+                UnderlineSpan = jclass("android.text.style.UnderlineSpan")
+                _set(UnderlineSpan())
+            elif decoration == "line_through":
+                StrikethroughSpan = jclass("android.text.style.StrikethroughSpan")
+                _set(StrikethroughSpan())
+        except Exception:
+            pass
+    return builder
+
+
 class TextHandler(AndroidViewHandler):
     def _build(self, props: Dict[str, Any]) -> Any:
         return jclass("android.widget.TextView")(_ctx())
 
     def _apply(self, tv: Any, props: Dict[str, Any], initial: bool) -> None:
-        if "text" in props:
-            tv.setText(str(props["text"]) if props["text"] is not None else "")
+        if "spans" in props or "text" in props:
+            # ``update()`` merges changed props into the view state
+            # before calling ``_apply``, so the merged dict always has
+            # the latest text/spans pair (covering rich -> plain
+            # transitions where only ``spans`` changed).
+            merged = _state_of(tv).get("props") or props
+            spans = merged.get("spans")
+            if spans:
+                try:
+                    tv.setText(_build_spannable(spans))
+                except Exception:
+                    tv.setText(str(merged.get("text") or ""))
+            else:
+                text = merged.get("text")
+                tv.setText(str(text) if text is not None else "")
         if "font_size" in props and props["font_size"] is not None:
             tv.setTextSize(float(props["font_size"]))
         if "color" in props and props["color"] is not None:
@@ -1355,8 +1602,13 @@ class ImageHandler(AndroidViewHandler):
                 iv.setImageTintList(ColorStateList.valueOf(parse_color_int(props["tint_color"])))
             except Exception:
                 pass
+        if "placeholder_color" in props and props["placeholder_color"] is not None:
+            try:
+                iv.setBackgroundColor(parse_color_int(props["placeholder_color"]))
+            except Exception:
+                pass
         if "source" in props and props["source"]:
-            self._load_source(iv, props["source"])
+            self._load_source(iv, str(props["source"]))
         if "scale_type" in props and props["scale_type"]:
             ScaleType = jclass("android.widget.ImageView$ScaleType")
             mapping = {
@@ -1372,43 +1624,39 @@ class ImageHandler(AndroidViewHandler):
 
     def _load_source(self, iv: Any, source: str) -> None:
         try:
-            if source.startswith(("http://", "https://")):
-                Thread = jclass("java.lang.Thread")
-                Runnable = jclass("java.lang.Runnable")
-                URL = jclass("java.net.URL")
-                BitmapFactory = jclass("android.graphics.BitmapFactory")
-                Handler = jclass("android.os.Handler")
-                Looper = jclass("android.os.Looper")
-                handler = Handler(Looper.getMainLooper())
+            if source.startswith("data:"):
+                self._load_data_uri(iv, source)
+            elif source.startswith(("http://", "https://")):
+                from ..images import fetch
 
-                class LoadTask(dynamic_proxy(Runnable)):
-                    def __init__(self, image_view: Any, url_str: str, main_handler: Any) -> None:
-                        super().__init__()
-                        self.image_view = image_view
-                        self.url_str = url_str
-                        self.main_handler = main_handler
+                state = _state_of(iv)
+                state["pending_uri"] = source
 
-                    def run(self) -> None:
-                        try:
-                            url = URL(self.url_str)
-                            stream = url.openStream()
-                            bitmap = BitmapFactory.decodeStream(stream)
-                            stream.close()
+                def _on_ready(path: str) -> None:
+                    if _state_of(iv).get("pending_uri") != source:
+                        return  # a newer source superseded this load
+                    bitmap = self._decode_downsampled(iv, path)
+                    if bitmap is None:
+                        _fire(iv, "on_error", "decode failed")
+                        return
+                    try:
+                        iv.setImageBitmap(bitmap)
+                        _fire(iv, "on_load")
+                    except Exception:
+                        pass
 
-                            class SetImage(dynamic_proxy(Runnable)):
-                                def __init__(self, view: Any, bmp: Any) -> None:
-                                    super().__init__()
-                                    self.view = view
-                                    self.bmp = bmp
+                def _on_error(message: str) -> None:
+                    if _state_of(iv).get("pending_uri") == source:
+                        _fire(iv, "on_error", message)
 
-                                def run(self) -> None:
-                                    self.view.setImageBitmap(self.bmp)
-
-                            self.main_handler.post(SetImage(self.image_view, bitmap))
-                        except Exception:
-                            pass
-
-                Thread(LoadTask(iv, source, handler)).start()
+                fetch(source, _on_ready, _on_error)
+            elif source.startswith("/"):
+                bitmap = self._decode_downsampled(iv, source)
+                if bitmap is not None:
+                    iv.setImageBitmap(bitmap)
+                    _fire(iv, "on_load")
+                else:
+                    _fire(iv, "on_error", "decode failed")
             else:
                 ctx = _ctx()
                 res = ctx.getResources()
@@ -1417,8 +1665,75 @@ class ImageHandler(AndroidViewHandler):
                 res_id = res.getIdentifier(res_name, "drawable", pkg)
                 if res_id != 0:
                     iv.setImageResource(res_id)
+                    _fire(iv, "on_load")
+                else:
+                    _fire(iv, "on_error", f"drawable {res_name!r} not found")
         except Exception:
             pass
+
+    def _load_data_uri(self, iv: Any, source: str) -> None:
+        """Decode an inline ``data:`` URI (base64 payload) into the view."""
+        try:
+            import base64
+
+            payload = source.split(",", 1)[1] if "," in source else ""
+            raw = base64.b64decode(payload)
+            BitmapFactory = jclass("android.graphics.BitmapFactory")
+            bitmap = BitmapFactory.decodeByteArray(raw, 0, len(raw))
+            if bitmap is not None:
+                iv.setImageBitmap(bitmap)
+                _fire(iv, "on_load")
+            else:
+                _fire(iv, "on_error", "data URI decode failed")
+        except Exception:
+            _fire(iv, "on_error", "data URI decode failed")
+
+    def _decode_downsampled(self, iv: Any, path: str) -> Any:
+        """Decode ``path`` with ``inSampleSize`` sized to the target view.
+
+        A 4000px photo displayed in a 200dp thumbnail should not hold a
+        48 MB bitmap; ``inSampleSize`` decodes at the nearest power-of-2
+        fraction that still covers the view (falling back to the screen
+        width when the view hasn't been laid out yet).
+        """
+        try:
+            BitmapFactory = jclass("android.graphics.BitmapFactory")
+            Options = jclass("android.graphics.BitmapFactory$Options")
+
+            bounds = Options()
+            bounds.inJustDecodeBounds = True
+            BitmapFactory.decodeFile(path, bounds)
+            src_w = int(bounds.outWidth)
+            src_h = int(bounds.outHeight)
+            if src_w <= 0 or src_h <= 0:
+                return None
+
+            target_w = 0
+            target_h = 0
+            try:
+                target_w = int(iv.getWidth())
+                target_h = int(iv.getHeight())
+            except Exception:
+                pass
+            if target_w <= 0:
+                try:
+                    metrics = _ctx().getResources().getDisplayMetrics()
+                    target_w = int(metrics.widthPixels)
+                    target_h = int(metrics.heightPixels)
+                except Exception:
+                    target_w, target_h = src_w, src_h
+            if target_h <= 0:
+                target_h = target_w
+
+            sample = 1
+            while (src_w // (sample * 2)) >= target_w and (src_h // (sample * 2)) >= target_h:
+                sample *= 2
+
+            opts = Options()
+            opts.inSampleSize = sample
+            return BitmapFactory.decodeFile(path, opts)
+        except Exception:
+            return None
 
 
 class SwitchHandler(AndroidViewHandler):
@@ -2663,6 +2978,210 @@ class DatePickerHandler(AndroidViewHandler):
 
 
 # ======================================================================
+# VirtualList — RecyclerView-backed native virtualization
+# ======================================================================
+#
+# The heavy lifting lives in the template's ``PNVirtualListView.java``:
+# Chaquopy cannot subclass abstract Java classes (RecyclerView.Adapter,
+# RecyclerView.ViewHolder), so the Java side owns the adapter and view
+# holders and calls back into Python through the small ``Delegate``
+# interface. Each visible row hosts a nested-reconciler subtree (see
+# ``pythonnative.virtual_rows``): the delegate's ``mountRow`` renders
+# the row element and attaches its native root to the recycled cell
+# container; ``onRowRecycled`` tears the subtree down.
+
+# Per-list mutable state, keyed by the RecyclerView's Java identity.
+# The delegate proxy closes over this dict so prop updates (new
+# ``render_row``, new ``count``) take effect without re-wiring Java.
+_pn_vlist_info: Dict[int, Dict[str, Any]] = {}
+
+
+class VirtualListHandler(AndroidViewHandler):
+    """Natively virtualized list backed by ``RecyclerView``.
+
+    Expects props:
+
+    - ``count``: total number of rows.
+    - ``row_height``: uniform row extent in points, or
+    - ``row_heights``: per-row extents (section lists interleave
+      headers and items of different heights).
+    - ``render_row``: ``render_row(index) -> Element`` producing one
+      row's subtree. Called lazily as rows enter the viewport.
+    - ``shows_scroll_indicator``: hide the scroll bar when ``False``.
+
+    Events (dispatched by tag): ``on_row_press`` with the row index,
+    ``on_scroll`` with ``{"x", "y", "extent", "range"}`` in points.
+
+    Commands: ``scroll_to_offset`` / ``scroll_to_index`` /
+    ``scroll_to_end`` / ``get_scroll_offset``.
+    """
+
+    def _build(self, props: Dict[str, Any]) -> Any:
+        from ..virtual_rows import RowHostPool
+
+        PNVirtualListView = _pn_runtime_class("PNVirtualListView")
+        info: Dict[str, Any] = {
+            "count": int(props.get("count", 0) or 0),
+            "row_height": float(props.get("row_height", 44.0) or 44.0),
+            "row_heights": props.get("row_heights"),
+            "render_row": props.get("render_row"),
+            "pool": RowHostPool(),
+        }
+
+        class _Delegate(dynamic_proxy(PNVirtualListView.Delegate)):
+            def getCount(self) -> int:
+                return int(info["count"])
+
+            def getRowHeightDp(self, position: int) -> float:
+                heights = info.get("row_heights")
+                if heights and 0 <= position < len(heights):
+                    return float(heights[position])
+                return float(info["row_height"])
+
+            def mountRow(self, position: int, container: Any, width_dp: float, height_dp: float) -> None:
+                render_row = info.get("render_row")
+                if render_row is None:
+                    return
+                try:
+                    pool = info["pool"]
+                    root = pool.bind(
+                        _java_id(container),
+                        lambda: render_row(int(position)),
+                        float(width_dp),
+                        float(height_dp),
+                    )
+                    if root is not None:
+                        _insert_view(container, root, 0)
+                except Exception:
+                    import traceback
+
+                    traceback.print_exc()
+
+            def onRowPress(self, position: int) -> None:
+                view = info.get("view")
+                if view is not None:
+                    _fire(view, "on_row_press", int(position))
+
+            def onRowRecycled(self, container: Any) -> None:
+                try:
+                    info["pool"].release(_java_id(container))
+                except Exception:
+                    pass
+
+            def onScrolled(self, offset_dp: float, extent_dp: float, range_dp: float) -> None:
+                view = info.get("view")
+                if view is not None:
+                    _fire(
+                        view,
+                        "on_scroll",
+                        {
+                            "x": 0.0,
+                            "y": float(offset_dp),
+                            "extent": float(extent_dp),
+                            "range": float(range_dp),
+                        },
+                    )
+
+        delegate = _Delegate()
+        view = PNVirtualListView(_ctx(), delegate)
+        info["view"] = view
+        # Keep the proxy alive: Java holds only a weak-ish reference
+        # through the field, and Chaquopy proxies are collectible once
+        # the Python side drops them.
+        info["delegate"] = delegate
+        _pn_vlist_info[_java_id(view)] = info
+        return view
+
+    def _apply(self, view: Any, props: Dict[str, Any], initial: bool) -> None:
+        _apply_common_visual(view, props)
+        info = _pn_vlist_info.get(_java_id(view))
+        if info is None:
+            return
+        data_changed = False
+        if "count" in props:
+            info["count"] = int(props.get("count") or 0)
+            data_changed = True
+        if "row_height" in props and props["row_height"] is not None:
+            info["row_height"] = float(props["row_height"])
+            data_changed = True
+        if "row_heights" in props:
+            info["row_heights"] = props.get("row_heights")
+            data_changed = True
+        if "render_row" in props:
+            info["render_row"] = props.get("render_row")
+            data_changed = True
+        if "shows_scroll_indicator" in props:
+            show = props["shows_scroll_indicator"] is not False
+            try:
+                view.setVerticalScrollBarEnabled(show)
+            except Exception:
+                pass
+        if data_changed and not initial:
+            try:
+                view.notifyDataChanged()
+            except Exception:
+                pass
+
+    def _teardown(self, native_view: Any) -> None:
+        info = _pn_vlist_info.pop(_java_id(native_view), None)
+        if info is not None:
+            info.get("pool").release_all()
+            info["view"] = None
+
+    def measure_intrinsic(
+        self,
+        native_view: Any,
+        max_width: float,
+        max_height: float,
+    ) -> Tuple[float, float]:
+        # Fill the available space, like a ScrollView clamped to its
+        # parent. Inside an unbounded axis (nested in another scroll
+        # view) collapse to 0, matching React Native's behavior for
+        # nested virtualized lists.
+        w = max_width if math.isfinite(max_width) else 0.0
+        h = max_height if math.isfinite(max_height) else 0.0
+        return (max(0.0, w), max(0.0, h))
+
+    def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
+        density = _density() or 1.0
+        if name == "scroll_to_offset":
+            try:
+                native_view.scrollToOffsetDp(
+                    float(args.get("y", 0.0) or 0.0),
+                    args.get("animated", True) is not False,
+                )
+            except Exception:
+                pass
+            return None
+        if name == "scroll_to_index":
+            try:
+                native_view.scrollToIndex(
+                    int(args.get("index", 0) or 0),
+                    args.get("animated", True) is not False,
+                )
+            except Exception:
+                pass
+            return None
+        if name == "scroll_to_end":
+            info = _pn_vlist_info.get(_java_id(native_view))
+            count = int(info.get("count", 0)) if info else 0
+            try:
+                native_view.scrollToIndex(max(0, count - 1), args.get("animated", True) is not False)
+            except Exception:
+                pass
+            return None
+        if name == "get_scroll_offset":
+            try:
+                return {
+                    "x": 0.0,
+                    "y": float(native_view.computeVerticalScrollOffset()) / density,
+                }
+            except Exception:
+                return {"x": 0.0, "y": 0.0}
+        return None
+
+
+# ======================================================================
 # Registration
 # ======================================================================
 
@@ -2694,6 +3213,7 @@ def register_handlers(registry: Any) -> None:
     registry.register("Checkbox", CheckboxHandler())
     registry.register("SegmentedControl", SegmentedControlHandler())
     registry.register("DatePicker", DatePickerHandler())
+    registry.register("VirtualList", VirtualListHandler())
 
 
 __all__ = [
@@ -2720,5 +3240,6 @@ __all__ = [
     "CheckboxHandler",
     "SegmentedControlHandler",
     "DatePickerHandler",
+    "VirtualListHandler",
     "register_handlers",
 ]

@@ -26,10 +26,17 @@ Example:
 
 import bisect
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 from .element import Element
-from .hooks import component, use_effect, use_ref, use_state
+from .hooks import (
+    component,
+    use_effect,
+    use_keyboard_height,
+    use_ref,
+    use_safe_area_insets,
+    use_state,
+)
 from .sdk import Props
 from .style import (
     AutoCapitalize,
@@ -117,10 +124,14 @@ class TextProps(Props):
     """Props for [`Text`][pythonnative.Text]."""
 
     text: str = ""
+    spans: Optional[List[Dict[str, Any]]] = None
     accessibility_label: Optional[str] = None
     accessibility_hint: Optional[str] = None
     accessibility_role: Optional[str] = None
     accessible: Optional[bool] = None
+    accessibility_state: Optional[Dict[str, Any]] = None
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
+    test_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -134,6 +145,9 @@ class ButtonProps(Props):
     accessibility_hint: Optional[str] = None
     accessibility_role: Optional[str] = None
     accessible: Optional[bool] = None
+    accessibility_state: Optional[Dict[str, Any]] = None
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
+    test_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -162,6 +176,9 @@ class TextInputProps(Props):
     accessibility_label: Optional[str] = None
     accessibility_hint: Optional[str] = None
     accessible: Optional[bool] = None
+    accessibility_state: Optional[Dict[str, Any]] = None
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
+    test_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -171,9 +188,15 @@ class ImageProps(Props):
     source: Optional[str] = None
     scale_type: Optional[ScaleType] = None
     tint_color: Optional[Color] = None
+    placeholder_color: Optional[Color] = None
+    on_load: Optional[Callable[[], None]] = None
+    on_error: Optional[Callable[[str], None]] = None
     accessibility_label: Optional[str] = None
     accessibility_role: Optional[str] = None
     accessible: Optional[bool] = None
+    accessibility_state: Optional[Dict[str, Any]] = None
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
+    test_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -245,6 +268,9 @@ class ViewProps(Props):
     accessibility_hint: Optional[str] = None
     accessibility_role: Optional[str] = None
     accessible: Optional[bool] = None
+    accessibility_state: Optional[Dict[str, Any]] = None
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
+    test_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -268,6 +294,8 @@ class ScrollViewProps(Props):
 @dataclass(frozen=True)
 class SafeAreaViewProps(Props):
     """Props for [`SafeAreaView`][pythonnative.SafeAreaView]."""
+
+    edges: Optional[Tuple[Literal["top", "left", "bottom", "right"], ...]] = None
 
 
 @dataclass(frozen=True)
@@ -298,6 +326,9 @@ class PressableProps(Props):
     accessibility_hint: Optional[str] = None
     accessibility_role: Optional[str] = None
     accessible: Optional[bool] = None
+    accessibility_state: Optional[Dict[str, Any]] = None
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
+    test_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -314,6 +345,7 @@ class KeyboardAvoidingViewProps(Props):
     """Props for [`KeyboardAvoidingView`][pythonnative.KeyboardAvoidingView]."""
 
     behavior: Literal["padding", "position"] = "padding"
+    keyboard_vertical_offset: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -332,6 +364,9 @@ class PickerProps(Props):
     accessibility_label: Optional[str] = None
     accessibility_hint: Optional[str] = None
     accessible: Optional[bool] = None
+    accessibility_state: Optional[Dict[str, Any]] = None
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
+    test_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -346,6 +381,9 @@ class TouchableOpacityProps(Props):
     accessibility_hint: Optional[str] = None
     accessibility_role: Optional[str] = None
     accessible: Optional[bool] = None
+    accessibility_state: Optional[Dict[str, Any]] = None
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
+    test_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -356,6 +394,9 @@ class ImageBackgroundProps(Props):
     scale_type: Optional[ScaleType] = None
     accessibility_label: Optional[str] = None
     accessible: Optional[bool] = None
+    accessibility_state: Optional[Dict[str, Any]] = None
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
+    test_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -370,6 +411,9 @@ class CheckboxProps(Props):
     accessibility_label: Optional[str] = None
     accessibility_hint: Optional[str] = None
     accessible: Optional[bool] = None
+    accessibility_state: Optional[Dict[str, Any]] = None
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
+    test_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -383,6 +427,9 @@ class SegmentedControlProps(Props):
     tint_color: Optional[Color] = None
     accessibility_label: Optional[str] = None
     accessible: Optional[bool] = None
+    accessibility_state: Optional[Dict[str, Any]] = None
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
+    test_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -403,6 +450,9 @@ class DatePickerProps(Props):
     enabled: bool = True
     accessibility_label: Optional[str] = None
     accessible: Optional[bool] = None
+    accessibility_state: Optional[Dict[str, Any]] = None
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
+    test_id: Optional[str] = None
 
 
 # ======================================================================
@@ -410,18 +460,71 @@ class DatePickerProps(Props):
 # ======================================================================
 
 
+# Style keys that can vary per span inside a rich-text run. Layout
+# keys are excluded: spans are inline fragments of one paragraph and
+# have no boxes of their own.
+_SPAN_STYLE_KEYS = (
+    "color",
+    "background_color",
+    "font_size",
+    "font_family",
+    "font_weight",
+    "bold",
+    "italic",
+    "text_decoration",
+    "letter_spacing",
+)
+
+
+def _flatten_text_spans(
+    parts: Tuple[Any, ...],
+    inherited: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Flatten nested ``Text`` parts into a flat list of styled spans.
+
+    Strings become spans carrying only the inherited style overrides;
+    nested ``Text`` elements contribute their own span-style keys
+    (merged over what they inherit) and recurse into their parts.
+    """
+    spans: List[Dict[str, Any]] = []
+    for part in parts:
+        if part is None:
+            continue
+        if isinstance(part, Element):
+            props = part.props or {}
+            child_style = dict(inherited)
+            for k in _SPAN_STYLE_KEYS:
+                if props.get(k) is not None:
+                    child_style[k] = props[k]
+            nested = props.get("spans")
+            if nested:
+                for span in nested:
+                    merged = dict(child_style)
+                    for k in _SPAN_STYLE_KEYS:
+                        if span.get(k) is not None:
+                            merged[k] = span[k]
+                    spans.append({"text": span.get("text", ""), **merged})
+            else:
+                spans.append({"text": str(props.get("text", "")), **child_style})
+        else:
+            spans.append({"text": str(part), **inherited})
+    return spans
+
+
 def Text(
-    text: str = "",
-    *,
+    *parts: Any,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
+    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Display a string of text.
+    """Display a string of text, optionally with styled nested spans.
 
     Style properties: ``font_size``, ``color``, ``bold``,
     ``font_weight``, ``font_family``, ``italic``, ``text_align``,
@@ -431,29 +534,70 @@ def Text(
     ``border_color``, ``shadow_*``, ``opacity``, ``transform``, plus
     the common layout props.
 
+    **Rich text**: pass multiple parts, mixing plain strings and
+    nested ``Text`` elements, to render one paragraph with per-span
+    styling (a single ``TextView`` / ``UILabel`` natively, so line
+    wrapping flows across spans):
+
+    ```python
+    pn.Text(
+        "Hello, ",
+        pn.Text("world", style=pn.style(bold=True, color="#0A84FF")),
+        "!",
+        style=pn.style(font_size=18),
+    )
+    ```
+
+    Nested spans inherit the outer element's text styling and may
+    override ``color``, ``background_color``, ``font_size``,
+    ``font_family``, ``font_weight``, ``bold``, ``italic``,
+    ``text_decoration``, and ``letter_spacing``.
+
     Args:
-        text: Text content to display.
+        *parts: Text content: a single string, or any mix of strings
+            and nested ``Text`` elements for rich text.
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
         accessibility_role: Semantic role for assistive tech.
         accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech,
+            e.g. ``{"disabled": True, "selected": False}``. Recognized
+            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
+            ``expanded``.
+        accessibility_live_region: How AT announces dynamic changes to
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``
+            (Android only).
+        test_id: Stable identifier for UI tests; exposed as
+            ``resource-id`` on Android and ``accessibilityIdentifier``
+            on iOS.
         ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Text"``.
     """
+    rich = any(isinstance(p, Element) for p in parts) or len(parts) > 1
+    if rich:
+        spans = _flatten_text_spans(parts, {})
+        text = "".join(s["text"] for s in spans)
+    else:
+        spans = None
+        text = str(parts[0]) if parts else ""
     return _make_element(
         "Text",
         style=style,
         ref=ref,
         key=key,
         text=text,
+        spans=spans,
         accessibility_label=accessibility_label,
         accessibility_hint=accessibility_hint,
         accessibility_role=accessibility_role,
         accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
     )
 
 
@@ -467,6 +611,9 @@ def Button(
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
+    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -488,6 +635,16 @@ def Button(
         accessibility_hint: Spoken extra detail (iOS only).
         accessibility_role: Override the default ``"button"`` role.
         accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech,
+            e.g. ``{"disabled": True, "selected": False}``. Recognized
+            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
+            ``expanded``.
+        accessibility_live_region: How AT announces dynamic changes to
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``
+            (Android only).
+        test_id: Stable identifier for UI tests; exposed as
+            ``resource-id`` on Android and ``accessibilityIdentifier``
+            on iOS.
         ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
@@ -506,6 +663,9 @@ def Button(
         accessibility_hint=accessibility_hint,
         accessibility_role=accessibility_role,
         accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
         _defaults={"accessibility_role": "button"},
     )
 
@@ -535,6 +695,9 @@ def TextInput(
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessible: Optional[bool] = None,
+    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -575,6 +738,16 @@ def TextInput(
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
         accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech,
+            e.g. ``{"disabled": True, "selected": False}``. Recognized
+            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
+            ``expanded``.
+        accessibility_live_region: How AT announces dynamic changes to
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``
+            (Android only).
+        test_id: Stable identifier for UI tests; exposed as
+            ``resource-id`` on Android and ``accessibilityIdentifier``
+            on iOS.
         ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
@@ -608,6 +781,9 @@ def TextInput(
         accessibility_label=accessibility_label,
         accessibility_hint=accessibility_hint,
         accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
     )
 
 
@@ -616,10 +792,16 @@ def Image(
     *,
     scale_type: Optional[ScaleType] = None,
     tint_color: Optional[Color] = None,
+    placeholder_color: Optional[Color] = None,
+    on_load: Optional[Callable[[], None]] = None,
+    on_error: Optional[Callable[[str], None]] = None,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
+    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -628,10 +810,11 @@ def Image(
     Style properties: ``background_color``, ``border_*``, ``opacity``,
     ``transform``, plus the common layout props.
 
-    Network images (``http://`` / ``https://``) are loaded
-    asynchronously off the main thread on both iOS (via
-    ``NSURLSession``) and Android (via a worker thread plus
-    ``BitmapFactory``).
+    Network images (``http://`` / ``https://``) go through the shared
+    image pipeline (`pythonnative.images`): downloads happen on a
+    background thread, bytes are cached in memory and on disk keyed by
+    URL, concurrent requests for the same URL share one download, and
+    large bitmaps are downsampled to the view size when decoded.
 
     Args:
         source: Image resource name or URL.
@@ -639,10 +822,26 @@ def Image(
             ``"center"``.
         tint_color: Color overlay applied to template images
             (monochrome icons).
+        placeholder_color: Background color shown while a remote image
+            is loading (and left in place if it fails).
+        on_load: Callback invoked once the image has been decoded and
+            displayed.
+        on_error: Callback invoked with an error message when a remote
+            image fails to download or decode.
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
         accessibility_role: Override the default ``"image"`` role.
         accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech,
+            e.g. ``{"disabled": True, "selected": False}``. Recognized
+            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
+            ``expanded``.
+        accessibility_live_region: How AT announces dynamic changes to
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``
+            (Android only).
+        test_id: Stable identifier for UI tests; exposed as
+            ``resource-id`` on Android and ``accessibilityIdentifier``
+            on iOS.
         ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
@@ -657,9 +856,15 @@ def Image(
         source=source or None,
         scale_type=scale_type,
         tint_color=tint_color,
+        placeholder_color=placeholder_color,
+        on_load=on_load,
+        on_error=on_error,
         accessibility_label=accessibility_label,
         accessibility_role=accessibility_role,
         accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
         _defaults={"accessibility_role": "image"},
     )
 
@@ -900,6 +1105,9 @@ def View(
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
+    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -939,6 +1147,16 @@ def View(
         accessibility_hint: Spoken extra detail (iOS only).
         accessibility_role: Semantic role for assistive tech.
         accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech,
+            e.g. ``{"disabled": True, "selected": False}``. Recognized
+            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
+            ``expanded``.
+        accessibility_live_region: How AT announces dynamic changes to
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``
+            (Android only).
+        test_id: Stable identifier for UI tests; exposed as
+            ``resource-id`` on Android and ``accessibilityIdentifier``
+            on iOS.
         ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
@@ -956,6 +1174,9 @@ def View(
         accessibility_hint=accessibility_hint,
         accessibility_role=accessibility_role,
         accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
         _defaults={"flex_direction": "column"},
     )
 
@@ -1087,25 +1308,76 @@ def ScrollView(
     )
 
 
+_SAFE_AREA_EDGES: Tuple[str, ...] = ("top", "left", "bottom", "right")
+
+
+def _numeric_edge_padding(style: Dict[str, Any], edge: str) -> float:
+    """Return the numeric padding already declared for ``edge`` in ``style``.
+
+    Only numeric values participate; percentage strings and dict
+    shorthands are left alone (the inset simply overrides them for
+    that edge). Resolution order matches the layout engine:
+    ``padding_{edge}`` beats the axis shorthand, which beats
+    ``padding``.
+    """
+    axis_key = "padding_vertical" if edge in ("top", "bottom") else "padding_horizontal"
+    for key in (f"padding_{edge}", axis_key, "padding"):
+        value = style.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+    return 0.0
+
+
+@component
+def _SafeAreaContainer(**p: Any) -> Element:
+    """Hook-driven body of `SafeAreaView`.
+
+    Reads the live insets via
+    [`use_safe_area_insets`][pythonnative.use_safe_area_insets] (so the
+    subtree re-renders when the platform publishes new values, e.g. on
+    rotation) and adds each selected edge's inset on top of any padding
+    the user declared for that edge.
+    """
+    insets = use_safe_area_insets()
+    style: Dict[str, Any] = dict(p.get("style") or {})
+    edges = p.get("edges") or _SAFE_AREA_EDGES
+    for edge in _SAFE_AREA_EDGES:
+        if edge not in edges:
+            continue
+        inset = float(insets.get(edge, 0.0) or 0.0)
+        if inset > 0:
+            style[f"padding_{edge}"] = _numeric_edge_padding(style, edge) + inset
+    children = p.get("children") or []
+    return Element("SafeAreaView", style, list(children))
+
+
 def SafeAreaView(
     *children: Element,
+    edges: Optional[Tuple[Literal["top", "left", "bottom", "right"], ...]] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
     """Container that respects safe-area insets (notch, status bar, home indicator).
 
+    Applies the platform-reported insets as extra padding on the
+    selected edges and re-renders automatically when the insets change
+    (rotation, split view). User padding on an inset edge is added to
+    the inset, matching ``react-native-safe-area-context``.
+
     Args:
         *children: Child elements that should avoid system UI overlays.
+        edges: Which edges to pad; defaults to all four.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type ``"SafeAreaView"``.
+        An [`Element`][pythonnative.Element] that renders a
+        ``"SafeAreaView"`` container.
     """
-    return _make_element(
-        "SafeAreaView",
-        *children,
-        style=style,
+    return _SafeAreaContainer(
+        children=list(children),
+        edges=tuple(edges) if edges else None,
+        style=resolve_style(style),
         key=key,
     )
 
@@ -1175,6 +1447,41 @@ def Modal(
     )
 
 
+@component
+def _StatefulPressable(**p: Any) -> Element:
+    """Hook-driven Pressable used when ``style`` is a callable.
+
+    Tracks the pressed state with ``use_state`` and re-invokes the
+    user's style function with ``{"pressed": bool}`` on every press
+    transition, mirroring React Native's function-style ``style`` prop.
+    """
+    pressed, set_pressed = use_state(False)
+    style_fn = p["style_fn"]
+    user_press_in = p.get("on_press_in")
+    user_press_out = p.get("on_press_out")
+
+    def _press_in() -> None:
+        set_pressed(True)
+        if user_press_in is not None:
+            user_press_in()
+
+    def _press_out() -> None:
+        set_pressed(False)
+        if user_press_out is not None:
+            user_press_out()
+
+    forwarded = {k: v for k, v in p.items() if k not in ("children", "style_fn", "on_press_in", "on_press_out")}
+    return _make_element(
+        "Pressable",
+        *(p.get("children") or []),
+        style=resolve_style(style_fn({"pressed": pressed})),
+        on_press_in=_press_in,
+        on_press_out=_press_out,
+        _defaults={"accessibility_role": "button"},
+        **forwarded,
+    )
+
+
 def Pressable(
     *children: Element,
     on_press: Optional[Callable[[], None]] = None,
@@ -1183,11 +1490,14 @@ def Pressable(
     on_press_out: Optional[Callable[[], None]] = None,
     pressed_opacity: float = 0.6,
     gestures: Optional[List[Any]] = None,
-    style: StyleProp = None,
+    style: Union[StyleProp, Callable[[Dict[str, bool]], StyleProp]] = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
+    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -1210,17 +1520,60 @@ def Pressable(
         gestures: Optional list of gesture descriptors from
             `pythonnative.gestures` recognized natively on this view
             (pan / swipe / pinch / rotation / multi-tap).
-        style: Style dict applied to the wrapper.
+        style: Style dict applied to the wrapper, or a callable
+            receiving the interaction state (``{"pressed": bool}``)
+            and returning a style, re-evaluated on every press
+            transition:
+
+            ```python
+            pn.Pressable(
+                pn.Text("Tap"),
+                style=lambda s: pn.style(
+                    background_color="#0051A8" if s["pressed"] else "#007AFF",
+                ),
+            )
+            ```
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
         accessibility_role: Override the default ``"button"`` role.
         accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech,
+            e.g. ``{"disabled": True, "selected": False}``. Recognized
+            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
+            ``expanded``.
+        accessibility_live_region: How AT announces dynamic changes to
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``
+            (Android only).
+        test_id: Stable identifier for UI tests; exposed as
+            ``resource-id`` on Android and ``accessibilityIdentifier``
+            on iOS.
         ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type ``"Pressable"``.
+        An [`Element`][pythonnative.Element] of type ``"Pressable"``
+        (wrapped in a stateful composite when ``style`` is callable).
     """
+    if callable(style):
+        return _StatefulPressable(
+            children=list(children),
+            style_fn=style,
+            ref=ref,
+            key=key,
+            on_press=on_press,
+            on_long_press=on_long_press,
+            on_press_in=on_press_in,
+            on_press_out=on_press_out,
+            pressed_opacity=pressed_opacity,
+            gestures=gestures,
+            accessibility_label=accessibility_label,
+            accessibility_hint=accessibility_hint,
+            accessibility_role=accessibility_role,
+            accessible=accessible,
+            accessibility_state=accessibility_state,
+            accessibility_live_region=accessibility_live_region,
+            test_id=test_id,
+        )
     return _make_element(
         "Pressable",
         *children,
@@ -1237,6 +1590,9 @@ def Pressable(
         accessibility_hint=accessibility_hint,
         accessibility_role=accessibility_role,
         accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
         _defaults={"accessibility_role": "button"},
     )
 
@@ -1257,6 +1613,9 @@ def TouchableOpacity(
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
+    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Wrap children so they fade to ``active_opacity`` while pressed.
@@ -1278,6 +1637,16 @@ def TouchableOpacity(
         accessibility_hint: Spoken extra detail (iOS only).
         accessibility_role: Override the default ``"button"`` role.
         accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech,
+            e.g. ``{"disabled": True, "selected": False}``. Recognized
+            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
+            ``expanded``.
+        accessibility_live_region: How AT announces dynamic changes to
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``
+            (Android only).
+        test_id: Stable identifier for UI tests; exposed as
+            ``resource-id`` on Android and ``accessibilityIdentifier``
+            on iOS.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -1300,6 +1669,9 @@ def TouchableOpacity(
         accessibility_hint=accessibility_hint,
         accessibility_role=accessibility_role,
         accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
         key=key,
     )
 
@@ -1311,6 +1683,9 @@ def ImageBackground(
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessible: Optional[bool] = None,
+    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Render ``children`` layered on top of a background image.
@@ -1329,6 +1704,16 @@ def ImageBackground(
         style: Style dict for the container (size, padding, alignment).
         accessibility_label: Spoken description of the background image.
         accessible: Override whether the image is exposed to AT.
+        accessibility_state: Current widget state for assistive tech,
+            e.g. ``{"disabled": True, "selected": False}``. Recognized
+            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
+            ``expanded``.
+        accessibility_live_region: How AT announces dynamic changes to
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``
+            (Android only).
+        test_id: Stable identifier for UI tests; exposed as
+            ``resource-id`` on Android and ``accessibilityIdentifier``
+            on iOS.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -1342,6 +1727,9 @@ def ImageBackground(
         style=fill,
         accessibility_label=accessibility_label,
         accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
     )
     content = View(*children, style={"flex": 1})
     return View(
@@ -1363,6 +1751,9 @@ def Checkbox(
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessible: Optional[bool] = None,
+    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     key: Optional[str] = None,
 ) -> Element:
     """A boolean checkbox with an optional inline label.
@@ -1381,6 +1772,16 @@ def Checkbox(
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
         accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech,
+            e.g. ``{"disabled": True, "selected": False}``. Recognized
+            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
+            ``expanded``.
+        accessibility_live_region: How AT announces dynamic changes to
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``
+            (Android only).
+        test_id: Stable identifier for UI tests; exposed as
+            ``resource-id`` on Android and ``accessibilityIdentifier``
+            on iOS.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -1398,6 +1799,9 @@ def Checkbox(
         accessibility_label=accessibility_label,
         accessibility_hint=accessibility_hint,
         accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
         _defaults={"accessibility_role": "checkbox"},
     )
 
@@ -1412,6 +1816,9 @@ def SegmentedControl(
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessible: Optional[bool] = None,
+    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     key: Optional[str] = None,
 ) -> Element:
     """A horizontal multi-choice control (one selected segment at a time).
@@ -1428,6 +1835,16 @@ def SegmentedControl(
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
         accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech,
+            e.g. ``{"disabled": True, "selected": False}``. Recognized
+            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
+            ``expanded``.
+        accessibility_live_region: How AT announces dynamic changes to
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``
+            (Android only).
+        test_id: Stable identifier for UI tests; exposed as
+            ``resource-id`` on Android and ``accessibilityIdentifier``
+            on iOS.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -1445,6 +1862,9 @@ def SegmentedControl(
         tint_color=tint_color,
         accessibility_label=accessibility_label,
         accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
     )
 
 
@@ -1459,6 +1879,9 @@ def DatePicker(
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessible: Optional[bool] = None,
+    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     key: Optional[str] = None,
 ) -> Element:
     """A native date / time picker.
@@ -1478,6 +1901,16 @@ def DatePicker(
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
         accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech,
+            e.g. ``{"disabled": True, "selected": False}``. Recognized
+            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
+            ``expanded``.
+        accessibility_live_region: How AT announces dynamic changes to
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``
+            (Android only).
+        test_id: Stable identifier for UI tests; exposed as
+            ``resource-id`` on Android and ``accessibilityIdentifier``
+            on iOS.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -1495,6 +1928,9 @@ def DatePicker(
         enabled=False if enabled is False else None,
         accessibility_label=accessibility_label,
         accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
         _defaults={"accessibility_role": "button"},
     )
 
@@ -1600,17 +2036,26 @@ def ErrorBoundary(
 
 
 # ======================================================================
-# Lists (Python-windowed virtualization over ScrollView)
+# Lists (native virtualization with a Python-windowed fallback)
 # ======================================================================
 #
-# FlatList and SectionList are pure Python components, not native
-# elements. They render a windowed slice of rows into a ScrollView
-# (leading spacer, visible rows, trailing spacer) and shift the window
-# from scroll events (the same architecture as React Native's
-# VirtualizedList). Because every windowed row lives in the *main*
-# layout tree, rows may be any height: estimates only steer the spacer
-# sizes, and each row's measured extent is fed back from the layout
-# pass through its ref to correct the estimates over time.
+# FlatList and SectionList pick between two engines:
+#
+# 1. **Native virtualization** (`_NativeList` -> the ``VirtualList``
+#    element): on Android and iOS, when every row extent is known up
+#    front and no windowed-only feature is requested, the list is
+#    backed by a real ``RecyclerView`` / ``UITableView``. The platform
+#    owns row recycling; each visible row hosts a nested-reconciler
+#    subtree (see ``pythonnative.virtual_rows``).
+# 2. **Python windowing** (`_VirtualizedList`): a windowed slice of
+#    rows rendered into a ScrollView (leading spacer, visible rows,
+#    trailing spacer), the window shifting from scroll events (the
+#    same architecture as React Native's VirtualizedList). Because
+#    every windowed row lives in the *main* layout tree, rows may be
+#    any height: estimates steer the spacer sizes and measured extents
+#    correct them over time. This is the desktop path and the fallback
+#    for variable-height rows, grids, horizontal lists, ornaments, and
+#    pull-to-refresh.
 
 _DEFAULT_ROW_EXTENT = 44.0
 
@@ -1841,6 +2286,132 @@ def _VirtualizedList(**p: Any) -> Element:
     )
 
 
+def _native_lists_supported() -> bool:
+    """Whether the natively virtualized list path is available.
+
+    Android (RecyclerView) and iOS (UITableView) have native handlers;
+    the desktop preview and off-device tests use the Python-windowed
+    engine. Patchable in tests to exercise the native routing.
+    """
+    from .utils import IS_ANDROID, IS_IOS
+
+    return IS_ANDROID or IS_IOS
+
+
+@component
+def _NativeList(**p: Any) -> Element:
+    """Platform-virtualized list: emits a ``VirtualList`` native element.
+
+    The native side (RecyclerView / UITableView) owns row windowing and
+    recycling; each visible row hosts a nested-reconciler subtree (see
+    ``pythonnative.virtual_rows``). This composite adapts the FlatList /
+    SectionList surface onto that element: it forwards ``render_row``,
+    derives ``on_end_reached`` and ``on_viewable_items_changed`` from
+    native scroll reports, and wires the imperative scroll controller.
+
+    Requires every row's extent to be known up front (the native
+    virtualizers need exact heights before rows are rendered); callers
+    fall back to the Python-windowed engine otherwise.
+    """
+    rows: List[_RowSpec] = p.get("rows") or []
+    n = len(rows)
+    heights: List[float] = [float(spec.extent or 0.0) for spec in rows]
+    uniform = len(set(heights)) <= 1
+
+    internal_ref = use_ref(None)
+    end_latch = use_ref({"fired_for": -1})
+    viewable_ref = use_ref({"keys": ()})
+
+    starts: List[float] = [0.0] * (n + 1)
+    acc = 0.0
+    for i, extent in enumerate(heights):
+        starts[i] = acc
+        acc += max(0.0, extent)
+    starts[n] = acc
+    total_extent = acc
+
+    def _render_row(index: int) -> Element:
+        if 0 <= index < n:
+            return rows[index].make()
+        return View()
+
+    on_end_reached = p.get("on_end_reached")
+    end_threshold = float(p.get("on_end_reached_threshold") or 0.5)
+    on_viewable = p.get("on_viewable_items_changed")
+    user_on_scroll = p.get("on_scroll")
+
+    def _handle_scroll(payload: Any) -> None:
+        offset = float(payload.get("y", 0.0) or 0.0) if isinstance(payload, dict) else float(payload or 0.0)
+        viewport = float(payload.get("extent", 0.0) or 0.0) if isinstance(payload, dict) else 0.0
+        if viewport <= 0:
+            viewport = 800.0
+
+        if on_end_reached is not None and total_extent > 0:
+            remaining = total_extent - (offset + viewport)
+            if remaining <= end_threshold * viewport:
+                if end_latch["current"]["fired_for"] != n:
+                    end_latch["current"]["fired_for"] = n
+                    on_end_reached()
+            elif remaining > end_threshold * viewport + viewport:
+                end_latch["current"]["fired_for"] = -1
+
+        if on_viewable is not None and n > 0:
+            v_first = max(0, bisect.bisect_right(starts, offset, 0, n) - 1)
+            v_last = min(n - 1, bisect.bisect_left(starts, offset + viewport, 0, n))
+            keys = tuple(rows[i].key for i in range(v_first, v_last + 1))
+            if keys != viewable_ref["current"]["keys"]:
+                viewable_ref["current"]["keys"] = keys
+                on_viewable(
+                    [
+                        {"index": rows[i].index, "key": rows[i].key, "item": rows[i].item}
+                        for i in range(v_first, v_last + 1)
+                    ]
+                )
+
+        if user_on_scroll is not None:
+            user_on_scroll({"x": 0.0, "y": offset})
+
+    controller = p.get("controller_ref")
+
+    def _attach_controller() -> None:
+        if not isinstance(controller, dict):
+            return
+
+        def scroll_to_offset(offset: float, animated: bool = True) -> None:
+            _dispatch_scroll_command(internal_ref, "scroll_to_offset", {"y": float(offset), "animated": animated})
+
+        def scroll_to_index(index: int, animated: bool = True) -> None:
+            _dispatch_scroll_command(internal_ref, "scroll_to_index", {"index": int(index), "animated": animated})
+
+        def scroll_to_end(animated: bool = True) -> None:
+            _dispatch_scroll_command(internal_ref, "scroll_to_end", {"animated": animated})
+
+        controller["scroll_to_offset"] = scroll_to_offset
+        controller["scroll_to_index"] = scroll_to_index
+        controller["scroll_to_end"] = scroll_to_end
+
+    use_effect(_attach_controller, None)
+
+    props: Dict[str, Any] = dict(p.get("list_style") or {})
+    props["count"] = n
+    if uniform:
+        props["row_height"] = heights[0] if heights else _DEFAULT_ROW_EXTENT
+    else:
+        props["row_heights"] = heights
+    props["render_row"] = _render_row
+    props["ref"] = internal_ref
+    wants_scroll = on_end_reached is not None or on_viewable is not None or user_on_scroll is not None
+    if wants_scroll:
+        props["on_scroll"] = _handle_scroll
+    if p.get("shows_scroll_indicator") is False:
+        props["shows_scroll_indicator"] = False
+    return Element("VirtualList", props, [])
+
+
+def _all_extents_known(rows: List[_RowSpec]) -> bool:
+    return all(spec.extent is not None for spec in rows)
+
+
 def FlatList(
     *,
     data: Optional[List[Any]] = None,
@@ -1994,6 +2565,32 @@ def FlatList(
 
     estimated = estimated_item_height if estimated_item_height is not None else (item_height or _DEFAULT_ROW_EXTENT)
 
+    # Route to the platform virtualizer (RecyclerView / UITableView)
+    # when it can represent this list exactly: vertical, single-column,
+    # every row extent known up front, and no features that only the
+    # Python-windowed engine implements (ornaments, pull-to-refresh).
+    if (
+        _native_lists_supported()
+        and not horizontal
+        and num_columns == 1
+        and list_header is None
+        and list_footer is None
+        and list_empty is None
+        and refresh_control is None
+        and _all_extents_known(rows)
+    ):
+        return _NativeList(
+            rows=rows,
+            on_end_reached=on_end_reached,
+            on_end_reached_threshold=on_end_reached_threshold,
+            on_viewable_items_changed=on_viewable_items_changed,
+            on_scroll=on_scroll,
+            shows_scroll_indicator=shows_scroll_indicator,
+            list_style=resolve_style(style) or None,
+            controller_ref=ref,
+            key=key,
+        )
+
     return _VirtualizedList(
         rows=rows,
         horizontal=horizontal,
@@ -2132,6 +2729,26 @@ def SectionList(
 
     estimated = estimated_item_height if estimated_item_height is not None else (item_height or _DEFAULT_ROW_EXTENT)
 
+    # Same native routing as FlatList: headers and items become one
+    # flattened row sequence with per-row heights.
+    if (
+        _native_lists_supported()
+        and list_header is None
+        and list_footer is None
+        and list_empty is None
+        and refresh_control is None
+        and _all_extents_known(rows)
+    ):
+        return _NativeList(
+            rows=rows,
+            on_end_reached=on_end_reached,
+            on_end_reached_threshold=on_end_reached_threshold,
+            on_scroll=on_scroll,
+            list_style=resolve_style(style) or None,
+            controller_ref=ref,
+            key=key,
+        )
+
     return _VirtualizedList(
         rows=rows,
         horizontal=False,
@@ -2194,9 +2811,40 @@ def StatusBar(
     return Element("StatusBar", props, [], key=key)
 
 
+@component
+def _KeyboardAvoidingContainer(**p: Any) -> Element:
+    """Hook-driven body of `KeyboardAvoidingView`.
+
+    Subscribes to the platform-reported keyboard height via
+    [`use_keyboard_height`][pythonnative.use_keyboard_height] and
+    applies the shift according to ``behavior``:
+
+    - ``"padding"``: adds the shift as bottom padding, resizing the
+      content area (the default, and the right choice for forms
+      inside a full-height container).
+    - ``"position"``: translates the whole container upward without
+      resizing it (useful for pinned footers/toolbars).
+    """
+    height = use_keyboard_height()
+    behavior = p.get("behavior") or "padding"
+    offset = float(p.get("keyboard_vertical_offset") or 0.0)
+    shift = max(0.0, height - offset) if height > 0 else 0.0
+    style: Dict[str, Any] = dict(p.get("style") or {})
+    if shift > 0:
+        if behavior == "position":
+            transform = list(style.get("transform") or [])
+            transform.append({"translate_y": -shift})
+            style["transform"] = transform
+        else:
+            style["padding_bottom"] = _numeric_edge_padding(style, "bottom") + shift
+    children = p.get("children") or []
+    return Element("KeyboardAvoidingView", style, list(children))
+
+
 def KeyboardAvoidingView(
     *children: Element,
     behavior: Literal["padding", "position"] = "padding",
+    keyboard_vertical_offset: float = 0.0,
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -2204,26 +2852,32 @@ def KeyboardAvoidingView(
 
     Subscribes to the platform-reported keyboard height (via
     [`use_keyboard_height`][pythonnative.use_keyboard_height]
-    internally) and applies it as bottom padding so the focused text
-    input stays visible.
+    internally) and shifts its content so the focused text input stays
+    visible. On iOS the height comes from
+    ``UIKeyboardWillShowNotification``; on Android from the window's
+    IME insets.
 
     Args:
         *children: Children rendered inside the avoiding container.
-        behavior: ``"padding"`` (adds bottom padding) or ``"position"``
-            (translates the container upward).
+        behavior: ``"padding"`` (adds bottom padding, resizing the
+            content) or ``"position"`` (translates the container
+            upward without resizing).
+        keyboard_vertical_offset: Distance in layout units already
+            covered by other UI (e.g. a nav bar); subtracted from the
+            keyboard height before applying the shift.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
 
     Returns:
-        An [`Element`][pythonnative.Element] of type
-        ``"KeyboardAvoidingView"``.
+        An [`Element`][pythonnative.Element] that renders a
+        ``"KeyboardAvoidingView"`` container.
     """
-    return _make_element(
-        "KeyboardAvoidingView",
-        *children,
-        style=style,
-        key=key,
+    return _KeyboardAvoidingContainer(
+        children=list(children),
         behavior=behavior,
+        keyboard_vertical_offset=keyboard_vertical_offset,
+        style=resolve_style(style),
+        key=key,
     )
 
 
@@ -2291,6 +2945,9 @@ def Picker(
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessible: Optional[bool] = None,
+    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     ref: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -2314,6 +2971,16 @@ def Picker(
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
         accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech,
+            e.g. ``{"disabled": True, "selected": False}``. Recognized
+            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
+            ``expanded``.
+        accessibility_live_region: How AT announces dynamic changes to
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``
+            (Android only).
+        test_id: Stable identifier for UI tests; exposed as
+            ``resource-id`` on Android and ``accessibilityIdentifier``
+            on iOS.
         ref: Optional ``use_ref()`` dict.
         key: Stable identity for keyed reconciliation.
 
@@ -2332,5 +2999,8 @@ def Picker(
         accessibility_label=accessibility_label,
         accessibility_hint=accessibility_hint,
         accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
         _defaults={"accessibility_role": "button"},
     )

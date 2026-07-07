@@ -66,6 +66,7 @@ from app.screens.hooks.batch_updates_demo import BatchUpdatesDemo
 from app.screens.hooks.memo_demo import MemoDemo
 from app.screens.hooks.use_async_effect import UseAsyncEffectDemo
 from app.screens.hooks.use_callback import UseCallbackDemo
+from app.screens.hooks.use_color_scheme import UseColorSchemeDemo
 from app.screens.hooks.use_context import UseContextDemo
 from app.screens.hooks.use_effect import UseEffectDemo
 from app.screens.hooks.use_memo import UseMemoDemo
@@ -75,6 +76,7 @@ from app.screens.hooks.use_query import UseQueryDemo
 from app.screens.hooks.use_reducer import UseReducerDemo
 from app.screens.hooks.use_ref import UseRefDemo
 from app.screens.hooks.use_state import UseStateDemo
+from app.screens.hooks.use_theme import UseThemeDemo
 from app.screens.hooks.use_window_dimensions import UseWindowDimensionsDemo
 from app.screens.layout.absolute_position import AbsolutePositionDemo
 from app.screens.layout.alignment import AlignmentDemo
@@ -220,6 +222,14 @@ DEMOS: List[DemoEntry] = [
     ),
     DemoEntry("memo", "Hooks", "memo", "memo", MemoDemo),
     DemoEntry("batch_updates", "Hooks", "batch_updates", "batch_updates", BatchUpdatesDemo),
+    DemoEntry(
+        "use_color_scheme",
+        "Hooks",
+        "use_color_scheme",
+        "use_color_scheme",
+        UseColorSchemeDemo,
+    ),
+    DemoEntry("use_theme", "Hooks", "use_theme", "use_theme", UseThemeDemo),
     # ------------------------------------------------------------------
     # Navigation
     # ------------------------------------------------------------------

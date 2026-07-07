@@ -304,6 +304,93 @@ def _apply_view_border(view: Any, props: Dict[str, Any]) -> None:
     _apply_border(view.layer, props)
 
 
+# Per-side border state keyed by id(view): {"widths": (l, t, r, b),
+# "colors": (l, t, r, b), "layers": [CALayer or None x4]}.
+_pn_side_border_map: dict = {}
+
+_SIDE_BORDER_WIDTH_KEYS = (
+    "border_left_width",
+    "border_top_width",
+    "border_right_width",
+    "border_bottom_width",
+)
+_SIDE_BORDER_COLOR_KEYS = (
+    "border_left_color",
+    "border_top_color",
+    "border_right_color",
+    "border_bottom_color",
+)
+
+
+def _apply_side_borders(view: Any, props: Dict[str, Any]) -> None:
+    """Record per-side border strips (drawn as CALayer sublayers).
+
+    Activated when any ``border_<side>_width`` key is present. In that
+    mode the strips own all four edges: each side's width falls back
+    to the uniform ``border_width`` (else 0) and its color to the
+    uniform ``border_color`` (else black), and the layer-level uniform
+    border is disabled so the two mechanisms don't double-draw. The
+    strips are (re)positioned at frame time when bounds are known.
+    """
+    if not any(k in props and props[k] is not None for k in _SIDE_BORDER_WIDTH_KEYS):
+        return
+    base_width = float(props.get("border_width") or 0.0)
+    base_color = props.get("border_color") or "#000000"
+    widths = tuple(float(props[k]) if props.get(k) is not None else base_width for k in _SIDE_BORDER_WIDTH_KEYS)
+    colors = tuple(props[k] if props.get(k) is not None else base_color for k in _SIDE_BORDER_COLOR_KEYS)
+    entry = _pn_side_border_map.setdefault(id(view), {"layers": [None, None, None, None]})
+    entry["widths"] = widths
+    entry["colors"] = colors
+    try:
+        view.layer.setBorderWidth_(0.0)
+    except Exception:
+        pass
+    try:
+        bounds = view.bounds
+        w = float(bounds.size.width)
+        h = float(bounds.size.height)
+        if w > 0.0 and h > 0.0:
+            _update_side_border_layers(view, w, h)
+    except Exception:
+        pass
+
+
+def _update_side_border_layers(view: Any, width: float, height: float) -> None:
+    """Size the four border-strip sublayers to the view's current bounds."""
+    entry = _pn_side_border_map.get(id(view))
+    if entry is None or "widths" not in entry:
+        return
+    left_w, top_w, right_w, bottom_w = entry["widths"]
+    frames = (
+        ((0.0, 0.0), (left_w, height)),
+        ((0.0, 0.0), (width, top_w)),
+        ((width - right_w, 0.0), (right_w, height)),
+        ((0.0, height - bottom_w), (width, bottom_w)),
+    )
+    CALayer = ObjCClass("CALayer")
+    layers = entry["layers"]
+    for i in range(4):
+        w_i = entry["widths"][i]
+        layer = layers[i]
+        if w_i <= 0.0:
+            if layer is not None:
+                try:
+                    layer.removeFromSuperlayer()
+                except Exception:
+                    pass
+                layers[i] = None
+            continue
+        try:
+            if layer is None:
+                layer = CALayer.layer()
+                view.layer.addSublayer_(layer)
+                layers[i] = layer
+            layer.setBackgroundColor_(_cgcolor(entry["colors"][i]))
+            layer.setFrame_(frames[i])
+        except Exception:
+            pass
+
+
 def _clamp_view_corner_radius(view: Any, width: float, height: float) -> None:
     """Clamp oversized pill radii to the view's rendered bounds."""
     requested = _pn_view_border_radius_map.get(id(view))
@@ -481,8 +568,38 @@ def _apply_transform(view: Any, props: Dict[str, Any]) -> None:
         pass
 
 
+# UIAccessibilityTraits bitmask values (UIKit constants).
+_TRAIT_BUTTON = 0x1
+_TRAIT_LINK = 0x2
+_TRAIT_IMAGE = 0x4
+_TRAIT_SELECTED = 0x8
+_TRAIT_KEYBOARD_KEY = 0x20
+_TRAIT_STATIC_TEXT = 0x40
+_TRAIT_SUMMARY_ELEMENT = 0x80
+_TRAIT_NOT_ENABLED = 0x100
+_TRAIT_UPDATES_FREQUENTLY = 0x200
+_TRAIT_SEARCH_FIELD = 0x400
+_TRAIT_ADJUSTABLE = 0x1000
+_TRAIT_HEADER = 0x10000
+
+_TRAIT_BY_ROLE = {
+    "button": _TRAIT_BUTTON,
+    "link": _TRAIT_LINK,
+    "image": _TRAIT_IMAGE,
+    "search": _TRAIT_SEARCH_FIELD,
+    "keyboard_key": _TRAIT_KEYBOARD_KEY,
+    "static_text": _TRAIT_STATIC_TEXT,
+    "summary_element": _TRAIT_SUMMARY_ELEMENT,
+    "adjustable": _TRAIT_ADJUSTABLE,
+    "header": _TRAIT_HEADER,
+    "selected": _TRAIT_SELECTED,
+    "checkbox": _TRAIT_BUTTON,
+    "none": 0,
+}
+
+
 def _apply_accessibility(view: Any, props: Dict[str, Any]) -> None:
-    """Apply accessibility_label / hint / role / accessible to a view."""
+    """Apply accessibility props (label / hint / role / state / test_id)."""
     if "accessible" in props:
         try:
             view.setIsAccessibilityElement_(bool(props["accessible"]))
@@ -500,25 +617,36 @@ def _apply_accessibility(view: Any, props: Dict[str, Any]) -> None:
             view.setAccessibilityHint_(str(v) if v is not None else "")
         except Exception:
             pass
-    if "accessibility_role" in props and props["accessibility_role"] is not None:
-        # UIAccessibilityTraits bitmask.
-        traits = {
-            "button": 1 << 0,
-            "link": 1 << 1,
-            "image": 1 << 2,
-            "search": 1 << 3,
-            "header": 1 << 28,
-            "summary_element": 1 << 6,
-            "selected": 1 << 5,
-            "static_text": 1 << 4,
-            "none": 0,
-        }
-        trait = traits.get(str(props["accessibility_role"]).lower())
-        if trait is not None:
+    if "test_id" in props:
+        v = props["test_id"]
+        try:
+            view.setAccessibilityIdentifier_(str(v) if v is not None else None)
+        except Exception:
+            pass
+
+    role = props.get("accessibility_role")
+    state = props.get("accessibility_state")
+    if role is None and state is None:
+        return
+    traits = 0
+    if role is not None:
+        traits |= _TRAIT_BY_ROLE.get(str(role).lower(), 0)
+    if isinstance(state, dict):
+        if state.get("selected") or state.get("checked"):
+            traits |= _TRAIT_SELECTED
+        if state.get("disabled"):
+            traits |= _TRAIT_NOT_ENABLED
+        if state.get("busy"):
+            traits |= _TRAIT_UPDATES_FREQUENTLY
+        if "expanded" in state:
             try:
-                view.setAccessibilityTraits_(trait)
+                view.setAccessibilityValue_("expanded" if state["expanded"] else "collapsed")
             except Exception:
                 pass
+    try:
+        view.setAccessibilityTraits_(traits)
+    except Exception:
+        pass
 
 
 def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
@@ -538,6 +666,7 @@ def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
         except Exception:
             pass
     _apply_view_border(view, props)
+    _apply_side_borders(view, props)
     _apply_shadow(view, props)
     _apply_transform(view, props)
     _apply_accessibility(view, props)
@@ -1037,6 +1166,8 @@ class IOSViewHandler(ViewHandler):
         # Controls register their own pointer as the action-handler key
         # (see _register_control_action); drop it with the view.
         _pn_action_handlers.pop(_recognizer_ptr(native_view), None)
+        _pn_view_border_radius_map.pop(id(native_view), None)
+        _pn_side_border_map.pop(id(native_view), None)
         try:
             native_view.removeFromSuperview()
         except Exception:
@@ -1086,6 +1217,7 @@ class IOSViewHandler(ViewHandler):
             native_view.setTranslatesAutoresizingMaskIntoConstraints_(True)
             native_view.setFrame_(((frame_x, frame_y), (frame_w, frame_h)))
             _clamp_view_corner_radius(native_view, frame_w, frame_h)
+            _update_side_border_layers(native_view, frame_w, frame_h)
             try:
                 _clamp_layer_corner_radius(native_view.layer, frame_w, frame_h)
             except Exception:
@@ -1271,8 +1403,24 @@ class TextHandler(IOSViewHandler):
                 pass
         return font
 
+    _SPAN_REBUILD_KEYS = (
+        "spans",
+        "text",
+        "font_size",
+        "font_weight",
+        "font_family",
+        "italic",
+        "bold",
+        "color",
+        "letter_spacing",
+        "line_height",
+        "text_decoration",
+    )
+
     def _apply(self, label: Any, props: Dict[str, Any], initial: bool) -> None:
-        if "text" in props:
+        merged_state = _state_of(label).get("props") or props
+        has_spans = bool(merged_state.get("spans"))
+        if "text" in props and not has_spans:
             label.setText_(str(props["text"]) if props["text"] is not None else "")
         # Font requires combining size + weight + family + italic + bold.
         font_keys_present = any(k in props for k in ("font_size", "font_weight", "font_family", "italic", "bold"))
@@ -1299,9 +1447,14 @@ class TextHandler(IOSViewHandler):
         if "text_align" in props:
             mapping = {"left": 0, "center": 1, "right": 2, "natural": 4, "justify": 3}
             label.setTextAlignment_(mapping.get(props["text_align"], 0))
-        if "letter_spacing" in props or "line_height" in props or "text_decoration" in props:
-            merged = _state_of(label).get("props") or props
-            self._apply_attributed(label, merged)
+        if has_spans:
+            if any(k in props for k in self._SPAN_REBUILD_KEYS):
+                self._apply_spans(label, merged_state)
+        elif "spans" in props:
+            # Rich -> plain transition: restore the plain string.
+            label.setText_(str(merged_state.get("text") or ""))
+        elif "letter_spacing" in props or "line_height" in props or "text_decoration" in props:
+            self._apply_attributed(label, merged_state)
         _apply_view_border(label, props)
         _apply_shadow(label, props)
         _apply_transform(label, props)
@@ -1309,6 +1462,74 @@ class TextHandler(IOSViewHandler):
         if "opacity" in props and props["opacity"] is not None:
             try:
                 label.setAlpha_(float(props["opacity"]))
+            except Exception:
+                pass
+
+    def _apply_spans(self, label: Any, merged: Dict[str, Any]) -> None:
+        """Render a rich-text span list as one NSAttributedString.
+
+        The label's base text styling (font, color, kerning, line
+        height, decoration) is applied over the full string first,
+        then each span's overrides are layered onto its own range, so
+        line wrapping flows across spans inside a single ``UILabel``.
+        """
+        try:
+            spans = [s for s in (merged.get("spans") or []) if isinstance(s, dict)]
+            full_text = "".join(str(s.get("text", "")) for s in spans)
+            NSMutableAttributedString = ObjCClass("NSMutableAttributedString")
+            NSMutableParagraphStyle = ObjCClass("NSMutableParagraphStyle")
+            attr = NSMutableAttributedString.alloc().initWithString_(full_text)
+            full_range = (0, len(full_text))
+
+            base_font = label.font
+            base_size = float(base_font.pointSize) if base_font is not None else 17.0
+            if base_font is not None:
+                attr.addAttribute_value_range_("NSFont", base_font, full_range)
+            if merged.get("letter_spacing") is not None:
+                attr.addAttribute_value_range_("NSKern", float(merged["letter_spacing"]), full_range)
+            if merged.get("line_height") is not None:
+                p_style = NSMutableParagraphStyle.alloc().init()
+                p_style.setMinimumLineHeight_(float(merged["line_height"]))
+                p_style.setMaximumLineHeight_(float(merged["line_height"]))
+                attr.addAttribute_value_range_("NSParagraphStyle", p_style, full_range)
+            if merged.get("text_decoration") == "underline":
+                attr.addAttribute_value_range_("NSUnderline", 1, full_range)
+            elif merged.get("text_decoration") == "line_through":
+                attr.addAttribute_value_range_("NSStrikethrough", 1, full_range)
+
+            pos = 0
+            for span in spans:
+                text = str(span.get("text", ""))
+                rng = (pos, len(text))
+                pos += len(text)
+                if not text:
+                    continue
+                try:
+                    if any(
+                        span.get(k) is not None for k in ("font_size", "font_weight", "font_family", "italic", "bold")
+                    ):
+                        size = float(span["font_size"]) if span.get("font_size") is not None else base_size
+                        weight = span.get("font_weight")
+                        if weight is None and span.get("bold"):
+                            weight = "bold"
+                        font = self._font_for(size, weight, span.get("font_family"), bool(span.get("italic")))
+                        attr.addAttribute_value_range_("NSFont", font, rng)
+                    if span.get("color") is not None:
+                        attr.addAttribute_value_range_("NSColor", _uicolor(span["color"]), rng)
+                    if span.get("background_color") is not None:
+                        attr.addAttribute_value_range_("NSBackgroundColor", _uicolor(span["background_color"]), rng)
+                    if span.get("letter_spacing") is not None:
+                        attr.addAttribute_value_range_("NSKern", float(span["letter_spacing"]), rng)
+                    if span.get("text_decoration") == "underline":
+                        attr.addAttribute_value_range_("NSUnderline", 1, rng)
+                    elif span.get("text_decoration") == "line_through":
+                        attr.addAttribute_value_range_("NSStrikethrough", 1, rng)
+                except Exception:
+                    pass
+            label.setAttributedText_(attr)
+        except Exception:
+            try:
+                label.setText_(str(merged.get("text") or ""))
             except Exception:
                 pass
 
@@ -1622,6 +1843,11 @@ class ImageHandler(IOSViewHandler):
                 iv.setTintColor_(_uicolor(props["tint_color"]))
             except Exception:
                 pass
+        if "placeholder_color" in props and props["placeholder_color"] is not None:
+            try:
+                iv.setBackgroundColor_(_uicolor(props["placeholder_color"]))
+            except Exception:
+                pass
         if "source" in props and props["source"]:
             self._load_source(iv, str(props["source"]))
         if "scale_type" in props and props["scale_type"]:
@@ -1652,7 +1878,9 @@ class ImageHandler(IOSViewHandler):
 
     def _load_source(self, iv: Any, source: str) -> None:
         try:
-            if source.startswith(("http://", "https://")):
+            if source.startswith("data:"):
+                self._load_data_uri(iv, source)
+            elif source.startswith(("http://", "https://")):
                 self._load_async(iv, source)
             else:
                 # Bundle resource or absolute file path.
@@ -1662,54 +1890,106 @@ class ImageHandler(IOSViewHandler):
                     image = UIImage.imageWithContentsOfFile_(source)
                 if image:
                     iv.setImage_(image)
+                    _fire(iv, "on_load")
+                else:
+                    _fire(iv, "on_error", f"image {source!r} not found")
         except Exception:
             pass
 
-    def _load_async(self, iv: Any, source: str) -> None:
-        """Asynchronously load a remote image off the main thread.
+    def _load_data_uri(self, iv: Any, source: str) -> None:
+        """Decode an inline ``data:`` URI (base64 payload) into the view."""
+        try:
+            import base64
 
-        Uses ``NSURLSession.sharedSession.dataTaskWithURL:completionHandler:``
-        so the main thread is never blocked. The completion handler
-        runs on a background queue; the image is set back on the main
-        queue so UIKit accepts it without threading warnings. The
-        latest requested URI wins if several loads race.
+            payload = source.split(",", 1)[1] if "," in source else ""
+            raw = base64.b64decode(payload)
+            NSData = ObjCClass("NSData")
+            data = NSData.dataWithBytes_length_(raw, len(raw))
+            image = ObjCClass("UIImage").imageWithData_(data)
+            if image is not None:
+                iv.setImage_(image)
+                _fire(iv, "on_load")
+            else:
+                _fire(iv, "on_error", "data URI decode failed")
+        except Exception:
+            _fire(iv, "on_error", "data URI decode failed")
+
+    def _load_async(self, iv: Any, source: str) -> None:
+        """Load a remote image through the shared image pipeline.
+
+        `pythonnative.images` downloads on a background thread with
+        memory + disk caching and request deduplication, then hands a
+        local file path back on the main queue; the decoded image is
+        downsampled to the view's bounds so oversized photos don't pin
+        full-resolution bitmaps in memory. The latest requested URI
+        wins if several loads race.
         """
         state = _state_of(iv)
         state["pending_uri"] = source
         try:
             iv.retain()
             _pn_retained_views.append(iv)
-            NSURL = ObjCClass("NSURL")
-            NSURLSession = ObjCClass("NSURLSession")
-            UIImage = ObjCClass("UIImage")
-            url = NSURL.URLWithString_(source)
-            session = NSURLSession.sharedSession
+            from ..images import fetch
 
-            def completion(data: Any, response: Any, error: Any) -> None:
-                if error is not None or data is None:
-                    return
+            def on_ready(path: str) -> None:
                 try:
-                    image = UIImage.imageWithData_(data)
-                    if image is None:
+                    if _state_of(iv).get("pending_uri") != source:
                         return
-
-                    def apply() -> None:
-                        try:
-                            if _state_of(iv).get("pending_uri") == source:
-                                iv.setImage_(image)
-                        except Exception:
-                            pass
-
-                    from ..runtime import call_on_main_thread
-
-                    call_on_main_thread(apply)
+                    image = self._decode_downsampled(iv, path)
+                    if image is None:
+                        _fire(iv, "on_error", "decode failed")
+                        return
+                    iv.setImage_(image)
+                    _fire(iv, "on_load")
                 except Exception:
                     pass
 
-            task = session.dataTaskWithURL_completionHandler_(url, completion)
-            task.resume()
+            def on_error(message: str) -> None:
+                if _state_of(iv).get("pending_uri") == source:
+                    _fire(iv, "on_error", message)
+
+            fetch(source, on_ready, on_error)
         except Exception:
             pass
+
+    def _decode_downsampled(self, iv: Any, path: str) -> Any:
+        """Decode a file, scaling down to the view's bounds if oversized.
+
+        Uses ``UIGraphicsImageRenderer`` to re-rasterize when the
+        source is more than 2x the target's pixel size, keeping memory
+        proportional to what's on screen.
+        """
+        try:
+            UIImage = ObjCClass("UIImage")
+            image = UIImage.imageWithContentsOfFile_(path)
+            if image is None:
+                return None
+            bounds = iv.bounds
+            target_w = float(bounds.size.width)
+            target_h = float(bounds.size.height)
+            if target_w <= 0.0 or target_h <= 0.0:
+                return image
+            size = image.size
+            src_w, src_h = float(size.width), float(size.height)
+            if src_w <= target_w * 2.0 and src_h <= target_h * 2.0:
+                return image
+            try:
+                scale = min(target_w * 2.0 / src_w, target_h * 2.0 / src_h)
+                new_w, new_h = src_w * scale, src_h * scale
+                UIGraphicsImageRenderer = ObjCClass("UIGraphicsImageRenderer")
+                renderer = UIGraphicsImageRenderer.alloc().initWithSize_((new_w, new_h))
+
+                def draw(_ctx_obj: Any) -> None:
+                    image.drawInRect_(((0.0, 0.0), (new_w, new_h)))
+
+                resized = renderer.imageWithActions_(draw)
+                return resized if resized is not None else image
+            except Exception:
+                # Resize is an optimization; the full-size image is
+                # still correct if the renderer path fails.
+                return image
+        except Exception:
+            return None
 
 
 # ----------------------------------------------------------------------
@@ -3642,6 +3922,403 @@ class DatePickerHandler(IOSViewHandler):
 
 
 # ======================================================================
+# VirtualList — UITableView-backed native virtualization
+# ======================================================================
+#
+# We register a raw libobjc class ``_PNTableSourceCTypes`` rather than
+# using rubicon-objc's ``@objc_method`` because UIKit invokes
+# ``tableView:cellForRowAtIndexPath:`` with a tagged-pointer
+# NSIndexPath that crashes inside CPython's ``_ctypes.O_get`` when
+# rubicon-objc's FFI closure tries to wrap it as a PyObject*.
+#
+# Each UITableView gets its own dataSource instance; per-instance state
+# lives in ``_pn_table_state`` keyed by the dataSource's raw pointer
+# (the integer passed as ``self`` to every IMP). Rows host nested
+# reconciler subtrees pooled per cell ``contentView`` (see
+# ``pythonnative.virtual_rows``); recycled cells rebind their existing
+# subtree instead of remounting, so steady scrolling reuses both the
+# native cell and the Python-side row tree.
+
+_pn_table_state: Dict[int, dict] = {}
+
+_PN_CELL_REUSE_ID = "PNCell"
+
+_SEL_ROW = _sel_reg(b"row")
+_SEL_DESELECT_ROW = _sel_reg(b"deselectRowAtIndexPath:animated:")
+_SEL_SET_DATA_SOURCE = _sel_reg(b"setDataSource:")
+
+_TABLE_NUM_SECTIONS_TYPE = _ct.CFUNCTYPE(_ct.c_long, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
+_TABLE_NUM_ROWS_TYPE = _ct.CFUNCTYPE(_ct.c_long, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_long)
+_TABLE_HEIGHT_TYPE = _ct.CFUNCTYPE(_ct.c_double, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
+_TABLE_CELL_TYPE = _ct.CFUNCTYPE(_ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
+_TABLE_DID_SELECT_TYPE = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
+_TABLE_SCROLL_TYPE = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
+
+
+def _table_row_of(ip_ptr: int) -> int:
+    """Read ``[indexPath row]`` via raw msgSend (tagged-pointer safe)."""
+    try:
+        _objc_msgSend.restype = _ct.c_long
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
+        return int(_objc_msgSend(_ct.c_void_p(ip_ptr), _SEL_ROW))
+    except Exception:
+        return 0
+
+
+def _table_row_height(info: dict, row: int) -> float:
+    heights = info.get("row_heights")
+    if heights and 0 <= row < len(heights):
+        return float(heights[row])
+    return float(info.get("row_height", 44.0))
+
+
+def _table_num_sections_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int) -> int:
+    return 1
+
+
+def _table_num_rows_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, section: int) -> int:
+    info = _pn_table_state.get(int(self_ptr))
+    return int(info.get("count", 0)) if info else 0
+
+
+def _table_height_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int) -> float:
+    info = _pn_table_state.get(int(self_ptr))
+    if info is None:
+        return 44.0
+    return _table_row_height(info, _table_row_of(ip_ptr))
+
+
+def _table_cell_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int) -> int:
+    """Build (or rebind) a cell for ``tableView:cellForRowAtIndexPath:``.
+
+    ``ip_ptr`` is read raw via ``[indexPath row]`` to avoid the
+    rubicon-objc tagged-pointer crash. The table view itself is a real
+    heap object so wrapping it as an ObjCInstance is safe. Freshly
+    allocated cells are retained explicitly so they survive the Python
+    wrapper's release.
+    """
+    import traceback as _tb
+
+    row = _table_row_of(ip_ptr)
+    try:
+        UITableViewCell = ObjCClass("UITableViewCell")
+        tv = ObjCInstance(_ct.c_void_p(tv_ptr))
+        info = _pn_table_state.get(int(self_ptr))
+        row_h = _table_row_height(info, row) if info else 44.0
+
+        try:
+            cell_w = float(tv.bounds.size.width)
+        except Exception:
+            cell_w = 0.0
+        if cell_w <= 0:
+            try:
+                cell_w = float(ObjCClass("UIScreen").mainScreen().bounds.size.width)
+            except Exception:
+                cell_w = 320.0
+
+        cell = tv.dequeueReusableCellWithIdentifier_(_PN_CELL_REUSE_ID)
+        if cell is None or (hasattr(cell, "ptr") and cell.ptr.value == 0):
+            cell = UITableViewCell.alloc().initWithStyle_reuseIdentifier_(0, _PN_CELL_REUSE_ID)
+            transparent = _uicolor("#00000000")
+            cell.setBackgroundColor_(transparent)
+            cell.contentView.setBackgroundColor_(transparent)
+            cell.setSelectionStyle_(0)
+            cell.retain()  # offset the Python wrapper's release on __del__
+
+        try:
+            cell.setFrame_(((0, 0), (cell_w, row_h)))
+            cell.contentView.setFrame_(((0, 0), (cell_w, row_h)))
+        except Exception:
+            pass
+
+        content = cell.contentView
+        try:
+            existing_subs = content.subviews
+            if callable(existing_subs):
+                existing_subs = existing_subs()
+            for sub in list(existing_subs or []):
+                sub.removeFromSuperview()
+        except Exception:
+            pass
+
+        if info is not None:
+            render_row = info.get("render_row")
+            pool = info.get("pool")
+            if render_row is not None and pool is not None:
+                try:
+                    content_key = int(content.ptr.value)
+                    root = pool.bind(content_key, lambda: render_row(row), cell_w, row_h)
+                    if root is not None:
+                        content.addSubview_(root)
+                except Exception:
+                    print(f"[VirtualList][iOS] mount for row={row} raised:")
+                    _tb.print_exc()
+
+        cell_ptr = cell.ptr.value
+        return int(cell_ptr) if cell_ptr is not None else 0
+    except Exception:
+        print(f"[VirtualList][iOS] _table_cell_imp raised for row={row}:")
+        _tb.print_exc()
+        try:
+            cell = ObjCClass("UITableViewCell").alloc().initWithStyle_reuseIdentifier_(0, _PN_CELL_REUSE_ID)
+            cell.retain()
+            return int(cell.ptr.value)
+        except Exception:
+            return 0
+
+
+def _table_did_select_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int) -> None:
+    row = _table_row_of(ip_ptr)
+    try:
+        _objc_msgSend.restype = None
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_bool]
+        _objc_msgSend(_ct.c_void_p(tv_ptr), _SEL_DESELECT_ROW, _ct.c_void_p(ip_ptr), True)
+    except Exception:
+        pass
+    _fire_ptr(int(tv_ptr or 0), "on_row_press", row)
+
+
+def _table_scroll_imp(self_ptr: int, cmd_ptr: int, sv_ptr: int) -> None:
+    """Raw C callback for ``scrollViewDidScroll:`` on the table source."""
+    info = _pn_table_state.get(int(self_ptr))
+    if not info:
+        return
+    tv = info.get("tv")
+    if tv is None:
+        return
+    try:
+        offset = float(tv.contentOffset.y)
+        extent = float(tv.bounds.size.height)
+        content = float(tv.contentSize.height)
+    except Exception:
+        return
+    _fire(tv, "on_scroll", {"x": 0.0, "y": offset, "extent": extent, "range": content})
+
+
+_table_num_sections_imp_ref = _TABLE_NUM_SECTIONS_TYPE(_table_num_sections_imp)
+_table_num_rows_imp_ref = _TABLE_NUM_ROWS_TYPE(_table_num_rows_imp)
+_table_height_imp_ref = _TABLE_HEIGHT_TYPE(_table_height_imp)
+_table_cell_imp_ref = _TABLE_CELL_TYPE(_table_cell_imp)
+_table_did_select_imp_ref = _TABLE_DID_SELECT_TYPE(_table_did_select_imp)
+_table_scroll_imp_ref = _TABLE_SCROLL_TYPE(_table_scroll_imp)
+
+_PN_TABLE_SOURCE_CLS = _alloc_cls(_NS_OBJECT_CLS, b"_PNTableSourceCTypes", 0)
+if _PN_TABLE_SOURCE_CLS:
+    _add_method(
+        _PN_TABLE_SOURCE_CLS,
+        _sel_reg(b"numberOfSectionsInTableView:"),
+        _ct.cast(_table_num_sections_imp_ref, _ct.c_void_p),
+        b"q@:@",
+    )
+    _add_method(
+        _PN_TABLE_SOURCE_CLS,
+        _sel_reg(b"tableView:numberOfRowsInSection:"),
+        _ct.cast(_table_num_rows_imp_ref, _ct.c_void_p),
+        b"q@:@q",
+    )
+    _add_method(
+        _PN_TABLE_SOURCE_CLS,
+        _sel_reg(b"tableView:heightForRowAtIndexPath:"),
+        _ct.cast(_table_height_imp_ref, _ct.c_void_p),
+        b"d@:@@",
+    )
+    _add_method(
+        _PN_TABLE_SOURCE_CLS,
+        _sel_reg(b"tableView:cellForRowAtIndexPath:"),
+        _ct.cast(_table_cell_imp_ref, _ct.c_void_p),
+        b"@@:@@",
+    )
+    _add_method(
+        _PN_TABLE_SOURCE_CLS,
+        _sel_reg(b"tableView:didSelectRowAtIndexPath:"),
+        _ct.cast(_table_did_select_imp_ref, _ct.c_void_p),
+        b"v@:@@",
+    )
+    _add_method(
+        _PN_TABLE_SOURCE_CLS,
+        _sel_reg(b"scrollViewDidScroll:"),
+        _ct.cast(_table_scroll_imp_ref, _ct.c_void_p),
+        b"v@:@",
+    )
+    _reg_cls(_PN_TABLE_SOURCE_CLS)
+
+
+def _alloc_table_source_instance() -> int:
+    """Allocate and retain a fresh ``_PNTableSourceCTypes`` instance.
+
+    Returns the raw pointer for the new dataSource. Callers must keep
+    the pointer alive themselves; UITableView's dataSource and
+    delegate relationships are non-retaining.
+    """
+    if not _PN_TABLE_SOURCE_CLS:
+        raise RuntimeError("_PNTableSourceCTypes class registration failed")
+    _objc_msgSend.restype = _ct.c_void_p
+    _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
+    raw = _objc_msgSend(_PN_TABLE_SOURCE_CLS, _SEL_ALLOC)
+    raw = _objc_msgSend(raw, _SEL_INIT)
+    raw = _objc_msgSend(raw, _SEL_RETAIN)
+    return int(raw) if raw is not None else 0
+
+
+class VirtualListHandler(IOSViewHandler):
+    """Natively virtualized list backed by ``UITableView``.
+
+    Expects props:
+
+    - ``count``: total number of rows.
+    - ``row_height``: uniform row extent in points, or
+    - ``row_heights``: per-row extents.
+    - ``render_row``: ``render_row(index) -> Element`` producing one
+      row's subtree. Called lazily as rows enter the viewport.
+    - ``shows_scroll_indicator``: hide the scroll bar when ``False``.
+
+    Events (dispatched by tag): ``on_row_press`` with the row index,
+    ``on_scroll`` with ``{"x", "y", "extent", "range"}`` in points.
+
+    Commands: ``scroll_to_offset`` / ``scroll_to_index`` /
+    ``scroll_to_end`` / ``get_scroll_offset``.
+    """
+
+    def _build(self, props: Dict[str, Any]) -> Any:
+        from ..virtual_rows import RowHostPool
+
+        tv = ObjCClass("UITableView").alloc().initWithFrame_style_(((0, 0), (0, 0)), 0)
+        tv.setTranslatesAutoresizingMaskIntoConstraints_(True)
+        tv.setSeparatorStyle_(0)  # none by default; rows draw their own
+        try:
+            tv.setEstimatedRowHeight_(0.0)  # force exact heightForRow
+        except Exception:
+            pass
+        tv.retain()
+        _pn_retained_views.append(tv)
+
+        source_ptr = _alloc_table_source_instance()
+        if source_ptr == 0:
+            raise RuntimeError("[VirtualList][iOS] dataSource alloc returned NULL")
+
+        _pn_table_state[source_ptr] = {
+            "count": int(props.get("count", 0) or 0),
+            "row_height": float(props.get("row_height", 44.0) or 44.0),
+            "row_heights": props.get("row_heights"),
+            "render_row": props.get("render_row"),
+            "pool": RowHostPool(),
+            "tv": tv,
+        }
+
+        _objc_msgSend.restype = None
+        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p]
+        tv_ptr = tv.ptr if hasattr(tv, "ptr") else tv
+        _objc_msgSend(tv_ptr, _SEL_SET_DATA_SOURCE, _ct.c_void_p(source_ptr))
+        _objc_msgSend(tv_ptr, _SEL_SET_DELEGATE, _ct.c_void_p(source_ptr))
+
+        state = _pn_table_state[source_ptr]
+        state["source_ptr"] = source_ptr
+        return tv
+
+    def _source_state(self, tv: Any) -> Optional[dict]:
+        tv_ptr = _objc_ptr(tv)
+        for info in _pn_table_state.values():
+            candidate = info.get("tv")
+            if candidate is not None and _objc_ptr(candidate) == tv_ptr:
+                return info
+        return None
+
+    def _apply(self, tv: Any, props: Dict[str, Any], initial: bool) -> None:
+        _apply_common_visual(tv, props)
+        info = self._source_state(tv)
+        if info is None:
+            return
+        data_changed = False
+        if "count" in props:
+            info["count"] = int(props.get("count") or 0)
+            data_changed = True
+        if "row_height" in props and props["row_height"] is not None:
+            info["row_height"] = float(props["row_height"])
+            data_changed = True
+        if "row_heights" in props:
+            info["row_heights"] = props.get("row_heights")
+            data_changed = True
+        if "render_row" in props:
+            info["render_row"] = props.get("render_row")
+            data_changed = True
+        if "shows_scroll_indicator" in props:
+            visible = props["shows_scroll_indicator"] is not False
+            try:
+                tv.setShowsVerticalScrollIndicator_(visible)
+            except Exception:
+                pass
+        if data_changed and not initial:
+            try:
+                tv.reloadData()
+            except Exception:
+                pass
+
+    def _teardown(self, tv: Any) -> None:
+        info = self._source_state(tv)
+        if info is None:
+            return
+        try:
+            info["pool"].release_all()
+        except Exception:
+            pass
+        info["tv"] = None
+        _pn_table_state.pop(info.get("source_ptr"), None)
+
+    def measure_intrinsic(
+        self,
+        native_view: Any,
+        max_width: float,
+        max_height: float,
+    ) -> Tuple[float, float]:
+        # Fill the available space, like a ScrollView clamped to its
+        # parent; collapse to 0 on unbounded axes (nested lists don't
+        # scroll, matching React Native).
+        w = max_width if math.isfinite(max_width) else 0.0
+        h = max_height if math.isfinite(max_height) else 0.0
+        return (max(0.0, w), max(0.0, h))
+
+    def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
+        if name == "scroll_to_offset":
+            y = float(args.get("y", 0.0) or 0.0)
+            animated = args.get("animated", True) is not False
+            try:
+                native_view.setContentOffset_animated_((0.0, y), animated)
+            except Exception:
+                pass
+            return None
+        if name == "scroll_to_index":
+            index = int(args.get("index", 0) or 0)
+            animated = args.get("animated", True) is not False
+            info = self._source_state(native_view)
+            count = int(info.get("count", 0)) if info else 0
+            index = max(0, min(index, max(0, count - 1)))
+            try:
+                path = ObjCClass("NSIndexPath").indexPathForRow_inSection_(index, 0)
+                # 1 = UITableViewScrollPositionTop
+                native_view.scrollToRowAtIndexPath_atScrollPosition_animated_(path, 1, animated)
+            except Exception:
+                pass
+            return None
+        if name == "scroll_to_end":
+            animated = args.get("animated", True) is not False
+            try:
+                content_h = float(native_view.contentSize.height)
+                bounds_h = float(native_view.bounds.size.height)
+                target = max(0.0, content_h - bounds_h)
+                native_view.setContentOffset_animated_((0.0, target), animated)
+            except Exception:
+                pass
+            return None
+        if name == "get_scroll_offset":
+            try:
+                offset = native_view.contentOffset
+                return {"x": float(offset.x), "y": float(offset.y)}
+            except Exception:
+                return {"x": 0.0, "y": 0.0}
+        return None
+
+
+# ======================================================================
 # Registration
 # ======================================================================
 
@@ -3673,6 +4350,7 @@ def register_handlers(registry: Any) -> None:
     registry.register("Checkbox", CheckboxHandler())
     registry.register("SegmentedControl", SegmentedControlHandler())
     registry.register("DatePicker", DatePickerHandler())
+    registry.register("VirtualList", VirtualListHandler())
 
 
 __all__ = [
@@ -3699,5 +4377,6 @@ __all__ = [
     "CheckboxHandler",
     "SegmentedControlHandler",
     "DatePickerHandler",
+    "VirtualListHandler",
     "register_handlers",
 ]

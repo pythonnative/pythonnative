@@ -32,7 +32,6 @@ from pythonnative.mutations import (
     DestroyOp,
     InsertOp,
     Mutation,
-    RemoveOp,
     SetFrameOp,
     UpdateOp,
 )
@@ -137,14 +136,6 @@ class FakeBackend:
             parent.children.insert(index, child)
             child.parent = parent
             return ("insert_child", parent.id, child.id, index)
-
-        if isinstance(op, RemoveOp):
-            parent = self._require(op.parent_tag, "remove_child")
-            child = self._require(op.child_tag, "remove_child")
-            if child in parent.children:
-                parent.children.remove(child)
-                child.parent = None
-            return ("remove_child", parent.id, child.id)
 
         if isinstance(op, DestroyOp):
             view = self.views.pop(op.tag, None)

@@ -71,10 +71,12 @@ def test_stylesheet_flatten_none() -> None:
     assert result == {}
 
 
-def test_theme_context_has_default() -> None:
-    val = ThemeContext._current()
-    assert val is DEFAULT_LIGHT_THEME
-    assert "primary_color" in val
+def test_theme_context_defaults_to_follow_system_sentinel() -> None:
+    # Without a Provider, the raw context value is the follow-system
+    # sentinel; `use_theme` resolves it against the color scheme.
+    from pythonnative.style import _FOLLOW_SYSTEM_THEME
+
+    assert ThemeContext._current() is _FOLLOW_SYSTEM_THEME
 
 
 def test_light_and_dark_themes_differ() -> None:

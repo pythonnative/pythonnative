@@ -43,6 +43,36 @@ _POLL_INTERVAL_MS = 16
 _WATCH_INTERVAL_S = 0.4
 
 
+def _publish_desktop_color_scheme() -> None:
+    """Publish the host OS appearance so `use_color_scheme` works in preview.
+
+    ``PN_COLOR_SCHEME=light|dark`` forces a value (handy for testing
+    both appearances); otherwise macOS is asked via ``defaults read``
+    (the key only exists when dark mode is on). Other platforms default
+    to light.
+    """
+    from . import appearance
+
+    forced = os.environ.get("PN_COLOR_SCHEME")
+    if forced in ("light", "dark"):
+        appearance.set_system_color_scheme(forced)
+        return
+    if sys.platform == "darwin":
+        import subprocess
+
+        try:
+            result = subprocess.run(
+                ["defaults", "read", "-g", "AppleInterfaceStyle"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            is_dark = result.returncode == 0 and result.stdout.strip() == "Dark"
+            appearance.set_system_color_scheme("dark" if is_dark else "light")
+        except Exception:
+            pass
+
+
 class DesktopApp:
     """Navigation-stack controller for the desktop preview window.
 
@@ -359,6 +389,7 @@ def run_preview(
         )
 
     root_dir, watched = _resolve_paths(component_path, project_root, watch_dir)
+    _publish_desktop_color_scheme()
 
     root = tk.Tk()
     root.title(title)

@@ -15,3 +15,5 @@ appId: ${APP_ID}
 - runFlow: ../flows/hooks/use_window_dimensions.yaml
 - runFlow: ../flows/hooks/memo.yaml
 - runFlow: ../flows/hooks/batch_updates.yaml
+- runFlow: ../flows/hooks/use_color_scheme.yaml
+- runFlow: ../flows/hooks/use_theme.yaml

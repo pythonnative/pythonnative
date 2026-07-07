@@ -1,6 +1,6 @@
 ### Contributing to PythonNative
 
-Thanks for your interest in contributing. This repository contains the PythonNative library, CLI, templates, a demo app, and a Django site used for docs/demo hosting and E2E. Contributions should keep the code reliable, cross‑platform, and easy to use.
+Thanks for your interest in contributing. This repository contains the PythonNative library, the `pn` CLI, Android/iOS project templates, example apps, and the documentation site. Contributions should keep the code reliable, cross-platform, and easy to use.
 
 ## Quick start
 
@@ -23,7 +23,7 @@ Common library and CLI entry points:
 # CLI help
 pn --help
 
-# create a new sample app (template fetch is remote)
+# create a new sample app from the bundled templates
 pn init my_app
 
 # run the Hello World example
@@ -35,9 +35,9 @@ cd examples/hello-world && pn run android
 - `src/pythonnative/`: installable library and CLI
   - `pythonnative/`: core cross‑platform UI components and utilities
   - `cli/`: `pn` command
+  - `templates/`: Android/iOS project templates (bundled with the package)
 - `tests/`: unit tests for the library, plus the Maestro E2E suite
   - `e2e/`: the comprehensive E2E suite (see [E2E tests](#e2e-tests-maestro) below and `tests/e2e/AGENTS.md`)
-- `templates/`: Android/iOS project templates and zips
 - `examples/`: runnable example apps
   - `hello-world/`: minimal marketing demo
   - `e2e-suite/`: comprehensive feature catalog that drives the Maestro E2E suite
@@ -49,7 +49,7 @@ cd examples/hello-world && pn run android
 - Style: Black; lint: Ruff; typing where useful. Keep APIs stable.
 - Prefer explicit, descriptive names; keep platform abstractions clean.
 - Add/extend tests under `tests/` for new behavior.
-- Don't commit generated artifacts or large binaries; templates live under `templates/`.
+- Don't commit generated artifacts or large binaries; templates live under `src/pythonnative/templates/`.
 - Docstrings: Google style throughout. Ruff is configured with the Google
   convention (`pydocstyle.convention = "google"`) and enforces the `D` rule
   set on `src/pythonnative/`. See the
@@ -229,7 +229,7 @@ Co-authored-by: Name <email>
 - Tests: added/updated; `pytest` passes.
 - Lint/format: `ruff check .`, `black` pass.
 - Docs: update `README.md` if behavior changes.
-- Templates: update `templates/` if generator output changes.
+- Templates: update `src/pythonnative/templates/` if generator output changes.
 - No generated artifacts committed.
 
 ## Versioning and releases
@@ -329,7 +329,7 @@ When you add a new public symbol you must also:
 ## Security and provenance
 
 - Avoid bundling secrets or credentials in templates or code.
-- Prefer runtime configuration via environment variables for Django and CI.
+- Prefer runtime configuration via environment variables in CI.
 
 ## License
 

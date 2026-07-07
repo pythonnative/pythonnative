@@ -185,6 +185,48 @@ pn.Text(
 )
 ```
 
+### Rich text (nested spans)
+
+`Text` accepts a mix of strings and nested `Text` elements, which
+flatten into one native label (a `SpannableString` on Android, an
+`NSAttributedString` on iOS). Each nested `Text` styles its own run
+and inherits everything it doesn't override from the outer element:
+
+```python
+pn.Text(
+    "Every plan includes ",
+    pn.Text("unlimited builds", style={"bold": True}),
+    " and ",
+    pn.Text("priority support", style={"color": "#DC2626", "text_decoration": "underline"}),
+    ".",
+    style={"font_size": 15, "color": "#0F172A"},
+)
+```
+
+Because the result is a single label, it wraps, truncates
+(`max_lines`), and measures as one paragraph; there's no need to
+assemble rows of separate `Text` views to mix weights or colors
+inline.
+
+### Pressed-state styles
+
+[`Pressable`][pythonnative.Pressable]'s `style` prop also accepts a
+callable receiving a state dict, mirroring React Native's
+function-style prop. It's called with `{"pressed": bool}` and
+re-applied as the press state changes:
+
+```python
+pn.Pressable(
+    pn.Text("Save"),
+    on_press=save,
+    style=lambda state: {
+        "padding": 12,
+        "border_radius": 8,
+        "background_color": "#1D4ED8" if state["pressed"] else "#3B82F6",
+    },
+)
+```
+
 ## Borders, shadows, and shape
 
 Every element accepts these visual props in `style`:
@@ -194,6 +236,8 @@ Every element accepts these visual props in `style`:
 | `border_radius` | number (uniform) |
 | `border_width` | number (in pt / dp) |
 | `border_color` | hex string |
+| `border_left_width`, `border_top_width`, `border_right_width`, `border_bottom_width` | number (per side) |
+| `border_left_color`, `border_top_color`, `border_right_color`, `border_bottom_color` | hex string (per side) |
 | `shadow_color` | hex string |
 | `shadow_offset` | `{"width": x, "height": y}` |
 | `shadow_opacity` | 0.0 – 1.0 |
@@ -201,6 +245,22 @@ Every element accepts these visual props in `style`:
 | `elevation` | number (Android Material shadow shorthand) |
 | `opacity` | 0.0 – 1.0 |
 | `tint_color` | hex string (Image only) |
+
+Per-side border props override the uniform `border_width` /
+`border_color` for the sides they name, so an "underline" card is
+just:
+
+```python
+pn.View(
+    pn.Text("Active tab"),
+    style={"border_bottom_width": 2, "border_bottom_color": "#007AFF"},
+)
+```
+
+On Android, `shadow_color` and `shadow_opacity` apply on API 28+;
+older versions fall back to the elevation shadow's default color.
+When `shadow_radius` is set without `elevation`, the elevation is
+derived from it so shadows show up without extra Android-only props.
 
 ```python
 pn.View(
@@ -395,9 +455,52 @@ pn.Row(
 - `padding: {"left": 8, "top": 16, "right": 8, "bottom": 16}`: per
   side.
 
-## Theming
+## Dark mode and theming
 
-PythonNative includes a built-in theme context with light and dark themes:
+### Following the system appearance
+
+[`use_color_scheme`][pythonnative.use_color_scheme] returns the
+effective scheme (`"light"` or `"dark"`) and re-renders the component
+when it changes, including live when the user flips the system
+setting while the app is open:
+
+```python
+import pythonnative as pn
+
+
+@pn.component
+def Wallpaper():
+    scheme = pn.use_color_scheme()
+    bg = "#000000" if scheme == "dark" else "#FFFFFF"
+    return pn.View(style={"flex": 1, "background_color": bg})
+```
+
+[`use_theme`][pythonnative.use_theme] goes one step further: without
+any provider it resolves the built-in
+[`DEFAULT_LIGHT_THEME`][pythonnative.style.DEFAULT_LIGHT_THEME] or
+[`DEFAULT_DARK_THEME`][pythonnative.style.DEFAULT_DARK_THEME] from the
+current scheme, so themed components are dark-mode aware by default:
+
+```python
+@pn.component
+def ThemedText(text: str = ""):
+    theme = pn.use_theme()
+    return pn.Text(text, style={"color": theme["text_color"], "font_size": theme["font_size"]})
+```
+
+An in-app appearance toggle overrides the system setting through the
+[`appearance`](../api/appearance.md) module:
+
+```python
+pn.appearance.set_color_scheme("dark")  # force dark everywhere
+pn.appearance.set_color_scheme(None)  # follow the system again
+```
+
+### Pinning a theme with a provider
+
+To pin an explicit theme for a subtree (ignoring the color scheme),
+mount a `ThemeContext` provider; `use_theme` returns the provided
+value as-is:
 
 ```python
 import pythonnative as pn
@@ -405,16 +508,10 @@ from pythonnative.style import DEFAULT_DARK_THEME
 
 
 @pn.component
-def ThemedText(text: str = ""):
-    theme = pn.use_context(pn.ThemeContext)
-    return pn.Text(text, style={"color": theme["text_color"], "font_size": theme["font_size"]})
-
-
-@pn.component
 def DarkPage():
     return pn.Provider(pn.ThemeContext, DEFAULT_DARK_THEME,
         pn.Column(
-            ThemedText(text="Dark mode!"),
+            ThemedText(text="Always dark!"),
             style={"spacing": 8},
         )
     )

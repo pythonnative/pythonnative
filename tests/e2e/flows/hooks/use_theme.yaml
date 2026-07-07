@@ -1,0 +1,23 @@
+# Tests use_theme resolves the built-in theme from the color scheme.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_theme.py
+# Source under test: src/pythonnative/style.py :: use_theme
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_theme
+- tapOn: "Force light"
+- assertVisible: "Theme background: #FFFFFF"
+- assertVisible: "Theme primary: #007AFF"
+- tapOn: "Force dark"
+- assertVisible: "Theme background: #000000"
+- assertVisible: "Theme primary: #0A84FF"
+# Restore the system setting so later flows see an unforced scheme.
+- tapOn: "Follow system"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

@@ -54,6 +54,19 @@ All components accept these layout properties in their `style` dict:
 - `key`: stable identity for reconciliation (passed as a kwarg, not inside
   `style`).
 
+### Accessibility and testing (kwargs)
+
+Most visible components also accept these keyword arguments (see
+[Platform & Accessibility](../guides/platform-accessibility.md)):
+
+- `accessibility_label`, `accessibility_hint`, `accessibility_role`,
+  `accessible`
+- `accessibility_state`: dict of `disabled` / `selected` / `checked` /
+  `busy` / `expanded` flags
+- `accessibility_live_region`: `"polite"` or `"assertive"`
+- `test_id`: stable identifier exposed to UI test frameworks
+  (`accessibilityIdentifier` on iOS, resource-id on Android)
+
 ## View
 
 ```python
@@ -98,6 +111,14 @@ pn.Text(text, style={"font_size": 18, "color": "#333", "bold": True, "text_align
 
 - `text`: display string (positional)
 - Style properties: `font_size`, `color`, `bold`, `text_align`, `background_color`, `max_lines`
+
+Rich text: pass a mix of strings and nested `Text` elements as the
+positional parts; they flatten into a single native attributed string
+(each nested `Text` styles its own run and inherits the rest):
+
+```python
+pn.Text("Total: ", pn.Text("$42", style={"bold": True, "color": "#16A34A"}))
+```
 
 ## Button
 
@@ -190,11 +211,22 @@ pn.TextInput(value="", placeholder="Enter text", on_change=handler, secure=False
 ## Image
 
 ```python
-pn.Image(source="https://example.com/photo.jpg", style={"width": 200, "height": 150, "scale_type": "cover"})
+pn.Image(source="https://example.com/photo.jpg",
+         placeholder_color="#E2E8F0",
+         on_load=lambda: ..., on_error=lambda message: ...,
+         style={"width": 200, "height": 150, "scale_type": "cover"})
 ```
 
-- `source`: image URL (`http://...` / `https://...`) or local resource name
-- Style properties: `width`, `height`, `scale_type` (`"cover"`, `"contain"`, `"stretch"`, `"center"`), `background_color`
+- `source`: image URL (`http://...` / `https://...`), inline `data:` URI,
+  absolute file path, or local resource name
+- `placeholder_color`: background shown while a remote image loads
+- `on_load`: callback `() -> None` when the image is displayed
+- `on_error`: callback `(str) -> None` when loading or decoding fails
+- Style properties: `width`, `height`, `scale_type` (`"cover"`, `"contain"`, `"stretch"`, `"center"`), `background_color`, `tint_color`
+
+Remote sources load through the shared [image pipeline](images.md):
+background download, memory + disk caching, request deduplication,
+and decode downsampled to the view's bounds.
 
 ## Switch
 
@@ -271,6 +303,17 @@ pn.Pressable(child, on_press=handler, on_long_press=handler)
 ```
 
 Wraps any child element with tap/long-press handling.
+
+`style` may also be a callable receiving `{"pressed": bool}`, re-applied
+as the press state changes:
+
+```python
+pn.Pressable(
+    child,
+    on_press=handler,
+    style=lambda state: {"opacity": 0.6 if state["pressed"] else 1.0},
+)
+```
 
 ## Modal
 
@@ -433,10 +476,12 @@ pn.FlatList(data=items, render_item=render_fn, key_extractor=key_fn,
 - `data`: list of items
 - `render_item`: `(item, index) -> Element` function
 - `key_extractor`: `(item, index) -> str` for stable keys
-- `item_height`: fixed row height; enables native virtualization
+- `item_height`: fixed row height; qualifies the list for the native
+  RecyclerView / UITableView virtualization path (see the
+  [Lists guide](../guides/lists.md))
 - `separator_height`: spacing between items
-- `horizontal`: lay rows out left-to-right (eager backend)
-- `num_columns`: render as a grid of N columns (eager backend)
+- `horizontal`: lay rows out left-to-right (Python-windowed engine)
+- `num_columns`: render as a grid of N columns (Python-windowed engine)
 - `list_header` / `list_footer`: elements rendered once above / below rows
 - `list_empty`: element rendered when `data` is empty
 - `on_end_reached`: callback `() -> None` near the end (virtualized)

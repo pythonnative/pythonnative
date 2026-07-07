@@ -22,8 +22,8 @@ Op ordering rules (the reconciler guarantees these):
 
 1. A `CreateOp` for a tag precedes any other op referencing that tag.
 2. `InsertOp` ops appear after both the parent and child exist.
-3. `DestroyOp` ops appear after the corresponding `RemoveOp` (if the
-   node was attached) and are emitted children-first.
+3. `DestroyOp` ops are emitted children-first; handlers detach the view
+   from its parent as part of destruction.
 4. `SetFrameOp` ops are only emitted for frames that actually changed
    since the last layout pass (frame diffing).
 """
@@ -35,7 +35,6 @@ __all__ = [
     "CreateOp",
     "UpdateOp",
     "InsertOp",
-    "RemoveOp",
     "DestroyOp",
     "SetFrameOp",
     "Mutation",
@@ -87,14 +86,6 @@ class InsertOp:
 
 
 @dataclass(frozen=True)
-class RemoveOp:
-    """Detach the child view from the parent view (without destroying it)."""
-
-    parent_tag: int
-    child_tag: int
-
-
-@dataclass(frozen=True)
 class DestroyOp:
     """Release the native view registered under ``tag``.
 
@@ -126,5 +117,5 @@ class SetFrameOp:
         return (self.x, self.y, self.width, self.height)
 
 
-Mutation = Union[CreateOp, UpdateOp, InsertOp, RemoveOp, DestroyOp, SetFrameOp]
+Mutation = Union[CreateOp, UpdateOp, InsertOp, DestroyOp, SetFrameOp]
 """Union of every op type carried by a commit transaction."""

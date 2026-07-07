@@ -72,7 +72,7 @@ implemented on top of `Alert.show(style="action_sheet")`.
 ## Accessibility props
 
 Every interactive component (`Text`, `Button`, `Pressable`,
-`TextInput`, `Image`, container views) accepts the same four
+`TextInput`, `Image`, container views) accepts the same set of
 accessibility kwargs:
 
 | Prop | Purpose |
@@ -81,6 +81,46 @@ accessibility kwargs:
 | `accessibility_hint` | Extra detail (iOS only) |
 | `accessibility_role` | Semantic role (`"button"`, `"link"`, `"image"`, ...) |
 | `accessible` | Override whether the element is exposed to assistive tech |
+| `accessibility_state` | Dict of state flags announced with the element |
+| `accessibility_live_region` | Announce content changes: `"polite"` or `"assertive"` |
+| `test_id` | Stable identifier for UI test frameworks |
 
 Components like [`Button`][pythonnative.Button] supply a sensible
 default `accessibility_role` for you.
+
+### State flags
+
+`accessibility_state` mirrors React Native's prop of the same name.
+Supported keys are `disabled`, `selected`, `checked`, `busy`, and
+`expanded`; they map to `UIAccessibilityTraits` on iOS and to
+`AccessibilityNodeInfo` state on Android:
+
+```python
+pn.Pressable(
+    pn.Text("Inbox"),
+    on_press=select_inbox,
+    accessibility_role="button",
+    accessibility_state={"selected": current_tab == "inbox"},
+)
+```
+
+### Live regions
+
+Set `accessibility_live_region="polite"` on a status line so screen
+readers announce its text when it changes without moving focus (use
+`"assertive"` only for content the user must hear immediately):
+
+```python
+pn.Text(f"{unread} unread messages", accessibility_live_region="polite")
+```
+
+### Test identifiers
+
+`test_id` gives UI-test frameworks (Maestro, Appium, XCUITest,
+Espresso) a stable handle that is independent of visible text. It
+maps to `accessibilityIdentifier` on iOS and to the accessibility
+node's `viewIdResourceName` (resource-id) on Android:
+
+```python
+pn.Button("Continue", on_click=next_step, test_id="onboarding-continue")
+```

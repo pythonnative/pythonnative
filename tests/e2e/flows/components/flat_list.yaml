@@ -1,7 +1,10 @@
 # Tests FlatList virtualizes rows; scrolling reveals later rows.
+# With a fixed item_height the demo takes the native virtualization
+# path (RecyclerView / UITableView with nested-reconciler rows), so
+# this flow exercises native cell recycling end to end.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/flat_list.py
-# Source under test: src/pythonnative/components.py :: FlatList
+# Source under test: src/pythonnative/components.py :: FlatList, _NativeList
 #
 # The demo sizes the FlatList (~400 dp) so it overlaps the vertical
 # center of the screen on both the iOS and Android CI emulators,

@@ -36,7 +36,7 @@ Example:
 
 from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union
 
-from .hooks import Context, create_context
+from .hooks import Context, create_context, use_color_scheme, use_context
 
 # ======================================================================
 # Atomic value types
@@ -283,6 +283,14 @@ class Style(TypedDict, total=False):
     # --- Visual: borders ---
     border_width: float
     border_radius: float
+    border_top_width: float
+    border_right_width: float
+    border_bottom_width: float
+    border_left_width: float
+    border_top_color: Color
+    border_right_color: Color
+    border_bottom_color: Color
+    border_left_color: Color
 
     # --- Visual: typography ---
     font_size: float
@@ -481,6 +489,7 @@ DEFAULT_LIGHT_THEME: Dict[str, Any] = {
     "spacing_large": 16,
     "border_radius": 8,
 }
+"""Built-in light theme selected by [`use_theme`][pythonnative.use_theme]."""
 
 DEFAULT_DARK_THEME: Dict[str, Any] = {
     "primary_color": "#0A84FF",
@@ -500,15 +509,63 @@ DEFAULT_DARK_THEME: Dict[str, Any] = {
     "spacing_large": 16,
     "border_radius": 8,
 }
+"""Built-in dark theme selected by [`use_theme`][pythonnative.use_theme]."""
 
-ThemeContext: Context = create_context(DEFAULT_LIGHT_THEME)
-"""Default theme context populated with `DEFAULT_LIGHT_THEME`.
+_FOLLOW_SYSTEM_THEME = object()
+"""Sentinel default for `ThemeContext`: resolve from the color scheme."""
 
-Wrap a subtree in
+ThemeContext: Context = create_context(_FOLLOW_SYSTEM_THEME)
+"""Theme context that follows the system color scheme by default.
+
+Without a provider, [`use_theme`][pythonnative.use_theme] resolves to
+[`DEFAULT_LIGHT_THEME`][pythonnative.style.DEFAULT_LIGHT_THEME] or
+[`DEFAULT_DARK_THEME`][pythonnative.style.DEFAULT_DARK_THEME] based on
+the current appearance. Wrap a subtree in
 [`Provider(ThemeContext, my_theme, ...)`][pythonnative.Provider] to
-override the theme for that subtree, then read it inside descendants
-via [`use_context(ThemeContext)`][pythonnative.use_context].
+pin an explicit theme for that subtree, then read it inside
+descendants via [`use_theme`][pythonnative.use_theme] (or
+[`use_context(ThemeContext)`][pythonnative.use_context]).
 """
+
+
+def default_theme(scheme: str) -> Dict[str, Any]:
+    """Return the built-in theme dict for ``scheme`` (``"light"`` / ``"dark"``)."""
+    return DEFAULT_DARK_THEME if scheme == "dark" else DEFAULT_LIGHT_THEME
+
+
+def use_theme() -> Dict[str, Any]:
+    """Return the active theme, following the system appearance by default.
+
+    If an ancestor mounted a ``Provider(ThemeContext, ...)``, that
+    theme is returned as-is. Otherwise the built-in light or dark
+    theme is selected from the effective color scheme (via
+    [`use_color_scheme`][pythonnative.use_color_scheme], so the
+    component re-renders when the system appearance flips).
+
+    Returns:
+        The active theme dict.
+
+    Raises:
+        RuntimeError: If called outside a `@component` function.
+
+    Example:
+        ```python
+        import pythonnative as pn
+
+        @pn.component
+        def Card():
+            theme = pn.use_theme()
+            return pn.View(
+                pn.Text("Hello", style=pn.style(color=theme["text_color"])),
+                style=pn.style(background_color=theme["surface_color"]),
+            )
+        ```
+    """
+    scheme = use_color_scheme()
+    theme = use_context(ThemeContext)
+    if theme is _FOLLOW_SYSTEM_THEME:
+        return default_theme(scheme)
+    return theme
 
 
 __all__ = [
@@ -543,6 +600,8 @@ __all__ = [
     "TransformScaleY",
     "TransformSpec",
     "TransformTranslate",
+    "default_theme",
     "resolve_style",
     "style",
+    "use_theme",
 ]

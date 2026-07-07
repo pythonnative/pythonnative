@@ -170,13 +170,6 @@ def test_load_missing_raises(tmp_path: Path) -> None:
     assert "No pythonnative.toml" in str(exc.value)
 
 
-def test_load_missing_mentions_legacy_json(tmp_path: Path) -> None:
-    (tmp_path / "pythonnative.json").write_text("{}", encoding="utf-8")
-    with pytest.raises(ConfigError) as exc:
-        AppConfig.load(tmp_path)
-    assert "legacy" in str(exc.value).lower()
-
-
 def test_rendered_default_toml_parses_and_loads() -> None:
     text = render_default_toml(name="my_app", app_id="com.example.my_app")
     data = tomllib.loads(text)

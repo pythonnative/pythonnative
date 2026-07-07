@@ -13,7 +13,7 @@ from typing import Any, Dict, Tuple
 import pytest
 
 from pythonnative.layout import LAYOUT_STYLE_KEYS
-from pythonnative.mutations import CreateOp, DestroyOp, InsertOp, RemoveOp, SetFrameOp, UpdateOp
+from pythonnative.mutations import CreateOp, DestroyOp, InsertOp, SetFrameOp, UpdateOp
 from pythonnative.native_views import NativeViewRegistry, set_registry
 from pythonnative.native_views.base import (
     ViewHandler,
@@ -239,7 +239,7 @@ def test_registry_update_unknown_tag_noop() -> None:
     reg.apply_mutations([UpdateOp(999_999, {"a": 1})])
 
 
-def test_registry_insert_and_remove_child() -> None:
+def test_registry_insert_child() -> None:
     reg = _make_registry()
     parent_tag, child_tag = _next_tag(), _next_tag()
     reg.apply_mutations(
@@ -253,15 +253,10 @@ def test_registry_insert_and_remove_child() -> None:
     child = reg.resolve_view(child_tag)
     assert parent.children == [child]
 
-    reg.apply_mutations([RemoveOp(parent_tag, child_tag)])
-    assert parent.children == []
-    # Removed (not destroyed): the tag is still live.
-    assert reg.resolve_view(child_tag) is child
-
 
 def test_registry_child_ops_unknown_tags_noop() -> None:
     reg = _make_registry()
-    reg.apply_mutations([InsertOp(111_111, 222_222, 0), RemoveOp(111_111, 222_222)])
+    reg.apply_mutations([InsertOp(111_111, 222_222, 0)])
 
 
 def test_registry_destroy_releases_tag_and_calls_handler() -> None:

@@ -1,0 +1,22 @@
+# Tests use_color_scheme re-renders when the appearance override flips.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_color_scheme.py
+# Source under test: src/pythonnative/hooks.py :: use_color_scheme
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_color_scheme
+- assertVisible: "Scheme: .*"
+- tapOn: "Force dark"
+- assertVisible: "Scheme: dark"
+- tapOn: "Force light"
+- assertVisible: "Scheme: light"
+# Restore the system setting so later flows see an unforced scheme.
+- tapOn: "Follow system"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

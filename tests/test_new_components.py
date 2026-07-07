@@ -53,14 +53,54 @@ def test_status_bar_style_and_hidden() -> None:
 
 def test_keyboard_avoiding_default_behavior() -> None:
     el = KeyboardAvoidingView(Text("hi"))
-    assert el.type == "KeyboardAvoidingView"
+    assert callable(el.type)  # hook-driven composite
     assert el.props["behavior"] == "padding"
-    assert len(el.children) == 1
+    assert len(el.props["children"]) == 1
+
+    _, _, backend = _mount(el)
+    inner = [v for v in backend.views.values() if v.type_name == "KeyboardAvoidingView"]
+    assert len(inner) == 1
 
 
 def test_keyboard_avoiding_custom_behavior() -> None:
     el = KeyboardAvoidingView(Text("hi"), behavior="position")
     assert el.props["behavior"] == "position"
+
+
+def test_keyboard_avoiding_padding_follows_keyboard_height() -> None:
+    from pythonnative import platform_metrics
+
+    platform_metrics.reset_keyboard_height()
+    try:
+        _, rec, backend = _mount(KeyboardAvoidingView(Text("hi"), style={"padding_bottom": 4}))
+        view = next(v for v in backend.views.values() if v.type_name == "KeyboardAvoidingView")
+        assert view.props.get("padding_bottom") == 4
+
+        platform_metrics.set_keyboard_height(250.0)
+        rec.flush_dirty()
+        view = next(v for v in backend.views.values() if v.type_name == "KeyboardAvoidingView")
+        assert view.props.get("padding_bottom") == 254.0
+
+        platform_metrics.set_keyboard_height(0.0)
+        rec.flush_dirty()
+        view = next(v for v in backend.views.values() if v.type_name == "KeyboardAvoidingView")
+        assert view.props.get("padding_bottom") == 4
+    finally:
+        platform_metrics.reset_keyboard_height()
+
+
+def test_keyboard_avoiding_position_translates_upward() -> None:
+    from pythonnative import platform_metrics
+
+    platform_metrics.reset_keyboard_height()
+    try:
+        _, rec, backend = _mount(KeyboardAvoidingView(Text("hi"), behavior="position", keyboard_vertical_offset=50.0))
+        platform_metrics.set_keyboard_height(250.0)
+        rec.flush_dirty()
+        view = next(v for v in backend.views.values() if v.type_name == "KeyboardAvoidingView")
+        assert view.props.get("transform") == [{"translate_y": -200.0}]
+    finally:
+        platform_metrics.reset_keyboard_height()
 
 
 # ======================================================================

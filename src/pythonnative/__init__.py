@@ -62,7 +62,7 @@ Example:
 
 __version__ = "0.22.1"
 
-from . import gestures, runtime, sdk
+from . import appearance, gestures, images, runtime, sdk
 from .alerts import Alert
 from .animated import Animated, AnimatedValue, use_animated_value
 from .components import (
@@ -132,6 +132,7 @@ from .hooks import (
     memo,
     use_async_effect,
     use_callback,
+    use_color_scheme,
     use_context,
     use_effect,
     use_keyboard_height,
@@ -185,6 +186,8 @@ from .sdk import (
 )
 from .storage import AsyncStorage, use_persisted_state
 from .style import (
+    DEFAULT_DARK_THEME,
+    DEFAULT_LIGHT_THEME,
     AlignItems,
     AlignSelf,
     AutoCapitalize,
@@ -207,8 +210,10 @@ from .style import (
     TextDecoration,
     ThemeContext,
     TransformSpec,
+    default_theme,
     resolve_style,
     style,
+    use_theme,
 )
 
 __all__ = [
@@ -280,6 +285,7 @@ __all__ = [
     "QueryResult",
     "use_async_effect",
     "use_callback",
+    "use_color_scheme",
     "use_context",
     "use_effect",
     "use_focus_effect",
@@ -306,6 +312,8 @@ __all__ = [
     "AlignSelf",
     "AutoCapitalize",
     "Color",
+    "DEFAULT_DARK_THEME",
+    "DEFAULT_LIGHT_THEME",
     "Dimension",
     "EdgeInsets",
     "FlexDirection",
@@ -324,8 +332,14 @@ __all__ = [
     "TextDecoration",
     "ThemeContext",
     "TransformSpec",
+    "default_theme",
     "resolve_style",
     "style",
+    "use_theme",
+    # Appearance
+    "appearance",
+    # Image pipeline
+    "images",
     # Animation
     "Animated",
     "AnimatedValue",

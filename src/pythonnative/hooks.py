@@ -899,6 +899,47 @@ def use_keyboard_height() -> float:
     return platform_metrics.get_keyboard_height()
 
 
+def use_color_scheme() -> str:
+    """Return the effective color scheme and re-render when it changes.
+
+    Equivalent to React Native's ``useColorScheme``. The system value
+    is published by the screen host; an app-level override set through
+    [`appearance.set_color_scheme`][pythonnative.appearance.set_color_scheme]
+    takes precedence.
+
+    Returns:
+        ``"light"`` or ``"dark"``.
+
+    Raises:
+        RuntimeError: If called outside a `@component` function.
+
+    Example:
+        ```python
+        import pythonnative as pn
+
+        @pn.component
+        def Banner():
+            scheme = pn.use_color_scheme()
+            bg = "#000000" if scheme == "dark" else "#FFFFFF"
+            return pn.View(style=pn.style(background_color=bg))
+        ```
+    """
+    from . import appearance
+
+    ctx = _get_hook_state()
+    if ctx is None:
+        raise RuntimeError("use_color_scheme must be called inside a @component function")
+
+    _, set_tick = use_state(0)
+
+    def subscribe() -> Callable[[], None]:
+        return appearance.subscribe(lambda: set_tick(lambda n: n + 1))
+
+    use_effect(subscribe, [])
+
+    return appearance.get_color_scheme()
+
+
 # ======================================================================
 # Context
 # ======================================================================

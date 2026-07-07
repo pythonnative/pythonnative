@@ -1,4 +1,5 @@
-# Tests Text element renders multiple variants in one screen.
+# Tests Text element renders multiple variants, including rich text
+# built from nested spans (SpannableString / NSAttributedString).
 #
 # Demo screen: examples/e2e-suite/app/screens/components/text.py
 # Source under test: src/pythonnative/components.py :: Text
@@ -12,6 +13,9 @@ appId: ${APP_ID}
 - assertVisible: "Plain text line"
 - assertVisible: "Bold text line"
 - assertVisible: "Sized and colored line"
+# Rich text: three nested spans flatten into one native label whose
+# plain text is the concatenation of the parts.
+- assertVisible: "Rich start bold middle red end"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

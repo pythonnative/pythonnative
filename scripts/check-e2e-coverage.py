@@ -151,10 +151,19 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "Share",
     "Vibration",
     # --------------------------------------------------------------
+    # Theming data: observed through the use_theme demo, which flips
+    # the scheme and asserts the built-in light/dark values render.
+    # --------------------------------------------------------------
+    "DEFAULT_LIGHT_THEME",  # constant dict; values asserted in use_theme demo
+    "DEFAULT_DARK_THEME",  # constant dict; values asserted in use_theme demo
+    "default_theme",  # pure lookup over the two constants; use_theme demo
+    # --------------------------------------------------------------
     # SDK re-exports: module-level names mirroring submodule content.
     # --------------------------------------------------------------
     "runtime",  # module re-export; run_async demo covers it
     "sdk",  # module re-export; custom_component demo covers it
+    "appearance",  # module re-export; use_color_scheme demo drives set_color_scheme
+    "images",  # module re-export; Image demo exercises the fetch/cache pipeline
     "ViewHandler",  # ABC; subclassed by built-in handlers
     "element_factory",  # tested via unit tests; needs registered handlers
     "register_component",  # tested via unit tests; needs handler implementations

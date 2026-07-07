@@ -678,6 +678,65 @@ if IS_ANDROID:
                 bottom_px / density,
                 right_px / density,
             )
+            # IME (soft keyboard) insets: API 30+ exposes them through
+            # the typed getInsets API. The keyboard overlaps the system
+            # navigation bar, so the visible keyboard height is the IME
+            # inset minus the permanent bottom bar inset. Older API
+            # levels don't report IME insets here; those devices rely
+            # on ``adjustResize`` shrinking the window (the viewport
+            # push handles the layout) and the height stays 0.
+            try:
+                ime = insets_obj.getInsets(Type.ime())
+                ime_px = max(0, int(ime.bottom) - bottom_px)
+                platform_metrics.set_keyboard_height(ime_px / density)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    def _android_publish_color_scheme(activity: Any) -> None:
+        """Read the system night mode from the activity and publish it.
+
+        Android delivers appearance changes as a configuration change,
+        which recreates the activity by default, so publishing on
+        ``on_create`` / ``on_resume`` covers both the initial value and
+        subsequent flips.
+        """
+        try:
+            from . import appearance
+
+            Configuration = jclass("android.content.res.Configuration")
+            ui_mode = int(activity.getResources().getConfiguration().uiMode)
+            night = ui_mode & int(Configuration.UI_MODE_NIGHT_MASK)
+            is_dark = night == int(Configuration.UI_MODE_NIGHT_YES)
+            appearance.set_system_color_scheme("dark" if is_dark else "light")
+        except Exception:
+            pass
+
+    def _android_register_insets_listener(host: Any, view: Any) -> None:
+        """Re-publish insets whenever the window's insets change.
+
+        The ``OnLayoutChangeListener`` in ``_android_register_layout_listener``
+        only fires when the container is re-measured, which covers
+        ``adjustResize`` keyboards but not inset-only changes (e.g. an
+        edge-to-edge window where the IME floats over the content).
+        ``setOnApplyWindowInsetsListener`` fires on every insets pass,
+        so keyboard show/hide reaches ``platform_metrics`` immediately.
+        """
+        try:
+            View = jclass("android.view.View")
+
+            class _PNInsetsListener(dynamic_proxy(View.OnApplyWindowInsetsListener)):  # type: ignore[misc]
+                def onApplyWindowInsets(self, v: Any, insets: Any) -> Any:
+                    try:
+                        _android_publish_window_insets(v)
+                    except Exception:
+                        pass
+                    return insets
+
+            listener = _PNInsetsListener()
+            view.setOnApplyWindowInsetsListener(listener)
+            host._insets_listener = listener  # retain to prevent GC
         except Exception:
             pass
 
@@ -761,12 +820,14 @@ if IS_ANDROID:
             _init_host_common(self, component_path, component_func)
 
         def on_create(self) -> None:
+            _android_publish_color_scheme(self.native_instance)
             _on_create(self)
 
         def on_start(self) -> None:
             pass
 
         def on_resume(self) -> None:
+            _android_publish_color_scheme(self.native_instance)
             _set_host_focused(self, True)
 
         def on_layout(self) -> None:
@@ -873,6 +934,7 @@ if IS_ANDROID:
 
             if container is not None:
                 _android_register_layout_listener(self, container)
+                _android_register_insets_listener(self, container)
                 _android_push_initial_viewport(self, container)
 
         def _detach_root(self, native_view: Any) -> None:
@@ -1128,6 +1190,24 @@ else:
         except Exception:
             pass
 
+    def _ios_publish_color_scheme() -> None:
+        """Read the current UIKit interface style and publish it.
+
+        ``UITraitCollection.currentTraitCollection`` reflects the
+        active appearance; ``userInterfaceStyle`` is 1 for light and
+        2 for dark (0 = unspecified, treated as light). Called from
+        the lifecycle callbacks that fire on appearance flips
+        (``viewDidLayoutSubviews`` / ``viewDidAppear``).
+        """
+        try:
+            from . import appearance
+
+            UITraitCollection = ObjCClass("UITraitCollection")
+            style_value = int(UITraitCollection.currentTraitCollection.userInterfaceStyle)
+            appearance.set_system_color_scheme("dark" if style_value == 2 else "light")
+        except Exception:
+            pass
+
     def _ios_register_screen(vc_instance: Any, host_obj: Any) -> None:
         ptr = _objc_addr(vc_instance)
         if ptr is None:
@@ -1273,6 +1353,7 @@ else:
                     _ios_register_screen(self.native_instance, self)
 
             def on_create(self) -> None:
+                _ios_publish_color_scheme()
                 _on_create(self)
 
             def on_start(self) -> None:
@@ -1483,6 +1564,9 @@ else:
                 # insets are now valid (initial layout, rotation,
                 # multitasking, …). Re-sync the root frame and push the
                 # viewport so the layout engine matches the visible area.
+                # Appearance flips also trigger a layout pass, so the
+                # color scheme is re-published here too.
+                _ios_publish_color_scheme()
                 if self._root_native_view is None:
                     _log_pn("on_layout: no root_native_view yet, skipping")
                     return
@@ -1494,6 +1578,7 @@ else:
                 # ``viewDidAppear`` always follows ``viewDidLayoutSubviews``,
                 # but trigger one extra sync here for safety in case a
                 # template overrides the layout call without forwarding.
+                _ios_publish_color_scheme()
                 _set_host_focused(self, True)
                 if self._root_native_view is None:
                     _log_pn("on_resume: no root_native_view yet, skipping")

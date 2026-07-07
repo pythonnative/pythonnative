@@ -31,7 +31,7 @@ into your project or use this trimmed version:
 
 ```python
 from pythonnative.mutations import (
-    CreateOp, UpdateOp, InsertOp, RemoveOp, DestroyOp, SetFrameOp,
+    CreateOp, UpdateOp, InsertOp, DestroyOp, SetFrameOp,
 )
 
 
@@ -60,8 +60,6 @@ class FakeBackend:
             elif isinstance(op, InsertOp):
                 child = self.views[op.child_tag]
                 self.views[op.parent_tag].children.insert(op.index, child)
-            elif isinstance(op, RemoveOp):
-                self.views[op.parent_tag].children.remove(self.views[op.child_tag])
             elif isinstance(op, DestroyOp):
                 self.views.pop(op.tag, None)
             elif isinstance(op, SetFrameOp):

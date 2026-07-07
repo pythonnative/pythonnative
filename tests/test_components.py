@@ -37,6 +37,47 @@ def test_text_defaults() -> None:
     assert el.children == []
 
 
+def test_text_single_string_has_no_spans() -> None:
+    el = Text("plain")
+    assert el.props["text"] == "plain"
+    assert "spans" not in el.props
+
+
+def test_text_rich_spans_flatten_and_concatenate() -> None:
+    el = Text(
+        "Hello, ",
+        Text("world", style={"bold": True, "color": "#0A84FF"}),
+        "!",
+    )
+    assert el.props["text"] == "Hello, world!"
+    spans = el.props["spans"]
+    assert spans == [
+        {"text": "Hello, "},
+        {"text": "world", "bold": True, "color": "#0A84FF"},
+        {"text": "!"},
+    ]
+    assert el.children == []  # spans are props, not native children
+
+
+def test_text_nested_spans_inherit_and_override() -> None:
+    el = Text(
+        Text(
+            "outer ",
+            Text("inner", style={"italic": True}),
+            style={"color": "#FF0000", "italic": False},
+        ),
+    )
+    spans = el.props["spans"]
+    assert spans[0] == {"text": "outer ", "color": "#FF0000", "italic": False}
+    assert spans[1] == {"text": "inner", "color": "#FF0000", "italic": True}
+
+
+def test_text_multiple_plain_strings_become_spans() -> None:
+    el = Text("a", "b")
+    assert el.props["text"] == "ab"
+    assert el.props["spans"] == [{"text": "a"}, {"text": "b"}]
+
+
 def test_text_with_style() -> None:
     el = Text("Hello", style={"font_size": 18, "color": "#FF0000", "bold": True, "text_align": "center"})
     assert el.props["text"] == "Hello"
@@ -307,8 +348,9 @@ def test_view_flex_grow_shrink() -> None:
 
 def test_safe_area_view() -> None:
     el = SafeAreaView(Text("safe"), style={"background_color": "#000"})
-    assert el.type == "SafeAreaView"
-    assert len(el.children) == 1
+    assert callable(el.type)  # hook-driven composite
+    assert len(el.props["children"]) == 1
+    assert el.props["style"]["background_color"] == "#000"
 
 
 def test_modal() -> None:
@@ -447,3 +489,90 @@ def test_fragment_drops_none_children() -> None:
     c = Text("c")
     el = Fragment(a, None, c, None)
     assert el.children == [a, c]
+
+
+# ======================================================================
+# test_id / accessibility_state / accessibility_live_region
+# ======================================================================
+
+
+def test_test_id_and_accessibility_state_flow_into_props() -> None:
+    state = {"disabled": True, "checked": False}
+    el = Button(
+        "Go",
+        test_id="go_button",
+        accessibility_state=state,
+        accessibility_live_region="polite",
+    )
+    assert el.props["test_id"] == "go_button"
+    assert el.props["accessibility_state"] == state
+    assert el.props["accessibility_live_region"] == "polite"
+
+
+def test_test_id_omitted_when_not_set() -> None:
+    el = Button("Go")
+    assert "test_id" not in el.props
+    assert "accessibility_state" not in el.props
+    assert "accessibility_live_region" not in el.props
+
+
+# ======================================================================
+# Pressable state-based styles
+# ======================================================================
+
+
+def test_pressable_static_style_stays_plain_element() -> None:
+    el = Pressable(Text("tap"), style={"padding": 8})
+    assert el.type == "Pressable"
+    assert el.props["padding"] == 8
+
+
+def test_pressable_callable_style_tracks_pressed_state() -> None:
+    from pythonnative.events import dispatch_event
+    from pythonnative.reconciler import Reconciler
+
+    el = Pressable(
+        Text("tap"),
+        style=lambda s: {"background_color": "#222222" if s["pressed"] else "#EEEEEE"},
+    )
+    assert callable(el.type)  # stateful composite
+
+    backend = FakeBackend()
+    rec = Reconciler(backend)
+    rec._screen_re_render = lambda: None
+    rec.mount(el)
+
+    tag, view = next((t, v) for t, v in backend.views.items() if v.type_name == "Pressable")
+    assert view.props["background_color"] == "#EEEEEE"
+
+    assert dispatch_event(tag, "on_press_in") is True
+    rec.flush_dirty()
+    view = next(v for v in backend.views.values() if v.type_name == "Pressable")
+    assert view.props["background_color"] == "#222222"
+
+    dispatch_event(tag, "on_press_out")
+    rec.flush_dirty()
+    view = next(v for v in backend.views.values() if v.type_name == "Pressable")
+    assert view.props["background_color"] == "#EEEEEE"
+
+
+def test_pressable_callable_style_forwards_user_press_callbacks() -> None:
+    from pythonnative.events import dispatch_event
+    from pythonnative.reconciler import Reconciler
+
+    calls = []
+    el = Pressable(
+        Text("tap"),
+        style=lambda s: {"padding": 4},
+        on_press_in=lambda: calls.append("in"),
+        on_press_out=lambda: calls.append("out"),
+    )
+    backend = FakeBackend()
+    rec = Reconciler(backend)
+    rec._screen_re_render = lambda: None
+    rec.mount(el)
+
+    tag = next(t for t, v in backend.views.items() if v.type_name == "Pressable")
+    dispatch_event(tag, "on_press_in")
+    dispatch_event(tag, "on_press_out")
+    assert calls == ["in", "out"]

@@ -33,7 +33,6 @@ tree:
 - For container elements, match children by `key` first and by
   position only if no key was provided. Reorder, mount, and unmount
   as needed using [`InsertOp`][pythonnative.mutations.InsertOp] /
-  [`RemoveOp`][pythonnative.mutations.RemoveOp] /
   [`DestroyOp`][pythonnative.mutations.DestroyOp].
 
 That's it. There's no "fiber tree", no time slicing, and no priority

@@ -26,8 +26,7 @@ the render loop.
 | `CreateOp(tag, type_name, props)` | Create a native view for `tag`. Props are already *clean*: callables have been routed to the event registry. |
 | `UpdateOp(tag, changed_props)` | Apply only the props that changed (removed props arrive as `None`). |
 | `InsertOp(parent_tag, child_tag, index)` | Place the child at `index` (move-aware: an attached child is repositioned, not duplicated). |
-| `RemoveOp(parent_tag, child_tag)` | Detach the child without destroying it. |
-| `DestroyOp(tag)` | Release the native view and drop the tag record. |
+| `DestroyOp(tag)` | Release the native view (detaching it from its parent) and drop the tag record. |
 | `SetFrameOp(tag, x, y, w, h)` | Apply a layout frame. Only emitted for frames that actually changed. |
 
 Tags matter because the diff phase is pure: it runs before any native
@@ -158,7 +157,7 @@ geometry on Android and iOS; there's no "container-only" vs
 
 Children of a container element become subviews of the corresponding
 native view. The reconciler determines insertion order (and reorders
-on key change) and expresses it as `InsertOp` / `RemoveOp` pairs; the
+on key change) and expresses it as `InsertOp` / `DestroyOp` ops; the
 handler performs the actual native mutations:
 
 - iOS containers use `insertSubview_atIndex_` on a plain `UIView`.

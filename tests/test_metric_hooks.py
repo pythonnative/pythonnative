@@ -132,3 +132,52 @@ def test_use_keyboard_height_re_renders_on_change() -> None:
     pm.set_keyboard_height(300.0)
     assert len(rendered) > before
     assert rendered[-1] == 300.0
+
+
+# ======================================================================
+# SafeAreaView (inset padding driven by the metric hooks)
+# ======================================================================
+
+
+def _safe_area_props(backend: MockBackend) -> Dict[str, object]:
+    view = next(v for v in backend.views.values() if v.type_name == "SafeAreaView")
+    return view.props
+
+
+def test_safe_area_view_pads_all_edges_by_default() -> None:
+    from pythonnative.components import SafeAreaView, Text
+
+    pm.set_safe_area_insets(top=44.0, left=2.0, bottom=34.0, right=3.0)
+    backend = MockBackend()
+    Reconciler(backend).mount(SafeAreaView(Text("safe")))
+    props = _safe_area_props(backend)
+    assert props.get("padding_top") == 44.0
+    assert props.get("padding_left") == 2.0
+    assert props.get("padding_bottom") == 34.0
+    assert props.get("padding_right") == 3.0
+
+
+def test_safe_area_view_edges_subset_and_user_padding_added() -> None:
+    from pythonnative.components import SafeAreaView, Text
+
+    pm.set_safe_area_insets(top=44.0, left=0.0, bottom=34.0, right=0.0)
+    backend = MockBackend()
+    Reconciler(backend).mount(SafeAreaView(Text("safe"), edges=("top",), style={"padding": 16}))
+    props = _safe_area_props(backend)
+    assert props.get("padding_top") == 60.0  # 16 user + 44 inset
+    assert props.get("padding") == 16
+    assert "padding_bottom" not in props
+
+
+def test_safe_area_view_updates_when_insets_change() -> None:
+    from pythonnative.components import SafeAreaView, Text
+
+    backend = MockBackend()
+    rec = Reconciler(backend)
+    rec._screen_re_render = lambda: None
+    rec.mount(SafeAreaView(Text("safe")))
+    assert "padding_top" not in _safe_area_props(backend)
+
+    pm.set_safe_area_insets(top=20.0, left=0.0, bottom=0.0, right=0.0)
+    rec.flush_dirty()
+    assert _safe_area_props(backend).get("padding_top") == 20.0
