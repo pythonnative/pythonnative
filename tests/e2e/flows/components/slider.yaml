@@ -4,7 +4,11 @@
 # which the buttons bypass. The demo starts the slider at 0.5 so the
 # thumb sits at the control's center; element-anchored swipes start
 # from the element center, and iOS's UISlider only drags when the
-# gesture starts on the thumb. A right swipe rails the value to max.
+# gesture starts on the thumb. A right swipe drags the value to (or
+# near) max: iOS 26's redesigned UISlider insets the draggable track
+# at both ends, so the drag lands around 0.97 rather than railing to
+# exactly 1.00. The assertion accepts any near-max value; the snap
+# buttons below still verify exact values.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/slider.py
 # Source under test: src/pythonnative/components.py :: Slider
@@ -21,7 +25,7 @@ appId: ${APP_ID}
     from:
       text: "Demo slider"
     direction: RIGHT
-- assertVisible: "Value: 1.00"
+- assertVisible: "Value: (0\\.9\\d|1\\.00)"
 # Programmatic path: snap buttons set exact values.
 - tapOn: "Set 0.0"
 - assertVisible: "Value: 0.00"

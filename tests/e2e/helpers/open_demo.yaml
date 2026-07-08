@@ -60,24 +60,37 @@ appId: ${APP_ID}
 # The title is at the top of the scroll content and ``close_demo``
 # always scrolls back to it before exiting, so it's visible on both
 # platforms when the next flow's ``open_demo`` runs.
+#
+# The tap is wrapped in a retry because Maestro's iOS driver can drop
+# a tap on a slow CI simulator (the tap "lands" but the app never
+# navigates); the inner gate re-taps only if we're still on a
+# category screen, so a flaked home assertion alone doesn't re-tap.
 - runFlow:
     when:
       visible:
         text: "Demos in .*"
       notVisible: "Demos in ${CATEGORY}"
     commands:
-      - scrollUntilVisible:
-          element:
-            text: "Back to home"
-          direction: DOWN
-          timeout: 45000
-      - tapOn: "Back to home"
-      - scrollUntilVisible:
-          element:
-            text: "E2E Suite home"
-          direction: UP
-          timeout: 15000
-      - assertVisible: "E2E Suite home"
+      - retry:
+          maxRetries: 2
+          commands:
+            - runFlow:
+                when:
+                  visible:
+                    text: "Demos in .*"
+                commands:
+                  - scrollUntilVisible:
+                      element:
+                        text: "Back to home"
+                      direction: DOWN
+                      timeout: 45000
+                  - tapOn: "Back to home"
+            - scrollUntilVisible:
+                element:
+                  text: "E2E Suite home"
+                direction: UP
+                timeout: 15000
+            - assertVisible: "E2E Suite home"
 
 # 3. If neither the right category nor the home screen is visible, the
 # app is either not running yet (first flow of the suite) or the driver
@@ -95,21 +108,31 @@ appId: ${APP_ID}
                 visible: "E2E Suite home"
                 timeout: 60000
 
-# 4. From the home screen, navigate into the right category.
+# 4. From the home screen, navigate into the right category. Retried
+# for the same dropped-tap reason as step 2: the inner gate re-taps
+# only while we're still on the home screen.
 - runFlow:
     when:
       visible: "E2E Suite home"
       notVisible: "Demos in ${CATEGORY}"
     commands:
-      - scrollUntilVisible:
-          element:
-            text: "Open ${CATEGORY}"
-          direction: DOWN
-          timeout: 45000
-      - tapOn: "Open ${CATEGORY}"
-      - extendedWaitUntil:
-          visible: "Demos in ${CATEGORY}"
-          timeout: 15000
+      - retry:
+          maxRetries: 2
+          commands:
+            - runFlow:
+                when:
+                  visible: "E2E Suite home"
+                  notVisible: "Demos in ${CATEGORY}"
+                commands:
+                  - scrollUntilVisible:
+                      element:
+                        text: "Open ${CATEGORY}"
+                      direction: DOWN
+                      timeout: 45000
+                  - tapOn: "Open ${CATEGORY}"
+            - extendedWaitUntil:
+                visible: "Demos in ${CATEGORY}"
+                timeout: 15000
 
 # 5. We're now guaranteed to be on the right category list. Open the
 # requested demo. The Components category has ~28 rows, so reaching the
