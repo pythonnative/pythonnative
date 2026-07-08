@@ -3052,6 +3052,13 @@ class VirtualListHandler(AndroidViewHandler):
                     )
                     if root is not None:
                         _insert_view(container, root, 0)
+                        # The layout engine frames only the *descendants*
+                        # of a subtree root (screen hosts normally size
+                        # the root themselves), so the row root would
+                        # otherwise keep the 0x0 params ``_insert_view``
+                        # assigns and render as nothing. Fill the cell.
+                        FrameLP = jclass("android.widget.FrameLayout$LayoutParams")
+                        root.setLayoutParams(FrameLP(FrameLP.MATCH_PARENT, FrameLP.MATCH_PARENT))
                 except Exception:
                     import traceback
 

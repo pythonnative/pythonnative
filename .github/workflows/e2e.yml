@@ -142,7 +142,9 @@ jobs:
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
-          brew tap facebook/fb && brew install idb-companion
+          # Homebrew refuses formulae from untrusted third-party taps by
+          # default; trust the tap explicitly before installing.
+          brew tap facebook/fb && brew trust facebook/fb && brew install idb-companion
 
       - name: Build and run E2E tests
         run: ./scripts/run-e2e.sh ios ${{ matrix.suites }}

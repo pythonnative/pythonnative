@@ -4050,6 +4050,15 @@ def _table_cell_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int) -> in
                     root = pool.bind(content_key, lambda: render_row(row), cell_w, row_h)
                     if root is not None:
                         content.addSubview_(root)
+                        # The layout engine frames only the *descendants*
+                        # of a subtree root (screen hosts normally size
+                        # the root themselves), so the row root would
+                        # otherwise keep its zero frame and render as
+                        # nothing. Fill the cell.
+                        try:
+                            root.setFrame_(((0, 0), (cell_w, row_h)))
+                        except Exception:
+                            pass
                 except Exception:
                     print(f"[VirtualList][iOS] mount for row={row} raised:")
                     _tb.print_exc()

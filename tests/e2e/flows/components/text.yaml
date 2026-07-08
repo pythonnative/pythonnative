@@ -16,6 +16,14 @@ appId: ${APP_ID}
 # Rich text: three nested spans flatten into one native label whose
 # plain text is the concatenation of the parts.
 - assertVisible: "Rich start bold middle red end"
+# The rich-text section pushes "Back to list" below the fold on the
+# shorter emulator viewports; close_demo taps it without scrolling,
+# so surface it first (no-ops when it's already visible).
+- scrollUntilVisible:
+    element:
+      text: "Back to list"
+    direction: DOWN
+    timeout: 20000
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:
