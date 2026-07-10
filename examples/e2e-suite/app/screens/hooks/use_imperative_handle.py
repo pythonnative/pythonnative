@@ -62,7 +62,12 @@ def UseImperativeHandleDemo() -> pn.Element:
                     item_height=44,
                     ref=list_ref,
                 ),
-                style=pn.style(height=220, border_radius=8, overflow="hidden"),
+                # Exactly 3 rows tall. Kept small so that on the short
+                # Android CI emulator (320x640 dp) the page scroll the
+                # flow performs to surface the last row is minimal and
+                # the controller buttons stay on screen for the
+                # follow-up "Scroll to top" tap.
+                style=pn.style(height=132, border_radius=8, overflow="hidden"),
             ),
         ),
     )

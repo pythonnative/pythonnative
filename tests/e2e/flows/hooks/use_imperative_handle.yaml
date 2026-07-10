@@ -15,11 +15,37 @@ appId: ${APP_ID}
 - tapOn: "Scroll to end"
 - assertVisible: "Last action: scroll_to_end"
 - assertVisible: "Handle attached: yes"
+# The list box bottom can start below the page fold on the short
+# Android CI emulator (320x640 dp), hiding the last row even though the
+# list itself scrolled to the end. Scroll the page to surface it; the
+# swipe starts from screen center, which is over the Controller card
+# (not the list box), so it moves the page and never disturbs the
+# list's scroll position. Short-circuits with zero swipes when the row
+# is already on screen (iOS, desktop-sized devices).
+- scrollUntilVisible:
+    element: "Row 39"
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: false
 - assertVisible: "Row 39"
 - assertNotVisible: "Row 0"
 - tapOn: "Scroll to top"
 - assertVisible: "Last action: scroll_to_top"
 - assertVisible: "Row 0"
+# The two stacked cards can push "Back to list" below the fold on the
+# short Android CI emulator (640 dp tall); close_demo taps it without
+# scrolling, so surface it first. Scoped to Android for the same
+# reasons as the identical step in components/scroll_view.yaml.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: "Back to list"
+          direction: DOWN
+          timeout: 20000
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:
