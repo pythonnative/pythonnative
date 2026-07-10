@@ -1,16 +1,12 @@
-"""Built-in element factories and the typed prop schemas they share.
+"""Built-in element factories.
 
-Each ``@dataclass(frozen=True)`` class in this module (``TextProps``,
-``ButtonProps``, etc.) is the canonical schema for one built-in
-component. Each factory function (``Text``, ``Button``, …) is a thin
-ergonomic wrapper that builds an [`Element`][pythonnative.Element]
-through the shared :func:`_make_element` helper, so style resolution,
-``ref`` attachment, ``None``-default dropping, and forced overrides
-(e.g. ``Column``'s fixed ``flex_direction``) live in exactly one place.
-
-The same Props dataclasses are used by the `pythonnative.sdk` surface
-for third-party components, so the built-in API and the extension API
-speak the same shape.
+Each factory function (``Text``, ``Button``, …) is a fully-typed thin
+wrapper that builds an [`Element`][pythonnative.Element] through the
+shared :func:`_make_element` helper, so style resolution, ``ref``
+attachment, ``None``-default dropping, and forced overrides (e.g.
+``Column``'s fixed ``flex_direction``) live in exactly one place. The
+factory signatures themselves are the canonical prop schemas: editors
+and type checkers validate calls directly against them.
 
 Example:
     ```python
@@ -18,27 +14,27 @@ Example:
 
     pn.Column(
         pn.Text("Hello", style=pn.style(font_size=18)),
-        pn.Button("Tap", on_click=lambda: print("tapped")),
+        pn.Button("Tap", on_press=lambda: print("tapped")),
         style=pn.style(spacing=12, padding=16),
     )
     ```
 """
 
 import bisect
-from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 from .element import Element
 from .hooks import (
+    Ref,
     component,
-    use_effect,
+    use_imperative_handle,
     use_keyboard_height,
     use_ref,
     use_safe_area_insets,
     use_state,
 )
-from .sdk import Props
 from .style import (
+    AccessibilityState,
     AutoCapitalize,
     Color,
     KeyboardType,
@@ -46,6 +42,7 @@ from .style import (
     ScaleType,
     StyleProp,
     resolve_style,
+    validate_style_keys,
 )
 
 # ======================================================================
@@ -57,7 +54,7 @@ def _make_element(
     name: str,
     *children: Element,
     style: StyleProp = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
     _defaults: Optional[Dict[str, Any]] = None,
     _forced: Optional[Dict[str, Any]] = None,
@@ -85,8 +82,9 @@ def _make_element(
         name: Element type name (e.g. ``"Text"``).
         *children: Child elements.
         style: Style dict, list of dicts, or ``None``.
-        ref: Optional ``use_ref()`` dict; the reconciler populates
-            ``ref["current"]`` with the underlying native view.
+        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``; the
+            reconciler populates ``ref.current`` with the underlying
+            native view.
         key: Stable identity for keyed reconciliation.
         _defaults: Internal: fill-only-if-missing prop defaults.
         _forced: Internal: prop overrides applied last.
@@ -96,6 +94,8 @@ def _make_element(
         A fresh [`Element`][pythonnative.Element].
     """
     out: Dict[str, Any] = dict(resolve_style(style))
+    if out:
+        validate_style_keys(out, owner=name)
     if _defaults:
         for k, v in _defaults.items():
             out.setdefault(k, v)
@@ -107,352 +107,6 @@ def _make_element(
     if _forced:
         out.update(_forced)
     return Element(name, out, list(children), key=key)
-
-
-# ======================================================================
-# Props dataclasses
-# ======================================================================
-#
-# These are the canonical schemas for every built-in component. They
-# subclass the SDK's ``Props`` base, so the same shape works for both
-# the built-in factory functions and the third-party
-# [`element_factory`][pythonnative.element_factory] API.
-
-
-@dataclass(frozen=True)
-class TextProps(Props):
-    """Props for [`Text`][pythonnative.Text]."""
-
-    text: str = ""
-    spans: Optional[List[Dict[str, Any]]] = None
-    accessibility_label: Optional[str] = None
-    accessibility_hint: Optional[str] = None
-    accessibility_role: Optional[str] = None
-    accessible: Optional[bool] = None
-    accessibility_state: Optional[Dict[str, Any]] = None
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
-    test_id: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class ButtonProps(Props):
-    """Props for [`Button`][pythonnative.Button]."""
-
-    title: str = ""
-    on_click: Optional[Callable[[], None]] = None
-    enabled: bool = True
-    accessibility_label: Optional[str] = None
-    accessibility_hint: Optional[str] = None
-    accessibility_role: Optional[str] = None
-    accessible: Optional[bool] = None
-    accessibility_state: Optional[Dict[str, Any]] = None
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
-    test_id: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class TextInputProps(Props):
-    """Props for [`TextInput`][pythonnative.TextInput]."""
-
-    value: str = ""
-    placeholder: Optional[str] = None
-    on_change: Optional[Callable[[str], None]] = None
-    on_submit: Optional[Callable[[str], None]] = None
-    secure: bool = False
-    multiline: bool = False
-    keyboard_type: Optional[KeyboardType] = None
-    auto_capitalize: Optional[AutoCapitalize] = None
-    auto_correct: Optional[bool] = None
-    auto_focus: bool = False
-    return_key_type: Optional[ReturnKeyType] = None
-    max_length: Optional[int] = None
-    placeholder_color: Optional[Color] = None
-    editable: bool = True
-    clear_button: bool = False
-    on_focus: Optional[Callable[[], None]] = None
-    on_blur: Optional[Callable[[], None]] = None
-    selection_color: Optional[Color] = None
-    text_content_type: Optional[str] = None
-    accessibility_label: Optional[str] = None
-    accessibility_hint: Optional[str] = None
-    accessible: Optional[bool] = None
-    accessibility_state: Optional[Dict[str, Any]] = None
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
-    test_id: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class ImageProps(Props):
-    """Props for [`Image`][pythonnative.Image]."""
-
-    source: Optional[str] = None
-    scale_type: Optional[ScaleType] = None
-    tint_color: Optional[Color] = None
-    placeholder_color: Optional[Color] = None
-    on_load: Optional[Callable[[], None]] = None
-    on_error: Optional[Callable[[str], None]] = None
-    accessibility_label: Optional[str] = None
-    accessibility_role: Optional[str] = None
-    accessible: Optional[bool] = None
-    accessibility_state: Optional[Dict[str, Any]] = None
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
-    test_id: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class SwitchProps(Props):
-    """Props for [`Switch`][pythonnative.Switch]."""
-
-    value: bool = False
-    on_change: Optional[Callable[[bool], None]] = None
-    accessibility_label: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class ProgressBarProps(Props):
-    """Props for [`ProgressBar`][pythonnative.ProgressBar]."""
-
-    value: float = 0.0
-    color: Optional[Color] = None
-    track_color: Optional[Color] = None
-    indeterminate: bool = False
-
-
-@dataclass(frozen=True)
-class ActivityIndicatorProps(Props):
-    """Props for [`ActivityIndicator`][pythonnative.ActivityIndicator]."""
-
-    animating: bool = True
-    color: Optional[Color] = None
-    size: Literal["small", "large"] = "small"
-
-
-@dataclass(frozen=True)
-class WebViewProps(Props):
-    """Props for [`WebView`][pythonnative.WebView]."""
-
-    url: Optional[str] = None
-    html: Optional[str] = None
-    on_load: Optional[Callable[[str], None]] = None
-    on_message: Optional[Callable[[str], None]] = None
-    on_navigation_state_change: Optional[Callable[[str], None]] = None
-    inject_javascript: Optional[str] = None
-    scroll_enabled: bool = True
-
-
-@dataclass(frozen=True)
-class SpacerProps(Props):
-    """Props for [`Spacer`][pythonnative.Spacer]."""
-
-    size: Optional[float] = None
-    flex: Optional[float] = None
-
-
-@dataclass(frozen=True)
-class SliderProps(Props):
-    """Props for [`Slider`][pythonnative.Slider]."""
-
-    value: float = 0.0
-    min_value: float = 0.0
-    max_value: float = 1.0
-    on_change: Optional[Callable[[float], None]] = None
-    accessibility_label: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class ViewProps(Props):
-    """Props for [`View`][pythonnative.View], [`Column`][pythonnative.Column], and [`Row`][pythonnative.Row]."""
-
-    gestures: Optional[List[Any]] = None
-    accessibility_label: Optional[str] = None
-    accessibility_hint: Optional[str] = None
-    accessibility_role: Optional[str] = None
-    accessible: Optional[bool] = None
-    accessibility_state: Optional[Dict[str, Any]] = None
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
-    test_id: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class ScrollViewProps(Props):
-    """Props for [`ScrollView`][pythonnative.ScrollView].
-
-    ``on_scroll`` receives a single payload dict with ``"x"`` and
-    ``"y"`` content offsets in points.
-    """
-
-    refresh_control: Optional[Dict[str, Any]] = None
-    scroll_axis: Optional[Literal["vertical", "horizontal"]] = None
-    on_scroll: Optional[Callable[[Dict[str, float]], None]] = None
-    shows_scroll_indicator: bool = True
-    paging_enabled: bool = False
-    bounces: bool = True
-    content_container_style: StyleProp = None
-    keyboard_dismiss_mode: Optional[Literal["none", "on_drag", "interactive"]] = None
-
-
-@dataclass(frozen=True)
-class SafeAreaViewProps(Props):
-    """Props for [`SafeAreaView`][pythonnative.SafeAreaView]."""
-
-    edges: Optional[Tuple[Literal["top", "left", "bottom", "right"], ...]] = None
-
-
-@dataclass(frozen=True)
-class ModalProps(Props):
-    """Props for [`Modal`][pythonnative.Modal]."""
-
-    visible: bool = False
-    on_dismiss: Optional[Callable[[], None]] = None
-    on_show: Optional[Callable[[], None]] = None
-    title: Optional[str] = None
-    animation_type: Literal["slide", "fade", "none"] = "slide"
-    transparent: bool = False
-    presentation_style: Literal["page_sheet", "form_sheet", "full_screen", "overlay"] = "page_sheet"
-    dismiss_on_backdrop: bool = True
-
-
-@dataclass(frozen=True)
-class PressableProps(Props):
-    """Props for [`Pressable`][pythonnative.Pressable]."""
-
-    on_press: Optional[Callable[[], None]] = None
-    on_long_press: Optional[Callable[[], None]] = None
-    on_press_in: Optional[Callable[[], None]] = None
-    on_press_out: Optional[Callable[[], None]] = None
-    pressed_opacity: float = 0.6
-    gestures: Optional[List[Any]] = None
-    accessibility_label: Optional[str] = None
-    accessibility_hint: Optional[str] = None
-    accessibility_role: Optional[str] = None
-    accessible: Optional[bool] = None
-    accessibility_state: Optional[Dict[str, Any]] = None
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
-    test_id: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class StatusBarProps(Props):
-    """Props for [`StatusBar`][pythonnative.StatusBar]."""
-
-    bar_style: Optional[Literal["light", "dark", "default"]] = None
-    background_color: Optional[Color] = None
-    hidden: Optional[bool] = None
-
-
-@dataclass(frozen=True)
-class KeyboardAvoidingViewProps(Props):
-    """Props for [`KeyboardAvoidingView`][pythonnative.KeyboardAvoidingView]."""
-
-    behavior: Literal["padding", "position"] = "padding"
-    keyboard_vertical_offset: float = 0.0
-
-
-@dataclass(frozen=True)
-class PickerProps(Props):
-    """Props for [`Picker`][pythonnative.Picker].
-
-    ``items`` is an ordered list of ``{"value": Any, "label": str}``
-    entries. ``value`` is matched against ``items[i]["value"]`` to
-    determine the currently selected row.
-    """
-
-    value: Any = None
-    items: List[Dict[str, Any]] = field(default_factory=list)
-    on_change: Optional[Callable[[Any], None]] = None
-    placeholder: str = "Select…"
-    accessibility_label: Optional[str] = None
-    accessibility_hint: Optional[str] = None
-    accessible: Optional[bool] = None
-    accessibility_state: Optional[Dict[str, Any]] = None
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
-    test_id: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class TouchableOpacityProps(Props):
-    """Props for [`TouchableOpacity`][pythonnative.TouchableOpacity]."""
-
-    on_press: Optional[Callable[[], None]] = None
-    on_long_press: Optional[Callable[[], None]] = None
-    active_opacity: float = 0.2
-    disabled: bool = False
-    accessibility_label: Optional[str] = None
-    accessibility_hint: Optional[str] = None
-    accessibility_role: Optional[str] = None
-    accessible: Optional[bool] = None
-    accessibility_state: Optional[Dict[str, Any]] = None
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
-    test_id: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class ImageBackgroundProps(Props):
-    """Props for [`ImageBackground`][pythonnative.ImageBackground]."""
-
-    source: Optional[str] = None
-    scale_type: Optional[ScaleType] = None
-    accessibility_label: Optional[str] = None
-    accessible: Optional[bool] = None
-    accessibility_state: Optional[Dict[str, Any]] = None
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
-    test_id: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class CheckboxProps(Props):
-    """Props for [`Checkbox`][pythonnative.Checkbox]."""
-
-    value: bool = False
-    on_change: Optional[Callable[[bool], None]] = None
-    label: Optional[str] = None
-    disabled: bool = False
-    color: Optional[Color] = None
-    accessibility_label: Optional[str] = None
-    accessibility_hint: Optional[str] = None
-    accessible: Optional[bool] = None
-    accessibility_state: Optional[Dict[str, Any]] = None
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
-    test_id: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class SegmentedControlProps(Props):
-    """Props for [`SegmentedControl`][pythonnative.SegmentedControl]."""
-
-    segments: List[str] = field(default_factory=list)
-    selected_index: int = 0
-    on_change: Optional[Callable[[int], None]] = None
-    enabled: bool = True
-    tint_color: Optional[Color] = None
-    accessibility_label: Optional[str] = None
-    accessible: Optional[bool] = None
-    accessibility_state: Optional[Dict[str, Any]] = None
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
-    test_id: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class DatePickerProps(Props):
-    """Props for [`DatePicker`][pythonnative.DatePicker].
-
-    ``value`` and the value passed to ``on_change`` are ISO-8601
-    strings (``"2026-05-31"`` for ``mode="date"``, ``"14:30"`` for
-    ``mode="time"``, ``"2026-05-31T14:30"`` for ``mode="datetime"``),
-    so the schema stays JSON-serializable and platform-agnostic.
-    """
-
-    value: Optional[str] = None
-    mode: Literal["date", "time", "datetime"] = "date"
-    on_change: Optional[Callable[[str], None]] = None
-    minimum: Optional[str] = None
-    maximum: Optional[str] = None
-    enabled: bool = True
-    accessibility_label: Optional[str] = None
-    accessible: Optional[bool] = None
-    accessibility_state: Optional[Dict[str, Any]] = None
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None
-    test_id: Optional[str] = None
 
 
 # ======================================================================
@@ -518,10 +172,10 @@ def Text(
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
-    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
     test_id: Optional[str] = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Display a string of text, optionally with styled nested spans.
@@ -571,7 +225,7 @@ def Text(
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
-        ref: Optional ``use_ref()`` dict.
+        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -604,17 +258,17 @@ def Text(
 def Button(
     title: str = "",
     *,
-    on_click: Optional[Callable[[], None]] = None,
+    on_press: Optional[Callable[[], None]] = None,
     enabled: bool = True,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
-    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
     test_id: Optional[str] = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Display a tappable button.
@@ -627,7 +281,7 @@ def Button(
 
     Args:
         title: Button label.
-        on_click: Callback invoked when the user taps the button.
+        on_press: Callback invoked when the user taps the button.
         enabled: When ``False``, the button is disabled and cannot be
             tapped.
         style: Style dict (or list of dicts).
@@ -645,7 +299,7 @@ def Button(
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
-        ref: Optional ``use_ref()`` dict.
+        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -657,7 +311,7 @@ def Button(
         ref=ref,
         key=key,
         title=title,
-        on_click=on_click,
+        on_press=on_press,
         enabled=enabled,
         accessibility_label=accessibility_label,
         accessibility_hint=accessibility_hint,
@@ -695,10 +349,10 @@ def TextInput(
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessible: Optional[bool] = None,
-    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
     test_id: Optional[str] = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Display a text-entry field (single-line by default, or ``multiline``).
@@ -748,7 +402,7 @@ def TextInput(
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
-        ref: Optional ``use_ref()`` dict.
+        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -799,10 +453,10 @@ def Image(
     accessibility_label: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
-    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
     test_id: Optional[str] = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Display an image from a resource path or URL.
@@ -842,7 +496,7 @@ def Image(
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
-        ref: Optional ``use_ref()`` dict.
+        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -1105,10 +759,10 @@ def View(
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
-    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
     test_id: Optional[str] = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Universal flex container (like React Native's ``View``).
@@ -1157,7 +811,7 @@ def View(
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
-        ref: Optional ``use_ref()`` dict.
+        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -1184,7 +838,7 @@ def View(
 def Column(
     *children: Element,
     style: StyleProp = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Arrange children vertically.
@@ -1196,7 +850,7 @@ def Column(
     Args:
         *children: Child elements stacked top to bottom.
         style: Style dict (or list of dicts).
-        ref: Optional ``use_ref()`` dict for native-view access.
+        ref: Optional [`Ref`][pythonnative.Ref] for native-view access.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -1215,7 +869,7 @@ def Column(
 def Row(
     *children: Element,
     style: StyleProp = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Arrange children horizontally.
@@ -1227,7 +881,7 @@ def Row(
     Args:
         *children: Child elements arranged left to right.
         style: Style dict (or list of dicts).
-        ref: Optional ``use_ref()`` dict for native-view access.
+        ref: Optional [`Ref`][pythonnative.Ref] for native-view access.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -1254,7 +908,7 @@ def ScrollView(
     content_container_style: StyleProp = None,
     keyboard_dismiss_mode: Optional[Literal["none", "on_drag", "interactive"]] = None,
     style: StyleProp = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Wrap children in a scrollable container.
@@ -1285,7 +939,7 @@ def ScrollView(
             ``"interactive"``. Controls whether scrolling dismisses
             the keyboard.
         style: Style dict (or list of dicts).
-        ref: Optional ``use_ref()`` dict.
+        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -1495,10 +1149,10 @@ def Pressable(
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
-    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
     test_id: Optional[str] = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Wrap children with tap / long-press / gesture handlers.
@@ -1547,7 +1201,7 @@ def Pressable(
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
-        ref: Optional ``use_ref()`` dict.
+        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -1613,7 +1267,7 @@ def TouchableOpacity(
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
-    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
     test_id: Optional[str] = None,
     key: Optional[str] = None,
@@ -1683,7 +1337,7 @@ def ImageBackground(
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessible: Optional[bool] = None,
-    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
     test_id: Optional[str] = None,
     key: Optional[str] = None,
@@ -1751,7 +1405,7 @@ def Checkbox(
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessible: Optional[bool] = None,
-    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
     test_id: Optional[str] = None,
     key: Optional[str] = None,
@@ -1816,7 +1470,7 @@ def SegmentedControl(
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessible: Optional[bool] = None,
-    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
     test_id: Optional[str] = None,
     key: Optional[str] = None,
@@ -1879,7 +1533,7 @@ def DatePicker(
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessible: Optional[bool] = None,
-    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
     test_id: Optional[str] = None,
     key: Optional[str] = None,
@@ -1889,7 +1543,10 @@ def DatePicker(
     Backed by ``UIDatePicker`` on iOS and a trigger button that opens
     the platform ``DatePickerDialog`` / ``TimePickerDialog`` on
     Android. ``value`` and the value reported to ``on_change`` are
-    ISO-8601 strings (see [`DatePickerProps`][pythonnative.DatePickerProps]).
+    ISO-8601 strings (``"2026-05-31"`` for ``mode="date"``, ``"14:30"``
+    for ``mode="time"``, ``"2026-05-31T14:30"`` for
+    ``mode="datetime"``), so values stay JSON-serializable and
+    platform-agnostic.
 
     Args:
         value: Currently selected value as an ISO-8601 string.
@@ -1943,14 +1600,12 @@ def DatePicker(
 def Fragment(*children: Optional[Element], key: Optional[str] = None) -> Element:
     """Group children without adding a wrapping native view.
 
-    Like React's ``<></>``: returns multiple elements from a component
-    without introducing an extra container. The reconciler flattens
-    Fragment elements at the children-list level, so each child appears
-    as a direct sibling of the Fragment's parent in the native tree.
-
-    Useful inside [`Provider`][pythonnative.Provider] /
-    [`memo`][pythonnative.memo] / conditional logic when grouping
-    siblings inside another component's child list:
+    Like React's ``<></>``: groups elements without introducing an
+    extra container. Each child mounts as a direct sibling of the
+    Fragment's position in the parent's child list. Components may
+    also simply return a plain ``list`` of elements; ``Fragment``
+    exists for when the group needs a ``key`` (e.g. rendering a list
+    of pairs) or when a single expression reads better.
 
     ```python
     pn.Column(
@@ -1964,24 +1619,54 @@ def Fragment(*children: Optional[Element], key: Optional[str] = None) -> Element
     ```
 
     Args:
-        *children: Child elements to expose at the parent level. ``None``
-            children are dropped, which makes conditional rendering with
-            ``cond and pn.Text(...)`` ergonomic.
-        key: Optional key for the Fragment itself (rarely useful since
-            Fragment doesn't appear in the native tree).
+        *children: Child elements to expose at the parent level.
+            ``None`` and ``False`` children are dropped, which makes
+            conditional rendering with ``cond and pn.Text(...)``
+            ergonomic.
+        key: Stable identity for keyed reconciliation. A keyed
+            Fragment moves all of its children as one unit and
+            preserves their state across reorders.
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"__Fragment__"``.
-
-    Note:
-        Today, returning a Fragment from a ``@pn.component`` function
-        only mounts its first child as the component's root. To return
-        multiple top-level elements from a function component, use a
-        container such as [`Column`][pythonnative.Column] or
-        [`Row`][pythonnative.Row] instead.
     """
-    filtered = [c for c in children if c is not None]
-    return Element("__Fragment__", {}, filtered, key=key)
+    kept = [c for c in children if c is not None and c is not False]
+    return Element("__Fragment__", {}, kept, key=key)
+
+
+def Portal(*children: Element, key: Optional[str] = None) -> Element:
+    """Render ``children`` into a full-screen overlay above everything else.
+
+    Like React DOM's ``createPortal``: the children stay part of this
+    component's tree for state, context, and events, but their native
+    views mount in a transparent overlay attached to the window (above
+    the screen's content) instead of inside the surrounding parent.
+    Use it for toasts, dropdowns, tooltips, and lightweight custom
+    overlays that must escape ``overflow: "hidden"`` ancestors. For a
+    system-styled dialog with its own presentation and dismissal
+    gestures, use [`Modal`][pythonnative.Modal] instead.
+
+    The overlay itself does not intercept touches; only the children
+    themselves are hit-testable. Children are laid out against the
+    full viewport, so position them with absolute insets:
+
+    ```python
+    pn.Portal(
+        pn.View(
+            pn.Text("Saved!"),
+            style=pn.style(position="absolute", bottom=40, left=40, right=40),
+        ),
+    )
+    ```
+
+    Args:
+        *children: Overlay content.
+        key: Stable identity for keyed reconciliation.
+
+    Returns:
+        An [`Element`][pythonnative.Element] of type ``"Portal"``.
+    """
+    return Element("Portal", {}, list(children), key=key)
 
 
 # ======================================================================
@@ -1992,23 +1677,33 @@ def Fragment(*children: Optional[Element], key: Optional[str] = None) -> Element
 def ErrorBoundary(
     *children: Element,
     fallback: Optional[Any] = None,
+    on_error: Optional[Callable[[BaseException], None]] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Catch render errors in the wrapped subtree and display ``fallback`` instead.
 
-    ``fallback`` may be an [`Element`][pythonnative.Element] or a
-    callable that receives the exception and returns an ``Element``.
-    Useful for isolating risky subtrees so a single failure doesn't
-    crash the page.
+    When any descendant raises during render (initial mount, a parent
+    re-render, or a local state-driven update), the failed subtree is
+    torn down and ``fallback`` is mounted in its place. Without a
+    boundary the error propagates to the screen host (which shows the
+    dev error overlay in dev mode).
 
-    When multiple children are passed they're grouped under a
-    [`Fragment`][pythonnative.Fragment] so the boundary still wraps a
-    single logical subtree.
+    ``fallback`` may be:
+
+    - An [`Element`][pythonnative.Element], shown as-is.
+    - ``fallback(error) -> Element``.
+    - ``fallback(error, reset) -> Element``, where ``reset`` is a
+      zero-arg callable that clears the error and remounts the
+      original children (fresh state), for retry buttons.
 
     Args:
         *children: Subtree to wrap.
-        fallback: Element rendered when the subtree raises during
-            render, or a callable ``fallback(err) -> Element``.
+        fallback: Fallback content (see above). Required for the
+            boundary to actually catch; without it errors propagate
+            to the next boundary up.
+        on_error: Callback invoked with the exception when the
+            boundary catches, before the fallback mounts. Use it for
+            error reporting.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -2021,18 +1716,20 @@ def ErrorBoundary(
 
         pn.ErrorBoundary(
             MyRiskyComponent(),
-            fallback=lambda err: pn.Text(f"Error: {err}"),
+            fallback=lambda err, reset: pn.Column(
+                pn.Text(f"Error: {err}"),
+                pn.Button("Retry", on_press=reset),
+            ),
+            on_error=lambda err: log.exception(err),
         )
         ```
     """
     props: Dict[str, Any] = {}
     if fallback is not None:
         props["__fallback__"] = fallback
-    if len(children) <= 1:
-        kids = list(children)
-    else:
-        kids = [Fragment(*children)]
-    return Element("__ErrorBoundary__", props, kids, key=key)
+    if on_error is not None:
+        props["__on_error__"] = on_error
+    return Element("__ErrorBoundary__", props, list(children), key=key)
 
 
 # ======================================================================
@@ -2082,7 +1779,7 @@ class _RowSpec:
 
 def _dispatch_scroll_command(scroll_ref: Any, name: str, args: Dict[str, Any]) -> Any:
     """Send an imperative command to the ScrollView under ``scroll_ref``."""
-    tag = scroll_ref.get("_pn_tag") if isinstance(scroll_ref, dict) else None
+    tag = getattr(scroll_ref, "_pn_tag", None)
     if tag is None:
         return None
     from .native_views import get_registry
@@ -2091,6 +1788,55 @@ def _dispatch_scroll_command(scroll_ref: Any, name: str, args: Dict[str, Any]) -
         return get_registry().command(tag, name, args)
     except Exception:
         return None
+
+
+class ListController:
+    """Imperative scroll handle published on a list's ``ref``.
+
+    [`FlatList`][pythonnative.FlatList] and
+    [`SectionList`][pythonnative.SectionList] install a
+    ``ListController`` on ``ref.current`` (via
+    [`use_imperative_handle`][pythonnative.use_imperative_handle])
+    after mount and clear it back to ``None`` on unmount.
+
+    Example:
+        ```python
+        import pythonnative as pn
+
+        @pn.component
+        def Chat(messages):
+            list_ref = pn.use_ref()
+            pn.use_layout_effect(
+                lambda: list_ref.current and list_ref.current.scroll_to_end(animated=False),
+                [len(messages)],
+            )
+            return pn.FlatList(data=messages, render_item=Bubble, ref=list_ref)
+        ```
+    """
+
+    __slots__ = ("_scroll_to_offset", "_scroll_to_index", "_scroll_to_end")
+
+    def __init__(
+        self,
+        scroll_to_offset: Callable[[float, bool], None],
+        scroll_to_index: Callable[[int, bool], None],
+        scroll_to_end: Callable[[bool], None],
+    ) -> None:
+        self._scroll_to_offset = scroll_to_offset
+        self._scroll_to_index = scroll_to_index
+        self._scroll_to_end = scroll_to_end
+
+    def scroll_to_offset(self, offset: float, animated: bool = True) -> None:
+        """Scroll to an absolute content offset in points."""
+        self._scroll_to_offset(offset, animated)
+
+    def scroll_to_index(self, index: int, animated: bool = True) -> None:
+        """Scroll so the row at ``index`` sits at the top of the viewport."""
+        self._scroll_to_index(index, animated)
+
+    def scroll_to_end(self, animated: bool = True) -> None:
+        """Scroll to the end of the content."""
+        self._scroll_to_end(animated)
 
 
 @component
@@ -2104,18 +1850,18 @@ def _VirtualizedList(**p: Any) -> Element:
     initial_extent: float = float(p.get("initial_window_extent") or 800.0)
 
     window, set_window = use_state((0, -1))
-    measured = use_ref({})  # row key -> measured extent (points)
-    row_refs = use_ref({})  # row key -> ref dict for live rows
+    measured: Ref[Dict[str, float]] = use_ref({})  # row key -> measured extent (points)
+    row_refs: Ref[Dict[str, Ref]] = use_ref({})  # row key -> Ref for live rows
     end_latch = use_ref({"fired_for": -1})
-    viewable_ref = use_ref({"keys": ()})
+    viewable_ref: Ref[Dict[str, Tuple[str, ...]]] = use_ref({"keys": ()})
     scroll_pos = use_ref({"offset": 0.0})
-    sv_ref = use_ref(None)
+    sv_ref: Ref = use_ref(None)
 
     # ------------------------------------------------------------------
     # Extent model: measured > per-row hint > estimate. ``starts`` are
     # prefix sums; ``starts[n]`` is the total content extent.
     # ------------------------------------------------------------------
-    measured_map: Dict[str, float] = measured["current"]
+    measured_map: Dict[str, float] = measured.current
     starts: List[float] = [0.0] * (n + 1)
     acc = 0.0
     for i, spec in enumerate(rows):
@@ -2128,7 +1874,7 @@ def _VirtualizedList(**p: Any) -> Element:
     total_extent = acc
 
     def _viewport_extent() -> float:
-        frame = sv_ref.get("_pn_frame") if isinstance(sv_ref, dict) else None
+        frame = sv_ref._pn_frame
         if frame:
             extent = frame[2] if horizontal else frame[3]
             if extent and extent > 0:
@@ -2147,7 +1893,7 @@ def _VirtualizedList(**p: Any) -> Element:
 
     first, last = window
     if last < 0 or first >= n:
-        first, last = _window_for(scroll_pos["current"]["offset"], _viewport_extent())
+        first, last = _window_for(scroll_pos.current["offset"], _viewport_extent())
     last = min(last, n - 1)
     first = max(0, min(first, max(0, n - 1)))
 
@@ -2163,8 +1909,8 @@ def _VirtualizedList(**p: Any) -> Element:
     user_on_scroll = p.get("on_scroll")
 
     def _sweep_measured() -> None:
-        for row_key, ref in row_refs["current"].items():
-            frame = ref.get("_pn_frame") if isinstance(ref, dict) else None
+        for row_key, row_ref in row_refs.current.items():
+            frame = getattr(row_ref, "_pn_frame", None)
             if frame:
                 extent = frame[2] if horizontal else frame[3]
                 if extent and extent > 0:
@@ -2175,7 +1921,7 @@ def _VirtualizedList(**p: Any) -> Element:
             offset = float(payload.get("x" if horizontal else "y", 0.0) or 0.0)
         else:
             offset = float(payload or 0.0)
-        scroll_pos["current"]["offset"] = offset
+        scroll_pos.current["offset"] = offset
         _sweep_measured()
         viewport = _viewport_extent()
 
@@ -2186,18 +1932,18 @@ def _VirtualizedList(**p: Any) -> Element:
         if on_end_reached is not None and total_extent > 0:
             remaining = total_extent - (offset + viewport)
             if remaining <= end_threshold * viewport:
-                if end_latch["current"]["fired_for"] != n:
-                    end_latch["current"]["fired_for"] = n
+                if end_latch.current["fired_for"] != n:
+                    end_latch.current["fired_for"] = n
                     on_end_reached()
             elif remaining > end_threshold * viewport + viewport:
-                end_latch["current"]["fired_for"] = -1
+                end_latch.current["fired_for"] = -1
 
         if on_viewable is not None and n > 0:
             v_first = max(0, bisect.bisect_right(starts, offset, 0, n) - 1)
             v_last = min(n - 1, bisect.bisect_left(starts, offset + viewport, 0, n))
             keys = tuple(rows[i].key for i in range(v_first, v_last + 1))
-            if keys != viewable_ref["current"]["keys"]:
-                viewable_ref["current"]["keys"] = keys
+            if keys != viewable_ref.current["keys"]:
+                viewable_ref.current["keys"] = keys
                 on_viewable(
                     [
                         {"index": rows[i].index, "key": rows[i].key, "item": rows[i].item}
@@ -2209,33 +1955,26 @@ def _VirtualizedList(**p: Any) -> Element:
             user_on_scroll(payload)
 
     # ------------------------------------------------------------------
-    # Imperative controller (scroll_to_index / offset / end) exposed on
-    # the user's ref dict. Re-attached every render so the closures see
-    # fresh extents; the effect itself must run unconditionally to keep
-    # hook order stable.
+    # Imperative controller (scroll_to_index / offset / end) published
+    # on the user's ref. Rebuilt every render (deps=None) so the
+    # closures see fresh extents.
     # ------------------------------------------------------------------
-    controller = p.get("controller_ref")
+    def _scroll_to_offset(offset: float, animated: bool = True) -> None:
+        axis = "x" if horizontal else "y"
+        _dispatch_scroll_command(sv_ref, "scroll_to_offset", {axis: float(offset), "animated": animated})
 
-    def _attach_controller() -> None:
-        if not isinstance(controller, dict):
-            return
+    def _scroll_to_index(index: int, animated: bool = True) -> None:
+        idx = max(0, min(int(index), n - 1)) if n else 0
+        _scroll_to_offset(starts[idx], animated)
 
-        def scroll_to_offset(offset: float, animated: bool = True) -> None:
-            axis = "x" if horizontal else "y"
-            _dispatch_scroll_command(sv_ref, "scroll_to_offset", {axis: float(offset), "animated": animated})
+    def _scroll_to_end(animated: bool = True) -> None:
+        _scroll_to_offset(max(0.0, total_extent - _viewport_extent()), animated)
 
-        def scroll_to_index(index: int, animated: bool = True) -> None:
-            idx = max(0, min(int(index), n - 1)) if n else 0
-            scroll_to_offset(starts[idx], animated)
-
-        def scroll_to_end(animated: bool = True) -> None:
-            scroll_to_offset(max(0.0, total_extent - _viewport_extent()), animated)
-
-        controller["scroll_to_offset"] = scroll_to_offset
-        controller["scroll_to_index"] = scroll_to_index
-        controller["scroll_to_end"] = scroll_to_end
-
-    use_effect(_attach_controller, None)
+    use_imperative_handle(
+        p.get("controller_ref"),
+        lambda: ListController(_scroll_to_offset, _scroll_to_index, _scroll_to_end),
+        None,
+    )
 
     # ------------------------------------------------------------------
     # Children: header, leading spacer, windowed rows, trailing spacer,
@@ -2254,17 +1993,17 @@ def _VirtualizedList(**p: Any) -> Element:
         if empty is not None:
             children.append(View(empty, key="__pn_empty__"))
     else:
-        live_refs: Dict[str, Any] = {}
+        live_refs: Dict[str, Ref] = {}
         lead = starts[first]
         if lead > 0:
             lead_style: Dict[str, Any] = {spacer_key: lead}
             children.append(View(style=lead_style, key="__pn_lead__"))
         for i in range(first, last + 1):
             spec = rows[i]
-            row_ref = row_refs["current"].get(spec.key) or {"current": None}
+            row_ref = row_refs.current.get(spec.key) or Ref()
             live_refs[spec.key] = row_ref
             children.append(View(spec.make(), ref=row_ref, key=spec.key))
-        row_refs["current"] = live_refs
+        row_refs.current = live_refs
         trail = total_extent - starts[last + 1]
         if trail > 0:
             trail_style: Dict[str, Any] = {spacer_key: trail}
@@ -2318,9 +2057,9 @@ def _NativeList(**p: Any) -> Element:
     heights: List[float] = [float(spec.extent or 0.0) for spec in rows]
     uniform = len(set(heights)) <= 1
 
-    internal_ref = use_ref(None)
+    internal_ref: Ref = use_ref(None)
     end_latch = use_ref({"fired_for": -1})
-    viewable_ref = use_ref({"keys": ()})
+    viewable_ref: Ref[Dict[str, Tuple[str, ...]]] = use_ref({"keys": ()})
 
     starts: List[float] = [0.0] * (n + 1)
     acc = 0.0
@@ -2349,18 +2088,18 @@ def _NativeList(**p: Any) -> Element:
         if on_end_reached is not None and total_extent > 0:
             remaining = total_extent - (offset + viewport)
             if remaining <= end_threshold * viewport:
-                if end_latch["current"]["fired_for"] != n:
-                    end_latch["current"]["fired_for"] = n
+                if end_latch.current["fired_for"] != n:
+                    end_latch.current["fired_for"] = n
                     on_end_reached()
             elif remaining > end_threshold * viewport + viewport:
-                end_latch["current"]["fired_for"] = -1
+                end_latch.current["fired_for"] = -1
 
         if on_viewable is not None and n > 0:
             v_first = max(0, bisect.bisect_right(starts, offset, 0, n) - 1)
             v_last = min(n - 1, bisect.bisect_left(starts, offset + viewport, 0, n))
             keys = tuple(rows[i].key for i in range(v_first, v_last + 1))
-            if keys != viewable_ref["current"]["keys"]:
-                viewable_ref["current"]["keys"] = keys
+            if keys != viewable_ref.current["keys"]:
+                viewable_ref.current["keys"] = keys
                 on_viewable(
                     [
                         {"index": rows[i].index, "key": rows[i].key, "item": rows[i].item}
@@ -2371,26 +2110,20 @@ def _NativeList(**p: Any) -> Element:
         if user_on_scroll is not None:
             user_on_scroll({"x": 0.0, "y": offset})
 
-    controller = p.get("controller_ref")
+    def _scroll_to_offset(offset: float, animated: bool = True) -> None:
+        _dispatch_scroll_command(internal_ref, "scroll_to_offset", {"y": float(offset), "animated": animated})
 
-    def _attach_controller() -> None:
-        if not isinstance(controller, dict):
-            return
+    def _scroll_to_index(index: int, animated: bool = True) -> None:
+        _dispatch_scroll_command(internal_ref, "scroll_to_index", {"index": int(index), "animated": animated})
 
-        def scroll_to_offset(offset: float, animated: bool = True) -> None:
-            _dispatch_scroll_command(internal_ref, "scroll_to_offset", {"y": float(offset), "animated": animated})
+    def _scroll_to_end(animated: bool = True) -> None:
+        _dispatch_scroll_command(internal_ref, "scroll_to_end", {"animated": animated})
 
-        def scroll_to_index(index: int, animated: bool = True) -> None:
-            _dispatch_scroll_command(internal_ref, "scroll_to_index", {"index": int(index), "animated": animated})
-
-        def scroll_to_end(animated: bool = True) -> None:
-            _dispatch_scroll_command(internal_ref, "scroll_to_end", {"animated": animated})
-
-        controller["scroll_to_offset"] = scroll_to_offset
-        controller["scroll_to_index"] = scroll_to_index
-        controller["scroll_to_end"] = scroll_to_end
-
-    use_effect(_attach_controller, None)
+    use_imperative_handle(
+        p.get("controller_ref"),
+        lambda: ListController(_scroll_to_offset, _scroll_to_index, _scroll_to_end),
+        None,
+    )
 
     props: Dict[str, Any] = dict(p.get("list_style") or {})
     props["count"] = n
@@ -2434,7 +2167,7 @@ def FlatList(
     shows_scroll_indicator: bool = True,
     content_container_style: StyleProp = None,
     style: StyleProp = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Virtualized scrollable list that renders items from ``data`` lazily.
@@ -2447,10 +2180,12 @@ def FlatList(
     unknown rows start at ``estimated_item_height`` and are corrected
     with their measured extent once they've been on screen.
 
-    The ``ref`` dict (from [`use_ref`][pythonnative.use_ref]) is
-    populated with an imperative controller:
-    ``ref["scroll_to_index"](i)``, ``ref["scroll_to_offset"](pts)``,
-    and ``ref["scroll_to_end"]()``.
+    Pass a [`Ref`][pythonnative.Ref] (from
+    [`use_ref`][pythonnative.use_ref]) to receive a
+    [`ListController`][pythonnative.ListController] on ``ref.current``:
+    ``ref.current.scroll_to_index(i)``,
+    ``ref.current.scroll_to_offset(pts)``, and
+    ``ref.current.scroll_to_end()``.
 
     Args:
         data: List of arbitrary item values.
@@ -2485,8 +2220,9 @@ def FlatList(
         content_container_style: Style applied to the inner content
             wrapper.
         style: Style for the outer scroll container.
-        ref: Optional ``use_ref()`` dict; receives the scroll
-            controller functions.
+        ref: Optional [`Ref`][pythonnative.Ref]; receives a
+            [`ListController`][pythonnative.ListController] on
+            ``ref.current`` after mount.
         key: Stable identity for keyed reconciliation of the list.
 
     Returns:
@@ -2630,7 +2366,7 @@ def SectionList(
     on_end_reached_threshold: float = 0.5,
     on_scroll: Optional[Callable[[Dict[str, float]], None]] = None,
     style: StyleProp = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Virtualized list with section headers interleaved between row groups.
@@ -2664,8 +2400,9 @@ def SectionList(
             multiples, at which ``on_end_reached`` fires.
         on_scroll: Called with the raw scroll payload.
         style: Style for the outer scroll container.
-        ref: Optional ``use_ref()`` dict; receives the scroll
-            controller functions.
+        ref: Optional [`Ref`][pythonnative.Ref]; receives a
+            [`ListController`][pythonnative.ListController] on
+            ``ref.current`` after mount.
         key: Stable identity for keyed reconciliation of the list.
 
     Returns:
@@ -2945,10 +2682,10 @@ def Picker(
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessible: Optional[bool] = None,
-    accessibility_state: Optional[Dict[str, Any]] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
     test_id: Optional[str] = None,
-    ref: Optional[Dict[str, Any]] = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """A real native dropdown / select widget.
@@ -2981,7 +2718,7 @@ def Picker(
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
-        ref: Optional ``use_ref()`` dict.
+        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
 
     Returns:

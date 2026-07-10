@@ -74,7 +74,7 @@ def HomeScreen():
         pn.Text("Home", style={"font_size": 24}),
         pn.Button(
             "Go to Detail",
-            on_click=lambda: nav.navigate("Detail", params={"id": 42}),
+            on_press=lambda: nav.navigate("Detail", params={"id": 42}),
         ),
         style={"spacing": 12, "padding": 16},
     )
@@ -85,7 +85,7 @@ def DetailScreen():
     params = nav.get_params()
     return pn.Column(
         pn.Text(f"Detail #{params.get('id')}", style={"font_size": 20}),
-        pn.Button("Back", on_click=nav.go_back),
+        pn.Button("Back", on_press=nav.go_back),
         style={"spacing": 12, "padding": 16},
     )
 ```
@@ -139,7 +139,7 @@ def App():
 def HomeScreen():
     nav = pn.use_navigation()
     return pn.Column(
-        pn.Button("Open Menu", on_click=nav.open_drawer),
+        pn.Button("Open Menu", on_press=nav.open_drawer),
         pn.Text("Home Screen"),
     )
 ```

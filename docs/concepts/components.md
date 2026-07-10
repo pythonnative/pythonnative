@@ -15,7 +15,7 @@ objects are created until the
 import pythonnative as pn
 
 pn.Text("Hello", style={"font_size": 18, "color": "#333333"})
-pn.Button("Tap me", on_click=lambda: print("tapped"))
+pn.Button("Tap me", on_press=lambda: print("tapped"))
 pn.Column(
     pn.Text("First"),
     pn.Text("Second"),
@@ -48,7 +48,7 @@ pn.Column(
 
 **Input:**
 
-- [`Button(title, on_click, style=...)`][pythonnative.Button]:
+- [`Button(title, on_press, style=...)`][pythonnative.Button]:
   tappable button.
 - [`TextInput(value, placeholder, on_change, secure, style=...)`][pythonnative.TextInput]:
   text entry.
@@ -69,17 +69,28 @@ pn.Column(
 
 - [`Modal(*children, visible, on_dismiss, title)`][pythonnative.Modal]:
   modal dialog.
+- [`Portal(*children)`][pythonnative.Portal]: render children into a
+  full-screen overlay above everything else (analogous to React DOM's
+  `createPortal`). The children stay part of your component tree for
+  state, context, and events; only their native views move. Use it for
+  toasts, floating action buttons, and custom dropdowns.
 
 **Error handling:**
 
-- [`ErrorBoundary(child, fallback)`][pythonnative.ErrorBoundary]:
-  catches render errors in child and displays fallback.
+- [`ErrorBoundary(*children, fallback, on_error)`][pythonnative.ErrorBoundary]:
+  catches render errors in the subtree and displays `fallback`. The
+  fallback may be an element, `fallback(error)`, or
+  `fallback(error, reset)` where `reset` remounts the children.
 
 **Composition:**
 
-- [`Fragment(*children)`][pythonnative.Fragment]: group siblings into a
-  parent's child list without an extra wrapping view (analogous to
-  React's `<>…</>`).
+- [`Fragment(*children, key)`][pythonnative.Fragment]: group siblings
+  into a parent's child list without an extra wrapping view (analogous
+  to React's `<>…</>`). A keyed Fragment moves all of its children as
+  one unit during keyed reconciliation.
+- Components may also return a plain `list` of elements, or `None` to
+  render nothing; `None` and `False` children are dropped, so
+  `cond and pn.Text(...)` works for conditional rendering.
 
 **Lists:**
 
@@ -204,7 +215,7 @@ def CounterPage():
 
     return pn.Column(
         pn.Text(f"Count: {count}", style={"font_size": 24}),
-        pn.Button("Increment", on_click=lambda: set_count(count + 1)),
+        pn.Button("Increment", on_press=lambda: set_count(count + 1)),
         style={"spacing": 12},
     )
 ```
@@ -222,8 +233,8 @@ def Counter(label: str = "Count", initial: int = 0):
     return pn.Column(
         pn.Text(f"{label}: {count}", style={"font_size": 18}),
         pn.Row(
-            pn.Button("-", on_click=lambda: set_count(count - 1)),
-            pn.Button("+", on_click=lambda: set_count(count + 1)),
+            pn.Button("-", on_press=lambda: set_count(count - 1)),
+            pn.Button("+", on_press=lambda: set_count(count + 1)),
             style={"spacing": 8},
         ),
         style={"spacing": 4},
@@ -250,14 +261,24 @@ hook state.
   reducer-based state; returns `(state, dispatch)`.
 - [`use_effect(effect, deps)`][pythonnative.use_effect]: side effects,
   run after native commit (timers, API calls, subscriptions).
+- [`use_layout_effect(effect, deps)`][pythonnative.use_layout_effect]:
+  side effects run synchronously inside the commit, before passive
+  effects; use to measure committed frames or issue view commands.
 - [`use_memo(factory, deps)`][pythonnative.use_memo]: memoized
   computed values.
 - [`use_callback(fn, deps)`][pythonnative.use_callback]: stable
   function references.
-- [`use_ref(initial)`][pythonnative.use_ref]: mutable ref that
-  persists across renders. When passed via the `ref=` prop, the
-  reconciler populates `ref["current"]` with the underlying native
-  view.
+- [`use_ref(initial)`][pythonnative.use_ref]: mutable
+  [`Ref`][pythonnative.Ref] that persists across renders. When passed
+  via the `ref=` prop, the reconciler populates `ref.current` with the
+  underlying native view.
+- [`use_imperative_handle(ref, factory, deps)`][pythonnative.use_imperative_handle]:
+  publish a controller object on `ref.current` from a composite
+  component (how `FlatList` exposes its
+  [`ListController`][pythonnative.ListController]).
+- [`use_back_handler(handler)`][pythonnative.use_back_handler]:
+  intercept the Android back button / desktop Escape; return `True`
+  to consume.
 - [`use_animated_value(initial)`][pythonnative.use_animated_value]:
   stable [`AnimatedValue`][pythonnative.AnimatedValue] across renders;
   the canonical way to drive `Animated.View`.

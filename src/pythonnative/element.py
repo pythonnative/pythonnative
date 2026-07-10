@@ -36,7 +36,10 @@ class Element:
             components decorated with [`component`][pythonnative.component].
         props: Dict of properties passed to the native handler or
             component function.
-        children: Ordered list of child `Element` instances.
+        children: Ordered list of child `Element` instances. `None` and
+            `False` entries are permitted and dropped during
+            reconciliation, so conditional children (`cond and Text(...)`)
+            need no special casing.
         key: Optional stable identity used by the reconciler when
             diffing keyed lists. Two elements with the same `type` and
             `key` are treated as the same logical node across renders.
@@ -48,7 +51,7 @@ class Element:
         self,
         type_name: Union[str, Any],
         props: Dict[str, Any],
-        children: List["Element"],
+        children: List[Any],
         key: Optional[str] = None,
     ) -> None:
         self.type = type_name

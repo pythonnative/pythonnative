@@ -34,11 +34,11 @@ def CategoryListScreen() -> pn.Element:
             *[
                 pn.Button(
                     f"Open: {demo.title}",
-                    on_click=lambda _id=demo.id: open_demo(_id),
+                    on_press=lambda _id=demo.id: open_demo(_id),
                 )
                 for demo in demos
             ],
-            pn.Button("Back to home", on_click=nav.go_back),
+            pn.Button("Back to home", on_press=nav.go_back),
             style=styles["screen"],
         )
     )

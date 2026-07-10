@@ -1,0 +1,26 @@
+# Tests use_imperative_handle publishes a ListController on the ref.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_imperative_handle.py
+# Source under test: src/pythonnative/hooks.py :: use_imperative_handle
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_imperative_handle
+- assertVisible: "Row 0"
+- assertNotVisible: "Row 39"
+# Drive the list through the controller published on the ref.
+- tapOn: "Scroll to end"
+- assertVisible: "Last action: scroll_to_end"
+- assertVisible: "Handle attached: yes"
+- assertVisible: "Row 39"
+- assertNotVisible: "Row 0"
+- tapOn: "Scroll to top"
+- assertVisible: "Last action: scroll_to_top"
+- assertVisible: "Row 0"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

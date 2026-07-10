@@ -38,7 +38,7 @@ def Toolbar():
         report = await build_report()
         await save_to_disk(report)
 
-    return pn.Button("Export", on_click=lambda: pn.run_async(export()))
+    return pn.Button("Export", on_press=lambda: pn.run_async(export()))
 ```
 
 ## Async side effects: `use_async_effect`
@@ -84,7 +84,7 @@ def UserCard(user_id: int):
         return pn.Text(f"Error: {q.error}")
     return pn.Column(
         pn.Text(q.data["name"]),
-        pn.Button("Refresh", on_click=q.refetch),
+        pn.Button("Refresh", on_press=q.refetch),
     )
 ```
 
@@ -115,7 +115,7 @@ def NewPostForm():
         pn.TextInput(value=title, on_change=set_title),
         pn.Button(
             "Save" if not state.loading else "Saving…",
-            on_click=lambda: pn.run_async(submit()),
+            on_press=lambda: pn.run_async(submit()),
         ),
         pn.Text(str(state.error)) if state.error else pn.Spacer(),
     )
@@ -176,7 +176,7 @@ def ThemeToggle():
     theme, set_theme = pn.use_persisted_state("settings.theme", "light")
     return pn.Button(
         f"Theme: {theme}",
-        on_click=lambda: set_theme("dark" if theme == "light" else "light"),
+        on_press=lambda: set_theme("dark" if theme == "light" else "light"),
     )
 ```
 
@@ -241,7 +241,7 @@ def PostsScreen(user_id: int):
         pn.TextInput(value=draft, on_change=set_draft),
         pn.Button(
             "Post" if not state.loading else "Posting…",
-            on_click=lambda: pn.run_async(submit()),
+            on_press=lambda: pn.run_async(submit()),
         ),
         pn.FlatList(
             posts.data or [],

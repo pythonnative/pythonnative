@@ -21,23 +21,23 @@ def UseCallbackDemo() -> pn.Element:
 
     cb = pn.use_callback(lambda: None, [dep])
 
-    if last_id["current"] is None:
-        last_id["current"] = id(cb)
-    elif last_id["current"] != id(cb):
-        changes["current"] += 1
-        last_id["current"] = id(cb)
+    if last_id.current is None:
+        last_id.current = id(cb)
+    elif last_id.current != id(cb):
+        changes.current += 1
+        last_id.current = id(cb)
 
     return demo_screen(
         "use_callback",
         "Function identity stays stable until dep changes.",
         section(
             "Identity tracking",
-            result_text("Identity changes", changes["current"]),
+            result_text("Identity changes", changes.current),
             result_text("Dep value", dep),
             result_text("Other value", other),
             buttons_row(
-                pn.Button("Change dep", on_click=lambda: set_dep(dep + 1)),
-                pn.Button("Change other", on_click=lambda: set_other(other + 1)),
+                pn.Button("Change dep", on_press=lambda: set_dep(dep + 1)),
+                pn.Button("Change other", on_press=lambda: set_other(other + 1)),
             ),
             hint("Tapping 'Change other' must NOT bump 'Identity changes'. " "Tapping 'Change dep' bumps it by 1."),
         ),

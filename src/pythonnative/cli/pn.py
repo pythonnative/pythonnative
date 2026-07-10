@@ -59,8 +59,8 @@ def HomeScreen():
         pn.Column(
             pn.Text("Hello from PythonNative!", style={"font_size": 24, "bold": True}),
             pn.Text(f"Tapped {count} times"),
-            pn.Button("Tap me", on_click=lambda: set_count(count + 1)),
-            pn.Button("Open detail", on_click=lambda: nav.navigate("Detail", {"count": count})),
+            pn.Button("Tap me", on_press=lambda: set_count(count + 1)),
+            pn.Button("Open detail", on_press=lambda: nav.navigate("Detail", {"count": count})),
             style={"spacing": 12, "padding": 16, "align_items": "stretch"},
         )
     )
@@ -72,7 +72,7 @@ def DetailScreen():
     params = pn.use_route()
     return pn.Column(
         pn.Text(f"Detail: count was {params.get('count', 0)}", style={"font_size": 20}),
-        pn.Button("Back", on_click=nav.go_back),
+        pn.Button("Back", on_press=nav.go_back),
         style={"spacing": 12, "padding": 16},
     )
 

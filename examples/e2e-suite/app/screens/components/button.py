@@ -2,7 +2,7 @@
 
 Exposes an "Increment" button that drives a counter so flows can tap
 it twice and assert ``"Counter: 2"``. Also includes a disabled-button
-variant whose ``on_click`` should never fire.
+variant whose ``on_press`` should never fire.
 """
 
 from __future__ import annotations
@@ -24,8 +24,8 @@ def ButtonDemo() -> pn.Element:
             "Enabled button",
             result_text("Counter", count),
             buttons_row(
-                pn.Button("Increment", on_click=lambda: set_count(count + 1)),
-                pn.Button("Reset", on_click=lambda: set_count(0)),
+                pn.Button("Increment", on_press=lambda: set_count(count + 1)),
+                pn.Button("Reset", on_press=lambda: set_count(0)),
             ),
             hint("Tap 'Increment' to increase the counter."),
         ),
@@ -34,7 +34,7 @@ def ButtonDemo() -> pn.Element:
             result_text("Disabled taps", disabled_count),
             pn.Button(
                 "Should not fire",
-                on_click=lambda: set_disabled_count(disabled_count + 1),
+                on_press=lambda: set_disabled_count(disabled_count + 1),
                 enabled=False,
             ),
             hint("Tapping this button must keep 'Disabled taps' at 0."),

@@ -56,8 +56,8 @@ def counter_badge(initial: int = 0) -> pn.Element:
         pn.Text(f"Tapped {count} times", style=styles["subtitle"]),
         pn.Text(medal, style=local_styles["medal"]),
         pn.Row(
-            pn.Button("Tap me", on_click=handle_tap),
-            pn.Button("Reset", on_click=handle_reset),
+            pn.Button("Tap me", on_press=handle_tap),
+            pn.Button("Reset", on_press=handle_reset),
             style=local_styles["button_row"],
         ),
         style=local_styles["card"],
@@ -94,7 +94,7 @@ def HomeScreen() -> pn.Element:
                 style=styles["hint"],
             ),
             counter_badge(),
-            pn.Button("View Showcase", on_click=view_showcase),
+            pn.Button("View Showcase", on_press=view_showcase),
             style=styles["section"],
         )
     )

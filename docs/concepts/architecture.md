@@ -32,10 +32,12 @@ platform APIs synchronously from Python.
    reload). Sibling and ancestor components whose state did not change
    are left untouched.
 4. **Post-render effects.** Effects queued via
-   [`use_effect`][pythonnative.use_effect] are flushed **after** the
-   reconciler commits native mutations, matching React semantics.
-   This guarantees that effect callbacks interact with the committed
-   native tree.
+   [`use_layout_effect`][pythonnative.use_layout_effect] run
+   synchronously inside the commit (after frames are set), and effects
+   queued via [`use_effect`][pythonnative.use_effect] are flushed
+   **after** the commit completes, matching React semantics. This
+   guarantees that effect callbacks interact with the committed native
+   tree.
 5. **State batching.** Multiple state updates triggered during a
    render pass (e.g., from effects) are automatically batched into a
    single re-render. Explicit batching is available via
@@ -129,7 +131,7 @@ def Counter(initial: int = 0):
     count, set_count = pn.use_state(initial)
     return pn.Column(
         pn.Text(f"Count: {count}", style={"font_size": 18}),
-        pn.Button("+", on_click=lambda: set_count(count + 1)),
+        pn.Button("+", on_press=lambda: set_count(count + 1)),
         style={"spacing": 4},
     )
 ```

@@ -199,3 +199,16 @@ class FakeBackend:
     def ops_of(self, kind: str) -> List[Any]:
         """Return every recorded op tuple whose first element is ``kind``."""
         return [op for op in self.ops if op[0] == kind]
+
+    def detached_views(self, type_name: Optional[str] = None) -> List[FakeView]:
+        """Return live views that were never inserted into a parent.
+
+        ``Portal`` overlays are the main case: the reconciler creates
+        them and inserts *children into them*, but never inserts the
+        overlay itself anywhere (real handlers self-attach to a
+        top-level container). Optionally filter by ``type_name``.
+        """
+        out = [v for v in self.views.values() if v.parent is None]
+        if type_name is not None:
+            out = [v for v in out if v.type_name == type_name]
+        return out

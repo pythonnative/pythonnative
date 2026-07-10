@@ -52,7 +52,7 @@ def demo_screen(
             pn.Text(f"Demo: {title}", style=styles["title"]),
             pn.Text(summary, style=styles["subtitle"]),
             *body,
-            pn.Button("Back to list", on_click=nav.go_back),
+            pn.Button("Back to list", on_press=nav.go_back),
             style=styles["screen"],
         ),
         refresh_control=refresh_control,

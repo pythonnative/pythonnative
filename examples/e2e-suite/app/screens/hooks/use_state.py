@@ -22,9 +22,9 @@ def UseStateDemo() -> pn.Element:
             "Counter",
             result_text("Counter", count),
             buttons_row(
-                pn.Button("Increment", on_click=lambda: set_count(count + 1)),
-                pn.Button("Decrement", on_click=lambda: set_count(count - 1)),
-                pn.Button("Reset", on_click=lambda: set_count(0)),
+                pn.Button("Increment", on_press=lambda: set_count(count + 1)),
+                pn.Button("Decrement", on_press=lambda: set_count(count - 1)),
+                pn.Button("Reset", on_press=lambda: set_count(0)),
             ),
             hint("Maestro taps Increment twice, asserts 'Counter: 2'."),
         ),

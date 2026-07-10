@@ -1,0 +1,22 @@
+# Tests use_layout_effect measures committed frames before passive effects.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_layout_effect.py
+# Source under test: src/pythonnative/hooks.py :: use_layout_effect
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_layout_effect
+- assertVisible: "Box size: 120x48"
+- assertVisible: "Phase order: layout then passive"
+- tapOn: "Wide box"
+- assertVisible: "Box size: 200x48"
+- assertVisible: "Phase order: layout then passive"
+- tapOn: "Narrow box"
+- assertVisible: "Box size: 120x48"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

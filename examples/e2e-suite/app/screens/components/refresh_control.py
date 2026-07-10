@@ -38,7 +38,7 @@ def RefreshControlDemo() -> pn.Element:
             "Refresh state",
             result_text("Refreshing", "yes" if refreshing else "no"),
             result_text("Refresh runs", count),
-            pn.Button("Trigger refresh", on_click=start_refresh),
+            pn.Button("Trigger refresh", on_press=start_refresh),
             hint("Maestro pulls the page down, then taps 'Trigger refresh'."),
         ),
         refresh_control=pn.RefreshControl(refreshing=refreshing, on_refresh=start_refresh),

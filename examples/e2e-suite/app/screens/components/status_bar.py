@@ -27,7 +27,7 @@ def StatusBarDemo() -> pn.Element:
             result_text("Bar style", style),
             pn.Button(
                 "Toggle",
-                on_click=lambda: set_style("light" if style == "dark" else "dark"),
+                on_press=lambda: set_style("light" if style == "dark" else "dark"),
             ),
             hint("Tapping the button flips Bar style between 'dark' and 'light'."),
         ),

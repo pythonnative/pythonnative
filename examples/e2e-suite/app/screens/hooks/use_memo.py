@@ -20,7 +20,7 @@ def UseMemoDemo() -> pn.Element:
     other, set_other = pn.use_state(0)
 
     def _expensive() -> int:
-        runs["current"] += 1
+        runs.current += 1
         return dep * 2
 
     memoized = pn.use_memo(_expensive, [dep])
@@ -30,12 +30,12 @@ def UseMemoDemo() -> pn.Element:
         "Factory only re-runs when its dep array changes.",
         section(
             "Memo",
-            result_text("Factory runs", runs["current"]),
+            result_text("Factory runs", runs.current),
             result_text("Memo value", memoized),
             result_text("Other state", other),
             buttons_row(
-                pn.Button("Change dep", on_click=lambda: set_dep(dep + 1)),
-                pn.Button("Change other", on_click=lambda: set_other(other + 1)),
+                pn.Button("Change dep", on_press=lambda: set_dep(dep + 1)),
+                pn.Button("Change other", on_press=lambda: set_other(other + 1)),
             ),
             hint("Tap 'Change other': factory runs stays the same. " "Tap 'Change dep': factory runs goes up."),
         ),

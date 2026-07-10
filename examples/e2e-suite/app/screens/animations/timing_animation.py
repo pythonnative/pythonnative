@@ -43,8 +43,8 @@ def TimingAnimationDemo() -> pn.Element:
                 ),
             ),
             buttons_row(
-                pn.Button("Run timing", on_click=lambda: pn.run_async(run())),
-                pn.Button("Reset", on_click=lambda: pn.run_async(reset())),
+                pn.Button("Run timing", on_press=lambda: pn.run_async(run())),
+                pn.Button("Reset", on_press=lambda: pn.run_async(reset())),
             ),
             hint("Maestro taps 'Run timing' and asserts 'Status: done'."),
         ),

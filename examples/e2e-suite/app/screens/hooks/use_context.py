@@ -38,8 +38,8 @@ def UseContextDemo() -> pn.Element:
             result_text("Current theme", theme),
             pn.Provider(_ThemeContext, theme, _Consumer()),
             buttons_row(
-                pn.Button("Set light", on_click=lambda: set_theme("light")),
-                pn.Button("Set dark", on_click=lambda: set_theme("dark")),
+                pn.Button("Set light", on_press=lambda: set_theme("light")),
+                pn.Button("Set dark", on_press=lambda: set_theme("dark")),
             ),
             hint("Tap 'Set dark' and the consumer line should show 'dark'."),
         ),

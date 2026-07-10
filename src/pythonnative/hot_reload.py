@@ -576,7 +576,10 @@ class ModuleReloader:
             if getattr(vnode, "element", None) is not None:
                 rewrite_element_tree(vnode.element)
             rendered = getattr(vnode, "_rendered", None)
-            if rendered is not None:
+            if isinstance(rendered, (list, tuple)):
+                for rendered_el in rendered:
+                    rewrite_element_tree(rendered_el)
+            elif rendered is not None:
                 rewrite_element_tree(rendered)
             for child in getattr(vnode, "children", []) or []:
                 visit(child)
@@ -598,6 +601,11 @@ class ModuleReloader:
         if not replacement_map:
             return False
         rewrites = ModuleReloader.swap_components_in_tree(reconciler, replacement_map)
+        if rewrites > 0 and hasattr(reconciler, "reset_hook_signatures"):
+            # New component bodies may legitimately call a different
+            # hook sequence; forget the recorded signatures so the
+            # dev-mode order guard doesn't flag the refresh itself.
+            reconciler.reset_hook_signatures()
         return rewrites > 0
 
     @staticmethod

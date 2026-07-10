@@ -48,6 +48,8 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # Type-only re-exports: statically checkable, no UI surface.
     # --------------------------------------------------------------
     "Element",
+    "AccessibilityState",
+    "AlignContent",
     "AlignItems",
     "AlignSelf",
     "AutoCapitalize",
@@ -55,13 +57,16 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "Dimension",
     "EdgeInsets",
     "FlexDirection",
+    "FlexWrap",
     "FontWeight",
     "JustifyContent",
     "KeyboardType",
+    "LayoutDirection",
     "Overflow",
     "Position",
     "ReturnKeyType",
     "ScaleType",
+    "ScreenOptions",
     "ShadowOffset",
     "Style",
     "StyleProp",
@@ -73,33 +78,8 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "QueryResult",  # observed via use_query demo
     "MutationCall",  # observed via use_mutation demo
     "MutationState",  # observed via use_mutation demo
-    # --------------------------------------------------------------
-    # Built-in Props dataclasses: exercised indirectly via their
-    # corresponding component demos.
-    # --------------------------------------------------------------
-    "ActivityIndicatorProps",
-    "ButtonProps",
-    "CheckboxProps",
-    "DatePickerProps",
-    "ImageBackgroundProps",
-    "ImageProps",
-    "KeyboardAvoidingViewProps",
-    "ModalProps",
-    "PickerProps",
-    "PressableProps",
-    "ProgressBarProps",
-    "SafeAreaViewProps",
-    "ScrollViewProps",
-    "SegmentedControlProps",
-    "SliderProps",
-    "SpacerProps",
-    "StatusBarProps",
-    "SwitchProps",
-    "TextInputProps",
-    "TextProps",
-    "TouchableOpacityProps",
-    "ViewProps",
-    "WebViewProps",
+    "Ref",  # returned by use_ref; exercised by use_ref + use_imperative_handle demos
+    "ListController",  # driven through the use_imperative_handle demo's scroll buttons
     # --------------------------------------------------------------
     # Ambient infrastructure exercised by every flow (importing the
     # app + rendering any screen invokes them, so a dedicated demo
@@ -168,6 +148,14 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "element_factory",  # tested via unit tests; needs registered handlers
     "register_component",  # tested via unit tests; needs handler implementations
     "Props",  # tested in custom_component demo and SDK unit tests
+    # --------------------------------------------------------------
+    # Dev-mode diagnostics: warnings, hook-order checks, and RedBox
+    # routing only activate in dev builds, so there is no stable
+    # release-app UI to assert on. Covered by unit tests
+    # (tests/test_core_semantics.py).
+    # --------------------------------------------------------------
+    "diagnostics",
+    "HookOrderError",
 }
 
 

@@ -124,6 +124,7 @@ nav:
     - Native views: api/native_views.md
     - SDK: api/sdk.md
     - Hot reload: api/hot_reload.md
+    - Diagnostics: api/diagnostics.md
     - Utilities: api/utils.md
     - CLI (pn): api/cli.md
     - Component properties: api/component-properties.md

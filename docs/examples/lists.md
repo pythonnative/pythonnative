@@ -22,7 +22,7 @@ def TodoRow(todo, on_toggle, on_delete):
                 "color": "#888" if todo["done"] else "#000",
             },
         ),
-        pn.Button("Delete", on_click=lambda: on_delete(todo["id"])),
+        pn.Button("Delete", on_press=lambda: on_delete(todo["id"])),
         style={"spacing": 12, "padding": 8, "align_items": "center"},
     )
 
@@ -65,7 +65,7 @@ def TodoList():
                 placeholder="What needs doing?",
                 style={"flex": 1},
             ),
-            pn.Button("Add", on_click=add),
+            pn.Button("Add", on_press=add),
             style={"spacing": 8, "padding": 16},
         ),
         pn.FlatList(

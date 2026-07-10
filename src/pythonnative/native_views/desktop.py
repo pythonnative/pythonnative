@@ -803,7 +803,7 @@ class TextHandler(DesktopViewHandler):
 class ButtonHandler(DesktopViewHandler):
     def build(self, props: Dict[str, Any]) -> Any:
         button = tk.Button(_master(), highlightthickness=0, takefocus=0)
-        button.configure(command=lambda: _fire(button, "on_click"))
+        button.configure(command=lambda: _fire(button, "on_press"))
         return button
 
     def apply(self, button: Any, props: Dict[str, Any]) -> None:
@@ -1329,6 +1329,42 @@ class ModalHandler(DesktopViewHandler):
 
 
 # ======================================================================
+# Portal
+# ======================================================================
+
+
+class PortalHandler(DesktopViewHandler):
+    """Portal host that floats children over the whole stage.
+
+    Tkinter has no view that can cover the stage without also
+    swallowing clicks, so the portal keeps its own frame unmapped and
+    instead places each child directly against the stage (``_place``
+    with no logical parent targets the root container). The detached
+    layout pass produces viewport coordinates, which is exactly the
+    stage coordinate space, and ``_place`` lifts children above the
+    main content. Empty portal area has no widget at all, so clicks
+    there reach whatever sits underneath.
+    """
+
+    def insert_child(self, parent: Any, child: Any, index: int) -> None:
+        # No ``_pn_parent``: placement composes against the stage.
+        child._pn_parent = None
+        _register_child(parent, child, index)
+        _place(child)
+
+    def remove_child(self, parent: Any, child: Any) -> None:
+        _unregister_child(parent, child)
+        try:
+            child.place_forget()
+        except Exception:
+            pass
+
+    def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
+        # The portal frame itself stays unmapped; only children render.
+        return
+
+
+# ======================================================================
 # TabBar
 # ======================================================================
 
@@ -1580,6 +1616,7 @@ def register_handlers(registry: Any) -> None:
     registry.register("ScrollView", ScrollViewHandler())
     registry.register("SafeAreaView", SafeAreaViewHandler())
     registry.register("Modal", ModalHandler())
+    registry.register("Portal", PortalHandler())
     registry.register("Slider", SliderHandler())
     registry.register("TabBar", TabBarHandler())
     registry.register("Pressable", PressableHandler())

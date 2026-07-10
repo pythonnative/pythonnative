@@ -27,7 +27,7 @@ def HomeScreen():
         pn.Text("Home", style={"font_size": 28, "bold": True}),
         pn.Button(
             "View profile",
-            on_click=lambda: nav.navigate("Profile", {"user_id": 42}),
+            on_press=lambda: nav.navigate("Profile", {"user_id": 42}),
         ),
         style={"spacing": 12, "padding": 16},
     )
@@ -39,7 +39,7 @@ def ProfileScreen():
     nav = pn.use_navigation()
     return pn.Column(
         pn.Text(f"User #{route['params']['user_id']}", style={"font_size": 24}),
-        pn.Button("Back", on_click=nav.go_back),
+        pn.Button("Back", on_press=nav.go_back),
         style={"spacing": 12, "padding": 16},
     )
 

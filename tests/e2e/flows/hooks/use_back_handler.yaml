@@ -1,0 +1,35 @@
+# Tests use_back_handler intercepts the Android hardware back press.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_back_handler.py
+# Source under test: src/pythonnative/hooks.py :: use_back_handler
+#
+# The device-back steps are Android-only: iOS has no system back
+# button, so there the flow just verifies the demo renders and the
+# guard state toggles.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_back_handler
+- assertVisible: "Guard armed: no"
+- assertVisible: "Back presses intercepted: 0"
+- tapOn: "Arm guard"
+- assertVisible: "Guard armed: yes"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      # With the guard armed, device back must NOT leave the screen.
+      - back
+      - assertVisible: "Back presses intercepted: 1"
+      - assertVisible: "Demo: use_back_handler"
+      - back
+      - assertVisible: "Back presses intercepted: 2"
+- tapOn: "Disarm guard"
+- assertVisible: "Guard armed: no"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

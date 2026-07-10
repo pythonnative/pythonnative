@@ -38,9 +38,9 @@ def AsyncStorageDemo() -> pn.Element:
             "Storage I/O",
             result_text("Read value", value),
             buttons_row(
-                pn.Button("Write", on_click=lambda: pn.run_async(_write())),
-                pn.Button("Read", on_click=lambda: pn.run_async(_read())),
-                pn.Button("Clear", on_click=lambda: pn.run_async(_clear())),
+                pn.Button("Write", on_press=lambda: pn.run_async(_write())),
+                pn.Button("Read", on_press=lambda: pn.run_async(_read())),
+                pn.Button("Clear", on_press=lambda: pn.run_async(_clear())),
             ),
             hint("Tap Write, then Read; assert 'Read value: stored-value'."),
         ),

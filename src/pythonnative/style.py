@@ -34,8 +34,10 @@ Example:
     ```
 """
 
+import difflib
 from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union
 
+from . import diagnostics
 from .hooks import Context, create_context, use_color_scheme, use_context
 
 # ======================================================================
@@ -72,6 +74,30 @@ class EdgeInsets(TypedDict, total=False):
 EdgeValue = Union[Dimension, EdgeInsets]
 """Padding/margin value: a uniform number, a ``"%"`` string, or an
 [`EdgeInsets`][pythonnative.EdgeInsets] dict."""
+
+
+class AccessibilityState(TypedDict, total=False):
+    """Current widget state exposed to assistive technology.
+
+    Passed via the ``accessibility_state=`` prop on interactive
+    components. All keys are optional; omitted keys are treated as
+    unset (not ``False``).
+
+    Attributes:
+        disabled: The widget is visible but not interactive.
+        selected: The widget is currently selected (e.g. the active
+            tab).
+        checked: Toggle/checkbox state. ``"mixed"`` represents a
+            tri-state checkbox.
+        busy: The widget is loading or otherwise temporarily busy.
+        expanded: A disclosure/accordion is currently expanded.
+    """
+
+    disabled: bool
+    selected: bool
+    checked: Union[bool, Literal["mixed"]]
+    busy: bool
+    expanded: bool
 
 
 class ShadowOffset(TypedDict):
@@ -136,6 +162,17 @@ TransformSpec = Union[TransformEntry, List[TransformEntry]]
 # ----------------------------------------------------------------------
 
 FlexDirection = Literal["row", "column", "row_reverse", "column_reverse"]
+FlexWrap = Literal["nowrap", "wrap", "wrap_reverse"]
+AlignContent = Literal[
+    "flex_start",
+    "center",
+    "flex_end",
+    "stretch",
+    "space_between",
+    "space_around",
+    "space_evenly",
+]
+LayoutDirection = Literal["ltr", "rtl"]
 JustifyContent = Literal[
     "flex_start",
     "center",
@@ -241,9 +278,12 @@ class Style(TypedDict, total=False):
     flex_shrink: float
     flex_basis: Dimension
     flex_direction: FlexDirection
+    flex_wrap: FlexWrap
     justify_content: JustifyContent
     align_items: AlignItems
     align_self: AlignSelf
+    align_content: AlignContent
+    direction: LayoutDirection
 
     # --- Layout: position ---
     position: Position
@@ -251,6 +291,8 @@ class Style(TypedDict, total=False):
     right: Dimension
     bottom: Dimension
     left: Dimension
+    start: Dimension
+    end: Dimension
 
     # --- Layout: spacing ---
     padding: EdgeValue
@@ -258,6 +300,8 @@ class Style(TypedDict, total=False):
     padding_bottom: Dimension
     padding_left: Dimension
     padding_right: Dimension
+    padding_start: Dimension
+    padding_end: Dimension
     padding_horizontal: Dimension
     padding_vertical: Dimension
     margin: EdgeValue
@@ -265,10 +309,14 @@ class Style(TypedDict, total=False):
     margin_bottom: Dimension
     margin_left: Dimension
     margin_right: Dimension
+    margin_start: Dimension
+    margin_end: Dimension
     margin_horizontal: Dimension
     margin_vertical: Dimension
     spacing: float
     gap: float
+    row_gap: float
+    column_gap: float
 
     # --- Visual: clipping & overflow ---
     overflow: Overflow
@@ -376,6 +424,40 @@ def resolve_style(value: StyleProp) -> Dict[str, Any]:
         if entry:
             result.update(entry)
     return result
+
+
+_KNOWN_STYLE_KEYS = frozenset(Style.__annotations__)
+"""Every key declared on the [`Style`][pythonnative.Style] TypedDict."""
+
+
+def validate_style_keys(style_dict: Dict[str, Any], owner: str = "") -> None:
+    """Warn (once per key) about style keys no built-in handler reads.
+
+    Dev-mode only; production skips the scan entirely. Typos get a
+    "did you mean" suggestion via fuzzy matching against the declared
+    [`Style`][pythonnative.Style] keys. Unknown keys still flow through
+    to handlers untouched, so custom components that read extra keys
+    keep working (at the cost of one dev warning).
+
+    Args:
+        style_dict: The flattened style dict about to be merged into an
+            element's props.
+        owner: Element type name for the warning message (e.g.
+            ``"Text"``).
+    """
+    if not diagnostics.is_dev() or not style_dict:
+        return
+    for key in style_dict:
+        if key in _KNOWN_STYLE_KEYS:
+            continue
+        matches = difflib.get_close_matches(str(key), _KNOWN_STYLE_KEYS, n=1)
+        hint = f" Did you mean {matches[0]!r}?" if matches else ""
+        diagnostics.warn_once(
+            f"Unknown style key {key!r}"
+            + (f" on {owner}" if owner else "")
+            + f".{hint} Built-in components ignore keys they don't recognize.",
+            key=f"style:{owner}:{key}",
+        )
 
 
 # ======================================================================
@@ -604,4 +686,5 @@ __all__ = [
     "resolve_style",
     "style",
     "use_theme",
+    "validate_style_keys",
 ]

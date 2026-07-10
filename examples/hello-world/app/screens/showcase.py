@@ -181,9 +181,9 @@ def ShowcaseScreen() -> pn.Element:
                 on_press=_toggle_color,
                 pressed_opacity=0.7,
             ),
-            pn.Button("View Forms", on_click=view_forms),
-            pn.Button("View Async Demo", on_click=view_data),
-            pn.Button("Back", on_click=go_back),
+            pn.Button("View Forms", on_press=view_forms),
+            pn.Button("View Async Demo", on_press=view_data),
+            pn.Button("Back", on_press=go_back),
             style=styles["section"],
         )
     )

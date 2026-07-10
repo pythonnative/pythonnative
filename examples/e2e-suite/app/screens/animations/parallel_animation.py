@@ -43,7 +43,7 @@ def ParallelAnimationDemo() -> pn.Element:
                     border_radius=12,
                 ),
             ),
-            buttons_row(pn.Button("Run parallel", on_click=lambda: pn.run_async(run()))),
+            buttons_row(pn.Button("Run parallel", on_press=lambda: pn.run_async(run()))),
             hint("Maestro taps 'Run parallel' and asserts 'Status: done'."),
         ),
     )

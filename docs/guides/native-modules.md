@@ -78,7 +78,7 @@ def CameraScreen():
             set_photo(path)
 
     return pn.Column(
-        pn.Button("Take photo", on_click=lambda: pn.run_async(take())),
+        pn.Button("Take photo", on_press=lambda: pn.run_async(take())),
         pn.Image(source=photo) if photo else pn.Spacer(),
     )
 ```

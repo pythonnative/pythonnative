@@ -34,9 +34,9 @@ def SliderDemo() -> pn.Element:
                 accessibility_label="Demo slider",
             ),
             buttons_row(
-                pn.Button("Set 0.0", on_click=lambda: on_change(0.0)),
-                pn.Button("Set 0.5", on_click=lambda: on_change(0.5)),
-                pn.Button("Set 1.0", on_click=lambda: on_change(1.0)),
+                pn.Button("Set 0.0", on_press=lambda: on_change(0.0)),
+                pn.Button("Set 0.5", on_press=lambda: on_change(0.5)),
+                pn.Button("Set 1.0", on_press=lambda: on_change(1.0)),
             ),
             hint("Maestro drags the slider right, then taps the Set buttons."),
         ),

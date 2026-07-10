@@ -3,8 +3,11 @@ appId: ${APP_ID}
 ---
 - runFlow: ../flows/hooks/use_state.yaml
 - runFlow: ../flows/hooks/use_effect.yaml
+- runFlow: ../flows/hooks/use_layout_effect.yaml
 - runFlow: ../flows/hooks/use_reducer.yaml
 - runFlow: ../flows/hooks/use_ref.yaml
+- runFlow: ../flows/hooks/use_imperative_handle.yaml
+- runFlow: ../flows/hooks/use_back_handler.yaml
 - runFlow: ../flows/hooks/use_memo.yaml
 - runFlow: ../flows/hooks/use_callback.yaml
 - runFlow: ../flows/hooks/use_context.yaml

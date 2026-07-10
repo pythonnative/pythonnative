@@ -45,11 +45,12 @@ Example:
     ```
 """
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, TypedDict, Union
 
 from .element import Element
 from .hooks import (
     Provider,
+    Ref,
     _NavigationContext,
     component,
     create_context,
@@ -59,6 +60,29 @@ from .hooks import (
     use_ref,
     use_state,
 )
+
+
+class ScreenOptions(TypedDict, total=False):
+    """Typed per-screen options accepted by ``Screen(..., options=...)``.
+
+    All keys are optional. Navigators ignore keys they don't use.
+
+    Attributes:
+        title: Human-readable screen title. Stack navigators forward it
+            to the host's native navigation bar; tab and drawer
+            navigators use it as the item label.
+        tab_bar_icon: Native system icon identifier for tab items. A
+            string is used on every platform; a dict like
+            ``{"ios": "house.fill", "android": "ic_menu_home"}``
+            selects per platform. iOS values are resolved via
+            SF Symbols (``UIImage.systemImageNamed_``); Android values
+            are resolved against ``android.R.drawable.<name>``. Names
+            that don't resolve fall back to text-only.
+    """
+
+    title: str
+    tab_bar_icon: Union[str, Dict[str, str]]
+
 
 # ======================================================================
 # Focus context
@@ -85,14 +109,14 @@ class _ScreenDef:
         name: Route name used by `navigate(name, ...)`.
         component: A `@component` function rendered when this screen is
             active.
-        options: Free-form per-screen options (e.g., `title` for the
-            tab bar, `headerShown`, etc.). Interpretation is up to the
-            specific navigator implementation.
+        options: Per-screen [`ScreenOptions`][pythonnative.ScreenOptions]
+            (e.g., `title`, `tab_bar_icon`). Interpretation is up to
+            the specific navigator implementation.
     """
 
     __slots__ = ("name", "component", "options")
 
-    def __init__(self, name: str, component_fn: Any, options: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, name: str, component_fn: Any, options: Optional[ScreenOptions] = None) -> None:
         self.name = name
         self.component = component_fn
         self.options = options or {}
@@ -450,10 +474,10 @@ def _stack_navigator_impl(screens: Any = None, initial_route: Optional[str] = No
     stack, set_stack = use_state(lambda: [_RouteEntry(first_route, first_params)])
 
     stack_ref = use_ref(None)
-    stack_ref["current"] = stack
+    stack_ref.current = stack
 
     handle = use_memo(
-        lambda: _DeclarativeNavHandle(screen_map, lambda: stack_ref["current"], set_stack, parent=parent_nav), []
+        lambda: _DeclarativeNavHandle(screen_map, lambda: stack_ref.current, set_stack, parent=parent_nav), []
     )
     handle._screen_map = screen_map
     handle._parent = parent_nav
@@ -505,7 +529,7 @@ def create_stack_navigator() -> Any:
 
     class _StackNavigator:
         @staticmethod
-        def Screen(name: str, *, component: Any, options: Optional[Dict[str, Any]] = None) -> "_ScreenDef":
+        def Screen(name: str, *, component: Any, options: Optional[ScreenOptions] = None) -> "_ScreenDef":
             """Define a screen within this stack navigator.
 
             Args:
@@ -556,8 +580,8 @@ def _tab_navigator_impl(screens: Any = None, initial_route: Optional[str] = None
     active_tab, set_active_tab = use_state(first_route)
     tab_params, set_tab_params = use_state(lambda: {first_route: {}})
 
-    params_ref = use_ref(None)
-    params_ref["current"] = tab_params
+    params_ref: Ref[Dict[str, Dict[str, Any]]] = use_ref(None)
+    params_ref.current = tab_params
 
     def switch_tab(name: str, params: Optional[Dict[str, Any]] = None) -> None:
         set_active_tab(name)
@@ -565,7 +589,7 @@ def _tab_navigator_impl(screens: Any = None, initial_route: Optional[str] = None
             set_tab_params(lambda p: {**p, name: params})
 
     def get_stack() -> List[_RouteEntry]:
-        p = params_ref["current"] or {}
+        p = params_ref.current or {}
         return [_RouteEntry(active_tab, p.get(active_tab, {}))]
 
     handle = use_memo(lambda: _TabNavHandle(screen_map, get_stack, lambda _: None, switch_tab, parent=parent_nav), [])
@@ -643,7 +667,7 @@ def create_tab_navigator() -> Any:
 
     class _TabNavigator:
         @staticmethod
-        def Screen(name: str, *, component: Any, options: Optional[Dict[str, Any]] = None) -> "_ScreenDef":
+        def Screen(name: str, *, component: Any, options: Optional[ScreenOptions] = None) -> "_ScreenDef":
             """Define a screen within this tab navigator.
 
             Args:
@@ -704,8 +728,8 @@ def _drawer_navigator_impl(screens: Any = None, initial_route: Optional[str] = N
     drawer_open, set_drawer_open = use_state(False)
     screen_params, set_screen_params = use_state(lambda: {first_route: {}})
 
-    params_ref = use_ref(None)
-    params_ref["current"] = screen_params
+    params_ref: Ref[Dict[str, Dict[str, Any]]] = use_ref(None)
+    params_ref.current = screen_params
 
     def switch_screen(name: str, params: Optional[Dict[str, Any]] = None) -> None:
         set_active_screen(name)
@@ -713,7 +737,7 @@ def _drawer_navigator_impl(screens: Any = None, initial_route: Optional[str] = N
             set_screen_params(lambda p: {**p, name: params})
 
     def get_stack() -> List[_RouteEntry]:
-        p = params_ref["current"] or {}
+        p = params_ref.current or {}
         return [_RouteEntry(active_screen, p.get(active_screen, {}))]
 
     handle = use_memo(
@@ -763,7 +787,7 @@ def _drawer_navigator_impl(screens: Any = None, initial_route: Optional[str] = N
                 return _select
 
             menu_items.append(
-                Element("Button", {"title": label, "on_click": make_select(item_name)}, [], key=f"__drawer_{item_name}")
+                Element("Button", {"title": label, "on_press": make_select(item_name)}, [], key=f"__drawer_{item_name}")
             )
 
         drawer_panel = Element(
@@ -813,7 +837,7 @@ def create_drawer_navigator() -> Any:
 
     class _DrawerNavigator:
         @staticmethod
-        def Screen(name: str, *, component: Any, options: Optional[Dict[str, Any]] = None) -> "_ScreenDef":
+        def Screen(name: str, *, component: Any, options: Optional[ScreenOptions] = None) -> "_ScreenDef":
             """Define a screen within this drawer navigator.
 
             Args:

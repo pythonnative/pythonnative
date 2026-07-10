@@ -28,7 +28,7 @@ def RunAsyncDemo() -> pn.Element:
         section(
             "Async job",
             result_text("Status", last),
-            pn.Button("Run async job", on_click=lambda: pn.run_async(_job())),
+            pn.Button("Run async job", on_press=lambda: pn.run_async(_job())),
             hint("Maestro taps the button and waits for 'Status: done'."),
         ),
     )

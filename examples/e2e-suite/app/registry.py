@@ -45,6 +45,7 @@ from app.screens.components.image_background import ImageBackgroundDemo
 from app.screens.components.keyboard_avoiding_view import KeyboardAvoidingViewDemo
 from app.screens.components.modal import ModalDemo
 from app.screens.components.picker import PickerDemo
+from app.screens.components.portal import PortalDemo
 from app.screens.components.pressable import PressableDemo
 from app.screens.components.progress_bar import ProgressBarDemo
 from app.screens.components.refresh_control import RefreshControlDemo
@@ -65,10 +66,13 @@ from app.screens.gestures.gestures import GesturesDemo
 from app.screens.hooks.batch_updates_demo import BatchUpdatesDemo
 from app.screens.hooks.memo_demo import MemoDemo
 from app.screens.hooks.use_async_effect import UseAsyncEffectDemo
+from app.screens.hooks.use_back_handler import UseBackHandlerDemo
 from app.screens.hooks.use_callback import UseCallbackDemo
 from app.screens.hooks.use_color_scheme import UseColorSchemeDemo
 from app.screens.hooks.use_context import UseContextDemo
 from app.screens.hooks.use_effect import UseEffectDemo
+from app.screens.hooks.use_imperative_handle import UseImperativeHandleDemo
+from app.screens.hooks.use_layout_effect import UseLayoutEffectDemo
 from app.screens.hooks.use_memo import UseMemoDemo
 from app.screens.hooks.use_mutation import UseMutationDemo
 from app.screens.hooks.use_persisted_state import UsePersistedStateDemo
@@ -163,6 +167,7 @@ DEMOS: List[DemoEntry] = [
         RefreshControlDemo,
     ),
     DemoEntry("fragment", "Components", "Fragment", "Fragment", FragmentDemo),
+    DemoEntry("portal", "Components", "Portal", "Portal", PortalDemo),
     DemoEntry(
         "error_boundary",
         "Components",
@@ -192,8 +197,29 @@ DEMOS: List[DemoEntry] = [
     # ------------------------------------------------------------------
     DemoEntry("use_state", "Hooks", "use_state", "use_state", UseStateDemo),
     DemoEntry("use_effect", "Hooks", "use_effect", "use_effect", UseEffectDemo),
+    DemoEntry(
+        "use_layout_effect",
+        "Hooks",
+        "use_layout_effect",
+        "use_layout_effect",
+        UseLayoutEffectDemo,
+    ),
     DemoEntry("use_reducer", "Hooks", "use_reducer", "use_reducer", UseReducerDemo),
     DemoEntry("use_ref", "Hooks", "use_ref", "use_ref", UseRefDemo),
+    DemoEntry(
+        "use_imperative_handle",
+        "Hooks",
+        "use_imperative_handle",
+        "use_imperative_handle",
+        UseImperativeHandleDemo,
+    ),
+    DemoEntry(
+        "use_back_handler",
+        "Hooks",
+        "use_back_handler",
+        "use_back_handler",
+        UseBackHandlerDemo,
+    ),
     DemoEntry("use_memo", "Hooks", "use_memo", "use_memo", UseMemoDemo),
     DemoEntry("use_callback", "Hooks", "use_callback", "use_callback", UseCallbackDemo),
     DemoEntry("use_context", "Hooks", "use_context", "use_context", UseContextDemo),

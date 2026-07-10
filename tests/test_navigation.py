@@ -735,7 +735,7 @@ def test_drawer_navigator_switches_screens_back_and_forth() -> None:
             {},
             [
                 Element("Text", {"text": "screen One"}, []),
-                Element("Button", {"title": "Go to Two", "on_click": lambda: nav.navigate("Two")}, []),
+                Element("Button", {"title": "Go to Two", "on_press": lambda: nav.navigate("Two")}, []),
             ],
         )
 
@@ -747,7 +747,7 @@ def test_drawer_navigator_switches_screens_back_and_forth() -> None:
             {},
             [
                 Element("Text", {"text": "screen Two"}, []),
-                Element("Button", {"title": "Go to One", "on_click": lambda: nav.navigate("One")}, []),
+                Element("Button", {"title": "Go to One", "on_press": lambda: nav.navigate("One")}, []),
             ],
         )
 
@@ -776,10 +776,10 @@ def test_drawer_navigator_switches_screens_back_and_forth() -> None:
 
     assert "screen One" in texts()
 
-    registry.dispatch(tag_of_button("Go to Two"), "on_click")
+    registry.dispatch(tag_of_button("Go to Two"), "on_press")
     assert texts() == {"screen Two"}, "navigate('Two') must show screen Two only"
 
-    registry.dispatch(tag_of_button("Go to One"), "on_click")
+    registry.dispatch(tag_of_button("Go to One"), "on_press")
     assert texts() == {"screen One"}, "navigate('One') must switch back to screen One"
 
 

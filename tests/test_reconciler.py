@@ -179,19 +179,19 @@ def test_reconcile_callback_swap_costs_no_native_traffic() -> None:
     backend = MockBackend()
     rec = Reconciler(backend)
     calls: list = []
-    el1 = Element("Button", {"title": "x", "on_click": lambda: calls.append("first")}, [])
+    el1 = Element("Button", {"title": "x", "on_press": lambda: calls.append("first")}, [])
     rec.mount(el1)
     tag = rec.root_tag()
     assert tag is not None
 
     backend.ops.clear()
-    el2 = Element("Button", {"title": "x", "on_click": lambda: calls.append("second")}, [])
+    el2 = Element("Button", {"title": "x", "on_press": lambda: calls.append("second")}, [])
     rec.reconcile(el2)
 
     update_ops = [op for op in backend.ops if op[0] == "update"]
     assert update_ops == [], "listener identity churn must not reach the native layer"
     # The registry now routes to the latest closure.
-    assert get_event_registry().dispatch(tag, "on_click") is True
+    assert get_event_registry().dispatch(tag, "on_press") is True
     assert calls == ["second"]
 
 
@@ -201,13 +201,13 @@ def test_callback_routed_through_event_registry_on_mount() -> None:
     backend = MockBackend()
     rec = Reconciler(backend)
     calls: list = []
-    root = rec.mount(Element("Button", {"title": "x", "on_click": lambda: calls.append(1)}, []))
+    root = rec.mount(Element("Button", {"title": "x", "on_press": lambda: calls.append(1)}, []))
     tag = rec.root_tag()
 
     # The callable never reaches the backend; only the event-name set does.
-    assert "on_click" not in root.props
-    assert "on_click" in root.props["_pn_events"]
-    get_event_registry().dispatch(tag, "on_click")
+    assert "on_press" not in root.props
+    assert "on_press" in root.props["_pn_events"]
+    get_event_registry().dispatch(tag, "on_press")
     assert calls == [1]
 
 
@@ -216,12 +216,12 @@ def test_event_registry_cleared_on_destroy() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec.mount(Element("Button", {"title": "x", "on_click": lambda: None}, []))
+    rec.mount(Element("Button", {"title": "x", "on_press": lambda: None}, []))
     tag = rec.root_tag()
-    assert get_event_registry().has(tag, "on_click")
+    assert get_event_registry().has(tag, "on_press")
 
     rec.reconcile(Element("Text", {"text": "replaced"}, []))
-    assert not get_event_registry().has(tag, "on_click")
+    assert not get_event_registry().has(tag, "on_press")
 
 
 # ======================================================================

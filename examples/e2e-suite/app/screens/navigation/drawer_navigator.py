@@ -34,10 +34,10 @@ def _DrawerOne() -> pn.Element:
     nav = pn.use_navigation()
     bus = pn.use_context(_NavBus)
     if bus is not None:
-        bus["current"] = nav
+        bus.current = nav
     return pn.Column(
         pn.Text("Drawer screen One", style=pn.style(font_size=18, font_weight="700")),
-        pn.Button("Open drawer", on_click=nav.open_drawer),
+        pn.Button("Open drawer", on_press=nav.open_drawer),
         style=pn.style(spacing=8, padding=16),
     )
 
@@ -47,10 +47,10 @@ def _DrawerTwo() -> pn.Element:
     nav = pn.use_navigation()
     bus = pn.use_context(_NavBus)
     if bus is not None:
-        bus["current"] = nav
+        bus.current = nav
     return pn.Column(
         pn.Text("Drawer screen Two", style=pn.style(font_size=18, font_weight="700")),
-        pn.Button("Open drawer", on_click=nav.open_drawer),
+        pn.Button("Open drawer", on_press=nav.open_drawer),
         style=pn.style(spacing=8, padding=16),
     )
 
@@ -62,7 +62,7 @@ def DrawerNavigatorDemo() -> pn.Element:
 
     def _nav_to(route: str):
         def _handler() -> None:
-            handle = bus["current"]
+            handle = bus.current
             if handle is not None:
                 handle.navigate(route)
 
@@ -85,8 +85,8 @@ def DrawerNavigatorDemo() -> pn.Element:
                 style=pn.style(height=260, border_radius=8, background_color="#F8FAFC"),
             ),
             buttons_row(
-                pn.Button("Go to One", on_click=_nav_to("One")),
-                pn.Button("Go to Two", on_click=_nav_to("Two")),
+                pn.Button("Go to One", on_press=_nav_to("One")),
+                pn.Button("Go to Two", on_press=_nav_to("Two")),
             ),
             hint(
                 "'Go to One' / 'Go to Two' live outside the swapped screens (like a "

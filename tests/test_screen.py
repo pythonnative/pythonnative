@@ -68,6 +68,73 @@ def test_screen_reload_reimports_root_component(
     assert host._root_native_view.props["text"] == "after"
 
 
+def test_screen_host_on_destroy_unmounts_tree(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``on_destroy`` must unmount the reconciler: cleanups run, views die."""
+    registry = NativeViewRegistry()
+    registry.register("Text", TextHandler())
+    import pythonnative.native_views as native_views
+
+    monkeypatch.setattr(native_views, "_registry", registry)
+
+    from pythonnative.element import Element
+    from pythonnative.hooks import component, use_effect
+
+    cleanups: list = []
+
+    @component
+    def Root() -> Element:
+        use_effect(lambda: (lambda: cleanups.append("cleaned")), [])
+        return Element("Text", {"text": "hi"}, [])
+
+    import pythonnative.screen as screen_mod
+
+    monkeypatch.setattr(screen_mod, "_import_component", lambda path: Root)
+
+    host: Any = create_screen("dummy.path.Root")
+    host.on_create()
+    assert host._reconciler is not None
+    assert cleanups == []
+
+    host.on_destroy()
+    assert cleanups == ["cleaned"], "effect cleanup must run on destroy"
+    assert host._reconciler is None
+    assert host._root_native_view is None
+
+
+def test_screen_host_on_back_pressed_routes_to_handlers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``on_back_pressed`` consults ``use_back_handler`` subscribers."""
+    registry = NativeViewRegistry()
+    registry.register("Text", TextHandler())
+    import pythonnative.native_views as native_views
+
+    monkeypatch.setattr(native_views, "_registry", registry)
+
+    from pythonnative.element import Element
+    from pythonnative.hooks import component, use_back_handler, use_state
+
+    consume = {"value": True}
+
+    @component
+    def Root() -> Element:
+        _count, _set_count = use_state(0)
+        use_back_handler(lambda: consume["value"])
+        return Element("Text", {"text": "hi"}, [])
+
+    import pythonnative.screen as screen_mod
+
+    monkeypatch.setattr(screen_mod, "_import_component", lambda path: Root)
+
+    host: Any = create_screen("dummy.path.Root")
+    host.on_create()
+    assert host.on_back_pressed() is True
+
+    consume["value"] = False
+    assert host.on_back_pressed() is False
+
+    host.on_destroy()
+    assert host.on_back_pressed() is False, "destroyed host must decline back events"
+
+
 def test_screen_host_exposes_on_layout_lifecycle_hook(monkeypatch: pytest.MonkeyPatch) -> None:
     """Regression: every host class must accept an ``on_layout`` callback.
 

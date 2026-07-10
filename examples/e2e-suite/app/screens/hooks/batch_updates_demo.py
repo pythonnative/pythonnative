@@ -15,7 +15,7 @@ from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, se
 def BatchUpdatesDemo() -> pn.Element:
     """Render a screen tracking render counts across batched vs unbatched setters."""
     renders = pn.use_ref(0)
-    renders["current"] += 1
+    renders.current += 1
 
     a, set_a = pn.use_state(0)
     b, set_b = pn.use_state(0)
@@ -36,10 +36,10 @@ def BatchUpdatesDemo() -> pn.Element:
             "State values",
             result_text("a", a),
             result_text("b", b),
-            result_text("Render count", renders["current"]),
+            result_text("Render count", renders.current),
             buttons_row(
-                pn.Button("Unbatched bump", on_click=update_both_unbatched),
-                pn.Button("Batched bump", on_click=update_both_batched),
+                pn.Button("Unbatched bump", on_press=update_both_unbatched),
+                pn.Button("Batched bump", on_press=update_both_batched),
             ),
             hint("Tapping 'Batched bump' increases render count by 1; " "'Unbatched bump' may increase by 2."),
         ),

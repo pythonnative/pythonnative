@@ -419,7 +419,7 @@ pn.Column(
     pn.TextInput(placeholder="Enter username"),
     pn.Text("Password"),
     pn.TextInput(placeholder="Enter password", secure=True),
-    pn.Button("Login", on_click=handle_login),
+    pn.Button("Login", on_press=handle_login),
     style={"spacing": 8, "padding": 16, "align_items": "stretch"},
 )
 ```

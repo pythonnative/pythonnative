@@ -28,7 +28,7 @@ def ModalDemo() -> pn.Element:
             # closes) because on iOS the presented sheet covers the
             # outer view, so a readout inside the modal can't be checked.
             result_text("Show count", show_count),
-            pn.Button("Open modal", on_click=lambda: set_visible(True)),
+            pn.Button("Open modal", on_press=lambda: set_visible(True)),
             hint("Maestro asserts 'Modal body text' appears after tap."),
         ),
         pn.Modal(
@@ -41,7 +41,7 @@ def ModalDemo() -> pn.Element:
                     "This content only renders when the modal is visible.",
                     style=pn.style(font_size=13, color="#374151"),
                 ),
-                pn.Button("Close modal", on_click=lambda: set_visible(False)),
+                pn.Button("Close modal", on_press=lambda: set_visible(False)),
                 style=pn.style(spacing=12, padding=20),
             ),
             visible=visible,

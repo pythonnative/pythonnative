@@ -19,7 +19,7 @@ def Counter(initial: int = 0):
     count, set_count = pn.use_state(initial)
     return pn.Column(
         pn.Text(f"Count: {count}", style=pn.style(font_size=24, bold=True)),
-        pn.Button("+", on_click=lambda: set_count(count + 1)),
+        pn.Button("+", on_press=lambda: set_count(count + 1)),
         style=pn.style(spacing=12, padding=16),
     )
 ```
@@ -53,6 +53,10 @@ produce identical frames on both platforms.
 - **Fast Refresh hot reload.** `pn run --hot-reload` watches `app/`
   and patches the running app in place, preserving component state
   across most edits.
+- **Dev-mode diagnostics.** Uncaught errors show a full-screen RedBox
+  with the traceback instead of crashing; typos in style keys and
+  duplicate list keys print "did you mean" warnings; conditional
+  hooks raise at the source. Every check is skipped in production.
 - **Instant desktop preview.** `pn preview` renders your app in a
   desktop window with Fast Refresh, so you can iterate on UI, state,
   and navigation in milliseconds (no simulator boot required). See the

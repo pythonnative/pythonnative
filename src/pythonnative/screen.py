@@ -27,7 +27,7 @@ Example:
         count, set_count = pn.use_state(0)
         return pn.Column(
             pn.Text(f"Count: {count}", style={"font_size": 24}),
-            pn.Button("Tap me", on_click=lambda: set_count(count + 1)),
+            pn.Button("Tap me", on_press=lambda: set_count(count + 1)),
             style={"spacing": 12, "padding": 16},
         )
     ```
@@ -48,8 +48,10 @@ import json
 import os
 import sys
 import threading
+import traceback
 from typing import Any, Dict, Optional, Sequence
 
+from . import diagnostics
 from .utils import IS_ANDROID, IS_DESKTOP, IS_IOS, set_android_context
 
 _MAX_RENDER_PASSES = 25
@@ -186,6 +188,10 @@ def _init_host_common(host: Any, component_path: str, component_func: Any) -> No
     host._hot_reload_manifest_path = None
     host._hot_reload_last_version = None
     host._layout_listener = None  # retained on Android to prevent GC
+    # RedBox state: a dedicated reconciler that mounts the dev error
+    # overlay in place of the app tree (see ``_show_redbox``).
+    host._redbox_reconciler = None
+    host._redbox_root = None
     # Focus state: drives ``use_focus_effect``. Starts focused because
     # a host is only created when the screen is being presented; the
     # platform lifecycle hooks (``on_resume`` / ``on_pause``) flip this
@@ -207,6 +213,54 @@ def _set_host_focused(host: Any, focused: bool) -> None:
             pass
 
 
+def _destroy_host(host: Any) -> None:
+    """Tear down a screen host when the native screen is destroyed for good.
+
+    Called from each platform's ``on_destroy``. Unmounting the
+    reconciler runs every pending effect cleanup, destroys the native
+    views (releasing their event registrations), and clears back
+    handlers, so a popped screen doesn't leak its whole tree. Also
+    unregisters the host's RedBox reporter so runtime errors from other
+    screens don't route to a dead overlay.
+    """
+    _clear_redbox(host, reattach=False)
+    diagnostics.set_error_reporter(host, None)
+    reconciler = host._reconciler
+    host._reconciler = None
+    if reconciler is not None:
+        try:
+            reconciler.unmount()
+        except Exception:
+            _log_pn("_destroy_host: reconciler.unmount() failed")
+    root = host._root_native_view
+    host._root_native_view = None
+    if root is not None:
+        try:
+            host._detach_root(root)
+        except Exception:
+            pass
+    host._nav_handle = None
+    host._focus_subscribers = []
+
+
+def _host_back_pressed(host: Any) -> bool:
+    """Offer the system back action to ``use_back_handler`` subscribers.
+
+    Called by the native templates before running the platform's
+    default back behavior. Returns ``True`` when a handler consumed
+    the event, in which case the platform must *not* pop the screen.
+    """
+    reconciler = host._reconciler
+    if reconciler is None:
+        return False
+    try:
+        return bool(reconciler.dispatch_back_press())
+    except Exception as exc:
+        if not diagnostics.report_error(exc, phase="back handler"):
+            traceback.print_exc()
+        return False
+
+
 def _push_viewport_size(host: Any, width: float, height: float) -> None:
     """Forward a viewport-size change to the reconciler.
 
@@ -223,6 +277,9 @@ def _push_viewport_size(host: Any, width: float, height: float) -> None:
     if width <= 0 or height <= 0:
         return
     host._reconciler.set_viewport_size(float(width), float(height))
+    redbox = getattr(host, "_redbox_reconciler", None)
+    if redbox is not None:
+        redbox.set_viewport_size(float(width), float(height))
     try:
         from . import platform_metrics
 
@@ -285,6 +342,7 @@ def _on_create(host: Any) -> None:
     # If we're already mounted, just re-attach the existing root view
     # to the (newly created) native container; ``on_resume`` will
     # fire the focus subscribers separately.
+    _register_redbox_reporter(host)
     if host._reconciler is not None and host._root_native_view is not None:
         host._attach_root(host._root_native_view)
         return
@@ -292,16 +350,21 @@ def _on_create(host: Any) -> None:
     host._nav_handle = NavigationHandle(host)
     host._reconciler = _new_reconciler(host)
 
-    app_element = _render_app(host)
-    provider_element = Provider(_NavigationContext, host._nav_handle, app_element)
-
-    host._is_rendering = True
     try:
-        host._root_native_view = host._reconciler.mount(provider_element)
-        host._attach_root(host._root_native_view)
-        _drain_renders(host)
-    finally:
-        host._is_rendering = False
+        app_element = _render_app(host)
+        provider_element = Provider(_NavigationContext, host._nav_handle, app_element)
+
+        host._is_rendering = True
+        try:
+            host._root_native_view = host._reconciler.mount(provider_element)
+            host._attach_root(host._root_native_view)
+            _drain_renders(host)
+        finally:
+            host._is_rendering = False
+    except Exception as exc:
+        if not diagnostics.is_dev():
+            raise
+        _show_redbox(host, exc, phase="mount")
 
 
 def _request_render(host: Any) -> None:
@@ -333,13 +396,18 @@ def _re_render(host: Any) -> None:
     hot reload.
     """
     _log_pn("_re_render: starting local render pass")
-    host._is_rendering = True
     try:
-        host._render_queued = False
-        _commit_dirty(host)
-        _drain_renders(host)
-    finally:
-        host._is_rendering = False
+        host._is_rendering = True
+        try:
+            host._render_queued = False
+            _commit_dirty(host)
+            _drain_renders(host)
+        finally:
+            host._is_rendering = False
+    except Exception as exc:
+        if not diagnostics.is_dev():
+            raise
+        _show_redbox(host, exc, phase="render")
     _log_pn("_re_render: done")
 
 
@@ -367,6 +435,130 @@ def _drain_renders(host: Any) -> None:
         _commit_dirty(host)
 
 
+# ======================================================================
+# RedBox (dev-mode error overlay)
+# ======================================================================
+#
+# In dev mode (``pn preview``, ``pn run`` with hot reload, ``PN_DEV=1``)
+# an uncaught error from a mount, render, effect, or event handler
+# replaces the screen with a full-screen traceback instead of crashing
+# the process or dying silently in the log. The overlay is a normal
+# PythonNative element tree mounted by a *dedicated* reconciler so a
+# broken app tree can't take the error display down with it. Fixing the
+# code and saving clears it via hot reload; the Dismiss button restores
+# the previous native root (which is still mounted underneath).
+
+
+def _redbox_element(exc: BaseException, phase: str, on_dismiss: Any) -> Any:
+    """Build the RedBox element tree for ``exc``."""
+    from .components import Button, Column, ScrollView, Text
+
+    trace = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    message = str(exc) or "(no message)"
+    return Column(
+        Column(
+            Text(
+                f"{type(exc).__name__} in {phase}",
+                style={"color": "#FFD3DA", "font_size": 13, "bold": True},
+            ),
+            Text(message, style={"color": "#FFFFFF", "font_size": 17, "bold": True}),
+            style={
+                "background_color": "#C4283C",
+                "padding": 16,
+                "padding_top": 56,
+                "spacing": 6,
+            },
+        ),
+        ScrollView(
+            Text(trace, style={"color": "#FF9AA8", "font_size": 12}),
+            style={"flex": 1, "padding": 12},
+        ),
+        Column(
+            Button("Dismiss", on_press=on_dismiss, style={"color": "#FFFFFF"}),
+            Text(
+                "Fix the error and save to reload.",
+                style={"color": "#8E8E93", "font_size": 12, "text_align": "center"},
+            ),
+            style={"padding": 12, "padding_bottom": 32, "spacing": 4},
+        ),
+        style={"flex": 1, "background_color": "#1C1C1E"},
+    )
+
+
+def _show_redbox(host: Any, exc: BaseException, phase: str = "render") -> None:
+    """Mount the dev error overlay over the host's screen.
+
+    Safe to call repeatedly (a newer error replaces the current
+    overlay) and from any thread (the mount hops to the main thread).
+    Failures inside the RedBox itself fall back to printing both
+    tracebacks so the original error is never lost.
+    """
+    _log_pn(f"_show_redbox: {type(exc).__name__} during {phase}")
+    try:
+        print(f"[PN] {phase} error:", file=sys.stderr)
+        traceback.print_exception(type(exc), exc, exc.__traceback__)
+    except Exception:
+        pass
+
+    def _mount() -> None:
+        try:
+            _clear_redbox(host, reattach=False)
+            from .native_views import get_registry
+            from .reconciler import Reconciler
+
+            redbox = Reconciler(get_registry())
+            redbox._screen_re_render = redbox.flush_dirty
+            element = _redbox_element(exc, phase, lambda: _clear_redbox(host))
+            root = redbox.mount(element)
+            width, height = (0.0, 0.0)
+            if host._reconciler is not None:
+                width, height = host._reconciler._viewport_size
+            if width <= 0 or height <= 0:
+                from . import platform_metrics
+
+                dims = platform_metrics.get_window_dimensions()
+                width, height = dims.width, dims.height
+            if width > 0 and height > 0:
+                redbox.set_viewport_size(width, height)
+            host._redbox_reconciler = redbox
+            host._redbox_root = root
+            if host._root_native_view is not None:
+                host._detach_root(host._root_native_view)
+            host._attach_root(root)
+        except Exception:
+            print("[PN] RedBox failed to mount:", file=sys.stderr)
+            traceback.print_exc()
+
+    from .runtime import call_on_main_thread
+
+    call_on_main_thread(_mount)
+
+
+def _clear_redbox(host: Any, reattach: bool = True) -> None:
+    """Tear down the RedBox overlay and optionally restore the app root."""
+    redbox = getattr(host, "_redbox_reconciler", None)
+    if redbox is None:
+        return
+    host._redbox_reconciler = None
+    host._redbox_root = None
+    try:
+        redbox.unmount()
+    except Exception:
+        pass
+    if reattach and host._root_native_view is not None:
+        try:
+            host._attach_root(host._root_native_view)
+        except Exception:
+            pass
+
+
+def _register_redbox_reporter(host: Any) -> None:
+    """Route runtime errors (events, async) for this host to the RedBox."""
+    if not diagnostics.is_dev():
+        return
+    diagnostics.set_error_reporter(host, lambda exc, phase: _show_redbox(host, exc, phase))
+
+
 def _set_args(host: Any, args: Any) -> None:
     if isinstance(args, str):
         try:
@@ -380,6 +572,10 @@ def _set_args(host: Any, args: Any) -> None:
 def _enable_hot_reload(host: Any, manifest_path: str) -> None:
     host._hot_reload_manifest_path = manifest_path
     host._hot_reload_last_version = None
+    # Hot reload only runs on debug builds, so treat it as the on-device
+    # dev-mode switch (validation warnings, hook-order checks, RedBox).
+    diagnostics.set_dev_mode(True)
+    _register_redbox_reporter(host)
 
 
 def _hot_reload_tick(host: Any) -> bool:
@@ -473,8 +669,13 @@ def _reload_host(host: Any, changed_modules: Optional[Sequence[str]] = None) -> 
 
     try:
         new_component = _import_component(host._component_path)
-    except Exception as e:
-        _log_pn(f"_reload_host: re-import failed: {e!r}; aborting reload")
+    except Exception as exc:
+        _log_pn(f"_reload_host: re-import failed: {exc!r}; aborting reload")
+        if diagnostics.is_dev():
+            # A syntax error (or import-time crash) in the edited file:
+            # show it in the RedBox so the developer sees it on device
+            # instead of the app silently keeping the old code.
+            _show_redbox(host, exc, phase="hot reload import")
         return
     host._component = new_component
 
@@ -482,11 +683,22 @@ def _reload_host(host: Any, changed_modules: Optional[Sequence[str]] = None) -> 
         _log_pn(f"_reload_host: host=0x{id(host):x} reconciler=None; skipping refresh")
         return
 
+    # A reload always replaces whatever error state was on screen.
+    # Re-attach the current root now: Fast Refresh patches that tree in
+    # place (attach must happen regardless of whether it succeeds), and
+    # a full remount swaps in its own fresh root anyway.
+    _clear_redbox(host)
+
     if _try_fast_refresh(host, reloaded):
         print(f"[hot-reload] Fast Refresh: {', '.join(requested) or ', '.join(reloaded)}", file=sys.stderr)
         return
 
-    _full_remount(host, reloaded)
+    try:
+        _full_remount(host, reloaded)
+    except Exception as exc:
+        if not diagnostics.is_dev():
+            raise
+        _show_redbox(host, exc, phase="hot reload")
 
 
 def _try_fast_refresh(host: Any, reloaded_modules: Sequence[str]) -> bool:
@@ -844,7 +1056,10 @@ if IS_ANDROID:
             pass
 
         def on_destroy(self) -> None:
-            pass
+            _destroy_host(self)
+
+        def on_back_pressed(self) -> bool:
+            return _host_back_pressed(self)
 
         def enable_hot_reload(self, manifest_path: str, source_root: Optional[str] = None) -> None:
             _enable_hot_reload(self, manifest_path)
@@ -1024,7 +1239,10 @@ elif IS_DESKTOP:
             pass
 
         def on_destroy(self) -> None:
-            pass
+            _destroy_host(self)
+
+        def on_back_pressed(self) -> bool:
+            return _host_back_pressed(self)
 
         def enable_hot_reload(self, manifest_path: str, source_root: Optional[str] = None) -> None:
             _enable_hot_reload(self, manifest_path)
@@ -1368,6 +1586,10 @@ else:
             def on_destroy(self) -> None:
                 if self.native_instance is not None:
                     _ios_unregister_screen(self.native_instance)
+                _destroy_host(self)
+
+            def on_back_pressed(self) -> bool:
+                return _host_back_pressed(self)
 
             def enable_hot_reload(self, manifest_path: str, source_root: Optional[str] = None) -> None:
                 _enable_hot_reload(self, manifest_path)
@@ -1631,7 +1853,10 @@ else:
                 pass
 
             def on_destroy(self) -> None:
-                pass
+                _destroy_host(self)
+
+            def on_back_pressed(self) -> bool:
+                return _host_back_pressed(self)
 
             def enable_hot_reload(self, manifest_path: str, source_root: Optional[str] = None) -> None:
                 _enable_hot_reload(self, manifest_path)

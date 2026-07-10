@@ -66,7 +66,7 @@ def QuoteCard() -> pn.Element:
         body,
         pn.Button(
             "Refresh" if not q.loading else "Refreshing…",
-            on_click=q.refetch,
+            on_press=q.refetch,
         ),
         style=local_styles["quote_card"],
     )
@@ -101,7 +101,7 @@ def TapCounter() -> pn.Element:
 
     def on_clear() -> None:
         # Alert.confirm is awaitable; fire it on the runtime loop so
-        # we can use it from a sync ``on_click`` handler.
+        # we can use it from a sync ``on_press`` handler.
         pn.run_async(clear())
 
     return pn.View(
@@ -112,8 +112,8 @@ def TapCounter() -> pn.Element:
             style=styles["hint"],
         ),
         pn.Row(
-            pn.Button("Tap me", on_click=tap),
-            pn.Button("Reset", on_click=on_clear),
+            pn.Button("Tap me", on_press=tap),
+            pn.Button("Reset", on_press=on_clear),
             style=pn.style(spacing=8, align_items="center"),
         ),
         style=local_styles["counter_card"],
@@ -134,7 +134,7 @@ def DataScreen() -> pn.Element:
             ),
             QuoteCard(),
             TapCounter(),
-            pn.Button("Back", on_click=nav.go_back),
+            pn.Button("Back", on_press=nav.go_back),
             style=styles["section"],
         )
     )

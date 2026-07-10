@@ -42,7 +42,7 @@ def SequenceAnimationDemo() -> pn.Element:
                     border_radius=12,
                 ),
             ),
-            buttons_row(pn.Button("Run sequence", on_click=lambda: pn.run_async(run()))),
+            buttons_row(pn.Button("Run sequence", on_press=lambda: pn.run_async(run()))),
             hint("Maestro taps 'Run sequence' and asserts 'Status: done'."),
         ),
     )

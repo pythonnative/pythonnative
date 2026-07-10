@@ -135,7 +135,7 @@ when:
 
 - You called the hook at module scope.
 - You called it inside a regular function that wasn't decorated.
-- You called it inside a callback (e.g., `on_click`); move the hook
+- You called it inside a callback (e.g., `on_press`); move the hook
   to the top of the component and use the captured value.
 
 ### `RuntimeError: Hooks must be called in the same order on every render`

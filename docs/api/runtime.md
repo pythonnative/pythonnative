@@ -32,7 +32,7 @@ def Toolbar():
         report = await build_report()
         await save_to_disk(report)
 
-    return pn.Button("Export", on_click=lambda: pn.run_async(export()))
+    return pn.Button("Export", on_press=lambda: pn.run_async(export()))
 ```
 
 ## Next steps

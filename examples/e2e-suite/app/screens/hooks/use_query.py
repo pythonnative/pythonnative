@@ -37,7 +37,7 @@ def UseQueryDemo() -> pn.Element:
             "Query",
             result_text("Status", status),
             result_text("Data", q.data or "(none)"),
-            pn.Button("Refetch", on_click=q.refetch),
+            pn.Button("Refetch", on_press=q.refetch),
             hint("Maestro waits for 'Data: fetched-value' after the fetch resolves."),
         ),
     )

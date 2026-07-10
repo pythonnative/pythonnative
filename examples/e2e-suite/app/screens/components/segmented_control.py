@@ -30,9 +30,9 @@ def SegmentedControlDemo() -> pn.Element:
                 on_change=set_index,
             ),
             buttons_row(
-                pn.Button("Pick One", on_click=lambda: set_index(0)),
-                pn.Button("Pick Two", on_click=lambda: set_index(1)),
-                pn.Button("Pick Three", on_click=lambda: set_index(2)),
+                pn.Button("Pick One", on_press=lambda: set_index(0)),
+                pn.Button("Pick Two", on_press=lambda: set_index(1)),
+                pn.Button("Pick Three", on_press=lambda: set_index(2)),
             ),
             hint("Maestro taps segments directly, then the 'Pick X' buttons."),
         ),

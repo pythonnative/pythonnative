@@ -33,8 +33,8 @@ def HomeScreen():
     count, set_count = pn.use_state(0)
     return pn.Column(
         pn.Text(f"Count: {count}", style={"font_size": 24}),
-        pn.Button("Tap me", on_click=lambda: set_count(count + 1)),
-        pn.Button("Open details", on_click=lambda: nav.navigate("Detail", {"count": count})),
+        pn.Button("Tap me", on_press=lambda: set_count(count + 1)),
+        pn.Button("Open details", on_press=lambda: nav.navigate("Detail", {"count": count})),
         style={"spacing": 12, "padding": 16},
     )
 
@@ -189,7 +189,7 @@ def App():
     print(f"[App] render count={count}")
     return pn.Column(
         pn.Text(f"Count: {count}"),
-        pn.Button("Tap me", on_click=lambda: set_count(count + 1)),
+        pn.Button("Tap me", on_press=lambda: set_count(count + 1)),
     )
 ```
 

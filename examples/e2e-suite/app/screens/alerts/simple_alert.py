@@ -22,7 +22,7 @@ def SimpleAlertDemo() -> pn.Element:
         "Open a native alert dialog; dismiss with OK.",
         section(
             "Alert",
-            pn.Button("Show alert", on_click=_show),
+            pn.Button("Show alert", on_press=_show),
             hint("Maestro asserts 'Hello!' appears, then taps 'OK'."),
         ),
     )

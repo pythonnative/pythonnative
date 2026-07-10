@@ -23,8 +23,8 @@ def SwitchDemo() -> pn.Element:
             result_text("State", "ON" if on else "OFF"),
             pn.Switch(value=on, on_change=set_on, accessibility_label="Demo switch"),
             buttons_row(
-                pn.Button("Turn on", on_click=lambda: set_on(True)),
-                pn.Button("Turn off", on_click=lambda: set_on(False)),
+                pn.Button("Turn on", on_press=lambda: set_on(True)),
+                pn.Button("Turn off", on_press=lambda: set_on(False)),
             ),
             hint("Maestro taps the switch itself, then the buttons."),
         ),

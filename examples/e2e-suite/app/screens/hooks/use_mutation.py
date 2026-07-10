@@ -36,7 +36,7 @@ def UseMutationDemo() -> pn.Element:
             "Mutation",
             result_text("Status", status),
             result_text("Last data", state.data or "(none)"),
-            pn.Button("Submit hello", on_click=lambda: run("hello")),
+            pn.Button("Submit hello", on_press=lambda: run("hello")),
             hint("Tap submit; Maestro asserts 'Last data: echo:hello'."),
         ),
     )

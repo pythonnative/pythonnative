@@ -25,8 +25,8 @@ def UsePersistedStateDemo() -> pn.Element:
             "Counter",
             result_text("Persisted value", value),
             buttons_row(
-                pn.Button("Bump", on_click=lambda: set_value(value + 1)),
-                pn.Button("Clear", on_click=lambda: set_value(0)),
+                pn.Button("Bump", on_press=lambda: set_value(value + 1)),
+                pn.Button("Clear", on_press=lambda: set_value(0)),
             ),
             hint("Tap 'Bump' twice; Maestro asserts 'Persisted value: 2'."),
         ),

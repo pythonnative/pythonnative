@@ -42,8 +42,8 @@ def MemoDemo() -> pn.Element:
     # ("MemoA render count: 1") hold on revisits too, e.g. when the suite
     # retries after an unrelated failure and walks through this demo again.
     mounted = pn.use_ref(False)
-    if not mounted["current"]:
-        mounted["current"] = True
+    if not mounted.current:
+        mounted.current = True
         _render_counts["a"] = 0
         _render_counts["b"] = 0
 
@@ -56,10 +56,10 @@ def MemoDemo() -> pn.Element:
             _MemoA(),
             _MemoB(label=b_label),
             buttons_row(
-                pn.Button("Bump parent", on_click=lambda: set_parent_count(parent_count + 1)),
+                pn.Button("Bump parent", on_press=lambda: set_parent_count(parent_count + 1)),
                 pn.Button(
                     "Toggle B label",
-                    on_click=lambda: set_b_label("y" if b_label == "x" else "x"),
+                    on_press=lambda: set_b_label("y" if b_label == "x" else "x"),
                 ),
             ),
             hint("Bumping parent should NOT bump MemoA's count. Toggling B label DOES bump MemoB's count."),

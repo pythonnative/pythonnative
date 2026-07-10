@@ -44,7 +44,7 @@ def UseEffectDemo() -> pn.Element:
             result_text("Dep runs", dep_runs),
             result_text("Dep value", dep),
             buttons_row(
-                pn.Button("Bump dep", on_click=lambda: set_dep(dep + 1)),
+                pn.Button("Bump dep", on_press=lambda: set_dep(dep + 1)),
             ),
             hint("Tapping 'Bump dep' twice should set 'Dep runs: 3' (1 on mount + 2 bumps)."),
         ),

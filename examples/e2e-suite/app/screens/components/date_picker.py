@@ -23,7 +23,7 @@ def DatePickerDemo() -> pn.Element:
             "Date",
             result_text("Date", value),
             pn.DatePicker(value=value, mode="date", on_change=set_value),
-            pn.Button("Set 2026-12-25", on_click=lambda: set_value("2026-12-25")),
+            pn.Button("Set 2026-12-25", on_press=lambda: set_value("2026-12-25")),
             hint("Maestro taps 'Set 2026-12-25' and asserts 'Date: 2026-12-25'."),
         ),
     )

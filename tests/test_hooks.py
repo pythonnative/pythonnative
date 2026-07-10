@@ -219,7 +219,7 @@ def test_use_effect_cleanup_on_rerun() -> None:
         _set_hook_state(None)
     ctx.flush_pending_effects()
 
-    ctx.reset_index()
+    ctx.begin_render()
     _set_hook_state(ctx)
     try:
         use_effect(make_effect("second"), None)
@@ -241,7 +241,7 @@ def test_use_effect_skips_with_same_deps() -> None:
         _set_hook_state(None)
     ctx.flush_pending_effects()
 
-    ctx.reset_index()
+    ctx.begin_render()
     _set_hook_state(ctx)
     try:
         use_effect(lambda: calls.append("run"), [1, 2])
@@ -386,7 +386,7 @@ def test_use_memo_caches() -> None:
     finally:
         _set_hook_state(None)
 
-    ctx.reset_index()
+    ctx.begin_render()
     _set_hook_state(ctx)
     try:
         val2 = use_memo(factory_b, [1])
@@ -407,7 +407,7 @@ def test_use_memo_recomputes_on_dep_change() -> None:
     finally:
         _set_hook_state(None)
 
-    ctx.reset_index()
+    ctx.begin_render()
     _set_hook_state(ctx)
     try:
         val2 = use_memo(lambda: "second", ["b"])
@@ -428,7 +428,7 @@ def test_use_callback_returns_stable_reference() -> None:
     finally:
         _set_hook_state(None)
 
-    ctx.reset_index()
+    ctx.begin_render()
     _set_hook_state(ctx)
     try:
         cb2 = use_callback(lambda: None, [1])
@@ -449,16 +449,16 @@ def test_use_ref_persists() -> None:
     _set_hook_state(ctx)
     try:
         ref = use_ref(0)
-        assert ref["current"] == 0
-        ref["current"] = 5
+        assert ref.current == 0
+        ref.current = 5
     finally:
         _set_hook_state(None)
 
-    ctx.reset_index()
+    ctx.begin_render()
     _set_hook_state(ctx)
     try:
         ref2 = use_ref(0)
-        assert ref2["current"] == 5
+        assert ref2.current == 5
         assert ref2 is ref
     finally:
         _set_hook_state(None)
@@ -690,16 +690,15 @@ def test_navigation_handle_methods() -> None:
 # ======================================================================
 
 
-def test_provider_with_multiple_children_wraps_in_fragment() -> None:
+def test_provider_with_multiple_children_kept_flat() -> None:
+    """Multi-child providers rely on the reconciler's multi-child support."""
     theme = create_context("light")
     child_a = Element("Text", {"text": "a"}, [])
     child_b = Element("Text", {"text": "b"}, [])
 
     el = Provider(theme, "dark", child_a, child_b)
     assert el.type == "__Provider__"
-    inner = el.children[0]
-    assert inner.type == "__Fragment__"
-    assert inner.children == [child_a, child_b]
+    assert el.children == [child_a, child_b]
 
 
 def test_provider_with_single_child_no_fragment_wrap() -> None:

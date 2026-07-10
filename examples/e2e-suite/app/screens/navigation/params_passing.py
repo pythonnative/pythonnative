@@ -28,8 +28,8 @@ def ParamsPassingDemo() -> pn.Element:
             "Route info",
             result_text("Param 'value'", params.get("value") or "(none)"),
             buttons_row(
-                pn.Button("Push value=alpha", on_click=lambda: push_with("alpha")),
-                pn.Button("Push value=beta", on_click=lambda: push_with("beta")),
+                pn.Button("Push value=alpha", on_press=lambda: push_with("alpha")),
+                pn.Button("Push value=beta", on_press=lambda: push_with("beta")),
             ),
             hint(
                 "Maestro taps 'Push value=alpha' and asserts \"Param 'value': alpha\". "

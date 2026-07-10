@@ -24,6 +24,7 @@ from pythonnative.components import (
     View,
     WebView,
 )
+from pythonnative.style import AccessibilityState
 
 # ---------------------------------------------------------------------------
 # Text
@@ -120,14 +121,14 @@ def test_button_defaults() -> None:
     el = Button()
     assert el.type == "Button"
     assert el.props["title"] == ""
-    assert "on_click" not in el.props
+    assert "on_press" not in el.props
 
 
 def test_button_with_callback() -> None:
     cb = lambda: None  # noqa: E731
-    el = Button("Tap", on_click=cb, style={"background_color": "#123456"})
+    el = Button("Tap", on_press=cb, style={"background_color": "#123456"})
     assert el.props["title"] == "Tap"
-    assert el.props["on_click"] is cb
+    assert el.props["on_press"] is cb
     assert el.props["background_color"] == "#123456"
 
 
@@ -497,7 +498,7 @@ def test_fragment_drops_none_children() -> None:
 
 
 def test_test_id_and_accessibility_state_flow_into_props() -> None:
-    state = {"disabled": True, "checked": False}
+    state: AccessibilityState = {"disabled": True, "checked": False}
     el = Button(
         "Go",
         test_id="go_button",

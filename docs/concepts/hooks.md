@@ -44,7 +44,7 @@ def Counter(initial: int = 0):
 
     return pn.Column(
         pn.Text(f"Count: {count}"),
-        pn.Button("+", on_click=lambda: set_count(count + 1)),
+        pn.Button("+", on_press=lambda: set_count(count + 1)),
     )
 ```
 
@@ -84,9 +84,9 @@ def Counter():
     return pn.Column(
         pn.Text(f"Count: {count}"),
         pn.Row(
-            pn.Button("-", on_click=lambda: dispatch("decrement")),
-            pn.Button("+", on_click=lambda: dispatch("increment")),
-            pn.Button("Reset", on_click=lambda: dispatch("reset")),
+            pn.Button("-", on_press=lambda: dispatch("decrement")),
+            pn.Button("+", on_press=lambda: dispatch("increment")),
+            pn.Button("Reset", on_press=lambda: dispatch("reset")),
             style={"spacing": 8},
         ),
     )
@@ -125,6 +125,30 @@ Dependency control:
 - `pn.use_effect(fn, [])`: run on mount only.
 - `pn.use_effect(fn, [a, b])`: run when `a` or `b` change.
 
+### use_layout_effect
+
+Like [`use_effect`][pythonnative.use_effect], but runs synchronously
+inside the commit, after native mutations and the layout pass and
+before passive effects. Use it to read a committed frame from a ref or
+to issue an imperative command (like scrolling a list into position)
+before the user sees the new frame:
+
+```python
+@pn.component
+def Chat(messages):
+    list_ref = pn.use_ref()
+
+    def scroll_to_bottom():
+        if list_ref.current is not None:
+            list_ref.current.scroll_to_end(animated=False)
+
+    pn.use_layout_effect(scroll_to_bottom, [len(messages)])
+    return pn.FlatList(data=messages, render_item=Bubble, ref=list_ref)
+```
+
+Prefer `use_effect` for everything else; layout effects block the
+commit, so heavy work here delays the frame.
+
 ### use_navigation
 
 Access navigation from any component. Returns a navigation handle with
@@ -139,7 +163,7 @@ def HomeScreen():
         pn.Text("Home", style={"font_size": 24}),
         pn.Button(
             "Go to Details",
-            on_click=lambda: nav.navigate("Detail", params={"id": 42}),
+            on_press=lambda: nav.navigate("Detail", params={"id": 42}),
         ),
         style={"spacing": 12, "padding": 16},
     )
@@ -151,7 +175,7 @@ def DetailScreen():
 
     return pn.Column(
         pn.Text(f"Detail #{item_id}", style={"font_size": 20}),
-        pn.Button("Back", on_click=nav.go_back),
+        pn.Button("Back", on_press=nav.go_back),
         style={"spacing": 12, "padding": 16},
     )
 ```
@@ -202,12 +226,66 @@ handle_click = pn.use_callback(lambda: set_count(count + 1), [count])
 
 ### use_ref
 
-A mutable container that persists across renders without triggering re-renders:
+Returns a [`Ref`][pythonnative.Ref], a mutable container that persists
+across renders without triggering re-renders:
 
 ```python
 render_count = pn.use_ref(0)
-render_count["current"] += 1
+render_count.current += 1
 ```
+
+Pass a ref to a built-in element via the `ref=` prop and the
+reconciler populates `ref.current` with the underlying native view
+after commit (and clears it on unmount). The layout pass also mirrors
+the committed frame, so Python code can read measured geometry without
+a native round-trip:
+
+```python
+box_ref = pn.use_ref()
+pn.View(ref=box_ref, style={"height": 48})
+# after commit: box_ref.current is the native view
+```
+
+### use_imperative_handle
+
+Composite components that accept a `ref` prop can publish a curated
+controller object on `ref.current` instead of a raw native view.
+[`FlatList`][pythonnative.FlatList] does this out of the box: it
+installs a [`ListController`][pythonnative.ListController] with
+`scroll_to_offset`, `scroll_to_index`, and `scroll_to_end` methods.
+Your own components use [`use_imperative_handle`][pythonnative.use_imperative_handle]:
+
+```python
+@pn.component
+def VideoPlayer(source, ref=None):
+    pn.use_imperative_handle(ref, lambda: PlayerController(...), [source])
+    return pn.View(...)
+
+@pn.component
+def Screen():
+    player = pn.use_ref()
+    return pn.Column(
+        VideoPlayer(source=url, ref=player),
+        pn.Button("Play", on_press=lambda: player.current.play()),
+    )
+```
+
+### use_back_handler
+
+Intercept the system back action (the Android hardware back button and
+predictive back gesture; Escape in the desktop preview). Return `True`
+to consume the event, `False` to pass it along:
+
+```python
+@pn.component
+def Editor():
+    dirty, set_dirty = pn.use_state(False)
+    pn.use_back_handler(lambda: dirty)  # block back while dirty
+    ...
+```
+
+iOS has no system back button, so the handler never fires there;
+swipe-back is controlled by the navigation stack instead.
 
 ### use_animated_value
 
@@ -248,6 +326,12 @@ def UserProfile():
     return pn.Text(f"Welcome, {user['name']}")
 ```
 
+Context is **reactive**: when a `Provider`'s value changes, every
+component that read the context re-renders, even when a memoized
+ancestor in between would otherwise skip its subtree. This matches
+React's context propagation, so `@pn.memo` walls never trap stale
+theme or session values.
+
 ## Batching state updates
 
 By default, each state setter call triggers a re-render. When you
@@ -269,7 +353,7 @@ def Form():
 
     return pn.Column(
         pn.Text(f"{name} <{email}>"),
-        pn.Button("Fill", on_click=on_submit),
+        pn.Button("Fill", on_press=on_submit),
     )
 ```
 
@@ -308,18 +392,27 @@ identity doesn't change between renders of the parent.
 
 Wrap risky components in
 [`ErrorBoundary`][pythonnative.ErrorBoundary] to catch render errors
-and display a fallback UI:
+and display a fallback UI. The fallback can receive the error and a
+`reset` callable that remounts the original children, and `on_error`
+hooks in error reporting:
 
 ```python
 @pn.component
 def App():
     return pn.ErrorBoundary(
         MyRiskyComponent(),
-        fallback=lambda err: pn.Text(f"Something went wrong: {err}"),
+        fallback=lambda err, reset: pn.Column(
+            pn.Text(f"Something went wrong: {err}"),
+            pn.Button("Retry", on_press=reset),
+        ),
+        on_error=lambda err: log.exception(err),
     )
 ```
 
-Without an error boundary, an exception during rendering crashes the entire page. Error boundaries catch errors during both initial mount and subsequent reconciliation.
+Without an error boundary, an exception during rendering propagates to
+the screen host: in dev mode that shows the full-screen error overlay
+(the RedBox); in production it crashes the screen. Error boundaries
+catch errors during both initial mount and subsequent reconciliation.
 
 ## Custom hooks
 
@@ -365,6 +458,12 @@ def Settings():
     and the framework can't keep your state straight. Move the
     condition *inside* the hook, or compose the hook into a helper
     that the parent calls unconditionally.
+
+In dev mode (`pn preview`, `pn run` with hot reload, or `PN_DEV=1`),
+violating these rules raises a
+[`HookOrderError`][pythonnative.HookOrderError] naming the component
+and the offending hook position, instead of silently cross-wiring
+state.
 
 ## Next steps
 

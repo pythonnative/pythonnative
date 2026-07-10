@@ -39,8 +39,8 @@ def ProgressBarDemo() -> pn.Element:
             result_text("Progress", f"{int(progress * 100)}%"),
             pn.ProgressBar(value=progress),
             buttons_row(
-                pn.Button("Advance", on_click=advance),
-                pn.Button("Reset", on_click=reset),
+                pn.Button("Advance", on_press=advance),
+                pn.Button("Reset", on_press=reset),
             ),
             hint("Tap 'Advance' to move the bar in 25% steps up to 100%."),
         ),

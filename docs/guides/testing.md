@@ -116,7 +116,7 @@ def test_counter_increments():
         count, set_count = pn.use_state(0)
         return pn.Column(
             pn.Text(f"Count: {count}", key="t"),
-            pn.Button("+", on_click=lambda: set_count(count + 1), key="b"),
+            pn.Button("+", on_press=lambda: set_count(count + 1), key="b"),
         )
 
     root, rec = render(Counter())
@@ -124,7 +124,7 @@ def test_counter_increments():
     label, button = root.children
     assert label.props["text"] == "Count: 0"
 
-    dispatch_event(button.tag, "on_click")
+    dispatch_event(button.tag, "on_press")
     rec.flush_dirty()  # state changes commit on the next flush
     assert root.children[0].props["text"] == "Count: 1"
 ```
@@ -153,11 +153,11 @@ def test_use_toggle():
     @pn.component
     def Probe():
         on, toggle = use_toggle()
-        return pn.Text("on" if on else "off", on_click=toggle, key="t")
+        return pn.Text("on" if on else "off", on_press=toggle, key="t")
 
     root, rec = render(Probe())
     assert root.props["text"] == "off"
-    dispatch_event(root.tag, "on_click")
+    dispatch_event(root.tag, "on_press")
     rec.flush_dirty()
     assert root.props["text"] == "on"
 ```

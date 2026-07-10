@@ -90,7 +90,7 @@ def SignUp():
             ),
             pn.Button(
                 "Submitting..." if submitting else "Create account",
-                on_click=submit,
+                on_press=submit,
                 disabled=not can_submit,
             ),
             style={"spacing": 12, "padding": 16, "align_items": "stretch"},

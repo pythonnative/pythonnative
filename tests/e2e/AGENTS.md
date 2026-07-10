@@ -188,7 +188,7 @@ When you add a new public symbol to `pythonnative`, follow this exact recipe:
            section(
                "Try it",
                result_text("State", "..."),
-               pn.Button("Trigger", on_click=lambda: None),
+               pn.Button("Trigger", on_press=lambda: None),
                hint("Maestro asserts the State line."),
            ),
        )
@@ -219,7 +219,7 @@ If a symbol is genuinely untestable through a UI flow (type-only alias, network-
 
 Every flow for an interactive component must exercise the **real native control** at least once (tap the actual Switch/Checkbox/segment, drag the actual Slider, open the actual Picker, pull the actual page) before (or in addition to) driving state through proxy buttons.
 
-Proxy "Set X" / "Turn on" buttons all share one happy-path event route (`Button.on_click`). The per-control native event bridges (target-actions for `ValueChanged` on iOS, per-widget listeners on Android) are exactly where platform-specific breakage hides. A regression where tapping the real `UISwitch` crashed the app on iOS 18 was completely invisible to a buttons-only flow; the suite stayed green while the control was unusable. Real-control interaction also catches rendering bugs (a control that never gets laid out or draws white-on-white can still pass text-only assertions).
+Proxy "Set X" / "Turn on" buttons all share one happy-path event route (`Button.on_press`). The per-control native event bridges (target-actions for `ValueChanged` on iOS, per-widget listeners on Android) are exactly where platform-specific breakage hides. A regression where tapping the real `UISwitch` crashed the app on iOS 18 was completely invisible to a buttons-only flow; the suite stayed green while the control was unusable. Real-control interaction also catches rendering bugs (a control that never gets laid out or draws white-on-white can still pass text-only assertions).
 
 Practical notes:
 

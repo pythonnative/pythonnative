@@ -32,9 +32,9 @@ def UseReducerDemo() -> pn.Element:
             "Reducer counter",
             result_text("Counter", count),
             buttons_row(
-                pn.Button("Dispatch inc", on_click=lambda: dispatch("inc")),
-                pn.Button("Dispatch dec", on_click=lambda: dispatch("dec")),
-                pn.Button("Dispatch reset", on_click=lambda: dispatch("reset")),
+                pn.Button("Dispatch inc", on_press=lambda: dispatch("inc")),
+                pn.Button("Dispatch dec", on_press=lambda: dispatch("dec")),
+                pn.Button("Dispatch reset", on_press=lambda: dispatch("reset")),
             ),
             hint("Tap 'Dispatch inc' twice, assert 'Counter: 2'."),
         ),

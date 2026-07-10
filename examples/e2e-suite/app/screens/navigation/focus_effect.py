@@ -36,7 +36,7 @@ def FocusEffectDemo() -> pn.Element:
             "Focus",
             result_text("Focus count", focus_count),
             buttons_row(
-                pn.Button("Push another screen", on_click=push_and_pop_temp),
+                pn.Button("Push another screen", on_press=push_and_pop_temp),
             ),
             hint(
                 "Push, then tap Back. The focus count should be at least 2 "

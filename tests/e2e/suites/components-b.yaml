@@ -12,6 +12,7 @@ appId: ${APP_ID}
 ---
 - runFlow: ../flows/components/refresh_control.yaml
 - runFlow: ../flows/components/fragment.yaml
+- runFlow: ../flows/components/portal.yaml
 - runFlow: ../flows/components/error_boundary.yaml
 - runFlow: ../flows/components/spacer.yaml
 - runFlow: ../flows/components/status_bar.yaml

@@ -375,7 +375,7 @@ def use_persisted_state(
             theme, set_theme = pn.use_persisted_state("settings.theme", "light")
             return pn.Button(
                 f"Theme: {theme}",
-                on_click=lambda: set_theme("dark" if theme == "light" else "light"),
+                on_press=lambda: set_theme("dark" if theme == "light" else "light"),
             )
         ```
     """
@@ -389,14 +389,14 @@ def use_persisted_state(
         stored = await AsyncStorage.get_json(key)
         if stored is not None:
             set_state(stored)
-        loaded["current"] = True
+        loaded.current = True
 
     use_async_effect(_load, [key])
 
     def setter(value_or_updater: Any) -> None:
         def _reducer(current: Any) -> Any:
             new_value = value_or_updater(current) if callable(value_or_updater) else value_or_updater
-            if loaded["current"] is True:
+            if loaded.current is True:
                 run_async(AsyncStorage.set_json(key, new_value))
             return new_value
 

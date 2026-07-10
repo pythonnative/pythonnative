@@ -25,16 +25,16 @@ def UseColorSchemeDemo() -> pn.Element:
             buttons_row(
                 pn.Button(
                     "Force dark",
-                    on_click=lambda: pn.appearance.set_color_scheme("dark"),
+                    on_press=lambda: pn.appearance.set_color_scheme("dark"),
                 ),
                 pn.Button(
                     "Force light",
-                    on_click=lambda: pn.appearance.set_color_scheme("light"),
+                    on_press=lambda: pn.appearance.set_color_scheme("light"),
                 ),
             ),
             pn.Button(
                 "Follow system",
-                on_click=lambda: pn.appearance.set_color_scheme(None),
+                on_press=lambda: pn.appearance.set_color_scheme(None),
             ),
             hint("Maestro forces each scheme and asserts the Scheme line."),
         ),

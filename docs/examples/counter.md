@@ -26,11 +26,11 @@ def Counter(initial: int = 0):
             style={"font_size": 28, "bold": True, "color": color},
         ),
         pn.Row(
-            pn.Button("-", on_click=dec, style={"flex": 1}),
-            pn.Button("+", on_click=inc, style={"flex": 1}),
+            pn.Button("-", on_press=dec, style={"flex": 1}),
+            pn.Button("+", on_press=inc, style={"flex": 1}),
             style={"spacing": 8},
         ),
-        pn.Button("Reset", on_click=reset),
+        pn.Button("Reset", on_press=reset),
         style={
             "spacing": 12,
             "padding": 16,
@@ -86,11 +86,11 @@ def Counter():
     return pn.Column(
         pn.Text(str(state), style={"font_size": 28}),
         pn.Row(
-            pn.Button("-", on_click=lambda: dispatch("dec")),
-            pn.Button("+", on_click=lambda: dispatch("inc")),
+            pn.Button("-", on_press=lambda: dispatch("dec")),
+            pn.Button("+", on_press=lambda: dispatch("inc")),
             style={"spacing": 8},
         ),
-        pn.Button("Reset", on_click=lambda: dispatch("reset")),
+        pn.Button("Reset", on_press=lambda: dispatch("reset")),
         style={"spacing": 12, "padding": 16, "align_items": "stretch"},
     )
 ```

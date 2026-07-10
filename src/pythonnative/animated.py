@@ -834,7 +834,7 @@ def _make_animated_factory(
         ref = use_ref(None)
 
         def _attach_bindings() -> Callable[[], None]:
-            tag = ref.get("_pn_tag")
+            tag = ref._pn_tag
             if tag is None:
                 return lambda: None
             detachers = [value.attach(tag, _animated_prop_name(prop)) for prop, value in bindings.items()]

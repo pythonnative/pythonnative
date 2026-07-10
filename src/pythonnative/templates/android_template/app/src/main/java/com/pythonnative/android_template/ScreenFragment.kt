@@ -8,6 +8,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import com.chaquo.python.PyObject
@@ -54,6 +55,27 @@ class ScreenFragment : Fragment() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to instantiate screen", e)
         }
+
+        // Offer the system back action to Python (`use_back_handler`)
+        // before running the default pop/finish behavior.
+        requireActivity().onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    val consumed = try {
+                        screen?.callAttr("on_back_pressed")?.toBoolean() ?: false
+                    } catch (e: Exception) {
+                        Log.w(TAG, "on_back_pressed failed", e)
+                        false
+                    }
+                    if (!consumed) {
+                        isEnabled = false
+                        requireActivity().onBackPressedDispatcher.onBackPressed()
+                        isEnabled = true
+                    }
+                }
+            }
+        )
     }
 
     override fun onCreateView(

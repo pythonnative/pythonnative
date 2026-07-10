@@ -87,20 +87,44 @@ A `@pn.component` function is treated as an element type just like
 1. It looks up the function's hook state (or creates a fresh slot).
 2. It calls the function with the current props inside an active hook
    context.
-3. It recursively reconciles whatever
-   [`Element`][pythonnative.Element] the function returned.
+3. It recursively reconciles whatever the function returned: a single
+   [`Element`][pythonnative.Element], a `list` of elements (which
+   mount as siblings at the component's position), or `None` (which
+   mounts nothing).
 
 Hook slots are matched by their position in the function body, which is
-why hooks must be called at the top level (not inside `if`/`for`).
+why hooks must be called at the top level (not inside `if`/`for`). In
+dev mode the reconciler verifies the hook call sequence on every
+render and raises
+[`HookOrderError`][pythonnative.HookOrderError] on a mismatch.
+
+## Fragments and multi-child rendering
+
+[`Fragment`][pythonnative.Fragment] groups siblings without a wrapping
+native view: its children splice directly into the parent's native
+child list. `None` and `False` children are dropped everywhere, so
+conditional rendering with `cond and pn.Text(...)` needs no special
+casing. A keyed Fragment participates in keyed diffing as one unit,
+moving all of its children together.
+
+## Portals
+
+[`Portal`][pythonnative.Portal] elements contribute **zero** native
+children to their parent. Their subtree mounts into a full-screen
+overlay owned by the platform handler, and the layout pass positions
+portal children against the viewport instead of the parent box. State,
+context, and events still flow through the normal component tree; only
+the native views live elsewhere.
 
 ## Context providers
 
 [`Provider`][pythonnative.Provider] is itself an element type. When the
 reconciler mounts one, it pushes a value onto a per-context stack;
 descendants reading via [`use_context`][pythonnative.use_context]
-observe the topmost value. On unmount or value change, the reconciler
-re-renders descendants whose `use_context` hook subscribes to that
-context.
+observe the topmost value. Context is reactive: when a re-render
+changes a Provider's value, the reconciler marks every recorded
+consumer of that context dirty, so consumers re-render even when a
+memoized ancestor in between skips its subtree.
 
 ```python
 ThemeContext = pn.create_context({"primary": "#000"})
@@ -125,11 +149,12 @@ def Header():
 element. When the reconciler renders a subtree underneath one and an
 exception escapes a child component or handler, the reconciler:
 
-1. Catches the exception.
+1. Catches the exception and invokes the boundary's `on_error`
+   callback, if provided.
 2. Tears down the partially-mounted subtree.
-3. Renders the boundary's `fallback` (which may be a static
-   [`Element`][pythonnative.Element] or a callable that receives the
-   exception).
+3. Renders the boundary's `fallback` (a static
+   [`Element`][pythonnative.Element], `fallback(error)`, or
+   `fallback(error, reset)` where `reset` remounts the children).
 4. Continues reconciling the rest of the page.
 
 This means a single misbehaving component can't bring down the whole

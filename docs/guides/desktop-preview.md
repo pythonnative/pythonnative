@@ -93,6 +93,21 @@ in-process stack of screen hosts in the preview, the same way they drive
 pushes a new screen host (preserving the previous screen's state);
 `go_back()` pops it. Each screen runs in its own reconciler host.
 
+The Escape key acts as the system back action:
+[`use_back_handler`][pythonnative.use_back_handler] subscribers on the
+active screen get the first chance to consume it, and otherwise the
+navigation stack pops, matching the Android hardware back button.
+
+### Dev mode and the error overlay
+
+The preview always runs with dev diagnostics on: unknown style keys
+and duplicate list keys print `[PN] WARN` messages, hook-order
+violations raise immediately, and uncaught errors from renders,
+effects, and event handlers show a full-screen **RedBox** with the
+traceback. Fix the code and save; a successful reload clears the
+overlay. The same diagnostics run on device under `pn run` with hot
+reload enabled.
+
 ## Fast Refresh
 
 Saving a `.py` file under `app/` triggers a reload. The preview prefers

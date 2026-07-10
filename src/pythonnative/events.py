@@ -1,6 +1,6 @@
 """Tag-based event routing between native views and Python callbacks.
 
-Before the batched-commit overhaul, every event prop (``on_click``,
+Before the batched-commit overhaul, every event prop (``on_press``,
 ``on_change``, …) was wired by storing the Python callable on (or next
 to) the native view, and every re-render re-pushed fresh closures across
 the bridge. This module replaces that with a single dispatch channel:
@@ -78,19 +78,24 @@ class EventRegistry:
 
         Returns:
             ``True`` when a callback existed and was invoked (even if
-            it raised: exceptions are swallowed so a buggy app
-            callback can't crash the platform's UI thread), ``False``
-            when nothing is registered.
+            it raised: exceptions never propagate into the platform's
+            UI thread; in dev mode they are routed to the RedBox via
+            [`report_error`][pythonnative.diagnostics.report_error],
+            otherwise the traceback is printed), ``False`` when nothing
+            is registered.
         """
         callback = self.get(tag, name)
         if callback is None:
             return False
         try:
             callback(*args)
-        except Exception:
-            import traceback
+        except Exception as exc:
+            from . import diagnostics
 
-            traceback.print_exc()
+            if not diagnostics.report_error(exc, phase=f"event {name!r}"):
+                import traceback
+
+                traceback.print_exc()
         return True
 
     def reset(self) -> None:
@@ -115,7 +120,7 @@ def dispatch_event(tag: int, name: str, *args: Any) -> bool:
 
     Args:
         tag: The view's reconciler-assigned tag.
-        name: Event name, the original prop name (``"on_click"``,
+        name: Event name, the original prop name (``"on_press"``,
             ``"on_change"``, …) or a gesture channel (``"gesture:0"``).
         *args: Positional arguments forwarded to the user callback,
             preserving each prop's documented signature.

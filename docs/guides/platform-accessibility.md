@@ -122,5 +122,5 @@ maps to `accessibilityIdentifier` on iOS and to the accessibility
 node's `viewIdResourceName` (resource-id) on Android:
 
 ```python
-pn.Button("Continue", on_click=next_step, test_id="onboarding-continue")
+pn.Button("Continue", on_press=next_step, test_id="onboarding-continue")
 ```

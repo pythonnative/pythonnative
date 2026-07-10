@@ -42,9 +42,9 @@ def PickerDemo() -> pn.Element:
                 ),
             ),
             buttons_row(
-                pn.Button("Pick apple", on_click=lambda: set_fruit("apple")),
-                pn.Button("Pick banana", on_click=lambda: set_fruit("banana")),
-                pn.Button("Pick cherry", on_click=lambda: set_fruit("cherry")),
+                pn.Button("Pick apple", on_press=lambda: set_fruit("apple")),
+                pn.Button("Pick banana", on_press=lambda: set_fruit("banana")),
+                pn.Button("Pick cherry", on_press=lambda: set_fruit("cherry")),
             ),
             hint("Maestro opens the picker and selects, then taps the buttons."),
         ),

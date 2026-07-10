@@ -42,8 +42,8 @@ def SpringAnimationDemo() -> pn.Element:
                 ),
             ),
             buttons_row(
-                pn.Button("Run spring", on_click=lambda: pn.run_async(run())),
-                pn.Button("Reset", on_click=lambda: pn.run_async(reset())),
+                pn.Button("Run spring", on_press=lambda: pn.run_async(run())),
+                pn.Button("Reset", on_press=lambda: pn.run_async(reset())),
             ),
             hint("Maestro taps 'Run spring' and asserts 'Status: done'."),
         ),

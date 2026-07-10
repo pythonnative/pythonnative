@@ -249,20 +249,20 @@ def test_flatlist_with_refresh_control() -> None:
 
 
 def test_flatlist_scroll_controller_attached_to_ref() -> None:
+    from pythonnative.hooks import Ref
     from pythonnative.native_views import set_registry
 
-    ref: dict = {"current": None}
+    ref: Ref = Ref()
     el = FlatList(data=[1, 2, 3], item_height=20, ref=ref)
     _root, _rec, backend = _mount(el)
 
-    assert callable(ref["scroll_to_index"])
-    assert callable(ref["scroll_to_offset"])
-    assert callable(ref["scroll_to_end"])
+    controller = ref.current
+    assert controller is not None, "mount must publish a ListController on the ref"
 
     # Imperative scroll commands resolve through the process registry.
     set_registry(backend)  # type: ignore[arg-type]
     try:
-        ref["scroll_to_index"](2, animated=False)
+        controller.scroll_to_index(2, animated=False)
     finally:
         set_registry(None)
     assert backend.commands, "scroll_to_index must dispatch a native command"

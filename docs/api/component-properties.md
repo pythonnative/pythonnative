@@ -123,11 +123,11 @@ pn.Text("Total: ", pn.Text("$42", style={"bold": True, "color": "#16A34A"}))
 ## Button
 
 ```python
-pn.Button(title, on_click=handler, style={"color": "#FFF", "background_color": "#007AFF", "font_size": 16})
+pn.Button(title, on_press=handler, style={"color": "#FFF", "background_color": "#007AFF", "font_size": 16})
 ```
 
 - `title`: button label (positional)
-- `on_click`: callback `() -> None`
+- `on_press`: callback `() -> None`
 - `enabled`: interactive state (kwarg, default `True`)
 - Style properties: `color`, `background_color`, `font_size`
 

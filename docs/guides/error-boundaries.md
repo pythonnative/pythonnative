@@ -48,14 +48,16 @@ def App(users):
     )
 ```
 
-The `fallback` may be a static [`Element`][pythonnative.Element] or a
-callable that receives the exception:
+The `fallback` may be a static [`Element`][pythonnative.Element], a
+callable that receives the exception, or a callable that receives the
+exception *and* a `reset` function:
 
 ```python
-def render_error(exc: BaseException):
+def render_error(exc: BaseException, reset):
     return pn.Column(
         pn.Text("Something went wrong", style={"font_size": 18, "bold": True}),
         pn.Text(repr(exc), style={"color": "#888"}),
+        pn.Button("Retry", on_press=reset),
     )
 
 pn.ErrorBoundary(child, fallback=render_error)
@@ -75,48 +77,48 @@ pn.ErrorBoundary(child, fallback=render_error)
 - Exceptions inside [`use_effect`][pythonnative.use_effect] callbacks
   (effects run *after* commit, so the boundary has already reported
   success). Wrap the callback body in `try/except` and surface the
-  error via `set_state`.
-- Exceptions in event handlers (`on_click`, `on_change`). Same
+  error via `set_state`. In dev mode these errors show the RedBox
+  overlay instead of vanishing.
+- Exceptions in event handlers (`on_press`, `on_change`). Same
   reasoning: handlers fire later, on user interaction. Use
-  `try/except` inside the handler.
+  `try/except` inside the handler. Dev mode routes these to the
+  RedBox too.
 - Exceptions raised from threads or async tasks scheduled by your
   code. Catch them at the boundary of the task.
 
 ## Recovery
 
 Once a boundary shows its fallback, the subtree stays in the fallback
-state until something forces it to remount. The simplest reset is to
-change a parent prop or `key`:
+state until it's reset. Use the `reset` callable passed to the
+fallback; it clears the error and remounts the original children with
+fresh state:
 
 ```python
-@pn.component
-def Panel():
-    nonce, set_nonce = pn.use_state(0)
-    return pn.Column(
-        pn.ErrorBoundary(
-            FlakySection(),
-            fallback=lambda exc: pn.Column(
-                pn.Text(f"Error: {exc}"),
-                pn.Button("Retry", on_click=lambda: set_nonce(nonce + 1)),
-            ),
-            key=nonce,
-        )
-    )
+pn.ErrorBoundary(
+    FlakySection(),
+    fallback=lambda exc, reset: pn.Column(
+        pn.Text(f"Error: {exc}"),
+        pn.Button("Retry", on_press=reset),
+    ),
+)
 ```
 
-Bumping `nonce` changes the boundary's key, which causes the
-reconciler to unmount the old boundary instance and mount a fresh one
-that retries the render.
+Changing the boundary's `key` from a parent also works (it unmounts
+the old boundary instance entirely), but `reset` is simpler and keeps
+the boundary's position in the tree stable.
 
 ## Reporting errors
 
-The boundary is also the right place to wire crash reporting. Pass a
-callable fallback and report the exception there:
+The boundary is also the right place to wire crash reporting. Pass an
+`on_error` callback; it fires once when the boundary catches, before
+the fallback mounts:
 
 ```python
-def reporting_fallback(exc: BaseException):
-    crash_reporter.send(exc)
-    return pn.Text("We hit a snag. The team has been notified.")
+pn.ErrorBoundary(
+    child,
+    fallback=pn.Text("We hit a snag. The team has been notified."),
+    on_error=lambda exc: crash_reporter.send(exc),
+)
 ```
 
 Most crash reporters (Sentry, Bugsnag, etc.) ship Python clients that

@@ -25,7 +25,7 @@ def ActivityIndicatorDemo() -> pn.Element:
             pn.ActivityIndicator(animating=spinning),
             pn.Button(
                 "Stop" if spinning else "Start",
-                on_click=lambda: set_spinning(not spinning),
+                on_press=lambda: set_spinning(not spinning),
             ),
             hint("Tapping the toggle flips Animating between 'yes' and 'no'."),
         ),

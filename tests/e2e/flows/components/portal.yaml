@@ -1,0 +1,26 @@
+# Tests Portal floats children over the screen with live state/events.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/portal.py
+# Source under test: src/pythonnative/reconciler.py :: Portal
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: Portal
+- assertVisible: "Banner shown: no"
+- assertNotVisible: "Floating banner (count 0)"
+- tapOn: "Show banner"
+- assertVisible: "Banner shown: yes"
+- assertVisible: "Floating banner (count 0)"
+# Events inside the portal stay wired to the screen's state.
+- tapOn: "Bump from portal"
+- assertVisible: "Floating banner (count 1)"
+- assertVisible: "Portal count: 1"
+- tapOn: "Hide banner"
+- assertNotVisible: "Floating banner (count 1)"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

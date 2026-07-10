@@ -20,7 +20,7 @@ def UseRefDemo() -> pn.Element:
     renders, set_renders = pn.use_state(0)
 
     def bump_silent() -> None:
-        silent["current"] += 1
+        silent.current += 1
 
     def force_render() -> None:
         set_renders(renders + 1)
@@ -30,11 +30,11 @@ def UseRefDemo() -> pn.Element:
         "Compare a silent ref counter to a re-render-driving state counter.",
         section(
             "Counters",
-            result_text("Silent ref value", silent["current"]),
+            result_text("Silent ref value", silent.current),
             result_text("Renders", renders),
             buttons_row(
-                pn.Button("Bump silent", on_click=bump_silent),
-                pn.Button("Force render", on_click=force_render),
+                pn.Button("Bump silent", on_press=bump_silent),
+                pn.Button("Force render", on_press=force_render),
             ),
             hint(
                 "Bump silent N times: 'Silent ref value' stays 0 until a "

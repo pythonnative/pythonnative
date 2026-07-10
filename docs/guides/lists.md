@@ -118,8 +118,9 @@ it changes, as a list of `{"index", "key", "item"}` dicts.
 
 ## Imperative scrolling
 
-Pass a [`use_ref`][pythonnative.use_ref] dict as `ref=` and the list
-attaches a scroll controller:
+Pass a [`use_ref`][pythonnative.use_ref] as `ref=` and the list
+publishes a [`ListController`][pythonnative.ListController] on
+`ref.current`:
 
 ```python
 @pn.component
@@ -127,7 +128,7 @@ def JumpableList():
     list_ref = pn.use_ref()
 
     return pn.Column(
-        pn.Button("Jump to row 200", on_click=lambda: list_ref["scroll_to_index"](200)),
+        pn.Button("Jump to row 200", on_press=lambda: list_ref.current.scroll_to_index(200)),
         pn.FlatList(data=items, item_height=44, ref=list_ref, style={"flex": 1}),
         style={"flex": 1},
     )

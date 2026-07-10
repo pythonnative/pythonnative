@@ -29,18 +29,24 @@ The phases:
    so this phase is cheap and pure (modulo `use_state` updates).
 2. **Commit**. The
    [`Reconciler`][pythonnative.reconciler.Reconciler] diffs the
-   re-rendered subtree against the previous one and applies the
-   smallest set of native mutations through the registered
-   [`ViewHandler`][pythonnative.native_views.base.ViewHandler]s.
-3. **Effects**. Cleanup callbacks from the *previous* render run
-   first; new [`use_effect`][pythonnative.use_effect] callbacks run
-   after, in depth-first order so children commit before parents.
-4. **Drain**. If any effect set state, another render pass is queued
+   re-rendered subtree against the previous one, applies the smallest
+   set of native mutations through the registered
+   [`ViewHandler`][pythonnative.native_views.base.ViewHandler]s, and
+   runs the layout pass.
+3. **Layout effects**.
+   [`use_layout_effect`][pythonnative.use_layout_effect] callbacks run
+   synchronously inside the commit, after frames are set, so they can
+   measure committed geometry or issue view commands before the frame
+   is presented.
+4. **Passive effects**. Cleanup callbacks from the *previous* render
+   run first; new [`use_effect`][pythonnative.use_effect] callbacks
+   run after, in depth-first order so children run before parents.
+5. **Drain**. If any effect set state, another render pass is queued
    immediately. The screen host caps the loop to prevent runaway
    re-renders.
 
 ```text
-[render] -> [commit] -> [effects] -> drain? -> [render] ...
+[render] -> [commit + layout] -> [layout effects] -> [passive effects] -> drain? -> [render] ...
 ```
 
 ## Effects vs focus effects
@@ -72,7 +78,7 @@ For a class-component-style mental model:
 | `componentDidUpdate` | `use_effect(fn, deps=[a, b])` |
 | `componentWillUnmount` | the cleanup function returned from `use_effect` |
 | `getDerivedStateFromProps` | a plain expression at the top of the component |
-| `getSnapshotBeforeUpdate` | not exposed; handle in commit-time platform APIs if needed |
+| `getSnapshotBeforeUpdate` | `use_layout_effect` (runs inside the commit, before paint-visible effects) |
 
 ## Navigation lifecycle
 

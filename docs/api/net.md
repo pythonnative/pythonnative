@@ -17,7 +17,7 @@ if you need multipart, streaming, or HTTP/2.
   [`use_query`][pythonnative.use_query] for loading/error state and
   automatic cancellation on unmount.
 - **In an event handler**: wrap an `async def` in
-  [`pn.run_async`][pythonnative.run_async] so a sync `on_click` can
+  [`pn.run_async`][pythonnative.run_async] so a sync `on_press` can
   drive an awaitable request.
 - **Mutations**: pair with [`use_mutation`][pythonnative.use_mutation]
   to track ``loading`` / ``error`` for POST/PUT/DELETE flows.

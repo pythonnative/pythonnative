@@ -270,19 +270,20 @@ def test_native_list_forwards_user_on_scroll(native_lists: None) -> None:
 
 
 def test_native_list_controller_dispatches_commands(native_lists: None) -> None:
-    ref: dict = {"current": None}
+    from pythonnative.hooks import Ref
+
+    ref: Ref = Ref()
     el = FlatList(data=list(range(50)), item_height=20, ref=ref)
     _root, _rec, backend = _mount(el)
 
-    assert callable(ref["scroll_to_index"])
-    assert callable(ref["scroll_to_offset"])
-    assert callable(ref["scroll_to_end"])
+    controller = ref.current
+    assert controller is not None
 
     set_registry(backend)  # type: ignore[arg-type]
     try:
-        ref["scroll_to_index"](3, animated=False)
-        ref["scroll_to_offset"](120.0)
-        ref["scroll_to_end"]()
+        controller.scroll_to_index(3, animated=False)
+        controller.scroll_to_offset(120.0)
+        controller.scroll_to_end()
     finally:
         set_registry(None)
 

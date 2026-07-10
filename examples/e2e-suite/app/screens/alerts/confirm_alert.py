@@ -32,7 +32,7 @@ def ConfirmAlertDemo() -> pn.Element:
             "Confirm",
             result_text("Last response", last),
             buttons_row(
-                pn.Button("Show confirm", on_click=lambda: pn.run_async(_run())),
+                pn.Button("Show confirm", on_press=lambda: pn.run_async(_run())),
             ),
             hint(
                 "Maestro taps 'Show confirm', taps 'Confirm', asserts 'Last response: confirmed'. "

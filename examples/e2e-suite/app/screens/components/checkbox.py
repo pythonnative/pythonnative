@@ -24,8 +24,8 @@ def CheckboxDemo() -> pn.Element:
             result_text("Checked", "ON" if on else "OFF"),
             pn.Checkbox(value=on, on_change=set_on, label="Accept"),
             buttons_row(
-                pn.Button("Check", on_click=lambda: set_on(True)),
-                pn.Button("Uncheck", on_click=lambda: set_on(False)),
+                pn.Button("Check", on_press=lambda: set_on(True)),
+                pn.Button("Uncheck", on_press=lambda: set_on(False)),
             ),
             hint("Maestro taps the box itself, then the buttons."),
         ),

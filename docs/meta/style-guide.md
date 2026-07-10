@@ -72,7 +72,7 @@ def use_state(initial=None):
             count, set_count = pn.use_state(0)
             return pn.Button(
                 f"Count: {count}",
-                on_click=lambda: set_count(count + 1),
+                on_press=lambda: set_count(count + 1),
             )
         ```
     """
@@ -141,7 +141,7 @@ Example:
         count, set_count = pn.use_state(initial)
         return pn.Button(
             f"Count: {count}",
-            on_click=lambda: set_count(count + 1),
+            on_press=lambda: set_count(count + 1),
         )
     ```
 """

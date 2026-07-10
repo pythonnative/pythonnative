@@ -48,7 +48,7 @@ def HomeScreen() -> pn.Element:
                 pn.Column(
                     pn.Button(
                         f"Open {name}",
-                        on_click=lambda _name=name: open_category(_name),
+                        on_press=lambda _name=name: open_category(_name),
                     ),
                     pn.Text(
                         f"{len(demos_for_category(name))} demos",

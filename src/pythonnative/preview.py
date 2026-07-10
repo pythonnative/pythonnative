@@ -231,23 +231,42 @@ class DesktopApp:
             host.on_pause()
         except Exception:
             pass
+        # ``on_destroy`` unmounts the host's reconciler: effect cleanups
+        # run, native widgets are destroyed, and event registrations are
+        # released (see ``screen._destroy_host``).
         try:
             host.on_destroy()
         except Exception:
             pass
-        reconciler = getattr(host, "_reconciler", None)
-        tree = getattr(reconciler, "_tree", None) if reconciler is not None else None
-        if reconciler is not None and tree is not None:
-            try:
-                reconciler._destroy_tree(tree)
-            except Exception:
-                pass
         container = getattr(host, "_pn_container", None)
         if container is not None:
             try:
                 container.destroy()
             except Exception:
                 pass
+
+    def teardown_all(self) -> None:
+        """Destroy every screen on the stack (preview window closing)."""
+        while self._stack:
+            self._teardown(self._stack.pop())
+
+    def back_pressed(self) -> None:
+        """Route a desktop back gesture (Escape) like a hardware back press.
+
+        ``use_back_handler`` subscribers on the active screen get the
+        first chance to consume the event; otherwise the stack pops
+        (matching Android's default back behavior). At the root the
+        event is ignored.
+        """
+        host = self.active_host()
+        if host is None:
+            return
+        try:
+            if host.on_back_pressed():
+                return
+        except Exception:
+            pass
+        self.pop_screen()
 
     # -- viewport / resize --------------------------------------------
 
@@ -391,6 +410,12 @@ def run_preview(
     root_dir, watched = _resolve_paths(component_path, project_root, watch_dir)
     _publish_desktop_color_scheme()
 
+    # The preview is inherently a development surface: turn on dev
+    # diagnostics (validation warnings, hook-order checks, RedBox).
+    from . import diagnostics
+
+    diagnostics.set_dev_mode(True)
+
     root = tk.Tk()
     root.title(title)
     root.geometry(f"{int(width)}x{int(height)}")
@@ -413,6 +438,11 @@ def run_preview(
             app.resize(event.width, event.height)
 
     stage.bind("<Configure>", _on_configure)
+
+    # Escape acts as the desktop stand-in for the hardware back button:
+    # ``use_back_handler`` subscribers can intercept it, and otherwise
+    # the navigation stack pops.
+    root.bind("<Escape>", lambda _event: app.back_pressed())
 
     watcher = _build_watcher(watched, root_dir, app, main_queue) if hot_reload else None
     if watcher is not None:
@@ -446,6 +476,12 @@ def run_preview(
                 watcher.stop()
             except Exception:
                 pass
+        # Unmount every screen first so effect cleanups (timers, tasks,
+        # subscriptions) run before the Tk interpreter goes away.
+        try:
+            app.teardown_all()
+        except Exception:
+            pass
         runtime_module.set_desktop_main_dispatch(None)
         desktop_backend.clear_root_container()
         try:

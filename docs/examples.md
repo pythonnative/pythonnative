@@ -57,7 +57,7 @@ def SignUp():
             pn.Text("Sign up", style={"font_size": 24, "bold": True}),
             LabeledInput(label="Name", placeholder="Enter your name"),
             LabeledInput(label="Email", placeholder="you@example.com"),
-            pn.Button("Submit", on_click=lambda: print("submitted")),
+            pn.Button("Submit", on_press=lambda: print("submitted")),
             style={"spacing": 12, "padding": 16},
         )
     )

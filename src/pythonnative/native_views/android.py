@@ -1073,7 +1073,7 @@ class ButtonHandler(AndroidViewHandler):
 
         class ClickProxy(dynamic_proxy(jclass("android.view.View").OnClickListener)):
             def onClick(self, view: Any) -> None:
-                _fire(view, "on_click")
+                _fire(view, "on_press")
 
         btn.setOnClickListener(ClickProxy())
         return btn
@@ -2092,6 +2092,81 @@ class ModalHandler(AndroidViewHandler):
                 dialog.dismiss()
             except Exception:
                 pass
+
+
+# ======================================================================
+# Portal: floats its children over the screen in a top-level overlay
+# ======================================================================
+
+
+class PortalHandler(AndroidViewHandler):
+    """Overlay container hosting [`Portal`][pythonnative.Portal] children.
+
+    The portal's native view is a full-size, non-clickable
+    ``FrameLayout`` added directly to the screen's fragment container
+    (the same parent as the screen root, so portal coordinates equal
+    viewport coordinates). It is appended last, which stacks it above
+    the main content; because the overlay itself never consumes
+    touches, taps on empty areas fall through to the screen below
+    while the portal's own children stay interactive.
+
+    The overlay attaches lazily on the first child insert and re-homes
+    itself if the fragment container was rebuilt (e.g. after popping
+    back to a previously mounted screen).
+    """
+
+    def _build(self, props: Dict[str, Any]) -> Any:
+        overlay = jclass("android.widget.FrameLayout")(_ctx())
+        overlay.setClickable(False)
+        return overlay
+
+    def _apply(self, overlay: Any, props: Dict[str, Any], initial: bool) -> None:
+        _apply_common_visual(overlay, props)
+        if not initial:
+            self._ensure_attached(overlay)
+
+    def _ensure_attached(self, overlay: Any) -> None:
+        try:
+            from ..utils import get_android_fragment_container
+
+            container = get_android_fragment_container()
+        except Exception:
+            return
+        try:
+            parent = overlay.getParent()
+            if parent is not None and _java_id(parent) == _java_id(container):
+                overlay.bringToFront()
+                return
+            if parent is not None:
+                parent.removeView(overlay)
+            LayoutParams = jclass("android.view.ViewGroup$LayoutParams")
+            lp = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+            container.addView(overlay, lp)
+        except Exception:
+            pass
+
+    def insert_child(self, parent: Any, child: Any, index: int) -> None:
+        self._ensure_attached(parent)
+        _insert_view(parent, child, index)
+
+    def remove_child(self, parent: Any, child: Any) -> None:
+        try:
+            parent.removeView(child)
+        except Exception:
+            pass
+
+    def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
+        # The overlay fills its container via MATCH_PARENT layout params;
+        # the engine frames only the portal's children.
+        return
+
+    def _teardown(self, overlay: Any) -> None:
+        try:
+            parent = overlay.getParent()
+            if parent is not None:
+                parent.removeView(overlay)
+        except Exception:
+            pass
 
 
 class SliderHandler(AndroidViewHandler):
@@ -3211,6 +3286,7 @@ def register_handlers(registry: Any) -> None:
     registry.register("Spacer", SpacerHandler())
     registry.register("SafeAreaView", SafeAreaViewHandler())
     registry.register("Modal", ModalHandler())
+    registry.register("Portal", PortalHandler())
     registry.register("Slider", SliderHandler())
     registry.register("TabBar", TabBarHandler())
     registry.register("Pressable", PressableHandler())
@@ -3238,6 +3314,7 @@ __all__ = [
     "SpacerHandler",
     "SafeAreaViewHandler",
     "ModalHandler",
+    "PortalHandler",
     "SliderHandler",
     "TabBarHandler",
     "PressableHandler",

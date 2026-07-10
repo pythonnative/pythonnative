@@ -46,9 +46,9 @@ def SettingsScreen() -> pn.Element:
                 f"Window: {dims['width']:.0f} × {dims['height']:.0f}",
                 style=styles["subtitle"],
             ),
-            pn.Button("Show alert", on_click=_show_alert),
-            pn.Button("Confirm destructive", on_click=_confirm_destructive),
-            pn.Button("Visual showcase", on_click=_view_showcase),
+            pn.Button("Show alert", on_press=_show_alert),
+            pn.Button("Confirm destructive", on_press=_confirm_destructive),
+            pn.Button("Visual showcase", on_press=_view_showcase),
             style=styles["section"],
         )
     )
