@@ -39,7 +39,7 @@ pytestmark = pytest.mark.skipif(
     reason=f"tkinter unavailable: {_DESKTOP_IMPORT_ERROR!r}",
 )
 
-# The 24 built-in element types every platform backend must service.
+# The 25 built-in element types every platform backend must service.
 _EXPECTED_TYPES = {
     "View",
     "Column",
@@ -65,6 +65,7 @@ _EXPECTED_TYPES = {
     "Checkbox",
     "SegmentedControl",
     "DatePicker",
+    "Portal",
 }
 
 

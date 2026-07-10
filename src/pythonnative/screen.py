@@ -49,7 +49,7 @@ import os
 import sys
 import threading
 import traceback
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 from . import diagnostics
 from .utils import IS_ANDROID, IS_DESKTOP, IS_IOS, set_android_context
@@ -326,6 +326,32 @@ def _flush_scheduled_renders(hosts: Sequence[Any]) -> None:
         _re_render(host)
 
 
+def _seed_initial_viewport(host: Any) -> None:
+    """Give the reconciler a plausible viewport size *before* the first mount.
+
+    The authoritative size arrives right after attach (Android's
+    ``OnLayoutChangeListener``, iOS ``viewDidLayoutSubviews``, the
+    desktop stage size), but by then the mount commit has already run:
+    without a viewport its layout pass is skipped, so mount-time
+    [`use_layout_effect`][pythonnative.use_layout_effect] callbacks
+    would observe no committed frames. Hosts opt in by providing
+    ``_initial_viewport_size()``; the estimate only needs to be
+    plausible (screen-sized), not pixel-perfect.
+    """
+    getter = getattr(host, "_initial_viewport_size", None)
+    if not callable(getter):
+        return
+    try:
+        size = getter()
+    except Exception:
+        return
+    if not size:
+        return
+    width, height = size
+    if width > 0 and height > 0:
+        host._reconciler.set_viewport_size(float(width), float(height))
+
+
 def _on_create(host: Any) -> None:
     from .hooks import NavigationHandle, Provider, _NavigationContext
 
@@ -349,6 +375,7 @@ def _on_create(host: Any) -> None:
 
     host._nav_handle = NavigationHandle(host)
     host._reconciler = _new_reconciler(host)
+    _seed_initial_viewport(host)
 
     try:
         app_element = _render_app(host)
@@ -1031,6 +1058,15 @@ if IS_ANDROID:
             set_android_context(native_instance)
             _init_host_common(self, component_path, component_func)
 
+        def _initial_viewport_size(self) -> Optional[Tuple[float, float]]:
+            """Estimate the viewport from display metrics (pre-attach)."""
+            try:
+                metrics = self.native_instance.getResources().getDisplayMetrics()
+                density = float(metrics.density) or 1.0
+                return (metrics.widthPixels / density, metrics.heightPixels / density)
+            except Exception:
+                return None
+
         def on_create(self) -> None:
             _android_publish_color_scheme(self.native_instance)
             _on_create(self)
@@ -1153,11 +1189,18 @@ if IS_ANDROID:
                 _android_push_initial_viewport(self, container)
 
         def _detach_root(self, native_view: Any) -> None:
+            # Remove this host's specific root view from whatever parent
+            # holds it. Never clear the shared fragment container: when a
+            # fragment is popped, its ``onDestroy`` (and therefore this
+            # detach) runs *after* the screen below has already re-attached
+            # its own root to the container, so a ``removeAllViews()`` here
+            # would blank the restored screen.
+            if native_view is None:
+                return
             try:
-                from .utils import get_android_fragment_container
-
-                container = get_android_fragment_container()
-                container.removeAllViews()
+                parent = native_view.getParent()
+                if parent is not None:
+                    parent.removeView(native_view)
             except Exception:
                 pass
 
@@ -1219,6 +1262,17 @@ elif IS_DESKTOP:
         def __init__(self, native_instance: Any = None, component_path: str = "", component_func: Any = None) -> None:
             self.native_instance = native_instance
             _init_host_common(self, component_path, component_func)
+
+        def _initial_viewport_size(self) -> Optional[Tuple[float, float]]:
+            """Read the stage size from the DesktopApp controller (pre-attach)."""
+            app = self.native_instance
+            if app is None or not hasattr(app, "viewport_size"):
+                return None
+            try:
+                width, height = app.viewport_size()
+                return (float(width), float(height))
+            except Exception:
+                return None
 
         def on_create(self) -> None:
             _on_create(self)
@@ -1569,6 +1623,24 @@ else:
                 _init_host_common(self, component_path, component_func)
                 if self.native_instance is not None:
                     _ios_register_screen(self.native_instance, self)
+
+            def _initial_viewport_size(self) -> Optional[Tuple[float, float]]:
+                """Estimate the viewport from the VC's view bounds (pre-attach)."""
+                try:
+                    if self.native_instance is not None:
+                        bounds = self.native_instance.view.bounds
+                        width = float(bounds.size.width)
+                        height = float(bounds.size.height)
+                        if width > 0 and height > 0:
+                            return (width, height)
+                except Exception:
+                    pass
+                try:
+                    UIScreen = ObjCClass("UIScreen")
+                    screen_bounds = UIScreen.mainScreen.bounds
+                    return (float(screen_bounds.size.width), float(screen_bounds.size.height))
+                except Exception:
+                    return None
 
             def on_create(self) -> None:
                 _ios_publish_color_scheme()

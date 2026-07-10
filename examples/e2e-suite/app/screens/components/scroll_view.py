@@ -13,8 +13,17 @@ from app.screens.scaffold import demo_screen, hint, result_text, section
 
 @pn.component
 def ScrollViewDemo() -> pn.Element:
-    """Render a fixed-height ScrollView with 30 numbered rows."""
-    rows = list(range(1, 31))
+    """Render a fixed-height ScrollView with 60 numbered rows.
+
+    60 rows (not 30) so the last row's *unclipped* accessibility frame
+    lands beyond the physical screen even on the tallest simulators
+    (e.g. iPhone Pro Max at 956 pt). ScrollView children keep their
+    content-coordinate frames in the accessibility tree when clipped,
+    and Maestro treats anything inside the screen bounds as visible,
+    so a shorter list lets ``scrollUntilVisible`` short-circuit with
+    zero swipes and the on_scroll assertion below never flips.
+    """
+    rows = list(range(1, 61))
     scrolled, set_scrolled = pn.use_state(False)
 
     def on_scroll(payload: dict) -> None:

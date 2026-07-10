@@ -62,7 +62,7 @@ def UseImperativeHandleDemo() -> pn.Element:
                     item_height=44,
                     ref=list_ref,
                 ),
-                style=pn.style(height=220, corner_radius=8, overflow="hidden"),
+                style=pn.style(height=220, border_radius=8, overflow="hidden"),
             ),
         ),
     )

@@ -33,7 +33,7 @@ def PortalDemo() -> pn.Element:
                 right=24,
                 bottom=40,
                 background_color="#1F6FEB",
-                corner_radius=12,
+                border_radius=12,
                 padding=16,
                 spacing=8,
             ),

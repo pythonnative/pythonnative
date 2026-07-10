@@ -27,15 +27,18 @@ appId: ${APP_ID}
 # the early rows (~1-21) are on-screen without scrolling. Asserting a row
 # that *is* already visible would let Maestro short-circuit with zero
 # swipes (it does exactly that for "ScrollRow 20" on iOS), and then
-# on_scroll never fires. The last row is always below the fold, forcing a
-# real scroll on both platforms.
+# on_scroll never fires. The last row must land beyond the *physical
+# screen* (not just the 400 dp box): clipped ScrollView children keep
+# their content-coordinate accessibility frames, and Maestro treats
+# anything within the screen bounds as visible, so the demo renders 60
+# rows to push the last one past every simulator's screen height.
 - scrollUntilVisible:
-    element: "ScrollRow 30"
+    element: "ScrollRow 60"
     direction: DOWN
     timeout: 20000
     visibilityPercentage: 100
     centerElement: false
-- assertVisible: "ScrollRow 30"
+- assertVisible: "ScrollRow 60"
 # on_scroll fired during the swipe(s), flipping the outer readout.
 - assertVisible: "Scrolled: ON"
 # The inner scroll's height plus the "Scrolled" readout push the demo's

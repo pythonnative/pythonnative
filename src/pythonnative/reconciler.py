@@ -1435,6 +1435,15 @@ class Reconciler:
         }
     )
 
+    # Childless native leaves that get a measure callback. Extends the
+    # intrinsic set with ``VirtualList``, whose handlers report "fill
+    # the available space" (like a ScrollView clamped to its parent):
+    # without the callback an unstyled list would collapse to 0 points
+    # and the platform virtualizer would never bind a row. Kept out of
+    # ``_INTRINSIC_TYPES`` because its *frame* depends only on
+    # available space, so data-prop changes need no layout pass.
+    _MEASURED_LEAF_TYPES = _INTRINSIC_TYPES | {"VirtualList"}
+
     @classmethod
     def _affects_layout(cls, type_name: str, changed: Dict[str, Any]) -> bool:
         """Whether ``changed`` props can alter the node's layout.
@@ -1679,7 +1688,7 @@ class Reconciler:
     def _make_measure_callback(self, vnode: VNode) -> Optional[Any]:
         """Return a measure callback for ``vnode`` if it has an intrinsic size."""
         type_name = vnode.element.type
-        if type_name not in self._INTRINSIC_TYPES:
+        if type_name not in self._MEASURED_LEAF_TYPES:
             return None
         if vnode.tag is None:
             return None

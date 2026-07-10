@@ -51,7 +51,7 @@ def UseLayoutEffectDemo() -> pn.Element:
                     width=200 if wide else 120,
                     height=48,
                     background_color="#1F6FEB",
-                    corner_radius=8,
+                    border_radius=8,
                 ),
             ),
             result_text("Box size", measured),

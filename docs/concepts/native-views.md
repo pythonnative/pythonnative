@@ -140,7 +140,7 @@ On each platform that boils down to:
   `translatesAutoresizingMaskIntoConstraints = NO`; `set_frame`
   assigns `view.frame = CGRect(x, y, w, h)`. Leaf widgets implement
   `measure_intrinsic` via `sizeThatFits_`. Visual props
-  (`background_color`, `corner_radius`, `font_*`, `color`, `text_align`,
+  (`background_color`, `border_radius`, `font_*`, `color`, `text_align`,
   …) are applied directly through UIKit setters.
 - **Android**: every container is a plain `FrameLayout`; `set_frame`
   builds a `MarginLayoutParams` and sets `view.x` / `view.y`. Padding

@@ -3165,7 +3165,13 @@ def _portal_point_inside_imp(self_ptr: int, _cmd_ptr: int, point: Any, _event_pt
         view = ObjCInstance(_ct.c_void_p(self_ptr))
         px = float(point.x)
         py = float(point.y)
-        for sub in list(view.subviews or []):
+        # On instances of this raw-registered class rubicon resolves
+        # ``subviews`` as a bound method rather than a property, so it
+        # must be called to get the NSArray.
+        subs = view.subviews
+        if callable(subs):
+            subs = subs()
+        for sub in list(subs or []):
             try:
                 if bool(sub.isHidden()) or float(sub.alpha) <= 0.01:
                     continue
@@ -4134,6 +4140,28 @@ def _table_row_height(info: dict, row: int) -> float:
     return float(info.get("row_height", 44.0))
 
 
+def _table_row_start(info: dict, row: int) -> float:
+    """Content-coordinate y where ``row`` begins."""
+    starts = info.get("row_starts")
+    if starts is not None and 0 <= row < len(starts):
+        return float(starts[row])
+    return float(info.get("row_height", 44.0)) * row
+
+
+def _table_set_heights(info: dict, heights: Optional[List[float]]) -> None:
+    """Store per-row heights plus their prefix sums (for row starts)."""
+    info["row_heights"] = heights
+    if not heights:
+        info["row_starts"] = None
+        return
+    starts = [0.0] * len(heights)
+    acc = 0.0
+    for i, h in enumerate(heights):
+        starts[i] = acc
+        acc += float(h)
+    info["row_starts"] = starts
+
+
 def _table_num_sections_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int) -> int:
     return 1
 
@@ -4203,7 +4231,37 @@ def _table_cell_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int) -> in
         except Exception:
             pass
 
-        if info is not None:
+        # Only rows in (or near) the visible content window get a
+        # mounted subtree. UITableView's accessibility container calls
+        # ``cellForRowAtIndexPath:`` for *every* row whenever an
+        # accessibility client (VoiceOver, XCUITest / UI-test drivers)
+        # snapshots the hierarchy, no matter the estimated heights.
+        # Mounting those would defeat virtualization -- a 10k-row list
+        # would mount 10k Python subtrees on the first snapshot -- and
+        # the never-displayed cells would sit stacked at the table
+        # origin where tests read them as visible. Off-window requests
+        # get an empty accessibility-hidden placeholder; when the row
+        # really scrolls on screen UIKit asks again and the content
+        # window has moved, so the real subtree mounts.
+        try:
+            offset_y = float(tv.contentOffset.y)
+        except Exception:
+            offset_y = 0.0
+        try:
+            viewport_h = float(tv.bounds.size.height)
+        except Exception:
+            viewport_h = 0.0
+        row_start = _table_row_start(info, row) if info else 0.0
+        margin = viewport_h if viewport_h > 0 else 800.0
+        in_window = (row_start + row_h >= offset_y - margin) and (
+            row_start <= offset_y + max(viewport_h, row_h) + margin
+        )
+        try:
+            cell.setAccessibilityElementsHidden_(not in_window)
+        except Exception:
+            pass
+
+        if in_window and info is not None:
             render_row = info.get("render_row")
             pool = info.get("pool")
             if render_row is not None and pool is not None:
@@ -4357,7 +4415,19 @@ class VirtualListHandler(IOSViewHandler):
         tv.setTranslatesAutoresizingMaskIntoConstraints_(True)
         tv.setSeparatorStyle_(0)  # none by default; rows draw their own
         try:
-            tv.setEstimatedRowHeight_(0.0)  # force exact heightForRow
+            # A *nonzero* estimate keeps UITableView lazy: with
+            # ``estimatedRowHeight = 0`` modern UIKit builds cells for
+            # every row up front to size its content, which mounts a
+            # Python subtree per row (defeating virtualization) and
+            # leaves the never-displayed cells visible to the
+            # accessibility tree. ``heightForRowAtIndexPath:`` still
+            # returns exact heights for the rows that do come on screen.
+            heights = props.get("row_heights")
+            if heights:
+                estimate = sum(float(h) for h in heights) / max(1, len(heights))
+            else:
+                estimate = float(props.get("row_height", 44.0) or 44.0)
+            tv.setEstimatedRowHeight_(max(1.0, estimate))
         except Exception:
             pass
         tv.retain()
@@ -4367,14 +4437,15 @@ class VirtualListHandler(IOSViewHandler):
         if source_ptr == 0:
             raise RuntimeError("[VirtualList][iOS] dataSource alloc returned NULL")
 
-        _pn_table_state[source_ptr] = {
+        state = {
             "count": int(props.get("count", 0) or 0),
             "row_height": float(props.get("row_height", 44.0) or 44.0),
-            "row_heights": props.get("row_heights"),
             "render_row": props.get("render_row"),
             "pool": RowHostPool(),
             "tv": tv,
         }
+        _table_set_heights(state, props.get("row_heights"))
+        _pn_table_state[source_ptr] = state
 
         _objc_msgSend.restype = None
         _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p]
@@ -4382,7 +4453,6 @@ class VirtualListHandler(IOSViewHandler):
         _objc_msgSend(tv_ptr, _SEL_SET_DATA_SOURCE, _ct.c_void_p(source_ptr))
         _objc_msgSend(tv_ptr, _SEL_SET_DELEGATE, _ct.c_void_p(source_ptr))
 
-        state = _pn_table_state[source_ptr]
         state["source_ptr"] = source_ptr
         return tv
 
@@ -4407,7 +4477,7 @@ class VirtualListHandler(IOSViewHandler):
             info["row_height"] = float(props["row_height"])
             data_changed = True
         if "row_heights" in props:
-            info["row_heights"] = props.get("row_heights")
+            _table_set_heights(info, props.get("row_heights"))
             data_changed = True
         if "render_row" in props:
             info["render_row"] = props.get("render_row")
