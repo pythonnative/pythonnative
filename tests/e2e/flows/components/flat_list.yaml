@@ -19,18 +19,21 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: FlatList
 - assertVisible: "FlatRow 1"
-# Generous timeout plus a settle pause: every hierarchy poll between
-# swipes materializes accessibility cells for the whole list, which is
-# slow on the CI simulator, so the default-ish 20 s budget can expire
-# after only a few swipes even though scrolling works fine.
+# Target the *last* row. Virtualized rows exist in the accessibility
+# tree only while on screen, and one Maestro fling can travel several
+# hundred points between visibility polls, so a mid-list target (say
+# row 20 of 100) can be recycled away between polls and never observed
+# -- the scroll then sails to the bottom and times out. The last row
+# cannot be overshot. The generous timeout and settle pause absorb the
+# slow CI simulator, where each poll re-snapshots the hierarchy.
 - scrollUntilVisible:
-    element: "FlatRow 20"
+    element: "FlatRow 40"
     direction: DOWN
     timeout: 45000
     waitToSettleTimeoutMs: 500
     visibilityPercentage: 100
     centerElement: false
-- assertVisible: "FlatRow 20"
+- assertVisible: "FlatRow 40"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:
