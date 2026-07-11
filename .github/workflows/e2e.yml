@@ -103,7 +103,11 @@ jobs:
   e2e-ios:
     needs: coverage
     runs-on: macos-latest
-    timeout-minutes: 40
+    # Budget for the worst case: ~8 min build/boot plus two full suite
+    # attempts (run-e2e.sh retries the whole suite once after a driver
+    # flake) at up to ~20 min each on a slow runner. 40 was enough for
+    # a clean pass but cut the retry off mid-suite.
+    timeout-minutes: 55
     # iOS simulators are stable for the full suite (unlike the Android
     # emulator; see the e2e-android note), so this split is purely a
     # speed optimization: the iOS Maestro run is ~22 minutes and is the

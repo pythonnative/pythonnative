@@ -19,10 +19,15 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: FlatList
 - assertVisible: "FlatRow 1"
+# Generous timeout plus a settle pause: every hierarchy poll between
+# swipes materializes accessibility cells for the whole list, which is
+# slow on the CI simulator, so the default-ish 20 s budget can expire
+# after only a few swipes even though scrolling works fine.
 - scrollUntilVisible:
     element: "FlatRow 20"
     direction: DOWN
-    timeout: 20000
+    timeout: 45000
+    waitToSettleTimeoutMs: 500
     visibilityPercentage: 100
     centerElement: false
 - assertVisible: "FlatRow 20"
