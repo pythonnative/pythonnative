@@ -25,6 +25,22 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Picked: banana"
     timeout: 10000
+    optional: true
+# On a slow CI simulator a delayed duplicate tap can land on the
+# picker control (whose title is now also "Banana") and reopen the
+# chooser; its scrim hides the result line from Maestro. Dismiss it
+# before asserting.
+- runFlow:
+    when:
+      visible: "Cancel"
+    commands:
+      - tapOn: "Cancel"
+      - extendedWaitUntil:
+          notVisible: "Cancel"
+          timeout: 10000
+- extendedWaitUntil:
+    visible: "Picked: banana"
+    timeout: 10000
 # Programmatic path: buttons drive the same value.
 - tapOn: "Pick cherry"
 - assertVisible: "Picked: cherry"

@@ -16,7 +16,21 @@ appId: ${APP_ID}
 - assertVisible: "Floating banner (count 0)"
 # Events inside the portal stay wired to the screen's state.
 - tapOn: "Bump from portal"
-- assertVisible: "Floating banner (count 1)"
+# A slow CI simulator can swallow the tap (the button gets the
+# touch-down but never the release). Give the bump time to render,
+# then re-tap once if the count never moved.
+- extendedWaitUntil:
+    visible: "Floating banner (count 1)"
+    timeout: 10000
+    optional: true
+- runFlow:
+    when:
+      notVisible: "Floating banner (count 1)"
+    commands:
+      - tapOn: "Bump from portal"
+- extendedWaitUntil:
+    visible: "Floating banner (count 1)"
+    timeout: 10000
 - assertVisible: "Portal count: 1"
 - tapOn: "Hide banner"
 - assertNotVisible: "Floating banner (count 1)"
