@@ -612,11 +612,16 @@ def _make_end_listener(anim_id: int) -> Any:
     AnimatorListener = jclass("android.animation.Animator$AnimatorListener")
 
     class _EndProxy(dynamic_proxy(AnimatorListener)):
+        # ``onAnimationStart`` / ``onAnimationEnd`` accept an optional
+        # ``isReverse``: API 26 added default two-arg overloads to
+        # ``AnimatorListener``, and ``ValueAnimator`` invokes those, so
+        # the java.lang.reflect.Proxy forwards two arguments here.
+
         def __init__(self) -> None:
             super().__init__()
             self._cancelled = False
 
-        def onAnimationStart(self, animation: Any) -> None:
+        def onAnimationStart(self, animation: Any, isReverse: bool = False) -> None:
             pass
 
         def onAnimationRepeat(self, animation: Any) -> None:
@@ -625,7 +630,7 @@ def _make_end_listener(anim_id: int) -> Any:
         def onAnimationCancel(self, animation: Any) -> None:
             self._cancelled = True
 
-        def onAnimationEnd(self, animation: Any) -> None:
+        def onAnimationEnd(self, animation: Any, isReverse: bool = False) -> None:
             entry = _native_anims.pop(anim_id, None)
             if entry is None:
                 return

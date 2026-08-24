@@ -322,7 +322,13 @@ def run_blocking(awaitable: Awaitlike[T], timeout: Optional[float] = None) -> T:
 
     async def _driver() -> T:
         if timeout is not None:
-            return await asyncio.wait_for(_ensure_coro(awaitable), timeout)
+            try:
+                return await asyncio.wait_for(_ensure_coro(awaitable), timeout)
+            except asyncio.TimeoutError:
+                # On Python 3.10, asyncio.TimeoutError is not the builtin
+                # TimeoutError (they were unified in 3.11); normalize so
+                # callers can always catch the builtin.
+                raise TimeoutError(f"run_blocking() timed out after {timeout}s") from None
         return await _ensure_coro(awaitable)
 
     return loop.run_until_complete(_driver())
@@ -625,23 +631,47 @@ def _ios_call_on_main(fn: Callable[[], None]) -> None:
     _ios_dispatch_async(fn)
 
 
+# Cached Android main-queue plumbing. Posting a pump is a hot path (it
+# runs for every batch of scheduled loop work), so the Runnable proxy
+# class and the main-looper Handler are created once and reused;
+# defining a ``dynamic_proxy`` class per call would register a new JNI
+# class every time.
+_android_runnable_cls: Optional[Any] = None
+_android_main_handler: Optional[Any] = None
+
+
+def _ensure_android_main_handler() -> Any:
+    global _android_runnable_cls, _android_main_handler
+    if _android_main_handler is not None:
+        return _android_main_handler
+    from java import dynamic_proxy, jclass
+
+    Runnable = jclass("java.lang.Runnable")
+
+    class _PNMainRunnable(dynamic_proxy(Runnable)):  # type: ignore[misc]
+        def __init__(self, fn: Callable[[], None]) -> None:
+            super().__init__()
+            self._fn = fn
+
+        def run(self) -> None:
+            try:
+                self._fn()
+            except Exception as exc:  # pragma: no cover - last resort
+                print(f"[pn.runtime] main-thread runnable raised: {exc!r}")
+
+    Looper = jclass("android.os.Looper")
+    Handler = jclass("android.os.Handler")
+    _android_runnable_cls = _PNMainRunnable
+    _android_main_handler = Handler(Looper.getMainLooper())
+    return _android_main_handler
+
+
 def _android_post_to_main(fn: Callable[[], None]) -> None:
     """Enqueue ``fn`` on the Android main looper (always queued)."""
     try:
-        from java import dynamic_proxy, jclass
-
-        Runnable = jclass("java.lang.Runnable")
-
-        class _PNMainRunnable(dynamic_proxy(Runnable)):  # type: ignore[misc]
-            def run(self) -> None:
-                try:
-                    fn()
-                except Exception as exc:  # pragma: no cover - last resort
-                    print(f"[pn.runtime] main-thread runnable raised: {exc!r}")
-
-        Looper = jclass("android.os.Looper")
-        Handler = jclass("android.os.Handler")
-        Handler(Looper.getMainLooper()).post(_PNMainRunnable())
+        handler = _ensure_android_main_handler()
+        assert _android_runnable_cls is not None
+        handler.post(_android_runnable_cls(fn))
     except Exception as exc:
         print(f"[pn.runtime] _android_post_to_main failed, falling back inline: {exc!r}")
         fn()
