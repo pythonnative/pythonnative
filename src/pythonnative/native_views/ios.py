@@ -3251,7 +3251,18 @@ class PortalHandler(IOSViewHandler):
                 return
             current = overlay.superview
             if current is not None and _objc_ptr(current) == _objc_ptr(host):
-                host.bringSubviewToFront_(overlay)
+                # Already attached to the right host. Only reorder when
+                # the overlay is not frontmost: reordering the subview
+                # array during an active touch sequence (a re-render can
+                # flush between touch-down and touch-up) can cancel the
+                # touch and leave the portal's controls stuck
+                # highlighted with their action never fired.
+                try:
+                    front = host.subviews.lastObject()
+                    if front is None or _objc_ptr(front) != _objc_ptr(overlay):
+                        host.bringSubviewToFront_(overlay)
+                except Exception:
+                    host.bringSubviewToFront_(overlay)
                 self._sync_overlay_frame(overlay, host)
                 return
             if current is not None:

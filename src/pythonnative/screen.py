@@ -1587,6 +1587,19 @@ else:
                     return True
                 _log_pn("_request_render: native iOS scheduler unavailable; render remains queued")
                 return True
+            # Defer via the main dispatch queue rather than an NSTimer.
+            # GCD main-queue blocks are serviced in the common run-loop
+            # modes, so they still run while UIKit is in tracking mode
+            # (scrolls, synthesized test touches). A default-mode NSTimer
+            # is starved for the whole gesture, which delayed renders
+            # long enough on slow CI simulators for Maestro asserts to
+            # time out, and let stale flushes land mid-touch.
+            from .runtime import _ensure_libdispatch_loaded, _ios_dispatch_async
+
+            if _ensure_libdispatch_loaded():
+                _ios_dispatch_async(_flush_ios_scheduled_renders)
+                _log_pn("_request_render: deferred iOS render to next main-queue turn")
+                return True
             try:
                 NSTimer = ObjCClass("NSTimer")
                 target = _ensure_ios_render_scheduler_target()
