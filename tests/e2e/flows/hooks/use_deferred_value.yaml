@@ -1,0 +1,24 @@
+# Tests use_deferred_value catches up to the urgent value after a tap.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_deferred_value.py
+# Source under test: src/pythonnative/hooks.py :: use_deferred_value
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_deferred_value
+- assertVisible: "Value: 0"
+- assertVisible: "Deferred: 0"
+- tapOn: "Increment"
+- extendedWaitUntil:
+    visible: "Value: 1"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "Deferred: 1"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

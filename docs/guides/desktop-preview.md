@@ -72,8 +72,8 @@ No other dependencies are required; the desktop backend is pure Python.
    [`Reconciler`][pythonnative.reconciler.Reconciler] and pushes the
    window size in as the layout viewport.
 4. Runs the Tk event loop on the main thread, polling ~60×/second to
-   apply renders requested from the async runtime thread and to drain
-   file-change reloads.
+   pump the framework's guest `asyncio` loop, apply pending renders,
+   and drain file-change reloads.
 5. Watches `app/` with a
    [`FileWatcher`][pythonnative.hot_reload.FileWatcher] and Fast
    Refreshes on every save.

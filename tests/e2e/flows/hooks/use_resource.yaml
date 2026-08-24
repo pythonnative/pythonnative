@@ -1,0 +1,22 @@
+# Tests use_resource suspends the first render, resolves, and refetches on deps change.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_resource.py
+# Source under test: src/pythonnative/hooks.py :: use_resource
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_resource
+- extendedWaitUntil:
+    visible: "Item: item-1"
+    timeout: 8000
+- tapOn: "Next item"
+- extendedWaitUntil:
+    visible: "Item: item-2"
+    timeout: 8000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

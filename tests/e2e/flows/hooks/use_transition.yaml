@@ -1,0 +1,28 @@
+# Tests start_transition defers the low-priority update and it lands on a later turn.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_transition.py
+# Source under test: src/pythonnative/hooks.py :: use_transition
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_transition
+- assertVisible: "Taps: 0"
+- assertVisible: "Adopted: 0"
+- assertVisible: "Pending: no"
+- tapOn: "Tap"
+- extendedWaitUntil:
+    visible: "Taps: 1"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "Adopted: 1"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "Pending: no"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

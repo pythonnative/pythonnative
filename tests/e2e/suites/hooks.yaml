@@ -11,7 +11,10 @@ appId: ${APP_ID}
 - runFlow: ../flows/hooks/use_memo.yaml
 - runFlow: ../flows/hooks/use_callback.yaml
 - runFlow: ../flows/hooks/use_context.yaml
-- runFlow: ../flows/hooks/use_async_effect.yaml
+- runFlow: ../flows/hooks/async_effect.yaml
+- runFlow: ../flows/hooks/use_resource.yaml
+- runFlow: ../flows/hooks/use_transition.yaml
+- runFlow: ../flows/hooks/use_deferred_value.yaml
 - runFlow: ../flows/hooks/use_query.yaml
 - runFlow: ../flows/hooks/use_mutation.yaml
 - runFlow: ../flows/hooks/use_persisted_state.yaml

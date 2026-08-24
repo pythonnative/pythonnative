@@ -109,6 +109,7 @@ nav:
     - Gestures: api/gestures.md
     - Alerts: api/alerts.md
     - Async runtime: api/runtime.md
+    - Suspense: api/suspense.md
     - Appearance: api/appearance.md
     - Images: api/images.md
     - Network: api/net.md

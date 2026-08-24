@@ -1732,6 +1732,65 @@ def ErrorBoundary(
     return Element("__ErrorBoundary__", props, list(children), key=key)
 
 
+def Suspense(
+    *children: Element,
+    fallback: Optional[Any] = None,
+    key: Optional[str] = None,
+) -> Element:
+    """Show ``fallback`` while descendants wait on async work, then swap in the content.
+
+    A Suspense boundary catches **suspensions** from the subtree it
+    wraps: an ``async def`` component body blocking on a pending
+    await, or a regular component calling
+    [`Resource.read`][pythonnative.suspense.Resource.read] on data that hasn't
+    arrived (see [`use_resource`][pythonnative.use_resource] and
+    [`lazy`][pythonnative.lazy]). While anything is pending the
+    boundary renders ``fallback``; when the awaited work completes it
+    retries the content and swaps it in. Suspended components keep
+    their hook state across retries, so cached resources aren't
+    refetched.
+
+    Two timing behaviors, matching React:
+
+    - **Initial mount**: the fallback shows until the content is ready.
+    - **Updates**: a component that's already on screen and suspends
+      again (its dependencies changed) keeps its previous content
+      visible and re-renders when ready; there's no fallback flash.
+
+    Args:
+        *children: Subtree to wrap (the async content).
+        fallback: Content shown while suspended: an
+            [`Element`][pythonnative.Element] or a zero-arg callable
+            returning one. Without it, suspensions propagate to the
+            next Suspense boundary up.
+        key: Stable identity for keyed reconciliation.
+
+    Returns:
+        An [`Element`][pythonnative.Element] of type ``"__Suspense__"``.
+
+    Example:
+        ```python
+        import pythonnative as pn
+
+        @pn.component
+        async def Profile(user_id: str):
+            user = await api.fetch_user(user_id)
+            return pn.Text(user.name)
+
+        @pn.component
+        def Screen():
+            return pn.Suspense(
+                Profile(user_id="42"),
+                fallback=pn.ActivityIndicator(),
+            )
+        ```
+    """
+    props: Dict[str, Any] = {}
+    if fallback is not None:
+        props["__fallback__"] = fallback
+    return Element("__Suspense__", props, list(children), key=key)
+
+
 # ======================================================================
 # Lists (native virtualization with a Python-windowed fallback)
 # ======================================================================

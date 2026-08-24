@@ -162,11 +162,16 @@ Two strategies, depending on the cadence:
 
 ## Is there async/await support?
 
-Yes. `asyncio.create_task` works, and many native APIs surface as
-coroutine-friendly callbacks via small bridge helpers. PythonNative
-does not start an event loop for you (Chaquopy/iOS run their own UI
-loops); use `asyncio.run` from the entry point or schedule tasks on
-the loop your platform integration provides.
+Yes, and it's the core of the framework. PythonNative runs a single
+`asyncio` event loop on the platform's main thread, pumped as a guest
+of the native run loop. Components themselves can be `async def` (pair
+them with [`Suspense`][pythonnative.Suspense] for loading states),
+`use_effect` accepts coroutine callbacks and cancels them on unmount,
+[`use_resource`][pythonnative.use_resource] fetches during render, and
+native modules like `Camera` and `Location` are awaitable. From a
+synchronous event handler, kick off work with
+[`pn.run_async`][pythonnative.run_async]. See the
+[Async + data guide](../guides/async.md).
 
 ## How is this different from Toga, BeeWare, Kivy, Briefcase?
 

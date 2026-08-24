@@ -1,0 +1,22 @@
+# Tests an async def component suspends behind a Suspense fallback, then renders.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/suspense.py
+# Source under test: src/pythonnative/reconciler.py :: Suspense boundaries
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: Suspense
+- extendedWaitUntil:
+    visible: "Data: hello-1"
+    timeout: 8000
+- tapOn: "Reload"
+- extendedWaitUntil:
+    visible: "Data: hello-2"
+    timeout: 8000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

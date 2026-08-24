@@ -177,9 +177,11 @@ private attributes.
 The engine intentionally does **not** implement:
 
 - `position: "fixed"`.
-- `wrap` / `flex_wrap` (single-line flex only for now).
-- RTL flipping (use `row_reverse` / `column_reverse` explicitly).
 - Float / inline / table / grid layouts.
+
+Wrapping (`flex_wrap: "wrap"` / `"wrap_reverse"`) and RTL flipping
+(`direction: "rtl"`, with `start` / `end` edge insets resolving against
+the inherited direction) are both supported.
 
 Everything else from the React Native flexbox cheat-sheet is
 supported.

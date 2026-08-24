@@ -1,10 +1,8 @@
-"""Unit tests for pn.use_async_effect, pn.use_query, pn.use_mutation."""
+"""Unit tests for async effects (use_effect), pn.use_query, pn.use_mutation."""
 
 from __future__ import annotations
 
 import asyncio
-import threading
-import time
 from typing import Any
 
 import pytest
@@ -15,73 +13,77 @@ from pythonnative.hooks import (
     MutationCall,
     QueryResult,
     component,
-    use_async_effect,
+    use_effect,
     use_mutation,
     use_query,
     use_state,
 )
 from pythonnative.reconciler import Reconciler
+from pythonnative.runtime import drain, run_blocking
 
 
-def _wait_for(predicate: Any, timeout: float = 2.0) -> bool:
-    """Spin until ``predicate`` returns truthy, or ``timeout`` elapses."""
+def _settle(rec: Reconciler, predicate: Any, timeout: float = 2.0) -> bool:
+    """Pump the framework loop and flush renders until ``predicate`` holds."""
+    import time
+
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        drain(timeout=0.05)
+        rec.flush_dirty()
         if predicate():
             return True
-        time.sleep(0.01)
     return False
 
 
 # ======================================================================
-# use_async_effect
+# Async use_effect (coroutine effects)
 # ======================================================================
 
 
-def test_use_async_effect_runs_on_mount() -> None:
-    fired = threading.Event()
+def test_async_effect_runs_on_mount() -> None:
+    fired: list = []
 
     @component
     def screen() -> Element:
         async def effect() -> None:
-            fired.set()
+            fired.append(True)
 
-        use_async_effect(effect, [])
+        use_effect(effect, [])
         return Element("View", {}, [])
 
     rec = Reconciler(_StubBackend())
     rec.mount(screen())
-    assert fired.wait(2.0)
+    drain()
+    assert fired == [True]
 
 
-def test_use_async_effect_cancels_on_unmount() -> None:
-    cancelled = threading.Event()
-    started = threading.Event()
+def test_async_effect_cancels_on_unmount() -> None:
+    events: list = []
 
     @component
     def screen() -> Element:
         async def effect() -> None:
-            started.set()
+            events.append("started")
             try:
                 await asyncio.sleep(5.0)
             except asyncio.CancelledError:
-                cancelled.set()
+                events.append("cancelled")
                 raise
 
-        use_async_effect(effect, [])
+        use_effect(effect, [])
         return Element("View", {}, [])
 
     rec = Reconciler(_StubBackend())
     rec.mount(screen())
-    assert started.wait(2.0)
-    # The reconciler exposes destruction via the internal walker;
-    # public-API unmount is the host's responsibility on real screens.
-    assert rec._tree is not None
-    rec._destroy_tree(rec._tree)
-    assert cancelled.wait(2.0)
+    drain(until=lambda: "started" in events)
+    assert events == ["started"]
+
+    rec.unmount()
+    drain(until=lambda: "cancelled" in events)
+    assert events == ["cancelled", "started"] or events == ["started", "cancelled"]
 
 
-def test_use_async_effect_reruns_on_deps_change() -> None:
+def test_async_effect_reruns_on_deps_change() -> None:
     fired_with: list = []
 
     @component
@@ -89,18 +91,85 @@ def test_use_async_effect_reruns_on_deps_change() -> None:
         async def effect() -> None:
             fired_with.append(value)
 
-        use_async_effect(effect, [value])
+        use_effect(effect, [value])
         return Element("View", {}, [])
 
     rec = Reconciler(_StubBackend())
     rec.mount(screen(0))
-    assert _wait_for(lambda: fired_with == [0])
+    drain()
+    assert fired_with == [0]
     rec.reconcile(screen(1))
-    assert _wait_for(lambda: fired_with == [0, 1])
-    rec.reconcile(screen(1))
-    # Same value → no rerun.
-    time.sleep(0.1)
+    drain()
     assert fired_with == [0, 1]
+    rec.reconcile(screen(1))
+    drain()
+    # Same value: no rerun.
+    assert fired_with == [0, 1]
+
+
+def test_async_effect_completed_cleanup_runs() -> None:
+    """An async effect that returns a callable gets that callable run
+    as its cleanup once the effect re-runs or the component unmounts."""
+    events: list = []
+
+    @component
+    def screen() -> Element:
+        async def effect() -> Any:
+            events.append("ran")
+            return lambda: events.append("cleaned")
+
+        use_effect(effect, [])
+        return Element("View", {}, [])
+
+    rec = Reconciler(_StubBackend())
+    rec.mount(screen())
+    drain()
+    assert events == ["ran"]
+    rec.unmount()
+    drain()
+    assert events == ["ran", "cleaned"]
+
+
+def test_sync_effect_still_works() -> None:
+    events: list = []
+
+    @component
+    def screen() -> Element:
+        def effect() -> Any:
+            events.append("ran")
+            return lambda: events.append("cleaned")
+
+        use_effect(effect, [])
+        return Element("View", {}, [])
+
+    rec = Reconciler(_StubBackend())
+    rec.mount(screen())
+    assert events == ["ran"]
+    rec.unmount()
+    assert events == ["ran", "cleaned"]
+
+
+def test_async_effect_state_update_triggers_local_rerender() -> None:
+    """The core async-first loop: an async effect awaits, sets state,
+    and the component re-renders locally, all on one thread."""
+    snapshots: list = []
+
+    @component
+    def screen() -> Element:
+        message, set_message = use_state("loading")
+        snapshots.append(message)
+
+        async def load() -> None:
+            await asyncio.sleep(0)
+            set_message("done")
+
+        use_effect(load, [])
+        return Element("View", {}, [])
+
+    rec = Reconciler(_StubBackend())
+    rec.mount(screen())
+    assert snapshots[-1] == "loading"
+    assert _settle(rec, lambda: snapshots[-1] == "done")
 
 
 # ======================================================================
@@ -127,15 +196,7 @@ def test_use_query_resolves_to_data() -> None:
     assert captured[0].loading is True
     assert captured[0].data is None
 
-    # Drive the runtime + reconciler until the fetch lands.
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline:
-        rec.reconcile(screen())
-        if captured[-1].data == "hello":
-            break
-        time.sleep(0.01)
-
-    assert captured[-1].data == "hello"
+    assert _settle(rec, lambda: captured[-1].data == "hello")
     assert captured[-1].loading is False
     assert captured[-1].error is None
 
@@ -155,13 +216,7 @@ def test_use_query_captures_error() -> None:
     rec = Reconciler(_StubBackend())
     rec.mount(screen())
 
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline:
-        rec.reconcile(screen())
-        if captured[-1].error is not None:
-            break
-        time.sleep(0.01)
-
+    assert _settle(rec, lambda: captured[-1].error is not None)
     assert isinstance(captured[-1].error, RuntimeError)
     assert captured[-1].loading is False
 
@@ -183,25 +238,10 @@ def test_use_query_refetches_when_called() -> None:
     rec = Reconciler(_StubBackend())
     rec.mount(screen())
 
-    # First fetch.
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline:
-        rec.reconcile(screen())
-        if captured[-1].data == 1:
-            break
-        time.sleep(0.01)
-    assert captured[-1].data == 1
+    assert _settle(rec, lambda: captured[-1].data == 1)
 
-    # Trigger refetch.
     captured[-1].refetch()
-
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline:
-        rec.reconcile(screen())
-        if captured[-1].data == 2:
-            break
-        time.sleep(0.01)
-    assert captured[-1].data == 2
+    assert _settle(rec, lambda: captured[-1].data == 2)
 
 
 def test_use_query_returns_query_result_dataclass() -> None:
@@ -246,17 +286,10 @@ def test_use_mutation_runs_and_resolves() -> None:
     assert captured_state[0].loading is False
     assert captured_state[0].data is None
 
-    mutate = triggered[-1]
-    call = mutate(7)
+    call = triggered[-1](7)
     assert isinstance(call, MutationCall)
 
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline:
-        rec.reconcile(screen())
-        if captured_state[-1].data == 14:
-            break
-        time.sleep(0.01)
-    assert captured_state[-1].data == 14
+    assert _settle(rec, lambda: captured_state[-1].data == 14)
     assert captured_state[-1].loading is False
 
 
@@ -279,7 +312,7 @@ def test_use_mutation_awaitable_returns_value() -> None:
     async def call_and_await() -> int:
         return await mutate(41)
 
-    assert asyncio.run(call_and_await()) == 42
+    assert run_blocking(call_and_await(), timeout=2.0) == 42
 
 
 def test_use_mutation_captures_error() -> None:
@@ -298,19 +331,13 @@ def test_use_mutation_captures_error() -> None:
 
     rec = Reconciler(_StubBackend())
     rec.mount(screen())
-    mutate = triggered[-1]
-    call = mutate()
+    call = triggered[-1]()
     # Discarding the call is fine; the state will reflect the failure.
 
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline:
-        rec.reconcile(screen())
-        if captured_state[-1].error is not None:
-            break
-        time.sleep(0.01)
+    assert _settle(rec, lambda: captured_state[-1].error is not None)
     assert isinstance(captured_state[-1].error, ValueError)
     assert call.done() is True
 
 
 # Suppress unused-import lint when running just the file.
-_ = use_state, pytest
+_ = pytest

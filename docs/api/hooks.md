@@ -17,9 +17,16 @@ slot across renders.
 For coroutines and data-driven UI, PythonNative ships dedicated
 async-aware hooks layered on top of `use_state` / `use_effect`:
 
-- [`use_async_effect`][pythonnative.use_async_effect]: async sibling
-  of `use_effect`; cancels the in-flight coroutine on re-run /
-  unmount.
+- [`use_effect`][pythonnative.use_effect] accepts `async def`
+  callbacks directly; the coroutine runs as a task and is cancelled
+  on re-run / unmount.
+- [`use_resource`][pythonnative.use_resource]: starts a fetch during
+  render and caches it; reading a pending
+  [`Resource`][pythonnative.Resource] suspends the render (pair with
+  [`Suspense`][pythonnative.Suspense]).
+- [`use_transition`][pythonnative.use_transition] /
+  [`use_deferred_value`][pythonnative.use_deferred_value]: mark
+  expensive updates as low priority so urgent updates render first.
 - [`use_query`][pythonnative.use_query]: subscribes to an async
   fetcher and re-renders on data / error / refetch.
 - [`use_mutation`][pythonnative.use_mutation]: wraps an async

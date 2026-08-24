@@ -1,0 +1,18 @@
+# Tests an async def use_effect callback resolves and updates state on mount.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/async_effect.py
+# Source under test: src/pythonnative/hooks.py :: use_effect (coroutine callbacks)
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: async use_effect
+- extendedWaitUntil:
+    visible: "Status: done"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

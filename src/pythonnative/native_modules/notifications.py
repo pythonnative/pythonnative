@@ -28,10 +28,15 @@ Example:
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Dict
 
 from ..runtime import resolve_future
 from ..utils import IS_ANDROID
+
+# Delayed Android deliveries in flight, keyed by identifier, so
+# ``cancel`` can abort a notification that hasn't posted yet. (iOS
+# delivers delays natively through UNTimeIntervalNotificationTrigger.)
+_android_delayed: Dict[str, "asyncio.Task[Any]"] = {}
 
 
 class Notifications:
@@ -82,7 +87,13 @@ class Notifications:
         """
         del options
         if IS_ANDROID:
-            return await asyncio.to_thread(_android_schedule, title, body, delay_seconds, identifier)
+            if delay_seconds > 0:
+                _cancel_android_delayed(identifier)
+                _android_delayed[identifier] = asyncio.ensure_future(
+                    _android_schedule_later(title, body, delay_seconds, identifier)
+                )
+                return True
+            return await asyncio.to_thread(_android_schedule, title, body, identifier)
         return await asyncio.to_thread(_ios_schedule, title, body, delay_seconds, identifier)
 
     @staticmethod
@@ -94,6 +105,7 @@ class Notifications:
                 [`schedule`][pythonnative.native_modules.notifications.Notifications.schedule].
         """
         if IS_ANDROID:
+            _cancel_android_delayed(identifier)
             await asyncio.to_thread(_android_cancel, identifier)
             return
         await asyncio.to_thread(_ios_cancel, identifier)
@@ -104,8 +116,28 @@ class Notifications:
 # ======================================================================
 
 
-def _android_schedule(title: str, body: str, delay_seconds: float, identifier: str) -> bool:
-    del delay_seconds  # Android schedule is fire-and-forget for now.
+def _cancel_android_delayed(identifier: str) -> None:
+    pending = _android_delayed.pop(identifier, None)
+    if pending is not None and not pending.done():
+        pending.cancel()
+
+
+async def _android_schedule_later(title: str, body: str, delay_seconds: float, identifier: str) -> None:
+    """Post an Android notification after ``delay_seconds`` on the framework loop.
+
+    The delay lives in the app process (matching the semantics of
+    ``UNTimeIntervalNotificationTrigger`` closely enough for in-app
+    reminders); notifications whose delay outlives the process need
+    ``AlarmManager``, which is out of scope for the built-in module.
+    """
+    try:
+        await asyncio.sleep(delay_seconds)
+        await asyncio.to_thread(_android_schedule, title, body, identifier)
+    finally:
+        _android_delayed.pop(identifier, None)
+
+
+def _android_schedule(title: str, body: str, identifier: str) -> bool:
     try:
         from java import jclass
 

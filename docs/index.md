@@ -39,6 +39,11 @@ produce identical frames on both platforms.
 - **No JS bridge, no transpiler.** The reconciler runs synchronously
   in Python on the platform's main thread; native API calls are
   direct method calls.
+- **Async-first.** One `asyncio` loop runs the whole framework on the
+  main thread. Components can be `async def` and await data right in
+  the body, with [`Suspense`][pythonnative.Suspense] providing the
+  loading state declaratively. See the
+  [Async + data guide](guides/async.md).
 - **Typed styling.** [`pn.Style`][pythonnative.style.Style] is a
   `TypedDict` with `Literal` enums for every fixed-value field, so
   mypy and your editor catch typos in `align_items` or

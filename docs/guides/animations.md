@@ -59,7 +59,7 @@ def FadeInBox():
     async def _fade_in():
         await pn.Animated.timing(opacity, to=1.0, duration=400)
 
-    pn.use_async_effect(_fade_in, [])
+    pn.use_effect(_fade_in, [])
 
     return pn.Animated.View(
         pn.Text("Hello!"),
@@ -73,9 +73,9 @@ def FadeInBox():
 ```
 
 `opacity` starts at `0.0` and the timing animation interpolates it to
-`1.0` over 400 ms. Using `use_async_effect` means the in-flight
-animation is automatically cancelled if the component unmounts before
-the 400 ms is up.
+`1.0` over 400 ms. Passing an `async def` to `use_effect` means the
+in-flight animation is automatically cancelled if the component
+unmounts before the 400 ms is up.
 
 If you don't need to react to completion, the synchronous form is fine
 too:

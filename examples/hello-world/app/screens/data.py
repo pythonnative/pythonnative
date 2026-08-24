@@ -1,9 +1,11 @@
-"""Data screen: ``use_query``, ``use_mutation``, persisted state, awaitable alerts.
+"""Data screen: async components, Suspense, queries, mutations, persisted state.
 
 Pushed onto the navigation stack from the Showcase screen. Showcases
 PythonNative's async surface end-to-end without needing a network
-connection: the "fetch" is simulated with ``asyncio.sleep``, taps are
-counted in [`AsyncStorage`][pythonnative.AsyncStorage] via
+connection: an ``async def`` component awaits its data behind a
+[`Suspense`][pythonnative.Suspense] fallback, the "fetch" is simulated
+with ``asyncio.sleep``, taps are counted in
+[`AsyncStorage`][pythonnative.AsyncStorage] via
 [`use_persisted_state`][pythonnative.use_persisted_state], and the
 reset button awaits a [`pn.Alert.confirm`][pythonnative.Alert.confirm]
 before wiping the saved value.
@@ -72,6 +74,44 @@ def QuoteCard() -> pn.Element:
     )
 
 
+async def _fake_load_profile(seed: int) -> dict:
+    """Pretend to call an API that returns a tiny profile."""
+    await asyncio.sleep(0.5)
+    names = ["Ada Lovelace", "Grace Hopper", "Alan Turing", "Guido van Rossum"]
+    return {"name": names[seed % len(names)], "id": seed}
+
+
+@pn.component
+async def ProfileCard(seed: int = 0) -> pn.Element:
+    """An ``async def`` component: it awaits its data, then returns its tree.
+
+    While the await is pending the nearest [`Suspense`][pythonnative.Suspense]
+    ancestor shows its fallback; no loading-state bookkeeping needed here.
+    """
+    profile = await pn.use_resource(lambda: _fake_load_profile(seed), [seed])
+    return pn.View(
+        pn.Text(profile["name"], style=pn.style(font_size=18, font_weight="600")),
+        pn.Text(f"Profile #{profile['id']}", style=styles["hint"]),
+        style=pn.style(spacing=4),
+    )
+
+
+@pn.component
+def SuspenseCard() -> pn.Element:
+    """Wraps the async ProfileCard in a Suspense boundary with a fallback."""
+    seed, set_seed = pn.use_state(0)
+
+    return pn.View(
+        pn.Text("Async component + Suspense", style=styles["section_title"]),
+        pn.Suspense(
+            ProfileCard(seed=seed),
+            fallback=pn.Text("Loading profile…", style=styles["hint"]),
+        ),
+        pn.Button("Next profile", on_press=lambda: set_seed(seed + 1)),
+        style=local_styles["quote_card"],
+    )
+
+
 async def _save_tap_count(count: int) -> int:
     """Pretend to call an API that confirms the save and returns the new total."""
     await asyncio.sleep(0.3)
@@ -127,11 +167,13 @@ def DataScreen() -> pn.Element:
 
     return pn.ScrollView(
         pn.Column(
-            pn.Text("Async hooks demo", style=styles["title"]),
+            pn.Text("Async demo", style=styles["title"]),
             pn.Text(
-                "Demonstrates use_query, use_mutation, use_persisted_state, " "and awaitable pn.Alert.confirm.",
+                "Demonstrates async components with Suspense, use_query, "
+                "use_mutation, use_persisted_state, and awaitable pn.Alert.confirm.",
                 style=styles["hint"],
             ),
+            SuspenseCard(),
             QuoteCard(),
             TapCounter(),
             pn.Button("Back", on_press=nav.go_back),

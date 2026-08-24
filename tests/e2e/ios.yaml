@@ -41,6 +41,8 @@ env:
 - runFlow: flows/components/checkbox.yaml
 - runFlow: flows/components/segmented_control.yaml
 - runFlow: flows/components/date_picker.yaml
+- runFlow: flows/components/suspense.yaml
+- runFlow: flows/components/lazy.yaml
 - runFlow: flows/hooks/use_state.yaml
 - runFlow: flows/hooks/use_effect.yaml
 - runFlow: flows/hooks/use_layout_effect.yaml
@@ -51,7 +53,10 @@ env:
 - runFlow: flows/hooks/use_memo.yaml
 - runFlow: flows/hooks/use_callback.yaml
 - runFlow: flows/hooks/use_context.yaml
-- runFlow: flows/hooks/use_async_effect.yaml
+- runFlow: flows/hooks/async_effect.yaml
+- runFlow: flows/hooks/use_resource.yaml
+- runFlow: flows/hooks/use_transition.yaml
+- runFlow: flows/hooks/use_deferred_value.yaml
 - runFlow: flows/hooks/use_query.yaml
 - runFlow: flows/hooks/use_mutation.yaml
 - runFlow: flows/hooks/use_persisted_state.yaml

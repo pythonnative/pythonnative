@@ -62,11 +62,12 @@ cleanup runs when the screen is blurred). Use it for camera streams,
 GPS subscriptions, and anything that should be released as soon as the
 user navigates away.
 
-!!! warning "Effects are not awaitable"
-    Returning an awaitable from an effect doesn't await it. Schedule
-    async work explicitly (e.g., via `asyncio.create_task`) and store
-    the resulting cancellation handle in the effect's cleanup
-    closure.
+!!! tip "Effects can be coroutines"
+    Both hooks accept an `async def` callback. The coroutine runs as a
+    task on the framework loop and is cancelled automatically when the
+    effect re-runs, the screen blurs (for focus effects), or the
+    component unmounts; no manual task bookkeeping is needed. See the
+    [Async + data guide](../guides/async.md).
 
 ## Mount, update, unmount
 
@@ -123,22 +124,18 @@ import pythonnative as pn
 def LiveClock():
     now, set_now = pn.use_state("--:--")
 
-    def start_clock():
-        async def tick():
-            while True:
-                set_now(_format_now())
-                await asyncio.sleep(1)
+    async def tick():
+        while True:
+            set_now(_format_now())
+            await asyncio.sleep(1)
 
-        task = asyncio.create_task(tick())
-        return task.cancel  # cleanup
-
-    pn.use_focus_effect(start_clock, deps=[])
+    pn.use_focus_effect(tick, deps=[])
     return pn.Text(now, style={"font_size": 48})
 ```
 
 - The clock starts only while `LiveClock` is on the focused screen.
-- Navigating away cancels the task because the focus cleanup runs
-  immediately.
+- Navigating away cancels the coroutine because the focus cleanup
+  runs immediately.
 - Returning to the screen restarts a fresh task; the user never sees
   the previous, stale state because `use_state` resets on remount.
 

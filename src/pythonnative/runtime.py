@@ -1,41 +1,46 @@
-"""Asyncio runtime for PythonNative.
+"""Asyncio runtime: one event loop, hosted on the platform main thread.
 
-PythonNative runs a single, framework-wide ``asyncio`` event loop on
-a dedicated daemon thread. Every awaitable surface in the framework
-schedules its work on this loop via
-[`run_async`][pythonnative.runtime.run_async]: the async hooks
-([`use_async_effect`][pythonnative.hooks.use_async_effect],
-[`use_query`][pythonnative.hooks.use_query],
-[`use_mutation`][pythonnative.hooks.use_mutation]), the
-[`fetch`][pythonnative.net.fetch] HTTP client,
-[`AsyncStorage`][pythonnative.storage.AsyncStorage], the awaitable
-native modules
-([`Camera`][pythonnative.native_modules.camera.Camera] /
-[`Location`][pythonnative.native_modules.location.Location] /
-[`Notifications`][pythonnative.native_modules.notifications.Notifications]),
-and awaited animations.
+PythonNative is **async-first**: the whole framework (rendering,
+effects, native modules, animations, timers) shares a single
+``asyncio`` event loop that lives on the platform's main thread. There
+is no background runtime thread; coroutines interleave with rendering
+on the same thread, so async code can touch component state and (via
+the commit) native views without any cross-thread marshaling.
 
-The reconciler is **not** asyncio-aware; it still runs synchronously on
-the platform main thread. Coroutines that want to mutate component
-state simply call the regular ``use_state`` setter, and the existing
-deferred-render path inside the screen host marshals the re-render
-onto the main thread. The runtime is therefore additive: it gives
-coroutines somewhere to live without changing the rendering contract.
+Because UIKit and the Android view system own the main thread's run
+loop, the framework loop cannot call ``run_forever`` and block.
+Instead it runs as a **guest**: whenever work is scheduled
+(``call_soon`` / ``call_soon_threadsafe`` / timers), the runtime asks
+the platform to *pump* the loop on the next main-queue turn
+(``dispatch_async`` on iOS, ``Handler.post`` on Android, the Tk poll
+loop in ``pn preview``). One pump runs every ready callback and due
+timer, then returns control to the platform.
+
+Key entry points:
+
+- [`get_loop`][pythonnative.runtime.get_loop]: the framework loop. If
+  a loop is already running on the calling thread (an ``async`` test,
+  ``asyncio.run``), that loop is adopted instead.
+- [`run_async`][pythonnative.runtime.run_async]: schedule a coroutine
+  from synchronous code (an event handler, an effect). Returns an
+  ``asyncio.Task`` when called on the loop's thread, or a
+  ``concurrent.futures.Future`` when called from another thread.
+- [`run_blocking`][pythonnative.runtime.run_blocking] /
+  [`drain`][pythonnative.runtime.drain]: drive the guest loop from
+  synchronous code. Used by tests and plain scripts, where no platform
+  pump exists.
 
 Example:
     ```python
-    import asyncio
-
     import pythonnative as pn
 
 
-    async def hello() -> str:
-        await asyncio.sleep(0.1)
-        return "hi"
+    @pn.component
+    def SaveButton():
+        async def save():
+            await pn.AsyncStorage.set_item("draft", "…")
 
-
-    future = pn.runtime.run_async(hello())
-    print(future.result(timeout=1.0))  # "hi"
+        return pn.Button("Save", on_press=lambda: pn.run_async(save()))
     ```
 """
 
@@ -46,134 +51,208 @@ import ctypes
 import ctypes.util
 import inspect
 import threading
-from concurrent.futures import Future as _ThreadFuture
+import time as _time
 from typing import Any, Awaitable, Callable, Coroutine, Dict, Optional, TypeVar, Union
 
 T = TypeVar("T")
 
 
 # ======================================================================
-# Module-level loop singleton
+# The guest loop
 # ======================================================================
 
-_loop: Optional[asyncio.AbstractEventLoop] = None
-_thread: Optional[threading.Thread] = None
-_lock = threading.Lock()
 
+class _GuestLoop(asyncio.SelectorEventLoop):
+    """A selector event loop that asks the platform to pump it.
 
-# ======================================================================
-# Apple QoS bump (iOS / macOS)
-# ======================================================================
-#
-# By default ``threading.Thread`` lands at a low QoS class on Apple
-# platforms, which iOS subjects to wake-up coalescing; the asyncio
-# loop only gets ~2 timeslices per second (~500ms granularity). Bumping
-# the thread to ``QOS_CLASS_USER_INTERACTIVE`` is *necessary* for it to
-# be treated as foreground work, but on the simulator it's not
-# *sufficient* on its own. The companion fix is the PyDLL-based main
-# thread dispatch further down in this file, which keeps the GIL held
-# (and the thread off the kernel's coalescing grid) for the actual
-# bg→main hop.
-
-# qos_class_t value from <sys/qos.h>
-_QOS_CLASS_USER_INTERACTIVE = 0x21
-
-
-def _apply_apple_thread_qos() -> None:
-    """Bump the calling thread to ``USER_INTERACTIVE`` on iOS.
-
-    No-op on other platforms or if the symbol can't be loaded. Must be
-    called from inside the target thread (the underlying syscall is
-    ``pthread_set_qos_class_self_np``). Empirically ``USER_INTERACTIVE``
-    is required on iOS; anything lower triggers wake-up coalescing on
-    the background asyncio thread, which adds ~500ms latency to every
-    cross-thread dispatch.
+    Overrides every scheduling entry point so that queuing work also
+    requests a pump on the platform main queue. The pump itself
+    (:func:`_pump`) runs one ``run_forever`` iteration bounded by an
+    immediate ``stop``, which executes all ready callbacks and due
+    timers, then reschedules itself while work remains.
     """
-    from .platform import Platform
 
-    if not Platform.is_ios:
-        return
-    try:
-        libc_path = ctypes.util.find_library("c")
-        if libc_path is None:
+    def __init__(self) -> None:
+        super().__init__()
+        self._pn_owner_thread = threading.current_thread()
+        self._pn_pumping = False
+        self._pn_pump_queued = False
+        self._pn_timer: Optional[threading.Timer] = None
+        self._pn_timer_when: float = float("inf")
+        self._pn_lock = threading.Lock()
+
+    # -- scheduling overrides ------------------------------------------
+    #
+    # ``type: ignore[override]``: the typeshed stubs type these with a
+    # ``TypeVarTuple`` linking ``callback`` to ``*args``; the plain
+    # ``Callable[..., Any]`` form used here accepts the same calls.
+
+    def call_soon(self, callback: Callable[..., Any], *args: Any, context: Any = None) -> Any:  # type: ignore[override]
+        handle = super().call_soon(callback, *args, context=context)
+        self._pn_request_pump(0.0)
+        return handle
+
+    def call_soon_threadsafe(  # type: ignore[override]
+        self, callback: Callable[..., Any], *args: Any, context: Any = None
+    ) -> Any:
+        handle = super().call_soon_threadsafe(callback, *args, context=context)
+        self._pn_request_pump(0.0)
+        return handle
+
+    def call_at(  # type: ignore[override]
+        self, when: float, callback: Callable[..., Any], *args: Any, context: Any = None
+    ) -> Any:
+        handle = super().call_at(when, callback, *args, context=context)
+        self._pn_request_pump(max(0.0, when - self.time()))
+        return handle
+
+    # -- pumping --------------------------------------------------------
+
+    def _pn_request_pump(self, delay: float) -> None:
+        """Ask the platform to pump this loop after ``delay`` seconds.
+
+        No-op while a pump is executing (the post-pump check
+        reschedules if work remains) and when no platform dispatcher
+        exists (headless tests drive the loop with
+        [`drain`][pythonnative.runtime.drain] /
+        [`run_blocking`][pythonnative.runtime.run_blocking] instead).
+        """
+        if self._pn_pumping or self.is_running() or self.is_closed():
             return
-        libc = ctypes.CDLL(libc_path)
-        set_fn = libc.pthread_set_qos_class_self_np
-        set_fn.argtypes = [ctypes.c_int, ctypes.c_int]
-        set_fn.restype = ctypes.c_int
-        set_fn(_QOS_CLASS_USER_INTERACTIVE, 0)
-    except Exception as exc:
-        print(f"[pn.runtime] could not bump thread QoS: {exc!r}")
+        if delay <= 0.0:
+            with self._pn_lock:
+                if self._pn_pump_queued:
+                    return
+                if not _has_pump_dispatcher():
+                    return
+                self._pn_pump_queued = True
+            _dispatch_to_main_queue(self._pn_pump)
+            return
+        # Delayed work: keep a single earliest-deadline timer that
+        # forwards onto the main queue when it fires.
+        now = _time.monotonic()
+        when = now + delay
+        with self._pn_lock:
+            if not _has_pump_dispatcher():
+                return
+            if self._pn_timer is not None and self._pn_timer_when <= when:
+                return
+            if self._pn_timer is not None:
+                self._pn_timer.cancel()
+            timer = threading.Timer(delay, self._pn_timer_fired)
+            timer.daemon = True
+            self._pn_timer = timer
+            self._pn_timer_when = when
+        timer.start()
+
+    def _pn_timer_fired(self) -> None:
+        with self._pn_lock:
+            self._pn_timer = None
+            self._pn_timer_when = float("inf")
+        self._pn_request_pump(0.0)
+
+    def _pn_pump(self) -> None:
+        """Run one loop iteration on the main thread, then reschedule."""
+        with self._pn_lock:
+            self._pn_pump_queued = False
+        if self.is_closed() or self.is_running() or self._pn_pumping:
+            return
+        if threading.current_thread() is not self._pn_owner_thread:
+            # A dispatcher delivered the pump on the wrong thread
+            # (shouldn't happen on device); drop it rather than run the
+            # loop off its owner thread.
+            return
+        self._pn_pumping = True
+        try:
+            super().call_soon(self.stop)
+            self.run_forever()
+        except Exception as exc:  # pragma: no cover - platform-level guard
+            print(f"[pn.runtime] loop pump raised: {exc!r}")
+        finally:
+            self._pn_pumping = False
+        # Reschedule while work remains: immediately for ready
+        # callbacks, at the earliest deadline for timers.
+        ready = getattr(self, "_ready", None)
+        if ready:
+            self._pn_request_pump(0.0)
+            return
+        scheduled = getattr(self, "_scheduled", None)
+        if scheduled:
+            next_when = scheduled[0].when()
+            self._pn_request_pump(max(0.0, next_when - self.time()))
 
 
-def _spawn_loop() -> asyncio.AbstractEventLoop:
-    """Create a fresh event loop on a daemon thread and block until it's running."""
-    loop = asyncio.new_event_loop()
-    ready = threading.Event()
-
-    def _run() -> None:
-        _apply_apple_thread_qos()
-        asyncio.set_event_loop(loop)
-        ready.set()
-        loop.run_forever()
-
-    thread = threading.Thread(target=_run, daemon=True, name="pn-asyncio")
-    thread.start()
-    ready.wait()
-
-    global _thread
-    _thread = thread
-    return loop
+_loop: Optional[_GuestLoop] = None
+_loop_lock = threading.Lock()
 
 
 def get_loop() -> asyncio.AbstractEventLoop:
-    """Return the framework-wide event loop, starting it on first use.
+    """Return the framework event loop.
 
-    The loop runs on a daemon thread (``"pn-asyncio"``) and lives for
-    the duration of the process. It is safe to call this from any
-    thread.
+    If a loop is already running on the calling thread (an ``async``
+    test, or app code inside ``asyncio.run``), that loop is adopted so
+    every framework awaitable lives on the caller's loop. Otherwise
+    the shared guest loop is returned, created on first use and owned
+    by the creating thread (the platform main thread on device).
 
     Returns:
-        The shared :class:`asyncio.AbstractEventLoop`.
+        The :class:`asyncio.AbstractEventLoop` all framework work
+        should be scheduled on.
     """
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        pass
     global _loop
     if _loop is not None and not _loop.is_closed():
         return _loop
-    with _lock:
+    with _loop_lock:
         if _loop is None or _loop.is_closed():
-            _loop = _spawn_loop()
+            _loop = _GuestLoop()
         return _loop
 
 
-def _shutdown_for_tests() -> None:
-    """Stop the runtime loop, primarily for test isolation.
+def _on_loop_thread(loop: asyncio.AbstractEventLoop) -> bool:
+    """Whether the current thread may schedule non-threadsafe work on ``loop``."""
+    owner = getattr(loop, "_pn_owner_thread", None)
+    if owner is not None:
+        return threading.current_thread() is owner
+    try:
+        return asyncio.get_running_loop() is loop
+    except RuntimeError:
+        return False
 
-    Cancels every pending task, stops the loop, joins the thread, and
-    clears the module-level state so the next call to
-    [`get_loop`][pythonnative.runtime.get_loop] starts a fresh loop.
-    Production code should not call this; the loop is a daemon and
-    will be torn down with the process.
+
+def _shutdown_for_tests() -> None:
+    """Close the guest loop and reset module state (test isolation).
+
+    Cancels every pending task, lets cancellations propagate, and
+    closes the loop so the next [`get_loop`][pythonnative.runtime.get_loop]
+    starts fresh. Production code never calls this; the loop lives for
+    the process.
     """
-    global _loop, _thread
-    with _lock:
+    global _loop
+    with _loop_lock:
         loop = _loop
-        thread = _thread
         _loop = None
-        _thread = None
-    if loop is None:
+    if loop is None or loop.is_closed():
+        return
+    timer = loop._pn_timer
+    if timer is not None:
+        timer.cancel()
+    if loop.is_running():  # pragma: no cover - misuse guard
         return
     try:
-        for task in asyncio.all_tasks(loop):
-            loop.call_soon_threadsafe(task.cancel)
-        loop.call_soon_threadsafe(loop.stop)
-    except RuntimeError:
+        tasks = [t for t in asyncio.all_tasks(loop) if not t.done()]
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+        loop.run_until_complete(loop.shutdown_asyncgens())
+    except Exception:
         pass
-    if thread is not None:
-        thread.join(timeout=2.0)
-    try:
+    finally:
         loop.close()
-    except RuntimeError:
-        pass
 
 
 # ======================================================================
@@ -184,23 +263,22 @@ def _shutdown_for_tests() -> None:
 Awaitlike = Union[Coroutine[Any, Any, T], Awaitable[T]]
 
 
-def run_async(awaitable: Awaitlike[T]) -> "_ThreadFuture[T]":
-    """Schedule ``awaitable`` on the framework loop and return a thread future.
+def run_async(awaitable: Awaitlike[T]) -> Any:
+    """Schedule ``awaitable`` on the framework loop.
 
-    Use this when calling async code from synchronous code (e.g. an
-    event handler, a hook setup function, or a test). The returned
-    :class:`concurrent.futures.Future` is created by
-    :func:`asyncio.run_coroutine_threadsafe` so it can be ``result()``-ed
-    from the calling thread and ``cancel()``-ed from anywhere.
+    The standard bridge from synchronous code (event handlers, effect
+    setups) into async code. On the loop's own thread this returns an
+    :class:`asyncio.Task`; from another thread it returns the
+    :class:`concurrent.futures.Future` produced by
+    :func:`asyncio.run_coroutine_threadsafe`. Both support
+    ``cancel()`` and ``add_done_callback()``.
 
     Args:
-        awaitable: Either a coroutine object (the typical case) or any
-            awaitable. Awaitables that are not coroutines are wrapped
-            with :func:`asyncio.ensure_future` on the loop.
+        awaitable: A coroutine object (the typical case) or any
+            awaitable.
 
     Returns:
-        A thread-safe future that resolves with the coroutine's return
-        value, or raises its exception.
+        A future-like handle for the scheduled work.
 
     Example:
         ```python
@@ -209,11 +287,12 @@ def run_async(awaitable: Awaitlike[T]) -> "_ThreadFuture[T]":
         async def work():
             return 42
 
-        fut = pn.runtime.run_async(work())
-        assert fut.result(timeout=1.0) == 42
+        task = pn.run_async(work())
         ```
     """
     loop = get_loop()
+    if _on_loop_thread(loop):
+        return asyncio.ensure_future(awaitable, loop=loop)
     if inspect.iscoroutine(awaitable):
         return asyncio.run_coroutine_threadsafe(awaitable, loop)
 
@@ -223,14 +302,78 @@ def run_async(awaitable: Awaitlike[T]) -> "_ThreadFuture[T]":
     return asyncio.run_coroutine_threadsafe(_wrap(), loop)
 
 
+def run_blocking(awaitable: Awaitlike[T], timeout: Optional[float] = None) -> T:
+    """Run ``awaitable`` to completion on the framework loop, blocking.
+
+    For synchronous scripts and tests. Must not be called while the
+    loop is already running (i.e., from inside a coroutine); ``await``
+    directly there instead.
+
+    Args:
+        awaitable: The coroutine or awaitable to drive.
+        timeout: Optional seconds before :class:`TimeoutError`.
+
+    Returns:
+        The awaitable's result.
+    """
+    loop = get_loop()
+    if loop.is_running():
+        raise RuntimeError("run_blocking() cannot be used while the event loop is running; use `await` instead")
+
+    async def _driver() -> T:
+        if timeout is not None:
+            return await asyncio.wait_for(_ensure_coro(awaitable), timeout)
+        return await _ensure_coro(awaitable)
+
+    return loop.run_until_complete(_driver())
+
+
+async def _ensure_coro(awaitable: Awaitlike[T]) -> T:
+    return await awaitable
+
+
+def drain(timeout: float = 1.0, *, until: Optional[Callable[[], bool]] = None) -> bool:
+    """Pump the framework loop until it goes idle (or ``until`` holds).
+
+    Runs ready callbacks, due timers, and task steps repeatedly. Used
+    by synchronous tests to settle async effects, resources, and
+    transition flushes deterministically; on-device the platform pump
+    makes this unnecessary.
+
+    Args:
+        timeout: Maximum seconds to keep pumping.
+        until: Optional predicate; draining stops early once it
+            returns truthy.
+
+    Returns:
+        ``True`` if the loop went idle (or ``until`` matched) before
+        the timeout, ``False`` otherwise.
+    """
+    loop = get_loop()
+    if loop.is_running():
+        raise RuntimeError("drain() cannot be used while the event loop is running; use `await` instead")
+    deadline = _time.monotonic() + timeout
+    while _time.monotonic() < deadline:
+        loop.run_until_complete(asyncio.sleep(0))
+        if until is not None and until():
+            return True
+        pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+        ready = bool(getattr(loop, "_ready", ()))
+        scheduled = bool(getattr(loop, "_scheduled", ()))
+        if until is None and not pending and not ready and not scheduled:
+            return True
+        if pending or scheduled:
+            loop.run_until_complete(asyncio.sleep(0.002))
+    return False
+
+
 def call_threadsafe(callback: Callable[..., Any], *args: Any) -> None:
-    """Schedule ``callback(*args)`` on the loop thread.
+    """Schedule ``callback(*args)`` on the framework loop from any thread.
 
     Thin wrapper around
     :meth:`asyncio.AbstractEventLoop.call_soon_threadsafe`. Useful from
-    native delegates (which may fire on arbitrary threads) when you
-    need to hop onto the runtime thread before touching asyncio
-    primitives.
+    native delegates (which may fire on arbitrary OS threads) to hop
+    onto the main-thread loop before touching asyncio primitives.
     """
     get_loop().call_soon_threadsafe(callback, *args)
 
@@ -243,7 +386,7 @@ def resolve_future(future: "asyncio.Future[T]", value: T) -> None:
     it's on, only that it must not race with cancellation.
 
     Args:
-        future: An :class:`asyncio.Future` bound to the runtime loop.
+        future: An :class:`asyncio.Future` bound to the framework loop.
         value: The value to deliver as the future's result.
     """
     loop = future.get_loop()
@@ -267,48 +410,63 @@ def _set_future_exception(future: "asyncio.Future[Any]", error: BaseException) -
 
 
 def create_future() -> "asyncio.Future[Any]":
-    """Create a future bound to the framework runtime loop.
+    """Create a future bound to the framework loop.
 
-    Safe to call from any thread. The returned future is **not**
-    attached to whatever loop is current on the caller; instead it
-    lives on the framework's shared loop so any thread can call
+    Safe to call from any thread. Native delegates deliver into it via
     [`resolve_future`][pythonnative.runtime.resolve_future] /
-    [`reject_future`][pythonnative.runtime.reject_future] on it.
+    [`reject_future`][pythonnative.runtime.reject_future].
     """
     return get_loop().create_future()
 
 
 # ======================================================================
-# UI-thread bridge
+# Main-queue dispatch
 # ======================================================================
 #
-# Every awaitable that touches the platform's UI APIs runs on the
-# framework's background asyncio loop, but UIKit and the Android view
-# system require all UI calls on the platform main thread. The helpers
-# below marshal a synchronous Python callable onto the right thread per
-# platform, so awaitable code (alerts, animations, etc.) can transparently
-# bridge back when it needs to talk to native UI.
+# The guest loop is pumped by enqueueing a callable on the platform's
+# main queue. Unlike ``call_on_main_thread`` (which runs inline when
+# already on the main thread), pump dispatch is ALWAYS queued: pumping
+# inline from arbitrary call sites (say, a ``call_soon`` issued in the
+# middle of a reconciler commit) would re-enter the renderer.
 
 
 # Desktop (Tkinter) main-thread dispatcher, installed by
-# ``pythonnative.preview`` while a ``pn preview`` session is live. Tk is
-# not thread-safe, so UI work scheduled from the asyncio worker thread
-# (animations, alerts) must hop onto the Tk main thread; the preview's
-# poll loop drains whatever this dispatcher enqueues. When no preview is
-# running (plain scripts / tests) the dispatcher stays ``None`` and work
-# runs inline.
+# ``pythonnative.preview`` while a ``pn preview`` session is live; the
+# preview's poll loop drains whatever this dispatcher enqueues.
 _desktop_main_dispatch: Optional[Callable[[Callable[[], None]], None]] = None
 
 
 def set_desktop_main_dispatch(dispatch: Optional[Callable[[Callable[[], None]], None]]) -> None:
     """Install (or clear) the desktop main-thread dispatcher.
 
-    Called by ``pythonnative.preview`` with a
-    function that marshals ``fn`` onto the Tk main thread, and with
-    ``None`` when the preview window closes.
+    Called by ``pythonnative.preview`` with a function that marshals
+    work onto the Tk main thread, and with ``None`` when the preview
+    window closes.
     """
     global _desktop_main_dispatch
     _desktop_main_dispatch = dispatch
+
+
+def _has_pump_dispatcher() -> bool:
+    """Whether a queued main-thread dispatcher exists on this platform."""
+    from .platform import Platform
+
+    if Platform.is_ios or Platform.is_android:
+        return True
+    return _desktop_main_dispatch is not None
+
+
+def _dispatch_to_main_queue(fn: Callable[[], None]) -> None:
+    """Enqueue ``fn`` on the platform main queue (never runs inline)."""
+    from .platform import Platform
+
+    if Platform.is_ios:
+        _ios_dispatch_async(fn)
+    elif Platform.is_android:
+        _android_post_to_main(fn)
+    elif _desktop_main_dispatch is not None:
+        _desktop_main_dispatch(fn)
+    # Headless: nothing to dispatch to; drain()/run_blocking() pump.
 
 
 def call_on_main_thread(fn: Callable[[], None]) -> None:
@@ -316,19 +474,17 @@ def call_on_main_thread(fn: Callable[[], None]) -> None:
 
     - **iOS**: dispatches ``fn`` onto the main dispatch queue via
       ``libdispatch.dispatch_async_f`` (called through
-      :class:`ctypes.PyDLL` to keep the GIL held; see the
-      ``_ios_call_on_main`` comment block for why this matters).
+      :class:`ctypes.PyDLL` to keep the GIL held), or runs inline when
+      already on the main thread.
     - **Android**: posts a ``Runnable`` to
-      ``Handler(Looper.getMainLooper())``.
-    - **Desktop**: enqueues ``fn`` for the ``pn preview`` poll loop to
-      run on the Tk main thread (or runs inline if no preview is live).
+      ``Handler(Looper.getMainLooper())``, or runs inline on the main
+      looper thread.
+    - **Desktop**: enqueues ``fn`` for the ``pn preview`` poll loop
+      (or runs inline if no preview is live).
     - **Tests**: runs ``fn()`` inline.
 
     Exceptions raised by ``fn`` are caught and printed; they must not
-    propagate into UIKit / the Android Looper. If you need to surface
-    a result back to the asyncio loop, do it via
-    [`resolve_future`][pythonnative.runtime.resolve_future] from
-    inside ``fn``.
+    propagate into UIKit / the Android Looper.
 
     Args:
         fn: A zero-arg callable. Runs on the main thread when the
@@ -347,20 +503,18 @@ def call_on_main_thread(fn: Callable[[], None]) -> None:
 
 
 # ----------------------------------------------------------------------
-# iOS main-thread dispatch (PyDLL-based, no GIL release)
+# iOS main-queue dispatch (PyDLL-based, no GIL release)
 # ----------------------------------------------------------------------
 #
 # rubicon-objc loads libobjc via ctypes.CDLL, which RELEASES THE GIL
 # around every ObjC method call. On the iOS simulator (and to a lesser
-# extent on-device), the asyncio thread is then parked by the kernel
-# until the next wakeup-coalescing tick (~500ms), making each ObjC call
-# absurdly slow when made from a background thread.
-#
-# To avoid this, we call libdispatch's ``dispatch_async_f`` directly
-# via ``ctypes.PyDLL`` (which keeps the GIL held), and pass a
-# ``CFUNCTYPE`` trampoline as the work function. The trampoline runs
-# on the main thread, looks up the pending Python callable by an
-# integer key, and invokes it.
+# extent on-device), a thread is then parked by the kernel until the
+# next wakeup-coalescing tick (~500ms), making cross-thread ObjC calls
+# absurdly slow. To avoid this, we call libdispatch's
+# ``dispatch_async_f`` directly via ``ctypes.PyDLL`` (which keeps the
+# GIL held), and pass a ``CFUNCTYPE`` trampoline as the work function.
+# The trampoline runs on the main thread, looks up the pending Python
+# callable by an integer key, and invokes it.
 
 _dispatch_lib: Optional[Any] = None
 _dispatch_async_f_c: Optional[Any] = None
@@ -395,7 +549,7 @@ def _ensure_libdispatch_loaded() -> bool:
         return True
     try:
         # PyDLL keeps the GIL held during C calls, preventing the
-        # asyncio thread from being parked after dispatch_async_f.
+        # calling thread from being parked after dispatch_async_f.
         lib = ctypes.PyDLL("/usr/lib/system/libdispatch.dylib")
     except OSError:
         try:
@@ -440,31 +594,16 @@ def _ios_is_main_thread() -> bool:
         return threading.current_thread().name == "MainThread"
 
 
-def _ios_call_on_main(fn: Callable[[], None]) -> None:
-    """Dispatch ``fn`` to the iOS main thread without releasing the GIL.
-
-    Uses libdispatch's ``dispatch_async_f`` via ``ctypes.PyDLL`` to
-    avoid the rubicon-objc / CDLL GIL release that causes the asyncio
-    thread to be parked by the kernel for ~500ms on each call.
-    """
+def _ios_dispatch_async(fn: Callable[[], None]) -> None:
+    """Enqueue ``fn`` on the iOS main dispatch queue (always queued)."""
     global _main_next_id
-    if _ios_is_main_thread():
-        try:
-            fn()
-        except Exception as exc:
-            print(f"[pn.runtime] main-inline callback raised: {exc!r}")
-        return
-
     if not _ensure_libdispatch_loaded():
-        # Last-resort fallback: run inline (UI calls may crash, but at
-        # least we don't deadlock).
         print("[pn.runtime] libdispatch unavailable; running callback inline")
         try:
             fn()
         except Exception as exc:
             print(f"[pn.runtime] inline fallback raised: {exc!r}")
         return
-
     with _main_pending_lock:
         _main_next_id += 1
         key = _main_next_id
@@ -475,15 +614,21 @@ def _ios_call_on_main(fn: Callable[[], None]) -> None:
     _dispatch_async_f_c(_dispatch_main_q_ptr, key, _main_trampoline_c)
 
 
-def _android_call_on_main(fn: Callable[[], None]) -> None:
-    """Android-only: post ``fn`` to the main looper via Handler."""
+def _ios_call_on_main(fn: Callable[[], None]) -> None:
+    """Run ``fn`` on the iOS main thread (inline when already there)."""
+    if _ios_is_main_thread():
+        try:
+            fn()
+        except Exception as exc:
+            print(f"[pn.runtime] main-inline callback raised: {exc!r}")
+        return
+    _ios_dispatch_async(fn)
+
+
+def _android_post_to_main(fn: Callable[[], None]) -> None:
+    """Enqueue ``fn`` on the Android main looper (always queued)."""
     try:
         from java import dynamic_proxy, jclass
-
-        Looper = jclass("android.os.Looper")
-        if Looper.myLooper() == Looper.getMainLooper():
-            fn()
-            return
 
         Runnable = jclass("java.lang.Runnable")
 
@@ -494,19 +639,36 @@ def _android_call_on_main(fn: Callable[[], None]) -> None:
                 except Exception as exc:  # pragma: no cover - last resort
                     print(f"[pn.runtime] main-thread runnable raised: {exc!r}")
 
+        Looper = jclass("android.os.Looper")
         Handler = jclass("android.os.Handler")
         Handler(Looper.getMainLooper()).post(_PNMainRunnable())
     except Exception as exc:
-        print(f"[pn.runtime] _android_call_on_main failed, falling back inline: {exc!r}")
+        print(f"[pn.runtime] _android_post_to_main failed, falling back inline: {exc!r}")
         fn()
+
+
+def _android_call_on_main(fn: Callable[[], None]) -> None:
+    """Run ``fn`` on the Android main thread (inline when already there)."""
+    try:
+        from java import jclass
+
+        Looper = jclass("android.os.Looper")
+        if Looper.myLooper() == Looper.getMainLooper():
+            fn()
+            return
+    except Exception:
+        pass
+    _android_post_to_main(fn)
 
 
 __all__ = [
     "call_on_main_thread",
     "call_threadsafe",
     "create_future",
+    "drain",
     "get_loop",
     "reject_future",
     "resolve_future",
     "run_async",
+    "run_blocking",
 ]

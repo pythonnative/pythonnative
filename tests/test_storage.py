@@ -14,6 +14,7 @@ from fake_backend import FakeBackend as _StubBackend
 from pythonnative.element import Element
 from pythonnative.hooks import component
 from pythonnative.reconciler import Reconciler
+from pythonnative.runtime import drain, run_blocking
 from pythonnative.storage import AsyncStorage, _desktop_store, use_persisted_state
 
 
@@ -149,16 +150,12 @@ def test_use_persisted_state_loads_existing_value() -> None:
     rec = Reconciler(_StubBackend())
     rec.mount(screen())
 
-    # The first render returns the initial; the async load triggers a
-    # state update on a separate task. Allow the runtime loop to
-    # deliver the update, then re-render.
-    deadline = asyncio.get_event_loop_policy().new_event_loop().time() + 1.5
-    import time as _time
-
-    while _time.monotonic() < deadline and (not captured or captured[-1] != "dark"):
-        _time.sleep(0.02)
-        rec.reconcile(screen())
-
+    # The first render returns the initial; the async load runs as a
+    # task on the framework loop. Pump the loop, then flush the
+    # resulting local re-render.
+    assert captured[0] == "light"
+    drain()
+    rec.flush_dirty()
     assert captured[-1] == "dark"
 
 
@@ -174,19 +171,14 @@ def test_use_persisted_state_setter_persists_writes() -> None:
     rec = Reconciler(_StubBackend())
     rec.mount(screen())
 
-    # Wait for the load to mark loaded=True so the setter actually writes.
-    import time as _time
-
-    _time.sleep(0.2)
-    rec.reconcile(screen())
+    # Pump the load effect so loaded=True and the setter actually writes.
+    drain()
+    rec.flush_dirty()
 
     _, set_value = setters[-1]
     set_value("dark")
-    rec.reconcile(screen())
+    rec.flush_dirty()
 
-    deadline = _time.monotonic() + 1.0
-    while _time.monotonic() < deadline:
-        if asyncio.run(AsyncStorage.get_json("theme")) == "dark":
-            break
-        _time.sleep(0.02)
-    assert asyncio.run(AsyncStorage.get_json("theme")) == "dark"
+    # Pump the fire-and-forget persistence write.
+    drain()
+    assert run_blocking(AsyncStorage.get_json("theme")) == "dark"

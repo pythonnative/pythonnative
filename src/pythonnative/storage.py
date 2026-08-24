@@ -379,7 +379,7 @@ def use_persisted_state(
             )
         ```
     """
-    from .hooks import use_async_effect, use_callback, use_ref, use_state
+    from .hooks import use_callback, use_effect, use_ref, use_state
     from .runtime import run_async
 
     state, set_state = use_state(initial)
@@ -391,7 +391,7 @@ def use_persisted_state(
             set_state(stored)
         loaded.current = True
 
-    use_async_effect(_load, [key])
+    use_effect(_load, [key])
 
     def setter(value_or_updater: Any) -> None:
         def _reducer(current: Any) -> Any:

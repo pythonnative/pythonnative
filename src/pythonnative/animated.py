@@ -47,7 +47,7 @@ Example:
             await pn.Animated.timing(opacity, to=1.0, duration=400)
             await pn.Animated.timing(opacity, to=0.5, duration=200)
 
-        pn.use_async_effect(fade_in, [])
+        pn.use_effect(fade_in, [])
 
         return pn.Animated.View(
             pn.Text("Hello!"),
@@ -1014,7 +1014,7 @@ def use_animated_value(initial: float = 0.0) -> AnimatedValue:
             async def fade_in():
                 await pn.Animated.timing(opacity, to=1.0, duration=300)
 
-            pn.use_async_effect(fade_in, [])
+            pn.use_effect(fade_in, [])
             return pn.Animated.View(
                 pn.Text("Hello"),
                 style=pn.style(opacity=opacity),

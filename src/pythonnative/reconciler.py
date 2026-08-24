@@ -29,6 +29,20 @@ Supports:
   catch exceptions in child subtrees, invoke ``on_error``, render a
   fallback (optionally receiving a ``reset`` callable), and remount
   their children when ``reset`` is called.
+- **Suspense boundaries** (`type == "__Suspense__"`), which catch
+  [`Suspend`][pythonnative.suspense.Suspend] signals from mounting
+  descendants (``async def`` component bodies blocking on pending
+  awaits, [`Resource.read`][pythonnative.suspense.Resource.read] on unresolved
+  data), show their ``fallback`` while pending, and retry the content
+  when the awaited work completes. Suspended components' hook states
+  are preserved across retries so cached resources are not refetched.
+  Updates of already-mounted components that suspend keep their
+  previous content on screen and re-render when ready, no fallback
+  flash.
+- **Async component bodies**: a component may be an ``async def``.
+  The body is driven synchronously as far as possible (awaits on
+  resolved futures complete inline); blocking on pending work
+  suspends the render.
 - **Fragments** (`type == "__Fragment__"`), expanded inline unless
   keyed, in which case they participate in keyed reconciliation as a
   transparent multi-child wrapper.
@@ -50,6 +64,7 @@ Supports:
   sent to the native side.
 """
 
+import asyncio
 import inspect
 import itertools
 import os
@@ -60,6 +75,7 @@ from .element import Element
 from .events import extract_events, get_event_registry
 from .layout import LayoutNode, calculate_layout, extract_layout_style
 from .mutations import CreateOp, DestroyOp, InsertOp, Mutation, SetFrameOp, UpdateOp
+from .suspense import CoroDriver, Suspend
 
 # Props the reconciler consumes itself (i.e., never forwards to the
 # native handler). ``ref`` is one such prop: components pass a
@@ -72,7 +88,7 @@ _RECONCILER_OWNED_PROPS = frozenset({"ref"})
 # Element types that never own a native view: they are transparent
 # wrappers whose children mount directly into the surrounding native
 # parent.
-_TRANSPARENT_TYPES = frozenset({"__Provider__", "__ErrorBoundary__", "__Fragment__"})
+_TRANSPARENT_TYPES = frozenset({"__Provider__", "__ErrorBoundary__", "__Suspense__", "__Fragment__"})
 
 # Native element types whose subtree is laid out against the viewport
 # in a detached pass instead of participating in the main layout flow.
@@ -216,6 +232,9 @@ class VNode:
         "_layout_node",
         "_layout_dirty",
         "_error",
+        "_suspense_showing_fallback",
+        "_suspense_hydration",
+        "_suspense_waits",
     )
 
     def __init__(self, element: Element, children: List["VNode"], tag: Optional[int] = None) -> None:
@@ -247,6 +266,13 @@ class VNode:
         # For ``__ErrorBoundary__`` nodes: the caught exception while
         # the fallback is showing, else ``None``.
         self._error: Optional[BaseException] = None
+        # For ``__Suspense__`` nodes: whether the fallback is showing,
+        # the hook states of suspended descendants preserved for the
+        # next retry (keyed by ``(component identity, element key)``),
+        # and the ids of waitables already wired to trigger a retry.
+        self._suspense_showing_fallback: bool = False
+        self._suspense_hydration: Optional[Dict[Tuple[int, Any], List[Any]]] = None
+        self._suspense_waits: Optional[Set[int]] = None
 
 
 class Reconciler:
@@ -289,6 +315,18 @@ class Reconciler:
         # Error-boundary VNodes whose ``reset`` was called; drained
         # alongside dirty components.
         self._dirty_boundaries: Dict[int, VNode] = {}
+        # Suspense VNodes whose awaited work completed; their content
+        # is retried on the next drain.
+        self._dirty_suspense: Dict[int, VNode] = {}
+        # Hydration map active while a Suspense boundary retries its
+        # content: suspended hook states from the previous attempt,
+        # reclaimed by matching components so cached resources survive.
+        self._hydration: Optional[Dict[Tuple[int, Any], List[Any]]] = None
+        # Hook states salvaged while a Suspend unwinds through partially
+        # built subtrees (siblings of the suspender that had already
+        # rendered). The catching boundary folds these into its
+        # hydration map so the retry keeps their caches too.
+        self._suspense_salvage: Optional[Dict[Tuple[int, Any], List[Any]]] = None
         # Tags destroyed during the current pass, used when simulating
         # a native parent's child list. Tags are never reused, so stale
         # entries can never alias a live view.
@@ -316,8 +354,13 @@ class Reconciler:
         self._log(f"mount: start type={self._type_label(element.type)!r}")
         self._dirty_nodes.clear()
         self._dirty_boundaries.clear()
+        self._dirty_suspense.clear()
         self._destroyed_tags.clear()
-        self._tree = self._create_tree(element)
+        try:
+            self._tree = self._create_tree(element)
+        except Suspend as signal:
+            self._discard_salvage()
+            raise self._missing_suspense_error(signal) from None
         self._drain_dirty()
         self._commit()
         self._warn_on_multiple_roots()
@@ -338,10 +381,14 @@ class Reconciler:
         # are drained before commit.
         self._dirty_nodes.clear()
         self._destroyed_tags.clear()
-        if self._tree is None:
-            self._tree = self._create_tree(new_element)
-        else:
-            self._tree = self._reconcile_node(self._tree, new_element)
+        try:
+            if self._tree is None:
+                self._tree = self._create_tree(new_element)
+            else:
+                self._tree = self._reconcile_node(self._tree, new_element)
+        except Suspend as signal:
+            self._discard_salvage()
+            raise self._missing_suspense_error(signal) from None
         self._drain_dirty()
         self._commit()
         self._warn_on_multiple_roots()
@@ -363,6 +410,7 @@ class Reconciler:
         self._tree = None
         self._dirty_nodes.clear()
         self._dirty_boundaries.clear()
+        self._dirty_suspense.clear()
         self._back_handlers.clear()
         self._flush_ops()
 
@@ -408,7 +456,7 @@ class Reconciler:
         """
         if self._tree is None:
             return None
-        if not self._dirty_nodes and not self._dirty_boundaries:
+        if not self._dirty_nodes and not self._dirty_boundaries and not self._dirty_suspense:
             return self._tree.native_view
 
         self._destroyed_tags.clear()
@@ -483,7 +531,7 @@ class Reconciler:
         cap to break pathological update cycles.
         """
         guard = 0
-        while self._dirty_nodes or self._dirty_boundaries:
+        while self._dirty_nodes or self._dirty_boundaries or self._dirty_suspense:
             guard += 1
             if guard > 100:
                 diagnostics.warn(
@@ -492,6 +540,7 @@ class Reconciler:
                 )
                 self._dirty_nodes.clear()
                 self._dirty_boundaries.clear()
+                self._dirty_suspense.clear()
                 return
 
             boundaries = list(self._dirty_boundaries.values())
@@ -509,6 +558,24 @@ class Reconciler:
                         context._stack.pop()
                 self._bubble_structure_change(boundary)
 
+            suspended = list(self._dirty_suspense.values())
+            self._dirty_suspense.clear()
+            for node in suspended:
+                if not node.mounted or not node._suspense_showing_fallback:
+                    continue
+                providers = self._ancestor_providers(node)
+                for context, value in providers:
+                    context._stack.append(value)
+                try:
+                    try:
+                        self._retry_suspense(node)
+                    except Exception as exc:
+                        self._handle_local_render_error(node, exc)
+                finally:
+                    for context, _value in reversed(providers):
+                        context._stack.pop()
+                self._bubble_structure_change(node)
+
             pending = list(self._dirty_nodes.values())
             self._dirty_nodes.clear()
             pending.sort(key=self._node_depth)
@@ -521,6 +588,11 @@ class Reconciler:
                     continue
                 try:
                     self._update_component(vnode)
+                except Suspend as signal:
+                    # A descendant mounted during this local update
+                    # suspended: hand the subtree to the nearest
+                    # Suspense boundary (fallback + retry).
+                    self._handle_local_render_suspend(vnode, signal)
                 except Exception as exc:
                     # A local re-render starts below any enclosing
                     # ``ErrorBoundary``, so route the failure to the nearest
@@ -730,21 +802,110 @@ class Reconciler:
         return depth
 
     def _render_component_body(self, hook_state: Any, element: Element) -> List[Element]:
-        """Run a function component's body and normalize its output."""
-        from .hooks import _set_hook_state
+        """Run a function component's body and normalize its output.
+
+        ``async def`` bodies are driven synchronously as far as they
+        can go (see
+        [`CoroDriver`][pythonnative.suspense.CoroDriver]); if the body
+        blocks on pending work, [`Suspend`][pythonnative.suspense.Suspend]
+        propagates to the caller, annotated with the component's hook
+        state so a Suspense boundary can preserve it across retries.
+        """
+        from .hooks import _reset_hook_state, _set_hook_state
 
         component_fn = element.type
         assert callable(component_fn), "component elements always carry a callable type"
-        hook_state.begin_render(self._type_label(element.type))
+        label = self._type_label(element.type)
+        hook_state.begin_render(label)
         hook_state._trigger_render = self._screen_re_render
-        _set_hook_state(hook_state)
+        token = _set_hook_state(hook_state)
         try:
             rendered = component_fn(**element.props)
+            if inspect.iscoroutine(rendered):
+                rendered = self._drive_async_body(hook_state, label, rendered)
             hook_state.finish_render()
+        except Suspend as signal:
+            hook_state.abort_render()
+            if signal.hook_state is None:
+                signal.hook_state = hook_state
+            if signal.key is None:
+                signal.key = (id(element.type), element.key)
+            if not signal.label:
+                signal.label = label
+            raise
         finally:
-            _set_hook_state(None)
+            _reset_hook_state(token)
             hook_state._dirty = False
-        return _normalize_children(rendered, owner=self._type_label(element.type))
+        return _normalize_children(rendered, owner=label)
+
+    @staticmethod
+    def _drive_async_body(hook_state: Any, label: str, coro: Any) -> Any:
+        """Drive an ``async def`` component body, suspending when it blocks.
+
+        The driver captures the current :mod:`contextvars` context (in
+        which the hook state is installed), so hook calls after an
+        ``await`` still resolve against this component. A previous
+        in-flight body for the same component is cancelled first: only
+        the newest render's coroutine may deliver a tree.
+
+        When the *previous* attempt's coroutine finished while the
+        component was suspended (it keeps running in the background),
+        the retry consumes that finished result instead of re-running
+        the body, so bodies that await one-shot work (a bare
+        ``asyncio.sleep``, a network call not wrapped in a resource)
+        make progress rather than restarting forever.
+        """
+        prev = hook_state._async_driver
+        if prev is not None:
+            if prev.done and not prev.cancelled():
+                # Deliver the completed attempt's tree. The body's hook
+                # calls already ran to completion inside the driver's
+                # captured context, so skip this render's (empty) hook
+                # order log rather than flagging a false mismatch.
+                coro.close()
+                hook_state._async_driver = None
+                hook_state._hook_log = None
+                error = prev.exception()
+                if error is not None:
+                    raise error
+                return prev.result()
+            if not prev.done:
+                prev.cancel()
+        driver = CoroDriver(coro)
+        hook_state._async_driver = driver
+        driver.start()
+        if driver.done:
+            hook_state._async_driver = None
+            if driver.cancelled():
+                raise asyncio.CancelledError()
+            error = driver.exception()
+            if error is not None:
+                raise error
+            return driver.result()
+        raise Suspend(driver, hook_state=hook_state, label=label)
+
+    def _register_component_retry(self, vnode: "VNode", signal: Suspend) -> None:
+        """Re-render ``vnode`` when the work it suspended on completes.
+
+        Used for update-time suspensions: the component keeps its
+        previous content on screen and re-runs its body once the
+        awaited work is done (no fallback flash, matching transition
+        semantics).
+        """
+        hook_state = vnode.hook_state
+
+        def _on_done(_waitable: Any) -> None:
+            if not vnode.mounted or vnode.hook_state is not hook_state:
+                return
+            hook_state._dirty = True
+            self.mark_dirty(vnode)
+            trigger = self._screen_re_render
+            if trigger is not None:
+                from .hooks import _schedule_trigger
+
+                _schedule_trigger(trigger)
+
+        signal.waitable.add_done_callback(_on_done)
 
     def _update_component(self, vnode: "VNode") -> None:
         """Re-run one function component's body and reconcile its subtree in place.
@@ -757,6 +918,12 @@ class Reconciler:
         read the context default instead of the provided value). Nested
         providers *inside* this subtree are pushed/popped normally by the
         recursive reconcile beneath us.
+
+        When the body itself suspends, the previous subtree stays on
+        screen untouched and the component re-renders once the awaited
+        work completes. Suspensions from *descendant mounts* during the
+        child reconcile propagate to the caller (which routes them to
+        the nearest Suspense boundary).
         """
         element = vnode.element
         if not callable(element.type):
@@ -771,7 +938,13 @@ class Reconciler:
         for context, value in providers:
             context._stack.append(value)
         try:
-            rendered = self._render_component_body(hook_state, element)
+            try:
+                rendered = self._render_component_body(hook_state, element)
+            except Suspend as signal:
+                if signal.hook_state is hook_state:
+                    self._register_component_retry(vnode, signal)
+                    return
+                raise
             new_children = self._reconcile_child_list(vnode.children, rendered)
         finally:
             for context, _value in reversed(providers):
@@ -812,6 +985,49 @@ class Reconciler:
                 return
             node = node.parent
         raise exc
+
+    def _handle_local_render_suspend(self, vnode: "VNode", signal: Suspend) -> None:
+        """Route a suspension from a local update to the nearest Suspense ancestor.
+
+        The child reconcile that suspended may have left the boundary's
+        content partially updated, so the boundary's whole content is
+        torn down and rebuilt through the fallback-and-retry path
+        (suspended hook states are preserved for the retry).
+        """
+        node = vnode.parent
+        while node is not None:
+            if isinstance(node.element.type, str) and node.element.type == "__Suspense__":
+                providers = self._ancestor_providers(node)
+                for context, value in providers:
+                    context._stack.append(value)
+                try:
+                    self._teardown_suspense_content(node)
+                    self._suspend_boundary(node, signal)
+                finally:
+                    for context, _value in reversed(providers):
+                        context._stack.pop()
+                self._bubble_structure_change(node)
+                return
+            node = node.parent
+        self._discard_salvage()
+        raise self._missing_suspense_error(signal) from None
+
+    def _discard_salvage(self) -> None:
+        """Dispose hook states salvaged during a Suspend that no boundary caught."""
+        salvage = self._suspense_salvage
+        self._suspense_salvage = None
+        if salvage:
+            self._dispose_hydration(salvage)
+
+    @staticmethod
+    def _missing_suspense_error(signal: Suspend) -> RuntimeError:
+        """Build the error raised when a suspension escapes every boundary."""
+        who = signal.label or "A component"
+        return RuntimeError(
+            f"{who} suspended while rendering, but no Suspense ancestor provides a "
+            "fallback. Wrap the async part of the tree in pn.Suspense(..., "
+            "fallback=...) to declare its loading state."
+        )
 
     @staticmethod
     def _ancestor_providers(vnode: "VNode") -> List[Tuple[Any, Any]]:
@@ -875,6 +1091,10 @@ class Reconciler:
         if element.type == "__ErrorBoundary__":
             return self._create_error_boundary(element)
 
+        # Suspense boundary: catch suspensions in the child subtree.
+        if element.type == "__Suspense__":
+            return self._create_suspense(element)
+
         # Keyed fragment (or a fragment reaching here as a root):
         # a transparent multi-child wrapper.
         if element.type == "__Fragment__":
@@ -885,13 +1105,28 @@ class Reconciler:
             self._refresh_identity(vnode)
             return vnode
 
-        # Function component: call with hook context.
+        # Function component: call with hook context. A retrying
+        # Suspense boundary may have preserved this component's hook
+        # state from the attempt that suspended; reclaiming it keeps
+        # cached resources (so the retry renders from cache instead of
+        # refetching).
         if callable(element.type):
             from .hooks import HookState
 
-            hook_state = HookState()
+            hook_state = self._take_hydrated_hook_state(element)
+            if hook_state is None:
+                hook_state = HookState()
             rendered = self._render_component_body(hook_state, element)
-            children = self._create_child_list(rendered)
+            try:
+                children = self._create_child_list(rendered)
+            except Suspend:
+                # The body rendered fine but a descendant suspended:
+                # salvage this component's own state too, so the
+                # boundary's retry re-adopts it.
+                if self._suspense_salvage is None:
+                    self._suspense_salvage = {}
+                self._suspense_salvage.setdefault((id(element.type), element.key), []).append(hook_state)
+                raise
             vnode = VNode(element, children)
             for child in children:
                 child.parent = vnode
@@ -914,22 +1149,47 @@ class Reconciler:
 
         child_els = _normalize_children(element.children, owner=element.type)
         index = 0
-        for child_el in child_els:
-            child_node = self._create_tree(child_el)
-            child_node.parent = vnode
-            vnode.children.append(child_node)
-            for root in self._native_roots(child_node):
-                if root.tag is not None:
-                    self._ops.append(InsertOp(tag, root.tag, index))
-                    index += 1
+        try:
+            for child_el in child_els:
+                child_node = self._create_tree(child_el)
+                child_node.parent = vnode
+                vnode.children.append(child_node)
+                for root in self._native_roots(child_node):
+                    if root.tag is not None:
+                        self._ops.append(InsertOp(tag, root.tag, index))
+                        index += 1
+        except Suspend:
+            # Don't leak the container (and already-built siblings)
+            # when a child suspends; hook states are salvaged for the
+            # boundary's retry.
+            if self._suspense_salvage is None:
+                self._suspense_salvage = {}
+            self._destroy_tree(vnode, salvage=self._suspense_salvage)
+            raise
+        except Exception:
+            self._destroy_tree(vnode)
+            raise
         return vnode
 
     def _create_child_list(self, elements: List[Element]) -> List[VNode]:
-        """Create VNodes for ``elements``, cleaning up on mid-list failure."""
+        """Create VNodes for ``elements``, cleaning up on mid-list failure.
+
+        When the failure is a [`Suspend`][pythonnative.suspense.Suspend],
+        already-built siblings are torn down with their hook states
+        *salvaged* (see `_destroy_tree`), so the Suspense boundary's
+        retry re-mounts them with their caches intact instead of
+        refetching everything the suspender's siblings had loaded.
+        """
         nodes: List[VNode] = []
         try:
             for el in elements:
                 nodes.append(self._create_tree(el))
+        except Suspend:
+            if self._suspense_salvage is None:
+                self._suspense_salvage = {}
+            for node in nodes:
+                self._destroy_tree(node, salvage=self._suspense_salvage)
+            raise
         except Exception:
             for node in nodes:
                 self._destroy_tree(node)
@@ -1057,6 +1317,202 @@ class Reconciler:
         return reset
 
     # ------------------------------------------------------------------
+    # Suspense boundaries
+    # ------------------------------------------------------------------
+
+    def _create_suspense(self, element: Element) -> VNode:
+        vnode = VNode(element, [])
+        self._attempt_suspense_content(vnode)
+        return vnode
+
+    def _reconcile_suspense(self, old: VNode, new_el: Element) -> VNode:
+        old.element = new_el
+
+        if old._suspense_showing_fallback:
+            # Fallback showing; keep it in sync with the latest fallback
+            # prop. Content retries are driven by waitable completions,
+            # not by parent re-renders.
+            fallback_els = self._suspense_fallback_elements(old)
+            old.children = self._reconcile_child_list(old.children, fallback_els)
+            for child in old.children:
+                child.parent = old
+            self._refresh_identity(old)
+            return old
+
+        try:
+            children = self._reconcile_child_list(old.children, _normalize_children(new_el.children, owner="Suspense"))
+            old.children = children
+            for child in children:
+                child.parent = old
+            self._refresh_identity(old)
+        except Suspend as signal:
+            self._teardown_suspense_content(old)
+            self._suspend_boundary(old, signal)
+        return old
+
+    def _attempt_suspense_content(self, node: VNode) -> None:
+        """Build a boundary's content from scratch (initial mount or retry).
+
+        Components re-adopt hook states preserved from the previous
+        attempt (the hydration map), so cached resources resolve
+        instead of refetching. On success any still-showing fallback
+        is swapped out for the content; on suspension the fallback
+        mounts (or stays) and a retry is wired to the pending work.
+        """
+        el = node.element
+        hydration = node._suspense_hydration or {}
+        node._suspense_hydration = None
+        saved_hydration = self._hydration
+        saved_salvage = self._suspense_salvage
+        self._hydration = hydration
+        self._suspense_salvage = None
+        try:
+            children = self._create_child_list(_normalize_children(el.children, owner="Suspense"))
+        except Suspend as signal:
+            # Unclaimed hook states from the previous attempt stay
+            # preserved for the next retry; salvaged sibling states are
+            # folded in by _suspend_boundary.
+            merged = {key: states for key, states in hydration.items() if states}
+            node._suspense_hydration = merged or None
+            self._suspend_boundary(node, signal)
+            return
+        finally:
+            self._hydration = saved_hydration
+            self._suspense_salvage = saved_salvage
+
+        # Success: dispose hook states no component reclaimed, then
+        # swap the fallback (if any) out for the real content.
+        self._dispose_hydration(hydration)
+        for child in node.children:
+            self._destroy_tree(child)
+        for child in children:
+            child.parent = node
+        node.children = children
+        node._suspense_showing_fallback = False
+        node._suspense_waits = None
+        self._refresh_identity(node)
+
+    def _retry_suspense(self, node: VNode) -> None:
+        """Re-attempt a suspended boundary's content after awaited work finished."""
+        self._attempt_suspense_content(node)
+
+    def _teardown_suspense_content(self, node: VNode) -> None:
+        """Destroy a boundary's live content, salvaging its hook states.
+
+        Used when an *update* under the boundary suspends: the content
+        components' hook states move into the boundary's hydration map,
+        so when the retry re-mounts them their state, caches, and
+        effect bookkeeping carry over (the fallback round-trip doesn't
+        reset the subtree).
+        """
+        salvage: Dict[Tuple[int, Any], List[Any]] = {}
+        for child in node.children:
+            self._destroy_tree(child, salvage=salvage)
+        node.children = []
+        node._suspense_showing_fallback = False
+        if salvage:
+            hydration = node._suspense_hydration
+            if hydration is None:
+                hydration = node._suspense_hydration = {}
+            for key, states in salvage.items():
+                hydration.setdefault(key, []).extend(states)
+
+    def _suspend_boundary(self, node: VNode, signal: Suspend) -> None:
+        """Show a boundary's fallback and schedule a retry for ``signal``.
+
+        A boundary without a fallback is transparent: the suspension
+        propagates to the next Suspense ancestor (mirroring how an
+        ErrorBoundary without a fallback re-raises).
+        """
+        el = node.element
+        fallback = el.props.get("__fallback__")
+        if fallback is None:
+            raise signal
+
+        # Fold in hook states salvaged while the Suspend unwound
+        # (already-rendered siblings of the suspender), plus the
+        # suspender's own state carried on the signal.
+        salvage = self._suspense_salvage
+        self._suspense_salvage = None
+        if salvage or (signal.hook_state is not None and signal.key is not None):
+            hydration = node._suspense_hydration
+            if hydration is None:
+                hydration = node._suspense_hydration = {}
+            if salvage:
+                for key, states in salvage.items():
+                    hydration.setdefault(key, []).extend(states)
+            if signal.hook_state is not None and signal.key is not None:
+                bucket = hydration.setdefault(signal.key, [])
+                if signal.hook_state not in bucket:
+                    bucket.append(signal.hook_state)
+
+        if not node._suspense_showing_fallback:
+            children = self._create_child_list(self._suspense_fallback_elements(node))
+            for child in children:
+                child.parent = node
+            node.children = children
+            node._suspense_showing_fallback = True
+            self._refresh_identity(node)
+
+        self._watch_waitable(node, signal.waitable)
+
+    def _suspense_fallback_elements(self, node: VNode) -> List[Element]:
+        """Render a Suspense boundary's fallback prop into a normalized child list."""
+        fallback = node.element.props.get("__fallback__")
+        if fallback is None:
+            return []
+        result: Any = fallback
+        if callable(fallback) and not isinstance(fallback, Element):
+            result = fallback()
+        return _normalize_children(result, owner="Suspense.fallback")
+
+    def _watch_waitable(self, node: VNode, waitable: Any) -> None:
+        """Queue a content retry for ``node`` when ``waitable`` completes."""
+        waits = node._suspense_waits
+        if waits is None:
+            waits = node._suspense_waits = set()
+        marker = id(waitable)
+        if marker in waits:
+            return
+        waits.add(marker)
+
+        def _on_done(_w: Any = None) -> None:
+            live_waits = node._suspense_waits
+            if live_waits is not None:
+                live_waits.discard(marker)
+            if not node.mounted or not node._suspense_showing_fallback:
+                return
+            self._dirty_suspense[id(node)] = node
+            trigger = self._screen_re_render
+            if trigger is not None:
+                from .hooks import _schedule_trigger
+
+                _schedule_trigger(trigger)
+
+        waitable.add_done_callback(_on_done)
+
+    def _take_hydrated_hook_state(self, element: Element) -> Any:
+        """Pop a preserved hook state matching ``element`` from the hydration map."""
+        hydration = self._hydration
+        if not hydration:
+            return None
+        bucket = hydration.get((id(element.type), element.key))
+        if not bucket:
+            return None
+        return bucket.pop(0)
+
+    @staticmethod
+    def _dispose_hydration(hydration: Dict[Tuple[int, Any], List[Any]]) -> None:
+        """Clean up preserved hook states that no component reclaimed."""
+        for states in hydration.values():
+            for hook_state in states:
+                try:
+                    hook_state.cleanup_all_effects()
+                except Exception as exc:
+                    diagnostics.warn(f"Error disposing a suspended component's state: {exc!r}")
+        hydration.clear()
+
+    # ------------------------------------------------------------------
     # Reconciliation
     # ------------------------------------------------------------------
 
@@ -1097,6 +1553,10 @@ class Reconciler:
         # Error boundary.
         if new_el.type == "__ErrorBoundary__":
             return self._reconcile_error_boundary(old, new_el)
+
+        # Suspense boundary.
+        if new_el.type == "__Suspense__":
+            return self._reconcile_suspense(old, new_el)
 
         # Keyed fragment: transparent multi-child wrapper.
         if new_el.type == "__Fragment__":
@@ -1297,7 +1757,18 @@ class Reconciler:
             if changed:
                 self._mark_layout_dirty(parent)
 
-    def _destroy_tree(self, node: VNode) -> None:
+    def _destroy_tree(self, node: VNode, salvage: Optional[Dict[Tuple[int, Any], List[Any]]] = None) -> None:
+        """Tear down a subtree, destroying native views and cleaning hook state.
+
+        Args:
+            node: Root of the subtree to destroy.
+            salvage: When given (a Suspense boundary is unwinding),
+                function-component hook states are moved into this map
+                keyed by ``(component identity, element key)`` instead
+                of being cleaned up, so the boundary's retry can
+                re-adopt them (cached resources and effect queues
+                survive the fallback round-trip).
+        """
         if not node.mounted:
             return
         node.mounted = False
@@ -1305,19 +1776,29 @@ class Reconciler:
         # fired moments before unmount can't resurrect a dead subtree.
         self._dirty_nodes.pop(id(node), None)
         self._dirty_boundaries.pop(id(node), None)
+        self._dirty_suspense.pop(id(node), None)
+        if node._suspense_hydration:
+            self._dispose_hydration(node._suspense_hydration)
+            node._suspense_hydration = None
         if node.hook_state is not None:
-            node.hook_state.cleanup_all_effects()
-            # Break the back-references so the unmounted component's hook
-            # state (and the closures it captured) can be freed by plain
-            # refcounting, important on iOS, where the cyclic GC is
-            # disabled.
-            node.hook_state._vnode = None
-            node.hook_state._reconciler = None
-            node.hook_state._trigger_render = None
+            if salvage is not None and callable(node.element.type):
+                salvage.setdefault((id(node.element.type), node.element.key), []).append(node.hook_state)
+                node.hook_state._vnode = None
+                node.hook_state._reconciler = None
+                node.hook_state._trigger_render = None
+            else:
+                node.hook_state.cleanup_all_effects()
+                # Break the back-references so the unmounted component's hook
+                # state (and the closures it captured) can be freed by plain
+                # refcounting, important on iOS, where the cyclic GC is
+                # disabled.
+                node.hook_state._vnode = None
+                node.hook_state._reconciler = None
+                node.hook_state._trigger_render = None
         if node.element is not None:
             self._detach_ref(node.element)
         for child in node.children:
-            self._destroy_tree(child)
+            self._destroy_tree(child, salvage=salvage)
         if self._is_native_node(node) and node.tag is not None:
             self._events.clear(node.tag)
             self._ops.append(DestroyOp(node.tag))

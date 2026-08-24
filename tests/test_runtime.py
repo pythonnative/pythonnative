@@ -1,4 +1,4 @@
-"""Unit tests for the pn.runtime asyncio runtime."""
+"""Unit tests for the pn.runtime main-thread guest loop."""
 
 from __future__ import annotations
 
@@ -12,60 +12,127 @@ from pythonnative.runtime import (
     call_on_main_thread,
     call_threadsafe,
     create_future,
+    drain,
     get_loop,
     reject_future,
     resolve_future,
     run_async,
+    run_blocking,
 )
 
 
-def test_loop_is_singleton_and_running() -> None:
+def test_loop_is_singleton() -> None:
     loop_a = get_loop()
     loop_b = get_loop()
     assert loop_a is loop_b
-    assert loop_a.is_running()
 
 
-def test_loop_runs_on_dedicated_thread() -> None:
-    loop = get_loop()
+def test_loop_lives_on_the_creating_thread() -> None:
+    """The framework loop is owned by the thread that created it (the
+    platform main thread on device, the test thread here); coroutines
+    run on that same thread, never a background one."""
     main_thread = threading.current_thread()
+    get_loop()
 
-    async def grab_thread() -> str:
-        return threading.current_thread().name
+    async def grab_thread() -> threading.Thread:
+        return threading.current_thread()
 
-    name = asyncio.run_coroutine_threadsafe(grab_thread(), loop).result(timeout=2.0)
-    assert name == "pn-asyncio"
-    assert threading.current_thread() is main_thread  # we never crossed onto the loop thread
+    assert run_blocking(grab_thread()) is main_thread
 
 
-def test_run_async_returns_thread_future_with_result() -> None:
+def test_get_loop_adopts_running_loop() -> None:
+    """Inside asyncio.run / an async test, get_loop returns the
+    caller's loop instead of the framework's own."""
+
+    async def check() -> bool:
+        return get_loop() is asyncio.get_running_loop()
+
+    assert asyncio.run(check())
+
+
+def test_run_blocking_returns_result() -> None:
     async def work() -> int:
         await asyncio.sleep(0)
         return 7
 
-    future = run_async(work())
-    assert future.result(timeout=2.0) == 7
+    assert run_blocking(work()) == 7
 
 
-def test_run_async_propagates_exceptions() -> None:
+def test_run_blocking_propagates_exceptions() -> None:
     async def explode() -> None:
         raise ValueError("nope")
 
-    future = run_async(explode())
     with pytest.raises(ValueError, match="nope"):
-        future.result(timeout=2.0)
+        run_blocking(explode())
+
+
+def test_run_blocking_timeout() -> None:
+    async def forever() -> None:
+        await asyncio.sleep(60)
+
+    with pytest.raises(TimeoutError):
+        run_blocking(forever(), timeout=0.05)
+
+
+def test_run_async_on_loop_thread_returns_task() -> None:
+    """On the loop's own thread run_async wraps the coroutine in an
+    asyncio.Task, so callers can await or cancel it."""
+    get_loop()
+
+    async def work() -> int:
+        return 3
+
+    handle = run_async(work())
+    assert isinstance(handle, asyncio.Task)
+    drain()
+    assert handle.result() == 3
+
+
+def test_run_async_from_other_thread_returns_concurrent_future() -> None:
+    """From a foreign thread run_async returns a
+    concurrent.futures.Future; the work still executes on the loop's
+    owner thread once it pumps."""
+    get_loop()
+    results: list = []
+
+    async def work() -> threading.Thread:
+        return threading.current_thread()
+
+    def submit() -> None:
+        results.append(run_async(work()))
+
+    worker = threading.Thread(target=submit)
+    worker.start()
+    worker.join()
+
+    future = results[0]
+    assert not isinstance(future, asyncio.Task)
+    drain(until=future.done)
+    assert future.result(timeout=0) is threading.current_thread()
+
+
+def test_run_async_task_propagates_exceptions() -> None:
+    async def explode() -> None:
+        raise ValueError("bad")
+
+    task = run_async(explode())
+    drain()
+    with pytest.raises(ValueError, match="bad"):
+        task.result()
 
 
 def test_call_threadsafe_dispatches_callback() -> None:
+    get_loop()
     received: list = []
-    done = threading.Event()
 
-    def callback(x: int) -> None:
-        received.append(x)
-        done.set()
+    def deliver() -> None:
+        call_threadsafe(received.append, 42)
 
-    call_threadsafe(callback, 42)
-    assert done.wait(2.0)
+    worker = threading.Thread(target=deliver)
+    worker.start()
+    worker.join()
+
+    drain(until=lambda: bool(received))
     assert received == [42]
 
 
@@ -73,7 +140,7 @@ def test_resolve_future_from_any_thread() -> None:
     future = create_future()
 
     def deliver() -> None:
-        time.sleep(0.05)
+        time.sleep(0.02)
         resolve_future(future, "hi")
 
     threading.Thread(target=deliver, daemon=True).start()
@@ -81,14 +148,14 @@ def test_resolve_future_from_any_thread() -> None:
     async def wait() -> str:
         return await future
 
-    assert run_async(wait()).result(timeout=2.0) == "hi"
+    assert run_blocking(wait(), timeout=2.0) == "hi"
 
 
 def test_reject_future_from_any_thread() -> None:
     future = create_future()
 
     def deliver() -> None:
-        time.sleep(0.05)
+        time.sleep(0.02)
         reject_future(future, RuntimeError("bad"))
 
     threading.Thread(target=deliver, daemon=True).start()
@@ -98,7 +165,7 @@ def test_reject_future_from_any_thread() -> None:
         return "unreached"
 
     with pytest.raises(RuntimeError, match="bad"):
-        run_async(wait()).result(timeout=2.0)
+        run_blocking(wait(), timeout=2.0)
 
 
 def test_resolve_after_done_is_noop() -> None:
@@ -110,8 +177,53 @@ def test_resolve_after_done_is_noop() -> None:
     async def wait() -> int:
         return await future
 
-    # Race-free wait for the first resolution to land via call_soon_threadsafe.
-    assert run_async(wait()).result(timeout=2.0) == 1
+    assert run_blocking(wait(), timeout=2.0) == 1
+
+
+def test_drain_settles_chained_tasks() -> None:
+    """drain() keeps pumping until dependent tasks settle, not just one
+    loop iteration."""
+    order: list = []
+
+    async def second() -> None:
+        await asyncio.sleep(0)
+        order.append("second")
+
+    async def first() -> None:
+        order.append("first")
+        await asyncio.sleep(0.01)
+        await second()
+
+    run_async(first())
+    assert drain(timeout=2.0)
+    assert order == ["first", "second"]
+
+
+def test_drain_until_predicate() -> None:
+    hits: list = []
+
+    async def tick() -> None:
+        while True:
+            hits.append(1)
+            await asyncio.sleep(0.001)
+
+    task = run_async(tick())
+    assert drain(timeout=2.0, until=lambda: len(hits) >= 3)
+    task.cancel()
+    drain()
+    assert len(hits) >= 3
+
+
+def test_run_blocking_rejects_reentrant_use() -> None:
+    async def inner() -> None:
+        coro = asyncio.sleep(0)
+        try:
+            run_blocking(coro)
+        finally:
+            coro.close()
+
+    with pytest.raises(RuntimeError, match="event loop is running"):
+        run_blocking(inner())
 
 
 def test_call_on_main_thread_runs_inline_off_device() -> None:
@@ -127,20 +239,14 @@ def test_call_on_main_thread_runs_inline_off_device() -> None:
     assert received == [caller_thread]
 
 
-def test_call_on_main_thread_bridges_coroutine_to_caller_thread() -> None:
-    """Off-device, ``call_on_main_thread`` from inside a coroutine runs
-    ``fn`` on the asyncio loop thread (the only "main-like" thread we
-    have in tests). The future round-trip mirrors the iOS / Android
-    flow: coroutine → main → resolve_future → coroutine."""
+def test_coroutines_share_the_callers_thread() -> None:
+    """The async-first model: coroutines and synchronous code interleave
+    on one thread, so a coroutine can safely touch state the sync side
+    owns without locks."""
+    state = {"value": 0}
 
-    async def confirm() -> str:
-        future = create_future()
+    async def bump() -> None:
+        state["value"] += 1
 
-        def on_main() -> None:
-            resolve_future(future, threading.current_thread().name)
-
-        call_on_main_thread(on_main)
-        return await future
-
-    name = run_async(confirm()).result(timeout=2.0)
-    assert name == "pn-asyncio"
+    run_blocking(bump())
+    assert state["value"] == 1

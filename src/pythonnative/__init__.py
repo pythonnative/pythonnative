@@ -92,6 +92,7 @@ from .components import (
     Slider,
     Spacer,
     StatusBar,
+    Suspense,
     Switch,
     Text,
     TextInput,
@@ -111,11 +112,11 @@ from .hooks import (
     component,
     create_context,
     memo,
-    use_async_effect,
     use_back_handler,
     use_callback,
     use_color_scheme,
     use_context,
+    use_deferred_value,
     use_effect,
     use_imperative_handle,
     use_keyboard_height,
@@ -126,8 +127,10 @@ from .hooks import (
     use_query,
     use_reducer,
     use_ref,
+    use_resource,
     use_safe_area_insets,
     use_state,
+    use_transition,
     use_window_dimensions,
 )
 from .native_modules import (
@@ -160,7 +163,7 @@ from .navigation import (
 )
 from .net import HTTPError, Response, fetch
 from .platform import Platform
-from .runtime import run_async
+from .runtime import run_async, run_blocking
 from .screen import create_screen
 from .sdk import (
     Props,
@@ -204,6 +207,7 @@ from .style import (
     style,
     use_theme,
 )
+from .suspense import Resource, lazy, start_resource
 
 __all__ = [
     # Components
@@ -233,6 +237,7 @@ __all__ = [
     "Slider",
     "Spacer",
     "StatusBar",
+    "Suspense",
     "Switch",
     "Text",
     "TextInput",
@@ -251,11 +256,11 @@ __all__ = [
     "MutationState",
     "QueryResult",
     "Ref",
-    "use_async_effect",
     "use_back_handler",
     "use_callback",
     "use_color_scheme",
     "use_context",
+    "use_deferred_value",
     "use_effect",
     "use_focus_effect",
     "use_imperative_handle",
@@ -268,11 +273,17 @@ __all__ = [
     "use_query",
     "use_reducer",
     "use_ref",
+    "use_resource",
     "use_route",
     "use_safe_area_insets",
     "use_state",
+    "use_transition",
     "use_window_dimensions",
     "Provider",
+    # Suspense and async rendering
+    "Resource",
+    "lazy",
+    "start_resource",
     # Navigation
     "NavigationContainer",
     "ScreenOptions",
@@ -349,6 +360,7 @@ __all__ = [
     "Response",
     # Runtime
     "run_async",
+    "run_blocking",
     "runtime",
     # Diagnostics
     "HookOrderError",

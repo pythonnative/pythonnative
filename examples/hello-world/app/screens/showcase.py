@@ -34,7 +34,7 @@ local_styles = pn.StyleSheet.create(
 def AnimatedCard() -> pn.Element:
     """Demonstrates ``Animated.View`` driven by ``use_animated_value``.
 
-    Uses ``use_async_effect`` so the parallel enter animation is
+    Uses an ``async def`` effect so the parallel enter animation is
     awaited (no callback ladder) and gets automatically cancelled if
     the screen unmounts before it finishes.
     """
@@ -49,7 +49,7 @@ def AnimatedCard() -> pn.Element:
             ]
         )
 
-    pn.use_async_effect(_enter, [])
+    pn.use_effect(_enter, [])
 
     return pn.Animated.View(
         pn.Text("I faded in", style={"font_size": 18, "font_weight": "600"}),

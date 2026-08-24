@@ -43,6 +43,7 @@ from app.screens.components.fragment import FragmentDemo
 from app.screens.components.image import ImageDemo
 from app.screens.components.image_background import ImageBackgroundDemo
 from app.screens.components.keyboard_avoiding_view import KeyboardAvoidingViewDemo
+from app.screens.components.lazy_component import LazyDemo
 from app.screens.components.modal import ModalDemo
 from app.screens.components.picker import PickerDemo
 from app.screens.components.portal import PortalDemo
@@ -56,6 +57,7 @@ from app.screens.components.segmented_control import SegmentedControlDemo
 from app.screens.components.slider import SliderDemo
 from app.screens.components.spacer import SpacerDemo
 from app.screens.components.status_bar import StatusBarDemo
+from app.screens.components.suspense import SuspenseDemo
 from app.screens.components.switch import SwitchDemo
 from app.screens.components.text import TextDemo
 from app.screens.components.text_input import TextInputDemo
@@ -63,13 +65,14 @@ from app.screens.components.touchable_opacity import TouchableOpacityDemo
 from app.screens.components.view_column_row import ViewColumnRowDemo
 from app.screens.components.web_view import WebViewDemo
 from app.screens.gestures.gestures import GesturesDemo
+from app.screens.hooks.async_effect import AsyncEffectDemo
 from app.screens.hooks.batch_updates_demo import BatchUpdatesDemo
 from app.screens.hooks.memo_demo import MemoDemo
-from app.screens.hooks.use_async_effect import UseAsyncEffectDemo
 from app.screens.hooks.use_back_handler import UseBackHandlerDemo
 from app.screens.hooks.use_callback import UseCallbackDemo
 from app.screens.hooks.use_color_scheme import UseColorSchemeDemo
 from app.screens.hooks.use_context import UseContextDemo
+from app.screens.hooks.use_deferred_value import UseDeferredValueDemo
 from app.screens.hooks.use_effect import UseEffectDemo
 from app.screens.hooks.use_imperative_handle import UseImperativeHandleDemo
 from app.screens.hooks.use_layout_effect import UseLayoutEffectDemo
@@ -79,8 +82,10 @@ from app.screens.hooks.use_persisted_state import UsePersistedStateDemo
 from app.screens.hooks.use_query import UseQueryDemo
 from app.screens.hooks.use_reducer import UseReducerDemo
 from app.screens.hooks.use_ref import UseRefDemo
+from app.screens.hooks.use_resource import UseResourceDemo
 from app.screens.hooks.use_state import UseStateDemo
 from app.screens.hooks.use_theme import UseThemeDemo
+from app.screens.hooks.use_transition import UseTransitionDemo
 from app.screens.hooks.use_window_dimensions import UseWindowDimensionsDemo
 from app.screens.layout.absolute_position import AbsolutePositionDemo
 from app.screens.layout.alignment import AlignmentDemo
@@ -192,6 +197,8 @@ DEMOS: List[DemoEntry] = [
     DemoEntry("checkbox", "Components", "Checkbox", "Checkbox", CheckboxDemo),
     DemoEntry("segmented_control", "Components", "SegmentedControl", "SegmentedControl", SegmentedControlDemo),
     DemoEntry("date_picker", "Components", "DatePicker", "DatePicker", DatePickerDemo),
+    DemoEntry("suspense", "Components", "Suspense", "Suspense", SuspenseDemo),
+    DemoEntry("lazy", "Components", "lazy", "lazy", LazyDemo),
     # ------------------------------------------------------------------
     # Hooks
     # ------------------------------------------------------------------
@@ -224,11 +231,20 @@ DEMOS: List[DemoEntry] = [
     DemoEntry("use_callback", "Hooks", "use_callback", "use_callback", UseCallbackDemo),
     DemoEntry("use_context", "Hooks", "use_context", "use_context", UseContextDemo),
     DemoEntry(
-        "use_async_effect",
+        "async_effect",
         "Hooks",
-        "use_async_effect",
-        "use_async_effect",
-        UseAsyncEffectDemo,
+        "async use_effect",
+        "use_effect",
+        AsyncEffectDemo,
+    ),
+    DemoEntry("use_resource", "Hooks", "use_resource", "use_resource", UseResourceDemo),
+    DemoEntry("use_transition", "Hooks", "use_transition", "use_transition", UseTransitionDemo),
+    DemoEntry(
+        "use_deferred_value",
+        "Hooks",
+        "use_deferred_value",
+        "use_deferred_value",
+        UseDeferredValueDemo,
     ),
     DemoEntry("use_query", "Hooks", "use_query", "use_query", UseQueryDemo),
     DemoEntry("use_mutation", "Hooks", "use_mutation", "use_mutation", UseMutationDemo),

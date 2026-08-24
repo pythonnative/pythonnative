@@ -78,6 +78,7 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "QueryResult",  # observed via use_query demo
     "MutationCall",  # observed via use_mutation demo
     "MutationState",  # observed via use_mutation demo
+    "Resource",  # returned by use_resource; observed via use_resource demo
     "Ref",  # returned by use_ref; exercised by use_ref + use_imperative_handle demos
     "ListController",  # driven through the use_imperative_handle demo's scroll buttons
     # --------------------------------------------------------------
@@ -141,6 +142,8 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # SDK re-exports: module-level names mirroring submodule content.
     # --------------------------------------------------------------
     "runtime",  # module re-export; run_async demo covers it
+    "run_blocking",  # blocking script/test helper; can't run inside the app's live loop
+    "start_resource",  # non-hook Resource constructor; driven by the lazy demo and unit tests
     "sdk",  # module re-export; custom_component demo covers it
     "appearance",  # module re-export; use_color_scheme demo drives set_color_scheme
     "images",  # module re-export; Image demo exercises the fetch/cache pipeline

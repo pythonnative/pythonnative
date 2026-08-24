@@ -25,3 +25,5 @@ appId: ${APP_ID}
 - runFlow: ../flows/components/checkbox.yaml
 - runFlow: ../flows/components/segmented_control.yaml
 - runFlow: ../flows/components/date_picker.yaml
+- runFlow: ../flows/components/suspense.yaml
+- runFlow: ../flows/components/lazy.yaml

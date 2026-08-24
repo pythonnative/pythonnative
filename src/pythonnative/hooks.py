@@ -15,7 +15,15 @@ Two effect phases exist, mirroring React:
   layout pass have been applied. They can measure committed frames and
   issue imperative view commands before the user sees the new frame.
 - [`use_effect`][pythonnative.use_effect] callbacks (passive effects)
-  run after the layout effects, at the end of the same commit.
+  run after the layout effects, at the end of the same commit. An
+  effect may be an ``async def``; it runs as a task on the framework
+  loop and is cancelled when its dependencies change or the component
+  unmounts.
+
+The current hook state travels in a :mod:`contextvars` context rather
+than a plain global, so ``async def`` component bodies keep their hook
+identity across ``await`` boundaries even when several coroutine
+renders interleave on the event loop.
 
 Example:
     ```python
@@ -33,21 +41,34 @@ Example:
 
 import asyncio
 import inspect
-import threading
 from contextlib import contextmanager
+from contextvars import ContextVar, Token
 from dataclasses import dataclass, field, replace
 from typing import Any, Awaitable, Callable, Dict, Generator, Generic, List, Optional, Tuple, TypeVar
 
 from . import diagnostics
 from .element import Element
+from .suspense import CoroDriver, Resource
 
 T = TypeVar("T")
 
 _SENTINEL = object()
 
-_hook_context: threading.local = threading.local()
+# The component whose body is currently executing. A ContextVar (not a
+# global or thread-local) so coroutine component bodies resume with the
+# right hook state after every ``await``, no matter how renders
+# interleave on the loop.
+_hook_context: "ContextVar[Optional[HookState]]" = ContextVar("pn_hook_state", default=None)
 
-_batch_context: threading.local = threading.local()
+# Depth of nested ``batch_updates`` blocks plus the trigger deferred by
+# the outermost block, per execution context.
+_batch_depth: "ContextVar[int]" = ContextVar("pn_batch_depth", default=0)
+_batch_pending: "ContextVar[Optional[List[Callable[[], None]]]]" = ContextVar("pn_batch_pending", default=None)
+
+# Whether state updates in the current execution context were marked as
+# transitions (see ``use_transition``). Transition updates defer their
+# re-render to a later loop turn so urgent updates stay responsive.
+_transition_var: "ContextVar[bool]" = ContextVar("pn_transition", default=False)
 
 
 # ======================================================================
@@ -121,21 +142,26 @@ class HookState:
         "layout_effects",
         "memos",
         "refs",
+        "resources",
         "state_index",
         "effect_index",
         "layout_effect_index",
         "memo_index",
         "ref_index",
+        "resource_index",
         "context_deps",
         "_trigger_render",
         "_pending_effects",
         "_pending_layout_effects",
+        "_pending_effects_mark",
+        "_pending_layout_effects_mark",
         "_dirty",
         "_vnode",
         "_reconciler",
         "_hook_log",
         "_hook_signature",
         "_component_name",
+        "_async_driver",
     )
 
     def __init__(self) -> None:
@@ -144,11 +170,14 @@ class HookState:
         self.layout_effects: List[Tuple[Any, Any]] = []
         self.memos: List[Tuple[Any, Any]] = []
         self.refs: List[Ref] = []
+        # One ``(deps, Resource)`` per ``use_resource`` call.
+        self.resources: List[Tuple[Any, Resource]] = []
         self.state_index: int = 0
         self.effect_index: int = 0
         self.layout_effect_index: int = 0
         self.memo_index: int = 0
         self.ref_index: int = 0
+        self.resource_index: int = 0
         # Contexts read during the last completed render, keyed by
         # ``id(context)``. The reconciler consults this when a
         # Provider's value changes so consumers re-render even when a
@@ -176,6 +205,13 @@ class HookState:
         self._hook_log: Optional[List[str]] = None
         self._hook_signature: Optional[List[str]] = None
         self._component_name: str = ""
+        # For ``async def`` components: the CoroDriver running the
+        # in-flight body, cancelled when a newer render supersedes it.
+        self._async_driver: Optional[CoroDriver] = None
+        # Effect-queue lengths at ``begin_render``, so a suspended
+        # render can be rolled back without double-queueing effects.
+        self._pending_effects_mark: int = 0
+        self._pending_layout_effects_mark: int = 0
 
     def begin_render(self, component_name: str = "") -> None:
         """Prepare for a render pass: reset cursors and the dev-mode hook log.
@@ -189,10 +225,23 @@ class HookState:
         self.layout_effect_index = 0
         self.memo_index = 0
         self.ref_index = 0
+        self.resource_index = 0
         self.context_deps = {}
         if component_name:
             self._component_name = component_name
         self._hook_log = [] if diagnostics.is_dev() else None
+        self._pending_effects_mark = len(self._pending_effects)
+        self._pending_layout_effects_mark = len(self._pending_layout_effects)
+
+    def abort_render(self) -> None:
+        """Roll back a suspended render's effect queue.
+
+        A suspended body re-runs from the top on retry, so any effects
+        it queued before suspending would otherwise be queued twice.
+        """
+        del self._pending_effects[self._pending_effects_mark :]
+        del self._pending_layout_effects[self._pending_layout_effects_mark :]
+        self._hook_log = None
 
     def finish_render(self) -> None:
         """Finalize a successful render: lock in / verify the hook signature.
@@ -260,6 +309,7 @@ class HookState:
         """Run layout effects queued during render (commit phase, pre-paint)."""
         pending = self._pending_layout_effects
         self._pending_layout_effects = []
+        self._pending_layout_effects_mark = 0
         for idx, effect_fn, deps in pending:
             _, prev_cleanup = self.layout_effects[idx]
             if callable(prev_cleanup):
@@ -267,7 +317,7 @@ class HookState:
                     prev_cleanup()
                 except Exception:
                     pass
-            cleanup = effect_fn()
+            cleanup = _activate_effect(effect_fn)
             self.layout_effects[idx] = (list(deps) if deps is not None else None, cleanup)
 
     def flush_pending_effects(self) -> None:
@@ -275,10 +325,14 @@ class HookState:
 
         For each pending effect, the previous cleanup is invoked first
         (if any), then the new effect callback. The new return value
-        becomes the next cleanup.
+        becomes the next cleanup. Effects that are ``async def`` (or
+        that return an awaitable) run as tasks on the framework loop;
+        their cleanup cancels the task, and a callable returned by the
+        coroutine runs as an additional cleanup once it completed.
         """
         pending = self._pending_effects
         self._pending_effects = []
+        self._pending_effects_mark = 0
         for idx, effect_fn, deps in pending:
             _, prev_cleanup = self.effects[idx]
             if callable(prev_cleanup):
@@ -286,15 +340,16 @@ class HookState:
                     prev_cleanup()
                 except Exception:
                     pass
-            cleanup = effect_fn()
+            cleanup = _activate_effect(effect_fn)
             self.effects[idx] = (list(deps) if deps is not None else None, cleanup)
 
     def cleanup_all_effects(self) -> None:
         """Run every outstanding cleanup function, then clear state.
 
         Layout-effect cleanups run before passive-effect cleanups,
-        matching the mount order in reverse. Called when the component
-        instance is unmounted by the reconciler.
+        matching the mount order in reverse. Also cancels in-flight
+        resources and any pending ``async def`` body. Called when the
+        component instance is unmounted by the reconciler.
         """
         for i, (_deps, cleanup) in enumerate(self.layout_effects):
             if callable(cleanup):
@@ -312,21 +367,38 @@ class HookState:
             self.effects[i] = (_SENTINEL, None)
         self._pending_effects = []
         self._pending_layout_effects = []
+        self._pending_effects_mark = 0
+        self._pending_layout_effects_mark = 0
+        for _deps, resource in self.resources:
+            try:
+                resource.cancel()
+            except Exception:
+                pass
+        self.resources = []
+        driver = self._async_driver
+        self._async_driver = None
+        if driver is not None:
+            driver.cancel()
 
 
 # ======================================================================
-# Thread-local context helpers
+# Context helpers
 # ======================================================================
 
 
 def _get_hook_state() -> Optional[HookState]:
     """Return the active `HookState`, or `None` if no render is in flight."""
-    return getattr(_hook_context, "current", None)
+    return _hook_context.get()
 
 
-def _set_hook_state(state: Optional[HookState]) -> None:
-    """Install `state` as the active `HookState` for the current thread."""
-    _hook_context.current = state
+def _set_hook_state(state: Optional[HookState]) -> "Token[Optional[HookState]]":
+    """Install `state` as the active `HookState`; returns the reset token."""
+    return _hook_context.set(state)
+
+
+def _reset_hook_state(token: "Token[Optional[HookState]]") -> None:
+    """Restore the hook state that was active before `_set_hook_state`."""
+    _hook_context.reset(token)
 
 
 def _deps_changed(prev: Any, current: Any) -> bool:
@@ -340,17 +412,124 @@ def _deps_changed(prev: Any, current: Any) -> bool:
     return any(p is not c and p != c for p, c in zip(prev, current))
 
 
+def _activate_effect(effect_fn: Callable) -> Any:
+    """Invoke an effect callback, running coroutine effects as tasks.
+
+    Synchronous effects return their cleanup directly. When the effect
+    is an ``async def`` (or returns an awaitable), the coroutine runs
+    as a task on the framework loop and the returned cleanup cancels
+    it; if the coroutine already finished and returned a callable, that
+    callable runs as the cleanup instead.
+    """
+    result = effect_fn()
+    if not inspect.isawaitable(result):
+        return result
+
+    from .runtime import run_async
+
+    future = run_async(result)
+
+    def _observe(fut: Any) -> None:
+        # Surface unhandled async-effect crashes instead of letting the
+        # future's exception vanish unobserved: RedBox in dev mode,
+        # traceback in production.
+        if fut.cancelled():
+            return
+        exc = fut.exception()
+        if exc is None or isinstance(exc, asyncio.CancelledError):
+            return
+        if not diagnostics.report_error(exc, phase="async effect"):
+            import traceback
+
+            traceback.print_exception(type(exc), exc, exc.__traceback__)
+
+    future.add_done_callback(_observe)
+
+    def _cleanup() -> None:
+        if future.cancelled():
+            return
+        if future.done():
+            if future.exception() is None:
+                returned = future.result()
+                if callable(returned):
+                    try:
+                        returned()
+                    except Exception:
+                        pass
+            return
+        future.cancel()
+
+    return _cleanup
+
+
 # ======================================================================
-# Batching helpers
+# Batching and transition scheduling
 # ======================================================================
 
 
 def _schedule_trigger(trigger: Callable[[], None]) -> None:
     """Run ``trigger`` immediately, or defer it inside a `batch_updates` block."""
-    if getattr(_batch_context, "depth", 0) > 0:
-        _batch_context.pending_trigger = trigger
+    pending = _batch_pending.get()
+    if _batch_depth.get() > 0 and pending is not None:
+        if trigger not in pending:
+            pending.append(trigger)
     else:
         trigger()
+
+
+# Transition scheduling state. Deferred triggers (and the callbacks
+# that flip ``is_pending`` back off) run together on a later loop turn.
+_deferred_triggers: List[Callable[[], None]] = []
+_post_transition_callbacks: List[Callable[[], None]] = []
+_transition_flush_scheduled = False
+
+
+def _flush_transitions() -> None:
+    """Run every deferred transition render, then the completion callbacks."""
+    global _transition_flush_scheduled
+    _transition_flush_scheduled = False
+    triggers = list(_deferred_triggers)
+    _deferred_triggers.clear()
+    callbacks = list(_post_transition_callbacks)
+    _post_transition_callbacks.clear()
+    for trigger in triggers:
+        try:
+            trigger()
+        except Exception as exc:
+            if not diagnostics.report_error(exc, phase="transition"):
+                raise
+    for callback in callbacks:
+        try:
+            callback()
+        except Exception as exc:
+            if not diagnostics.report_error(exc, phase="transition"):
+                raise
+
+
+def _schedule_transition_flush() -> None:
+    """Ensure a transition flush is queued on the framework loop."""
+    global _transition_flush_scheduled
+    if _transition_flush_scheduled:
+        return
+    _transition_flush_scheduled = True
+    from .runtime import get_loop
+
+    get_loop().call_soon(_flush_transitions)
+
+
+def _defer_transition_trigger(trigger: Callable[[], None]) -> None:
+    if trigger not in _deferred_triggers:
+        _deferred_triggers.append(trigger)
+    _schedule_transition_flush()
+
+
+def _run_in_transition(fn: Callable[[], None]) -> None:
+    """Run ``fn`` with its state updates marked as transitions."""
+    token = _transition_var.set(True)
+    try:
+        fn()
+    finally:
+        _transition_var.reset(token)
 
 
 def _notify_state_changed(ctx: "HookState") -> None:
@@ -361,7 +540,9 @@ def _notify_state_changed(ctx: "HookState") -> None:
     ``flush_dirty``, which re-renders only the components marked here
     rather than the whole app. The dirty mark is eager (so several
     setters coalesce), while the render trigger respects
-    [`batch_updates`][pythonnative.batch_updates].
+    [`batch_updates`][pythonnative.batch_updates] and defers to a later
+    loop turn inside a transition (see
+    [`use_transition`][pythonnative.use_transition]).
     """
     ctx._dirty = True
     reconciler = ctx._reconciler
@@ -369,7 +550,10 @@ def _notify_state_changed(ctx: "HookState") -> None:
     if reconciler is not None and vnode is not None:
         reconciler.mark_dirty(vnode)
     if ctx._trigger_render:
-        _schedule_trigger(ctx._trigger_render)
+        if _transition_var.get():
+            _defer_transition_trigger(ctx._trigger_render)
+        else:
+            _schedule_trigger(ctx._trigger_render)
 
 
 @contextmanager
@@ -393,18 +577,19 @@ def batch_updates() -> Generator[None, None, None]:
             set_name("hello")
         ```
     """
-    depth = getattr(_batch_context, "depth", 0)
-    _batch_context.depth = depth + 1
+    depth = _batch_depth.get()
+    depth_token = _batch_depth.set(depth + 1)
+    pending_token = None
     if depth == 0:
-        _batch_context.pending_trigger = None
+        pending_token = _batch_pending.set([])
     try:
         yield
     finally:
-        _batch_context.depth -= 1
-        if _batch_context.depth == 0:
-            trigger = _batch_context.pending_trigger
-            _batch_context.pending_trigger = None
-            if trigger is not None:
+        _batch_depth.reset(depth_token)
+        if pending_token is not None:
+            triggers = _batch_pending.get() or []
+            _batch_pending.reset(pending_token)
+            for trigger in triggers:
                 trigger()
 
 
@@ -548,12 +733,20 @@ def use_effect(effect: Callable, deps: Optional[list] = None) -> None:
     - `[]`: mount only.
     - `[a, b]`: when `a` or `b` change (compared by identity, then `==`).
 
-    `effect` may return a cleanup callable; the previous cleanup runs
-    before the next effect (and on unmount).
+    A synchronous `effect` may return a cleanup callable; the previous
+    cleanup runs before the next effect (and on unmount).
+
+    An **async** `effect` (an ``async def``) runs as a task on the
+    framework loop. When `deps` change or the component unmounts, the
+    in-flight task is cancelled (:class:`asyncio.CancelledError` is
+    raised at its current ``await``), giving async effects structured
+    cancellation for free. If the coroutine finishes and returns a
+    callable, that callable runs as the cleanup instead.
 
     Args:
-        effect: A zero-arg callable invoked after commit. Optionally
-            returns a cleanup callable.
+        effect: A zero-arg callable invoked after commit: either a
+            synchronous function (optionally returning a cleanup
+            callable) or an ``async def``.
         deps: Dependency list, or `None` to run on every render.
 
     Raises:
@@ -561,20 +754,21 @@ def use_effect(effect: Callable, deps: Optional[list] = None) -> None:
 
     Example:
         ```python
+        import asyncio
+
         import pythonnative as pn
 
         @pn.component
-        def Timer():
-            seconds, set_seconds = pn.use_state(0)
+        def Clock():
+            now, set_now = pn.use_state("")
 
-            def tick():
-                import threading
-                t = threading.Timer(1.0, lambda: set_seconds(seconds + 1))
-                t.start()
-                return t.cancel
+            async def tick():
+                while True:
+                    set_now(time.strftime("%H:%M:%S"))
+                    await asyncio.sleep(1)
 
-            pn.use_effect(tick, [seconds])
-            return pn.Text(f"Elapsed: {seconds}s")
+            pn.use_effect(tick, [])
+            return pn.Text(now)
         ```
     """
     ctx = _get_hook_state()
@@ -803,23 +997,31 @@ def use_imperative_handle(
 # ======================================================================
 
 
-def use_async_effect(
-    effect: Callable[[], Awaitable[None]],
-    deps: Optional[list] = None,
-) -> None:
-    """Schedule an async effect that's cancelled on re-run / unmount.
+def use_resource(fetcher: Callable[[], Any], deps: Optional[list] = None) -> Resource[Any]:
+    """Start an async fetch and cache it across renders.
 
-    Like [`use_effect`][pythonnative.use_effect] but takes an
-    ``async def`` (or any zero-arg callable returning an awaitable).
-    The coroutine is scheduled on the framework runtime via
-    [`run_async`][pythonnative.runtime.run_async] after the native
-    commit. When ``deps`` change (or the component unmounts), the
-    in-flight future is cancelled.
+    The fetch starts immediately (during render, not after commit) and
+    the resulting [`Resource`][pythonnative.Resource] is cached until
+    ``deps`` change, at which point the old fetch is cancelled and a
+    new one starts. Because results are cached, re-renders resolve
+    instantly; only genuinely new data suspends.
+
+    Consume the resource with ``resource.read()`` (suspends the render
+    while pending; pair with a [`Suspense`][pythonnative.Suspense]
+    boundary) or ``await resource`` inside an ``async def`` component.
+    Errors raised by the fetcher re-raise at the read site, so an
+    enclosing [`ErrorBoundary`][pythonnative.ErrorBoundary] catches
+    failures declaratively.
 
     Args:
-        effect: A zero-arg callable returning an awaitable. Typically
-            an ``async def`` defined inside the component.
-        deps: Dependency list, or ``None`` to re-run on every render.
+        fetcher: Zero-arg ``async def`` (or plain callable) producing
+            the value. Synchronous fetchers resolve immediately and
+            never suspend.
+        deps: Dependency list controlling when to refetch. Defaults to
+            ``[]`` (fetch once per component instance).
+
+    Returns:
+        The cached [`Resource`][pythonnative.Resource].
 
     Raises:
         RuntimeError: If called outside a ``@component`` function.
@@ -830,43 +1032,121 @@ def use_async_effect(
 
 
         @pn.component
-        def Posts(user_id):
-            posts, set_posts = pn.use_state([])
-
-            async def load():
-                set_posts(await api.get_posts(user_id))
-
-            pn.use_async_effect(load, [user_id])
-            return pn.FlatList(posts, render_item=...)
+        async def UserCard(user_id):
+            user = await pn.use_resource(lambda: api.get_user(user_id), [user_id])
+            return pn.Text(user["name"])
         ```
     """
-    from .runtime import run_async
+    from .suspense import start_resource
 
-    def _sync_effect() -> Callable[[], None]:
-        future = run_async(effect())
+    ctx = _get_hook_state()
+    if ctx is None:
+        raise RuntimeError("use_resource must be called inside a @component function")
+    ctx.record_hook("use_resource")
 
-        def _observe(fut: Any) -> None:
-            # Surface unhandled async-effect crashes instead of letting
-            # the future's exception vanish unobserved: RedBox in dev
-            # mode, traceback in production.
-            if fut.cancelled():
-                return
-            exc = fut.exception()
-            if exc is None or isinstance(exc, asyncio.CancelledError):
-                return
-            if not diagnostics.report_error(exc, phase="async effect"):
-                import traceback
+    idx = ctx.resource_index
+    ctx.resource_index += 1
+    deps = [] if deps is None else deps
 
-                traceback.print_exception(type(exc), exc, exc.__traceback__)
+    if idx >= len(ctx.resources):
+        resource = start_resource(fetcher)
+        ctx.resources.append((list(deps), resource))
+        return resource
 
-        future.add_done_callback(_observe)
+    prev_deps, prev_resource = ctx.resources[idx]
+    if not _deps_changed(prev_deps, deps):
+        return prev_resource
 
-        def _cancel() -> None:
-            future.cancel()
+    prev_resource.cancel()
+    resource = start_resource(fetcher)
+    ctx.resources[idx] = (list(deps), resource)
+    return resource
 
-        return _cancel
 
-    use_effect(_sync_effect, deps)
+def use_transition() -> Tuple[bool, Callable[[Callable[[], None]], None]]:
+    """Return ``(is_pending, start_transition)`` for low-priority updates.
+
+    State updates made inside ``start_transition(fn)`` are marked as
+    *transitions*: instead of re-rendering synchronously, their render
+    is deferred to a later turn of the framework loop, so urgent
+    updates (typing, presses) queued in the meantime render first.
+    ``is_pending`` is ``True`` from the moment ``start_transition`` is
+    called until the deferred render has committed, which is exactly
+    when to show a lightweight busy indicator.
+
+    Returns:
+        A 2-tuple ``(is_pending, start_transition)``.
+
+    Raises:
+        RuntimeError: If called outside a ``@component`` function.
+
+    Example:
+        ```python
+        import pythonnative as pn
+
+
+        @pn.component
+        def Search():
+            query, set_query = pn.use_state("")
+            results_for, set_results_for = pn.use_state("")
+            is_pending, start_transition = pn.use_transition()
+
+            def on_change(text):
+                set_query(text)  # urgent: keep the input responsive
+                start_transition(lambda: set_results_for(text))
+
+            return pn.Column(
+                pn.TextInput(value=query, on_change=on_change),
+                pn.ActivityIndicator() if is_pending else Results(results_for),
+            )
+        ```
+    """
+    ctx = _get_hook_state()
+    if ctx is None:
+        raise RuntimeError("use_transition must be called inside a @component function")
+
+    is_pending, set_pending = use_state(False)
+
+    def start_transition(fn: Callable[[], None]) -> None:
+        set_pending(True)
+        _run_in_transition(fn)
+        _post_transition_callbacks.append(lambda: set_pending(False))
+        _schedule_transition_flush()
+
+    start = use_callback(start_transition, [])
+    return is_pending, start
+
+
+def use_deferred_value(value: Any) -> Any:
+    """Return a copy of ``value`` that lags behind during fast updates.
+
+    The returned value updates in a deferred (transition-priority)
+    render after the urgent render that changed ``value`` has
+    committed. Pass the deferred value to expensive subtrees (a
+    filtered list, a chart) so the urgent part of the UI stays
+    responsive while the expensive part catches up a beat later.
+
+    Args:
+        value: The latest value.
+
+    Returns:
+        The previous value while a newer one is still being adopted,
+        then the latest value.
+
+    Raises:
+        RuntimeError: If called outside a ``@component`` function.
+    """
+    ctx = _get_hook_state()
+    if ctx is None:
+        raise RuntimeError("use_deferred_value must be called inside a @component function")
+
+    deferred, set_deferred = use_state(value)
+
+    def _adopt() -> None:
+        _run_in_transition(lambda: set_deferred(value))
+
+    use_effect(_adopt, [value])
+    return deferred
 
 
 @dataclass(frozen=True)
@@ -1012,7 +1292,10 @@ class MutationCall(Generic[T]):
         self._future = future
 
     def __await__(self) -> Any:
-        return asyncio.wrap_future(self._future).__await__()
+        future = self._future
+        if isinstance(future, asyncio.Future):
+            return future.__await__()
+        return asyncio.wrap_future(future).__await__()
 
     def cancel(self) -> bool:
         """Cancel the underlying mutation. Returns whether cancellation succeeded."""

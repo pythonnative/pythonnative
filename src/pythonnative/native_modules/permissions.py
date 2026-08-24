@@ -193,8 +193,31 @@ def _ios_request(permission: str, on_done: Callable[[PermissionStatus], None]) -
 
             AVCaptureDevice.requestAccessForMediaType_completionHandler_(media, Block(_granted, None, bool))
             return
+
+        if permission == "photos":
+            PHPhotoLibrary = ObjCClass("PHPhotoLibrary")
+
+            def _photos_done(status: int) -> None:
+                # 0 notDetermined, 1 restricted, 2 denied, 3 authorized,
+                # 4 limited (counts as granted).
+                on_done({0: UNDETERMINED, 1: BLOCKED, 2: DENIED, 3: GRANTED, 4: GRANTED}.get(int(status), UNDETERMINED))
+
+            PHPhotoLibrary.requestAuthorization_(Block(_photos_done, None, int))
+            return
+
+        if permission == "notifications":
+            center = ObjCClass("UNUserNotificationCenter").currentNotificationCenter()
+
+            def _notif_done(granted: bool, _error: Any) -> None:
+                on_done(GRANTED if granted else DENIED)
+
+            # 0x07 = badge | sound | alert.
+            center.requestAuthorizationWithOptions_completionHandler_(0x07, Block(_notif_done, None, bool, object))
+            return
     except Exception:
         pass
     # Fall back to reporting the current status for permissions whose
-    # request flow isn't wired up natively.
+    # request flow isn't wired up natively (location needs a
+    # CLLocationManager delegate; use the Location module's own
+    # request path for that).
     on_done(_ios_check(permission))

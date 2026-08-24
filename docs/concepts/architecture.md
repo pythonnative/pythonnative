@@ -49,25 +49,65 @@ platform APIs synchronously from Python.
    [`ErrorBoundary`][pythonnative.ErrorBoundary] catches render
    errors in child subtrees and displays fallback UI, preventing a
    single component failure from crashing the entire page.
-8. **Direct bindings.** Under the hood, native views are created and
+8. **Async components and Suspense.** A component body may be an
+   `async def`. The reconciler drives it synchronously as far as it
+   can (awaits on already-resolved data complete inline); if it
+   blocks on pending work the render *suspends* and the nearest
+   [`Suspense`][pythonnative.Suspense] boundary shows its fallback
+   until the awaited work finishes.
+   [`use_resource`][pythonnative.use_resource] starts fetches during
+   render, and [`lazy`][pythonnative.lazy] code-splits components
+   behind the same mechanism.
+9. **Direct bindings.** Under the hood, native views are created and
    updated through direct platform calls:
    - **iOS**: rubicon-objc exposes Objective-C/Swift classes
      (`UILabel`, `UIButton`, `UIStackView`, etc.).
    - **Android**: Chaquopy exposes Java classes
      (`android.widget.TextView`, `android.widget.Button`, etc.) via
      the JNI bridge.
-9. **Thin native bootstrap.** The host app remains native (Android
+10. **Thin native bootstrap.** The host app remains native (Android
    `Activity` or iOS `UIViewController`). It calls
    [`create_screen`][pythonnative.create_screen] internally to bootstrap
    your Python component, and the reconciler drives the UI from
    there.
-10. **`App` entry point.** The user's app module (`app/main.py`)
+11. **`App` entry point.** The user's app module (`app/main.py`)
     defines a top-level component named `App`. Native templates
     import that module by path (`"app.main"`) and look up its `App`
     attribute, so users never write a separate registration step.
     Components with other names can still be loaded by passing an
     explicit dotted path like `"app.main.RootScreen"` to the
     template.
+
+## Concurrency model
+
+PythonNative is **async-first**: one `asyncio` event loop hosts every
+coroutine in the framework (async component bodies, effects,
+resources, native modules, animations, timers), and that loop lives
+**on the platform's main thread**.
+
+Because UIKit and the Android view system own the main thread's run
+loop, the framework loop can't call `run_forever` and block. It runs
+as a *guest* instead: whenever async work is scheduled, the runtime
+asks the platform to pump the loop on the next main-queue turn
+(`dispatch_async` on iOS, `Handler.post` on Android, the Tk poll loop
+in `pn preview`). One pump runs every ready callback and due timer,
+then hands control back to the platform.
+
+The payoff is that coroutines and rendering interleave on one thread:
+
+- Async code can call state setters, read hook values, and (through
+  the commit) touch native views without cross-thread marshaling.
+- There are no locks and no thread-affinity bugs; "which thread am I
+  on" stops being a question.
+- Hook state is carried in `contextvars`, so a component that awaits
+  in the middle of its body still resolves its hooks against the
+  right instance when it resumes.
+
+Synchronous scripts and tests drive the loop explicitly with
+[`run_blocking`][pythonnative.runtime.run_blocking] and
+[`drain`][pythonnative.runtime.drain]; async tests just `await`,
+since [`get_loop`][pythonnative.runtime.get_loop] adopts an
+already-running loop.
 
 ## How it works
 

@@ -19,8 +19,9 @@ underlying platform call:
 - **Coroutines** (`await` them): `Camera.take_photo`,
   `Location.get_current`, `Share.share`, `Permissions.request`,
   `Biometrics.authenticate`, `Notifications.*`. Inside a component,
-  drive them with
-  [`use_async_effect`][pythonnative.hooks.use_async_effect],
+  drive them with an `async def`
+  [`use_effect`][pythonnative.use_effect] callback,
+  [`use_resource`][pythonnative.use_resource],
   [`use_query`][pythonnative.hooks.use_query], or
   [`pn.run_async(coro)`][pythonnative.runtime.run_async] from a sync
   handler.

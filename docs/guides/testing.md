@@ -210,6 +210,22 @@ class FakeFs:
 Pass the fake into your component (via a context, a default argument,
 or a module-level injection) and assert on `store`.
 
+## Testing async code
+
+The framework's `asyncio` loop is a guest of whatever thread creates
+it, so synchronous tests drive it explicitly:
+
+- [`pn.runtime.drain()`][pythonnative.runtime.drain] pumps the loop
+  until it goes idle (or a predicate holds), settling async effects,
+  resources, and transitions deterministically.
+- [`pn.run_blocking(coro)`][pythonnative.runtime.run_blocking] runs a
+  single awaitable to completion and returns its result.
+
+After draining, call the reconciler's `flush_dirty()` to apply any
+re-renders the async work queued. See
+[Testing async code](async.md#testing-async-code) in the async guide
+for worked examples.
+
 ## Running the suite
 
 PythonNative uses `pytest` plus the standard CI matrix (Ruff, Black,

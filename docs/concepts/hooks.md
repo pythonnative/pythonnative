@@ -103,11 +103,10 @@ Run side effects **after** the native view tree is committed. The effect functio
 def Timer():
     seconds, set_seconds = pn.use_state(0)
 
-    def tick():
-        import threading
-        t = threading.Timer(1.0, lambda: set_seconds(seconds + 1))
-        t.start()
-        return t.cancel  # cleanup: cancel the timer
+    async def tick():
+        import asyncio
+        await asyncio.sleep(1.0)
+        set_seconds(seconds + 1)
 
     pn.use_effect(tick, [seconds])
 
@@ -118,6 +117,12 @@ Effects are **deferred**: they are queued during the render phase and
 executed after the reconciler finishes committing native view
 mutations. This means effect callbacks can safely measure layout or
 interact with the committed native tree.
+
+The effect callback may be an `async def` (as above); the coroutine
+runs as a task on the framework loop and is **cancelled
+automatically** when the effect re-runs or the component unmounts, so
+the sleeping tick above never fires against an unmounted component.
+See the [Async + data guide](../guides/async.md).
 
 Dependency control:
 
@@ -306,6 +311,23 @@ Read a value from the nearest `Provider` ancestor:
 theme = pn.use_context(pn.ThemeContext)
 color = theme["primary_color"]
 ```
+
+### Async hooks
+
+Data fetching and priority scheduling have dedicated hooks, covered in
+the [Async + data guide](../guides/async.md):
+
+- [`use_resource`][pythonnative.use_resource]: start a fetch during
+  render; reading a pending resource suspends until the nearest
+  [`Suspense`][pythonnative.Suspense] boundary's fallback resolves.
+- [`use_query`][pythonnative.use_query] /
+  [`use_mutation`][pythonnative.use_mutation]: subscribe to an async
+  fetcher / wrap an async mutator with loading and error state.
+- [`use_transition`][pythonnative.use_transition] /
+  [`use_deferred_value`][pythonnative.use_deferred_value]: mark
+  expensive updates as low priority so urgent updates paint first.
+- [`use_persisted_state`][pythonnative.use_persisted_state]:
+  `use_state` backed by [`AsyncStorage`][pythonnative.AsyncStorage].
 
 ## Context and Provider
 
