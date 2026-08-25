@@ -154,6 +154,30 @@ jobs:
           # default; trust the tap explicitly before installing.
           brew tap facebook/fb && brew trust facebook/fb && brew install idb-companion
 
+      # Boot an iOS 26.2 simulator BEFORE the build so `pn run ios`
+      # targets it (it prefers the already-booted device). The runner
+      # image's default runtime (iOS 26.5, since the default Xcode moved
+      # to 26.6 on 2026-07-21) has a UIKit regression where a single
+      # XCTest-synthesized tap sends a UIControl's actions twice
+      # (unified log shows one UIEvent delivered to one window followed
+      # by two back-to-back "send control actions" activities ~1ms
+      # apart). Every on_press then fires twice: reducer counters jump
+      # by two, alerts present twice and can't be dismissed, pickers
+      # reopen. iOS 26.2 (the runtime main last passed on) delivers
+      # exactly one action per tap.
+      - name: Boot iOS 26.2 simulator
+        run: |
+          UDID=$(xcrun simctl list devices --json \
+            | jq -r '.devices["com.apple.CoreSimulator.SimRuntime.iOS-26-2"] // [] | .[] | select(.isAvailable and (.name | startswith("iPhone"))) | .udid' \
+            | head -1)
+          if [[ -z "$UDID" ]]; then
+            echo "No available iOS 26.2 iPhone simulator on this image." >&2
+            xcrun simctl list devices >&2
+            exit 1
+          fi
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID"
+
       - name: Build and run E2E tests
         run: ./scripts/run-e2e.sh ios ${{ matrix.suites }}
         env:

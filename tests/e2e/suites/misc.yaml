@@ -1,33 +1,9 @@
 # Alerts / storage / runtime / platform / SDK category suite.
 appId: ${APP_ID}
 ---
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/alerts/simple_alert.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/alerts/confirm_alert.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/storage/async_storage.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/runtime/run_async.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/platform/platform_info.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/sdk/custom_component.yaml
+- runFlow: ../flows/alerts/simple_alert.yaml
+- runFlow: ../flows/alerts/confirm_alert.yaml
+- runFlow: ../flows/storage/async_storage.yaml
+- runFlow: ../flows/runtime/run_async.yaml
+- runFlow: ../flows/platform/platform_info.yaml
+- runFlow: ../flows/sdk/custom_component.yaml

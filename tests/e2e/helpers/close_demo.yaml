@@ -32,22 +32,10 @@ appId: ${APP_ID}
     timeout: 30000
     optional: true
 - tapOn: "Back to list"
-# Give the pop time to land before deciding anything else. On a slow
-# CI simulator several seconds can pass between the tap landing and
-# the demo screen actually popping; concluding "dropped tap" too
-# early and re-tapping would pop a second level (demo -> category ->
-# home) and strand the suite on the home screen. ``optional`` keeps a
-# genuinely dropped tap (element still visible at timeout) from
-# failing the helper; the retry below handles it.
-- extendedWaitUntil:
-    notVisible: "Back to list"
-    timeout: 15000
-    optional: true
 # Scrolling back to the top can take many swipes after a deep demo, and
 # a badly lagging emulator can compress one of those swipes into a
 # stray tap that opens another demo mid-scroll. Wrap the scroll in a
-# retry whose first commands pop any accidentally-opened demo and
-# recover from an accidental double-pop to the home screen.
+# retry whose first command pops any accidentally-opened demo.
 - retry:
     maxRetries: 2
     commands:
@@ -58,21 +46,6 @@ appId: ${APP_ID}
             - tapOn: "Back to list"
             - extendedWaitUntil:
                 notVisible: "Back to list"
-                timeout: 15000
-      # A re-tap that raced a slow pop lands us on the home screen;
-      # re-enter the category so the exit assertion below holds.
-      - runFlow:
-          when:
-            visible: "E2E Suite home"
-          commands:
-            - scrollUntilVisible:
-                element:
-                  text: "Open ${CATEGORY}"
-                direction: DOWN
-                timeout: 45000
-            - tapOn: "Open ${CATEGORY}"
-            - extendedWaitUntil:
-                visible: "Demos in ${CATEGORY}"
                 timeout: 15000
       - scrollUntilVisible:
           element:

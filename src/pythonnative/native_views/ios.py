@@ -37,9 +37,7 @@ trigger this import path.
 
 import ctypes as _ct
 import math
-import os
 import threading
-import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from rubicon.objc import SEL, ObjCClass, ObjCInstance, objc_method
@@ -151,7 +149,6 @@ def _fire(view: Any, name: str, *args: Any) -> bool:
     tag = _tag_of(view)
     if tag is None:
         return False
-    _trace_event(f"fire tag={tag} name={name} t={time.monotonic():.6f}")
     return dispatch_event(tag, name, *args)
 
 
@@ -757,53 +754,10 @@ _pn_action_handlers: Dict[int, Any] = {}
 
 _ACTION_IMP_TYPE = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
 
-# ----------------------------------------------------------------------
-# TEMPORARY event-dispatch trace (PN_EVENT_TRACE=1)
-# ----------------------------------------------------------------------
-#
-# CI-only diagnostic: iOS e2e runs show single Maestro taps producing
-# *two* on_press dispatches (reducer counters jump by 2, alerts present
-# twice) while the XCTest runner logs exactly one injected touch. These
-# NSLog lines land in the unified log, which Maestro captures into the
-# device-simulator.log debug artifact, so a failing CI run tells us
-# whether UIKit invoked the action IMP twice or Python doubled the
-# dispatch. Remove once the root cause is fixed.
-
-_nslog_c: Any = None
-
-
-def _trace_event(msg: str) -> None:
-    """NSLog ``msg`` when PN_EVENT_TRACE is on (visible in unified log)."""
-    # Read the env var lazily: the app module may set it after this
-    # module is imported by the bootstrap.
-    if os.environ.get("PN_EVENT_TRACE", "").lower() not in {"1", "true", "yes", "on"}:
-        return
-    global _nslog_c
-    try:
-        if _nslog_c is None:
-            foundation = _ct.CDLL("/System/Library/Frameworks/Foundation.framework/Foundation")
-            fn = foundation.NSLog
-            fn.restype = None
-            fn.argtypes = [_ct.c_void_p]
-            _nslog_c = fn
-        _objc_msgSend.restype = _ct.c_void_p
-        _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_char_p]
-        # The message is used as the NSLog *format* string: escape '%'.
-        payload = f"[PN-TRACE] {msg}".replace("%", "%%").encode("utf-8", "replace")
-        ns = _objc_msgSend(_get_cls(b"NSString"), _sel_reg(b"stringWithUTF8String:"), payload)
-        if ns:
-            _nslog_c(ns)
-    except Exception:
-        pass
-
 
 def _action_imp(_self_ptr: int, _cmd_ptr: int, sender_ptr: int) -> None:
     """Raw C callback for every PythonNative recognizer action."""
     handler = _pn_action_handlers.get(int(sender_ptr or 0))
-    _trace_event(
-        f"action_imp sender=0x{int(sender_ptr or 0):x} "
-        f"handler={'yes' if handler is not None else 'no'} t={time.monotonic():.6f}"
-    )
     if handler is None:
         return
     try:

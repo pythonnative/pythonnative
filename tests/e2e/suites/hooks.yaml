@@ -1,113 +1,25 @@
 # Hooks category suite: Maestro entry-point for hook-only runs.
 appId: ${APP_ID}
 ---
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_state.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_effect.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_layout_effect.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_reducer.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_ref.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_imperative_handle.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_back_handler.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_memo.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_callback.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_context.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/async_effect.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_resource.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_transition.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_deferred_value.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_query.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_mutation.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_persisted_state.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_window_dimensions.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/memo.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/batch_updates.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_color_scheme.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/hooks/use_theme.yaml
+- runFlow: ../flows/hooks/use_state.yaml
+- runFlow: ../flows/hooks/use_effect.yaml
+- runFlow: ../flows/hooks/use_layout_effect.yaml
+- runFlow: ../flows/hooks/use_reducer.yaml
+- runFlow: ../flows/hooks/use_ref.yaml
+- runFlow: ../flows/hooks/use_imperative_handle.yaml
+- runFlow: ../flows/hooks/use_back_handler.yaml
+- runFlow: ../flows/hooks/use_memo.yaml
+- runFlow: ../flows/hooks/use_callback.yaml
+- runFlow: ../flows/hooks/use_context.yaml
+- runFlow: ../flows/hooks/async_effect.yaml
+- runFlow: ../flows/hooks/use_resource.yaml
+- runFlow: ../flows/hooks/use_transition.yaml
+- runFlow: ../flows/hooks/use_deferred_value.yaml
+- runFlow: ../flows/hooks/use_query.yaml
+- runFlow: ../flows/hooks/use_mutation.yaml
+- runFlow: ../flows/hooks/use_persisted_state.yaml
+- runFlow: ../flows/hooks/use_window_dimensions.yaml
+- runFlow: ../flows/hooks/memo.yaml
+- runFlow: ../flows/hooks/batch_updates.yaml
+- runFlow: ../flows/hooks/use_color_scheme.yaml
+- runFlow: ../flows/hooks/use_theme.yaml

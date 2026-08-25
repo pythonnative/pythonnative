@@ -1,23 +1,7 @@
 # Navigation category suite.
 appId: ${APP_ID}
 ---
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/navigation/tab_navigator.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/navigation/drawer_navigator.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/navigation/params_passing.yaml
-- retry:
-    maxRetries: 2
-    commands:
-      - runFlow: ../helpers/recover.yaml
-      - runFlow: ../flows/navigation/focus_effect.yaml
+- runFlow: ../flows/navigation/tab_navigator.yaml
+- runFlow: ../flows/navigation/drawer_navigator.yaml
+- runFlow: ../flows/navigation/params_passing.yaml
+- runFlow: ../flows/navigation/focus_effect.yaml

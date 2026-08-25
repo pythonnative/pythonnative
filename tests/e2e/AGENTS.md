@@ -105,12 +105,6 @@ Maestro's `scrollUntilVisible` always swipes from the screen center. That works 
 
 When adding a new flow that needs to scroll a non-fullscreen container, copy this pattern (small swipes ~10% of screen height, ~500 ms each, `times` cap as a safety net) rather than calling `scrollUntilVisible`.
 
-### Flow-level retry
-
-Every `runFlow` in the suite files is wrapped in a `retry` (up to two extra attempts) whose first command runs `helpers/recover.yaml`. This absorbs the Maestro iOS driver's per-tap anomalies on starved CI simulators: a synthesized tap occasionally never lands (a stranded alert stays up, a demo never opens) or lands twice (a reducer counter jumps by two). Those are injection-layer faults, so no app-side fix can prevent them; retrying the single affected flow is cheap and deterministic, whereas retrying the whole suite (20+ minutes on CI) just rolls the same dice on 100+ taps again.
-
-`recover.yaml` dismisses any native alert or action sheet a failed attempt stranded above the app (they block every later tap); `open_demo`'s state machine already recovers from every other stranding, including a dead app. For this to work, flows must be safe to re-run in the same process: start by normalizing state (the storage flow's leading "Clear"), and reset any module-level state on mount the way `memo_demo.py` does.
-
 ### Suite-level retry
 
 `scripts/run-e2e.sh` re-invokes the whole `maestro test` once if the first attempt exits non-zero. The retry exists to absorb Maestro's iOS XCUITest driver flake (transient `Application is not running` / `Request for viewHierarchy failed`), not to paper over real failures.
@@ -130,6 +124,10 @@ treat it as a signal to investigate, not as "all clear." If a flow needs the ret
 - or a real Maestro/driver bug worth filing upstream.
 
 Override or disable with `MAESTRO_MAX_ATTEMPTS=1 ./scripts/run-e2e.sh ios` when bisecting a flake.
+
+### The iOS simulator runtime is pinned on CI
+
+The iOS jobs in `e2e.yml` boot an iOS 26.2 simulator explicitly instead of taking the runner image's default runtime. The iOS 26.5 runtime (the default since the image's Xcode moved to 26.6) has a UIKit regression where one XCTest-synthesized tap sends a `UIControl`'s actions twice: the unified log shows a single `UIEvent` delivered to one window followed by two back-to-back "send control actions" activities about 1 ms apart. Every `on_press` then fires twice, so reducer counters jump by two, alerts present twice (the second one can't be dismissed by the flow), and pickers reopen after a selection. Idempotent handlers (plain value setters) mask the bug, which makes the failures look flow-specific when they aren't. If a future runtime bump reintroduces this signature, check the double-fire before touching any flow: tap a counter demo once and read the count.
 
 ## The flow header convention
 
