@@ -4,4 +4,8 @@
 #     maestro test tests/e2e/suites/gestures.yaml -e APP_ID=com.pythonnative.e2e
 appId: ${APP_ID}
 ---
-- runFlow: ../flows/gestures/gestures.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow: ../helpers/recover.yaml
+      - runFlow: ../flows/gestures/gestures.yaml

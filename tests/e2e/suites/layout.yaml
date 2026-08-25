@@ -1,8 +1,28 @@
 # Layout category suite.
 appId: ${APP_ID}
 ---
-- runFlow: ../flows/layout/flex_layout.yaml
-- runFlow: ../flows/layout/aspect_ratio.yaml
-- runFlow: ../flows/layout/absolute_position.yaml
-- runFlow: ../flows/layout/padding_margin.yaml
-- runFlow: ../flows/layout/alignment.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow: ../helpers/recover.yaml
+      - runFlow: ../flows/layout/flex_layout.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow: ../helpers/recover.yaml
+      - runFlow: ../flows/layout/aspect_ratio.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow: ../helpers/recover.yaml
+      - runFlow: ../flows/layout/absolute_position.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow: ../helpers/recover.yaml
+      - runFlow: ../flows/layout/padding_margin.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow: ../helpers/recover.yaml
+      - runFlow: ../flows/layout/alignment.yaml

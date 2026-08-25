@@ -105,6 +105,12 @@ Maestro's `scrollUntilVisible` always swipes from the screen center. That works 
 
 When adding a new flow that needs to scroll a non-fullscreen container, copy this pattern (small swipes ~10% of screen height, ~500 ms each, `times` cap as a safety net) rather than calling `scrollUntilVisible`.
 
+### Flow-level retry
+
+Every `runFlow` in the suite files is wrapped in a `retry` (up to two extra attempts) whose first command runs `helpers/recover.yaml`. This absorbs the Maestro iOS driver's per-tap anomalies on starved CI simulators: a synthesized tap occasionally never lands (a stranded alert stays up, a demo never opens) or lands twice (a reducer counter jumps by two). Those are injection-layer faults, so no app-side fix can prevent them; retrying the single affected flow is cheap and deterministic, whereas retrying the whole suite (20+ minutes on CI) just rolls the same dice on 100+ taps again.
+
+`recover.yaml` dismisses any native alert or action sheet a failed attempt stranded above the app (they block every later tap); `open_demo`'s state machine already recovers from every other stranding, including a dead app. For this to work, flows must be safe to re-run in the same process: start by normalizing state (the storage flow's leading "Clear"), and reset any module-level state on mount the way `memo_demo.py` does.
+
 ### Suite-level retry
 
 `scripts/run-e2e.sh` re-invokes the whole `maestro test` once if the first attempt exits non-zero. The retry exists to absorb Maestro's iOS XCUITest driver flake (transient `Application is not running` / `Request for viewHierarchy failed`), not to paper over real failures.
