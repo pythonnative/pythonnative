@@ -32,8 +32,8 @@ def ParamsPassingDemo() -> pn.Element:
                 pn.Button("Push value=beta", on_press=lambda: push_with("beta")),
             ),
             hint(
-                "Maestro taps 'Push value=alpha' and asserts \"Param 'value': alpha\". "
-                "Then taps the second button and asserts the param flipped to 'beta'."
+                "Maestro taps 'Push value=alpha' and asserts \"Param 'value': alpha\", "
+                "then pops back and asserts the readout returns to '(none)'."
             ),
         ),
     )

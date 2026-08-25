@@ -313,19 +313,6 @@ def _schedule_render_async(host: Any) -> bool:
     return False
 
 
-def _nav_transitions_animated() -> bool:
-    """Whether native push/pop transitions should animate.
-
-    Test hook: UI test drivers retry taps that don't settle quickly,
-    and a retry landing mid-transition can hit the outgoing screen's
-    (shifted) controls or double-pop through two identically laid-out
-    screens. Suites set ``PN_DISABLE_NAV_ANIMATIONS=1`` so stack
-    transitions commit instantly and taps always land on a settled
-    screen.
-    """
-    return os.environ.get("PN_DISABLE_NAV_ANIMATIONS") != "1"
-
-
 def _flush_scheduled_renders(hosts: Sequence[Any]) -> None:
     """Run renders that were deferred out of a native event callback."""
     for host in hosts:
@@ -1745,21 +1732,54 @@ else:
                     raise RuntimeError(
                         "No UINavigationController available; ensure template embeds root in navigation controller"
                     )
-                nav.pushViewController_animated_(next_vc, _nav_transitions_animated())
+                self._run_nav_op(lambda n: n.pushViewController_animated_(next_vc, True))
 
             def _pop(self) -> None:
-                nav = getattr(self.native_instance, "navigationController", None)
-                if nav is not None:
-                    nav.popViewControllerAnimated_(_nav_transitions_animated())
+                self._run_nav_op(lambda n: n.popViewControllerAnimated_(True))
 
             def _reset_to_root(self) -> None:
                 """Pop everything above the root view-controller."""
-                nav = getattr(self.native_instance, "navigationController", None)
-                if nav is not None:
+
+                def op(n: Any) -> None:
                     try:
-                        nav.popToRootViewControllerAnimated_(_nav_transitions_animated())
+                        n.popToRootViewControllerAnimated_(True)
                     except Exception:
                         pass
+
+                self._run_nav_op(op)
+
+            def _run_nav_op(self, op: Any) -> None:
+                """Run ``op(nav)`` unless a stack transition is mid-flight.
+
+                UIKit does not queue navigation calls: a
+                ``pushViewController`` / ``popViewController`` issued
+                while the previous transition is still animating is
+                silently ignored or, worse, misapplies and pops past
+                the intended screen. A fast tap right after a push
+                (easy for a user, common for a UI test on a slow
+                machine) lands exactly in that window. Dropping the
+                operation keeps the stack consistent: the tap simply
+                does nothing, and a retry lands on a settled stack.
+                (Deferring the operation instead was tried and is
+                worse: the user retries, then the deferred operation
+                also fires, popping one screen too many.)
+                """
+                nav = getattr(self.native_instance, "navigationController", None)
+                if nav is None:
+                    return
+                try:
+                    # rubicon resolves ``transitionCoordinator`` as a bound
+                    # method rather than a property on some classes; call
+                    # it to get the actual (possibly nil -> None) value.
+                    coord = nav.transitionCoordinator
+                    if callable(coord):
+                        coord = coord()
+                    if coord is not None:
+                        _log_pn("_run_nav_op: transition in flight; dropping nav op")
+                        return
+                except Exception:
+                    pass
+                op(nav)
 
             def _set_screen_options(self, options: Dict[str, Any]) -> None:
                 """Bind screen options (e.g. title) to the native nav bar.

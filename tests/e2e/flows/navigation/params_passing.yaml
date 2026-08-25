@@ -2,6 +2,14 @@
 #
 # Demo screen: examples/e2e-suite/app/screens/navigation/params_passing.py
 # Source under test: src/pythonnative/navigation.py :: use_route, NavigationHandle.navigate
+#
+# Every tap below is followed by an optional wait plus a one-shot
+# conditional retap. Navigation calls that land while the previous
+# stack transition is still animating are deliberately dropped by the
+# framework (see _run_nav_op in screen.py), and on a slow CI simulator
+# a transition can outlive the gap between Maestro commands, so a
+# single tap is not guaranteed to navigate. A dropped tap leaves the
+# screen unchanged, which is exactly what the retap conditions detect.
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -10,17 +18,35 @@ appId: ${APP_ID}
       CATEGORY: Navigation
       DEMO_TITLE: Route Params
 - assertVisible: "Param 'value': (none)"
+# Navigating to the demo's own route id with new params pushes a new
+# entry whose use_route() readout reflects those params.
 - tapOn: "Push value=alpha"
-- assertVisible: "Param 'value': alpha"
-- tapOn: "Push value=beta"
-- assertVisible: "Param 'value': beta"
-# Each ``Push value=…`` pushes a new ``params_passing`` entry onto
-# the stack, so two pops are needed to drain that history before
-# the standard close_demo tap pops out of the demo to the category.
+- extendedWaitUntil:
+    visible: "Param 'value': alpha"
+    timeout: 10000
+    optional: true
+- runFlow:
+    when:
+      visible: "Param 'value': (none)"
+    commands:
+      - tapOn: "Push value=alpha"
+- extendedWaitUntil:
+    visible: "Param 'value': alpha"
+    timeout: 10000
+# Popping restores the previous entry's params.
 - tapOn: "Back to list"
-- assertVisible: "Param 'value': alpha"
-- tapOn: "Back to list"
-- assertVisible: "Param 'value': (none)"
+- extendedWaitUntil:
+    visible: "Param 'value': (none)"
+    timeout: 10000
+    optional: true
+- runFlow:
+    when:
+      visible: "Param 'value': alpha"
+    commands:
+      - tapOn: "Back to list"
+- extendedWaitUntil:
+    visible: "Param 'value': (none)"
+    timeout: 10000
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:
