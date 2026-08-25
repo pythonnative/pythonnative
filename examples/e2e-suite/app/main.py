@@ -13,6 +13,13 @@ one push, and every back press lands the user back on ``"Home"``.
 
 from __future__ import annotations
 
+import os
+
+# TEMPORARY: trace every native event dispatch to the unified log so CI
+# artifacts show whether single Maestro taps double-fire on_press (see
+# pythonnative.native_views.ios._trace_event). Remove with the fix.
+os.environ.setdefault("PN_EVENT_TRACE", "1")
+
 import pythonnative as pn
 from app.registry import DEMOS
 from app.screens.category import CategoryListScreen
