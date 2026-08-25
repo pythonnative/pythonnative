@@ -13,10 +13,19 @@ one push, and every back press lands the user back on ``"Home"``.
 
 from __future__ import annotations
 
+import os
+
 import pythonnative as pn
 from app.registry import DEMOS
 from app.screens.category import CategoryListScreen
 from app.screens.home import HomeScreen
+
+# Commit stack transitions instantly (checked on every push/pop).
+# Maestro retries taps that don't settle quickly, and a retry landing
+# mid-animation can hit the outgoing screen's shifted controls
+# (pushing the wrong route) or double-pop through two identically
+# laid-out screens.
+os.environ["PN_DISABLE_NAV_ANIMATIONS"] = "1"
 
 print("[e2e-suite] main module imported")
 

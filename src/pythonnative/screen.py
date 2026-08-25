@@ -313,6 +313,19 @@ def _schedule_render_async(host: Any) -> bool:
     return False
 
 
+def _nav_transitions_animated() -> bool:
+    """Whether native push/pop transitions should animate.
+
+    Test hook: UI test drivers retry taps that don't settle quickly,
+    and a retry landing mid-transition can hit the outgoing screen's
+    (shifted) controls or double-pop through two identically laid-out
+    screens. Suites set ``PN_DISABLE_NAV_ANIMATIONS=1`` so stack
+    transitions commit instantly and taps always land on a settled
+    screen.
+    """
+    return os.environ.get("PN_DISABLE_NAV_ANIMATIONS") != "1"
+
+
 def _flush_scheduled_renders(hosts: Sequence[Any]) -> None:
     """Run renders that were deferred out of a native event callback."""
     for host in hosts:
@@ -1732,19 +1745,19 @@ else:
                     raise RuntimeError(
                         "No UINavigationController available; ensure template embeds root in navigation controller"
                     )
-                nav.pushViewController_animated_(next_vc, True)
+                nav.pushViewController_animated_(next_vc, _nav_transitions_animated())
 
             def _pop(self) -> None:
                 nav = getattr(self.native_instance, "navigationController", None)
                 if nav is not None:
-                    nav.popViewControllerAnimated_(True)
+                    nav.popViewControllerAnimated_(_nav_transitions_animated())
 
             def _reset_to_root(self) -> None:
                 """Pop everything above the root view-controller."""
                 nav = getattr(self.native_instance, "navigationController", None)
                 if nav is not None:
                     try:
-                        nav.popToRootViewControllerAnimated_(True)
+                        nav.popToRootViewControllerAnimated_(_nav_transitions_animated())
                     except Exception:
                         pass
 
