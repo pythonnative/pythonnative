@@ -106,7 +106,18 @@ jobs:
 
   e2e-ios:
     needs: coverage
-    runs-on: macos-latest
+    # Pinned to macos-15 rather than macos-latest: the macos-26 image
+    # (default since mid-July 2026) sporadically delivers a single
+    # XCTest-synthesized tap as TWO UIControl action sends (~25% of
+    # taps; the app's unified log shows one UIEvent followed by a
+    # doubled "send control actions" burst ~1ms apart). It reproduces
+    # on both the iOS 26.5 and 26.2 simulator runtimes on that image,
+    # but never on a macOS 15 host, so the host-side simulator/XCTest
+    # event-injection stack is the trigger. Doubled taps break every
+    # non-idempotent press handler: reducer counters jump by two,
+    # alerts present twice, pickers reopen after selecting. This suite
+    # ran green on the macos-15 image for months.
+    runs-on: macos-15
     # Budget for the worst case: ~8 min build/boot plus two full suite
     # attempts (run-e2e.sh retries the whole suite once after a driver
     # flake) at up to ~20 min each on a slow runner. 40 was enough for
@@ -150,33 +161,11 @@ jobs:
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
-          # Homebrew refuses formulae from untrusted third-party taps by
-          # default; trust the tap explicitly before installing.
-          brew tap facebook/fb && brew trust facebook/fb && brew install idb-companion
-
-      # Boot an iOS 26.2 simulator BEFORE the build so `pn run ios`
-      # targets it (it prefers the already-booted device). The runner
-      # image's default runtime (iOS 26.5, since the default Xcode moved
-      # to 26.6 on 2026-07-21) has a UIKit regression where a single
-      # XCTest-synthesized tap sends a UIControl's actions twice
-      # (unified log shows one UIEvent delivered to one window followed
-      # by two back-to-back "send control actions" activities ~1ms
-      # apart). Every on_press then fires twice: reducer counters jump
-      # by two, alerts present twice and can't be dismissed, pickers
-      # reopen. iOS 26.2 (the runtime main last passed on) delivers
-      # exactly one action per tap.
-      - name: Boot iOS 26.2 simulator
-        run: |
-          UDID=$(xcrun simctl list devices --json \
-            | jq -r '.devices["com.apple.CoreSimulator.SimRuntime.iOS-26-2"] // [] | .[] | select(.isAvailable and (.name | startswith("iPhone"))) | .udid' \
-            | head -1)
-          if [[ -z "$UDID" ]]; then
-            echo "No available iOS 26.2 iPhone simulator on this image." >&2
-            xcrun simctl list devices >&2
-            exit 1
-          fi
-          xcrun simctl boot "$UDID"
-          xcrun simctl bootstatus "$UDID"
+          # Recent Homebrew refuses formulae from untrusted third-party
+          # taps; trust the tap explicitly before installing. Non-fatal
+          # because a Homebrew old enough to lack `brew trust` does not
+          # enforce trust checks either.
+          brew tap facebook/fb && (brew trust facebook/fb || true) && brew install idb-companion
 
       - name: Build and run E2E tests
         run: ./scripts/run-e2e.sh ios ${{ matrix.suites }}

@@ -125,9 +125,11 @@ treat it as a signal to investigate, not as "all clear." If a flow needs the ret
 
 Override or disable with `MAESTRO_MAX_ATTEMPTS=1 ./scripts/run-e2e.sh ios` when bisecting a flake.
 
-### The iOS simulator runtime is pinned on CI
+### The iOS jobs are pinned to the macos-15 runner image
 
-The iOS jobs in `e2e.yml` boot an iOS 26.2 simulator explicitly instead of taking the runner image's default runtime. The iOS 26.5 runtime (the default since the image's Xcode moved to 26.6) has a UIKit regression where one XCTest-synthesized tap sends a `UIControl`'s actions twice: the unified log shows a single `UIEvent` delivered to one window followed by two back-to-back "send control actions" activities about 1 ms apart. Every `on_press` then fires twice, so reducer counters jump by two, alerts present twice (the second one can't be dismissed by the flow), and pickers reopen after a selection. Idempotent handlers (plain value setters) mask the bug, which makes the failures look flow-specific when they aren't. If a future runtime bump reintroduces this signature, check the double-fire before touching any flow: tap a counter demo once and read the count.
+The iOS jobs in `e2e.yml` run on `macos-15`, not `macos-latest`. The macos-26 image sporadically (about a quarter of taps) delivers one XCTest-synthesized tap as two `UIControl` action sends: the app's unified log shows a single `UIEvent` delivered to one window, then a doubled "send control actions" burst about 1 ms apart. It reproduces on both the iOS 26.5 and iOS 26.2 simulator runtimes on that image, and never on a macOS 15 host with the same app, flows, and Maestro version, so the host-side simulator/XCTest event-injection stack is the trigger. Doubled taps break every non-idempotent press handler: reducer counters jump by two, alerts present twice (the second can't be dismissed by the flow), and pickers reopen after a selection. Idempotent handlers (plain value setters) mask the bug, which makes the failures look flow-specific when they aren't.
+
+If the pin ever has to move to a newer image, check for the double-fire before touching any flow: tap a counter demo once and read the count, or grep the maestro-debug artifact's `device-simulator.log` for back-to-back "send control actions" bursts after one tap.
 
 ## The flow header convention
 
