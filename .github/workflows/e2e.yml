@@ -157,15 +157,14 @@ jobs:
       - name: Install PythonNative
         run: pip install -e .
 
-      - name: Install Maestro and idb
+      # Maestro drives iOS simulators with its own bundled XCTest
+      # runner; idb-companion (once installed here) hasn't been needed
+      # since Maestro dropped idb, and its formula no longer installs
+      # on macos-15 anyway (no bottle, and building needs Xcode 26).
+      - name: Install Maestro
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
-          # Recent Homebrew refuses formulae from untrusted third-party
-          # taps; trust the tap explicitly before installing. Non-fatal
-          # because a Homebrew old enough to lack `brew trust` does not
-          # enforce trust checks either.
-          brew tap facebook/fb && (brew trust facebook/fb || true) && brew install idb-companion
 
       - name: Build and run E2E tests
         run: ./scripts/run-e2e.sh ios ${{ matrix.suites }}

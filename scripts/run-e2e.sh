@@ -29,7 +29,7 @@
 #     - `pn` CLI available (e.g. via `pip install -e .`).
 #     - `maestro` CLI on PATH (https://maestro.dev/).
 #     - For Android: an emulator running.
-#     - For iOS: a simulator running (and `idb-companion` installed).
+#     - For iOS: a simulator running.
 #
 # The script:
 #     1. Builds + installs the e2e-suite app via `pn run <platform> --no-logs`.

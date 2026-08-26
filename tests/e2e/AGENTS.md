@@ -63,7 +63,7 @@ scripts/
 # Full Android suite (emulator must be running)
 ./scripts/run-e2e.sh android
 
-# Full iOS suite (simulator must be running; idb-companion installed)
+# Full iOS suite (simulator must be running)
 ./scripts/run-e2e.sh ios
 
 # Just one category, for tight iteration loops:
