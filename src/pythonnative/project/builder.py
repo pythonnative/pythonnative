@@ -2,9 +2,14 @@
 
 The [`Builder`][pythonnative.project.builder.Builder] ties the pieces
 together: it stages the bundled native template, runs the platform
-[`configurators`][pythonnative.project.android], invokes the native
-toolchains (Gradle / Xcode), and, on iOS, embeds the CPython runtime into
-the built app.
+[`configurators`][pythonnative.project.android], stages the Python
+sources and (on iOS) the embedded CPython runtime into the native
+project, and invokes the native toolchains (Gradle / Xcode).
+
+On iOS, the staged project is self-contained: ``Python.xcframework`` is
+linked at build time and an Xcode build phase installs the standard
+library and app code into the bundle, so ``xcodebuild`` output is
+directly runnable and archivable with no post-build patching.
 
 All shell-outs go through a small
 [`CommandRunner`][pythonnative.project.builder.CommandRunner] abstraction
@@ -20,7 +25,9 @@ builder stops at producing installable/archivable artifacts.
 
 from __future__ import annotations
 
+import compileall
 import os
+import platform as platform_module
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -251,11 +258,15 @@ class Builder:
 
     # -- Preparation ----------------------------------------------------
 
-    def prepare(self, platform: str) -> PreparedProject:
+    def prepare(self, platform: str, *, release: bool = False) -> PreparedProject:
         """Stage and configure the native project for ``platform``.
 
         Args:
             platform: ``"android"`` or ``"ios"``.
+            release: Prepare for a release/store build. On iOS this
+                byte-compiles the staged Python code and drops the
+                ``.py`` sources from the bundle. (Chaquopy does the
+                equivalent on Android automatically.)
 
         Returns:
             A [`PreparedProject`][pythonnative.project.builder.PreparedProject].
@@ -286,9 +297,8 @@ class Builder:
             )
 
         ios_layout = ios_config.configure(project_dir, self.config, log=self.log)
-        # iOS Python sources are staged into a side directory and embedded
-        # into the built .app after the build.
-        self._stage_ios_python(build_dir)
+        self._stage_ios_python(project_dir, release=release)
+        self._link_ios_runtime(project_dir)
         return PreparedProject(
             platform=platform,
             build_dir=build_dir,
@@ -297,25 +307,101 @@ class Builder:
             ios=ios_layout,
         )
 
-    def _stage_ios_python(self, build_dir: Path) -> Path:
+    def _stage_ios_python(self, project_dir: Path, *, release: bool) -> None:
+        """Stage ``app/`` and ``app_packages/`` at the Xcode project root.
+
+        The Xcode project references both folders as bundle resources
+        and the "Install Python runtime" build phase converts any
+        binary modules inside them into signed frameworks.
+        """
         import shutil
 
-        python_dir = build_dir / "python"
-        if python_dir.exists():
-            shutil.rmtree(python_dir)
-        python_dir.mkdir(parents=True, exist_ok=True)
+        app_dir = project_dir / "app"
+        packages_dir = project_dir / "app_packages"
+        for directory in (app_dir, packages_dir):
+            if directory.exists():
+                shutil.rmtree(directory)
+            directory.mkdir(parents=True, exist_ok=True)
 
         app_src = self.config.project_root / "app"
-        if app_src.is_dir():
-            shutil.copytree(app_src, python_dir / "app", dirs_exist_ok=True)
+        if not app_src.is_dir():
+            raise BuildError(f"No app/ directory found at {app_src}; nothing to bundle.")
+        shutil.copytree(app_src, app_dir, dirs_exist_ok=True)
+
         if self.dev_lib_root.is_dir():
             shutil.copytree(
                 self.dev_lib_root,
-                python_dir / "pythonnative",
+                packages_dir / "pythonnative",
                 dirs_exist_ok=True,
                 ignore=android_config.LIB_IGNORE,
             )
-        return python_dir
+
+        # rubicon-objc supplies the iOS Objective-C bridge; user
+        # requirements ride along in the same site directory.
+        result = self.runner.run(
+            [sys.executable, "-m", "pip", "install", "--no-deps", "--upgrade", "rubicon-objc", "-t", str(packages_dir)],
+            capture=True,
+        )
+        if not result.ok:
+            raise BuildError(f"pip install rubicon-objc failed:\n{result.stderr}")
+        if self.config.requirements:
+            result = self.runner.run(
+                [sys.executable, "-m", "pip", "install", "-t", str(packages_dir), *self.config.requirements],
+                capture=True,
+            )
+            if not result.ok:
+                raise BuildError(f"pip install of [requirements].packages failed:\n{result.stderr}")
+
+        if release:
+            self._compile_ios_bytecode(app_dir, packages_dir)
+
+    def _compile_ios_bytecode(self, *roots: Path) -> None:
+        """Byte-compile staged Python code and drop the ``.py`` sources.
+
+        Ships ``.pyc`` only: smaller bundles, faster cold start, and no
+        plain-text source in the store artifact. Requires the host
+        interpreter to match ``app.python_version``, since bytecode is
+        version-specific.
+        """
+        host_version = f"{sys.version_info[0]}.{sys.version_info[1]}"
+        if host_version != self.config.python_version:
+            self.log(
+                f"Skipping bytecode compilation: the build host runs Python {host_version} "
+                f"but app.python_version is {self.config.python_version}, and bytecode is "
+                "version-specific. The app will ship .py sources. Run pn with Python "
+                f"{self.config.python_version} to ship bytecode."
+            )
+            return
+        for root in roots:
+            # legacy=True writes module.pyc next to module.py (no
+            # __pycache__), which the embedded interpreter imports
+            # directly once the .py files are gone.
+            if not compileall.compile_dir(str(root), quiet=1, legacy=True, optimize=1):
+                raise BuildError(f"Byte-compiling {root} failed; fix the syntax error above.")
+            for source in root.rglob("*.py"):
+                source.unlink()
+        self.log("Compiled Python sources to bytecode for release.")
+
+    def _link_ios_runtime(self, project_dir: Path) -> None:
+        """Make ``Python.xcframework`` available at the project root.
+
+        A symlink into the shared runtime cache is preferred (the
+        framework is hundreds of megabytes); staging falls back to a
+        copy when symlinks are unavailable.
+        """
+        import shutil
+
+        runtime = self._ios_runtime()
+        link = project_dir / "Python.xcframework"
+        if link.is_symlink() or link.is_file():
+            link.unlink()
+        elif link.is_dir():
+            shutil.rmtree(link)
+        try:
+            link.symlink_to(runtime.xcframework_dir, target_is_directory=True)
+        except OSError:
+            shutil.copytree(runtime.xcframework_dir, link)
+        self.log(f"Linked Python.xcframework (Python {self.config.python_version}).")
 
     # -- Android builds -------------------------------------------------
 
@@ -378,21 +464,28 @@ class Builder:
     # -- iOS builds -----------------------------------------------------
 
     def build_ios_simulator(self, prepared: PreparedProject) -> Path:
-        """Build the iOS app for the simulator and embed the runtime.
+        """Build the iOS app for the simulator.
+
+        The Xcode build produces a complete, runnable ``.app``: the
+        Python framework is linked and the "Install Python runtime"
+        build phase embeds the standard library and staged sources.
 
         Args:
             prepared: A prepared iOS project.
 
         Returns:
-            Path to the built ``.app`` with the runtime embedded.
+            Path to the built ``.app``.
 
         Raises:
-            BuildError: If the runtime can't be prepared or the build
-                fails.
+            BuildError: If the build fails.
         """
-        runtime = self._ios_runtime()
         derived = prepared.project_dir / "build"
         settings = ios_config.build_settings(self.config)
+        # The simulator runs on the host CPU, and BeeWare's runtime
+        # install script requires a single-architecture build (its
+        # stdlib layout is per-arch), so pin ARCHS to the host.
+        host_arch = "arm64" if platform_module.machine() == "arm64" else "x86_64"
+        settings.append(f"ARCHS={host_arch}")
         result = self.runner.run(
             [
                 "xcodebuild",
@@ -417,27 +510,65 @@ class Builder:
         app_path = derived / "Build" / "Products" / "Debug-iphonesimulator" / ios_config.APP_BUNDLE_NAME
         if not app_path.is_dir():
             raise BuildError(f"Built app not found at {app_path}.")
-
-        site_packages = self._install_ios_site_packages(prepared.build_dir)
-        ios_config.embed_runtime(
-            app_path,
-            runtime=runtime,
-            destination="simulator",
-            python_sources=prepared.build_dir / "python",
-            site_packages=site_packages,
-            log=self.log,
-        )
         return app_path
 
-    def build_ios_archive(self, prepared: PreparedProject) -> BuildArtifacts:
-        """Archive the iOS app for a device and export a signed IPA.
+    def build_ios_device(self, prepared: PreparedProject) -> Path:
+        """Build a signed Debug app for a physical iOS device.
 
-        This path is experimental: it embeds the device CPython slice into
-        the archive before export and relies on ``xcodebuild`` to re-sign
-        the embedded framework.
+        Requires ``[ios].development_team`` for automatic signing.
 
         Args:
             prepared: A prepared iOS project.
+
+        Returns:
+            Path to the built ``.app``.
+
+        Raises:
+            BuildError: If the build fails or signing is not set up.
+        """
+        if not self.config.ios.development_team:
+            raise BuildError(
+                "Running on a physical iOS device requires code signing. "
+                "Set [ios].development_team in pythonnative.toml."
+            )
+        derived = prepared.project_dir / "build"
+        settings = ios_config.build_settings(self.config)
+        settings.append("-allowProvisioningUpdates")
+        result = self.runner.run(
+            [
+                "xcodebuild",
+                "-project",
+                ios_config.PROJECT_FILE,
+                "-scheme",
+                ios_config.PROJECT_NAME,
+                "-configuration",
+                "Debug",
+                "-destination",
+                "generic/platform=iOS",
+                "-derivedDataPath",
+                str(derived),
+                "build",
+                *settings,
+            ],
+            cwd=prepared.project_dir,
+        )
+        if not result.ok:
+            raise BuildError("xcodebuild (device) failed. See output above.")
+
+        app_path = derived / "Build" / "Products" / "Debug-iphoneos" / ios_config.APP_BUNDLE_NAME
+        if not app_path.is_dir():
+            raise BuildError(f"Built app not found at {app_path}.")
+        return app_path
+
+    def build_ios_archive(self, prepared: PreparedProject, *, upload: bool = False) -> BuildArtifacts:
+        """Archive the iOS app and export a signed IPA (or upload it).
+
+        Args:
+            prepared: A prepared iOS project (use ``release=True``).
+            upload: Upload directly to App Store Connect instead of
+                exporting a local ``.ipa`` (requires
+                ``export_method = "app-store"`` and stored ASC
+                credentials in Xcode).
 
         Returns:
             The produced ``.ipa`` (and ``.xcarchive``) paths.
@@ -445,7 +576,6 @@ class Builder:
         Raises:
             BuildError: If archiving or export fails.
         """
-        runtime = self._ios_runtime()
         archive_path = prepared.build_dir / "ios_template.xcarchive"
         settings = ios_config.build_settings(self.config, for_archive=True)
         result = self.runner.run(
@@ -461,6 +591,7 @@ class Builder:
                 "generic/platform=iOS",
                 "-archivePath",
                 str(archive_path),
+                "-allowProvisioningUpdates",
                 "archive",
                 *settings,
             ],
@@ -469,20 +600,10 @@ class Builder:
         if not result.ok:
             raise BuildError("xcodebuild archive failed. See output above.")
 
-        app_in_archive = archive_path / "Products" / "Applications" / ios_config.APP_BUNDLE_NAME
-        if app_in_archive.is_dir():
-            site_packages = self._install_ios_site_packages(prepared.build_dir)
-            ios_config.embed_runtime(
-                app_in_archive,
-                runtime=runtime,
-                destination="device",
-                python_sources=prepared.build_dir / "python",
-                site_packages=site_packages,
-                log=self.log,
-            )
-
         export_dir = prepared.build_dir / "export"
-        options = ios_config.write_export_options(self.config, prepared.build_dir / "exportOptions.plist")
+        options = ios_config.write_export_options(
+            self.config, prepared.build_dir / "exportOptions.plist", upload=upload
+        )
         result = self.runner.run(
             [
                 "xcodebuild",
@@ -493,6 +614,7 @@ class Builder:
                 str(options),
                 "-exportPath",
                 str(export_dir),
+                "-allowProvisioningUpdates",
             ],
             cwd=prepared.project_dir,
         )
@@ -507,26 +629,6 @@ class Builder:
             return runtime_assets.prepare_ios_runtime(cache, self.config.python_version, log=self.log)
         except RuntimeError as exc:
             raise BuildError(str(exc)) from exc
-
-    def _install_ios_site_packages(self, build_dir: Path) -> Optional[Path]:
-        import shutil
-
-        site_dir = build_dir / "platform-site"
-        if site_dir.exists():
-            shutil.rmtree(site_dir)
-        site_dir.mkdir(parents=True, exist_ok=True)
-
-        # rubicon-objc supplies the iOS Objective-C bridge.
-        self.runner.run(
-            [sys.executable, "-m", "pip", "install", "--no-deps", "--upgrade", "rubicon-objc", "-t", str(site_dir)],
-            capture=True,
-        )
-        if self.config.requirements:
-            self.runner.run(
-                [sys.executable, "-m", "pip", "install", "-t", str(site_dir), *self.config.requirements],
-                capture=True,
-            )
-        return site_dir
 
 
 # ======================================================================

@@ -35,6 +35,19 @@ def test_minimal_config_defaults() -> None:
     assert cfg.application_id == "com.example.app"
     assert cfg.bundle_id == "com.example.app"
     assert cfg.android_package_path == "com/example/app"
+    assert cfg.url_schemes == []
+    # 64-bit only by default; 32-bit ABIs are opt-in.
+    assert cfg.android.abi_filters == ["arm64-v8a", "x86_64"]
+
+
+def test_url_schemes_parsing_and_validation() -> None:
+    cfg = AppConfig.from_dict(_minimal(url_schemes=["coolapp", "cool-beta"]))
+    assert cfg.url_schemes == ["coolapp", "cool-beta"]
+
+    with pytest.raises(ConfigError, match="url_schemes"):
+        AppConfig.from_dict(_minimal(url_schemes=["9bad"]))
+    with pytest.raises(ConfigError, match="url_schemes"):
+        AppConfig.from_dict(_minimal(url_schemes=["has space"]))
 
 
 def test_full_config_parsing() -> None:

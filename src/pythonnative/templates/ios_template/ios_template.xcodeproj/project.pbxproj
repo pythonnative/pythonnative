@@ -10,13 +10,16 @@
 		146EBB822A40CCC900E4A2B3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146EBB812A40CCC900E4A2B3 /* AppDelegate.swift */; };
 		146EBB842A40CCC900E4A2B3 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146EBB832A40CCC900E4A2B3 /* SceneDelegate.swift */; };
 		146EBB862A40CCC900E4A2B3 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146EBB852A40CCC900E4A2B3 /* ViewController.swift */; };
-		146EBB892A40CCC900E4A2B3 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 146EBB872A40CCC900E4A2B3 /* Main.storyboard */; };
 		146EBB8B2A40CCCE00E4A2B3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 146EBB8A2A40CCCE00E4A2B3 /* Assets.xcassets */; };
 		146EBB8E2A40CCCE00E4A2B3 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 146EBB8C2A40CCCE00E4A2B3 /* LaunchScreen.storyboard */; };
 		146EBB992A40CCCE00E4A2B3 /* ios_templateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146EBB982A40CCCE00E4A2B3 /* ios_templateTests.swift */; };
 		146EBBA32A40CCCE00E4A2B3 /* ios_templateUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146EBBA22A40CCCE00E4A2B3 /* ios_templateUITests.swift */; };
-        146EBBA52A40CCCE00E4A2B3 /* ios_templateUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146EBBA42A40CCCE00E4A2B3 /* ios_templateUITestsLaunchTests.swift */; };
-		A1B2C3D42B2F000000000012 /* PythonKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D42B2F000000000011 /* PythonKit */; };
+		146EBBA52A40CCCE00E4A2B3 /* ios_templateUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146EBBA42A40CCCE00E4A2B3 /* ios_templateUITestsLaunchTests.swift */; };
+		AA0000000000000000000002 /* PythonRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000001 /* PythonRuntime.swift */; };
+		AA0000000000000000000004 /* Python.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000003 /* Python.xcframework */; };
+		AA0000000000000000000005 /* Python.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000003 /* Python.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		AA0000000000000000000007 /* app in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000006 /* app */; };
+		AA0000000000000000000009 /* app_packages in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000008 /* app_packages */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,7 +44,6 @@
 		146EBB812A40CCC900E4A2B3 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		146EBB832A40CCC900E4A2B3 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		146EBB852A40CCC900E4A2B3 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
-		146EBB882A40CCC900E4A2B3 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		146EBB8A2A40CCCE00E4A2B3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		146EBB8D2A40CCCE00E4A2B3 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		146EBB8F2A40CCCE00E4A2B3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -49,16 +51,21 @@
 		146EBB982A40CCCE00E4A2B3 /* ios_templateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ios_templateTests.swift; sourceTree = "<group>"; };
 		146EBB9E2A40CCCE00E4A2B3 /* ios_templateUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ios_templateUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		146EBBA22A40CCCE00E4A2B3 /* ios_templateUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ios_templateUITests.swift; sourceTree = "<group>"; };
-        146EBBA42A40CCCE00E4A2B3 /* ios_templateUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ios_templateUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		146EBBA42A40CCCE00E4A2B3 /* ios_templateUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ios_templateUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		AA0000000000000000000001 /* PythonRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PythonRuntime.swift; sourceTree = "<group>"; };
+		AA0000000000000000000003 /* Python.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Python.xcframework; sourceTree = "<group>"; };
+		AA0000000000000000000006 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
+		AA0000000000000000000008 /* app_packages */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app_packages; sourceTree = "<group>"; };
+		AA000000000000000000000B /* BridgingHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BridgingHeader.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		146EBB7B2A40CCC900E4A2B3 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-            files = (
-                A1B2C3D42B2F000000000012 /* PythonKit in Frameworks */,
-            );
+			files = (
+				AA0000000000000000000004 /* Python.xcframework in Frameworks */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		146EBB912A40CCCE00E4A2B3 /* Frameworks */ = {
@@ -80,10 +87,13 @@
 /* Begin PBXGroup section */
 		146EBB752A40CCC900E4A2B3 = {
 			isa = PBXGroup;
-            children = (
-                146EBB802A40CCC900E4A2B3 /* ios_template */,
+			children = (
+				146EBB802A40CCC900E4A2B3 /* ios_template */,
 				146EBB972A40CCCE00E4A2B3 /* ios_templateTests */,
 				146EBBA12A40CCCE00E4A2B3 /* ios_templateUITests */,
+				AA0000000000000000000003 /* Python.xcframework */,
+				AA0000000000000000000006 /* app */,
+				AA0000000000000000000008 /* app_packages */,
 				146EBB7F2A40CCC900E4A2B3 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -104,7 +114,8 @@
 				146EBB812A40CCC900E4A2B3 /* AppDelegate.swift */,
 				146EBB832A40CCC900E4A2B3 /* SceneDelegate.swift */,
 				146EBB852A40CCC900E4A2B3 /* ViewController.swift */,
-				146EBB872A40CCC900E4A2B3 /* Main.storyboard */,
+				AA0000000000000000000001 /* PythonRuntime.swift */,
+				AA000000000000000000000B /* BridgingHeader.h */,
 				146EBB8A2A40CCCE00E4A2B3 /* Assets.xcassets */,
 				146EBB8C2A40CCCE00E4A2B3 /* LaunchScreen.storyboard */,
 				146EBB8F2A40CCCE00E4A2B3 /* Info.plist */,
@@ -139,14 +150,12 @@
 				146EBB7A2A40CCC900E4A2B3 /* Sources */,
 				146EBB7B2A40CCC900E4A2B3 /* Frameworks */,
 				146EBB7C2A40CCC900E4A2B3 /* Resources */,
+				AA000000000000000000000A /* Install Python runtime */,
 				146EBC002A40CCCE00E4A2B3 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-			);
-			packageProductDependencies = (
-				A1B2C3D42B2F000000000011 /* PythonKit */,
 			);
 			name = ios_template;
 			productName = ios_template;
@@ -221,9 +230,6 @@
 				Base,
 			);
 			mainGroup = 146EBB752A40CCC900E4A2B3;
-			packageReferences = (
-				A1B2C3D42B2F000000000010 /* XCRemoteSwiftPackageReference "PythonKit" */,
-			);
 			productRefGroup = 146EBB7F2A40CCC900E4A2B3 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -242,30 +248,12 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
+				AA0000000000000000000005 /* Python.xcframework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		A1B2C3D42B2F000000000010 /* XCRemoteSwiftPackageReference "PythonKit" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/pvieito/PythonKit";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 0.5.1;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		A1B2C3D42B2F000000000011 /* PythonKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A1B2C3D42B2F000000000010 /* XCRemoteSwiftPackageReference "PythonKit" */;
-			productName = PythonKit;
-		};
-/* End XCSwiftPackageProductDependency section */
 
 /* Begin PBXResourcesBuildPhase section */
 		146EBB7C2A40CCC900E4A2B3 /* Resources */ = {
@@ -274,7 +262,8 @@
 			files = (
 				146EBB8E2A40CCCE00E4A2B3 /* LaunchScreen.storyboard in Resources */,
 				146EBB8B2A40CCCE00E4A2B3 /* Assets.xcassets in Resources */,
-				146EBB892A40CCC900E4A2B3 /* Main.storyboard in Resources */,
+				AA0000000000000000000007 /* app in Resources */,
+				AA0000000000000000000009 /* app_packages in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -294,12 +283,36 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		AA000000000000000000000A /* Install Python runtime */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Install Python runtime";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nif [ ! -d \"$PROJECT_DIR/Python.xcframework\" ]; then\n    echo \"error: Python.xcframework is missing from the project. Build with 'pn run ios' or 'pn build ios' so the PythonNative CLI links the embedded runtime; the raw template cannot be built directly.\"\n    exit 1\nfi\nif [ ! -d \"$PROJECT_DIR/app\" ] || [ ! -d \"$PROJECT_DIR/app_packages\" ]; then\n    echo \"error: app/ or app_packages/ has not been staged. Build with 'pn run ios' or 'pn build ios' so the PythonNative CLI stages the Python sources.\"\n    exit 1\nfi\nif [ ! -d \"$PROJECT_DIR/app_packages/pythonnative\" ]; then\n    echo \"error: the pythonnative package is missing from app_packages/. Re-run 'pn run ios' or 'pn build ios'.\"\n    exit 1\nfi\nsource \"$PROJECT_DIR/Python.xcframework/build/utils.sh\"\ninstall_python Python.xcframework app app_packages\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		146EBB7A2A40CCC900E4A2B3 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				146EBB862A40CCC900E4A2B3 /* ViewController.swift in Sources */,
+				AA0000000000000000000002 /* PythonRuntime.swift in Sources */,
 				146EBB822A40CCC900E4A2B3 /* AppDelegate.swift in Sources */,
 				146EBB842A40CCC900E4A2B3 /* SceneDelegate.swift in Sources */,
 			);
@@ -338,14 +351,6 @@
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
-		146EBB872A40CCC900E4A2B3 /* Main.storyboard */ = {
-			isa = PBXVariantGroup;
-			children = (
-				146EBB882A40CCC900E4A2B3 /* Base */,
-			);
-			name = Main.storyboard;
-			sourceTree = "<group>";
-		};
 		146EBB8C2A40CCCE00E4A2B3 /* LaunchScreen.storyboard */ = {
 			isa = PBXVariantGroup;
 			children = (
@@ -483,7 +488,6 @@
 				INFOPLIST_FILE = ios_template/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -494,6 +498,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pythonnative.ios-template";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "ios_template/BridgingHeader.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -511,7 +516,6 @@
 				INFOPLIST_FILE = ios_template/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -522,6 +526,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pythonnative.ios-template";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "ios_template/BridgingHeader.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

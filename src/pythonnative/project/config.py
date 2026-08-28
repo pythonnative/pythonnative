@@ -21,6 +21,7 @@ build = 1                     # integer build number
 python_version = "3.11"      # embedded CPython version
 orientation = "portrait"     # portrait | landscape | all
 entry_point = "app/main.py"  # module whose `App` is mounted
+url_schemes = ["myapp"]      # custom deep-link URL schemes
 
 [permissions]                 # see pythonnative.project.permissions
 camera = "Scan receipts."
@@ -45,7 +46,7 @@ provisioning_profile = "My App Distribution"
 [android]
 min_sdk = 24
 target_sdk = 34
-abi_filters = ["arm64-v8a", "x86_64"]
+abi_filters = ["arm64-v8a", "x86_64"]  # the default; add armeabi-v7a/x86 if needed
 
 [android.signing]
 keystore = "release.keystore"
@@ -72,10 +73,12 @@ CONFIG_FILENAME = "pythonnative.toml"
 """The fixed config filename looked up at the project root."""
 
 SUPPORTED_PYTHON_VERSIONS = ("3.10", "3.11", "3.12")
-"""CPython versions accepted in ``app.python_version``."""
+"""CPython versions accepted in ``app.python_version``.
 
-IOS_SUPPORTED_PYTHON_VERSION = "3.11"
-"""The CPython version with a pinned, verified iOS support build."""
+Every listed version has a pinned, checksum-verified iOS runtime (see
+``runtime_assets.PINNED_ASSETS``) and is supported by Chaquopy on
+Android.
+"""
 
 VALID_ORIENTATIONS = ("portrait", "landscape", "all")
 """Accepted values for ``app.orientation``."""
@@ -93,6 +96,7 @@ _JAVA_KEYWORDS = frozenset("""
 
 _APP_ID_SEGMENT = re.compile(r"^[a-z][a-z0-9_]*$")
 _VERSION_RE = re.compile(r"^\d+(\.\d+){0,3}$")
+_URL_SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*$")
 
 
 class ConfigError(Exception):
@@ -193,7 +197,9 @@ class AndroidConfig:
     target_sdk: int = 34
     compile_sdk: int = 34
     application_id: Optional[str] = None
-    abi_filters: List[str] = field(default_factory=lambda: ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"])
+    # arm64 devices plus x86_64 emulators. 32-bit ABIs (armeabi-v7a, x86)
+    # roughly double the native payload and are opt-in.
+    abi_filters: List[str] = field(default_factory=lambda: ["arm64-v8a", "x86_64"])
     permissions: List[str] = field(default_factory=list)
     signing: AndroidSigning = field(default_factory=AndroidSigning)
 
@@ -222,6 +228,9 @@ class AppConfig:
         python_version: Embedded CPython version (``app.python_version``).
         orientation: ``"portrait"``, ``"landscape"``, or ``"all"``.
         entry_point: Path to the entry module (``app.entry_point``).
+        url_schemes: Custom deep-link URL schemes the app handles
+            (``app.url_schemes``); wired into ``CFBundleURLTypes`` on
+            iOS and a ``VIEW`` intent filter on Android.
         permissions: The declared capability map (``[permissions]``).
         icon: Optional source icon path (``[assets].icon``).
         splash: Optional splash image path (``[assets].splash``).
@@ -240,6 +249,7 @@ class AppConfig:
     python_version: str = "3.11"
     orientation: str = "portrait"
     entry_point: str = "app/main.py"
+    url_schemes: List[str] = field(default_factory=list)
     permissions: Dict[str, _permissions.PermissionValue] = field(default_factory=dict)
     icon: Optional[str] = None
     splash: Optional[str] = None
@@ -358,6 +368,7 @@ class AppConfig:
             python_version=_opt_str(app, "python_version") or "3.11",
             orientation=(_opt_str(app, "orientation") or "portrait").lower(),
             entry_point=_opt_str(app, "entry_point") or "app/main.py",
+            url_schemes=_opt_str_list(app, "url_schemes"),
             permissions=dict(_expect_table(data, "permissions", optional=True)),
             ios=_parse_ios(_expect_table(data, "ios", optional=True)),
             android=_parse_android(_expect_table(data, "android", optional=True)),
@@ -405,6 +416,13 @@ class AppConfig:
 
         if not self.entry_point.strip():
             raise ConfigError("app.entry_point must not be empty.")
+
+        for scheme in self.url_schemes:
+            if not _URL_SCHEME_RE.match(scheme):
+                raise ConfigError(
+                    f"app.url_schemes entry {scheme!r} is invalid; schemes must start with a letter "
+                    "and contain only letters, digits, '+', '-', and '.'."
+                )
 
         unknown = _permissions.unknown_capabilities(self.permissions.keys())
         if unknown:
@@ -593,6 +611,8 @@ build = 1
 python_version = "{python_version}"
 orientation = "portrait"        # portrait | landscape | all
 entry_point = "app/main.py"
+# Custom URL schemes for deep links (e.g. "{name}" opens {name}://...).
+# url_schemes = ["{name}"]
 
 # Declare the device capabilities your app needs. A string becomes the
 # iOS permission prompt text; `true` uses a sensible default.
@@ -626,7 +646,9 @@ export_method = "development"   # development | ad-hoc | app-store | enterprise
 [android]
 min_sdk = 24
 target_sdk = 34
-abi_filters = ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
+# arm64 devices + x86_64 emulators (the default). Add "armeabi-v7a" or
+# "x86" only if you must support 32-bit hardware; each ABI adds ~30 MB.
+# abi_filters = ["arm64-v8a", "x86_64"]
 
 [android.signing]
 # keystore = "release.keystore"

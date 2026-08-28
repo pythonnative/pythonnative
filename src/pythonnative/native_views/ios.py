@@ -42,6 +42,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from rubicon.objc import SEL, ObjCClass, ObjCInstance, objc_method
 
+from .. import diagnostics
 from ..events import dispatch_event, event_names
 from . import _tripwire_log
 from .base import ViewHandler, _safe_max, parse_color_int
@@ -80,7 +81,7 @@ try:
     _UIView = ObjCClass("UIView")
     _UIView.declare_property("superview")
 except Exception:
-    pass
+    diagnostics.swallowed("ios.<module>")
 
 
 def _objc_ptr(obj: Any) -> Optional[int]:
@@ -267,17 +268,17 @@ def _apply_border(layer: Any, props: Dict[str, Any]) -> None:
             # asks for corners (matches iOS UIKit common practice).
             layer.setMasksToBounds_(True)
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_border")
     if "border_width" in props and props["border_width"] is not None:
         try:
             layer.setBorderWidth_(float(props["border_width"]))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_border")
     if "border_color" in props and props["border_color"] is not None:
         try:
             layer.setBorderColor_(_cgcolor(props["border_color"]))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_border")
 
 
 def _apply_view_border(view: Any, props: Dict[str, Any]) -> None:
@@ -294,13 +295,13 @@ def _apply_view_border(view: Any, props: Dict[str, Any]) -> None:
                 if width > 0.0 and height > 0.0:
                     radius = min(requested, min(width, height) / 2.0)
             except Exception:
-                pass
+                diagnostics.swallowed("ios._apply_view_border")
             border_props = dict(props)
             border_props["border_radius"] = radius
             _apply_border(view.layer, border_props)
             return
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_view_border")
     _apply_border(view.layer, props)
 
 
@@ -344,7 +345,7 @@ def _apply_side_borders(view: Any, props: Dict[str, Any]) -> None:
     try:
         view.layer.setBorderWidth_(0.0)
     except Exception:
-        pass
+        diagnostics.swallowed("ios._apply_side_borders")
     try:
         bounds = view.bounds
         w = float(bounds.size.width)
@@ -352,7 +353,7 @@ def _apply_side_borders(view: Any, props: Dict[str, Any]) -> None:
         if w > 0.0 and h > 0.0:
             _update_side_border_layers(view, w, h)
     except Exception:
-        pass
+        diagnostics.swallowed("ios._apply_side_borders")
 
 
 def _update_side_border_layers(view: Any, width: float, height: float) -> None:
@@ -377,7 +378,7 @@ def _update_side_border_layers(view: Any, width: float, height: float) -> None:
                 try:
                     layer.removeFromSuperlayer()
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios._update_side_border_layers")
                 layers[i] = None
             continue
         try:
@@ -388,7 +389,7 @@ def _update_side_border_layers(view: Any, width: float, height: float) -> None:
             layer.setBackgroundColor_(_cgcolor(entry["colors"][i]))
             layer.setFrame_(frames[i])
         except Exception:
-            pass
+            diagnostics.swallowed("ios._update_side_border_layers")
 
 
 def _clamp_view_corner_radius(view: Any, width: float, height: float) -> None:
@@ -402,7 +403,7 @@ def _clamp_view_corner_radius(view: Any, width: float, height: float) -> None:
     try:
         view.layer.setCornerRadius_(min(float(requested), max_radius))
     except Exception:
-        pass
+        diagnostics.swallowed("ios._clamp_view_corner_radius")
 
 
 def _clamp_layer_corner_radius(layer: Any, width: float, height: float) -> None:
@@ -418,7 +419,7 @@ def _clamp_layer_corner_radius(layer: Any, width: float, height: float) -> None:
     try:
         layer.setCornerRadius_(min(requested, max_radius))
     except Exception:
-        pass
+        diagnostics.swallowed("ios._clamp_layer_corner_radius")
 
 
 def _apply_shadow(view: Any, props: Dict[str, Any]) -> None:
@@ -434,22 +435,22 @@ def _apply_shadow(view: Any, props: Dict[str, Any]) -> None:
             layer.setMasksToBounds_(False)
             view.setClipsToBounds_(False)
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_shadow")
     if "shadow_color" in props and props["shadow_color"] is not None:
         try:
             layer.setShadowColor_(_cgcolor(props["shadow_color"]))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_shadow")
     if "shadow_opacity" in props and props["shadow_opacity"] is not None:
         try:
             layer.setShadowOpacity_(float(props["shadow_opacity"]))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_shadow")
     if "shadow_radius" in props and props["shadow_radius"] is not None:
         try:
             layer.setShadowRadius_(float(props["shadow_radius"]))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_shadow")
     if "shadow_offset" in props and props["shadow_offset"] is not None:
         offset = props["shadow_offset"]
         try:
@@ -460,7 +461,7 @@ def _apply_shadow(view: Any, props: Dict[str, Any]) -> None:
                 w, h = float(offset[0]), float(offset[1])
             layer.setShadowOffset_((w, h))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_shadow")
 
 
 def _make_transform(spec: Any) -> Any:
@@ -534,7 +535,7 @@ def _apply_transform(view: Any, props: Dict[str, Any]) -> None:
         try:
             view.setTransform_((1.0, 0.0, 0.0, 1.0, 0.0, 0.0))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_transform")
         return
     try:
         transform = _make_transform(spec)
@@ -565,7 +566,7 @@ def _apply_transform(view: Any, props: Dict[str, Any]) -> None:
         # rubicon-objc accepts the C struct as a tuple of its fields.
         view.setTransform_((a, b, c, d, tx, ty))
     except Exception:
-        pass
+        diagnostics.swallowed("ios._apply_transform")
 
 
 # UIAccessibilityTraits bitmask values (UIKit constants).
@@ -604,25 +605,25 @@ def _apply_accessibility(view: Any, props: Dict[str, Any]) -> None:
         try:
             view.setIsAccessibilityElement_(bool(props["accessible"]))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_accessibility")
     if "accessibility_label" in props:
         v = props["accessibility_label"]
         try:
             view.setAccessibilityLabel_(str(v) if v is not None else "")
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_accessibility")
     if "accessibility_hint" in props:
         v = props["accessibility_hint"]
         try:
             view.setAccessibilityHint_(str(v) if v is not None else "")
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_accessibility")
     if "test_id" in props:
         v = props["test_id"]
         try:
             view.setAccessibilityIdentifier_(str(v) if v is not None else None)
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_accessibility")
 
     role = props.get("accessibility_role")
     state = props.get("accessibility_state")
@@ -642,11 +643,11 @@ def _apply_accessibility(view: Any, props: Dict[str, Any]) -> None:
             try:
                 view.setAccessibilityValue_("expanded" if state["expanded"] else "collapsed")
             except Exception:
-                pass
+                diagnostics.swallowed("ios._apply_accessibility")
     try:
         view.setAccessibilityTraits_(traits)
     except Exception:
-        pass
+        diagnostics.swallowed("ios._apply_accessibility")
 
 
 def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
@@ -657,14 +658,14 @@ def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
         try:
             view.layer.setBackgroundColor_(color.CGColor)
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_common_visual")
     if "overflow" in props:
         view.setClipsToBounds_(props["overflow"] == "hidden")
     if "opacity" in props and props["opacity"] is not None:
         try:
             view.setAlpha_(float(props["opacity"]))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._apply_common_visual")
     _apply_view_border(view, props)
     _apply_side_borders(view, props)
     _apply_shadow(view, props)
@@ -733,7 +734,7 @@ def _set_recognizer_delegate(recognizer: Any) -> None:
         rec_ptr = recognizer.ptr if hasattr(recognizer, "ptr") else recognizer
         _objc_msgSend(rec_ptr, _SEL_SET_DELEGATE, delegate)
     except Exception:
-        pass
+        diagnostics.swallowed("ios._set_recognizer_delegate")
 
 
 # ======================================================================
@@ -763,7 +764,7 @@ def _action_imp(_self_ptr: int, _cmd_ptr: int, sender_ptr: int) -> None:
     try:
         handler()
     except Exception:
-        pass
+        diagnostics.swallowed("ios._action_imp")
 
 
 _action_imp_ref = _ACTION_IMP_TYPE(_action_imp)
@@ -864,11 +865,11 @@ def _make_gesture_handler(
             payload["x"] = float(location.x)
             payload["y"] = float(location.y)
         except Exception:
-            pass
+            diagnostics.swallowed("ios._make_gesture_handler.handler")
         try:
             payload["pointer_count"] = int(rec.numberOfTouches)
         except Exception:
-            pass
+            diagnostics.swallowed("ios._make_gesture_handler.handler")
 
         if kind == "pan":
             try:
@@ -879,17 +880,17 @@ def _make_gesture_handler(
                 payload["velocity_x"] = float(velocity.x)
                 payload["velocity_y"] = float(velocity.y)
             except Exception:
-                pass
+                diagnostics.swallowed("ios._make_gesture_handler.handler")
         elif kind == "pinch":
             try:
                 payload["scale"] = float(rec.scale)
             except Exception:
-                pass
+                diagnostics.swallowed("ios._make_gesture_handler.handler")
         elif kind == "rotation":
             try:
                 payload["rotation"] = float(rec.rotation)
             except Exception:
-                pass
+                diagnostics.swallowed("ios._make_gesture_handler.handler")
         elif kind == "swipe":
             # Discrete: UIKit only calls us on recognition, and only the
             # recognizer whose direction matched fires, so the bound
@@ -917,7 +918,7 @@ def _make_recognizer(kind: str, spec: Dict[str, Any]) -> List[Tuple[Any, Optiona
         try:
             rec.setNumberOfTapsRequired_(max(1, int(spec.get("n_taps", 1))))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._make_recognizer")
         out.append((rec, None))
     elif kind == "long_press":
         rec = ObjCClass("UILongPressGestureRecognizer").alloc().init()
@@ -925,14 +926,14 @@ def _make_recognizer(kind: str, spec: Dict[str, Any]) -> List[Tuple[Any, Optiona
             rec.setMinimumPressDuration_(float(spec.get("min_duration_ms", 500.0)) / 1000.0)
             rec.setAllowableMovement_(float(spec.get("max_distance", 12.0)))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._make_recognizer")
         out.append((rec, None))
     elif kind == "pan":
         rec = ObjCClass("UIPanGestureRecognizer").alloc().init()
         try:
             rec.setMinimumNumberOfTouches_(max(1, int(spec.get("min_pointers", 1))))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._make_recognizer")
         out.append((rec, None))
     elif kind == "swipe":
         direction = str(spec.get("direction", "any"))
@@ -942,7 +943,7 @@ def _make_recognizer(kind: str, spec: Dict[str, Any]) -> List[Tuple[Any, Optiona
             try:
                 rec.setDirection_(_SWIPE_DIRECTIONS[d])
             except Exception:
-                pass
+                diagnostics.swallowed("ios._make_recognizer")
             out.append((rec, d))
     elif kind == "pinch":
         out.append((ObjCClass("UIPinchGestureRecognizer").alloc().init(), None))
@@ -963,7 +964,7 @@ def _wire_gestures(view: Any, specs: Any) -> None:
         try:
             view.removeGestureRecognizer_(rec)
         except Exception:
-            pass
+            diagnostics.swallowed("ios._wire_gestures")
         _pn_action_handlers.pop(_recognizer_ptr(rec), None)
     state["gesture_recognizers"] = []
     if not isinstance(specs, (list, tuple)) or not specs:
@@ -972,7 +973,7 @@ def _wire_gestures(view: Any, specs: Any) -> None:
     try:
         view.setUserInteractionEnabled_(True)
     except Exception:
-        pass
+        diagnostics.swallowed("ios._wire_gestures")
 
     recognizers: List[Any] = []
     for i, spec in enumerate(specs):
@@ -985,7 +986,7 @@ def _wire_gestures(view: Any, specs: Any) -> None:
             try:
                 rec.setCancelsTouchesInView_(False)
             except Exception:
-                pass
+                diagnostics.swallowed("ios._wire_gestures")
             _set_recognizer_delegate(rec)
             try:
                 view.addGestureRecognizer_(rec)
@@ -1082,13 +1083,13 @@ def _start_native_animation(view: Any, anim_id: int, prop_name: str, spec: Dict[
 
             native_animation_completed(anim_id, bool(finished))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._start_native_animation._completion")
 
     def _animations() -> None:
         try:
             applier_to(view)
         except Exception:
-            pass
+            diagnostics.swallowed("ios._start_native_animation._animations")
 
     try:
         # Snap to the starting value so the animation covers the full
@@ -1171,7 +1172,7 @@ class IOSViewHandler(ViewHandler):
         try:
             native_view.removeFromSuperview()
         except Exception:
-            pass
+            diagnostics.swallowed("ios.IOSViewHandler.destroy")
         _forget(native_view)
 
     def _build(self, props: Dict[str, Any]) -> Any:
@@ -1187,7 +1188,7 @@ class IOSViewHandler(ViewHandler):
         try:
             child.setTranslatesAutoresizingMaskIntoConstraints_(True)
         except Exception:
-            pass
+            diagnostics.swallowed("ios.IOSViewHandler.insert_child")
         try:
             count = len(list(parent.subviews or []))
         except Exception:
@@ -1198,13 +1199,13 @@ class IOSViewHandler(ViewHandler):
             try:
                 parent.addSubview_(child)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.IOSViewHandler.insert_child")
 
     def remove_child(self, parent: Any, child: Any) -> None:
         try:
             child.removeFromSuperview()
         except Exception:
-            pass
+            diagnostics.swallowed("ios.IOSViewHandler.remove_child")
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
         if native_view is None:
@@ -1221,7 +1222,7 @@ class IOSViewHandler(ViewHandler):
             try:
                 _clamp_layer_corner_radius(native_view.layer, frame_w, frame_h)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.IOSViewHandler.set_frame")
             try:
                 parent = native_view.superview
                 parent_cls = ""
@@ -1238,9 +1239,9 @@ class IOSViewHandler(ViewHandler):
                     content_h = max(float(bounds.size.height), frame_y + frame_h)
                     parent.setContentSize_((content_w, content_h))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.IOSViewHandler.set_frame")
         except Exception:
-            pass
+            diagnostics.swallowed("ios.IOSViewHandler.set_frame")
 
     def measure_intrinsic(
         self,
@@ -1273,7 +1274,7 @@ class IOSViewHandler(ViewHandler):
         try:
             applier(native_view)
         except Exception:
-            pass
+            diagnostics.swallowed("ios.IOSViewHandler.set_animated_property")
 
     def start_animation(
         self,
@@ -1312,7 +1313,7 @@ class IOSViewHandler(ViewHandler):
         try:
             view.layer.removeAllAnimations()
         except Exception:
-            pass
+            diagnostics.swallowed("ios.IOSViewHandler.cancel_animation")
         return value
 
 
@@ -1400,7 +1401,7 @@ class TextHandler(IOSViewHandler):
                 if desc is not None:
                     font = UIFont.fontWithDescriptor_size_(desc, size)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextHandler._font_for")
         return font
 
     _SPAN_REBUILD_KEYS = (
@@ -1463,7 +1464,7 @@ class TextHandler(IOSViewHandler):
             try:
                 label.setAlpha_(float(props["opacity"]))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextHandler._apply")
 
     def _apply_spans(self, label: Any, merged: Dict[str, Any]) -> None:
         """Render a rich-text span list as one NSAttributedString.
@@ -1525,13 +1526,13 @@ class TextHandler(IOSViewHandler):
                     elif span.get("text_decoration") == "line_through":
                         attr.addAttribute_value_range_("NSStrikethrough", 1, rng)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.TextHandler._apply_spans")
             label.setAttributedText_(attr)
         except Exception:
             try:
                 label.setText_(str(merged.get("text") or ""))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextHandler._apply_spans")
 
     def _apply_attributed(self, label: Any, props: Dict[str, Any]) -> None:
         """Re-render the label's text as an NSAttributedString.
@@ -1576,7 +1577,7 @@ class TextHandler(IOSViewHandler):
                 attr.addAttribute_value_range_("NSStrikethrough", 1, full_range)
             label.setAttributedText_(attr)
         except Exception:
-            pass
+            diagnostics.swallowed("ios.TextHandler._apply_attributed")
 
 
 class ButtonHandler(IOSViewHandler):
@@ -1632,7 +1633,7 @@ class ButtonHandler(IOSViewHandler):
             try:
                 btn.setAlpha_(float(props["opacity"]))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ButtonHandler._apply")
 
 
 # ``scrollViewDidScroll:`` hands the delegate a ``UIScrollView*``. rubicon's
@@ -1718,24 +1719,24 @@ class ScrollViewHandler(IOSViewHandler):
                 sv.setShowsVerticalScrollIndicator_(visible)
                 sv.setShowsHorizontalScrollIndicator_(visible)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ScrollViewHandler._apply")
         if "paging_enabled" in props:
             try:
                 sv.setPagingEnabled_(bool(props["paging_enabled"]))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ScrollViewHandler._apply")
         if "bounces" in props:
             b = props["bounces"]
             try:
                 sv.setBounces_(True if b is None else bool(b))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ScrollViewHandler._apply")
         if "keyboard_dismiss_mode" in props and props["keyboard_dismiss_mode"] is not None:
             mapping = {"none": 0, "on_drag": 1, "interactive": 2}
             try:
                 sv.setKeyboardDismissMode_(mapping.get(props["keyboard_dismiss_mode"], 0))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ScrollViewHandler._apply")
 
     def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
         if name == "scroll_to_offset":
@@ -1745,7 +1746,7 @@ class ScrollViewHandler(IOSViewHandler):
             try:
                 native_view.setContentOffset_animated_((x, y), animated)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ScrollViewHandler.command")
             return None
         if name == "scroll_to_end":
             animated = args.get("animated", True) is not False
@@ -1760,7 +1761,7 @@ class ScrollViewHandler(IOSViewHandler):
                 offset = (target_x, 0.0) if horizontal else (0.0, target_y)
                 native_view.setContentOffset_animated_(offset, animated)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ScrollViewHandler.command")
             return None
         if name == "get_scroll_offset":
             try:
@@ -1799,7 +1800,7 @@ class ScrollViewHandler(IOSViewHandler):
                     sv.setRefreshControl_(None)
                     sv.setAlwaysBounceVertical_(False)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ScrollViewHandler._apply_refresh")
             return
         try:
             existing = sv.refreshControl
@@ -1816,7 +1817,7 @@ class ScrollViewHandler(IOSViewHandler):
                 try:
                     sv.setAlwaysBounceVertical_(True)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.ScrollViewHandler._apply_refresh")
                 existing = rc
             refreshing = bool(spec.get("refreshing")) if isinstance(spec, dict) else False
             if refreshing:
@@ -1824,7 +1825,7 @@ class ScrollViewHandler(IOSViewHandler):
             else:
                 existing.endRefreshing()
         except Exception:
-            pass
+            diagnostics.swallowed("ios.ScrollViewHandler._apply_refresh")
 
 
 class ImageHandler(IOSViewHandler):
@@ -1842,12 +1843,12 @@ class ImageHandler(IOSViewHandler):
             try:
                 iv.setTintColor_(_uicolor(props["tint_color"]))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ImageHandler._apply")
         if "placeholder_color" in props and props["placeholder_color"] is not None:
             try:
                 iv.setBackgroundColor_(_uicolor(props["placeholder_color"]))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ImageHandler._apply")
         if "source" in props and props["source"]:
             self._load_source(iv, str(props["source"]))
         if "scale_type" in props and props["scale_type"]:
@@ -1873,7 +1874,7 @@ class ImageHandler(IOSViewHandler):
                     w, h = max_width, h * scale
                 return (w, h)
         except Exception:
-            pass
+            diagnostics.swallowed("ios.ImageHandler.measure_intrinsic")
         return (0.0, 0.0)
 
     def _load_source(self, iv: Any, source: str) -> None:
@@ -1894,7 +1895,7 @@ class ImageHandler(IOSViewHandler):
                 else:
                     _fire(iv, "on_error", f"image {source!r} not found")
         except Exception:
-            pass
+            diagnostics.swallowed("ios.ImageHandler._load_source")
 
     def _load_data_uri(self, iv: Any, source: str) -> None:
         """Decode an inline ``data:`` URI (base64 payload) into the view."""
@@ -1942,7 +1943,7 @@ class ImageHandler(IOSViewHandler):
                     iv.setImage_(image)
                     _fire(iv, "on_load")
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.ImageHandler._load_async.on_ready")
 
             def on_error(message: str) -> None:
                 if _state_of(iv).get("pending_uri") == source:
@@ -1950,7 +1951,7 @@ class ImageHandler(IOSViewHandler):
 
             fetch(source, on_ready, on_error)
         except Exception:
-            pass
+            diagnostics.swallowed("ios.ImageHandler._load_async")
 
     def _decode_downsampled(self, iv: Any, path: str) -> Any:
         """Decode a file, scaling down to the view's bounds if oversized.
@@ -2052,7 +2053,7 @@ def _tf_on_change_imp(self_ptr: int, _cmd: int, sender_ptr: int) -> None:
         try:
             view.setText_(text)
         except Exception:
-            pass
+            diagnostics.swallowed("ios._tf_on_change_imp")
         finally:
             state["suppress"] = False
     _fire(view, "on_change", text)
@@ -2077,7 +2078,7 @@ def _tf_should_return_imp(self_ptr: int, _cmd: int, tf_ptr: int) -> bool:
         _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p]
         _objc_msgSend(_ct.c_void_p(int(tf_ptr or 0)), _SEL_RESIGN_FIRST_RESPONDER)
     except Exception:
-        pass
+        diagnostics.swallowed("ios._tf_should_return_imp")
     return True
 
 
@@ -2244,7 +2245,7 @@ class TextInputHandler(IOSViewHandler):
                 )
                 view.setAttributedPlaceholder_(attr)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler._apply")
         if "font_size" in props and props["font_size"] is not None:
             view.setFont_(UIFont.systemFontOfSize_(float(props["font_size"])))
         if "color" in props and props["color"] is not None:
@@ -2255,7 +2256,7 @@ class TextInputHandler(IOSViewHandler):
             try:
                 view.setSecureTextEntry_(bool(props["secure"]))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler._apply")
         if "keyboard_type" in props and props["keyboard_type"] is not None:
             mapping = {
                 "default": 0,
@@ -2270,19 +2271,19 @@ class TextInputHandler(IOSViewHandler):
             try:
                 view.setKeyboardType_(mapping.get(props["keyboard_type"], 0))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler._apply")
         if "auto_capitalize" in props and props["auto_capitalize"] is not None:
             # UITextAutocapitalizationType: none=0, words=1, sentences=2, all=3.
             mapping = {"none": 0, "words": 1, "sentences": 2, "characters": 3}
             try:
                 view.setAutocapitalizationType_(mapping.get(props["auto_capitalize"], 2))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler._apply")
         if "auto_correct" in props:
             try:
                 view.setAutocorrectionType_(1 if props["auto_correct"] else 0)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler._apply")
         if "return_key_type" in props and props["return_key_type"] is not None:
             mapping = {
                 "default": 0,
@@ -2299,23 +2300,23 @@ class TextInputHandler(IOSViewHandler):
             try:
                 view.setReturnKeyType_(mapping.get(props["return_key_type"], 0))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler._apply")
         if "selection_color" in props and props["selection_color"] is not None:
             try:
                 view.setTintColor_(_uicolor(props["selection_color"]))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler._apply")
         if "text_content_type" in props:
             tct = props["text_content_type"]
             try:
                 view.setTextContentType_(_ui_text_content_type(str(tct)) if tct is not None else None)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler._apply")
         if "clear_button" in props and is_field:
             try:
                 view.setClearButtonMode_(1 if props["clear_button"] else 0)  # 1 = WhileEditing
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler._apply")
         # ``editable`` is present only when False (read-only). A removed
         # prop arrives as None on update, which means "editable again".
         if "editable" in props:
@@ -2327,12 +2328,12 @@ class TextInputHandler(IOSViewHandler):
                 else:
                     view.setEditable_(resolved)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler._apply")
         if "auto_focus" in props and props["auto_focus"]:
             try:
                 view.becomeFirstResponder()
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler._apply")
         _apply_view_border(view, props)
         _apply_shadow(view, props)
         _apply_transform(view, props)
@@ -2341,7 +2342,7 @@ class TextInputHandler(IOSViewHandler):
             try:
                 view.setAlpha_(float(props["opacity"]))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler._apply")
 
     def measure_intrinsic(
         self,
@@ -2357,13 +2358,13 @@ class TextInputHandler(IOSViewHandler):
             try:
                 native_view.becomeFirstResponder()
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler.command")
             return None
         if name == "blur":
             try:
                 native_view.resignFirstResponder()
             except Exception:
-                pass
+                diagnostics.swallowed("ios.TextInputHandler.command")
             return None
         if name == "clear":
             state = _state_of(native_view)
@@ -2481,7 +2482,7 @@ class ActivityIndicatorHandler(IOSViewHandler):
             try:
                 ai.setActivityIndicatorViewStyle_(style)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ActivityIndicatorHandler._apply")
         if "color" in props and props["color"] is not None:
             ai.setColor_(_uicolor(props["color"]))
         animating = props.get("animating")
@@ -2563,7 +2564,7 @@ class PressableHandler(IOSViewHandler):
             try:
                 rec.setCancelsTouchesInView_(False)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.PressableHandler._wire_press")
             _set_recognizer_delegate(rec)
             view.addGestureRecognizer_(rec)
             rec.retain()
@@ -2643,7 +2644,7 @@ def _press_feedback(view: Any, pressed: bool) -> None:
         UIView = ObjCClass("UIView")
         UIView.animateWithDuration_animations_(duration, lambda: view.setAlpha_(opacity))
     except Exception:
-        pass
+        diagnostics.swallowed("ios._press_feedback")
 
 
 # ======================================================================
@@ -2668,7 +2669,7 @@ class ProgressBarHandler(IOSViewHandler):
             try:
                 ai.startAnimating()
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ProgressBarHandler._build")
             return ai
         pv = ObjCClass("UIProgressView").alloc().init()
         pv.setTranslatesAutoresizingMaskIntoConstraints_(True)
@@ -2684,27 +2685,27 @@ class ProgressBarHandler(IOSViewHandler):
                 try:
                     view.setColor_(_uicolor(props["color"]))
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.ProgressBarHandler._apply")
             try:
                 view.startAnimating()
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ProgressBarHandler._apply")
         else:
             if "value" in props and props["value"] is not None:
                 try:
                     view.setProgress_(float(props["value"]))
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.ProgressBarHandler._apply")
             if "color" in props and props["color"] is not None:
                 try:
                     view.setProgressTintColor_(_uicolor(props["color"]))
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.ProgressBarHandler._apply")
             if "track_color" in props and props["track_color"] is not None:
                 try:
                     view.setTrackTintColor_(_uicolor(props["track_color"]))
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.ProgressBarHandler._apply")
         _apply_accessibility(view, props)
 
     def measure_intrinsic(
@@ -2771,7 +2772,7 @@ def _webview_did_finish_imp(self_ptr: int, _cmd_ptr: int, _webview_ptr: int, _na
         try:
             wv.evaluateJavaScript_completionHandler_(str(js), None)
         except Exception:
-            pass
+            diagnostics.swallowed("ios._webview_did_finish_imp")
     _fire(wv, "on_load", _webview_url(wv))
 
 
@@ -2855,7 +2856,7 @@ class WebViewHandler(IOSViewHandler):
                 try:
                     cls.declare_property(prop)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.WebViewHandler._build")
             _pn_wkwebview_declared = True
         config = WKWebViewConfiguration.alloc().init()
         delegate_ptr = _new_webview_delegate_ptr()
@@ -2867,14 +2868,14 @@ class WebViewHandler(IOSViewHandler):
             try:
                 config.userContentController.addScriptMessageHandler_name_(delegate, "pythonnative")
             except Exception:
-                pass
+                diagnostics.swallowed("ios.WebViewHandler._build")
         wv = WKWebView.alloc().initWithFrame_configuration_(((0, 0), (0, 0)), config)
         wv.setTranslatesAutoresizingMaskIntoConstraints_(True)
         if delegate is not None:
             try:
                 wv.setNavigationDelegate_(delegate)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.WebViewHandler._build")
         if delegate_ptr:
             _pn_webview_state[delegate_ptr] = {"view": wv, "inject_js": None}
             self._delegate_ids[_objc_ptr(wv) or 0] = delegate_ptr
@@ -2907,7 +2908,7 @@ class WebViewHandler(IOSViewHandler):
             try:
                 wv.loadHTMLString_baseURL_(str(props["html"]), None)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.WebViewHandler._apply")
         elif "url" in props and props["url"]:
             try:
                 NSURL = ObjCClass("NSURL")
@@ -2915,38 +2916,38 @@ class WebViewHandler(IOSViewHandler):
                 url_obj = NSURL.URLWithString_(str(props["url"]))
                 wv.loadRequest_(NSURLRequest.requestWithURL_(url_obj))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.WebViewHandler._apply")
         if "scroll_enabled" in props:
             enabled = props["scroll_enabled"]
             try:
                 wv.scrollView.setScrollEnabled_(True if enabled is None else bool(enabled))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.WebViewHandler._apply")
 
     def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
         if name == "eval_js":
             try:
                 native_view.evaluateJavaScript_completionHandler_(str(args.get("source", "")), None)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.WebViewHandler.command")
             return None
         if name == "reload":
             try:
                 native_view.reload()
             except Exception:
-                pass
+                diagnostics.swallowed("ios.WebViewHandler.command")
             return None
         if name == "go_back":
             try:
                 native_view.goBack()
             except Exception:
-                pass
+                diagnostics.swallowed("ios.WebViewHandler.command")
             return None
         if name == "go_forward":
             try:
                 native_view.goForward()
             except Exception:
-                pass
+                diagnostics.swallowed("ios.WebViewHandler.command")
             return None
         return None
 
@@ -3026,13 +3027,13 @@ class ModalHandler(IOSViewHandler):
             try:
                 child.setTranslatesAutoresizingMaskIntoConstraints_(True)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ModalHandler.insert_child")
             try:
                 content = modal["content_view"]
                 count = len(list(content.subviews or []))
                 content.insertSubview_atIndex_(child, max(0, min(index, count)))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ModalHandler.insert_child")
         else:
             buf = state.setdefault("pending_children", [])
             buf.insert(max(0, min(index, len(buf))), child)
@@ -3041,7 +3042,7 @@ class ModalHandler(IOSViewHandler):
         try:
             child.removeFromSuperview()
         except Exception:
-            pass
+            diagnostics.swallowed("ios.ModalHandler.remove_child")
         buf = _state_of(parent).get("pending_children")
         if buf and child in buf:
             buf.remove(child)
@@ -3082,7 +3083,7 @@ class ModalHandler(IOSViewHandler):
                 content.setFrame_(((0, 0), (bounds.size.width, bounds.size.height)))
                 content.setAutoresizingMask_(2 | 16)  # FlexibleWidth | FlexibleHeight
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ModalHandler._present")
 
             # UIModalPresentationStyle: fullScreen=0, pageSheet=1,
             # formSheet=2, overCurrentContext=6 (the dimmed overlay).
@@ -3091,7 +3092,7 @@ class ModalHandler(IOSViewHandler):
             try:
                 controller.setModalPresentationStyle_(style_int)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ModalHandler._present")
             # For sheet styles, ``dismiss_on_backdrop=False`` locks
             # interactive (swipe / outside-tap) dismissal so the modal
             # stays put until ``visible`` is driven back to False.
@@ -3099,7 +3100,7 @@ class ModalHandler(IOSViewHandler):
                 try:
                     controller.setModalInPresentation_(True)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.ModalHandler._present")
 
             def _on_present_complete() -> None:
                 _fire(placeholder, "on_show")
@@ -3115,7 +3116,7 @@ class ModalHandler(IOSViewHandler):
                     child.setTranslatesAutoresizingMaskIntoConstraints_(True)
                     content.addSubview_(child)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.ModalHandler._present")
 
             top = _top_view_controller_for_alert(UIApplication.sharedApplication)
             if top is not None:
@@ -3133,7 +3134,7 @@ class ModalHandler(IOSViewHandler):
             try:
                 controller.dismissViewControllerAnimated_completion_(True, None)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.ModalHandler._dismiss")
         _fire(placeholder, "on_dismiss")
 
 
@@ -3270,7 +3271,7 @@ class PortalHandler(IOSViewHandler):
             host.addSubview_(overlay)
             self._sync_overlay_frame(overlay, host)
         except Exception:
-            pass
+            diagnostics.swallowed("ios.PortalHandler._ensure_attached")
 
     @staticmethod
     def _sync_overlay_frame(overlay: Any, host: Any) -> None:
@@ -3286,7 +3287,7 @@ class PortalHandler(IOSViewHandler):
             overlay.setFrame_(((left, top), (w, h)))
             overlay.setAutoresizingMask_(2 | 16)  # FlexibleWidth | FlexibleHeight
         except Exception:
-            pass
+            diagnostics.swallowed("ios.PortalHandler._sync_overlay_frame")
 
     def insert_child(self, parent: Any, child: Any, index: int) -> None:
         self._ensure_attached(parent)
@@ -3313,7 +3314,7 @@ class PortalHandler(IOSViewHandler):
         try:
             overlay.release()
         except Exception:
-            pass
+            diagnostics.swallowed("ios.PortalHandler._teardown")
 
 
 # ======================================================================
@@ -3347,7 +3348,7 @@ class StatusBarHandler(IOSViewHandler):
                 mapping = {"default": 3, "light": 1, "dark": 3}
                 app.setStatusBarStyle_animated_(mapping.get(props["bar_style"], 0), True)
         except Exception:
-            pass
+            diagnostics.swallowed("ios.StatusBarHandler._apply")
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
         return
@@ -3413,7 +3414,7 @@ def _ensure_keyboard_observer() -> None:
             None,
         )
     except Exception:
-        pass
+        diagnostics.swallowed("ios._ensure_keyboard_observer")
 
 
 class KeyboardAvoidingViewHandler(IOSViewHandler):
@@ -3457,7 +3458,7 @@ def _tabbar_did_select_imp(self_ptr: int, cmd_ptr: int, tabbar_ptr: int, item_pt
         if 0 <= index < len(items):
             _fire_ptr(int(tabbar_ptr), "on_tab_select", items[index].get("name", ""))
     except Exception:
-        pass
+        diagnostics.swallowed("ios._tabbar_did_select_imp")
 
 
 _tabbar_imp_ref = _DELEGATE_IMP_TYPE(_tabbar_did_select_imp)
@@ -3543,7 +3544,7 @@ class TabBarHandler(IOSViewHandler):
         try:
             tab_bar.setItems_animated_(bar_items, False)
         except Exception:
-            pass
+            diagnostics.swallowed("ios.TabBarHandler._set_bar_items")
 
     def _resolve_icon(self, UIImage: Any, icon: Any) -> Any:
         """Resolve a tab icon spec to a UIImage, or return None.
@@ -3577,7 +3578,7 @@ class TabBarHandler(IOSViewHandler):
                     if i < len(all_items):
                         tab_bar.setSelectedItem_(all_items[i])
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.TabBarHandler._set_active")
                 break
 
 
@@ -3600,7 +3601,7 @@ def _top_view_controller_for_alert(app: Any) -> Any:
     try:
         window = app.keyWindow
     except Exception:
-        pass
+        diagnostics.swallowed("ios._top_view_controller_for_alert")
 
     if window is None:
         try:
@@ -3612,7 +3613,7 @@ def _top_view_controller_for_alert(app: Any) -> Any:
             if window is None and windows:
                 window = windows[0]
         except Exception:
-            pass
+            diagnostics.swallowed("ios._top_view_controller_for_alert")
 
     if window is None:
         return None
@@ -3629,7 +3630,7 @@ def _top_view_controller_for_alert(app: Any) -> Any:
         if visible is not None:
             top = visible
     except Exception:
-        pass
+        diagnostics.swallowed("ios._top_view_controller_for_alert")
 
     while top is not None:
         try:
@@ -3677,7 +3678,7 @@ def _present_alert(
         try:
             on_result(index)
         except Exception:
-            pass
+            diagnostics.swallowed("ios._present_alert._deliver")
 
     def _present_on_main() -> None:
         try:
@@ -3778,7 +3779,7 @@ class PickerHandler(IOSViewHandler):
         try:
             btn.setTitle_forState_(_picker_button_title(merged), 0)
         except Exception:
-            pass
+            diagnostics.swallowed("ios.PickerHandler._apply")
         _apply_accessibility(btn, props)
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
@@ -3814,10 +3815,10 @@ def _checkbox_set_image(btn: Any) -> None:
                 if tinted is not None:
                     image = tinted
             except Exception:
-                pass
+                diagnostics.swallowed("ios._checkbox_set_image")
         btn.setImage_forState_(image, 0)
     except Exception:
-        pass
+        diagnostics.swallowed("ios._checkbox_set_image")
 
 
 def _checkbox_toggle(btn: Any) -> None:
@@ -3855,7 +3856,7 @@ class CheckboxHandler(IOSViewHandler):
                 btn.setTitleColor_forState_(_uicolor("#111111"), 0)
                 btn.setTintColor_(_uicolor("#111111"))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.CheckboxHandler._apply")
         if "value" in props:
             state["value"] = bool(props["value"])
         if "label" in props:
@@ -3863,14 +3864,14 @@ class CheckboxHandler(IOSViewHandler):
             try:
                 btn.setTitle_forState_(str(label) if label is not None else "", 0)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.CheckboxHandler._apply")
             # An image-bearing custom button is not exposed to the
             # accessibility tree by title alone; mirror the label
             # explicitly (an accessibility_label prop still wins below).
             try:
                 btn.setAccessibilityLabel_(str(label) if label is not None else "")
             except Exception:
-                pass
+                diagnostics.swallowed("ios.CheckboxHandler._apply")
         if "disabled" in props:
             # ``disabled`` is present only when True; a removed prop
             # (None) re-enables the control.
@@ -3878,7 +3879,7 @@ class CheckboxHandler(IOSViewHandler):
             try:
                 btn.setEnabled_(not disabled)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.CheckboxHandler._apply")
         _checkbox_set_image(btn)
         _apply_accessibility(btn, props)
 
@@ -3935,7 +3936,7 @@ class SegmentedControlHandler(IOSViewHandler):
                     for i, title in enumerate(new_segments):
                         control.insertSegmentWithTitle_atIndex_animated_(title, i, False)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.SegmentedControlHandler._apply")
                 finally:
                     state["suppress"] = False
                 rebuilt = True
@@ -3948,7 +3949,7 @@ class SegmentedControlHandler(IOSViewHandler):
             try:
                 control.setSelectedSegmentIndex_(int(merged.get("selected_index", 0) or 0))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.SegmentedControlHandler._apply")
             finally:
                 state["suppress"] = False
         if "tint_color" in props and props["tint_color"] is not None:
@@ -3956,11 +3957,11 @@ class SegmentedControlHandler(IOSViewHandler):
             try:
                 control.setSelectedSegmentTintColor_(color)  # iOS 13+
             except Exception:
-                pass
+                diagnostics.swallowed("ios.SegmentedControlHandler._apply")
             try:
                 control.setTintColor_(color)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.SegmentedControlHandler._apply")
         if "enabled" in props:
             # ``enabled`` is present only when False; a removed prop
             # (None) re-enables the control.
@@ -3968,7 +3969,7 @@ class SegmentedControlHandler(IOSViewHandler):
             try:
                 control.setEnabled_(True if enabled is None else bool(enabled))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.SegmentedControlHandler._apply")
         _apply_accessibility(control, props)
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
@@ -4007,7 +4008,7 @@ def _date_formatter(mode: str) -> Any:
         NSLocale = ObjCClass("NSLocale")
         formatter.setLocale_(NSLocale.alloc().initWithLocaleIdentifier_("en_US_POSIX"))
     except Exception:
-        pass
+        diagnostics.swallowed("ios._date_formatter")
     formatter.retain()
     _pn_date_formatters[fmt] = formatter
     return formatter
@@ -4024,7 +4025,7 @@ class DatePickerHandler(IOSViewHandler):
         try:
             picker.setPreferredDatePickerStyle_(2)  # UIDatePickerStyleCompact
         except Exception:
-            pass
+            diagnostics.swallowed("ios.DatePickerHandler._build")
 
         def _on_change() -> None:
             state = _state_of(picker)
@@ -4049,7 +4050,7 @@ class DatePickerHandler(IOSViewHandler):
             try:
                 picker.setDatePickerMode_(mode_map.get(mode, 1))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.DatePickerHandler._apply")
         if "minimum" in props:
             self._set_bound(picker, "setMinimumDate_", props["minimum"], mode)
         if "maximum" in props:
@@ -4064,7 +4065,7 @@ class DatePickerHandler(IOSViewHandler):
                 try:
                     picker.setDate_animated_(date, False)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("ios.DatePickerHandler._apply")
                 finally:
                     state["suppress"] = False
         if "enabled" in props:
@@ -4074,7 +4075,7 @@ class DatePickerHandler(IOSViewHandler):
             try:
                 picker.setEnabled_(True if enabled is None else bool(enabled))
             except Exception:
-                pass
+                diagnostics.swallowed("ios.DatePickerHandler._apply")
         _apply_accessibility(picker, props)
 
     def _set_bound(self, picker: Any, selector: str, value: Any, mode: str) -> None:
@@ -4085,7 +4086,7 @@ class DatePickerHandler(IOSViewHandler):
             date = _date_formatter(mode).dateFromString_(str(value))
             getattr(picker, selector)(date)
         except Exception:
-            pass
+            diagnostics.swallowed("ios.DatePickerHandler._set_bound")
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
         try:
@@ -4230,7 +4231,7 @@ def _table_cell_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int) -> in
             cell.setFrame_(((0, 0), (cell_w, row_h)))
             cell.contentView.setFrame_(((0, 0), (cell_w, row_h)))
         except Exception:
-            pass
+            diagnostics.swallowed("ios._table_cell_imp")
 
         content = cell.contentView
         try:
@@ -4240,7 +4241,7 @@ def _table_cell_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int) -> in
             for sub in list(existing_subs or []):
                 sub.removeFromSuperview()
         except Exception:
-            pass
+            diagnostics.swallowed("ios._table_cell_imp")
 
         # Only rows in (or near) the visible content window get a
         # mounted subtree. UITableView's accessibility container calls
@@ -4270,7 +4271,7 @@ def _table_cell_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int) -> in
         try:
             cell.setAccessibilityElementsHidden_(not in_window)
         except Exception:
-            pass
+            diagnostics.swallowed("ios._table_cell_imp")
 
         if in_window and info is not None:
             render_row = info.get("render_row")
@@ -4289,7 +4290,7 @@ def _table_cell_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int) -> in
                         try:
                             root.setFrame_(((0, 0), (cell_w, row_h)))
                         except Exception:
-                            pass
+                            diagnostics.swallowed("ios._table_cell_imp")
                 except Exception:
                     print(f"[VirtualList][iOS] mount for row={row} raised:")
                     _tb.print_exc()
@@ -4314,7 +4315,7 @@ def _table_did_select_imp(self_ptr: int, cmd_ptr: int, tv_ptr: int, ip_ptr: int)
         _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_bool]
         _objc_msgSend(_ct.c_void_p(tv_ptr), _SEL_DESELECT_ROW, _ct.c_void_p(ip_ptr), True)
     except Exception:
-        pass
+        diagnostics.swallowed("ios._table_did_select_imp")
     _fire_ptr(int(tv_ptr or 0), "on_row_press", row)
 
 
@@ -4440,7 +4441,7 @@ class VirtualListHandler(IOSViewHandler):
                 estimate = float(props.get("row_height", 44.0) or 44.0)
             tv.setEstimatedRowHeight_(max(1.0, estimate))
         except Exception:
-            pass
+            diagnostics.swallowed("ios.VirtualListHandler._build")
         tv.retain()
         _pn_retained_views.append(tv)
 
@@ -4498,12 +4499,12 @@ class VirtualListHandler(IOSViewHandler):
             try:
                 tv.setShowsVerticalScrollIndicator_(visible)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.VirtualListHandler._apply")
         if data_changed and not initial:
             try:
                 tv.reloadData()
             except Exception:
-                pass
+                diagnostics.swallowed("ios.VirtualListHandler._apply")
 
     def _teardown(self, tv: Any) -> None:
         info = self._source_state(tv)
@@ -4512,7 +4513,7 @@ class VirtualListHandler(IOSViewHandler):
         try:
             info["pool"].release_all()
         except Exception:
-            pass
+            diagnostics.swallowed("ios.VirtualListHandler._teardown")
         info["tv"] = None
         _pn_table_state.pop(info.get("source_ptr"), None)
 
@@ -4536,7 +4537,7 @@ class VirtualListHandler(IOSViewHandler):
             try:
                 native_view.setContentOffset_animated_((0.0, y), animated)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.VirtualListHandler.command")
             return None
         if name == "scroll_to_index":
             index = int(args.get("index", 0) or 0)
@@ -4549,7 +4550,7 @@ class VirtualListHandler(IOSViewHandler):
                 # 1 = UITableViewScrollPositionTop
                 native_view.scrollToRowAtIndexPath_atScrollPosition_animated_(path, 1, animated)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.VirtualListHandler.command")
             return None
         if name == "scroll_to_end":
             animated = args.get("animated", True) is not False
@@ -4559,7 +4560,7 @@ class VirtualListHandler(IOSViewHandler):
                 target = max(0.0, content_h - bounds_h)
                 native_view.setContentOffset_animated_((0.0, target), animated)
             except Exception:
-                pass
+                diagnostics.swallowed("ios.VirtualListHandler.command")
             return None
         if name == "get_scroll_offset":
             try:

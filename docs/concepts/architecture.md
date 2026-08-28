@@ -335,7 +335,7 @@ See [Mental model](mental-model.md) for a wider comparison table.
 
 ## iOS flow (rubicon-objc)
 
-- The iOS template (Swift plus PythonKit) boots Python and calls
+- The iOS template (Swift with CPython embedded through the C API) boots Python and calls
   [`create_screen`][pythonnative.create_screen] internally with the
   current `UIViewController` pointer.
 - The reconciler creates UIKit views and attaches them to the

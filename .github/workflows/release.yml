@@ -30,11 +30,31 @@ jobs:
       - name: Install build tools
         run: python -m pip install -U pip build
 
+      # TEMPORARY: inlined replacement for the
+      # python-semantic-release/python-semantic-release@v9 action. That
+      # action builds its Docker image at job time with GitPython
+      # unpinned, and GitPython 3.1.60 (2026-08-25) removed
+      # Actor.name_email_regex, which crashes every semantic-release
+      # config load (python-semantic-release issue #1475). This step
+      # mirrors the action: same git identity, same `version` command,
+      # and a `released` output for the steps below. Restore the action
+      # once the fix (python-semantic-release PR #1477) is released.
       - name: Python Semantic Release
         id: release
-        uses: python-semantic-release/python-semantic-release@v9
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          pip install "python-semantic-release==9.21.2" "gitpython<3.1.60"
+          tags_before=$(git tag | wc -l)
+          semantic-release -v version
+          tags_after=$(git tag | wc -l)
+          if [ "$tags_after" -gt "$tags_before" ]; then
+            echo "released=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build package
         if: steps.release.outputs.released == 'true'

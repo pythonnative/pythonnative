@@ -89,19 +89,35 @@ the release build so the resulting APK/AAB are signed and upload-ready.
 
 ## iOS
 
-`pn build ios` archives the app for a device with `xcodebuild archive`,
-embeds the device CPython slice into the archive, and exports a signed
-`.ipa` with `xcodebuild -exportArchive`. Outputs:
+`pn build ios` archives the app with `xcodebuild archive` and exports a
+signed `.ipa` with `xcodebuild -exportArchive`. The Python framework,
+standard library, and app code are installed and signed during the
+Xcode build itself, so the archive needs no post-processing. Outputs:
 
 ```
-build/ios/ios_template/build/export/*.ipa
-build/ios/ios_template/build/ios_template.xcarchive
+build/ios/export/*.ipa
+build/ios/ios_template.xcarchive
 ```
 
-!!! warning "Experimental"
-    The device archive/export path embeds and re-signs the embedded
-    Python framework. Treat it as experimental and verify on a real
-    device before relying on it for store submission.
+To send the build straight to App Store Connect instead of exporting a
+local `.ipa`, set `export_method = "app-store"` and pass `--upload`:
+
+```bash
+pn build ios --upload
+```
+
+The upload uses the App Store Connect credentials Xcode has stored; in
+CI, provide an ASC API key through Xcode's standard mechanisms or
+upload the exported `.ipa` with `xcrun altool`/Transporter instead.
+
+### Bytecode-only bundles
+
+Release builds byte-compile your `app/` sources and every bundled
+package to `.pyc` and drop the `.py` files, which shrinks the bundle
+and avoids shipping plain-text source. Because bytecode is
+version-specific, this requires the Python running `pn` to match
+`app.python_version`; otherwise `pn` prints a notice and ships `.py`
+sources instead.
 
 ### Signing
 
@@ -127,13 +143,13 @@ iOS has no system Python, so PythonNative embeds CPython from the
 [Python-Apple-support](https://github.com/beeware/Python-Apple-support)
 project. On the first iOS build, `pn` downloads the pinned, checksum-
 verified runtime for your `app.python_version` and caches it under
-`build/ios/ios_runtime/`. The correct slice (Simulator vs. device) is
-embedded into the app bundle along with the standard library, your
-`app/` sources, the bundled `pythonnative` package, and any pure-Python
-`[requirements].packages`.
+`build/ios/ios_runtime/`. The Xcode build links `Python.xcframework`,
+installs the standard library, and bundles your `app/` sources, the
+`pythonnative` package, and any pure-Python `[requirements].packages`.
 
-iOS currently ships a verified runtime for **Python 3.11**; set
-`python_version = "3.11"` in `[app]` for device builds.
+Pinned, verified runtimes exist for **Python 3.10, 3.11, and 3.12**;
+set `python_version` in `[app]` accordingly. Unpinned versions are
+rejected rather than fetched unverified.
 
 ---
 

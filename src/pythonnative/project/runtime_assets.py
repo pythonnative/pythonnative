@@ -3,11 +3,16 @@
 iOS apps can't rely on a system Python, so PythonNative bundles a copy of
 CPython built for iOS by the excellent
 [Python-Apple-support](https://github.com/beeware/Python-Apple-support)
-project. This module downloads the pinned release asset, verifies it,
-extracts it once (cached under the build directory), and exposes the
-paths the [`ios`][pythonnative.project.ios] configurator needs:
-``Python.xcframework``, the simulator ``Python.framework``, the standard
-library, and the simulator headers/static lib.
+project. This module downloads the pinned release asset for the
+project's ``app.python_version``, verifies its checksum, extracts it
+once (cached under the build directory), and exposes the path to
+``Python.xcframework``.
+
+The xcframework is linked and embedded by the bundled Xcode template at
+build time; its ``build/utils.sh`` helper (shipped inside the framework
+by BeeWare) installs the standard library and converts binary modules
+into signed frameworks during the Xcode build. There is no post-build
+copy step.
 
 Android doesn't need any of this: Chaquopy ships its own CPython via
 Gradle, so there's no Android equivalent here.
@@ -16,23 +21,34 @@ Gradle, so there's no Android equivalent here.
 from __future__ import annotations
 
 import hashlib
-import json
-import os
 import tarfile
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, Optional
 
-# Pinned, checksum-verified asset for the supported iOS Python version.
-_PINNED_ASSETS = {
+# Pinned, checksum-verified Python-Apple-support assets. Every version in
+# ``config.SUPPORTED_PYTHON_VERSIONS`` must have an entry here; iOS builds
+# refuse to run against an unpinned, unverified runtime.
+PINNED_ASSETS = {
+    "3.10": (
+        "3.10-b14",
+        "Python-3.10-iOS-support.b14.tar.gz",
+        "a6da479a67be74569813af77179dc8ac83a5e685324408110bfc04632166e404",
+    ),
     "3.11": (
-        "Python-3.11-iOS-support.b7.tar.gz",
-        "2b7d8589715b9890e8dd7e1bce91c210bb5287417e17b9af120fc577675ed28e",
+        "3.11-b9",
+        "Python-3.11-iOS-support.b9.tar.gz",
+        "56810335d2b73558f7a16b6b2f7ad855b88c3007b200cbaecae9d6a25a2d1ecc",
+    ),
+    "3.12": (
+        "3.12-b9",
+        "Python-3.12-iOS-support.b9.tar.gz",
+        "a3be9e278c742911db54dd3045bd7451928813508771c9acf14b4af75294edd2",
     ),
 }
 
-_RELEASES_API = "https://api.github.com/repos/beeware/Python-Apple-support/releases?per_page=100"
+_DOWNLOAD_URL = "https://github.com/beeware/Python-Apple-support/releases/download/{tag}/{name}"
 _USER_AGENT = "pythonnative-cli"
 
 Logger = Callable[[str], None]
@@ -40,98 +56,20 @@ Logger = Callable[[str], None]
 
 @dataclass
 class IOSRuntime:
-    """Resolved paths to an extracted iOS CPython support package.
+    """A resolved, extracted iOS CPython support package.
 
     Attributes:
         python_version: The CPython ``major.minor`` version.
-        xcframework_dir: Path to ``Python.xcframework``.
-        simulator_framework: Path to the simulator-slice
-            ``Python.framework`` (embedded into the simulator ``.app``).
-        stdlib_dir: Path to the simulator standard library directory.
-        simulator_headers: Path to the simulator-slice ``Headers``
-            directory (used when the project links the static lib).
-        simulator_static_lib: Path to the simulator ``libPythonX.Y.a``.
-        device_framework: Path to the device-slice ``Python.framework``
-            (embedded when archiving for a real device).
-        device_stdlib: Path to the device standard library directory.
+        xcframework_dir: Path to the extracted ``Python.xcframework``.
     """
 
     python_version: str
     xcframework_dir: Path
-    simulator_framework: Optional[Path]
-    stdlib_dir: Optional[Path]
-    simulator_headers: Optional[Path]
-    simulator_static_lib: Optional[Path]
-    device_framework: Optional[Path] = None
-    device_stdlib: Optional[Path] = None
 
-    def framework_for(self, destination: str) -> Optional[Path]:
-        """Return the ``Python.framework`` for a build destination.
-
-        Args:
-            destination: ``"simulator"`` or ``"device"``.
-
-        Returns:
-            The matching framework path, or ``None`` if unavailable.
-        """
-        return self.device_framework if destination == "device" else self.simulator_framework
-
-    def stdlib_for(self, destination: str) -> Optional[Path]:
-        """Return the standard library directory for a build destination.
-
-        Args:
-            destination: ``"simulator"`` or ``"device"``.
-
-        Returns:
-            The matching stdlib path, or ``None`` if unavailable.
-        """
-        return self.device_stdlib if destination == "device" else self.stdlib_dir
-
-
-def _github_json(url: str) -> object:
-    headers = {"User-Agent": _USER_AGENT}
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def resolve_asset_url(python_version: str, preferred_name: Optional[str] = None) -> Optional[str]:
-    """Resolve a download URL for a Python-Apple-support iOS release asset.
-
-    Prefers an exact ``preferred_name`` match across all releases, then
-    falls back to the newest asset whose name contains
-    ``Python-<version>-iOS-support`` and ends in ``.tar.gz``.
-
-    Args:
-        python_version: CPython ``major.minor`` (e.g., ``"3.11"``).
-        preferred_name: Exact asset filename to prefer.
-
-    Returns:
-        A ``browser_download_url``, or ``None`` if resolution fails.
-    """
-    try:
-        releases = _github_json(_RELEASES_API)
-    except Exception:
-        return None
-    if not isinstance(releases, list):
-        return None
-
-    if preferred_name:
-        for release in releases:
-            for asset in release.get("assets", []) or []:
-                if asset.get("name") == preferred_name:
-                    return asset.get("browser_download_url")
-
-    needle = f"Python-{python_version}-iOS-support"
-    for release in releases:
-        for asset in release.get("assets", []) or []:
-            name = asset.get("name") or ""
-            if needle in name and name.endswith(".tar.gz"):
-                return asset.get("browser_download_url")
-    return None
+    @property
+    def install_script(self) -> Path:
+        """Path to BeeWare's ``utils.sh`` build helper inside the framework."""
+        return self.xcframework_dir / "build" / "utils.sh"
 
 
 def _sha256(path: Path) -> str:
@@ -159,60 +97,31 @@ def _safe_extract(tar_path: Path, dest: Path) -> None:
             tar.extractall(dest)
 
 
-def _first_existing(candidates: List[Path]) -> Optional[Path]:
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None
-
-
 def _locate_runtime(extract_root: Path, python_version: str) -> IOSRuntime:
-    xc_candidates = [
-        extract_root / "Python.xcframework",
-        extract_root / "support" / "Python.xcframework",
-    ]
-    xcframework = _first_existing(xc_candidates)
-    if xcframework is None:
+    xcframework = extract_root / "Python.xcframework"
+    if not xcframework.is_dir():
         raise RuntimeError("Python.xcframework not found in extracted Python-Apple-support package.")
-
-    sim_slice = xcframework / "ios-arm64_x86_64-simulator"
-    simulator_framework = _first_existing([sim_slice / "Python.framework"])
-    stdlib_dir = _first_existing([sim_slice / "lib" / f"python{python_version}"])
-    simulator_headers = _first_existing([sim_slice / "Headers"])
-    simulator_static_lib = _first_existing(
-        [
-            sim_slice / f"libPython{python_version}.a",
-            sim_slice / "libpython.a",
-        ]
-    )
-
-    device_slice = xcframework / "ios-arm64"
-    device_framework = _first_existing([device_slice / "Python.framework"])
-    device_stdlib = _first_existing([device_slice / "lib" / f"python{python_version}"])
-
-    return IOSRuntime(
-        python_version=python_version,
-        xcframework_dir=xcframework,
-        simulator_framework=simulator_framework,
-        stdlib_dir=stdlib_dir,
-        simulator_headers=simulator_headers,
-        simulator_static_lib=simulator_static_lib,
-        device_framework=device_framework,
-        device_stdlib=device_stdlib,
-    )
+    runtime = IOSRuntime(python_version=python_version, xcframework_dir=xcframework)
+    if not runtime.install_script.is_file():
+        raise RuntimeError(
+            "The extracted Python.xcframework is missing build/utils.sh; the support "
+            "package layout is older than PythonNative expects. Delete the "
+            "build/ios_runtime cache and re-run to fetch the pinned asset."
+        )
+    return runtime
 
 
 def prepare_ios_runtime(
     cache_dir: Path,
-    python_version: str = "3.11",
+    python_version: str = "3.12",
     *,
     log: Optional[Logger] = None,
 ) -> IOSRuntime:
     """Download (if needed), verify, and extract the iOS CPython package.
 
     The download and extraction are cached under ``cache_dir`` so repeat
-    builds are fast. For the pinned version the tarball checksum is
-    verified; for other versions the checksum is skipped with a warning.
+    builds are fast. Only pinned, checksum-verified versions are
+    accepted; there is no unverified fallback.
 
     Args:
         cache_dir: Directory to store downloads and extractions in.
@@ -223,15 +132,20 @@ def prepare_ios_runtime(
         A resolved [`IOSRuntime`][pythonnative.project.runtime_assets.IOSRuntime].
 
     Raises:
-        RuntimeError: If the asset URL can't be resolved, the checksum
-            doesn't match, or the package layout is unexpected.
+        RuntimeError: If the version has no pinned asset, the download
+            fails, the checksum doesn't match, or the package layout is
+            unexpected.
     """
     emit: Logger = log or (lambda _message: None)
     cache_dir.mkdir(parents=True, exist_ok=True)
 
-    pinned = _PINNED_ASSETS.get(python_version)
-    preferred_name = pinned[0] if pinned else None
-    expected_sha = pinned[1] if pinned else None
+    pinned = PINNED_ASSETS.get(python_version)
+    if pinned is None:
+        supported = ", ".join(sorted(PINNED_ASSETS))
+        raise RuntimeError(
+            f"No pinned iOS runtime for Python {python_version}. " f"Set app.python_version to one of: {supported}."
+        )
+    tag, asset_name, expected_sha = pinned
 
     extract_root = cache_dir / f"python-{python_version}"
     if extract_root.is_dir():
@@ -241,30 +155,28 @@ def prepare_ios_runtime(
             # Stale/partial extraction: re-extract below.
             pass
 
-    url = resolve_asset_url(python_version, preferred_name=preferred_name)
-    if not url:
-        raise RuntimeError(
-            f"Could not resolve a Python-Apple-support iOS asset for Python {python_version}. "
-            "Check your network connection or set GITHUB_TOKEN to avoid rate limits."
-        )
-
-    tar_path = cache_dir / os.path.basename(url)
-    if not tar_path.exists():
-        emit(f"Downloading embedded Python runtime ({python_version} iOS): {os.path.basename(url)}")
+    url = _DOWNLOAD_URL.format(tag=tag, name=asset_name)
+    tar_path = cache_dir / asset_name
+    if not tar_path.exists() or _sha256(tar_path) != expected_sha:
+        emit(f"Downloading embedded Python runtime ({python_version} iOS): {asset_name}")
         req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
-        with urllib.request.urlopen(req) as response, open(tar_path, "wb") as handle:
-            handle.write(response.read())
-
-    if expected_sha:
-        actual = _sha256(tar_path)
-        if actual != expected_sha:
+        try:
+            with urllib.request.urlopen(req) as response, open(tar_path, "wb") as handle:
+                handle.write(response.read())
+        except OSError as exc:
             tar_path.unlink(missing_ok=True)
             raise RuntimeError(
-                f"Checksum mismatch for {tar_path.name}: expected {expected_sha}, got {actual}. "
-                "The download may be corrupt; re-run to try again."
-            )
-    else:
-        emit(f"Warning: no pinned checksum for Python {python_version}; skipping verification.")
+                f"Could not download the iOS Python runtime from {url}: {exc}. "
+                "Check your network connection and re-run."
+            ) from exc
+
+    actual = _sha256(tar_path)
+    if actual != expected_sha:
+        tar_path.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"Checksum mismatch for {asset_name}: expected {expected_sha}, got {actual}. "
+            "The download may be corrupt; re-run to try again."
+        )
 
     emit("Extracting embedded Python runtime...")
     extract_root.mkdir(parents=True, exist_ok=True)

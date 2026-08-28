@@ -23,6 +23,13 @@ directly; just export your component and configure the entry point in
 pn run android
 ```
 
+With several devices or emulators connected, list them and target one:
+
+```bash
+pn devices android
+pn run android --device emulator-5554
+```
+
 Or to only prepare the project without building:
 
 ```bash
@@ -46,6 +53,7 @@ the template use, so you get Python output without the usual logcat noise:
 
 Press Ctrl+C to stop streaming. Pass `--no-logs` to skip log streaming
 entirely (useful in CI or when you'd rather watch logs from Android Studio).
+To re-attach later without rebuilding, run `pn logs android`.
 
 If you need unfiltered output, run `adb logcat` yourself in another terminal.
 

@@ -17,6 +17,7 @@ build = 1                       # integer build number
 python_version = "3.11"         # embedded CPython version
 orientation = "portrait"        # portrait | landscape | all
 entry_point = "app/main.py"     # module whose `App` is mounted
+url_schemes = ["myapp"]         # deep-link schemes the app handles
 
 [permissions]
 camera = "Scan receipts with your camera."
@@ -42,7 +43,7 @@ export_method = "development"   # development | ad-hoc | app-store | enterprise
 [android]
 min_sdk = 24
 target_sdk = 34
-abi_filters = ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
+# abi_filters = ["arm64-v8a", "x86_64"]   # the default; add 32-bit ABIs if needed
 
 [android.signing]
 # keystore = "release.keystore"
@@ -66,8 +67,9 @@ Core identity, shared by both platforms.
 | `display_name` | string | `name` | The label shown under the icon on the home screen. |
 | `version` | string | `"1.0.0"` | Marketing version (`CFBundleShortVersionString` / `versionName`). One to four dot-separated numbers. |
 | `build` | integer | `1` | Build number (`CFBundleVersion` / `versionCode`). Must be a positive integer; bump it for every store upload. |
-| `python_version` | string | `"3.11"` | Embedded CPython version. One of `3.10`, `3.11`, `3.12`. iOS currently ships a pinned, verified build for `3.11`. |
+| `python_version` | string | `"3.11"` | Embedded CPython version. One of `3.10`, `3.11`, `3.12`; every listed version has a pinned, checksum-verified iOS runtime. |
 | `orientation` | string | `"portrait"` | `portrait`, `landscape`, or `all`. |
+| `url_schemes` | list of strings | `[]` | Custom deep-link URL schemes (e.g. `["myapp"]` handles `myapp://…`). Wired into `CFBundleURLTypes` on iOS and a `VIEW` intent filter on Android; inbound URLs reach `pn.Linking`. |
 | `entry_point` | string | `"app/main.py"` | The module whose top-level `App` component is mounted. `app/main.py` → imported as `app.main`. |
 
 !!! tip "Per-platform id overrides"
@@ -180,7 +182,7 @@ provisioning_profile = "My App Distribution"
 | `target_sdk` | integer | `34` | Target API level. Must be ≥ `min_sdk`. |
 | `compile_sdk` | integer | `34` | SDK level the project compiles against. |
 | `application_id` | string | `app.id` | Override the Android application id (and package). |
-| `abi_filters` | list of strings | all four | Native ABIs to include: `armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`. Trim to shrink the APK. |
+| `abi_filters` | list of strings | `["arm64-v8a", "x86_64"]` | Native ABIs to include. The default covers 64-bit devices and emulators; add `armeabi-v7a` or `x86` only if you must support 32-bit hardware (each ABI adds roughly 30 MB). |
 | `permissions` | list of strings | `[]` | Extra **raw** Android permission strings appended to the ones derived from `[permissions]`. |
 
 ### `[android.signing]`

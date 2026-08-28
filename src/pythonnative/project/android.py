@@ -255,7 +255,7 @@ def configure_strings(project_dir: Path, config: AppConfig) -> None:
 
 
 def configure_manifest(project_dir: Path, config: AppConfig) -> None:
-    """Inject ``<uses-permission>`` entries and the launch orientation.
+    """Inject permissions, the launch orientation, and deep-link filters.
 
     Args:
         project_dir: The staged Android project root.
@@ -272,10 +272,22 @@ def configure_manifest(project_dir: Path, config: AppConfig) -> None:
     orientation_attr = _ANDROID_ORIENTATION.get(config.orientation)
     if orientation_attr:
         content = content.replace(
-            '            android:exported="true">',
-            f'            android:exported="true"\n            android:screenOrientation="{orientation_attr}">',
+            '            android:exported="true"',
+            f'            android:exported="true"\n            android:screenOrientation="{orientation_attr}"',
             1,
         )
+
+    if config.url_schemes:
+        schemes = "".join(f'                <data android:scheme="{scheme}" />\n' for scheme in config.url_schemes)
+        deep_link_filter = (
+            "            <intent-filter>\n"
+            '                <action android:name="android.intent.action.VIEW" />\n'
+            '                <category android:name="android.intent.category.DEFAULT" />\n'
+            '                <category android:name="android.intent.category.BROWSABLE" />\n'
+            f"{schemes}"
+            "            </intent-filter>\n"
+        )
+        content = content.replace("        </activity>", f"{deep_link_filter}        </activity>", 1)
 
     manifest_path.write_text(content, encoding="utf-8")
 

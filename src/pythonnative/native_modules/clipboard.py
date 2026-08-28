@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from .. import diagnostics
 from ..utils import IS_ANDROID, IS_IOS
 
 # Desktop fallback buffer so the API is usable off-device.
@@ -79,7 +80,7 @@ def _ios_set(text: str) -> None:
     try:
         pb.string = text
     except Exception:
-        pass
+        diagnostics.swallowed("clipboard._ios_set")
 
 
 def _ios_get() -> str:
@@ -122,7 +123,7 @@ def _android_set(text: str) -> None:
         clip = ClipData.newPlainText("pythonnative", text)
         manager.setPrimaryClip(clip)
     except Exception:
-        pass
+        diagnostics.swallowed("clipboard._android_set")
 
 
 def _android_get() -> str:

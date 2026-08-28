@@ -62,6 +62,7 @@ from tkinter import font as tkfont
 from tkinter import ttk
 from typing import Any, Dict, List, Optional, Tuple
 
+from .. import diagnostics
 from ..events import dispatch_event, event_names
 from ..gestures import make_arbiter
 from .base import ViewHandler
@@ -325,7 +326,7 @@ def _place(widget: Any) -> None:
         widget.place(in_=target, x=x + tx - sx, y=y + ty - sy, width=max(0.0, w), height=max(0.0, h))
         widget.lift()
     except Exception:
-        pass
+        diagnostics.swallowed("desktop._place")
 
 
 def _register_child(parent: Any, child: Any, index: int) -> None:
@@ -375,7 +376,7 @@ def _apply_common(widget: Any, props: Dict[str, Any]) -> None:
             try:
                 widget.configure(background=color)
             except Exception:
-                pass
+                diagnostics.swallowed("desktop._apply_common")
     side_width_keys = (
         "border_left_width",
         "border_top_width",
@@ -406,7 +407,7 @@ def _apply_common(widget: Any, props: Dict[str, Any]) -> None:
             else:
                 widget.configure(highlightthickness=0)
         except Exception:
-            pass
+            diagnostics.swallowed("desktop._apply_common")
     if "test_id" in props and props["test_id"] is not None:
         # Stamped for introspection so preview-level tooling and tests
         # can locate widgets the same way Maestro does on device.
@@ -460,7 +461,7 @@ def _wire_gestures(widget: Any, specs: Any) -> None:
         try:
             widget.after(delay_ms, _poll)
         except Exception:
-            pass
+            diagnostics.swallowed("desktop._wire_gestures._schedule_poll")
 
     def _on_down(event: Any) -> None:
         current = getattr(widget, "_pn_arbiter", None)
@@ -483,7 +484,7 @@ def _wire_gestures(widget: Any, specs: Any) -> None:
         widget.bind("<B1-Motion>", _on_move, add="+")
         widget.bind("<ButtonRelease-1>", _on_up, add="+")
     except Exception:
-        pass
+        diagnostics.swallowed("desktop._wire_gestures")
 
 
 # ======================================================================
@@ -533,7 +534,7 @@ def _install_wheel_bindings(container: Any) -> None:
         top.bind_all("<Button-5>", _on_wheel, add="+")
         _WHEEL_BOUND = True
     except Exception:
-        pass
+        diagnostics.swallowed("desktop._install_wheel_bindings")
 
 
 def _content_extent(widget: Any) -> Tuple[float, float]:
@@ -627,7 +628,7 @@ class DesktopViewHandler(ViewHandler):
         try:
             child.place_forget()
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.DesktopViewHandler.remove_child")
         child._pn_parent = None
 
     def destroy(self, native_view: Any) -> None:
@@ -638,7 +639,7 @@ class DesktopViewHandler(ViewHandler):
         try:
             native_view.destroy()
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.DesktopViewHandler.destroy")
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
         if native_view is None:
@@ -672,7 +673,7 @@ class DesktopViewHandler(ViewHandler):
                 try:
                     native_view.configure(background=color)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("desktop.DesktopViewHandler.set_animated_property")
 
 
 # ======================================================================
@@ -775,7 +776,7 @@ class TextHandler(DesktopViewHandler):
         try:
             label.configure(**opts)
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.TextHandler.apply")
         _apply_common(label, merged)
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
@@ -784,7 +785,7 @@ class TextHandler(DesktopViewHandler):
         try:
             native_view.configure(wraplength=max(1, int(_finite(width))))
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.TextHandler.set_frame")
         super().set_frame(native_view, x, y, width, height)
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
@@ -825,7 +826,7 @@ class ButtonHandler(DesktopViewHandler):
         try:
             button.configure(**opts)
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.ButtonHandler.apply")
         _apply_common(button, merged)
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
@@ -873,7 +874,7 @@ class TextInputHandler(DesktopViewHandler):
                 widget.delete(0, "end")
                 widget.insert(0, value)
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.TextInputHandler._set_text")
         finally:
             widget._pn_suppress = False
 
@@ -900,7 +901,7 @@ class TextInputHandler(DesktopViewHandler):
             if not getattr(widget, "_pn_multiline", False):
                 widget.bind("<Return>", _on_return)
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.TextInputHandler._bind")
 
     def apply(self, widget: Any, props: Dict[str, Any]) -> None:
         merged = getattr(widget, "_pn_props", props)
@@ -918,7 +919,7 @@ class TextInputHandler(DesktopViewHandler):
         try:
             widget.configure(**opts)
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.TextInputHandler.apply")
         if "value" in props:
             incoming = "" if props["value"] is None else str(props["value"])
             if self._current_text(widget) != incoming:
@@ -927,20 +928,20 @@ class TextInputHandler(DesktopViewHandler):
         try:
             widget.configure(highlightbackground="#c7c7cc", highlightcolor="#007aff")
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.TextInputHandler.apply")
 
     def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
         if name == "focus":
             try:
                 native_view.focus_set()
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.TextInputHandler.command")
             return True
         if name == "blur":
             try:
                 native_view.winfo_toplevel().focus_set()
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.TextInputHandler.command")
             return True
         return None
 
@@ -982,7 +983,7 @@ class ImageHandler(DesktopViewHandler):
                 try:
                     label.configure(background=color)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("desktop.ImageHandler.apply")
         if "source" in props:
             source = props.get("source")
             label._pn_pending_source = source
@@ -1021,14 +1022,14 @@ class ImageHandler(DesktopViewHandler):
                 if path:
                     _fire(label, "on_error", "decode failed")
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.ImageHandler._show_file")
 
     def _show_fallback(self, label: Any, source: Any) -> None:
         name = str(source).rsplit("/", 1)[-1] if source else "image"
         try:
             label.configure(image="", text=f"\U0001f5bc\n{name}", compound="center")
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.ImageHandler._show_fallback")
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
         photo = getattr(native_view, "_pn_photo", None)
@@ -1036,7 +1037,7 @@ class ImageHandler(DesktopViewHandler):
             try:
                 return (float(photo.width()), float(photo.height()))
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.ImageHandler.measure_intrinsic")
         return (64.0, 64.0)
 
 
@@ -1059,7 +1060,7 @@ class SwitchHandler(DesktopViewHandler):
             try:
                 check._pn_var.set(1 if props.get("value") else 0)
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.SwitchHandler.apply")
         _apply_common(check, merged)
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
@@ -1088,12 +1089,12 @@ class CheckboxHandler(DesktopViewHandler):
             try:
                 check.configure(**opts)
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.CheckboxHandler.apply")
         if "value" in props:
             try:
                 check._pn_var.set(1 if props.get("value") else 0)
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.CheckboxHandler.apply")
         _apply_common(check, merged)
 
 
@@ -1118,7 +1119,7 @@ class SliderHandler(DesktopViewHandler):
                 try:
                     _fire(scale, "on_change", float(scale.get()))
                 except Exception:
-                    pass
+                    diagnostics.swallowed("desktop.SliderHandler.build._command")
 
         scale.configure(command=_command)
         return scale
@@ -1134,13 +1135,13 @@ class SliderHandler(DesktopViewHandler):
         try:
             scale.configure(**opts)
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.SliderHandler.apply")
         if "value" in merged:
             scale._pn_suppress = True
             try:
                 scale.set(_finite(merged.get("value")))
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.SliderHandler.apply")
             finally:
                 scale._pn_suppress = False
         _apply_common(scale, merged)
@@ -1161,12 +1162,12 @@ class ProgressBarHandler(DesktopViewHandler):
                 bar.configure(mode="indeterminate")
                 bar.start(60)
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.ProgressBarHandler.apply")
         else:
             try:
                 bar.configure(mode="determinate", value=max(0.0, min(1.0, _finite(merged.get("value", 0.0)))))
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.ProgressBarHandler.apply")
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
         width = max_width if math.isfinite(max_width) else 200.0
@@ -1185,7 +1186,7 @@ class ActivityIndicatorHandler(DesktopViewHandler):
             else:
                 bar.stop()
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.ActivityIndicatorHandler.apply")
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
         merged = getattr(native_view, "_pn_props", {}) or {}
@@ -1228,7 +1229,7 @@ class WebViewHandler(DesktopViewHandler):
         try:
             label.configure(text=f"\U0001f310 WebView\n{target}")
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.WebViewHandler.apply")
         _apply_common(label, merged)
 
 
@@ -1272,7 +1273,7 @@ class PressableHandler(DesktopViewHandler):
             frame.bind("<ButtonPress-1>", _on_press_down, add="+")
             frame.bind("<Leave>", _on_leave, add="+")
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.PressableHandler._bind")
 
     @staticmethod
     def _cancel_long(frame: Any) -> None:
@@ -1281,7 +1282,7 @@ class PressableHandler(DesktopViewHandler):
             try:
                 frame.after_cancel(after_id)
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.PressableHandler._cancel_long")
             frame._pn_long_after = None
 
 
@@ -1313,7 +1314,7 @@ class ModalHandler(DesktopViewHandler):
             else:
                 frame.place_forget()
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.ModalHandler.apply")
         if visible != getattr(frame, "_pn_was_visible", None):
             frame._pn_was_visible = visible
             if visible:
@@ -1357,7 +1358,7 @@ class PortalHandler(DesktopViewHandler):
         try:
             child.place_forget()
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.PortalHandler.remove_child")
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
         # The portal frame itself stays unmapped; only children render.
@@ -1377,7 +1378,7 @@ class TabBarHandler(DesktopViewHandler):
         try:
             frame.configure(highlightbackground="#c6c6c8", highlightcolor="#c6c6c8")
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.TabBarHandler.build")
         frame._pn_buttons = []
         return frame
 
@@ -1389,7 +1390,7 @@ class TabBarHandler(DesktopViewHandler):
             try:
                 button.destroy()
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.TabBarHandler.apply")
         buttons: List[Any] = []
         for item in items:
             name = item.get("name")
@@ -1428,7 +1429,7 @@ class TabBarHandler(DesktopViewHandler):
             try:
                 button.place(x=i * each, y=0, width=each, height=frame_h)
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.TabBarHandler._layout_buttons")
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
         native_view._pn_size = (max(0.0, _finite(width)), max(0.0, _finite(height)))
@@ -1458,7 +1459,7 @@ class PickerHandler(DesktopViewHandler):
         try:
             combo.bind("<<ComboboxSelected>>", _on_select)
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.PickerHandler.build")
         return combo
 
     def apply(self, combo: Any, props: Dict[str, Any]) -> None:
@@ -1469,7 +1470,7 @@ class PickerHandler(DesktopViewHandler):
         try:
             combo.configure(values=labels)
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.PickerHandler.apply")
         if "value" in merged:
             target = merged.get("value")
             for i, item in enumerate(items):
@@ -1477,7 +1478,7 @@ class PickerHandler(DesktopViewHandler):
                     try:
                         combo.current(i)
                     except Exception:
-                        pass
+                        diagnostics.swallowed("desktop.PickerHandler.apply")
                     break
 
     def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
@@ -1499,7 +1500,7 @@ class SegmentedControlHandler(DesktopViewHandler):
             try:
                 button.destroy()
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.SegmentedControlHandler.apply")
         buttons: List[Any] = []
         for i, label in enumerate(segments):
             is_active = i == selected
@@ -1522,7 +1523,7 @@ class SegmentedControlHandler(DesktopViewHandler):
                 state = "normal" if merged.get("enabled", True) else "disabled"
                 button.configure({"highlightbackground": tint, "state": state})
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.SegmentedControlHandler.apply")
             buttons.append(button)
         frame._pn_buttons = buttons
         self._layout_buttons(frame)
@@ -1540,7 +1541,7 @@ class SegmentedControlHandler(DesktopViewHandler):
             try:
                 button.place(x=i * each, y=0, width=each, height=frame_h)
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.SegmentedControlHandler._layout_buttons")
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
         native_view._pn_size = (max(0.0, _finite(width)), max(0.0, _finite(height)))
@@ -1560,7 +1561,7 @@ class DatePickerHandler(DesktopViewHandler):
         try:
             entry.bind("<KeyRelease>", _on_key)
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.DatePickerHandler.build")
         return entry
 
     def apply(self, entry: Any, props: Dict[str, Any]) -> None:
@@ -1569,7 +1570,7 @@ class DatePickerHandler(DesktopViewHandler):
             try:
                 entry.configure(state="normal" if merged.get("enabled", True) else "disabled")
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.DatePickerHandler.apply")
         if "value" in props:
             incoming = "" if props["value"] is None else str(props["value"])
             try:
@@ -1580,11 +1581,11 @@ class DatePickerHandler(DesktopViewHandler):
                     entry.insert(0, incoming)
                     entry.configure(state=state)
             except Exception:
-                pass
+                diagnostics.swallowed("desktop.DatePickerHandler.apply")
         try:
             entry.configure(highlightbackground="#c7c7cc", highlightcolor="#007aff")
         except Exception:
-            pass
+            diagnostics.swallowed("desktop.DatePickerHandler.apply")
 
 
 # ======================================================================

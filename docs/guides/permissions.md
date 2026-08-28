@@ -53,7 +53,8 @@ permissions, and (where relevant) iOS background modes.
 | `face_id` | Biometric auth | `NSFaceIDUsageDescription` | `USE_BIOMETRIC` |
 | `bluetooth` | Nearby Bluetooth devices | `NSBluetoothAlwaysUsageDescription` | `BLUETOOTH_CONNECT`, `BLUETOOTH_SCAN` |
 | `speech_recognition` | Speech recognition (iOS) | `NSSpeechRecognitionUsageDescription` | – |
-| `notifications` | Local/push notifications | – | `POST_NOTIFICATIONS` |
+| `notifications` | Show local notifications | – | `POST_NOTIFICATIONS` |
+| `remote_notifications` | Server-sent (remote) push | – (adds the `aps-environment` entitlement and `remote-notification` background mode) | `POST_NOTIFICATIONS` |
 | `vibration` | Haptics / vibration | – | `VIBRATE` |
 | `background_audio` | Play audio in background | – (adds `audio` background mode) | `FOREGROUND_SERVICE` |
 | `background_fetch` | Periodic background fetch | – (adds `fetch` background mode) | – |
@@ -64,9 +65,19 @@ need no iOS usage string, so declaring them as `true` is enough.
 
 ### Background modes
 
-`location_always`, `background_audio`, and `background_fetch` also add
-the corresponding values to the iOS `UIBackgroundModes` array
-(`location`, `audio`, `fetch`) so the OS keeps your app scheduled.
+`location_always`, `background_audio`, `background_fetch`, and
+`remote_notifications` also add the corresponding values to the iOS
+`UIBackgroundModes` array (`location`, `audio`, `fetch`,
+`remote-notification`) so the OS keeps your app scheduled.
+
+### Entitlements
+
+Some capabilities need a code-signing entitlement rather than an
+`Info.plist` key. Declaring `remote_notifications` generates an
+`.entitlements` file with `aps-environment` and wires it into the
+build, so `await pn.Notifications.get_device_token()` can register with
+APNs. (Distribution builds get the production APNs environment
+automatically when Xcode re-signs the archive for the store.)
 
 ## Always-on permissions
 

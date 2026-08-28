@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from typing import Callable, List
 
+from .. import diagnostics
 from ..hooks import use_effect, use_state
 
 AppStateStatus = str  # "active" | "inactive" | "background"
@@ -74,7 +75,7 @@ def dispatch_app_state(state: AppStateStatus) -> None:
         try:
             listener(state)
         except Exception:
-            pass
+            diagnostics.swallowed("app_state.dispatch_app_state")
 
 
 def use_app_state() -> AppStateStatus:

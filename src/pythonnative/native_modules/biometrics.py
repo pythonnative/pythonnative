@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Callable, Dict
 
+from .. import diagnostics
 from ..runtime import resolve_future
 from ..utils import IS_ANDROID, IS_IOS
 
@@ -93,7 +94,7 @@ def _ios_authenticate(reason: str, on_done: Callable[[bool], None]) -> None:
             try:
                 on_done(bool(success))
             except Exception:
-                pass
+                diagnostics.swallowed("biometrics._ios_authenticate._reply")
 
         context.evaluatePolicy_localizedReason_reply_(1, reason, Block(_reply, None, bool, ObjCClass("NSError")))
     except Exception:

@@ -40,6 +40,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 from java import dynamic_proxy, jclass
 
+from .. import diagnostics
 from ..events import dispatch_event, event_names
 from ..gestures import make_arbiter
 from ..utils import get_android_context
@@ -206,7 +207,7 @@ def _apply_side_border(view: Any, props: Dict[str, Any]) -> bool:
         try:
             view.invalidate()
         except Exception:
-            pass
+            diagnostics.swallowed("android._apply_side_border")
         return True
     except Exception:
         return False
@@ -237,12 +238,12 @@ def _apply_border(view: Any, props: Dict[str, Any]) -> None:
             try:
                 drawable.setColor(parse_color_int(props["background_color"]))
             except Exception:
-                pass
+                diagnostics.swallowed("android._apply_border")
         if "border_radius" in props and props["border_radius"] is not None:
             try:
                 drawable.setCornerRadius(float(_dp(float(props["border_radius"]))))
             except Exception:
-                pass
+                diagnostics.swallowed("android._apply_border")
         if ("border_width" in props and props["border_width"] is not None) or (
             "border_color" in props and props["border_color"] is not None
         ):
@@ -254,18 +255,18 @@ def _apply_border(view: Any, props: Dict[str, Any]) -> None:
                     parse_color_int(color or "#000000"),
                 )
             except Exception:
-                pass
+                diagnostics.swallowed("android._apply_border")
         view.setBackground(drawable)
         try:
             drawable.invalidateSelf()
         except Exception:
-            pass
+            diagnostics.swallowed("android._apply_border")
         try:
             view.invalidate()
         except Exception:
-            pass
+            diagnostics.swallowed("android._apply_border")
     except Exception:
-        pass
+        diagnostics.swallowed("android._apply_border")
 
 
 def _apply_shadow(view: Any, props: Dict[str, Any]) -> None:
@@ -291,7 +292,7 @@ def _apply_shadow(view: Any, props: Dict[str, Any]) -> None:
     try:
         view.setElevation(float(_dp(float(elevation))))
     except Exception:
-        pass
+        diagnostics.swallowed("android._apply_shadow")
     color = props.get("shadow_color")
     if color is None:
         return
@@ -308,7 +309,7 @@ def _apply_shadow(view: Any, props: Dict[str, Any]) -> None:
         view.setOutlineAmbientShadowColor(signed)
         view.setOutlineSpotShadowColor(signed)
     except Exception:
-        pass
+        diagnostics.swallowed("android._apply_shadow")
 
 
 def _apply_transform(view: Any, props: Dict[str, Any]) -> None:
@@ -324,7 +325,7 @@ def _apply_transform(view: Any, props: Dict[str, Any]) -> None:
             view.setTranslationX(0.0)
             view.setTranslationY(0.0)
         except Exception:
-            pass
+            diagnostics.swallowed("android._apply_transform")
         return
     entries = spec if isinstance(spec, list) else [spec]
     for entry in entries:
@@ -353,7 +354,7 @@ def _apply_transform(view: Any, props: Dict[str, Any]) -> None:
             if "translate_y" in entry:
                 view.setTranslationY(float(_dp(float(entry["translate_y"]))))
         except Exception:
-            pass
+            diagnostics.swallowed("android._apply_transform")
 
 
 def _apply_accessibility(view: Any, props: Dict[str, Any]) -> None:
@@ -365,13 +366,13 @@ def _apply_accessibility(view: Any, props: Dict[str, Any]) -> None:
                 View.IMPORTANT_FOR_ACCESSIBILITY_YES if props["accessible"] else View.IMPORTANT_FOR_ACCESSIBILITY_NO
             )
         except Exception:
-            pass
+            diagnostics.swallowed("android._apply_accessibility")
     if "accessibility_label" in props:
         try:
             label = props["accessibility_label"]
             view.setContentDescription(str(label) if label is not None else None)
         except Exception:
-            pass
+            diagnostics.swallowed("android._apply_accessibility")
     if "accessibility_live_region" in props:
         try:
             mode = {"none": 0, "polite": 1, "assertive": 2}.get(
@@ -379,14 +380,14 @@ def _apply_accessibility(view: Any, props: Dict[str, Any]) -> None:
             )
             view.setAccessibilityLiveRegion(mode)
         except Exception:
-            pass
+            diagnostics.swallowed("android._apply_accessibility")
 
     state = props.get("accessibility_state")
     if isinstance(state, dict) and "selected" in state:
         try:
             view.setSelected(bool(state["selected"]))
         except Exception:
-            pass
+            diagnostics.swallowed("android._apply_accessibility")
     test_id = props.get("test_id")
     if test_id is None and not isinstance(state, dict):
         return
@@ -413,7 +414,7 @@ def _apply_accessibility(view: Any, props: Dict[str, Any]) -> None:
             delegate.setStateBusy(state.get("busy"))
             delegate.setStateExpanded(state.get("expanded"))
     except Exception:
-        pass
+        diagnostics.swallowed("android._apply_accessibility")
 
 
 def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
@@ -433,12 +434,12 @@ def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
             view.setClipChildren(clip)
             view.setClipToPadding(clip)
         except Exception:
-            pass
+            diagnostics.swallowed("android._apply_common_visual")
     if "opacity" in props and props["opacity"] is not None:
         try:
             view.setAlpha(float(props["opacity"]))
         except Exception:
-            pass
+            diagnostics.swallowed("android._apply_common_visual")
     _apply_shadow(view, props)
     _apply_transform(view, props)
     _apply_accessibility(view, props)
@@ -501,7 +502,7 @@ def _schedule_arbiter_poll(view: Any, state: Dict[str, Any]) -> None:
 
         handler.postDelayed(_PollRunnable(), delay_ms)
     except Exception:
-        pass
+        diagnostics.swallowed("android._schedule_arbiter_poll")
 
 
 def _bind_touch_stream(view: Any, state: Dict[str, Any]) -> None:
@@ -515,7 +516,7 @@ def _bind_touch_stream(view: Any, state: Dict[str, Any]) -> None:
 
         view.setOnTouchListener(_GestureTouchProxy())
     except Exception:
-        pass
+        diagnostics.swallowed("android._bind_touch_stream")
 
 
 def _feed_motion_event(view: Any, state: Dict[str, Any], event: Any) -> bool:
@@ -546,7 +547,7 @@ def _feed_motion_event(view: Any, state: Dict[str, Any], event: Any) -> bool:
                     if parent is not None:
                         parent.requestDisallowInterceptTouchEvent(True)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("android._feed_motion_event")
         elif action in (1, 6):  # UP / POINTER_UP
             idx = int(event.getActionIndex())
             pid = int(event.getPointerId(idx))
@@ -603,7 +604,7 @@ def _read_animated_value(view: Any, prop_name: str) -> Any:
         if prop_name == "rotate":
             return float(view.getRotation())
     except Exception:
-        pass
+        diagnostics.swallowed("android._read_animated_value")
     return None
 
 
@@ -639,7 +640,7 @@ def _make_end_listener(anim_id: int) -> Any:
 
                 native_animation_completed(anim_id, not self._cancelled)
             except Exception:
-                pass
+                diagnostics.swallowed("android._make_end_listener._EndProxy.onAnimationEnd")
 
     return _EndProxy()
 
@@ -731,7 +732,7 @@ class AndroidViewHandler(ViewHandler):
             if parent is not None:
                 parent.removeView(native_view)
         except Exception:
-            pass
+            diagnostics.swallowed("android.AndroidViewHandler.destroy")
         _forget(native_view)
 
     def _build(self, props: Dict[str, Any]) -> Any:
@@ -760,17 +761,17 @@ class AndroidViewHandler(ViewHandler):
                     lp.width = px_w
                     lp.height = px_h
                 except Exception:
-                    pass
+                    diagnostics.swallowed("android.AndroidViewHandler.set_frame")
             try:
                 lp.leftMargin = px_x
                 lp.topMargin = px_y
                 lp.rightMargin = 0
                 lp.bottomMargin = 0
             except Exception:
-                pass
+                diagnostics.swallowed("android.AndroidViewHandler.set_frame")
             native_view.setLayoutParams(lp)
         except Exception:
-            pass
+            diagnostics.swallowed("android.AndroidViewHandler.set_frame")
 
     def measure_intrinsic(
         self,
@@ -823,7 +824,7 @@ class AndroidViewHandler(ViewHandler):
             elif prop_name == "background_color":
                 native_view.setBackgroundColor(parse_color_int(value))
         except Exception:
-            pass
+            diagnostics.swallowed("android.AndroidViewHandler.set_animated_property")
 
     def start_animation(
         self,
@@ -851,7 +852,7 @@ class AndroidViewHandler(ViewHandler):
         try:
             entry["animator"].cancel()
         except Exception:
-            pass
+            diagnostics.swallowed("android.AndroidViewHandler.cancel_animation")
         return _read_animated_value(entry.get("view"), str(entry.get("prop", "")))
 
 
@@ -879,7 +880,7 @@ class FlexContainerHandler(AndroidViewHandler):
         try:
             parent.removeView(child)
         except Exception:
-            pass
+            diagnostics.swallowed("android.FlexContainerHandler.remove_child")
 
 
 def _insert_view(parent: Any, child: Any, index: int) -> None:
@@ -905,7 +906,7 @@ def _insert_view(parent: Any, child: Any, index: int) -> None:
         try:
             parent.addView(child)
         except Exception:
-            pass
+            diagnostics.swallowed("android._insert_view")
 
 
 # ======================================================================
@@ -993,7 +994,7 @@ def _build_spannable(spans: Any) -> Any:
                 StrikethroughSpan = jclass("android.text.style.StrikethroughSpan")
                 _set(StrikethroughSpan())
         except Exception:
-            pass
+            diagnostics.swallowed("android._build_spannable")
     return builder
 
 
@@ -1035,7 +1036,7 @@ class TextHandler(AndroidViewHandler):
                 else:
                     tv.setTypeface(tv.getTypeface(), style)
             except Exception:
-                pass
+                diagnostics.swallowed("android.TextHandler._apply")
         if "max_lines" in props and props["max_lines"] is not None:
             tv.setMaxLines(int(props["max_lines"]))
         if "text_align" in props:
@@ -1050,14 +1051,14 @@ class TextHandler(AndroidViewHandler):
                 size = float(merged.get("font_size") or 16.0)
                 tv.setLetterSpacing(float(props["letter_spacing"]) / max(size, 1.0))
             except Exception:
-                pass
+                diagnostics.swallowed("android.TextHandler._apply")
         if "line_height" in props and props["line_height"] is not None:
             try:
                 merged = _state_of(tv).get("props") or props
                 size = float(merged.get("font_size") or 16.0)
                 tv.setLineSpacing(0.0, float(props["line_height"]) / max(size, 1.0))
             except Exception:
-                pass
+                diagnostics.swallowed("android.TextHandler._apply")
         if "text_decoration" in props:
             try:
                 Paint = jclass("android.graphics.Paint")
@@ -1068,7 +1069,7 @@ class TextHandler(AndroidViewHandler):
                     flags |= Paint.STRIKE_THRU_TEXT_FLAG
                 tv.setPaintFlags(flags)
             except Exception:
-                pass
+                diagnostics.swallowed("android.TextHandler._apply")
         _apply_common_visual(tv, props)
 
 
@@ -1147,7 +1148,7 @@ class ScrollViewHandler(AndroidViewHandler):
                 try:
                     outer.setEnabled(False)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("android.ScrollViewHandler.create")
         self._bind_scroll_listener(outer, sv)
         self._apply(outer, props, initial=True)
         if props.get("gestures"):
@@ -1165,7 +1166,7 @@ class ScrollViewHandler(AndroidViewHandler):
                 sv.setVerticalScrollBarEnabled(show)
                 sv.setHorizontalScrollBarEnabled(show)
             except Exception:
-                pass
+                diagnostics.swallowed("android.ScrollViewHandler._apply")
         if "bounces" in props:
             # ``bounces`` is only present when ``False``; map it to the
             # closest analogue, the over-scroll (glow) mode.
@@ -1174,7 +1175,7 @@ class ScrollViewHandler(AndroidViewHandler):
                 mode = View.OVER_SCROLL_NEVER if props["bounces"] is False else View.OVER_SCROLL_IF_CONTENT_SCROLLS
                 sv.setOverScrollMode(mode)
             except Exception:
-                pass
+                diagnostics.swallowed("android.ScrollViewHandler._apply")
         if "refresh_control" in props and state.get("refresh") is not None:
             self._apply_refresh(outer, props)
         # ``paging_enabled`` and ``keyboard_dismiss_mode`` have no clean
@@ -1190,7 +1191,7 @@ class ScrollViewHandler(AndroidViewHandler):
         try:
             sv.removeView(child)
         except Exception:
-            pass
+            diagnostics.swallowed("android.ScrollViewHandler.remove_child")
 
     def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
         state = _state_of(native_view)
@@ -1206,7 +1207,7 @@ class ScrollViewHandler(AndroidViewHandler):
                 else:
                     sv.scrollTo(x_px, y_px)
             except Exception:
-                pass
+                diagnostics.swallowed("android.ScrollViewHandler.command")
             return None
         if name == "scroll_to_end":
             try:
@@ -1220,7 +1221,7 @@ class ScrollViewHandler(AndroidViewHandler):
                     target_y = max(0, int(child.getHeight()) - int(sv.getHeight()))
                     sv.smoothScrollTo(0, target_y)
             except Exception:
-                pass
+                diagnostics.swallowed("android.ScrollViewHandler.command")
             return None
         if name == "get_scroll_offset":
             try:
@@ -1250,11 +1251,13 @@ class ScrollViewHandler(AndroidViewHandler):
                         density = _density() or 1.0
                         _fire(outer, "on_scroll", {"x": scroll_x / density, "y": scroll_y / density})
                     except Exception:
-                        pass
+                        diagnostics.swallowed(
+                            "android.ScrollViewHandler._bind_scroll_listener._ScrollChangeProxy.onScrollChange"
+                        )
 
             sv.setOnScrollChangeListener(_ScrollChangeProxy())
         except Exception:
-            pass
+            diagnostics.swallowed("android.ScrollViewHandler._bind_scroll_listener")
 
     def _wrap_in_refresh(self, sv: Any) -> Any:
         try:
@@ -1278,7 +1281,7 @@ class ScrollViewHandler(AndroidViewHandler):
 
             srl.setOnRefreshListener(_RefreshProxy())
         except Exception:
-            pass
+            diagnostics.swallowed("android.ScrollViewHandler._bind_refresh_listener")
 
     def _apply_refresh(self, outer: Any, props: Dict[str, Any]) -> None:
         srl = _state_of(outer).get("refresh")
@@ -1289,21 +1292,21 @@ class ScrollViewHandler(AndroidViewHandler):
             try:
                 srl.setEnabled(False)
             except Exception:
-                pass
+                diagnostics.swallowed("android.ScrollViewHandler._apply_refresh")
             return
         try:
             srl.setEnabled(True)
         except Exception:
-            pass
+            diagnostics.swallowed("android.ScrollViewHandler._apply_refresh")
         if spec.get("tint_color"):
             try:
                 srl.setColorSchemeColors([parse_color_int(spec["tint_color"])])
             except Exception:
-                pass
+                diagnostics.swallowed("android.ScrollViewHandler._apply_refresh")
         try:
             srl.setRefreshing(bool(spec.get("refreshing")))
         except Exception:
-            pass
+            diagnostics.swallowed("android.ScrollViewHandler._apply_refresh")
 
 
 class TextInputHandler(AndroidViewHandler):
@@ -1316,7 +1319,7 @@ class TextInputHandler(AndroidViewHandler):
             if not props.get("multiline"):
                 et.setSingleLine(True)
         except Exception:
-            pass
+            diagnostics.swallowed("android.TextInputHandler._build")
         self._bind_listeners(et, props)
         return et
 
@@ -1342,7 +1345,7 @@ class TextInputHandler(AndroidViewHandler):
 
             et.addTextChangedListener(ChangeProxy())
         except Exception:
-            pass
+            diagnostics.swallowed("android.TextInputHandler._bind_listeners")
         try:
 
             class _FocusProxy(dynamic_proxy(jclass("android.view.View").OnFocusChangeListener)):
@@ -1351,7 +1354,7 @@ class TextInputHandler(AndroidViewHandler):
 
             et.setOnFocusChangeListener(_FocusProxy())
         except Exception:
-            pass
+            diagnostics.swallowed("android.TextInputHandler._bind_listeners")
 
     def _apply(self, et: Any, props: Dict[str, Any], initial: bool) -> None:
         state = _state_of(et)
@@ -1368,7 +1371,7 @@ class TextInputHandler(AndroidViewHandler):
                     selection_start = et.getSelectionStart()
                     selection_end = et.getSelectionEnd()
                 except Exception:
-                    pass
+                    diagnostics.swallowed("android.TextInputHandler._apply")
                 state["suppress"] = True
                 try:
                     et.setText(incoming)
@@ -1381,7 +1384,7 @@ class TextInputHandler(AndroidViewHandler):
                         else:
                             et.setSelection(start, end)
                     except Exception:
-                        pass
+                        diagnostics.swallowed("android.TextInputHandler._apply")
                 finally:
                     state["suppress"] = False
         if "placeholder" in props:
@@ -1390,7 +1393,7 @@ class TextInputHandler(AndroidViewHandler):
             try:
                 et.setHintTextColor(parse_color_int(props["placeholder_color"]))
             except Exception:
-                pass
+                diagnostics.swallowed("android.TextInputHandler._apply")
         if "font_size" in props and props["font_size"] is not None:
             et.setTextSize(float(props["font_size"]))
         if "color" in props and props["color"] is not None:
@@ -1428,18 +1431,18 @@ class TextInputHandler(AndroidViewHandler):
                     et.setSingleLine(True)
                 et.setInputType(base)
             except Exception:
-                pass
+                diagnostics.swallowed("android.TextInputHandler._apply")
         if "max_length" in props and props["max_length"] is not None:
             try:
                 InputFilter = jclass("android.text.InputFilter$LengthFilter")
                 et.setFilters([InputFilter(int(props["max_length"]))])
             except Exception:
-                pass
+                diagnostics.swallowed("android.TextInputHandler._apply")
         if "auto_focus" in props and props["auto_focus"]:
             try:
                 et.requestFocus()
             except Exception:
-                pass
+                diagnostics.swallowed("android.TextInputHandler._apply")
         if "editable" in props:
             # ``editable`` is only present when ``False`` (read-only); a
             # removal (``None``) restores editing. We keep the field
@@ -1452,12 +1455,12 @@ class TextInputHandler(AndroidViewHandler):
                 et.setCursorVisible(editable)
                 et.setLongClickable(editable)
             except Exception:
-                pass
+                diagnostics.swallowed("android.TextInputHandler._apply")
         if "selection_color" in props and props["selection_color"] is not None:
             try:
                 et.setHighlightColor(parse_color_int(props["selection_color"]))
             except Exception:
-                pass
+                diagnostics.swallowed("android.TextInputHandler._apply")
         if "text_content_type" in props and props["text_content_type"] is not None:
             self._apply_autofill(et, str(props["text_content_type"]))
         if "clear_button" in props:
@@ -1485,7 +1488,7 @@ class TextInputHandler(AndroidViewHandler):
                 action = rkt_mapping.get(props["return_key_type"], EditorInfo.IME_ACTION_DONE)
                 et.setImeOptions(action)
             except Exception:
-                pass
+                diagnostics.swallowed("android.TextInputHandler._apply")
         if initial or "multiline" in props:
             self._apply_editor_action(et)
         _apply_common_visual(et, props)
@@ -1514,7 +1517,9 @@ class TextInputHandler(AndroidViewHandler):
                         try:
                             _fire(view, "on_submit", str(view.getText()))
                         except Exception:
-                            pass
+                            diagnostics.swallowed(
+                                "android.TextInputHandler._apply_editor_action.SubmitProxy.onEditorAction"
+                            )
                     if not multiline:
                         try:
                             view.clearFocus()
@@ -1522,12 +1527,14 @@ class TextInputHandler(AndroidViewHandler):
                             imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE)
                             imm.hideSoftInputFromWindow(view.getWindowToken(), 0)
                         except Exception:
-                            pass
+                            diagnostics.swallowed(
+                                "android.TextInputHandler._apply_editor_action.SubmitProxy.onEditorAction"
+                            )
                     return True
 
             et.setOnEditorActionListener(SubmitProxy())
         except Exception:
-            pass
+            diagnostics.swallowed("android.TextInputHandler._apply_editor_action")
 
     @staticmethod
     def _autofill_hint(content_type: str) -> Optional[str]:
@@ -1559,7 +1566,7 @@ class TextInputHandler(AndroidViewHandler):
             if hint:
                 et.setAutofillHints([hint])
         except Exception:
-            pass
+            diagnostics.swallowed("android.TextInputHandler._apply_autofill")
 
     def _apply_clear_button(self, et: Any, enabled: bool) -> None:
         # Best-effort drawableEnd "X": shows a system clear icon and wires
@@ -1588,12 +1595,12 @@ class TextInputHandler(AndroidViewHandler):
                                     view.setText("")
                                     return True
                     except Exception:
-                        pass
+                        diagnostics.swallowed("android.TextInputHandler._apply_clear_button._ClearTouchProxy.onTouch")
                     return False
 
             et.setOnTouchListener(_ClearTouchProxy())
         except Exception:
-            pass
+            diagnostics.swallowed("android.TextInputHandler._apply_clear_button")
 
 
 class ImageHandler(AndroidViewHandler):
@@ -1606,12 +1613,12 @@ class ImageHandler(AndroidViewHandler):
                 ColorStateList = jclass("android.content.res.ColorStateList")
                 iv.setImageTintList(ColorStateList.valueOf(parse_color_int(props["tint_color"])))
             except Exception:
-                pass
+                diagnostics.swallowed("android.ImageHandler._apply")
         if "placeholder_color" in props and props["placeholder_color"] is not None:
             try:
                 iv.setBackgroundColor(parse_color_int(props["placeholder_color"]))
             except Exception:
-                pass
+                diagnostics.swallowed("android.ImageHandler._apply")
         if "source" in props and props["source"]:
             self._load_source(iv, str(props["source"]))
         if "scale_type" in props and props["scale_type"]:
@@ -1648,7 +1655,7 @@ class ImageHandler(AndroidViewHandler):
                         iv.setImageBitmap(bitmap)
                         _fire(iv, "on_load")
                     except Exception:
-                        pass
+                        diagnostics.swallowed("android.ImageHandler._load_source._on_ready")
 
                 def _on_error(message: str) -> None:
                     if _state_of(iv).get("pending_uri") == source:
@@ -1674,7 +1681,7 @@ class ImageHandler(AndroidViewHandler):
                 else:
                     _fire(iv, "on_error", f"drawable {res_name!r} not found")
         except Exception:
-            pass
+            diagnostics.swallowed("android.ImageHandler._load_source")
 
     def _load_data_uri(self, iv: Any, source: str) -> None:
         """Decode an inline ``data:`` URI (base64 payload) into the view."""
@@ -1719,7 +1726,7 @@ class ImageHandler(AndroidViewHandler):
                 target_w = int(iv.getWidth())
                 target_h = int(iv.getHeight())
             except Exception:
-                pass
+                diagnostics.swallowed("android.ImageHandler._decode_downsampled")
             if target_w <= 0:
                 try:
                     metrics = _ctx().getResources().getDisplayMetrics()
@@ -1780,7 +1787,7 @@ class ProgressBarHandler(AndroidViewHandler):
                 ColorStateList = jclass("android.content.res.ColorStateList")
                 pb.setProgressTintList(ColorStateList.valueOf(parse_color_int(props["color"])))
             except Exception:
-                pass
+                diagnostics.swallowed("android.ProgressBarHandler._apply")
         if "track_color" in props and props["track_color"] is not None:
             try:
                 ColorStateList = jclass("android.content.res.ColorStateList")
@@ -1788,12 +1795,12 @@ class ProgressBarHandler(AndroidViewHandler):
                 pb.setProgressBackgroundTintList(track)
                 pb.setSecondaryProgressTintList(track)
             except Exception:
-                pass
+                diagnostics.swallowed("android.ProgressBarHandler._apply")
         if "indeterminate" in props:
             try:
                 pb.setIndeterminate(bool(props["indeterminate"]))
             except Exception:
-                pass
+                diagnostics.swallowed("android.ProgressBarHandler._apply")
 
 
 class ActivityIndicatorHandler(AndroidViewHandler):
@@ -1809,7 +1816,7 @@ class ActivityIndicatorHandler(AndroidViewHandler):
                 ColorStateList = jclass("android.content.res.ColorStateList")
                 pb.setIndeterminateTintList(ColorStateList.valueOf(parse_color_int(props["color"])))
             except Exception:
-                pass
+                diagnostics.swallowed("android.ActivityIndicatorHandler._apply")
         if "size" in props and props["size"] is not None:
             # The framework ProgressBar has no runtime size switch, so
             # approximate "large" by scaling the indeterminate drawable.
@@ -1818,7 +1825,7 @@ class ActivityIndicatorHandler(AndroidViewHandler):
                 pb.setScaleX(scale)
                 pb.setScaleY(scale)
             except Exception:
-                pass
+                diagnostics.swallowed("android.ActivityIndicatorHandler._apply")
 
 
 def _make_web_client(wv: Any) -> Any:
@@ -1854,13 +1861,13 @@ def _make_web_client(wv: Any) -> Any:
                         )
                         view.evaluateJavascript(shim, None)
                     except Exception:
-                        pass
+                        diagnostics.swallowed("android._make_web_client._WebClientProxy.onPageFinished")
                 inject_js = (_state_of(wv).get("props") or {}).get("inject_javascript")
                 if inject_js:
                     try:
                         view.evaluateJavascript(str(inject_js), None)
                     except Exception:
-                        pass
+                        diagnostics.swallowed("android._make_web_client._WebClientProxy.onPageFinished")
 
             def shouldOverrideUrlLoading(self, view: Any, request: Any) -> bool:
                 try:
@@ -1873,7 +1880,7 @@ def _make_web_client(wv: Any) -> Any:
 
                         _fire(wv, "on_message", unquote(url[len(scheme) :]))
                     except Exception:
-                        pass
+                        diagnostics.swallowed("android._make_web_client._WebClientProxy.shouldOverrideUrlLoading")
                     return True
                 return False
 
@@ -1893,7 +1900,7 @@ class WebViewHandler(AndroidViewHandler):
             try:
                 wv.getSettings().setJavaScriptEnabled(True)
             except Exception:
-                pass
+                diagnostics.swallowed("android.WebViewHandler._apply")
 
         if initial:
             client = _make_web_client(wv)
@@ -1901,19 +1908,19 @@ class WebViewHandler(AndroidViewHandler):
                 try:
                     wv.setWebViewClient(client)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("android.WebViewHandler._apply")
 
         # ``html`` takes precedence over ``url`` when both are present.
         if "html" in props and props["html"]:
             try:
                 wv.loadDataWithBaseURL(None, str(props["html"]), "text/html", "utf-8", None)
             except Exception:
-                pass
+                diagnostics.swallowed("android.WebViewHandler._apply")
         elif "url" in props and props["url"]:
             try:
                 wv.loadUrl(str(props["url"]))
             except Exception:
-                pass
+                diagnostics.swallowed("android.WebViewHandler._apply")
 
         if "scroll_enabled" in props:
             self._apply_scroll_enabled(wv, props["scroll_enabled"])
@@ -1930,7 +1937,7 @@ class WebViewHandler(AndroidViewHandler):
             else:
                 wv.setOnTouchListener(None)
         except Exception:
-            pass
+            diagnostics.swallowed("android.WebViewHandler._apply_scroll_enabled")
 
 
 class SpacerHandler(AndroidViewHandler):
@@ -1995,7 +2002,7 @@ class ModalHandler(AndroidViewHandler):
             try:
                 dialog.setCanceledOnTouchOutside(props["dismiss_on_backdrop"] is not False)
             except Exception:
-                pass
+                diagnostics.swallowed("android.ModalHandler._apply")
 
     def insert_child(self, parent: Any, child: Any, index: int) -> None:
         state = _state_of(parent)
@@ -2012,7 +2019,7 @@ class ModalHandler(AndroidViewHandler):
             try:
                 content.removeView(child)
             except Exception:
-                pass
+                diagnostics.swallowed("android.ModalHandler.remove_child")
         else:
             buf = state.get("pending")
             if buf and child in buf:
@@ -2057,18 +2064,18 @@ class ModalHandler(AndroidViewHandler):
                         WMLP = jclass("android.view.WindowManager$LayoutParams")
                         window.setLayout(WMLP.MATCH_PARENT, WMLP.MATCH_PARENT)
             except Exception:
-                pass
+                diagnostics.swallowed("android.ModalHandler._present")
             try:
                 dialog.setCanceledOnTouchOutside(props.get("dismiss_on_backdrop") is not False)
             except Exception:
-                pass
+                diagnostics.swallowed("android.ModalHandler._present")
             state["dialog"] = dialog
             state["content_view"] = content
             for child in state.pop("pending", []):
                 try:
                     content.addView(child)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("android.ModalHandler._present")
 
             OnShowListener = jclass("android.content.DialogInterface$OnShowListener")
 
@@ -2087,7 +2094,7 @@ class ModalHandler(AndroidViewHandler):
             dialog.setOnDismissListener(_DismissProxy())
             dialog.show()
         except Exception:
-            pass
+            diagnostics.swallowed("android.ModalHandler._present")
 
     def _dismiss(self, placeholder: Any, state: Dict[str, Any]) -> None:
         dialog = state.pop("dialog", None)
@@ -2096,7 +2103,7 @@ class ModalHandler(AndroidViewHandler):
             try:
                 dialog.dismiss()
             except Exception:
-                pass
+                diagnostics.swallowed("android.ModalHandler._dismiss")
 
 
 # ======================================================================
@@ -2148,7 +2155,7 @@ class PortalHandler(AndroidViewHandler):
             lp = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
             container.addView(overlay, lp)
         except Exception:
-            pass
+            diagnostics.swallowed("android.PortalHandler._ensure_attached")
 
     def insert_child(self, parent: Any, child: Any, index: int) -> None:
         self._ensure_attached(parent)
@@ -2158,7 +2165,7 @@ class PortalHandler(AndroidViewHandler):
         try:
             parent.removeView(child)
         except Exception:
-            pass
+            diagnostics.swallowed("android.PortalHandler.remove_child")
 
     def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
         # The overlay fills its container via MATCH_PARENT layout params;
@@ -2171,7 +2178,7 @@ class PortalHandler(AndroidViewHandler):
             if parent is not None:
                 parent.removeView(overlay)
         except Exception:
-            pass
+            diagnostics.swallowed("android.PortalHandler._teardown")
 
 
 class SliderHandler(AndroidViewHandler):
@@ -2225,7 +2232,7 @@ class TabBarHandler(AndroidViewHandler):
             try:
                 bnv.setLabelVisibilityMode(self._LABEL_VISIBILITY_LABELED)
             except Exception:
-                pass
+                diagnostics.swallowed("android.TabBarHandler._build")
             return bnv
         except Exception:
             LinearLayout = jclass("android.widget.LinearLayout")
@@ -2275,7 +2282,7 @@ class TabBarHandler(AndroidViewHandler):
 
             bnv.setOnItemSelectedListener(_TabSelectProxy())
         except Exception:
-            pass
+            diagnostics.swallowed("android.TabBarHandler._bind_material_listener")
 
     def _set_menu(self, bnv: Any, items: list) -> None:
         try:
@@ -2289,9 +2296,9 @@ class TabBarHandler(AndroidViewHandler):
                     try:
                         menu_item.setIcon(res_id)
                     except Exception:
-                        pass
+                        diagnostics.swallowed("android.TabBarHandler._set_menu")
         except Exception:
-            pass
+            diagnostics.swallowed("android.TabBarHandler._set_menu")
 
     def _resolve_icon(self, icon: Any) -> int:
         """Resolve a tab icon spec to an `android.R.drawable.*` res id.
@@ -2325,7 +2332,7 @@ class TabBarHandler(AndroidViewHandler):
                     try:
                         bnv.setSelectedItemId(i)
                     except Exception:
-                        pass
+                        diagnostics.swallowed("android.TabBarHandler._set_active")
                     break
 
     def _apply_fallback(self, ll: Any, props: Dict[str, Any]) -> None:
@@ -2425,7 +2432,9 @@ class PressableHandler(FlexContainerHandler):
                             try:
                                 view.animate().alpha(opacity).setDuration(50).start()
                             except Exception:
-                                pass
+                                diagnostics.swallowed(
+                                    "android.PressableHandler._bind_press_stream._PressTouchProxy.onTouch"
+                                )
                         if _has_event(view, "on_long_press"):
                             seq = press["seq"]
 
@@ -2456,7 +2465,9 @@ class PressableHandler(FlexContainerHandler):
                         try:
                             view.animate().alpha(1.0).setDuration(100).start()
                         except Exception:
-                            pass
+                            diagnostics.swallowed(
+                                "android.PressableHandler._bind_press_stream._PressTouchProxy.onTouch"
+                            )
                         if action == 1 and not press["moved"] and not press["long_fired"]:
                             _fire(view, "on_press")
                         return True
@@ -2464,7 +2475,7 @@ class PressableHandler(FlexContainerHandler):
 
             fl.setOnTouchListener(_PressTouchProxy())
         except Exception:
-            pass
+            diagnostics.swallowed("android.PressableHandler._bind_press_stream")
 
 
 # ======================================================================
@@ -2491,20 +2502,29 @@ class StatusBarHandler(AndroidViewHandler):
                 return
             if "background_color" in props and props["background_color"] is not None:
                 window.setStatusBarColor(parse_color_int(props["background_color"]))
+            View = jclass("android.view.View")
+            decor = window.getDecorView()
             if "bar_style" in props and props["bar_style"] is not None:
                 # API 23+: setSystemUiVisibility with SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
                 # for dark-content (light backgrounds), 0 for light-content.
-                View = jclass("android.view.View")
                 bar_style = props["bar_style"]
-                decor = window.getDecorView()
                 flags = decor.getSystemUiVisibility()
                 if bar_style in ("dark", "default"):
                     flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
                 else:
                     flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
                 decor.setSystemUiVisibility(flags)
-        except Exception:
-            pass
+            if "hidden" in props and props["hidden"] is not None:
+                flags = decor.getSystemUiVisibility()
+                if props["hidden"]:
+                    flags |= View.SYSTEM_UI_FLAG_FULLSCREEN
+                else:
+                    flags &= ~View.SYSTEM_UI_FLAG_FULLSCREEN
+                decor.setSystemUiVisibility(flags)
+        except Exception as exc:
+            from .. import diagnostics
+
+            diagnostics.warn_once(f"StatusBar: could not apply props on Android: {exc!r}")
 
 
 class KeyboardAvoidingViewHandler(FlexContainerHandler):
@@ -2552,7 +2572,7 @@ def _present_alert(
         try:
             on_result(index)
         except Exception:
-            pass
+            diagnostics.swallowed("android._present_alert._deliver")
 
     def _present_on_main() -> None:
         try:
@@ -2738,7 +2758,7 @@ class CheckboxHandler(AndroidViewHandler):
                 ColorStateList = jclass("android.content.res.ColorStateList")
                 cb.setButtonTintList(ColorStateList.valueOf(parse_color_int(props["color"])))
             except Exception:
-                pass
+                diagnostics.swallowed("android.CheckboxHandler._apply")
         _apply_accessibility(cb, props)
 
 
@@ -2798,7 +2818,7 @@ class SegmentedControlHandler(AndroidViewHandler):
         try:
             ll.removeAllViews()
         except Exception:
-            pass
+            diagnostics.swallowed("android.SegmentedControlHandler._rebuild")
         state["buttons"] = []
         LL_LP = jclass("android.widget.LinearLayout$LayoutParams")
         restyle = self._restyle
@@ -2808,7 +2828,7 @@ class SegmentedControlHandler(AndroidViewHandler):
             try:
                 btn.setAllCaps(False)
             except Exception:
-                pass
+                diagnostics.swallowed("android.SegmentedControlHandler._rebuild")
             # Equal-width segments: zero base width + weight 1, full height.
             btn.setLayoutParams(LL_LP(0, LL_LP.MATCH_PARENT, 1.0))
             enabled = (state.get("props") or {}).get("enabled") is not False
@@ -2856,7 +2876,7 @@ class SegmentedControlHandler(AndroidViewHandler):
             btn.setBackground(drawable)
             btn.setEnabled(enabled)
         except Exception:
-            pass
+            diagnostics.swallowed("android.SegmentedControlHandler._style_segment")
 
     def measure_intrinsic(
         self,
@@ -2911,7 +2931,7 @@ class DatePickerHandler(AndroidViewHandler):
         try:
             btn.setAllCaps(False)
         except Exception:
-            pass
+            diagnostics.swallowed("android.DatePickerHandler._build")
         open_dialog = self._open_dialog
 
         class _DateTriggerProxy(dynamic_proxy(jclass("android.view.View").OnClickListener)):
@@ -3021,7 +3041,7 @@ class DatePickerHandler(AndroidViewHandler):
             if maximum:
                 picker.setMaxDate(self._parse_to_calendar(maximum, mode).getTimeInMillis())
         except Exception:
-            pass
+            diagnostics.swallowed("android.DatePickerHandler._apply_min_max")
 
     def _parse_to_calendar(self, value: Any, mode: str) -> Any:
         Calendar = jclass("java.util.Calendar")
@@ -3033,7 +3053,7 @@ class DatePickerHandler(AndroidViewHandler):
                 fmt = SimpleDateFormat(self._PATTERNS.get(mode, self._PATTERNS["date"]), Locale.US)
                 cal.setTime(fmt.parse(str(value)))
             except Exception:
-                pass
+                diagnostics.swallowed("android.DatePickerHandler._parse_to_calendar")
         return cal
 
     def _format_calendar(self, cal: Any, mode: str) -> str:
@@ -3053,7 +3073,7 @@ class DatePickerHandler(AndroidViewHandler):
         try:
             btn.setText(iso)
         except Exception:
-            pass
+            diagnostics.swallowed("android.DatePickerHandler._commit")
         _fire(btn, "on_change", iso)
 
 
@@ -3153,7 +3173,7 @@ class VirtualListHandler(AndroidViewHandler):
                 try:
                     info["pool"].release(_java_id(container))
                 except Exception:
-                    pass
+                    diagnostics.swallowed("android.VirtualListHandler._build._Delegate.onRowRecycled")
 
             def onScrolled(self, offset_dp: float, extent_dp: float, range_dp: float) -> None:
                 view = info.get("view")
@@ -3202,12 +3222,12 @@ class VirtualListHandler(AndroidViewHandler):
             try:
                 view.setVerticalScrollBarEnabled(show)
             except Exception:
-                pass
+                diagnostics.swallowed("android.VirtualListHandler._apply")
         if data_changed and not initial:
             try:
                 view.notifyDataChanged()
             except Exception:
-                pass
+                diagnostics.swallowed("android.VirtualListHandler._apply")
 
     def _teardown(self, native_view: Any) -> None:
         info = _pn_vlist_info.pop(_java_id(native_view), None)
@@ -3238,7 +3258,7 @@ class VirtualListHandler(AndroidViewHandler):
                     args.get("animated", True) is not False,
                 )
             except Exception:
-                pass
+                diagnostics.swallowed("android.VirtualListHandler.command")
             return None
         if name == "scroll_to_index":
             try:
@@ -3247,7 +3267,7 @@ class VirtualListHandler(AndroidViewHandler):
                     args.get("animated", True) is not False,
                 )
             except Exception:
-                pass
+                diagnostics.swallowed("android.VirtualListHandler.command")
             return None
         if name == "scroll_to_end":
             info = _pn_vlist_info.get(_java_id(native_view))
@@ -3255,7 +3275,7 @@ class VirtualListHandler(AndroidViewHandler):
             try:
                 native_view.scrollToIndex(max(0, count - 1), args.get("animated", True) is not False)
             except Exception:
-                pass
+                diagnostics.swallowed("android.VirtualListHandler.command")
             return None
         if name == "get_scroll_offset":
             try:

@@ -166,6 +166,18 @@ async def setup_reminder():
 `request_permission()` is required on iOS and on Android 13+. On
 older Android the call returns `True` without prompting.
 
+For server-sent (remote) pushes, declare the `remote_notifications`
+capability in `pythonnative.toml`, then register with APNs:
+
+```python
+token = await pn.Notifications.get_device_token()  # APNs hex token
+```
+
+Your server passes the token to APNs to address this install. The
+simulator has no APNs connection, so test on a real device. Android
+remote push requires Firebase Cloud Messaging, which the built-in
+module doesn't wire up; `get_device_token()` returns `None` there.
+
 ## Clipboard
 
 [`Clipboard`][pythonnative.Clipboard] reads and writes the system
@@ -193,7 +205,7 @@ async def share_link():
 ## Linking
 
 [`Linking`][pythonnative.Linking] opens URLs, deep links, and the app's
-Settings page, and reports the URL that launched the app.
+Settings page, and delivers inbound deep links to your app.
 
 ```python
 if pn.Linking.can_open_url("tel:+15551234567"):
@@ -201,6 +213,22 @@ if pn.Linking.can_open_url("tel:+15551234567"):
 
 launch_url = pn.Linking.get_initial_url()  # deep link the app opened with
 pn.Linking.open_settings()                 # this app's entry in Settings
+```
+
+To receive deep links, declare your schemes in `pythonnative.toml`:
+
+```toml
+[app]
+url_schemes = ["myapp"]
+```
+
+Opening `myapp://orders/42` now launches (or foregrounds) your app on
+both platforms. The URL that cold-started the app is returned by
+`get_initial_url()`; URLs that arrive while the app is running reach
+subscribers:
+
+```python
+unsubscribe = pn.Linking.add_listener(lambda url: navigate_to(url))
 ```
 
 ## Permissions (runtime)

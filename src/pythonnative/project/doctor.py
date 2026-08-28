@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import List, Optional
 
 from . import icons
-from .config import IOS_SUPPORTED_PYTHON_VERSION, SUPPORTED_PYTHON_VERSIONS, AppConfig, ConfigError
+from .config import SUPPORTED_PYTHON_VERSIONS, AppConfig, ConfigError
+from .runtime_assets import PINNED_ASSETS
 
 OK = "ok"
 WARN = "warn"
@@ -154,13 +155,13 @@ def check_ios(config: Optional[AppConfig]) -> List[CheckResult]:
     results.append(CheckResult("xcrun simctl (Simulators)", OK if simctl else WARN, simctl or "not found on PATH"))
 
     if config is not None:
-        if config.python_version != IOS_SUPPORTED_PYTHON_VERSION:
+        if config.python_version not in PINNED_ASSETS:
+            supported = ", ".join(sorted(PINNED_ASSETS))
             results.append(
                 CheckResult(
                     "iOS embedded Python",
                     WARN,
-                    f"app.python_version={config.python_version}; only "
-                    f"{IOS_SUPPORTED_PYTHON_VERSION} has a pinned iOS build",
+                    f"app.python_version={config.python_version}; pinned iOS builds " f"exist for {supported}",
                 )
             )
         if config.ios.development_team:

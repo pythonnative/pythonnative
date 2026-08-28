@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List
 
+from .. import diagnostics
 from ..hooks import use_effect, use_state
 from ..utils import IS_ANDROID, IS_IOS
 
@@ -67,7 +68,7 @@ def dispatch_net_info(state: NetInfoState) -> None:
         try:
             listener(dict(state))
         except Exception:
-            pass
+            diagnostics.swallowed("net_info.dispatch_net_info")
 
 
 def use_net_info() -> NetInfoState:

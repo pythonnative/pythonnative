@@ -37,6 +37,7 @@ __all__ = [
     "is_dev",
     "warn",
     "warn_once",
+    "swallowed",
     "get_warnings",
     "clear_warnings",
     "set_error_reporter",
@@ -141,6 +142,32 @@ def warn_once(message: str, key: Optional[str] = None) -> None:
             return
         _warned_keys.add(dedupe)
     warn(message)
+
+
+def swallowed(context: str) -> None:
+    """Surface a suppressed native-backend exception (dev mode only).
+
+    The native view/module backends intentionally degrade gracefully in
+    production: a failed style application or a missing OS API must not
+    crash the app. Call this from the ``except`` block instead of
+    ``pass`` so that, in dev mode, each suppression is reported once per
+    call site instead of disappearing.
+
+    Args:
+        context: Where the suppression happened, e.g.
+            ``"ios.TextHandler._apply"``.
+    """
+    if not is_dev():
+        return
+    exc = sys.exc_info()[1]
+    if exc is None:
+        return
+    frame = sys._getframe(1)
+    location = f"{os.path.basename(frame.f_code.co_filename)}:{frame.f_lineno}"
+    warn_once(
+        f"{context} suppressed {type(exc).__name__}: {exc} ({location})",
+        key=f"swallowed:{context}:{location}",
+    )
 
 
 def get_warnings() -> List[str]:

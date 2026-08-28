@@ -55,6 +55,9 @@ class Capability:
             (e.g., ``"android.permission.CAMERA"``).
         ios_background_modes: ``UIBackgroundModes`` values to add
             (e.g., ``"location"``).
+        ios_entitlements: Code-signing entitlement key/value pairs the
+            capability requires (e.g., ``aps-environment`` for remote
+            push notifications).
         default_reason: Fallback usage description used when the
             capability is declared as ``true`` instead of a string.
         needs_reason: Whether iOS requires a usage description for this
@@ -68,6 +71,7 @@ class Capability:
     ios_usage_keys: Tuple[str, ...] = ()
     android_permissions: Tuple[str, ...] = ()
     ios_background_modes: Tuple[str, ...] = ()
+    ios_entitlements: Tuple[Tuple[str, object], ...] = ()
     default_reason: str = ""
     needs_reason: bool = True
 
@@ -196,9 +200,18 @@ CAPABILITIES: Dict[str, Capability] = {
         ),
         Capability(
             key="notifications",
-            summary="Show local and push notifications.",
+            summary="Show local notifications.",
             ios_usage_keys=(),
             android_permissions=("android.permission.POST_NOTIFICATIONS",),
+            needs_reason=False,
+        ),
+        Capability(
+            key="remote_notifications",
+            summary="Receive remote (APNs) push notifications on iOS.",
+            ios_usage_keys=(),
+            android_permissions=("android.permission.POST_NOTIFICATIONS",),
+            ios_background_modes=("remote-notification",),
+            ios_entitlements=(("aps-environment", "development"),),
             needs_reason=False,
         ),
         Capability(
@@ -249,12 +262,15 @@ class ResolvedPermissions:
             mapped to their reason strings.
         ios_background_modes: Ordered, de-duplicated ``UIBackgroundModes``
             values.
+        ios_entitlements: Code-signing entitlement keys mapped to their
+            values (empty when no capability needs entitlements).
         android_permissions: Ordered, de-duplicated Android permission
             names (including the always-on base set).
     """
 
     ios_usage_descriptions: Dict[str, str] = field(default_factory=dict)
     ios_background_modes: List[str] = field(default_factory=list)
+    ios_entitlements: Dict[str, object] = field(default_factory=dict)
     android_permissions: List[str] = field(default_factory=list)
 
 
@@ -318,6 +334,8 @@ def resolve_permissions(
         for mode in cap.ios_background_modes:
             if mode not in background:
                 background.append(mode)
+        for entitlement_key, entitlement_value in cap.ios_entitlements:
+            resolved.ios_entitlements.setdefault(entitlement_key, entitlement_value)
         for perm in cap.android_permissions:
             if perm not in android:
                 android.append(perm)

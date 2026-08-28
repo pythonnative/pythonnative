@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Callable, Dict, Optional, Tuple
 
+from .. import diagnostics
 from ..runtime import resolve_future
 from ..utils import IS_ANDROID, IS_IOS
 
@@ -94,7 +95,7 @@ def _ios_get(on_result: Callable[[Optional[Coords]], None]) -> None:
                     if self._manager is not None:
                         self._manager.stopUpdatingLocation()
                 except Exception:
-                    pass
+                    diagnostics.swallowed("location._ios_get._PNLocationDelegate._finish")
                 cb = self._callback
                 self._callback = None
                 _pending_delegates.pop(id(self), None)
@@ -102,7 +103,7 @@ def _ios_get(on_result: Callable[[Optional[Coords]], None]) -> None:
                     try:
                         cb(coords)
                     except Exception:
-                        pass
+                        diagnostics.swallowed("location._ios_get._PNLocationDelegate._finish")
 
             @objc_method
             def locationManager_didUpdateLocations_(self, manager: Any, locations: Any) -> None:
@@ -131,7 +132,9 @@ def _ios_get(on_result: Callable[[Optional[Coords]], None]) -> None:
                     try:
                         manager.startUpdatingLocation()
                     except Exception:
-                        pass
+                        diagnostics.swallowed(
+                            "location._ios_get._PNLocationDelegate.locationManagerDidChangeAuthorization_"
+                        )
 
         delegate = _PNLocationDelegate.new()
         delegate._callback = on_result
@@ -143,11 +146,11 @@ def _ios_get(on_result: Callable[[Optional[Coords]], None]) -> None:
         try:
             manager.requestWhenInUseAuthorization()
         except Exception:
-            pass
+            diagnostics.swallowed("location._ios_get")
         try:
             manager.startUpdatingLocation()
         except Exception:
-            pass
+            diagnostics.swallowed("location._ios_get")
     except Exception:
         on_result(None)
 
@@ -176,7 +179,7 @@ def _android_get(on_result: Callable[[Optional[Coords]], None]) -> None:
                     on_result((float(loc.getLatitude()), float(loc.getLongitude())))
                     return
         except Exception:
-            pass
+            diagnostics.swallowed("location._android_get")
 
         LocationListener = jclass("android.location.LocationListener")
         delivered = [False]
@@ -188,12 +191,12 @@ def _android_get(on_result: Callable[[Optional[Coords]], None]) -> None:
             try:
                 lm.removeUpdates(listener)
             except Exception:
-                pass
+                diagnostics.swallowed("location._android_get._finish")
             _pending_delegates.pop(id(listener), None)
             try:
                 on_result(coords)
             except Exception:
-                pass
+                diagnostics.swallowed("location._android_get._finish")
 
         class _PNLocationListener(dynamic_proxy(LocationListener)):  # type: ignore[misc]
             def onLocationChanged(self, loc: Any) -> None:

@@ -1,9 +1,11 @@
+import sys
 from pathlib import Path
 from typing import List, Optional, Sequence
 
 import pytest
 
 from pythonnative.project import builder as builder_mod
+from pythonnative.project import runtime_assets
 from pythonnative.project.builder import Builder, BuildError, CommandResult, CommandRunner, stage_template
 from pythonnative.project.config import AppConfig
 
@@ -88,17 +90,76 @@ def test_prepare_android_integration(tmp_path: Path) -> None:
     assert not (lib / "templates").exists()
 
 
-def test_prepare_ios_integration(tmp_path: Path) -> None:
+def _fake_ios_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> runtime_assets.IOSRuntime:
+    """Stub the runtime download with a minimal on-disk xcframework."""
+    xcframework = tmp_path / "fake_runtime" / "Python.xcframework"
+    (xcframework / "build").mkdir(parents=True)
+    (xcframework / "build" / "utils.sh").write_text("install_python() { :; }\n", encoding="utf-8")
+    runtime = runtime_assets.IOSRuntime(python_version="3.11", xcframework_dir=xcframework)
+    monkeypatch.setattr(builder_mod.runtime_assets, "prepare_ios_runtime", lambda *a, **k: runtime)
+    return runtime
+
+
+def test_prepare_ios_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _fake_ios_runtime(tmp_path, monkeypatch)
     root = _project(tmp_path, _TOML)
     cfg = AppConfig.load(root)
-    prepared = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios")
+    runner = RecordingRunner()
+    prepared = Builder(cfg, runner=runner, log=lambda _m: None).prepare("ios")
 
     assert prepared.app_id == "com.acme.cool"
     import plistlib
 
     plist = plistlib.loads(prepared.ios.info_plist.read_bytes())
     assert plist["CFBundleDisplayName"] == "Cool App"
-    assert (prepared.build_dir / "python" / "app" / "main.py").is_file()
+
+    # Python sources and the library are staged at the Xcode project root.
+    assert (prepared.project_dir / "app" / "main.py").is_file()
+    lib = prepared.project_dir / "app_packages" / "pythonnative"
+    assert (lib / "__init__.py").is_file()
+    assert not (lib / "templates").exists()
+    # The pinned runtime is linked into the project.
+    xcframework = prepared.project_dir / "Python.xcframework"
+    assert xcframework.is_dir() or xcframework.is_symlink()
+    assert (xcframework / "build" / "utils.sh").is_file()
+    # rubicon-objc is installed into app_packages via pip.
+    assert any("rubicon-objc" in cmd for cmd in runner.commands)
+
+
+def test_prepare_ios_release_compiles_bytecode_when_versions_match(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fake_ios_runtime(tmp_path, monkeypatch)
+    root = _project(tmp_path, _TOML)
+    cfg = AppConfig.load(root)
+    # Pretend the host interpreter matches the configured version so the
+    # bytecode path runs regardless of the interpreter running the tests.
+    cfg.python_version = f"{sys.version_info[0]}.{sys.version_info[1]}"
+    prepared = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", release=True)
+
+    app_dir = prepared.project_dir / "app"
+    assert (app_dir / "main.pyc").is_file()
+    assert not (app_dir / "main.py").exists()
+    lib = prepared.project_dir / "app_packages" / "pythonnative"
+    assert not list(lib.rglob("*.py"))
+    assert list(lib.rglob("*.pyc"))
+
+
+def test_prepare_ios_release_skips_bytecode_on_version_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fake_ios_runtime(tmp_path, monkeypatch)
+    root = _project(tmp_path, _TOML)
+    cfg = AppConfig.load(root)
+    host = f"{sys.version_info[0]}.{sys.version_info[1]}"
+    if cfg.python_version == host:
+        cfg.python_version = "3.10" if host != "3.10" else "3.12"
+    messages: List[str] = []
+    prepared = Builder(cfg, runner=RecordingRunner(), log=messages.append).prepare("ios", release=True)
+
+    # Sources ship as .py when the host can't produce matching bytecode.
+    assert (prepared.project_dir / "app" / "main.py").is_file()
+    assert any("Skipping bytecode compilation" in m for m in messages)
 
 
 def test_prepare_unknown_platform(tmp_path: Path) -> None:

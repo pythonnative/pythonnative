@@ -1,4 +1,4 @@
-"""Cross-platform local notifications.
+"""Cross-platform local notifications and remote push registration.
 
 Provides coroutines for requesting permission and scheduling /
 cancelling local push notifications. Uses Android's
@@ -8,6 +8,14 @@ On iOS you must ``await Notifications.request_permission()`` before
 scheduling. On Android 13+ the runtime permission should be requested
 through standard Android APIs (the manifest declaration is otherwise
 sufficient).
+
+For remote (server-sent) pushes, enable the ``remote_notifications``
+capability in ``pythonnative.toml`` and call
+``Notifications.get_device_token()`` to register with APNs and receive
+the device token your server needs. Android remote push requires
+Firebase Cloud Messaging, which needs a per-app ``google-services.json``
+and is not wired up by the built-in module; ``get_device_token`` returns
+``None`` there.
 
 Example:
     ```python
@@ -28,10 +36,11 @@ Example:
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
-from ..runtime import resolve_future
-from ..utils import IS_ANDROID
+from .. import diagnostics
+from ..runtime import reject_future, resolve_future
+from ..utils import IS_ANDROID, IS_IOS
 
 # Delayed Android deliveries in flight, keyed by identifier, so
 # ``cancel`` can abort a notification that hasn't posted yet. (iOS
@@ -110,6 +119,28 @@ class Notifications:
             return
         await asyncio.to_thread(_ios_cancel, identifier)
 
+    @staticmethod
+    async def get_device_token() -> Optional[str]:
+        """Register for remote notifications and return the device token.
+
+        On iOS this calls ``registerForRemoteNotifications`` and waits
+        for the APNs callback; the token is a lowercase hex string your
+        server passes to APNs. Requires the ``remote_notifications``
+        capability (which adds the ``aps-environment`` entitlement) and
+        a real device (the simulator has no APNs connection).
+
+        Returns:
+            The APNs token, or ``None`` on platforms without built-in
+            remote push support (Android and desktop).
+
+        Raises:
+            RuntimeError: If APNs registration fails, with the native
+                error description.
+        """
+        if not IS_IOS:
+            return None
+        return await _ios_get_device_token()
+
 
 # ======================================================================
 # Android implementation
@@ -171,7 +202,7 @@ def _android_cancel(identifier: str) -> None:
         nm = ctx.getSystemService(jclass("android.content.Context").NOTIFICATION_SERVICE)
         nm.cancel(abs(hash(identifier)) % (2**31))
     except Exception:
-        pass
+        diagnostics.swallowed("notifications._android_cancel")
 
 
 # ======================================================================
@@ -235,4 +266,64 @@ def _ios_cancel(identifier: str) -> None:
         arr = NSArray.arrayWithObject_(identifier)
         center.removePendingNotificationRequestsWithIdentifiers_(arr)
     except Exception:
-        pass
+        diagnostics.swallowed("notifications._ios_cancel")
+
+
+# ----------------------------------------------------------------------
+# Remote notifications (APNs)
+# ----------------------------------------------------------------------
+#
+# The registration result arrives through UIApplicationDelegate
+# callbacks in the native template, which forward here via
+# dispatch_device_token / dispatch_device_token_error. The token is
+# cached so later get_device_token() calls resolve immediately.
+
+_device_token: Optional[str] = None
+_device_token_error: Optional[str] = None
+_token_waiters: List["asyncio.Future[str]"] = []
+
+
+async def _ios_get_device_token() -> str:
+    if _device_token is not None:
+        return _device_token
+    if _device_token_error is not None:
+        raise RuntimeError(f"APNs registration failed: {_device_token_error}")
+
+    loop = asyncio.get_running_loop()
+    future: asyncio.Future[str] = loop.create_future()
+    _token_waiters.append(future)
+
+    def _register() -> None:
+        from rubicon.objc import ObjCClass
+
+        ObjCClass("UIApplication").sharedApplication.registerForRemoteNotifications()
+
+    try:
+        # registerForRemoteNotifications must run on the main thread.
+        from ..runtime import call_on_main_thread
+
+        call_on_main_thread(_register)
+    except Exception as exc:
+        _token_waiters.remove(future)
+        raise RuntimeError(f"Could not start APNs registration: {exc}") from exc
+    return await future
+
+
+def dispatch_device_token(token: str) -> None:
+    """Deliver the APNs device token from the native host."""
+    global _device_token, _device_token_error
+    _device_token = token
+    _device_token_error = None
+    waiters, _token_waiters[:] = list(_token_waiters), []
+    for future in waiters:
+        resolve_future(future, token)
+
+
+def dispatch_device_token_error(message: str) -> None:
+    """Deliver an APNs registration failure from the native host."""
+    global _device_token_error
+    _device_token_error = message
+    waiters, _token_waiters[:] = list(_token_waiters), []
+    error = RuntimeError(f"APNs registration failed: {message}")
+    for future in waiters:
+        reject_future(future, error)

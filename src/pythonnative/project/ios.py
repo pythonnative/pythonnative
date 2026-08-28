@@ -9,30 +9,32 @@ which avoids fragile ``project.pbxproj`` edits. This module owns the
 parts that must live on disk:
 
 - **Info.plist.** Display name, supported orientations, permission usage
-  descriptions (from ``[permissions]``), background modes, and any
-  ``[ios].extra_info_plist`` keys.
+  descriptions (from ``[permissions]``), background modes, URL schemes
+  (from ``[app].url_schemes``), and any ``[ios].extra_info_plist`` keys.
+- **Entitlements.** A ``.entitlements`` file generated when a declared
+  capability needs one (e.g., ``remote_notifications``).
 - **Branding.** The ``AppIcon`` asset and an optional ``Splash`` image
   set plus a generated ``LaunchScreen`` storyboard.
 - **Export options.** A plist for ``xcodebuild -exportArchive`` derived
   from ``[ios.signing]``.
 
-The embedded CPython runtime (``Python.framework``, the standard library,
-``rubicon-objc``, and user packages) is copied into the built ``.app``
-*after* the build by [`embed_runtime`][pythonnative.project.ios.embed_runtime],
-since PythonKit loads it at runtime rather than linking it.
+The embedded CPython runtime is *not* handled here: the bundled Xcode
+template links ``Python.xcframework`` directly and installs the standard
+library, app sources, and packages during the Xcode build (see the
+"Install Python runtime" build phase). The
+[`builder`][pythonnative.project.builder] stages the framework and the
+Python sources into the project before invoking ``xcodebuild``.
 """
 
 from __future__ import annotations
 
 import plistlib
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 from . import icons
 from .config import AppConfig
-from .runtime_assets import IOSRuntime
 
 PROJECT_NAME = "ios_template"
 """The fixed Xcode project/scheme/target name (kept stable on purpose)."""
@@ -42,6 +44,9 @@ PROJECT_FILE = "ios_template.xcodeproj"
 
 APP_BUNDLE_NAME = "ios_template.app"
 """The built ``.app`` bundle name (product name is left as the target name)."""
+
+ENTITLEMENTS_FILE = "ios_template/ios_template.entitlements"
+"""Project-relative path of the generated entitlements file (when needed)."""
 
 _ORIENTATIONS: Dict[str, List[str]] = {
     "portrait": ["UIInterfaceOrientationPortrait"],
@@ -97,6 +102,7 @@ def configure(project_dir: Path, config: AppConfig, *, log: Optional[Logger] = N
     info_plist = project_dir / "ios_template" / "Info.plist"
 
     configure_info_plist(info_plist, config)
+    write_entitlements(project_dir, config)
     _apply_branding(project_dir, config, emit)
 
     emit(f"Configured iOS project ({config.bundle_id}).")
@@ -131,6 +137,14 @@ def configure_info_plist(info_plist: Path, config: AppConfig) -> None:
     if resolved.ios_background_modes:
         plist["UIBackgroundModes"] = list(resolved.ios_background_modes)
 
+    if config.url_schemes:
+        plist["CFBundleURLTypes"] = [
+            {
+                "CFBundleURLName": config.bundle_id,
+                "CFBundleURLSchemes": list(config.url_schemes),
+            }
+        ]
+
     if config.splash:
         plist["UILaunchStoryboardName"] = "LaunchScreen"
 
@@ -139,6 +153,27 @@ def configure_info_plist(info_plist: Path, config: AppConfig) -> None:
 
     with open(info_plist, "wb") as handle:
         plistlib.dump(plist, handle)
+
+
+def write_entitlements(project_dir: Path, config: AppConfig) -> Optional[Path]:
+    """Generate the app entitlements file when a capability needs one.
+
+    Args:
+        project_dir: The staged ``ios_template`` directory.
+        config: The validated app configuration.
+
+    Returns:
+        The written entitlements path, or ``None`` when no declared
+        capability requires entitlements.
+    """
+    entitlements = config.resolved_permissions().ios_entitlements
+    if not entitlements:
+        return None
+    dest = project_dir / ENTITLEMENTS_FILE
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with open(dest, "wb") as handle:
+        plistlib.dump(dict(entitlements), handle)
+    return dest
 
 
 # ======================================================================
@@ -170,17 +205,22 @@ def build_settings(config: AppConfig, *, for_archive: bool = False) -> List[str]
     ]
     if config.ios.development_team:
         settings.append(f"DEVELOPMENT_TEAM={config.ios.development_team}")
+    if config.resolved_permissions().ios_entitlements:
+        settings.append(f"CODE_SIGN_ENTITLEMENTS={ENTITLEMENTS_FILE}")
     if for_archive and not config.ios.signing.provisioning_profile:
         settings.append("CODE_SIGN_STYLE=Automatic")
     return settings
 
 
-def write_export_options(config: AppConfig, dest: Path) -> Path:
+def write_export_options(config: AppConfig, dest: Path, *, upload: bool = False) -> Path:
     """Write an ``exportOptions.plist`` for ``xcodebuild -exportArchive``.
 
     Args:
         config: The validated app configuration.
         dest: Destination plist path.
+        upload: When ``True``, ask ``xcodebuild`` to upload the build to
+            App Store Connect instead of exporting a local ``.ipa``
+            (requires ``export_method = "app-store"``).
 
     Returns:
         ``dest``.
@@ -191,6 +231,8 @@ def write_export_options(config: AppConfig, dest: Path) -> Path:
         "compileBitcode": False,
         "stripSwiftSymbols": True,
     }
+    if upload:
+        options["destination"] = "upload"
     if config.ios.development_team:
         options["teamID"] = config.ios.development_team
     if signing.provisioning_profile:
@@ -274,71 +316,3 @@ _LAUNCH_STORYBOARD = """<?xml version="1.0" encoding="UTF-8"?>
     </resources>
 </document>
 """
-
-
-# ======================================================================
-# Runtime embedding (post-build)
-# ======================================================================
-
-
-def embed_runtime(
-    app_bundle: Path,
-    *,
-    runtime: IOSRuntime,
-    destination: str,
-    python_sources: Path,
-    site_packages: Optional[Path] = None,
-    log: Optional[Logger] = None,
-) -> None:
-    """Copy the embedded CPython runtime and app code into a built ``.app``.
-
-    PythonKit loads CPython at runtime, so the framework, standard
-    library, app sources, and pure-Python site packages are copied into
-    the bundle after the build/archive completes.
-
-    Args:
-        app_bundle: Path to the built ``.app`` directory.
-        runtime: The resolved iOS runtime paths.
-        destination: ``"simulator"`` or ``"device"`` (selects the slice).
-        python_sources: Directory whose children (``app``,
-            ``pythonnative``) are copied to the bundle root.
-        site_packages: Optional directory of installed pure-Python
-            packages (``rubicon-objc`` and user requirements) copied to
-            ``platform-site``.
-        log: Optional progress logger.
-    """
-    emit: Logger = log or (lambda _message: None)
-    app_bundle = Path(app_bundle)
-
-    framework = runtime.framework_for(destination)
-    if framework and framework.is_dir():
-        frameworks_dir = app_bundle / "Frameworks"
-        frameworks_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(framework, frameworks_dir / "Python.framework", dirs_exist_ok=True)
-        emit("Embedded Python.framework.")
-    else:
-        emit(f"Warning: no Python.framework for {destination}; the app may not start.")
-
-    stdlib = runtime.stdlib_for(destination)
-    if stdlib and stdlib.is_dir():
-        shutil.copytree(stdlib, app_bundle / "python-stdlib", dirs_exist_ok=True)
-        emit("Embedded Python standard library.")
-
-    if python_sources.is_dir():
-        for child in python_sources.iterdir():
-            target = app_bundle / child.name
-            if child.is_dir():
-                shutil.copytree(child, target, dirs_exist_ok=True)
-            else:
-                shutil.copy2(child, target)
-
-    if site_packages and site_packages.is_dir():
-        platform_site = app_bundle / "platform-site"
-        platform_site.mkdir(parents=True, exist_ok=True)
-        for child in site_packages.iterdir():
-            target = platform_site / child.name
-            if child.is_dir():
-                shutil.copytree(child, target, dirs_exist_ok=True)
-            else:
-                shutil.copy2(child, target)
-        emit("Embedded pure-Python site packages.")

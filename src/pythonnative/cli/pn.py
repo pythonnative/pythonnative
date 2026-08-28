@@ -6,10 +6,14 @@ The console script `pn` (declared in `pyproject.toml`) dispatches to:
 - `pn doctor [platform]`: diagnose the local toolchain and config.
 - `pn preview [component]`: render the app in a desktop (Tkinter) window
   with Fast Refresh, the fast inner dev loop, no device required.
-- `pn run android|ios`: stage + build + install + launch on a device or
-  simulator, with optional on-device hot reload.
+- `pn devices [platform]`: list connected devices, emulators, and
+  simulators.
+- `pn run android|ios [--device D]`: stage + build + install + launch on
+  a device, emulator, or simulator, with optional on-device hot reload.
+- `pn logs android|ios`: stream logs from the running app without
+  rebuilding.
 - `pn build android|ios`: produce standalone artifacts (signed APK/AAB,
-  or an iOS archive/IPA).
+  or an iOS archive/IPA, optionally uploaded to App Store Connect).
 - `pn app-id android|ios`: print the resolved application/bundle id
   (handy for scripts and CI).
 - `pn clean`: remove the local `build/` directory.
@@ -34,6 +38,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..project import builder as builder_mod
+from ..project import devices as devices_mod
 from ..project import doctor as doctor_mod
 from ..project.android import collect_logcat_filters
 from ..project.config import CONFIG_FILENAME, AppConfig, ConfigError, render_default_toml
@@ -242,6 +247,41 @@ def _preview_entry(project_dir: Path) -> str:
 
 
 # ======================================================================
+# devices
+# ======================================================================
+
+
+def devices_command(args: argparse.Namespace) -> None:
+    """List connected devices, emulators, and simulators.
+
+    Args:
+        args: Parsed namespace with optional ``platform``.
+    """
+    platform: Optional[str] = getattr(args, "platform", None)
+    devices = devices_mod.list_devices(platform)
+    if not devices:
+        print("No devices found.")
+        print("Android: start an emulator or connect a device with USB debugging enabled.")
+        print("iOS: open Xcode once to install Simulators, or plug in a device.")
+        sys.exit(1)
+    print(f"  {'IDENTIFIER':<40} {'KIND':<10} {'STATE':<10} NAME")
+    for device in devices:
+        print(device.format())
+    print("\nTarget one with: pn run <platform> --device <identifier or name>")
+
+
+def _resolve_device(platform: str, query: Optional[str]) -> Optional[devices_mod.Device]:
+    """Resolve ``--device`` to a concrete target, exiting on a bad query."""
+    if not query:
+        return None
+    device = devices_mod.find_device(devices_mod.list_devices(platform), query)
+    if device is None:
+        print(f"Error: no {platform} device matches {query!r}. Run 'pn devices {platform}' to list targets.")
+        sys.exit(1)
+    return device
+
+
+# ======================================================================
 # run
 # ======================================================================
 
@@ -250,13 +290,14 @@ def run_project(args: argparse.Namespace) -> None:
     """Stage, build, install, and launch the app on a device/simulator.
 
     Args:
-        args: Parsed namespace (``platform``, ``prepare_only``,
-            ``hot_reload``, ``no_logs``).
+        args: Parsed namespace (``platform``, ``device``,
+            ``prepare_only``, ``hot_reload``, ``no_logs``).
     """
     platform: str = args.platform
     prepare_only: bool = getattr(args, "prepare_only", False)
     hot_reload: bool = getattr(args, "hot_reload", False)
     show_logs: bool = not getattr(args, "no_logs", False)
+    device = _resolve_device(platform, getattr(args, "device", None))
 
     config = _load_config_or_exit()
     builder = builder_mod.Builder(config, log=print)
@@ -273,9 +314,14 @@ def run_project(args: argparse.Namespace) -> None:
 
     try:
         if platform == "android":
-            _run_android(builder, prepared, hot_reload=hot_reload, show_logs=show_logs)
+            _run_android(builder, prepared, device=device, hot_reload=hot_reload, show_logs=show_logs)
+        elif device is not None and device.kind == "device":
+            _run_ios_device(builder, prepared, device=device)
+            if hot_reload:
+                print("Note: hot reload targets the iOS Simulator; skipping it for a physical device.")
+            return
         else:
-            _run_ios(builder, prepared, hot_reload=hot_reload, show_logs=show_logs)
+            _run_ios(builder, prepared, device=device, hot_reload=hot_reload, show_logs=show_logs)
     except builder_mod.BuildError as exc:
         print(f"Error: {exc}")
         sys.exit(1)
@@ -295,9 +341,14 @@ def _run_android(
     builder: builder_mod.Builder,
     prepared: builder_mod.PreparedProject,
     *,
+    device: Optional[devices_mod.Device],
     hot_reload: bool,
     show_logs: bool,
 ) -> None:
+    if device is not None:
+        # Both Gradle's install task and every adb call below honor
+        # ANDROID_SERIAL, so exporting it targets the whole run.
+        os.environ["ANDROID_SERIAL"] = device.identifier
     builder.install_android_debug(prepared)
     _clear_android_hot_reload_overlay(prepared.app_id)
     subprocess.run(
@@ -319,11 +370,12 @@ def _run_ios(
     builder: builder_mod.Builder,
     prepared: builder_mod.PreparedProject,
     *,
+    device: Optional[devices_mod.Device],
     hot_reload: bool,
     show_logs: bool,
 ) -> None:
     app_path = builder.build_ios_simulator(prepared)
-    udid = _select_ios_simulator()
+    udid = device.identifier if device is not None else _select_ios_simulator()
     if udid is None:
         print("No available iOS Simulators found; open the project in Xcode to run.")
         return
@@ -352,6 +404,45 @@ def _run_ios(
         print("Launched iOS app on Simulator.")
 
 
+def _run_ios_device(
+    builder: builder_mod.Builder,
+    prepared: builder_mod.PreparedProject,
+    *,
+    device: devices_mod.Device,
+) -> None:
+    """Build, install, and launch on a physical iOS device via devicectl."""
+    app_path = builder.build_ios_device(prepared)
+    print(f"Installing on {device.name}...")
+    install = subprocess.run(
+        ["xcrun", "devicectl", "device", "install", "app", "--device", device.identifier, str(app_path)],
+        check=False,
+    )
+    if install.returncode != 0:
+        print(
+            "Error: install failed. Make sure the device is unlocked, paired with this Mac, "
+            "and has Developer Mode enabled (Settings > Privacy & Security > Developer Mode)."
+        )
+        sys.exit(1)
+    launch = subprocess.run(
+        [
+            "xcrun",
+            "devicectl",
+            "device",
+            "process",
+            "launch",
+            "--terminate-existing",
+            "--device",
+            device.identifier,
+            prepared.app_id,
+        ],
+        check=False,
+    )
+    if launch.returncode != 0:
+        print("Error: launch failed. Launch the app from the home screen to see details.")
+        sys.exit(1)
+    print(f"Launched on {device.name}. Use Console.app (or Xcode > Devices) for device logs.")
+
+
 # ======================================================================
 # build
 # ======================================================================
@@ -361,16 +452,24 @@ def build_project(args: argparse.Namespace) -> None:
     """Build standalone, distributable artifacts for ``platform``.
 
     Args:
-        args: Parsed namespace (``platform``, ``debug``).
+        args: Parsed namespace (``platform``, ``debug``, ``upload``).
     """
     platform: str = args.platform
     debug: bool = getattr(args, "debug", False)
+    upload: bool = getattr(args, "upload", False)
 
     config = _load_config_or_exit()
     builder = builder_mod.Builder(config, log=print)
 
+    if upload and (platform != "ios" or debug):
+        print("Error: --upload applies to 'pn build ios' release builds only.")
+        sys.exit(1)
+    if upload and config.ios.signing.export_method != "app-store":
+        print('Error: --upload requires [ios.signing] export_method = "app-store" in pythonnative.toml.')
+        sys.exit(1)
+
     try:
-        prepared = builder.prepare(platform)
+        prepared = builder.prepare(platform, release=not debug)
         if platform == "android":
             artifacts = builder.build_android(prepared, debug=debug)
         else:
@@ -378,17 +477,59 @@ def build_project(args: argparse.Namespace) -> None:
                 app_path = builder.build_ios_simulator(prepared)
                 artifacts = builder_mod.BuildArtifacts(paths=[app_path])
             else:
-                artifacts = builder.build_ios_archive(prepared)
+                artifacts = builder.build_ios_archive(prepared, upload=upload)
     except builder_mod.BuildError as exc:
         print(f"Error: {exc}")
         sys.exit(1)
 
+    if upload:
+        print("\nUploaded to App Store Connect. Check the build's status at appstoreconnect.apple.com.")
     if not artifacts.paths:
-        print("Build completed, but no artifacts were found. Check the build output above.")
+        if not upload:
+            print("Build completed, but no artifacts were found. Check the build output above.")
         return
     print("\nBuilt artifacts:")
     for path in artifacts.paths:
         print(f"  {path}")
+
+
+# ======================================================================
+# logs
+# ======================================================================
+
+
+def logs_command(args: argparse.Namespace) -> None:
+    """Stream logs from the running app without rebuilding.
+
+    Args:
+        args: Parsed namespace (``platform``).
+    """
+    platform: str = args.platform
+    if platform == "android":
+        proc = _start_android_log_stream()
+        if proc is None:
+            sys.exit(1)
+        try:
+            proc.wait()
+        except KeyboardInterrupt:
+            print()
+            _terminate_subprocess(proc)
+            print("Stopped log streaming.")
+        return
+
+    # iOS: relaunch the app on the booted simulator with a console PTY so
+    # Python's stdout/stderr stream to this terminal.
+    config = _load_config_or_exit()
+    proc = _start_ios_log_stream(config.bundle_id)
+    if proc is None:
+        print("For a physical device, use Console.app or Xcode > Devices and Simulators.")
+        sys.exit(1)
+    try:
+        proc.wait()
+    except KeyboardInterrupt:
+        print()
+        _terminate_subprocess(proc)
+        print("Stopped log streaming.")
 
 
 # ======================================================================
@@ -747,16 +888,35 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_preview.add_argument("--no-hot-reload", action="store_true", help="Disable file watching / Fast Refresh")
     parser_preview.set_defaults(func=preview_project)
 
+    parser_devices = subparsers.add_parser("devices", help="List devices, emulators, and simulators")
+    parser_devices.add_argument("platform", nargs="?", choices=["android", "ios"], help="Restrict to a platform")
+    parser_devices.set_defaults(func=devices_command)
+
     parser_run = subparsers.add_parser("run", help="Build, install, and launch on a device/simulator")
     parser_run.add_argument("platform", choices=["android", "ios"])
+    parser_run.add_argument(
+        "--device",
+        "-d",
+        help="Target device: an identifier or name from 'pn devices' "
+        "(physical iOS devices need [ios].development_team)",
+    )
     parser_run.add_argument("--prepare-only", action="store_true", help="Stage + configure without building")
     parser_run.add_argument("--hot-reload", action="store_true", help="Watch app/ and push updates to the running app")
     parser_run.add_argument("--no-logs", action="store_true", help="Don't stream device logs after launch")
     parser_run.set_defaults(func=run_project)
 
+    parser_logs = subparsers.add_parser("logs", help="Stream logs from the running app")
+    parser_logs.add_argument("platform", choices=["android", "ios"])
+    parser_logs.set_defaults(func=logs_command)
+
     parser_build = subparsers.add_parser("build", help="Build distributable artifacts")
     parser_build.add_argument("platform", choices=["android", "ios"])
     parser_build.add_argument("--debug", action="store_true", help="Build the debug variant instead of release")
+    parser_build.add_argument(
+        "--upload",
+        action="store_true",
+        help='Upload the iOS release build to App Store Connect (needs export_method = "app-store")',
+    )
     parser_build.set_defaults(func=build_project)
 
     parser_app_id = subparsers.add_parser("app-id", help="Print the resolved application/bundle id")

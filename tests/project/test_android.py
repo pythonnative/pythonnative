@@ -161,6 +161,25 @@ def test_configure_manifest_all_orientation_unset(template: Path, tmp_path: Path
     assert "screenOrientation" not in text
 
 
+def test_configure_manifest_deep_link_filter(template: Path, tmp_path: Path) -> None:
+    cfg = _config(tmp_path, app={"id": "com.acme.cool", "name": "cool", "url_schemes": ["coolapp", "cool2"]})
+    android.configure_manifest(template, cfg)
+    text = (template / "app" / "src" / "main" / "AndroidManifest.xml").read_text()
+    assert '<action android:name="android.intent.action.VIEW" />' in text
+    assert '<category android:name="android.intent.category.BROWSABLE" />' in text
+    assert '<data android:scheme="coolapp" />' in text
+    assert '<data android:scheme="cool2" />' in text
+    # The deep-link filter lives inside the activity element.
+    assert text.index("android.intent.action.VIEW") < text.index("</activity>")
+
+
+def test_configure_manifest_no_deep_links_by_default(template: Path, tmp_path: Path) -> None:
+    cfg = _config(tmp_path)
+    android.configure_manifest(template, cfg)
+    text = (template / "app" / "src" / "main" / "AndroidManifest.xml").read_text()
+    assert "android.intent.action.VIEW" not in text
+
+
 def test_configure_strings_escapes(template: Path, tmp_path: Path) -> None:
     cfg = _config(tmp_path)
     android.configure_strings(template, cfg)

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from .. import diagnostics
 from ..utils import IS_ANDROID, IS_IOS
 
 ImpactStyle = str  # "light" | "medium" | "heavy" | "soft" | "rigid"
@@ -86,7 +87,7 @@ class Vibration:
                 try:
                     vibrator.cancel()
                 except Exception:
-                    pass
+                    diagnostics.swallowed("haptics.Vibration.cancel")
 
 
 # ======================================================================
@@ -102,7 +103,7 @@ def _ios_impact(style: str) -> None:
         generator.prepare()
         generator.impactOccurred()
     except Exception:
-        pass
+        diagnostics.swallowed("haptics._ios_impact")
 
 
 def _ios_notification(type_: str) -> None:
@@ -113,7 +114,7 @@ def _ios_notification(type_: str) -> None:
         generator.prepare()
         generator.notificationOccurred_(_IOS_NOTIFICATION_TYPE.get(type_, 0))
     except Exception:
-        pass
+        diagnostics.swallowed("haptics._ios_notification")
 
 
 def _ios_selection() -> None:
@@ -124,7 +125,7 @@ def _ios_selection() -> None:
         generator.prepare()
         generator.selectionChanged()
     except Exception:
-        pass
+        diagnostics.swallowed("haptics._ios_selection")
 
 
 def _ios_legacy_vibrate() -> None:
@@ -134,7 +135,7 @@ def _ios_legacy_vibrate() -> None:
         audio = CDLL(util.find_library("AudioToolbox"))
         audio.AudioServicesPlaySystemSound(4095)  # kSystemSoundID_Vibrate
     except Exception:
-        pass
+        diagnostics.swallowed("haptics._ios_legacy_vibrate")
 
 
 # ======================================================================
@@ -177,4 +178,4 @@ def _android_buzz(duration_ms: int) -> None:
         else:
             vibrator.vibrate(int(duration_ms))
     except Exception:
-        pass
+        diagnostics.swallowed("haptics._android_buzz")

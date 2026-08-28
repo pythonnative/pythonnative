@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Callable, Dict, Optional
 
+from .. import diagnostics
 from ..runtime import resolve_future
 from ..utils import IS_ANDROID, IS_IOS
 
@@ -109,7 +110,9 @@ def _ios_launch_picker(on_result: Callable[[Optional[str]], None], source: str) 
                 try:
                     picker.dismissViewControllerAnimated_completion_(True, None)
                 except Exception:
-                    pass
+                    diagnostics.swallowed(
+                        "camera._ios_launch_picker._PNImagePickerDelegate.imagePickerController_didFinishPickingMediaWithInfo_"
+                    )
                 cb = self._callback
                 self._callback = None
                 _pending_delegates.pop(id(self), None)
@@ -117,14 +120,18 @@ def _ios_launch_picker(on_result: Callable[[Optional[str]], None], source: str) 
                     try:
                         cb(path)
                     except Exception:
-                        pass
+                        diagnostics.swallowed(
+                            "camera._ios_launch_picker._PNImagePickerDelegate.imagePickerController_didFinishPickingMediaWithInfo_"
+                        )
 
             @objc_method
             def imagePickerControllerDidCancel_(self, picker: Any) -> None:
                 try:
                     picker.dismissViewControllerAnimated_completion_(True, None)
                 except Exception:
-                    pass
+                    diagnostics.swallowed(
+                        "camera._ios_launch_picker._PNImagePickerDelegate.imagePickerControllerDidCancel_"
+                    )
                 cb = self._callback
                 self._callback = None
                 _pending_delegates.pop(id(self), None)
@@ -132,7 +139,9 @@ def _ios_launch_picker(on_result: Callable[[Optional[str]], None], source: str) 
                     try:
                         cb(None)
                     except Exception:
-                        pass
+                        diagnostics.swallowed(
+                            "camera._ios_launch_picker._PNImagePickerDelegate.imagePickerControllerDidCancel_"
+                        )
 
         delegate = _PNImagePickerDelegate.new()
         delegate._callback = on_result
@@ -170,7 +179,7 @@ def _ios_extract_path(info: Any) -> Optional[str]:
                 try:
                     return str(url.path)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("camera._ios_extract_path")
         image = info.objectForKey_("UIImagePickerControllerOriginalImage")
         if image is not None:
             return _ios_write_image_to_tmp(image)
@@ -293,13 +302,13 @@ def deliver_android_activity_result(request_code: int, result_code: int, data: A
                         if thumb is not None:
                             path = _android_write_bitmap_to_cache(thumb)
                 except Exception:
-                    pass
+                    diagnostics.swallowed("camera.deliver_android_activity_result")
     except Exception:
         path = None
     try:
         cb(path)
     except Exception:
-        pass
+        diagnostics.swallowed("camera.deliver_android_activity_result")
     return True
 
 

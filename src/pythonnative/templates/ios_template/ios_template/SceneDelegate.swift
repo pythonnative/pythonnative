@@ -2,18 +2,27 @@
 //  SceneDelegate.swift
 //  ios_template
 //
-//  Created by Owen Carey on 6/19/23.
+//  Creates the window programmatically and forwards scene-level events
+//  (deep links, foreground/background transitions) to the Python side.
 //
 
 import UIKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
-
     var window: UIWindow?
 
-
-    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+    func scene(
+        _ scene: UIScene,
+        willConnectTo session: UISceneSession,
+        options connectionOptions: UIScene.ConnectionOptions
+    ) {
         guard let windowScene = (scene as? UIWindowScene) else { return }
+        // A cold start from a deep link delivers the URL here, before
+        // Python is running; PythonRuntime buffers it and flushes after
+        // startup so Linking.get_initial_url() sees it.
+        for context in connectionOptions.urlContexts {
+            PythonRuntime.shared.deliverURL(context.url.absoluteString)
+        }
         let window = UIWindow(windowScene: windowScene)
         let root = ViewController()
         let nav = UINavigationController(rootViewController: root)
@@ -22,34 +31,36 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.makeKeyAndVisible()
     }
 
-    func sceneDidDisconnect(_ scene: UIScene) {
-        // Called as the scene is being released by the system.
-        // This occurs shortly after the scene enters the background, or when its session is discarded.
-        // Release any resources associated with this scene that can be re-created the next time the scene connects.
-        // The scene may re-connect later, as its session was not necessarily discarded (see `application:didDiscardSceneSessions` instead).
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        for context in URLContexts {
+            PythonRuntime.shared.deliverURL(context.url.absoluteString)
+        }
+    }
+
+    // MARK: - AppState forwarding
+
+    private func dispatchAppState(_ state: String) {
+        guard PythonRuntime.shared.started else { return }
+        PythonRuntime.shared.notify(
+            module: "pythonnative.native_modules.app_state", function: "dispatch_app_state", state
+        )
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
-        // Called when the scene has moved from an inactive state to an active state.
-        // Use this method to restart any tasks that were paused (or not yet started) when the scene was inactive.
+        dispatchAppState("active")
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
-        // Called when the scene will move from an active state to an inactive state.
-        // This may occur due to temporary interruptions (ex. an incoming phone call).
+        dispatchAppState("inactive")
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {
-        // Called as the scene transitions from the background to the foreground.
-        // Use this method to undo the changes made on entering the background.
+        dispatchAppState("inactive")
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {
-        // Called as the scene transitions from the foreground to the background.
-        // Use this method to save data, release shared resources, and store enough scene-specific state information
-        // to restore the scene back to its current state.
+        dispatchAppState("background")
     }
 
-
+    func sceneDidDisconnect(_ scene: UIScene) {}
 }
-

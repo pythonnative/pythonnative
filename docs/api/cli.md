@@ -15,10 +15,16 @@ the documented behavior never drifts from the code.
   with Fast Refresh, the fastest way to iterate on UI. Flags:
   `--width`, `--height`, `--title`, `--no-hot-reload`. See the
   [Desktop preview guide](../guides/desktop-preview.md).
+- `pn devices [android|ios]`: list connected devices, emulators, and
+  simulators with the identifiers `--device` accepts.
 - `pn run android|ios`: build and run on a connected device or
-  simulator. Flags: `--prepare-only`, `--hot-reload`, `--no-logs`.
+  simulator. Flags: `--device` (target a specific device by identifier
+  or name), `--prepare-only`, `--hot-reload`, `--no-logs`.
+- `pn logs android|ios`: stream logs from the running app without
+  rebuilding.
 - `pn build android|ios`: build distributable artifacts (release by
-  default). Flag: `--debug` for the debug variant. See
+  default). Flags: `--debug` for the debug variant, `--upload` to send
+  an iOS release build to App Store Connect. See
   [Building for release](../guides/building-for-release.md).
 - `pn app-id android|ios`: print the resolved application id (Android)
   or bundle id (iOS), handy for scripts and CI.

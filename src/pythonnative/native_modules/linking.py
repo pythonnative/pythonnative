@@ -4,27 +4,38 @@
 ``Intent(ACTION_VIEW)`` so a Python app can hand a URL (``https:``,
 ``mailto:``, ``tel:``, a custom scheme, …) to the OS.
 
-All methods are synchronous and return a ``bool`` describing whether
-the platform accepted the request. On desktop they return ``False``.
+Outbound methods are synchronous and return a ``bool`` describing
+whether the platform accepted the request. On desktop they return
+``False``.
+
+Inbound deep links flow the other way: declare your schemes in
+``pythonnative.toml`` (``app.url_schemes``) and the native host calls
+[`dispatch_url`][pythonnative.native_modules.linking.dispatch_url] for
+every URL that opens the app. The URL that cold-started the app is kept
+and returned by ``get_initial_url``; later URLs reach subscribers added
+with ``add_listener``.
 
 Example:
     ```python
     import pythonnative as pn
 
-    if pn.Linking.can_open_url("tel:+15551234567"):
-        pn.Linking.open_url("tel:+15551234567")
+    if url := pn.Linking.get_initial_url():
+        navigate_to(url)
+
+    unsubscribe = pn.Linking.add_listener(navigate_to)
     ```
 """
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Callable, List, Optional
 
 from ..utils import IS_ANDROID, IS_IOS
 
 # Populated by the native host when the app is launched from a deep
-# link; ``get_initial_url`` returns it once.
+# link; ``get_initial_url`` returns it.
 _initial_url: Optional[str] = None
+_url_listeners: List[Callable[[str], None]] = []
 
 
 class Linking:
@@ -62,11 +73,56 @@ class Linking:
         """Return the URL that launched the app, if any."""
         return _initial_url
 
+    @staticmethod
+    def add_listener(callback: Callable[[str], None]) -> Callable[[], None]:
+        """Subscribe to deep links that arrive while the app is running.
+
+        Args:
+            callback: Called with the full URL string for every inbound
+                deep link (including the initial one, which is
+                dispatched right after startup).
+
+        Returns:
+            A zero-arg function that unsubscribes when called.
+        """
+        _url_listeners.append(callback)
+
+        def _unsubscribe() -> None:
+            try:
+                _url_listeners.remove(callback)
+            except ValueError:
+                pass
+
+        return _unsubscribe
+
 
 def set_initial_url(url: Optional[str]) -> None:
     """Record the launch URL (called by the native host on cold start)."""
     global _initial_url
     _initial_url = url
+
+
+def dispatch_url(url: str) -> None:
+    """Deliver an inbound deep link from the native host.
+
+    The first URL ever dispatched is also recorded as the initial URL
+    (a cold start from a deep link reaches Python only after the
+    interpreter boots, so the host can't call ``set_initial_url``
+    earlier than this).
+
+    Args:
+        url: The full URL string that opened the app.
+    """
+    global _initial_url
+    if _initial_url is None:
+        _initial_url = url
+    for listener in list(_url_listeners):
+        try:
+            listener(url)
+        except Exception as exc:
+            from .. import diagnostics
+
+            diagnostics.warn(f"Linking listener raised while handling {url!r}: {exc!r}")
 
 
 # ======================================================================

@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Callable, Dict
 
+from .. import diagnostics
 from ..runtime import resolve_future
 from ..utils import IS_ANDROID, IS_IOS
 
@@ -141,7 +142,7 @@ def deliver_android_permission_result(request_code: int, permissions: Any, grant
     try:
         cb(status)
     except Exception:
-        pass
+        diagnostics.swallowed("permissions.deliver_android_permission_result")
     return True
 
 
@@ -215,7 +216,7 @@ def _ios_request(permission: str, on_done: Callable[[PermissionStatus], None]) -
             center.requestAuthorizationWithOptions_completionHandler_(0x07, Block(_notif_done, None, bool, object))
             return
     except Exception:
-        pass
+        diagnostics.swallowed("permissions._ios_request")
     # Fall back to reporting the current status for permissions whose
     # request flow isn't wired up natively (location needs a
     # CLLocationManager delegate; use the Location module's own

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List
 
+from .. import diagnostics
 from ..utils import IS_ANDROID, IS_IOS
 
 BatteryState = str  # "unknown" | "unplugged" | "charging" | "full"
@@ -62,7 +63,7 @@ def dispatch_battery(level: float, state: BatteryState) -> None:
         try:
             listener(dict(payload))
         except Exception:
-            pass
+            diagnostics.swallowed("battery.dispatch_battery")
 
 
 # ======================================================================
@@ -77,7 +78,7 @@ def _ios_device() -> object:
     try:
         device.setBatteryMonitoringEnabled_(True)
     except Exception:
-        pass
+        diagnostics.swallowed("battery._ios_device")
     return device
 
 

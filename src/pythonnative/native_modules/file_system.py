@@ -17,6 +17,7 @@ Example:
 import os
 from typing import Any, Optional
 
+from .. import diagnostics
 from ..utils import IS_ANDROID
 
 
@@ -49,7 +50,7 @@ class FileSystem:
 
                 return str(get_android_context().getFilesDir().getAbsolutePath())
             except Exception:
-                pass
+                diagnostics.swallowed("file_system.FileSystem.app_dir")
         else:
             try:
                 from rubicon.objc import ObjCClass
@@ -61,7 +62,7 @@ class FileSystem:
                 if docs and docs.count > 0:
                     return str(docs.objectAtIndex_(0).path)
             except Exception:
-                pass
+                diagnostics.swallowed("file_system.FileSystem.app_dir")
         return os.path.join(os.path.expanduser("~"), ".pythonnative_data")
 
     @staticmethod

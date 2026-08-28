@@ -215,6 +215,85 @@ def test_linking_initial_url() -> None:
     assert Linking.get_initial_url() == "myapp://launch"
 
 
+def test_linking_dispatch_url_notifies_listeners() -> None:
+    linking.set_initial_url(None)
+    received: list = []
+    unsubscribe = Linking.add_listener(received.append)
+    try:
+        linking.dispatch_url("myapp://one")
+        linking.dispatch_url("myapp://two")
+    finally:
+        unsubscribe()
+    linking.dispatch_url("myapp://after-unsubscribe")
+    assert received == ["myapp://one", "myapp://two"]
+    # The first dispatched URL doubles as the cold-start initial URL.
+    assert Linking.get_initial_url() == "myapp://one"
+    linking.set_initial_url(None)
+
+
+def test_linking_listener_errors_do_not_break_dispatch() -> None:
+    linking.set_initial_url(None)
+    received: list = []
+
+    def _bad(_url: str) -> None:
+        raise RuntimeError("boom")
+
+    unsub_bad = Linking.add_listener(_bad)
+    unsub_ok = Linking.add_listener(received.append)
+    try:
+        linking.dispatch_url("myapp://x")
+    finally:
+        unsub_bad()
+        unsub_ok()
+    assert received == ["myapp://x"]
+    linking.set_initial_url(None)
+
+
+# ======================================================================
+# Notifications: remote push registration
+# ======================================================================
+
+
+def test_get_device_token_none_on_desktop() -> None:
+    from pythonnative.native_modules.notifications import Notifications
+
+    assert asyncio.run(Notifications.get_device_token()) is None
+
+
+def test_dispatch_device_token_resolves_waiters() -> None:
+    from pythonnative.native_modules import notifications
+
+    async def scenario() -> str:
+        future: asyncio.Future = asyncio.get_running_loop().create_future()
+        notifications._token_waiters.append(future)
+        notifications.dispatch_device_token("aabbccdd")
+        return await future
+
+    try:
+        assert asyncio.run(scenario()) == "aabbccdd"
+        assert notifications._device_token == "aabbccdd"
+    finally:
+        notifications._device_token = None
+        notifications._device_token_error = None
+
+
+def test_dispatch_device_token_error_rejects_waiters() -> None:
+    from pythonnative.native_modules import notifications
+
+    async def scenario() -> None:
+        future: asyncio.Future = asyncio.get_running_loop().create_future()
+        notifications._token_waiters.append(future)
+        notifications.dispatch_device_token_error("no entitlement")
+        await future
+
+    try:
+        with pytest.raises(RuntimeError, match="no entitlement"):
+            asyncio.run(scenario())
+    finally:
+        notifications._device_token = None
+        notifications._device_token_error = None
+
+
 # ======================================================================
 # Share / Biometrics / Haptics (desktop no-ops)
 # ======================================================================

@@ -27,6 +27,11 @@ android {
         }
     }
 
+    buildFeatures {
+        // MainActivity gates dev-only behavior (hot reload) on BuildConfig.DEBUG.
+        buildConfig true
+    }
+
     buildTypes {
         release {
             minifyEnabled false

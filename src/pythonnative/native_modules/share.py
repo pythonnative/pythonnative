@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Callable, Dict, Optional
 
+from .. import diagnostics
 from ..runtime import resolve_future
 from ..utils import IS_ANDROID, IS_IOS
 
@@ -102,7 +103,7 @@ def _ios_share(
             try:
                 on_done(bool(completed))
             except Exception:
-                pass
+                diagnostics.swallowed("share._ios_share._completion")
 
         controller.setCompletionWithItemsHandler_(
             Block(_completion, None, ObjCClass("NSString"), Block, ObjCClass("NSArray"), ObjCClass("NSError"))
