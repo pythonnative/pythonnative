@@ -61,8 +61,17 @@ def _which_version(tool: str, version_args: List[str]) -> Optional[str]:
     return text[0] if text else path
 
 
+def _tkinter_available() -> bool:
+    """Return whether the host Python can import Tkinter."""
+    try:
+        import tkinter  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
 def check_common() -> List[CheckResult]:
-    """Run platform-agnostic checks (interpreter, Pillow).
+    """Run platform-agnostic checks (interpreter and optional dependencies).
 
     Returns:
         Check results for the host Python and optional dependencies.
@@ -87,6 +96,17 @@ def check_common() -> List[CheckResult]:
                 "Pillow (icon/splash generation)",
                 WARN,
                 "not installed; run: pip install 'pythonnative[build]'",
+            )
+        )
+    if _tkinter_available():
+        results.append(CheckResult("Tkinter (desktop preview)", OK))
+    else:
+        results.append(
+            CheckResult(
+                "Tkinter (desktop preview)",
+                WARN,
+                "not installed; macOS: brew install python-tk; Debian/Ubuntu: sudo apt-get install python3-tk; "
+                "Windows: reinstall Python with the 'tcl/tk' option checked",
             )
         )
     return results
