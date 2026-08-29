@@ -3152,8 +3152,9 @@
 </span></code></pre></div>
 <h2 id="create-a-project">Create a project<a class="headerlink" href="#create-a-project" title="Permanent link">&para;</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pn<span class="w"> </span>init<span class="w"> </span>MyApp
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>MyApp
 </span></code></pre></div>
-<p>This scaffolds:</p>
+<p>This creates a <code>MyApp/</code> directory containing:</p>
 <ul>
 <li><code>app/</code> with a minimal <code>main.py</code></li>
 <li><code>pythonnative.toml</code>: your project configuration (app id, version,
@@ -3161,6 +3162,8 @@
   <a href="../guides/configuration/">Configuration</a>.</li>
 <li><code>.gitignore</code></li>
 </ul>
+<p>Run <code>pn init</code> without a name to scaffold into the current directory
+instead, named after it.</p>
 <p>A minimal <code>app/main.py</code> looks like:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>

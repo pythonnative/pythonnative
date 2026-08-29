@@ -2883,6 +2883,50 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#refusing-to-overwrite-existing-non-empty-directory-my_app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refusing to overwrite existing non-empty directory: my_app/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refusing-to-overwrite-existing-file-my_app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refusing to overwrite existing file: my_app
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refusing-to-treat-a-path-as-a-project-name-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refusing to treat a path as a project name: '../app'
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refusing-to-scaffold-through-a-link-or-outside-the-current-directory-link" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refusing to scaffold through a link or outside the current directory: link
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#do-not-list-pythonnative-in-requirementspackages" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3297,6 +3341,50 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#refusing-to-overwrite-existing-non-empty-directory-my_app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refusing to overwrite existing non-empty directory: my_app/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refusing-to-overwrite-existing-file-my_app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refusing to overwrite existing file: my_app
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refusing-to-treat-a-path-as-a-project-name-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refusing to treat a path as a project name: '../app'
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refusing-to-scaffold-through-a-link-or-outside-the-current-directory-link" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refusing to scaffold through a link or outside the current directory: link
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#do-not-list-pythonnative-in-requirementspackages" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3659,6 +3747,26 @@ is finding a different Python. Reactivate the venv or run
 <h3 id="refusing-to-overwrite-existing-app-pythonnativetoml"><code>Refusing to overwrite existing: app/, pythonnative.toml, ...</code><a class="headerlink" href="#refusing-to-overwrite-existing-app-pythonnativetoml" title="Permanent link">&para;</a></h3>
 <p><code>pn init</code> won't clobber existing project files. Pass <code>--force</code> or
 remove the listed files first.</p>
+<h3 id="refusing-to-overwrite-existing-non-empty-directory-my_app"><code>Refusing to overwrite existing non-empty directory: my_app/</code><a class="headerlink" href="#refusing-to-overwrite-existing-non-empty-directory-my_app" title="Permanent link">&para;</a></h3>
+<p><code>pn init my_app</code> creates <code>my_app/</code> and scaffolds into it, so it stops
+when that directory already holds files. Pass <code>--force</code> to scaffold over
+it, choose a different name, or run <code>pn init</code> from inside the directory
+to use it as is. An existing but empty directory is fine.</p>
+<h3 id="refusing-to-overwrite-existing-file-my_app"><code>Refusing to overwrite existing file: my_app</code><a class="headerlink" href="#refusing-to-overwrite-existing-file-my_app" title="Permanent link">&para;</a></h3>
+<p>Something other than a directory is already at <code>./my_app</code>. <code>--force</code>
+won't help here, since <code>pn init</code> can't turn a file into a directory.
+Remove or rename it, or choose a different project name.</p>
+<h3 id="refusing-to-treat-a-path-as-a-project-name-app"><code>Refusing to treat a path as a project name: '../app'</code><a class="headerlink" href="#refusing-to-treat-a-path-as-a-project-name-app" title="Permanent link">&para;</a></h3>
+<p><code>pn init</code> takes a single directory name, not a path, so the project always
+lands inside the current directory. Pass a plain name like <code>my_app</code>, or
+<code>cd</code> to the directory you want the project in and run <code>pn init</code> with no
+name at all. <code>--force</code> doesn't lift this one.</p>
+<h3 id="refusing-to-scaffold-through-a-link-or-outside-the-current-directory-link"><code>Refusing to scaffold through a link or outside the current directory: link</code><a class="headerlink" href="#refusing-to-scaffold-through-a-link-or-outside-the-current-directory-link" title="Permanent link">&para;</a></h3>
+<p>The name resolves somewhere other than a directory directly inside the
+current one, so <code>pn init</code> stops rather than writing through it. A symlink
+at <code>./link</code> is the usual cause. Scaffold into a real directory, or <code>cd</code> to
+the directory the link points at and run <code>pn init</code> with no name. <code>--force</code>
+doesn't lift this one either.</p>
 <h3 id="do-not-list-pythonnative-in-requirementspackages"><code>Do not list 'pythonnative' in [requirements].packages</code><a class="headerlink" href="#do-not-list-pythonnative-in-requirementspackages" title="Permanent link">&para;</a></h3>
 <p>The CLI bundles the installed <code>pythonnative</code> package directly into
 your app, so listing it in <code>[requirements].packages</code> would install a

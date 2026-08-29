@@ -3244,8 +3244,10 @@ the documented behavior never drifts from the code.</p>
 <h2 id="subcommands">Subcommands<a class="headerlink" href="#subcommands" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>pn init [name]</code>: scaffold a new project (creates <code>app/</code>,
-  <code>pythonnative.toml</code>, <code>.gitignore</code>). Flag: <code>--force</code> to overwrite
-  existing files. See <a href="../../guides/configuration/">Configuration</a>.</li>
+  <code>pythonnative.toml</code>, <code>.gitignore</code>). With a name it creates <code>./&lt;name&gt;/</code>
+  and scaffolds into it; without one it uses the current directory.
+  Flag: <code>--force</code> to overwrite existing files or scaffold into a
+  non-empty directory. See <a href="../../guides/configuration/">Configuration</a>.</li>
 <li><code>pn doctor [android|ios]</code>: diagnose the local toolchain and validate
   <code>pythonnative.toml</code>. Exits non-zero when something will block a build.</li>
 <li><code>pn preview [component]</code>: render the app in a desktop (Tkinter) window
@@ -3279,7 +3281,9 @@ the documented behavior never drifts from the code.</p>
         <p><code>pn</code> CLI: scaffold, diagnose, preview, run, and build PythonNative apps.</p>
 <p>The console script <code>pn</code> (declared in <code>pyproject.toml</code>) dispatches to:</p>
 <ul>
-<li><code>pn init [name]</code>: scaffold a new project (<code>pythonnative.toml</code> + <code>app/</code>).</li>
+<li><code>pn init [name]</code>: scaffold a new project (<code>pythonnative.toml</code> +
+  <code>app/</code>) into <code>./name/</code>, or into the current directory when no name
+  is given.</li>
 <li><code>pn doctor [platform]</code>: diagnose the local toolchain and config.</li>
 <li><code>pn preview [component]</code>: render the app in a desktop (Tkinter) window
   with Fast Refresh, the fast inner dev loop, no device required.</li>
@@ -3324,7 +3328,7 @@ reload) that can't be unit tested.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;init_project&lt;/span&gt; (&lt;code&gt;pythonnative.cli.pn.init_project&lt;/code&gt;)" href="#pythonnative.cli.pn.init_project">init_project</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Scaffold a new PythonNative project in the current directory.</p>
+                  <p>Scaffold a new PythonNative project.</p>
                 </div>
               </td>
             </tr>
@@ -3484,9 +3488,20 @@ reload) that can't be unit tested.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Scaffold a new PythonNative project in the current directory.</p>
-<p>Creates <code>app/main.py</code>, <code>pythonnative.toml</code>, and <code>.gitignore</code>.
-Refuses to overwrite existing files unless <code>--force</code> is passed.</p>
+        <p>Scaffold a new PythonNative project.</p>
+<p>Given a name, this creates <code>./&lt;name&gt;/</code> and scaffolds into it. Without
+one, it scaffolds into the current directory and names the project after
+it. Either way it writes <code>app/main.py</code>, <code>pythonnative.toml</code>, and
+<code>.gitignore</code>.</p>
+<p>The name has to be a single directory name, so the project always lands
+inside the current directory. Anything that reads as a path, such as
+<code>a/b</code>, <code>..</code>, or <code>/tmp/app</code>, is refused, and so is a name that
+resolves somewhere else, such as a symlink to another directory.</p>
+<p>It won't scaffold into a target directory that already holds files, and it
+won't overwrite any of the three paths above; pass <code>--force</code> to override
+both. An existing but empty target directory is fine. A plain file at
+<code>./&lt;name&gt;</code> is always refused, since <code>--force</code> can't turn it into a
+directory, and <code>--force</code> lifts neither of the rules above.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
