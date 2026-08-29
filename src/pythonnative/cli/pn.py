@@ -34,6 +34,7 @@ import shutil
 import subprocess
 import sys
 import time
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -863,6 +864,12 @@ def _run_hot_reload(
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pn", description="PythonNative CLI")
+    parser.add_argument(
+        "--version",
+        "-V",
+        action="version",
+        version=f"pn {pkg_version('pythonnative')}",
+    )
     subparsers = parser.add_subparsers()
 
     parser_init = subparsers.add_parser("init", help="Scaffold a new project")

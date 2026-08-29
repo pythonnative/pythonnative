@@ -17,6 +17,20 @@ def run_pn(args: List[str], cwd: str) -> "subprocess.CompletedProcess[str]":
     return subprocess.run(cmd, cwd=cwd, check=False, capture_output=True, text=True)
 
 
+def test_cli_version(tmp_path: Path) -> None:
+    result = run_pn(["--version"], str(tmp_path))
+
+    assert result.returncode == 0
+    assert result.stdout.strip().startswith("pn ")
+
+
+def test_cli_short_version_flag(tmp_path: Path) -> None:
+    result = run_pn(["-V"], str(tmp_path))
+
+    assert result.returncode == 0
+    assert result.stdout.strip().startswith("pn ")
+
+
 def test_cli_init_and_clean() -> None:
     tmpdir = tempfile.mkdtemp(prefix="pn_cli_test_")
     try:
