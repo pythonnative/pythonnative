@@ -39,8 +39,9 @@ pytestmark = pytest.mark.skipif(
     reason=f"tkinter unavailable: {_DESKTOP_IMPORT_ERROR!r}",
 )
 
-# The 25 built-in element types every platform backend must service.
+# The 26 built-in element types every platform backend must service.
 _EXPECTED_TYPES = {
+    "VirtualList",
     "View",
     "Column",
     "Row",
@@ -161,6 +162,66 @@ def test_is_bold(props: dict, expected: bool) -> None:
 
 
 # ======================================================================
+# Per-corner radii + hit_slop helpers (headless)
+# ======================================================================
+
+
+@pytest.mark.parametrize(
+    ("props", "expected"),
+    [
+        ({}, (0.0, 0.0, 0.0, 0.0)),
+        ({"border_radius": 8}, (8.0, 8.0, 8.0, 8.0)),
+        ({"border_radius": 8, "border_top_left_radius": 2}, (2.0, 8.0, 8.0, 8.0)),
+        ({"border_bottom_right_radius": 5}, (0.0, 0.0, 5.0, 0.0)),
+        ({"border_radius": -4}, (0.0, 0.0, 0.0, 0.0)),
+        ({"border_radius": None, "border_top_right_radius": 6}, (0.0, 6.0, 0.0, 0.0)),
+    ],
+)
+def test_corner_radii(props: dict, expected: tuple) -> None:
+    # Order is (top-left, top-right, bottom-right, bottom-left).
+    assert desktop_backend._corner_radii(props) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (8, (8.0, 8.0, 8.0, 8.0)),
+        (None, (0.0, 0.0, 0.0, 0.0)),
+        ({"top": 4, "right": 6}, (4.0, 0.0, 0.0, 6.0)),
+        ({"top": -3}, (0.0, 0.0, 0.0, 0.0)),
+    ],
+)
+def test_parse_hit_slop(value: Any, expected: tuple) -> None:
+    # Order is (top, left, bottom, right).
+    assert desktop_backend._parse_hit_slop(value) == expected
+
+
+def test_within_hit_rect_expands_frame_by_slop() -> None:
+    from types import SimpleNamespace
+
+    widget = SimpleNamespace(_pn_frame=(0.0, 0.0, 100.0, 40.0), _pn_hit_slop=(10.0, 10.0, 10.0, 10.0))
+    assert desktop_backend._within_hit_rect(widget, 50.0, 20.0)
+    assert desktop_backend._within_hit_rect(widget, -10.0, -10.0)
+    assert desktop_backend._within_hit_rect(widget, 110.0, 50.0)
+    assert not desktop_backend._within_hit_rect(widget, -11.0, 20.0)
+    assert not desktop_backend._within_hit_rect(widget, 50.0, 51.0)
+
+    plain = SimpleNamespace(_pn_frame=(0.0, 0.0, 100.0, 40.0))
+    assert desktop_backend._within_hit_rect(plain, 100.0, 40.0)
+    assert not desktop_backend._within_hit_rect(plain, 101.0, 40.0)
+
+
+def test_rounded_rect_points_clamps_overlapping_radii() -> None:
+    # Radii larger than the box collapse proportionally instead of
+    # producing a self-intersecting polygon.
+    points = desktop_backend._rounded_rect_points(20.0, 20.0, (40.0, 40.0, 40.0, 40.0))
+    xs = points[0::2]
+    ys = points[1::2]
+    assert min(xs) >= 0.0 and max(xs) <= 20.0
+    assert min(ys) >= 0.0 and max(ys) <= 20.0
+
+
+# ======================================================================
 # Platform.select desktop branch (headless)
 # ======================================================================
 
@@ -268,6 +329,104 @@ _BACKEND_SCRIPT = """
 @requires_display
 def test_backend_mount_layout_and_measure(tmp_path: Any) -> None:
     _run_gui_script(tmp_path, "backend_script.py", _BACKEND_SCRIPT, "BACKEND_OK")
+
+
+# ======================================================================
+# New surface: rounded corners, animated colors, VirtualList
+# ======================================================================
+
+_SURFACE_SCRIPT = """
+    import tkinter as tk
+    import pythonnative as pn
+    from pythonnative.native_views import get_registry
+    from pythonnative.native_views import desktop as dk
+
+    root = tk.Tk(); root.withdraw()
+    stage = tk.Frame(root); stage.place(x=0, y=0, width=390, height=844)
+    dk.set_root_container(stage)
+    reg = get_registry()
+
+    # Rounded corners: a Frame-based view with radius props grows a
+    # Canvas child painting the rounded background and border.
+    flex = reg.handler_for("View")
+    box = flex.create(9001, {
+        "background_color": "#ff0000",
+        "border_radius": 12,
+        "border_top_left_radius": 2,
+        "border_width": 2,
+        "border_color": "#00ff00",
+    })
+    flex.set_frame(box, 10, 10, 120, 60)
+    root.update_idletasks()
+    canvas = box._pn_radius_canvas
+    assert isinstance(canvas, tk.Canvas), canvas
+    assert len(canvas.find_all()) == 1, canvas.find_all()
+    state = box._pn_radius_state
+    assert state["fill"] == "#ff0000" and state["outline"] == "#00ff00", state
+    assert state["radii"] == (2.0, 12.0, 12.0, 12.0), state["radii"]
+    assert int(str(box.cget("highlightthickness"))) == 0
+
+    # Animated color frames route into the rounded canvas fill.
+    flex.set_animated_property(box, "background_color", "#803366aa")
+    assert box._pn_radius_state["fill"] == "#3366aa"
+
+    # Radius removed: the canvas is dropped and the plain background /
+    # highlight border path takes over again.
+    flex.update(box, {"border_radius": None, "border_top_left_radius": None})
+    assert box._pn_radius_canvas is None
+    assert str(box.cget("background")) == "#ff0000"
+    assert int(str(box.cget("highlightthickness"))) == 2
+
+    # Plain widgets: animated colors accept "#AARRGGBB" strings.
+    plain = flex.create(9002, {})
+    flex.set_animated_property(plain, "background_color", "#FF112233")
+    assert str(plain.cget("background")) == "#112233"
+    text_h = reg.handler_for("Text")
+    lbl = text_h.create(9003, {"text": "x"})
+    text_h.set_animated_property(lbl, "color", "#80FF0000")
+    assert str(lbl.cget("foreground")).lower() == "#ff0000"
+
+    # hit_slop parses onto the widget for press tracking.
+    press_h = reg.handler_for("Pressable")
+    press = press_h.create(9005, {"hit_slop": 10})
+    assert press._pn_hit_slop == (10.0, 10.0, 10.0, 10.0)
+
+    # VirtualList: lazy row window plus the native command contract.
+    vh = reg.handler_for("VirtualList")
+    made = []
+    def render_row(i):
+        made.append(i)
+        return pn.Text("row %d" % i)
+    lst = vh.create(9004, {"count": 100, "row_height": 40.0, "render_row": render_row})
+    vh.set_frame(lst, 0, 0, 390, 400)
+    root.update_idletasks()
+    cells = lst._pn_vl["cells"]
+    assert 0 in cells and len(cells) < 100, sorted(cells)
+    assert max(cells) <= 30, sorted(cells)  # about three 400pt viewports of 40pt rows
+    assert vh.command(lst, "get_scroll_offset", {}) == {"x": 0.0, "y": 0.0}
+
+    vh.command(lst, "scroll_to_index", {"index": 50})
+    assert vh.command(lst, "get_scroll_offset", {})["y"] == 50 * 40.0
+    assert 50 in lst._pn_vl["cells"], sorted(lst._pn_vl["cells"])
+
+    vh.command(lst, "scroll_to_end", {})
+    assert vh.command(lst, "get_scroll_offset", {})["y"] == 100 * 40.0 - 400.0
+    assert 99 in lst._pn_vl["cells"], sorted(lst._pn_vl["cells"])
+
+    vh.command(lst, "scroll_to_offset", {"y": 0.0})
+    assert 0 in lst._pn_vl["cells"] and made, sorted(lst._pn_vl["cells"])
+
+    vh.destroy(lst)
+    assert lst._pn_vl["cells"] == {}
+
+    root.destroy()
+    print("SURFACE_OK")
+"""
+
+
+@requires_display
+def test_rounded_corners_colors_and_virtual_list(tmp_path: Any) -> None:
+    _run_gui_script(tmp_path, "surface_script.py", _SURFACE_SCRIPT, "SURFACE_OK", desktop_env=True)
 
 
 # ======================================================================

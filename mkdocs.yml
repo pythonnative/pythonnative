@@ -101,6 +101,7 @@ nav:
     - Forms: examples/forms.md
     - Lists: examples/lists.md
     - Navigation: examples/navigation.md
+    - Collapsing Header & Bottom Sheet: examples/collapsing-header.md
   - API Reference:
     - Package: api/pythonnative.md
     - Components: api/components.md

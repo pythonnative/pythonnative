@@ -234,6 +234,7 @@ Every element accepts these visual props in `style`:
 | Prop | Value |
 |---|---|
 | `border_radius` | number (uniform) |
+| `border_top_left_radius`, `border_top_right_radius`, `border_bottom_left_radius`, `border_bottom_right_radius` | number (per corner) |
 | `border_width` | number (in pt / dp) |
 | `border_color` | hex string |
 | `border_left_width`, `border_top_width`, `border_right_width`, `border_bottom_width` | number (per side) |
@@ -245,6 +246,21 @@ Every element accepts these visual props in `style`:
 | `elevation` | number (Android Material shadow shorthand) |
 | `opacity` | 0.0 – 1.0 |
 | `tint_color` | hex string (Image only) |
+
+Per-corner radius props override the uniform `border_radius` for the
+corners they name, so a "speech bubble" or "top-rounded sheet" shape
+needs no images:
+
+```python
+pn.View(
+    content,
+    style={
+        "border_top_left_radius": 16,
+        "border_top_right_radius": 16,
+        "background_color": "#FFFFFF",
+    },
+)
+```
 
 Per-side border props override the uniform `border_width` /
 `border_color` for the sides they name, so an "underline" card is
@@ -339,6 +355,10 @@ All components accept these in `style`:
 - `position`: `"relative"` (default) or `"absolute"`.
 - `top`, `right`, `bottom`, `left`: edge offsets when
   `position: "absolute"` (number or percentage string).
+- `z_index`: stacking order among siblings. Higher values render on
+  top regardless of declaration order; siblings without one keep
+  document order. Essential for absolutely positioned overlays like
+  collapsing headers and floating action buttons.
 
 ### Layout examples
 
@@ -454,6 +474,67 @@ pn.Row(
 - `padding: {"horizontal": 12, "vertical": 8}`: per axis.
 - `padding: {"left": 8, "top": 16, "right": 8, "bottom": 16}`: per
   side.
+
+## Interaction surface
+
+A few props shape how views participate in touch handling and layout
+measurement.
+
+### `pointer_events`
+
+The `pointer_events` style key controls whether a view (and its
+subtree) takes part in hit testing:
+
+- `"auto"` (default): normal hit testing.
+- `"none"`: the view and its children are invisible to touches;
+  taps pass through to whatever is underneath.
+- `"box_none"`: the view itself ignores touches but its children
+  still receive them, the right setting for full-screen overlay
+  containers that host a few interactive widgets.
+- `"box_only"`: the view receives touches but its children don't.
+
+```python
+pn.View(
+    style=[pn.StyleSheet.absolute_fill(), {
+        "background_color": "#00000022",
+        "pointer_events": "none",   # decorative scrim; taps pass through
+    }],
+)
+```
+
+### `hit_slop`
+
+`hit_slop` expands a pressable area beyond the view's visual bounds,
+so small controls stay comfortably tappable. Pass a number for a
+uniform expansion or a dict with `top` / `left` / `bottom` / `right`:
+
+```python
+pn.Pressable(
+    pn.Image(source="close.png", style={"width": 16, "height": 16}),
+    on_press=dismiss,
+    hit_slop=12,   # 40 x 40 effective target
+)
+```
+
+`View`, `Column`, `Row`, and `Pressable` all accept it.
+
+### `on_layout`
+
+The `on_layout` prop reports the element's computed frame after each
+layout pass in which it changed. The payload carries `x`, `y`,
+`width`, and `height` in the parent's coordinate space:
+
+```python
+def handle_layout(frame):
+    set_width(frame["width"])
+
+pn.View(content, on_layout=handle_layout)
+```
+
+The callback runs post-commit, so setting state inside it is safe and
+schedules a normal re-render. Use it for measure-then-position
+patterns (tooltips, anchored popovers) or container-driven item
+sizing.
 
 ## Dark mode and theming
 

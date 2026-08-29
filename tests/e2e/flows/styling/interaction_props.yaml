@@ -1,0 +1,26 @@
+# Tests pointer_events="none" pass-through and hit_slop taps.
+#
+# Demo screen: examples/e2e-suite/app/screens/styling/interaction_props.py
+# Source under test: src/pythonnative/style.py :: pointer_events, z_index,
+#   per-corner radii; src/pythonnative/components.py :: hit_slop
+#
+# The per-corner radius and z_index sections are visual-only; the two
+# counters are the functional assertions. Tapping the button must work
+# even though a pointer_events="none" overlay fully covers it.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Styling
+      DEMO_TITLE: Interaction props
+- assertVisible: "Through taps: 0"
+- tapOn: "Tap through overlay"
+- assertVisible: "Through taps: 1"
+- assertVisible: "Slop taps: 0"
+- tapOn: "Slop target"
+- assertVisible: "Slop taps: 1"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Styling

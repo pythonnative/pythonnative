@@ -3,8 +3,10 @@
 [`NetInfo`][pythonnative.NetInfo] reports whether the device is online
 and over what kind of connection. ``fetch`` returns a snapshot dict;
 ``add_listener`` (and the [`use_net_info`][pythonnative.use_net_info]
-hook) deliver live updates as the native host forwards connectivity
-changes through
+hook) deliver live updates: while at least one listener is subscribed,
+a lightweight background watcher polls the platform's connectivity
+state and dispatches a fresh snapshot whenever it changes. Native
+hosts may also push changes directly through
 [`dispatch_net_info`][pythonnative.native_modules.net_info.dispatch_net_info].
 
 A snapshot looks like::
@@ -17,7 +19,8 @@ A snapshot looks like::
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List
+import threading
+from typing import Callable, Dict, List, Optional
 
 from .. import diagnostics
 from ..hooks import use_effect, use_state
@@ -31,6 +34,11 @@ _last_state: NetInfoState = {
     "type": "unknown",
     "is_internet_reachable": True,
 }
+
+# Background watcher driving live updates while listeners exist.
+_WATCH_INTERVAL_S = 2.0
+_watcher_lock = threading.Lock()
+_watcher_stop: Optional[threading.Event] = None
 
 
 class NetInfo:
@@ -48,16 +56,58 @@ class NetInfo:
 
     @staticmethod
     def add_listener(callback: Callable[[NetInfoState], None]) -> Callable[[], None]:
-        """Subscribe to connectivity changes; returns an unsubscribe fn."""
+        """Subscribe to connectivity changes; returns an unsubscribe fn.
+
+        The first subscription starts a background watcher that polls
+        the platform connectivity state every couple of seconds and
+        dispatches a snapshot on change; the watcher stops when the
+        last listener unsubscribes.
+        """
         _listeners.append(callback)
+        _ensure_watcher()
 
         def _unsubscribe() -> None:
             try:
                 _listeners.remove(callback)
             except ValueError:
                 pass
+            if not _listeners:
+                _stop_watcher()
 
         return _unsubscribe
+
+
+def _ensure_watcher() -> None:
+    """Start the connectivity watcher if a platform backend exists."""
+    global _watcher_stop
+    if not (IS_ANDROID or IS_IOS):
+        return
+    with _watcher_lock:
+        if _watcher_stop is not None:
+            return
+        stop = threading.Event()
+        _watcher_stop = stop
+
+    def _watch() -> None:
+        previous = dict(_last_state)
+        while not stop.wait(_WATCH_INTERVAL_S):
+            try:
+                current = _android_state() if IS_ANDROID else _ios_state()
+            except Exception:
+                continue
+            if current != previous:
+                previous = dict(current)
+                dispatch_net_info(current)
+
+    threading.Thread(target=_watch, daemon=True, name="pn-netinfo").start()
+
+
+def _stop_watcher() -> None:
+    global _watcher_stop
+    with _watcher_lock:
+        if _watcher_stop is not None:
+            _watcher_stop.set()
+            _watcher_stop = None
 
 
 def dispatch_net_info(state: NetInfoState) -> None:
@@ -69,6 +119,25 @@ def dispatch_net_info(state: NetInfoState) -> None:
             listener(dict(state))
         except Exception:
             diagnostics.swallowed("net_info.dispatch_net_info")
+
+
+def dispatch_android_change() -> None:
+    """Re-read Android connectivity and notify listeners on change.
+
+    Called by the template's ``MainActivity`` from the
+    ``ConnectivityManager.NetworkCallback`` it registers via
+    ``registerDefaultNetworkCallback`` whenever the default network
+    appears, drops, or changes capabilities. The callback lives in
+    Kotlin because Chaquopy's ``dynamic_proxy`` implements interfaces
+    only and ``NetworkCallback`` is a class. Re-reading the snapshot
+    here keeps the transport-type mapping in one place, and identical
+    consecutive snapshots are dropped so paired ``onAvailable`` /
+    ``onCapabilitiesChanged`` callbacks don't double-notify.
+    """
+    state = _android_state()
+    if state == _last_state:
+        return
+    dispatch_net_info(state)
 
 
 def use_net_info() -> NetInfoState:

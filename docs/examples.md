@@ -13,6 +13,7 @@ project scaffolded with `pn init`.
 | [Forms](examples/forms.md) | `TextInput`, controlled inputs, validation, submit. |
 | [Lists](examples/lists.md) | `FlatList`, keyed children, dynamic rendering. |
 | [Navigation](examples/navigation.md) | Stack, tab, and drawer navigators side-by-side. |
+| [Collapsing header & bottom sheet](examples/collapsing-header.md) | Scroll-driven animation, `Animated.event`, gestures, and stacking. |
 
 ## Working from a project
 

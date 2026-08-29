@@ -14,20 +14,38 @@ is forwarded through
 view's reconciler-assigned tag.
 
 **Layout** is owned by the pure-Python flex engine in
-`pythonnative.layout`: container handlers create plain `UIView`s, the
-engine computes per-child frames in points, and
+`pythonnative.layout`: container handlers create hit-test-aware
+``UIView`` subclasses (see ``_PNInteractiveViewCTypes``), the engine
+computes per-child frames in points, and
 [`set_frame`][pythonnative.native_views.ios.IOSViewHandler.set_frame]
 applies those frames via UIKit's classic ``frame`` property (with Auto
 Layout disabled).
 
 **Gestures** attach real ``UIGestureRecognizer`` instances (pan, pinch,
-rotation, tap, long-press, swipe) configured from the serialized
-gesture specs, so recognition runs fully natively.
+rotation, tap, long-press, swipe, fling) configured from the
+serialized gesture specs, so recognition runs fully natively. The
+composition metadata emitted by
+[`serialize_gestures`][pythonnative.gestures.serialize_gestures] is
+honored natively too: the shared delegate answers
+``shouldRecognizeSimultaneously...`` from each spec's
+``"simultaneous"`` set, and ``"wait_for"`` relationships map onto
+``requireGestureRecognizerToFail:``.
+
+**Interaction props**: ``pointer_events`` and ``hit_slop`` are
+implemented by overriding ``pointInside:withEvent:`` and
+``hitTest:withEvent:`` on the container subclass; ``z_index`` maps to
+``layer.zPosition``. Per-corner radii (``border_top_left_radius`` and
+friends) use ``layer.maskedCorners`` when one radius is shared and a
+``CAShapeLayer`` mask when radii differ.
 
 **Animations**: ``timing`` and ``spring`` specs are driven by UIKit
 block animations with completion callbacks reported back through
 ``pythonnative.animated.native_animation_completed``; ``decay`` falls
-back to the Python ticker.
+back to the Python ticker. Python-driven frames arriving through
+``set_animated_property`` accept floats for opacity and transform
+channels, numeric degrees for ``rotate``, and ``"#RRGGBB"`` /
+``"#AARRGGBB"`` strings for ``background_color`` and ``color``;
+unknown properties are ignored.
 
 This module is only imported on iOS at runtime. Desktop tests inject a
 mock registry via
@@ -205,6 +223,10 @@ _add_method = _libobjc.class_addMethod
 _add_method.restype = _ct.c_bool
 _add_method.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_char_p]
 
+_get_method_imp = _libobjc.class_getMethodImplementation
+_get_method_imp.restype = _ct.c_void_p
+_get_method_imp.argtypes = [_ct.c_void_p, _ct.c_void_p]
+
 _objc_msgSend = _libobjc.objc_msgSend
 
 _SEL_ALLOC = _sel_reg(b"alloc")
@@ -226,6 +248,11 @@ _SEL_TEXT_VIEW_DID_END = _sel_reg(b"textViewDidEndEditing:")
 _SEL_TEXT_VIEW_DID_CHANGE = _sel_reg(b"textViewDidChange:")
 
 _NS_OBJECT_CLS = _get_cls(b"NSObject")
+_UIVIEW_CLS = _get_cls(b"UIView")
+
+
+class _PNCGPoint(_ct.Structure):
+    _fields_ = [("x", _ct.c_double), ("y", _ct.c_double)]
 
 
 # ======================================================================
@@ -420,6 +447,141 @@ def _clamp_layer_corner_radius(layer: Any, width: float, height: float) -> None:
         layer.setCornerRadius_(min(requested, max_radius))
     except Exception:
         diagnostics.swallowed("ios._clamp_layer_corner_radius")
+
+
+# ----------------------------------------------------------------------
+# Per-corner radii
+# ----------------------------------------------------------------------
+#
+# When every rounded corner shares one radius the cheap path applies:
+# ``layer.cornerRadius`` restricted to the rounded corners through
+# ``layer.maskedCorners``. When the radii differ, UIKit has no direct
+# API, so the view's layer gets a ``CAShapeLayer`` mask built from a
+# ``UIBezierPath`` with one arc per corner; the mask depends on the
+# view's bounds, so ``set_frame`` rebuilds it on every frame change via
+# ``_update_corner_mask``.
+
+# Order matches ``_MASKED_CORNER_BITS``: top-left, top-right,
+# bottom-left, bottom-right.
+_CORNER_RADIUS_KEYS = (
+    "border_top_left_radius",
+    "border_top_right_radius",
+    "border_bottom_left_radius",
+    "border_bottom_right_radius",
+)
+# CACornerMask bits: kCALayerMinXMinYCorner (top-left) = 1,
+# MaxXMinY (top-right) = 2, MinXMaxY (bottom-left) = 4,
+# MaxXMaxY (bottom-right) = 8.
+_MASKED_CORNER_BITS = (1, 2, 4, 8)
+_ALL_MASKED_CORNERS = 15
+
+# id(view) -> (tl, tr, bl, br) radii for views on the shape-mask path.
+_pn_corner_radii_map: dict = {}
+
+
+def _apply_corner_radii(view: Any, merged: Dict[str, Any]) -> None:
+    """Apply per-corner radii from the *merged* prop set.
+
+    Unspecified corners inherit the uniform ``border_radius`` (else 0),
+    matching the Android backend. With every per-corner key absent the
+    entry is dropped and the uniform path owns the corners again.
+    """
+    if not any(merged.get(k) is not None for k in _CORNER_RADIUS_KEYS):
+        if _pn_corner_radii_map.pop(id(view), None) is not None:
+            try:
+                view.layer.setMask_(None)
+                view.layer.setMaskedCorners_(_ALL_MASKED_CORNERS)
+            except Exception:
+                diagnostics.swallowed("ios._apply_corner_radii")
+            _apply_view_border(view, merged)
+        return
+    base = float(merged.get("border_radius") or 0.0)
+    radii = tuple(
+        max(0.0, _safe_finite(merged[k], base)) if merged.get(k) is not None else max(0.0, base)
+        for k in _CORNER_RADIUS_KEYS
+    )
+    distinct = {r for r in radii if r > 0.0}
+    if len(distinct) <= 1:
+        # One shared radius (or all zero): plain cornerRadius limited
+        # to the rounded corners.
+        _pn_corner_radii_map.pop(id(view), None)
+        value = distinct.pop() if distinct else 0.0
+        mask = 0
+        for bit, r in zip(_MASKED_CORNER_BITS, radii):
+            if r > 0.0:
+                mask |= bit
+        try:
+            view.layer.setMask_(None)
+            view.layer.setCornerRadius_(value)
+            view.layer.setMaskedCorners_(mask if mask else _ALL_MASKED_CORNERS)
+            view.layer.setMasksToBounds_(True)
+        except Exception:
+            diagnostics.swallowed("ios._apply_corner_radii")
+        # Route the shared value through the frame-time pill clamp.
+        _pn_view_border_radius_map[id(view)] = value
+        return
+    # Differing radii: shape-layer mask, rebuilt at frame time.
+    _pn_view_border_radius_map.pop(id(view), None)
+    _pn_corner_radii_map[id(view)] = radii
+    try:
+        view.layer.setCornerRadius_(0.0)
+        view.layer.setMaskedCorners_(_ALL_MASKED_CORNERS)
+    except Exception:
+        diagnostics.swallowed("ios._apply_corner_radii")
+    try:
+        bounds = view.bounds
+        w = float(bounds.size.width)
+        h = float(bounds.size.height)
+        if w > 0.0 and h > 0.0:
+            _update_corner_mask(view, w, h)
+    except Exception:
+        diagnostics.swallowed("ios._apply_corner_radii")
+
+
+def _update_corner_mask(view: Any, width: float, height: float) -> None:
+    """(Re)build the CAShapeLayer corner mask for the current bounds."""
+    radii = _pn_corner_radii_map.get(id(view))
+    if radii is None or width <= 0.0 or height <= 0.0:
+        return
+    tl, tr, bl, br = radii
+    # CSS-style scaling so adjacent radii never overlap along an edge.
+    scale = 1.0
+    for pair_sum, extent in ((tl + tr, width), (bl + br, width), (tl + bl, height), (tr + br, height)):
+        if pair_sum > extent > 0.0:
+            scale = min(scale, extent / pair_sum)
+    tl, tr, bl, br = (r * scale for r in radii)
+    try:
+        path = ObjCClass("UIBezierPath").bezierPath()
+        half_pi = math.pi / 2.0
+        path.moveToPoint_((tl, 0.0))
+        path.addLineToPoint_((width - tr, 0.0))
+        if tr > 0.0:
+            path.addArcWithCenter_radius_startAngle_endAngle_clockwise_((width - tr, tr), tr, -half_pi, 0.0, True)
+        path.addLineToPoint_((width, height - br))
+        if br > 0.0:
+            path.addArcWithCenter_radius_startAngle_endAngle_clockwise_(
+                (width - br, height - br), br, 0.0, half_pi, True
+            )
+        path.addLineToPoint_((bl, height))
+        if bl > 0.0:
+            path.addArcWithCenter_radius_startAngle_endAngle_clockwise_((bl, height - bl), bl, half_pi, math.pi, True)
+        path.addLineToPoint_((0.0, tl))
+        if tl > 0.0:
+            path.addArcWithCenter_radius_startAngle_endAngle_clockwise_(
+                (tl, tl), tl, math.pi, math.pi + half_pi, True
+            )
+        path.closePath()
+        # On raw-registered outbound wrappers rubicon sometimes resolves
+        # ``CGPath`` as a bound method rather than a property.
+        cgpath = path.CGPath
+        if callable(cgpath):
+            cgpath = cgpath()
+        shape = ObjCClass("CAShapeLayer").layer()
+        shape.setFrame_(((0.0, 0.0), (width, height)))
+        shape.setPath_(cgpath)
+        view.layer.setMask_(shape)
+    except Exception:
+        diagnostics.swallowed("ios._update_corner_mask")
 
 
 def _apply_shadow(view: Any, props: Dict[str, Any]) -> None:
@@ -666,11 +828,232 @@ def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
             view.setAlpha_(float(props["opacity"]))
         except Exception:
             diagnostics.swallowed("ios._apply_common_visual")
+    if "z_index" in props:
+        # A removed prop (None) restores the default plane.
+        try:
+            z = props["z_index"]
+            view.layer.setZPosition_(float(z) if z is not None else 0.0)
+        except Exception:
+            diagnostics.swallowed("ios._apply_common_visual")
+    if "pointer_events" in props or "hit_slop" in props:
+        _apply_interaction_props(view, props)
     _apply_view_border(view, props)
     _apply_side_borders(view, props)
+    # Per-corner radii read the merged prop set (an update may carry
+    # only one key); a lone border_radius change must also re-run the
+    # per-corner path when corner keys are active, or the uniform
+    # applier above would stomp the masked corners.
+    merged = _state_of(view).get("props") or props
+    if any(k in props for k in _CORNER_RADIUS_KEYS) or (
+        "border_radius" in props and any(merged.get(k) is not None for k in _CORNER_RADIUS_KEYS)
+    ):
+        _apply_corner_radii(view, merged)
     _apply_shadow(view, props)
     _apply_transform(view, props)
     _apply_accessibility(view, props)
+
+
+# ======================================================================
+# Interaction props: pointer_events / hit_slop (raw libobjc subclass)
+# ======================================================================
+#
+# ``pointer_events`` and ``hit_slop`` need to change how UIKit
+# hit-tests a view, which requires overriding ``pointInside:withEvent:``
+# and ``hitTest:withEvent:``. Like ``_PNPortalViewCTypes``, the
+# ``_PNInteractiveViewCTypes`` class is registered with raw libobjc
+# (CFUNCTYPE IMPs) rather than rubicon's ``@objc_method``, for the same
+# arm64 FFI reliability reasons documented in the module header.
+#
+# Container handlers (View / Row / Column, Pressable, SafeAreaView,
+# KeyboardAvoidingView) *always* instantiate this subclass. That is the
+# low-risk choice: with no entry in ``_pn_interaction_state`` both
+# overrides reproduce stock UIView behavior exactly, and it means the
+# props can appear, change, or disappear on any later render without
+# recreating the view. Leaf handlers (labels, controls) keep their
+# stock classes; if the props show up there, ``_apply_interaction_props``
+# warns once and the props are ignored.
+#
+# The overrides read per-view state synchronously from
+# ``_pn_interaction_state``, a Python dict keyed by the raw view
+# pointer (the ``self`` of every IMP), following the same routing
+# pattern as ``_pn_action_handlers``.
+#
+# Semantics (matching React Native and the Android backend):
+#
+# - ``"none"``: the view and its whole subtree are transparent to
+#   touches (``hitTest`` returns nil, ``pointInside`` returns NO).
+# - ``"box_none"``: the view itself never receives touches, but
+#   subviews still do (``hitTest`` returns the subview result and
+#   converts a self result to nil).
+# - ``"box_only"``: the view receives touches, subviews never do.
+# - ``hit_slop`` expands ``pointInside`` by the slop on each edge.
+#   As on every platform, the expanded area only works where the
+#   parent's own bounds still contain the point.
+
+# Maps view ptr -> {"pointer_events": mode or None,
+#                   "hit_slop": (top, left, bottom, right) or None}.
+_pn_interaction_state: Dict[int, Dict[str, Any]] = {}
+
+_POINTER_EVENT_MODES = ("none", "box_none", "box_only")
+
+
+def _hit_slop_insets(value: Any) -> Optional[Tuple[float, float, float, float]]:
+    """Normalize a ``hit_slop`` prop into ``(top, left, bottom, right)`` points.
+
+    Accepts a uniform number or a dict with any of ``top`` / ``left`` /
+    ``bottom`` / ``right``. Returns ``None`` for absent or unparseable
+    values.
+    """
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        try:
+            return (
+                float(value.get("top", 0.0) or 0.0),
+                float(value.get("left", 0.0) or 0.0),
+                float(value.get("bottom", 0.0) or 0.0),
+                float(value.get("right", 0.0) or 0.0),
+            )
+        except Exception:
+            return None
+    try:
+        uniform = float(value)
+    except Exception:
+        return None
+    return (uniform, uniform, uniform, uniform)
+
+
+_INTERACTIVE_POINT_INSIDE_TYPE = _ct.CFUNCTYPE(_ct.c_bool, _ct.c_void_p, _ct.c_void_p, _PNCGPoint, _ct.c_void_p)
+_INTERACTIVE_HITTEST_TYPE = _ct.CFUNCTYPE(_ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _PNCGPoint, _ct.c_void_p)
+
+_SEL_HITTEST_WITH_EVENT = _sel_reg(b"hitTest:withEvent:")
+
+# UIView's own ``hitTest:withEvent:`` IMP, called directly (the
+# superclass is known to be exactly UIView, so this is equivalent to a
+# ``objc_msgSendSuper`` call without the extra struct plumbing). Bound
+# after the class registration below.
+_uiview_hittest_imp: Any = None
+
+
+def _interactive_point_inside_imp(self_ptr: int, _cmd_ptr: int, point: Any, _event_ptr: int) -> bool:
+    """``pointInside:withEvent:`` honoring pointer_events and hit_slop."""
+    try:
+        info = _pn_interaction_state.get(int(self_ptr or 0)) or {}
+        if info.get("pointer_events") == "none":
+            return False
+        top = left = bottom = right = 0.0
+        slop = info.get("hit_slop")
+        if slop is not None:
+            top, left, bottom, right = slop
+        view = ObjCInstance(_ct.c_void_p(self_ptr))
+        bounds = view.bounds
+        w = float(bounds.size.width)
+        h = float(bounds.size.height)
+        px = float(point.x)
+        py = float(point.y)
+        return (-left <= px <= w + right) and (-top <= py <= h + bottom)
+    except Exception:
+        return False
+
+
+def _interactive_hittest_imp(self_ptr: int, _cmd_ptr: int, point: Any, event_ptr: int) -> int:
+    """``hitTest:withEvent:`` honoring the pointer_events mode.
+
+    Delegates to UIView's stock implementation (which consults our
+    ``pointInside:`` override, so hit_slop is already accounted for),
+    then filters the result per the mode.
+    """
+    try:
+        info = _pn_interaction_state.get(int(self_ptr or 0)) or {}
+        mode = info.get("pointer_events")
+        if mode == "none":
+            return 0
+        if _uiview_hittest_imp is None:
+            return 0
+        result = int(_uiview_hittest_imp(self_ptr, _SEL_HITTEST_WITH_EVENT, point, event_ptr) or 0)
+        if mode == "box_none" and result == int(self_ptr or 0):
+            return 0
+        if mode == "box_only":
+            return int(self_ptr or 0) if result else 0
+        return result
+    except Exception:
+        return 0
+
+
+_interactive_point_inside_imp_ref = _INTERACTIVE_POINT_INSIDE_TYPE(_interactive_point_inside_imp)
+_interactive_hittest_imp_ref = _INTERACTIVE_HITTEST_TYPE(_interactive_hittest_imp)
+
+_PN_INTERACTIVE_VIEW_CLS = _alloc_cls(_UIVIEW_CLS, b"_PNInteractiveViewCTypes", 0) if _UIVIEW_CLS else None
+if _PN_INTERACTIVE_VIEW_CLS:
+    _add_method(
+        _PN_INTERACTIVE_VIEW_CLS,
+        _sel_reg(b"pointInside:withEvent:"),
+        _ct.cast(_interactive_point_inside_imp_ref, _ct.c_void_p),
+        b"c@:{CGPoint=dd}@",
+    )
+    _add_method(
+        _PN_INTERACTIVE_VIEW_CLS,
+        _SEL_HITTEST_WITH_EVENT,
+        _ct.cast(_interactive_hittest_imp_ref, _ct.c_void_p),
+        b"@@:{CGPoint=dd}@",
+    )
+    _reg_cls(_PN_INTERACTIVE_VIEW_CLS)
+    try:
+        _raw_hittest = _get_method_imp(_UIVIEW_CLS, _SEL_HITTEST_WITH_EVENT)
+        if _raw_hittest:
+            _uiview_hittest_imp = _ct.cast(_ct.c_void_p(_raw_hittest), _INTERACTIVE_HITTEST_TYPE)
+    except Exception:
+        _uiview_hittest_imp = None
+
+
+def _new_container_view() -> Any:
+    """Instantiate the hit-test-aware container class (UIView fallback).
+
+    When the ``_PNInteractiveViewCTypes`` registration is unavailable
+    the container degrades to a plain ``UIView``: everything works
+    except ``pointer_events`` / ``hit_slop``, which warn when applied.
+    """
+    view = None
+    if _PN_INTERACTIVE_VIEW_CLS:
+        try:
+            view = ObjCClass("_PNInteractiveViewCTypes").alloc().init()
+        except Exception:
+            view = None
+    if view is None:
+        view = ObjCClass("UIView").alloc().init()
+    view.setTranslatesAutoresizingMaskIntoConstraints_(True)
+    return view
+
+
+def _apply_interaction_props(view: Any, props: Dict[str, Any]) -> None:
+    """Record pointer_events / hit_slop where the ObjC overrides read them."""
+    ptr = _objc_ptr(view)
+    if ptr is None:
+        return
+    entry = _pn_interaction_state.setdefault(ptr, {})
+    if "pointer_events" in props:
+        mode = props["pointer_events"]
+        entry["pointer_events"] = mode if mode in _POINTER_EVENT_MODES else None
+    if "hit_slop" in props:
+        entry["hit_slop"] = _hit_slop_insets(props["hit_slop"])
+    if entry.get("pointer_events") is None and entry.get("hit_slop") is None:
+        # Both props removed (or "auto"): drop the entry so the
+        # overrides take their stock-behavior fast path.
+        _pn_interaction_state.pop(ptr, None)
+        return
+    is_custom = False
+    try:
+        if _PN_INTERACTIVE_VIEW_CLS:
+            is_custom = bool(view.isKindOfClass_(ObjCClass("_PNInteractiveViewCTypes")))
+    except Exception:
+        is_custom = False
+    if not is_custom:
+        diagnostics.warn_once(
+            "pointer_events / hit_slop only work on container elements "
+            "(View, Row, Column, Pressable) on iOS; this element's native "
+            "class doesn't override hit-testing, so the props are ignored",
+            key=f"interaction_props:{_tag_of(view)}",
+        )
 
 
 # ======================================================================
@@ -684,17 +1067,42 @@ _pn_retained_views: list = []
 # Simultaneous-recognition gesture delegate (raw libobjc)
 # ======================================================================
 #
-# All PythonNative recognizers on a view should recognize together
-# (press feedback + pan + pinch...), matching the GestureArbiter's
-# semantics on Android/desktop. UIKit defaults to exclusivity, so every
-# recognizer we create gets this delegate, which answers YES to
-# ``gestureRecognizer:shouldRecognizeSimultaneouslyWithGestureRecognizer:``.
+# UIKit defaults to recognizer exclusivity, so every recognizer we
+# create gets this delegate. The answer to
+# ``gestureRecognizer:shouldRecognizeSimultaneouslyWithGestureRecognizer:``
+# mirrors the GestureArbiter's semantics on Android/desktop:
+#
+# - Recognizers wired by ``_wire_gestures`` carry an entry in
+#   ``_pn_gesture_relations`` (view pointer, spec index, and the spec's
+#   ``"simultaneous"`` index set). Two recognizers on the *same* view
+#   recognize together only when each is in the other's set; a spec
+#   without the key means "simultaneous with everything" (back-compat
+#   for hand-built spec dicts).
+# - Any pairing involving an unknown recognizer (Pressable's built-in
+#   press trio, a scroll view's pan, recognizers from another view)
+#   keeps the historical always-YES behavior.
 
 _GESTURE_SIMUL_TYPE = _ct.CFUNCTYPE(_ct.c_bool, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
 
+# Maps recognizer ptr -> (view ptr, spec index, simultaneous set or None).
+_pn_gesture_relations: Dict[int, Tuple[int, int, Optional[frozenset]]] = {}
+
 
 def _gesture_simul_imp(self_ptr: int, cmd_ptr: int, g1_ptr: int, g2_ptr: int) -> bool:
-    return True
+    try:
+        a = _pn_gesture_relations.get(int(g1_ptr or 0))
+        b = _pn_gesture_relations.get(int(g2_ptr or 0))
+        if a is None or b is None:
+            return True
+        if a[0] != b[0]:
+            return True
+        sim_a = a[2]
+        sim_b = b[2]
+        if sim_a is None or sim_b is None:
+            return True
+        return b[1] in sim_a and a[1] in sim_b
+    except Exception:
+        return True
 
 
 _gesture_simul_imp_ref = _GESTURE_SIMUL_TYPE(_gesture_simul_imp)
@@ -912,6 +1320,7 @@ def _make_gesture_handler(
     kind: str,
     index: int,
     direction: Optional[str] = None,
+    n_pointers: Optional[int] = None,
 ) -> Any:
     """Build the action closure emitting one ``gesture:<i>`` payload."""
 
@@ -962,6 +1371,13 @@ def _make_gesture_handler(
             # per-recognizer direction is the actual swipe direction.
             payload["state"] = "ended"
             payload["direction"] = direction
+        elif kind == "fling":
+            # Same discrete shape as swipe. ``numberOfTouches`` is often
+            # 0 by recognition time, so report the configured pointer
+            # requirement (which UIKit enforced) instead.
+            payload["state"] = "ended"
+            payload["direction"] = direction
+            payload["pointer_count"] = int(n_pointers or 1)
         elif kind == "tap":
             payload["state"] = "ended"
 
@@ -973,9 +1389,17 @@ def _make_gesture_handler(
 def _make_recognizer(kind: str, spec: Dict[str, Any]) -> List[Tuple[Any, Optional[str]]]:
     """Build the UIGestureRecognizer(s) for one serialized gesture spec.
 
-    Swipe with ``direction="any"`` needs one recognizer per direction
-    (UIKit constraint), so this returns ``(recognizer, direction)``
-    pairs; ``direction`` is ``None`` for non-swipe kinds.
+    Swipe and fling with ``direction="any"`` need one recognizer per
+    direction (a ``UISwipeGestureRecognizer`` reports no resolved
+    direction, only its configured mask), so this returns
+    ``(recognizer, direction)`` pairs; ``direction`` is ``None`` for
+    the other kinds.
+
+    Fling maps to ``UISwipeGestureRecognizer`` with
+    ``numberOfTouchesRequired``. The spec's ``min_velocity`` can't be
+    enforced: UIKit exposes no velocity knob on swipe recognizers, so
+    iOS uses the system's own swipe velocity threshold (a documented
+    approximation; Android and desktop honor the exact value).
     """
     out: List[Tuple[Any, Optional[str]]] = []
     if kind == "tap":
@@ -1010,6 +1434,18 @@ def _make_recognizer(kind: str, spec: Dict[str, Any]) -> List[Tuple[Any, Optiona
             except Exception:
                 diagnostics.swallowed("ios._make_recognizer")
             out.append((rec, d))
+    elif kind == "fling":
+        direction = str(spec.get("direction", "any"))
+        directions = [direction] if direction in _SWIPE_DIRECTIONS else list(_SWIPE_DIRECTIONS)
+        n_pointers = max(1, int(spec.get("n_pointers", 1)))
+        for d in directions:
+            rec = ObjCClass("UISwipeGestureRecognizer").alloc().init()
+            try:
+                rec.setDirection_(_SWIPE_DIRECTIONS[d])
+                rec.setNumberOfTouchesRequired_(n_pointers)
+            except Exception:
+                diagnostics.swallowed("ios._make_recognizer")
+            out.append((rec, d))
     elif kind == "pinch":
         out.append((ObjCClass("UIPinchGestureRecognizer").alloc().init(), None))
     elif kind == "rotation":
@@ -1023,6 +1459,15 @@ def _wire_gestures(view: Any, specs: Any) -> None:
     Re-wiring on update removes previously attached PythonNative
     recognizers first (configuration changes are rare; correctness
     beats incremental patching here).
+
+    Composition metadata is applied in two passes: while creating each
+    recognizer its ``(view, index, simultaneous-set)`` triple is
+    recorded in ``_pn_gesture_relations`` for the shared delegate, and
+    once every recognizer exists, each spec's ``"wait_for"`` indices
+    are wired with ``requireGestureRecognizerToFail:`` (every
+    recognizer of the waiting spec requires every recognizer of each
+    target spec to fail; a spec can own several recognizers, e.g. an
+    any-direction swipe).
     """
     state = _state_of(view)
     for rec in state.get("gesture_recognizers") or []:
@@ -1031,6 +1476,7 @@ def _wire_gestures(view: Any, specs: Any) -> None:
         except Exception:
             diagnostics.swallowed("ios._wire_gestures")
         _pn_action_handlers.pop(_recognizer_ptr(rec), None)
+        _pn_gesture_relations.pop(_recognizer_ptr(rec), None)
     state["gesture_recognizers"] = []
     if not isinstance(specs, (list, tuple)) or not specs:
         return
@@ -1040,13 +1486,18 @@ def _wire_gestures(view: Any, specs: Any) -> None:
     except Exception:
         diagnostics.swallowed("ios._wire_gestures")
 
+    view_ptr = _objc_ptr(view) or 0
     recognizers: List[Any] = []
+    recs_by_index: Dict[int, List[Any]] = {}
     for i, spec in enumerate(specs):
         if not isinstance(spec, dict):
             continue
         kind = str(spec.get("kind", ""))
         if not kind:
             continue
+        sim = spec.get("simultaneous")
+        sim_set = None if sim is None else frozenset(int(s) for s in sim)
+        n_pointers = max(1, int(spec.get("n_pointers", 1) or 1)) if kind == "fling" else None
         for rec, direction in _make_recognizer(kind, spec):
             try:
                 rec.setCancelsTouchesInView_(False)
@@ -1059,7 +1510,21 @@ def _wire_gestures(view: Any, specs: Any) -> None:
                 recognizers.append(rec)
             except Exception:
                 continue
-            _register_action(rec, _make_gesture_handler(rec, view, kind, i, direction))
+            _pn_gesture_relations[_recognizer_ptr(rec)] = (view_ptr, i, sim_set)
+            recs_by_index.setdefault(i, []).append(rec)
+            _register_action(rec, _make_gesture_handler(rec, view, kind, i, direction, n_pointers))
+
+    for i, spec in enumerate(specs):
+        if not isinstance(spec, dict):
+            continue
+        for target_index in spec.get("wait_for") or ():
+            targets = recs_by_index.get(int(target_index)) or []
+            for waiter in recs_by_index.get(i) or []:
+                for target in targets:
+                    try:
+                        waiter.requireGestureRecognizerToFail_(target)
+                    except Exception:
+                        diagnostics.swallowed("ios._wire_gestures")
 
     state["gesture_recognizers"] = recognizers
 
@@ -1076,6 +1541,16 @@ def _is_main_thread() -> bool:
 
 
 def _animated_applier_for(prop: str, value: Any) -> Optional[Callable[[Any], None]]:
+    """Build the per-frame applier for one animated property.
+
+    Color-valued frames (``background_color`` and ``color``) arrive as
+    ``"#RRGGBB"`` / ``"#AARRGGBB"`` strings from ``AnimatedInterpolation``
+    color outputs and go through the same ``_uicolor`` parsing the
+    ordinary update path uses. ``rotate`` receives numeric degrees,
+    which is what ``_apply_transform`` expects for bare numbers. An
+    unknown property returns ``None`` and the frame is silently
+    ignored.
+    """
     if prop == "opacity":
         v = float(value)
 
@@ -1087,6 +1562,18 @@ def _animated_applier_for(prop: str, value: Any) -> Optional[Callable[[Any], Non
 
         def _apply(view: Any) -> None:
             view.setBackgroundColor_(_uicolor(value))
+
+        return _apply
+    if prop == "color":
+
+        def _apply(view: Any) -> None:
+            color = _uicolor(value)
+            try:
+                view.setTextColor_(color)
+            except Exception:
+                # UIButton has no setTextColor:; views with neither
+                # selector raise into the caller's swallow.
+                view.setTitleColor_forState_(color, 0)
 
         return _apply
     if prop in ("translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate"):
@@ -1229,11 +1716,14 @@ class IOSViewHandler(ViewHandler):
         state = _state_of(native_view)
         for rec in state.get("gesture_recognizers") or []:
             _pn_action_handlers.pop(_recognizer_ptr(rec), None)
+            _pn_gesture_relations.pop(_recognizer_ptr(rec), None)
         # Controls register their own pointer as the action-handler key
         # (see _register_control_action); drop it with the view.
         _pn_action_handlers.pop(_recognizer_ptr(native_view), None)
         _pn_last_control_event_ts.pop(_recognizer_ptr(native_view), None)
+        _pn_interaction_state.pop(_objc_ptr(native_view) or 0, None)
         _pn_view_border_radius_map.pop(id(native_view), None)
+        _pn_corner_radii_map.pop(id(native_view), None)
         _pn_side_border_map.pop(id(native_view), None)
         try:
             native_view.removeFromSuperview()
@@ -1284,6 +1774,9 @@ class IOSViewHandler(ViewHandler):
             native_view.setTranslatesAutoresizingMaskIntoConstraints_(True)
             native_view.setFrame_(((frame_x, frame_y), (frame_w, frame_h)))
             _clamp_view_corner_radius(native_view, frame_w, frame_h)
+            # The per-corner shape mask is bounds-dependent; rebuild it
+            # whenever the frame changes.
+            _update_corner_mask(native_view, frame_w, frame_h)
             _update_side_border_layers(native_view, frame_w, frame_h)
             try:
                 _clamp_layer_corner_radius(native_view.layer, frame_w, frame_h)
@@ -1328,7 +1821,14 @@ class IOSViewHandler(ViewHandler):
             return (0.0, 0.0)
 
     def set_animated_property(self, native_view: Any, prop_name: str, value: Any) -> None:
-        """Apply one Python-driven animation frame immediately."""
+        """Apply one Python-driven animation frame immediately.
+
+        Accepts floats for ``opacity`` and the transform channels,
+        numeric degrees for ``rotate``, and ``"#RRGGBB"`` /
+        ``"#AARRGGBB"`` strings for ``background_color`` and ``color``
+        (see ``_animated_applier_for``). Unknown properties are
+        silently ignored.
+        """
         if native_view is None:
             return
         try:
@@ -1389,17 +1889,18 @@ class IOSViewHandler(ViewHandler):
 
 
 class FlexContainerHandler(IOSViewHandler):
-    """Container for flex layout, a bare `UIView`.
+    """Container for flex layout, a hit-test-aware ``UIView`` subclass.
 
     All flex semantics (direction, alignment, distribution, padding)
     are computed by the layout engine and applied via
     [`set_frame`][pythonnative.native_views.ios.IOSViewHandler.set_frame].
+    The view is a ``_PNInteractiveViewCTypes`` instance so
+    ``pointer_events`` and ``hit_slop`` can be applied on any render
+    without recreating the view (see the interaction-props section).
     """
 
     def _build(self, props: Dict[str, Any]) -> Any:
-        v = ObjCClass("UIView").alloc().init()
-        v.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        return v
+        return _new_container_view()
 
 
 # ======================================================================
@@ -2586,8 +3087,7 @@ class PressableHandler(IOSViewHandler):
     """
 
     def _build(self, props: Dict[str, Any]) -> Any:
-        v = ObjCClass("UIView").alloc().init()
-        v.setTranslatesAutoresizingMaskIntoConstraints_(True)
+        v = _new_container_view()
         v.setUserInteractionEnabled_(True)
         self._wire_press(v)
         return v
@@ -3044,9 +3544,7 @@ class SafeAreaViewHandler(IOSViewHandler):
     """Plain container; safe-area insets are applied by the layout engine."""
 
     def _build(self, props: Dict[str, Any]) -> Any:
-        v = ObjCClass("UIView").alloc().init()
-        v.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        return v
+        return _new_container_view()
 
 
 # ======================================================================
@@ -3220,10 +3718,6 @@ class ModalHandler(IOSViewHandler):
 # other delegate classes in this module.
 
 
-class _PNCGPoint(_ct.Structure):
-    _fields_ = [("x", _ct.c_double), ("y", _ct.c_double)]
-
-
 _PORTAL_POINT_INSIDE_TYPE = _ct.CFUNCTYPE(_ct.c_bool, _ct.c_void_p, _ct.c_void_p, _PNCGPoint, _ct.c_void_p)
 
 
@@ -3261,7 +3755,6 @@ def _portal_point_inside_imp(self_ptr: int, _cmd_ptr: int, point: Any, _event_pt
 
 _portal_point_inside_imp_ref = _PORTAL_POINT_INSIDE_TYPE(_portal_point_inside_imp)
 
-_UIVIEW_CLS = _get_cls(b"UIView")
 _PN_PORTAL_VIEW_CLS = _alloc_cls(_UIVIEW_CLS, b"_PNPortalViewCTypes", 0) if _UIVIEW_CLS else None
 if _PN_PORTAL_VIEW_CLS:
     _add_method(
@@ -3497,9 +3990,7 @@ class KeyboardAvoidingViewHandler(IOSViewHandler):
 
     def _build(self, props: Dict[str, Any]) -> Any:
         _ensure_keyboard_observer()
-        v = ObjCClass("UIView").alloc().init()
-        v.setTranslatesAutoresizingMaskIntoConstraints_(True)
-        return v
+        return _new_container_view()
 
 
 # ======================================================================

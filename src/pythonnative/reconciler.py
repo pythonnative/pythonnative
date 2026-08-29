@@ -307,6 +307,9 @@ class Reconciler:
         # Transaction state for the in-flight pass.
         self._ops: List[Mutation] = []
         self._created: List[VNode] = []
+        # ``(tag, frame)`` pairs whose ``on_layout`` should fire after
+        # the layout pass commits (frames are only queued on change).
+        self._pending_layout_events: List[Tuple[int, Tuple[float, float, float, float]]] = []
         # Function-component VNodes whose own state changed since the
         # last flush, keyed by ``id`` to dedupe while keeping a strong
         # reference. Drained by
@@ -485,6 +488,7 @@ class Reconciler:
         if self._tree is not None:
             self._run_layout()
             self._flush_ops()
+            self._dispatch_layout_events()
 
     # ------------------------------------------------------------------
     # Back handlers (use_back_handler)
@@ -610,6 +614,7 @@ class Reconciler:
         self._fix_tree_links()
         self._run_layout()
         self._flush_ops()
+        self._dispatch_layout_events()
         self._flush_layout_effects()
         self._flush_ops()
         self._flush_passive_effects()
@@ -2216,6 +2221,8 @@ class Reconciler:
                         ref._pn_frame = frame
                     except Exception:
                         pass
+                if vnode.element.props and "on_layout" in vnode.element.props:
+                    self._pending_layout_events.append((vnode.tag, frame))
             child_offset_x = 0.0
             child_offset_y = 0.0
         else:
@@ -2224,6 +2231,27 @@ class Reconciler:
 
         for child in layout_node.children:
             self._collect_frames(child, child_offset_x, child_offset_y)
+
+    def _dispatch_layout_events(self) -> None:
+        """Fire queued ``on_layout`` callbacks after frames were applied.
+
+        Runs post-commit (alongside layout effects), so callbacks may
+        set state; the resulting re-render is scheduled normally.
+        """
+        if not self._pending_layout_events:
+            return
+        from .events import dispatch_event
+
+        pending, self._pending_layout_events = self._pending_layout_events, []
+        for tag, frame in pending:
+            try:
+                dispatch_event(
+                    tag,
+                    "on_layout",
+                    {"x": frame[0], "y": frame[1], "width": frame[2], "height": frame[3]},
+                )
+            except Exception as exc:
+                diagnostics.report_error(exc, phase="event")
 
     # ------------------------------------------------------------------
     # Hot-reload support

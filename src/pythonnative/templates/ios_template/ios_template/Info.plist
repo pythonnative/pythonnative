@@ -2,6 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- PythonNative's StatusBar element drives the bar through the legacy
+	     UIApplication setters, which UIKit only honors when view-controller-based
+	     status bar appearance is turned off. -->
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

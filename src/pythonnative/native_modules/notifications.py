@@ -5,9 +5,10 @@ cancelling local push notifications. Uses Android's
 ``NotificationManager`` or iOS's ``UNUserNotificationCenter``.
 
 On iOS you must ``await Notifications.request_permission()`` before
-scheduling. On Android 13+ the runtime permission should be requested
-through standard Android APIs (the manifest declaration is otherwise
-sufficient).
+scheduling. On Android 13+ the ``POST_NOTIFICATIONS`` runtime
+permission is requested automatically the first time you schedule a
+notification (the template manifest declares it); earlier Android
+versions don't prompt at all.
 
 For remote (server-sent) pushes, enable the ``remote_notifications``
 capability in ``pythonnative.toml`` and call
@@ -55,17 +56,18 @@ class Notifications:
     async def request_permission() -> bool:
         """Request notification permission from the user.
 
-        On Android the manifest declaration is normally sufficient for
-        legacy permission grants and this returns ``True`` without
-        prompting (the runtime POST_NOTIFICATIONS prompt for Android
-        13+ should be requested via standard Android APIs).
+        On Android 12 and below the manifest declaration is sufficient
+        and this returns ``True`` without prompting. On Android 13+
+        (API 33) the ``POST_NOTIFICATIONS`` runtime permission is
+        requested through [`Permissions`][pythonnative.Permissions],
+        which shows the system prompt if the user hasn't decided yet.
 
         Returns:
             ``True`` if granted (or no prompt is needed), ``False``
             otherwise.
         """
         if IS_ANDROID:
-            return True
+            return await _android_request_permission()
         return await _ios_request_permission()
 
     @staticmethod
@@ -92,10 +94,15 @@ class Notifications:
 
         Returns:
             ``True`` on success, ``False`` if the underlying native
-            call failed.
+            call failed or (on Android 13+) the user denied the
+            notification permission.
         """
         del options
         if IS_ANDROID:
+            # Android 13+ silently drops notifications posted without
+            # the POST_NOTIFICATIONS grant, so prompt before posting.
+            if not await _android_request_permission():
+                return False
             if delay_seconds > 0:
                 _cancel_android_delayed(identifier)
                 _android_delayed[identifier] = asyncio.ensure_future(
@@ -145,6 +152,27 @@ class Notifications:
 # ======================================================================
 # Android implementation
 # ======================================================================
+
+
+async def _android_request_permission() -> bool:
+    """Request ``POST_NOTIFICATIONS`` on Android 13+; older versions skip.
+
+    Delegates to the shared
+    [`Permissions`][pythonnative.Permissions] machinery, which routes
+    through the activity's ``requestPermissions`` and resolves once
+    ``onRequestPermissionsResult`` arrives. Below API 33 there's no
+    runtime permission, so this resolves ``True`` immediately.
+    """
+    try:
+        from java import jclass
+
+        if int(jclass("android.os.Build$VERSION").SDK_INT) < 33:
+            return True
+    except Exception:
+        return True
+    from .permissions import GRANTED, Permissions
+
+    return await Permissions.request("notifications") == GRANTED
 
 
 def _cancel_android_delayed(identifier: str) -> None:

@@ -1,0 +1,49 @@
+# Tests gesture composition (Exclusive, Race) and Fling.
+#
+# Demo screen: examples/e2e-suite/app/screens/gestures/gesture_composition.py
+# Source under test: src/pythonnative/gestures.py :: Exclusive, Race, Fling
+#
+# - Exclusive(double, single): a single tap only reports after the
+#   double-tap window expires, and a double tap must report "double"
+#   exactly (no stray "single" firing first would survive the final
+#   assert since the double overwrites it, so the single-tap check
+#   runs first).
+# - Race(long_press, pan): holding still long enough activates the
+#   long press; the pan loses the race and is cancelled.
+# - Fling: a quick horizontal flick reports its direction.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Gestures
+      DEMO_TITLE: Gesture composition
+- assertVisible: "Last tap: none"
+- assertVisible: "Race winner: none"
+- assertVisible: "Fling: none"
+# Single tap: fires only after the double-tap sibling gives up its
+# window, hence the wait instead of an immediate assert.
+- tapOn: "Tap target"
+- extendedWaitUntil:
+    visible: "Last tap: single"
+    timeout: 5000
+- doubleTapOn: "Tap target"
+- extendedWaitUntil:
+    visible: "Last tap: double"
+    timeout: 5000
+- longPressOn: "Hold or drag target"
+- extendedWaitUntil:
+    visible: "Race winner: long_press"
+    timeout: 5000
+# Horizontal swipe so the page ScrollView doesn't steal the motion.
+- swipe:
+    from:
+      text: "Fling target"
+    direction: LEFT
+- extendedWaitUntil:
+    visible: "Fling: left"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Gestures

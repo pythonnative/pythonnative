@@ -1,8 +1,12 @@
 package com.pythonnative.android_template
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.util.Log
 import android.util.TypedValue
@@ -15,6 +19,7 @@ import com.chaquo.python.android.AndroidPlatform
 class MainActivity : AppCompatActivity() {
     private val TAG = javaClass.simpleName
     private var pythonReady = false
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,6 +52,21 @@ class MainActivity : AppCompatActivity() {
 
         // A cold start from a deep link carries the URL on the launch intent.
         intent?.dataString?.let { dispatchUrl(it) }
+
+        registerNetworkCallback()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        networkCallback?.let {
+            try {
+                (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
+                    .unregisterNetworkCallback(it)
+            } catch (e: Exception) {
+                Log.e("PythonNative", "unregisterNetworkCallback failed", e)
+            }
+            networkCallback = null
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -80,6 +100,46 @@ class MainActivity : AppCompatActivity() {
                 .callAttr("dispatch_app_state", state)
         } catch (e: Exception) {
             Log.e("PythonNative", "dispatch_app_state($state) failed", e)
+        }
+    }
+
+    // MARK: - NetInfo forwarding
+
+    // Live connectivity updates. The callback must be a NetworkCallback
+    // subclass, which Chaquopy's dynamic_proxy can't create from Python
+    // (interfaces only), so the registration lives here and forwards
+    // into the pythonnative net_info module.
+    private fun registerNetworkCallback() {
+        if (!pythonReady || networkCallback != null) return
+        try {
+            val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val callback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) = dispatchNetInfo()
+                override fun onLost(network: Network) = dispatchNetInfo()
+                override fun onCapabilitiesChanged(
+                    network: Network,
+                    capabilities: NetworkCapabilities
+                ) = dispatchNetInfo()
+            }
+            manager.registerDefaultNetworkCallback(callback)
+            networkCallback = callback
+        } catch (e: Exception) {
+            Log.e("PythonNative", "registerDefaultNetworkCallback failed", e)
+        }
+    }
+
+    private fun dispatchNetInfo() {
+        // NetworkCallback fires on a ConnectivityManager binder thread;
+        // hop to the main thread before crossing into Python.
+        runOnUiThread {
+            if (!pythonReady) return@runOnUiThread
+            try {
+                Python.getInstance()
+                    .getModule("pythonnative.native_modules.net_info")
+                    .callAttr("dispatch_android_change")
+            } catch (e: Exception) {
+                Log.e("PythonNative", "dispatch_android_change failed", e)
+            }
         }
     }
 

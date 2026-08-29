@@ -1,4 +1,4 @@
-"""Animated values, native-driven animation, and animated components.
+"""Animated values, derived animated nodes, and native-driven animation.
 
 Modeled on React Native's ``Animated`` API with an ``async``-aware
 completion contract. The core primitives are:
@@ -6,14 +6,26 @@ completion contract. The core primitives are:
 - [`AnimatedValue`][pythonnative.animated.AnimatedValue]: a numeric
   cell attached to native view properties; animations drive it over
   time.
+- **Derived nodes**: every animated node supports
+  [`interpolate`][pythonnative.animated.AnimatedNode.interpolate]
+  (range mapping with numeric, color, and angle outputs) and Python
+  arithmetic (``opacity * 0.5``, ``x + y``, ``-value``), producing
+  read-only [`AnimatedNode`][pythonnative.animated.AnimatedNode]
+  instances that update whenever their inputs change.
 - ``Animated.timing`` / ``Animated.spring`` / ``Animated.decay``:
   animation factories. The objects they return implement
   ``__await__``, so you can write ``await Animated.timing(v, to=1.0)``
   to suspend until the animation finishes.
-- ``Animated.sequence`` / ``Animated.parallel`` / ``Animated.delay``:
-  composition; also awaitable.
+- ``Animated.sequence`` / ``Animated.parallel`` / ``Animated.stagger``
+  / ``Animated.delay`` / ``Animated.loop``: composition; also
+  awaitable.
+- ``Animated.event``: build an event-prop callback that copies event
+  fields into animated values (``on_scroll=pn.Animated.event(y=v)``).
+- ``Animated.diff_clamp``: accumulate an input's *deltas* into a
+  clamped range (the collapsing-header primitive).
 - ``Animated.View`` / ``Animated.Text`` / ``Animated.Image``:
-  components whose ``style`` may contain ``AnimatedValue`` instances.
+  components whose ``style`` may contain animated nodes, including
+  inside ``transform`` entries.
 
 Driver architecture (the **native driver**):
 
@@ -29,10 +41,15 @@ native view the value is attached to
   [`AnimatedValue`][pythonnative.animated.AnimatedValue], and resolves
   any awaiting tasks.
 - **Declined** (desktop preview, unattached values, callable easings,
-  values feeding Python-side listeners): a single background thread
-  ticks the animation at ~60 Hz from Python, pushing each frame through
-  ``set_animated_property``. Semantics are identical; only the frame
-  source differs.
+  values feeding Python-side listeners or derived nodes): a single
+  background thread ticks the animation at ~60 Hz from Python, pushing
+  each frame through ``set_animated_property``. Semantics are
+  identical; only the frame source differs.
+
+Values driven by *events* (scroll offsets via ``Animated.event``,
+gesture translations) flow through Python: the native listener fires,
+the bound values update, and every attachment (including derived
+nodes) is pushed in the same call.
 
 Example:
     ```python
@@ -59,11 +76,13 @@ Example:
 from __future__ import annotations
 
 import asyncio
+import bisect
 import itertools
 import math
 import threading
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+import weakref
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from .element import Element
 from .hooks import use_effect, use_ref
@@ -125,67 +144,94 @@ _anim_id_counter = itertools.count(1)
 
 
 # ======================================================================
-# AnimatedValue
+# AnimatedNode: the shared graph-node base
 # ======================================================================
 
 
-class AnimatedValue:
-    """A numeric cell that can be attached to native view properties.
+class AnimatedNode:
+    """Base class for every animated node (settable leaves and derived nodes).
 
-    Animated components (``Animated.View`` et al.) **attach** the value
-    to ``(tag, prop)`` bindings after mount. Setting the value pushes
-    the new number to every attached native view through the registry's
-    ``set_animated_property``, and when an animation can be driven
-    natively, the platform animates those same bindings directly.
+    An animated node holds a current output value and a set of
+    ``(tag, prop)`` **attachments** binding it to native view
+    properties. Whenever the node's output changes (a leaf was set or
+    animated, or an input of a derived node changed), the new value is
+    pushed to every attachment through the registry's
+    ``set_animated_property`` and to every Python-side listener, then
+    propagated to derived nodes built from this one.
 
-    Python-side listeners registered via
-    [`add_listener`][pythonnative.animated.AnimatedValue.add_listener]
-    observe every Python-driven change. Natively-driven animations
-    intentionally skip per-frame Python callbacks (that's the point);
-    listeners see the final settled value.
+    Derived nodes are constructed with
+    [`interpolate`][pythonnative.animated.AnimatedNode.interpolate],
+    with Python arithmetic operators (``+``, ``-``, ``*``, ``/``,
+    ``%``, unary ``-``), or with
+    [`Animated.diff_clamp`][pythonnative.animated._AnimatedNamespace.diff_clamp].
+    They are read-only: only [`AnimatedValue`][pythonnative.AnimatedValue]
+    leaves can be set or animated directly.
     """
 
-    __slots__ = ("_value", "_subscribers", "_attachments", "_lock", "_native_group")
+    __slots__ = ("_subscribers", "_attachments", "_lock", "_children", "__weakref__")
 
-    def __init__(self, initial: float = 0.0) -> None:
-        self._value = float(initial)
-        self._subscribers: List[Tuple[str, Callable[[float], None]]] = []
+    def __init__(self) -> None:
+        self._subscribers: List[Tuple[str, Callable[[Any], None]]] = []
         self._attachments: List[Tuple[int, str]] = []
         self._lock = threading.Lock()
-        # The in-flight native animation group driving this value, if any.
-        self._native_group: Optional["_NativeAnimationGroup"] = None
+        # Derived nodes built from this one. Weak so a discarded
+        # interpolation doesn't keep receiving pushes forever.
+        self._children: "weakref.WeakSet[AnimatedNode]" = weakref.WeakSet()
+
+    # -- value -----------------------------------------------------------
 
     @property
-    def value(self) -> float:
-        """Return the current numeric value (without subscribing)."""
-        return self._value
+    def value(self) -> Any:
+        """Return the node's current output value."""
+        raise NotImplementedError
 
-    def set_value(self, new_value: float) -> None:
-        """Set the value immediately, pushing to native views and listeners."""
-        self._apply(float(new_value), push_native=True)
+    def __float__(self) -> float:
+        try:
+            return float(self.value)
+        except (TypeError, ValueError):
+            return 0.0
 
-    def _apply(self, new_value: float, push_native: bool) -> None:
+    # -- graph -----------------------------------------------------------
+
+    def _adopt_child(self, child: "AnimatedNode") -> None:
         with self._lock:
-            self._value = new_value
+            self._children.add(child)
+
+    def _has_dependents(self) -> bool:
+        """Whether any derived node consumes this node's output."""
+        with self._lock:
+            return len(self._children) > 0
+
+    def _refresh(self) -> None:
+        """Hook for stateful derived nodes to update from their inputs."""
+
+    def _propagate(self) -> None:
+        """Push the current output to attachments/listeners and descend."""
+        self._refresh()
+        current = self.value
+        with self._lock:
             subs = list(self._subscribers)
             attachments = list(self._attachments)
-        if push_native and attachments:
+            children = list(self._children)
+        if attachments:
             try:
                 backend = _backend()
                 for tag, prop in attachments:
-                    backend.set_animated_property(tag, prop, new_value)
+                    backend.set_animated_property(tag, prop, current)
             except Exception:
                 pass
-        for prop, cb in subs:
+        for _prop, cb in subs:
             try:
-                cb(new_value)
+                cb(current)
             except Exception:
                 pass
+        for child in children:
+            child._propagate()
 
-    # -- bindings ------------------------------------------------------
+    # -- bindings ----------------------------------------------------------
 
     def attach(self, tag: int, prop: str) -> Callable[[], None]:
-        """Bind this value to ``prop`` of the native view under ``tag``.
+        """Bind this node to ``prop`` of the native view under ``tag``.
 
         The current value is pushed immediately so the view reflects it
         even if no animation is running. Returns a detach callable.
@@ -194,7 +240,7 @@ class AnimatedValue:
         with self._lock:
             self._attachments.append(binding)
         try:
-            _backend().set_animated_property(tag, prop, self._value)
+            _backend().set_animated_property(tag, prop, self.value)
         except Exception:
             pass
 
@@ -212,14 +258,14 @@ class AnimatedValue:
         with self._lock:
             return list(self._attachments)
 
-    # -- listeners -----------------------------------------------------
+    # -- listeners ---------------------------------------------------------
 
-    def add_listener(self, prop: str, callback: Callable[[float], None]) -> Callable[[], None]:
-        """Register ``callback`` for Python-driven changes to this value.
+    def add_listener(self, prop: str, callback: Callable[[Any], None]) -> Callable[[], None]:
+        """Register ``callback`` for Python-driven changes to this node.
 
         Returns an unsubscribe callable. ``prop`` is metadata only; it
         lets the subscriber differentiate this binding from others on
-        the same ``AnimatedValue``.
+        the same node.
         """
         with self._lock:
             self._subscribers.append((prop, callback))
@@ -238,6 +284,149 @@ class AnimatedValue:
         with self._lock:
             return bool(self._subscribers)
 
+    # -- derivation --------------------------------------------------------
+
+    def interpolate(
+        self,
+        input_range: Sequence[float],
+        output_range: Sequence[Any],
+        extrapolate: str = "extend",
+        extrapolate_left: Optional[str] = None,
+        extrapolate_right: Optional[str] = None,
+    ) -> "AnimatedInterpolation":
+        """Map this node's value through an input/output range.
+
+        Mirrors React Native's ``interpolate``. ``output_range`` may
+        contain numbers, colors (``"#RRGGBB"`` / ``"#AARRGGBB"``), or
+        angle strings (``"45deg"`` / ``"0.5rad"``, emitted as numeric
+        degrees for the ``rotate`` transform).
+
+        Args:
+            input_range: Monotonically non-decreasing breakpoints for
+                this node's value. At least two entries.
+            output_range: Output breakpoints, same length as
+                ``input_range``.
+            extrapolate: Behavior outside the input range:
+                ``"extend"`` (continue the edge segment's slope,
+                default), ``"clamp"`` (pin to the edge output), or
+                ``"identity"`` (return the input unchanged).
+            extrapolate_left: Override ``extrapolate`` below the range.
+            extrapolate_right: Override ``extrapolate`` above the range.
+
+        Returns:
+            A derived, read-only animated node.
+
+        Example:
+            ```python
+            header_height = scroll_y.interpolate(
+                input_range=[0, 120],
+                output_range=[160, 56],
+                extrapolate="clamp",
+            )
+            ```
+        """
+        return AnimatedInterpolation(
+            self,
+            input_range,
+            output_range,
+            extrapolate=extrapolate,
+            extrapolate_left=extrapolate_left,
+            extrapolate_right=extrapolate_right,
+        )
+
+    # -- arithmetic --------------------------------------------------------
+
+    def __add__(self, other: Any) -> "_AnimatedOperation":
+        return _AnimatedOperation("add", lambda a, b: a + b, [self, other])
+
+    def __radd__(self, other: Any) -> "_AnimatedOperation":
+        return _AnimatedOperation("add", lambda a, b: a + b, [other, self])
+
+    def __sub__(self, other: Any) -> "_AnimatedOperation":
+        return _AnimatedOperation("subtract", lambda a, b: a - b, [self, other])
+
+    def __rsub__(self, other: Any) -> "_AnimatedOperation":
+        return _AnimatedOperation("subtract", lambda a, b: a - b, [other, self])
+
+    def __mul__(self, other: Any) -> "_AnimatedOperation":
+        return _AnimatedOperation("multiply", lambda a, b: a * b, [self, other])
+
+    def __rmul__(self, other: Any) -> "_AnimatedOperation":
+        return _AnimatedOperation("multiply", lambda a, b: a * b, [other, self])
+
+    def __truediv__(self, other: Any) -> "_AnimatedOperation":
+        return _AnimatedOperation("divide", lambda a, b: a / b if b else 0.0, [self, other])
+
+    def __rtruediv__(self, other: Any) -> "_AnimatedOperation":
+        return _AnimatedOperation("divide", lambda a, b: a / b if b else 0.0, [other, self])
+
+    def __mod__(self, other: Any) -> "_AnimatedOperation":
+        return _AnimatedOperation("modulo", lambda a, b: math.fmod(a, b) if b else 0.0, [self, other])
+
+    def __neg__(self) -> "_AnimatedOperation":
+        return _AnimatedOperation("negate", lambda a: -a, [self])
+
+
+# ======================================================================
+# AnimatedValue: the settable leaf
+# ======================================================================
+
+
+class AnimatedValue(AnimatedNode):
+    """A numeric cell that can be attached to native view properties.
+
+    Animated components (``Animated.View`` et al.) **attach** the value
+    to ``(tag, prop)`` bindings after mount. Setting the value pushes
+    the new number to every attached native view through the registry's
+    ``set_animated_property`` (and through every derived node built
+    from this value), and when an animation can be driven natively, the
+    platform animates those same bindings directly.
+
+    Python-side listeners registered via
+    [`add_listener`][pythonnative.animated.AnimatedNode.add_listener]
+    observe every Python-driven change. Natively-driven animations
+    intentionally skip per-frame Python callbacks (that's the point);
+    listeners see the final settled value.
+    """
+
+    __slots__ = ("_value", "_native_group")
+
+    def __init__(self, initial: float = 0.0) -> None:
+        super().__init__()
+        self._value = float(initial)
+        # The in-flight native animation group driving this value, if any.
+        self._native_group: Optional["_NativeAnimationGroup"] = None
+
+    @property
+    def value(self) -> float:
+        """Return the current numeric value (without subscribing)."""
+        return self._value
+
+    def set_value(self, new_value: float) -> None:
+        """Set the value immediately, pushing to native views and listeners."""
+        self._apply(float(new_value), push_native=True)
+
+    def _apply(self, new_value: float, push_native: bool) -> None:
+        with self._lock:
+            self._value = new_value
+            subs = list(self._subscribers)
+            attachments = list(self._attachments)
+            children = list(self._children)
+        if push_native and attachments:
+            try:
+                backend = _backend()
+                for tag, prop in attachments:
+                    backend.set_animated_property(tag, prop, new_value)
+            except Exception:
+                pass
+        for prop, cb in subs:
+            try:
+                cb(new_value)
+            except Exception:
+                pass
+        for child in children:
+            child._propagate()
+
     # -- native handoff ------------------------------------------------
 
     def _adopt_native_group(self, group: Optional["_NativeAnimationGroup"]) -> None:
@@ -251,11 +440,260 @@ class AnimatedValue:
         self._adopt_native_group(None)
         _manager.cancel_for_value(self)
 
-    def __float__(self) -> float:
-        return self._value
-
     def __repr__(self) -> str:
         return f"AnimatedValue({self._value:g})"
+
+
+# ======================================================================
+# Derived nodes
+# ======================================================================
+
+
+def _parse_color_output(value: str) -> Optional[Tuple[int, int, int, int]]:
+    """Parse ``"#RRGGBB"`` / ``"#AARRGGBB"`` into an ``(a, r, g, b)`` tuple."""
+    c = value.strip().lstrip("#")
+    if len(c) == 6:
+        c = "FF" + c
+    if len(c) != 8:
+        return None
+    try:
+        raw = int(c, 16)
+    except ValueError:
+        return None
+    return ((raw >> 24) & 0xFF, (raw >> 16) & 0xFF, (raw >> 8) & 0xFF, raw & 0xFF)
+
+
+def _parse_angle_output(value: str) -> Optional[float]:
+    """Parse ``"45deg"`` / ``"0.5rad"`` into numeric degrees."""
+    text = value.strip()
+    try:
+        if text.endswith("deg"):
+            return float(text[:-3])
+        if text.endswith("rad"):
+            return math.degrees(float(text[:-3]))
+    except ValueError:
+        return None
+    return None
+
+
+class AnimatedInterpolation(AnimatedNode):
+    """Read-only node mapping a parent node through an input/output range.
+
+    Built via
+    [`AnimatedNode.interpolate`][pythonnative.animated.AnimatedNode.interpolate];
+    see that method for the semantics of the arguments.
+    """
+
+    __slots__ = (
+        "_parent",
+        "_inputs",
+        "_outputs",
+        "_kind",
+        "_left",
+        "_right",
+    )
+
+    def __init__(
+        self,
+        parent: AnimatedNode,
+        input_range: Sequence[float],
+        output_range: Sequence[Any],
+        extrapolate: str = "extend",
+        extrapolate_left: Optional[str] = None,
+        extrapolate_right: Optional[str] = None,
+    ) -> None:
+        super().__init__()
+        inputs = [float(v) for v in input_range]
+        outputs = list(output_range)
+        if len(inputs) < 2:
+            raise ValueError("interpolate() needs at least two input_range entries")
+        if len(inputs) != len(outputs):
+            raise ValueError("interpolate() input_range and output_range must have the same length")
+        for a, b in zip(inputs, inputs[1:]):
+            if b < a:
+                raise ValueError("interpolate() input_range must be monotonically non-decreasing")
+
+        kind = "number"
+        first = outputs[0]
+        if isinstance(first, str):
+            if _parse_color_output(first) is not None:
+                kind = "color"
+                outputs = [_parse_color_output(str(v)) for v in outputs]
+                if any(v is None for v in outputs):
+                    raise ValueError("interpolate() color output_range entries must all be colors")
+            else:
+                angles = [_parse_angle_output(str(v)) for v in outputs]
+                if any(v is None for v in angles):
+                    raise ValueError(f"interpolate() cannot parse output value {first!r}")
+                outputs = angles
+        else:
+            outputs = [float(v) for v in outputs]
+
+        self._parent = parent
+        self._inputs = inputs
+        self._outputs = outputs
+        self._kind = kind
+        self._left = extrapolate_left or extrapolate
+        self._right = extrapolate_right or extrapolate
+        parent._adopt_child(self)
+
+    @property
+    def value(self) -> Any:
+        return self._compute(float(self._parent))
+
+    def _compute(self, x: float) -> Any:
+        inputs = self._inputs
+        n = len(inputs)
+        if x < inputs[0]:
+            if self._left == "identity":
+                return x
+            if self._left == "clamp":
+                x = inputs[0]
+            i = 0
+        elif x > inputs[-1]:
+            if self._right == "identity":
+                return x
+            if self._right == "clamp":
+                x = inputs[-1]
+            i = n - 2
+        else:
+            i = max(0, min(n - 2, bisect.bisect_right(inputs, x) - 1))
+
+        x0, x1 = inputs[i], inputs[i + 1]
+        span = x1 - x0
+        t = 0.0 if span <= 0 else (x - x0) / span
+
+        if self._kind == "color":
+            c0 = self._outputs[i]
+            c1 = self._outputs[i + 1]
+            t_cl = max(0.0, min(1.0, t))
+            channels = [int(round(c0[j] + (c1[j] - c0[j]) * t_cl)) for j in range(4)]
+            a, r, g, b = (max(0, min(255, ch)) for ch in channels)
+            return f"#{a:02X}{r:02X}{g:02X}{b:02X}"
+
+        y0 = self._outputs[i]
+        y1 = self._outputs[i + 1]
+        return y0 + (y1 - y0) * t
+
+    def __repr__(self) -> str:
+        return f"AnimatedInterpolation({self._inputs} -> {self._outputs})"
+
+
+class _AnimatedOperation(AnimatedNode):
+    """Read-only node computed from other nodes (and constants) by ``fn``."""
+
+    __slots__ = ("_op", "_fn", "_parents")
+
+    def __init__(self, op: str, fn: Callable[..., float], parents: List[Any]) -> None:
+        super().__init__()
+        self._op = op
+        self._fn = fn
+        self._parents = list(parents)
+        for parent in self._parents:
+            if isinstance(parent, AnimatedNode):
+                parent._adopt_child(self)
+
+    @property
+    def value(self) -> float:
+        args = [float(p) if isinstance(p, AnimatedNode) else float(p) for p in self._parents]
+        try:
+            return float(self._fn(*args))
+        except Exception:
+            return 0.0
+
+    def __repr__(self) -> str:
+        return f"AnimatedOperation({self._op})"
+
+
+class _AnimatedDiffClamp(AnimatedNode):
+    """Accumulate a parent's *deltas* into a clamped range.
+
+    Mirrors React Native's ``Animated.diffClamp``: the output moves by
+    the same amount as the input but is pinned to ``[min, max]``, so
+    scrolling far down then slightly up immediately re-reveals a
+    collapsing header regardless of absolute offset.
+    """
+
+    __slots__ = ("_parent", "_min", "_max", "_last_input", "_current")
+
+    def __init__(self, parent: AnimatedNode, min_value: float, max_value: float) -> None:
+        super().__init__()
+        if max_value < min_value:
+            raise ValueError("diff_clamp() requires min_value <= max_value")
+        self._parent = parent
+        self._min = float(min_value)
+        self._max = float(max_value)
+        self._last_input = float(parent)
+        self._current = max(self._min, min(self._max, self._last_input))
+        parent._adopt_child(self)
+
+    @property
+    def value(self) -> float:
+        return self._current
+
+    def _refresh(self) -> None:
+        latest = float(self._parent)
+        delta = latest - self._last_input
+        self._last_input = latest
+        self._current = max(self._min, min(self._max, self._current + delta))
+
+
+# ======================================================================
+# Animated.event
+# ======================================================================
+
+
+class AnimatedEvent:
+    """Callable event handler copying event fields into animated values.
+
+    Built via ``pn.Animated.event(...)``. Each keyword argument names a
+    field on the incoming event payload (a dict key for scroll payloads
+    such as ``{"x": ..., "y": ...}``, or an attribute for
+    [`GestureEvent`][pythonnative.gestures.GestureEvent] instances) and
+    maps it onto an [`AnimatedValue`][pythonnative.AnimatedValue].
+
+    Because the result is an ordinary callable, it can be passed to any
+    event prop:
+
+    ```python
+    scroll_y = pn.use_animated_value(0.0)
+    pn.ScrollView(..., on_scroll=pn.Animated.event(y=scroll_y))
+
+    tx = pn.use_animated_value(0.0)
+    gestures.Pan(on_change=pn.Animated.event(translation_x=tx))
+    ```
+    """
+
+    __slots__ = ("_bindings", "_listener")
+
+    def __init__(self, listener: Optional[Callable[..., None]] = None, **bindings: AnimatedValue) -> None:
+        for name, node in bindings.items():
+            if not isinstance(node, AnimatedValue):
+                raise TypeError(
+                    f"Animated.event() field {name!r} must map to an AnimatedValue "
+                    f"(got {type(node).__name__}); derived nodes are read-only."
+                )
+        self._bindings = dict(bindings)
+        self._listener = listener
+
+    def __call__(self, payload: Any = None, *args: Any) -> None:
+        for name, node in self._bindings.items():
+            raw: Any = None
+            if isinstance(payload, dict):
+                raw = payload.get(name)
+            elif payload is not None:
+                raw = getattr(payload, name, None)
+            if raw is None:
+                continue
+            try:
+                node.set_value(float(raw))
+            except (TypeError, ValueError):
+                continue
+        if self._listener is not None:
+            try:
+                self._listener(payload, *args)
+            except Exception:
+                pass
 
 
 # ======================================================================
@@ -601,6 +1039,10 @@ def _start_native(value: AnimatedValue, spec: Dict[str, Any]) -> Optional[_Nativ
         # Python listeners want per-frame values; only the ticker
         # provides those.
         return None
+    if value._has_dependents():
+        # Derived nodes (interpolations, arithmetic) need per-frame
+        # Python evaluation to keep their own attachments in sync.
+        return None
     try:
         backend = _backend()
     except Exception:
@@ -733,8 +1175,19 @@ class _AnimationHandle(_AwaitableAnimation):
             anim._finish()
             _manager.remove(anim)
 
+    def _is_running(self) -> bool:
+        if self._native_group is not None and not self._native_group._completed:
+            return True
+        if self._python_anim is not None and not self._python_anim._completed:
+            return True
+        return False
+
     async def _drive(self) -> None:
-        if self._native_group is None and self._python_anim is None:
+        # (Re)start unless an instance is currently mid-flight, so a
+        # reused handle (``Animated.loop``, awaiting the same handle
+        # twice) runs a fresh animation instead of resolving instantly
+        # against the finished previous instance.
+        if not self._is_running():
             self.start()
         loop = asyncio.get_running_loop()
         future: asyncio.Future[None] = loop.create_future()
@@ -748,11 +1201,12 @@ class _AnimationHandle(_AwaitableAnimation):
 
 
 class _CompositeAnimation(_AwaitableAnimation):
-    """Run a list of animations in sequence or in parallel."""
+    """Run a list of animations in sequence, in parallel, or staggered."""
 
-    def __init__(self, items: List[Any], mode: str) -> None:
+    def __init__(self, items: List[Any], mode: str, stagger_ms: float = 0.0) -> None:
         self._items = list(items)
         self._mode = mode
+        self._stagger_ms = float(stagger_ms)
 
     def start(self) -> "_CompositeAnimation":
         """Schedule the composite on the framework runtime, fire-and-forget."""
@@ -772,6 +1226,16 @@ class _CompositeAnimation(_AwaitableAnimation):
         if self._mode == "parallel":
             await asyncio.gather(*(self._await_item(item) for item in self._items))
             return
+        if self._mode == "stagger":
+            delay_s = max(0.0, self._stagger_ms) / 1000.0
+
+            async def _delayed(index: int, item: Any) -> None:
+                if index > 0 and delay_s > 0.0:
+                    await asyncio.sleep(delay_s * index)
+                await self._await_item(item)
+
+            await asyncio.gather(*(_delayed(i, item) for i, item in enumerate(self._items)))
+            return
         for item in self._items:
             await self._await_item(item)
 
@@ -784,26 +1248,95 @@ class _CompositeAnimation(_AwaitableAnimation):
         await item
 
 
+class _LoopAnimation(_AwaitableAnimation):
+    """Repeat an animation, resetting its values before each iteration."""
+
+    def __init__(self, animation: Any, iterations: int = -1, reset: bool = True) -> None:
+        self._animation = animation
+        self._iterations = int(iterations)
+        self._reset = bool(reset)
+        self._stopped = False
+
+    def start(self) -> "_LoopAnimation":
+        from .runtime import run_async
+
+        self._stopped = False
+        run_async(self._drive())
+        return self
+
+    def stop(self) -> None:
+        self._stopped = True
+        try:
+            self._animation.stop()
+        except Exception:
+            pass
+
+    def _collect_values(self, item: Any, out: List[AnimatedValue]) -> None:
+        if isinstance(item, _AnimationHandle):
+            if item._value is not None and item._value not in out:
+                out.append(item._value)
+        elif isinstance(item, _CompositeAnimation):
+            for sub in item._items:
+                self._collect_values(sub, out)
+        elif isinstance(item, _LoopAnimation):
+            self._collect_values(item._animation, out)
+
+    async def _drive(self) -> None:
+        self._stopped = False
+        values: List[AnimatedValue] = []
+        self._collect_values(self._animation, values)
+        origins = [(v, v.value) for v in values]
+        count = 0
+        while not self._stopped and (self._iterations < 0 or count < self._iterations):
+            if self._reset and count > 0:
+                for value, origin in origins:
+                    value.set_value(origin)
+            await self._animation
+            count += 1
+
+
 # ======================================================================
 # Animated component wrappers
 # ======================================================================
 
+# Transform-entry keys that may carry animated nodes; the key doubles
+# as the ``set_animated_property`` prop name.
+_ANIMATED_TRANSFORM_KEYS = frozenset(
+    {"translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate"},
+)
 
-def _resolve_style_with_values(style: StyleProp) -> Tuple[Dict[str, Any], Dict[str, AnimatedValue]]:
+
+def _resolve_style_with_values(style: StyleProp) -> Tuple[Dict[str, Any], Dict[str, AnimatedNode]]:
     """Split ``style`` into a plain dict and animated bindings.
 
-    AnimatedValue entries in the style are replaced with their current
-    numeric value in ``plain_style`` and recorded in
-    ``animated_bindings`` so the wrapping component can attach them
-    after mount.
+    Animated nodes in the style (top-level values *and* values inside
+    ``transform`` entries) are replaced with their current numeric
+    value in ``plain_style`` and recorded in ``animated_bindings`` so
+    the wrapping component can attach them after mount.
     """
     flat = resolve_style(style)
-    bindings: Dict[str, AnimatedValue] = {}
+    bindings: Dict[str, AnimatedNode] = {}
     plain: Dict[str, Any] = {}
     for k, v in flat.items():
-        if isinstance(v, AnimatedValue):
+        if isinstance(v, AnimatedNode):
             bindings[k] = v
             plain[k] = v.value
+        elif k == "transform" and v is not None:
+            entries = v if isinstance(v, list) else [v]
+            plain_entries: List[Any] = []
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    plain_entries.append(entry)
+                    continue
+                clean_entry: Dict[str, Any] = {}
+                for prop, val in entry.items():
+                    if isinstance(val, AnimatedNode) and prop in _ANIMATED_TRANSFORM_KEYS:
+                        bindings[prop] = val
+                        clean_entry[prop] = val.value
+                    else:
+                        clean_entry[prop] = val
+                plain_entries.append(clean_entry)
+            plain[k] = plain_entries
         else:
             plain[k] = v
     return plain, bindings
@@ -877,8 +1410,9 @@ def _animated_prop_name(prop: str) -> str:
 class _AnimatedNamespace:
     """Public ``Animated`` namespace.
 
-    Exposes the ``Value`` type, animation factories, composers, and
-    component wrappers (``View``, ``Text``, ``Image``).
+    Exposes the ``Value`` type, animation factories, composers,
+    derived-node helpers (``event``, ``diff_clamp``), and component
+    wrappers (``View``, ``Text``, ``Image``).
     """
 
     Value = AnimatedValue
@@ -969,6 +1503,54 @@ class _AnimatedNamespace:
         return _CompositeAnimation(animations, "sequence")
 
     @staticmethod
+    def stagger(delay: float, animations: List[Any]) -> _CompositeAnimation:
+        """Run ``animations`` in parallel, each starting ``delay`` ms after the previous.
+
+        Args:
+            delay: Milliseconds between successive starts.
+            animations: Animation handles (or awaitables) to run.
+
+        Example:
+            ```python
+            pn.Animated.stagger(80, [
+                pn.Animated.timing(v, to=1.0) for v in card_opacities
+            ]).start()
+            ```
+        """
+        return _CompositeAnimation(animations, "stagger", stagger_ms=delay)
+
+    @staticmethod
+    def loop(animation: Any, *, iterations: int = -1, reset: bool = True) -> _LoopAnimation:
+        """Repeat ``animation``, optionally forever.
+
+        Values driven by the animation are captured when the loop
+        starts and restored before each iteration (matching React
+        Native's ``resetBeforeIteration``), so ``timing`` loops replay
+        the same motion instead of animating in place.
+
+        Args:
+            animation: A handle from ``timing`` / ``spring`` / ``decay``
+                or a ``sequence`` / ``parallel`` / ``stagger`` composite.
+            iterations: Number of repetitions; ``-1`` (default) loops
+                until [`stop`][pythonnative.animated._LoopAnimation.stop]
+                is called or the awaiting task is cancelled.
+            reset: When ``False``, values continue from wherever the
+                previous iteration ended.
+
+        Example:
+            ```python
+            pulse = pn.Animated.loop(
+                pn.Animated.sequence([
+                    pn.Animated.timing(scale, to=1.15, duration=350),
+                    pn.Animated.timing(scale, to=1.0, duration=350),
+                ]),
+            ).start()
+            # later: pulse.stop()
+            ```
+        """
+        return _LoopAnimation(animation, iterations=iterations, reset=reset)
+
+    @staticmethod
     def delay(duration: float) -> _AnimationHandle:
         """Wait ``duration`` ms before continuing in a sequence."""
 
@@ -979,6 +1561,47 @@ class _AnimatedNamespace:
             return _DelayAnimation(duration)
 
         return _AnimationHandle(None, _spec, _fallback)
+
+    @staticmethod
+    def event(listener: Optional[Callable[..., None]] = None, **bindings: AnimatedValue) -> AnimatedEvent:
+        """Build a callback that copies event fields into animated values.
+
+        Pass the result to any event prop. Each keyword maps a payload
+        field (dict key or dataclass attribute) onto an
+        [`AnimatedValue`][pythonnative.AnimatedValue]:
+
+        ```python
+        scroll_y = pn.use_animated_value(0.0)
+        pn.ScrollView(..., on_scroll=pn.Animated.event(y=scroll_y))
+
+        tx = pn.use_animated_value(0.0)
+        gestures.Pan(on_change=pn.Animated.event(translation_x=tx))
+        ```
+
+        Args:
+            listener: Optional plain callback invoked with the raw
+                event after the values update.
+            **bindings: ``field_name=animated_value`` pairs.
+
+        Returns:
+            A callable [`AnimatedEvent`][pythonnative.animated.AnimatedEvent].
+        """
+        return AnimatedEvent(listener, **bindings)
+
+    @staticmethod
+    def diff_clamp(node: AnimatedNode, min_value: float, max_value: float) -> AnimatedNode:
+        """Accumulate ``node``'s deltas into ``[min_value, max_value]``.
+
+        The classic collapsing-header primitive: unlike ``interpolate``
+        with ``"clamp"`` (which pins the *absolute* input), the output
+        tracks input *movement*, so a small scroll upward immediately
+        re-reveals the header no matter how far down the list is.
+
+        ```python
+        header_shift = pn.Animated.diff_clamp(scroll_y, 0, 56)
+        ```
+        """
+        return _AnimatedDiffClamp(node, min_value, max_value)
 
     View = staticmethod(_make_animated_factory("View", accept_children=True))
     Text = staticmethod(_make_animated_factory("Text", accept_children=False))
@@ -1027,7 +1650,10 @@ def use_animated_value(initial: float = 0.0) -> AnimatedValue:
 
 
 __all__ = [
+    "AnimatedNode",
     "AnimatedValue",
+    "AnimatedInterpolation",
+    "AnimatedEvent",
     "Animated",
     "use_animated_value",
     "native_animation_completed",

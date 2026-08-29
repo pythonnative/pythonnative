@@ -230,6 +230,16 @@ KeyboardType = Literal[
 ]
 AutoCapitalize = Literal["none", "sentences", "words", "characters"]
 ReturnKeyType = Literal["default", "done", "go", "next", "send", "search"]
+PointerEvents = Literal["auto", "none", "box_none", "box_only"]
+"""Touch-handling mode for a view and its subtree:
+
+- ``"auto"``: the view and its children receive touches (default).
+- ``"none"``: neither the view nor its children receive touches;
+  touches pass through to whatever is underneath.
+- ``"box_none"``: the view itself ignores touches but its children
+  still receive them (decorative overlays with interactive content).
+- ``"box_only"``: the view receives touches but its children do not.
+"""
 
 
 # ======================================================================
@@ -331,6 +341,10 @@ class Style(TypedDict, total=False):
     # --- Visual: borders ---
     border_width: float
     border_radius: float
+    border_top_left_radius: float
+    border_top_right_radius: float
+    border_bottom_left_radius: float
+    border_bottom_right_radius: float
     border_top_width: float
     border_right_width: float
     border_bottom_width: float
@@ -360,6 +374,10 @@ class Style(TypedDict, total=False):
     elevation: float
     opacity: float
     transform: TransformSpec
+
+    # --- Interaction & stacking ---
+    z_index: int
+    pointer_events: PointerEvents
 
 
 StyleProp = Union[Style, Dict[str, Any], List[Optional[Union[Style, Dict[str, Any]]]], None]
@@ -665,6 +683,7 @@ __all__ = [
     "JustifyContent",
     "KeyboardType",
     "Overflow",
+    "PointerEvents",
     "Position",
     "ReturnKeyType",
     "ScaleType",

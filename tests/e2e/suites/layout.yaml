@@ -6,3 +6,4 @@ appId: ${APP_ID}
 - runFlow: ../flows/layout/absolute_position.yaml
 - runFlow: ../flows/layout/padding_margin.yaml
 - runFlow: ../flows/layout/alignment.yaml
+- runFlow: ../flows/layout/on_layout.yaml

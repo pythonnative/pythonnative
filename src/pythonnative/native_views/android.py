@@ -21,12 +21,28 @@ applies those frames via per-child `MarginLayoutParams`.
 
 **Gestures** feed raw ``MotionEvent`` streams into the shared
 pure-Python [`GestureArbiter`][pythonnative.gestures.GestureArbiter],
-so gesture semantics match the desktop preview exactly.
+so gesture semantics match the desktop preview exactly. Serialized
+specs (including ``simultaneous`` / ``wait_for`` composition metadata
+and ``fling`` configs) pass through untouched; this module only
+schedules main-looper polls at the arbiter's ``next_deadline()`` so
+long-press activation and multi-tap windows fire even when no
+further touch events arrive.
 
 **Animations**: ``timing`` animations on transform/opacity/color props
 are driven natively by ``ObjectAnimator`` (Choreographer-paced, no
 Python per-frame work); springs and decay fall back to the Python
-ticker.
+ticker, whose per-frame values arrive through
+``set_animated_property`` (floats for transforms and opacity,
+interpolated "#AARRGGBB" strings for background and text colors that
+re-bake through the border-drawable machinery instead of clobbering
+it).
+
+**Interaction props**: ``pointer_events`` maps onto the template's
+``PNFrameLayout`` touch interception when available (with a
+Python-side fallback for older projects), ``hit_slop`` expands touch
+targets via a parent ``TouchDelegate`` sized after layout,
+``z_index`` maps to ``View.setZ``, and per-corner radii extend the
+``GradientDrawable`` border path.
 
 This module is only imported on Android at runtime. Desktop tests
 inject a mock registry via
@@ -58,11 +74,20 @@ _SIDE_BORDER_COLOR_KEYS = (
     "border_right_color",
     "border_bottom_color",
 )
+# Order matches GradientDrawable.setCornerRadii: top-left, top-right,
+# bottom-right, bottom-left (each corner takes an x and a y radius).
+_CORNER_RADIUS_KEYS = (
+    "border_top_left_radius",
+    "border_top_right_radius",
+    "border_bottom_right_radius",
+    "border_bottom_left_radius",
+)
 _DRAWABLE_STYLE_KEYS = (
     "background_color",
     "border_radius",
     "border_width",
     "border_color",
+    *_CORNER_RADIUS_KEYS,
     *_SIDE_BORDER_WIDTH_KEYS,
     *_SIDE_BORDER_COLOR_KEYS,
 )
@@ -96,6 +121,38 @@ def _pn_runtime_class(class_name: str) -> Any:
     """
     package = _ctx().getPackageName()
     return jclass(f"{package}.{class_name}")
+
+
+# Cached lookup for the template's PNFrameLayout container class.
+# ``None`` means "not resolved yet"; ``False`` means "this generated
+# project predates the class", so creation falls back to FrameLayout
+# without retrying the (exception-throwing) lookup per view.
+_pn_container_cls: Any = None
+
+
+def _new_container() -> Any:
+    """Create a container view, preferring the template's ``PNFrameLayout``.
+
+    ``PNFrameLayout`` adds native ``pointer_events`` interception
+    (``onInterceptTouchEvent`` / ``dispatchTouchEvent``), which
+    Chaquopy can't express from Python. Older generated projects
+    without the class get a plain ``FrameLayout``; the
+    ``pointer_events`` prop then degrades to the Python-side
+    approximation in
+    [`_apply_pointer_events`][pythonnative.native_views.android._apply_pointer_events].
+    """
+    global _pn_container_cls
+    if _pn_container_cls is None:
+        try:
+            _pn_container_cls = _pn_runtime_class("PNFrameLayout")
+        except Exception:
+            _pn_container_cls = False
+    if _pn_container_cls is not False:
+        try:
+            return _pn_container_cls(_ctx())
+        except Exception:
+            diagnostics.swallowed("android._new_container")
+    return jclass("android.widget.FrameLayout")(_ctx())
 
 
 def _signed_color(value: int) -> int:
@@ -227,7 +284,7 @@ def _apply_border(view: Any, props: Dict[str, Any]) -> None:
     """
     if _apply_side_border(view, props):
         return
-    has_border = any(k in props for k in ("border_radius", "border_width", "border_color"))
+    has_border = any(k in props for k in ("border_radius", "border_width", "border_color", *_CORNER_RADIUS_KEYS))
     has_bg = "background_color" in props and props["background_color"] is not None
     if not has_border and not has_bg:
         return
@@ -239,7 +296,21 @@ def _apply_border(view: Any, props: Dict[str, Any]) -> None:
                 drawable.setColor(parse_color_int(props["background_color"]))
             except Exception:
                 diagnostics.swallowed("android._apply_border")
-        if "border_radius" in props and props["border_radius"] is not None:
+        if any(props.get(k) is not None for k in _CORNER_RADIUS_KEYS):
+            # Per-corner radii: unspecified corners inherit the uniform
+            # ``border_radius`` (else 0). ``setCornerRadii`` takes eight
+            # floats, an (x, y) pair per corner in _CORNER_RADIUS_KEYS
+            # order, each in pixels.
+            try:
+                base_radius = float(props.get("border_radius") or 0.0)
+                radii = []
+                for key in _CORNER_RADIUS_KEYS:
+                    r = float(_dp(float(props[key] if props.get(key) is not None else base_radius)))
+                    radii.extend([r, r])
+                drawable.setCornerRadii(radii)
+            except Exception:
+                diagnostics.swallowed("android._apply_border")
+        elif "border_radius" in props and props["border_radius"] is not None:
             try:
                 drawable.setCornerRadius(float(_dp(float(props["border_radius"]))))
             except Exception:
@@ -267,6 +338,44 @@ def _apply_border(view: Any, props: Dict[str, Any]) -> None:
             diagnostics.swallowed("android._apply_border")
     except Exception:
         diagnostics.swallowed("android._apply_border")
+
+
+def _set_animated_background(view: Any, value: Any) -> None:
+    """Apply one animated ``background_color`` frame without losing borders.
+
+    Interpolations hand this module raw color values ("#AARRGGBB" or
+    "#RRGGBB" strings, or ints). Views whose background is a
+    border-rendering drawable (the uniform ``GradientDrawable`` or the
+    per-side ``PNBorderDrawable``) must keep their corner radii and
+    strokes while the fill animates, so the color routes through the
+    same [`_apply_border`][pythonnative.native_views.android._apply_border]
+    machinery ``update()`` uses. When the current background already is
+    a ``GradientDrawable``, its fill is mutated in place, so no
+    drawable is allocated per animation frame. Plain views take the
+    direct ``setBackgroundColor`` path.
+    """
+    state = _state_of(view)
+    visual = state.get("visual")
+    has_border = isinstance(visual, dict) and any(
+        visual.get(k) is not None for k in _DRAWABLE_STYLE_KEYS if k != "background_color"
+    )
+    if has_border:
+        visual = dict(visual)
+        visual["background_color"] = value
+        state["visual"] = visual
+        try:
+            GradientDrawable = jclass("android.graphics.drawable.GradientDrawable")
+            bg = view.getBackground()
+            if bg is not None and isinstance(bg, GradientDrawable):
+                bg.setColor(parse_color_int(value))
+                return
+        except Exception:
+            diagnostics.swallowed("android._set_animated_background")
+        # Per-side ``PNBorderDrawable`` backgrounds (immutable fill) and
+        # first frames before any drawable exists re-bake the full set.
+        _apply_border(view, visual)
+        return
+    view.setBackgroundColor(parse_color_int(value))
 
 
 def _apply_shadow(view: Any, props: Dict[str, Any]) -> None:
@@ -417,6 +526,138 @@ def _apply_accessibility(view: Any, props: Dict[str, Any]) -> None:
         diagnostics.swallowed("android._apply_accessibility")
 
 
+def _pointer_events_blocked(view: Any) -> bool:
+    """Whether ``pointer_events`` disables the view's own touch handling.
+
+    Consulted at the top of every touch-stream proxy (gesture, press)
+    so listeners installed at create time honor the prop without being
+    re-wired: ``"none"`` and ``"box_none"`` both mean the view itself
+    must not observe or consume the stream.
+    """
+    merged = _state_of(view).get("props") or {}
+    return merged.get("pointer_events") in ("none", "box_none")
+
+
+def _apply_pointer_events(view: Any, value: Any) -> None:
+    """Apply the ``pointer_events`` prop (``None`` restores ``"auto"``).
+
+    Two cooperating layers implement the modes:
+
+    - **Native interception** (preferred): containers built by
+      [`_new_container`][pythonnative.native_views.android._new_container]
+      are the template's ``PNFrameLayout``, whose
+      ``setPointerEventsMode(String)`` drives real
+      ``dispatchTouchEvent`` / ``onInterceptTouchEvent`` overrides.
+      ``"none"`` declines the whole dispatch so touches pass through
+      to views underneath, ``"box_only"`` intercepts events away from
+      children, and ``"box_none"`` never intercepts. The call is
+      guarded so older generated projects without the class (and
+      non-container views) fall back cleanly.
+    - **Python-side muting**: ``setClickable`` toggles whether the
+      view claims events, and the touch-stream proxies consult
+      [`_pointer_events_blocked`][pythonnative.native_views.android._pointer_events_blocked]
+      so gesture/press wiring goes quiet without being torn down.
+      ``"auto"`` / removal restores the original clickability
+      captured before the first override.
+
+    On a plain ``FrameLayout`` (old template) the fallback keeps the
+    previous approximation: ``"none"`` silences the view itself but
+    interactive children keep receiving touches, and ``"box_only"``
+    only claims events no interactive child consumed. ``"box_none"``
+    is exact either way, since children need no help.
+    """
+    mode = value if value is not None else "auto"
+    state = _state_of(view)
+    try:
+        view.setPointerEventsMode(str(mode))
+    except Exception:
+        # Plain FrameLayout, a leaf widget, or an older template
+        # without PNFrameLayout; the Python-side fallback still runs.
+        pass
+    try:
+        if mode in ("none", "box_none"):
+            state.setdefault("pe_was_clickable", bool(view.isClickable()))
+            view.setClickable(False)
+        elif mode == "box_only":
+            state.setdefault("pe_was_clickable", bool(view.isClickable()))
+            view.setClickable(True)
+        elif "pe_was_clickable" in state:
+            view.setClickable(bool(state.pop("pe_was_clickable")))
+    except Exception:
+        diagnostics.swallowed("android._apply_pointer_events")
+
+
+def _hit_slop_insets(value: Any) -> Optional[Tuple[float, float, float, float]]:
+    """Normalize a ``hit_slop`` prop into ``(top, left, bottom, right)`` points.
+
+    Accepts a uniform number or a dict with any of ``top`` / ``left``
+    / ``bottom`` / ``right``. Returns ``None`` for absent or
+    unparseable values.
+    """
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        try:
+            return (
+                float(value.get("top") or 0.0),
+                float(value.get("left") or 0.0),
+                float(value.get("bottom") or 0.0),
+                float(value.get("right") or 0.0),
+            )
+        except Exception:
+            return None
+    try:
+        uniform = float(value)
+    except Exception:
+        return None
+    return (uniform, uniform, uniform, uniform)
+
+
+def _update_hit_slop(view: Any) -> None:
+    """Extend the view's touch target via a ``TouchDelegate`` on its parent.
+
+    The standard Android mechanism: the parent forwards touches
+    landing inside an expanded ``Rect`` (the view's frame plus the
+    slop insets, in parent-relative pixels) to the view. Parents are
+    PythonNative-managed ``FrameLayout``s, so installing the delegate
+    is safe; a parent only holds one delegate, so among siblings the
+    last ``hit_slop`` applied wins (matching the platform limitation).
+
+    Requires a known frame, so
+    [`set_frame`][pythonnative.native_views.android.AndroidViewHandler.set_frame]
+    records the frame and re-invokes this; prop-only updates before
+    the first frame defer until layout runs.
+    """
+    state = _state_of(view)
+    frame = state.get("frame")
+    if frame is None:
+        return
+    merged = state.get("props") or {}
+    insets = _hit_slop_insets(merged.get("hit_slop"))
+    try:
+        parent = view.getParent()
+        if parent is None:
+            return
+        if insets is None:
+            if state.pop("hit_slop_active", None):
+                parent.setTouchDelegate(None)
+            return
+        top, left, bottom, right = insets
+        x, y, width, height = frame
+        Rect = jclass("android.graphics.Rect")
+        TouchDelegate = jclass("android.view.TouchDelegate")
+        rect = Rect(
+            _dp(x - left),
+            _dp(y - top),
+            _dp(x + width + right),
+            _dp(y + height + bottom),
+        )
+        parent.setTouchDelegate(TouchDelegate(rect, view))
+        state["hit_slop_active"] = True
+    except Exception:
+        diagnostics.swallowed("android._update_hit_slop")
+
+
 def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
     """Apply visual properties shared across many handlers."""
     has_drawable_keys = any(k in props for k in _DRAWABLE_STYLE_KEYS)
@@ -440,6 +681,18 @@ def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
             view.setAlpha(float(props["opacity"]))
         except Exception:
             diagnostics.swallowed("android._apply_common_visual")
+    if "z_index" in props:
+        # ``setZ`` takes pixels, so scale like other coordinates; a
+        # removal (``None``) resets the view to the default plane.
+        try:
+            z = props["z_index"]
+            view.setZ(float(_dp(float(z))) if z is not None else 0.0)
+        except Exception:
+            diagnostics.swallowed("android._apply_common_visual")
+    if "pointer_events" in props:
+        _apply_pointer_events(view, props["pointer_events"])
+    if "hit_slop" in props:
+        _update_hit_slop(view)
     _apply_shadow(view, props)
     _apply_transform(view, props)
     _apply_accessibility(view, props)
@@ -454,10 +707,14 @@ def _wire_gestures(view: Any, specs: Any) -> None:
     """Feed ``MotionEvent`` streams on ``view`` into a `GestureArbiter`.
 
     The arbiter emits ``(gesture_index, payload)`` pairs which are
-    forwarded as ``gesture:<i>`` events for this view's tag. Long
-    presses are polled with a main-looper ``Handler``. When a pan
-    activates, the parent is asked not to intercept so an enclosing
-    ScrollView can't steal the drag.
+    forwarded as ``gesture:<i>`` events for this view's tag. Specs
+    (including ``simultaneous`` / ``wait_for`` metadata and fling
+    configs) pass through to the arbiter untouched; all arbitration
+    and recognition live in ``pythonnative.gestures``. Time-based
+    deadlines (long press, multi-tap windows) are polled with a
+    main-looper ``Handler`` scheduled at the arbiter's
+    ``next_deadline()``. When a pan activates, the parent is asked
+    not to intercept so an enclosing ScrollView can't steal the drag.
     """
     state = _state_of(view)
     if not isinstance(specs, (list, tuple)) or not specs:
@@ -476,12 +733,26 @@ def _wire_gestures(view: Any, specs: Any) -> None:
 
 
 def _schedule_arbiter_poll(view: Any, state: Dict[str, Any]) -> None:
-    """Schedule a main-looper poll at the arbiter's next deadline (long-press)."""
+    """Schedule a main-looper poll at the arbiter's next deadline.
+
+    Deadlines cover every time-based recognizer decision: long-press
+    activation and the multi-tap windows that flush an Exclusive
+    double-tap/single-tap buffer. Called after every pointer event
+    (not just DOWN) because a deadline can appear on UP, when no
+    further touch events arrive to drive the arbiter forward.
+
+    A pending poll at or before the requested deadline is reused
+    rather than stacking duplicate runnables; each poll reschedules
+    itself for the following deadline until none remains.
+    """
     arbiter = state.get("arbiter")
     if arbiter is None:
         return
     deadline = arbiter.next_deadline()
     if deadline is None:
+        return
+    pending = state.get("poll_deadline")
+    if pending is not None and pending <= deadline + 0.001:
         return
     delay_ms = max(1, int((deadline - time.monotonic()) * 1000.0))
     try:
@@ -492,9 +763,14 @@ def _schedule_arbiter_poll(view: Any, state: Dict[str, Any]) -> None:
         if handler is None:
             handler = Handler(Looper.getMainLooper())
             state["poll_handler"] = handler
+        token = state.get("poll_token", 0) + 1
+        state["poll_token"] = token
+        state["poll_deadline"] = deadline
 
         class _PollRunnable(dynamic_proxy(Runnable)):
             def run(self) -> None:
+                if state.get("poll_token") == token:
+                    state["poll_deadline"] = None
                 live = state.get("arbiter")
                 if live is not None:
                     live.poll(time.monotonic())
@@ -502,6 +778,7 @@ def _schedule_arbiter_poll(view: Any, state: Dict[str, Any]) -> None:
 
         handler.postDelayed(_PollRunnable(), delay_ms)
     except Exception:
+        state["poll_deadline"] = None
         diagnostics.swallowed("android._schedule_arbiter_poll")
 
 
@@ -512,6 +789,8 @@ def _bind_touch_stream(view: Any, state: Dict[str, Any]) -> None:
 
         class _GestureTouchProxy(dynamic_proxy(OnTouchListener)):
             def onTouch(self, v: Any, event: Any) -> bool:
+                if _pointer_events_blocked(v):
+                    return False
                 return bool(_feed_motion_event(v, state, event))
 
         view.setOnTouchListener(_GestureTouchProxy())
@@ -536,7 +815,6 @@ def _feed_motion_event(view: Any, state: Dict[str, Any], event: Any) -> bool:
             idx = int(event.getActionIndex())
             pid = int(event.getPointerId(idx))
             arbiter.pointer_down(pid, float(event.getX(idx)) / density, float(event.getY(idx)) / density, t)
-            _schedule_arbiter_poll(view, state)
         elif action == 2:  # MOVE
             for i in range(int(event.getPointerCount())):
                 pid = int(event.getPointerId(i))
@@ -554,6 +832,10 @@ def _feed_motion_event(view: Any, state: Dict[str, Any], event: Any) -> bool:
             arbiter.pointer_up(pid, float(event.getX(idx)) / density, float(event.getY(idx)) / density, t)
         elif action == 3:  # CANCEL
             arbiter.cancel(t)
+        # Every event can move the next time-based deadline (long-press
+        # activation, multi-tap windows opened on UP), so reschedule
+        # unconditionally; the scheduler dedups pending polls.
+        _schedule_arbiter_poll(view, state)
         return True
     except Exception:
         return True
@@ -770,6 +1052,13 @@ class AndroidViewHandler(ViewHandler):
             except Exception:
                 diagnostics.swallowed("android.AndroidViewHandler.set_frame")
             native_view.setLayoutParams(lp)
+            # ``hit_slop`` needs the frame (and an attached parent, which
+            # exists by the time frames are applied) to size its
+            # TouchDelegate rect, so record the frame and recompute here.
+            state = _state_of(native_view)
+            state["frame"] = (x, y, width, height)
+            if (state.get("props") or {}).get("hit_slop") is not None or state.get("hit_slop_active"):
+                _update_hit_slop(native_view)
         except Exception:
             diagnostics.swallowed("android.AndroidViewHandler.set_frame")
 
@@ -802,7 +1091,13 @@ class AndroidViewHandler(ViewHandler):
             return (0.0, 0.0)
 
     def set_animated_property(self, native_view: Any, prop_name: str, value: Any) -> None:
-        """Apply one Python-driven animation frame immediately."""
+        """Apply one Python-driven animation frame immediately.
+
+        Handles float transform props (dp-scaled translations, scales,
+        rotation degrees, opacity) and interpolated color frames for
+        ``background_color`` / ``color`` ("#AARRGGBB" / "#RRGGBB"
+        strings or ints). Unknown props are silently ignored.
+        """
         if native_view is None:
             return
         try:
@@ -822,7 +1117,12 @@ class AndroidViewHandler(ViewHandler):
             elif prop_name == "rotate":
                 native_view.setRotation(float(value))
             elif prop_name == "background_color":
-                native_view.setBackgroundColor(parse_color_int(value))
+                _set_animated_background(native_view, value)
+            elif prop_name == "color":
+                # Interpolations emit "#AARRGGBB" strings; parse_color_int
+                # accepts strings and raw ints alike. Views without
+                # setTextColor fall into the except below and skip.
+                native_view.setTextColor(parse_color_int(value))
         except Exception:
             diagnostics.swallowed("android.AndroidViewHandler.set_animated_property")
 
@@ -867,11 +1167,13 @@ class FlexContainerHandler(AndroidViewHandler):
     All flex semantics (direction, alignment, distribution, padding)
     are computed by the layout engine and applied via
     [`set_frame`][pythonnative.native_views.android.AndroidViewHandler.set_frame].
-    The container itself is just a positioning surface.
+    The container itself is just a positioning surface (the template's
+    ``PNFrameLayout`` when available, so ``pointer_events`` gets real
+    touch interception).
     """
 
     def _build(self, props: Dict[str, Any]) -> Any:
-        return jclass("android.widget.FrameLayout")(_ctx())
+        return _new_container()
 
     def insert_child(self, parent: Any, child: Any, index: int) -> None:
         _insert_view(parent, child, index)
@@ -1959,7 +2261,7 @@ class SafeAreaViewHandler(FlexContainerHandler):
     """Safe-area container using FrameLayout with ``fitsSystemWindows``."""
 
     def _build(self, props: Dict[str, Any]) -> Any:
-        fl = jclass("android.widget.FrameLayout")(_ctx())
+        fl = _new_container()
         fl.setFitsSystemWindows(True)
         return fl
 
@@ -2381,7 +2683,7 @@ class PressableHandler(FlexContainerHandler):
     _TAP_SLOP_DP = 12.0
 
     def _build(self, props: Dict[str, Any]) -> Any:
-        fl = jclass("android.widget.FrameLayout")(_ctx())
+        fl = _new_container()
         fl.setClickable(True)
         fl.setFocusable(True)
         self._bind_press_stream(fl)
@@ -2410,6 +2712,8 @@ class PressableHandler(FlexContainerHandler):
 
             class _PressTouchProxy(dynamic_proxy(OnTouchListener)):
                 def onTouch(self, view: Any, event: Any) -> bool:
+                    if _pointer_events_blocked(view):
+                        return False
                     state = _state_of(view)
                     _feed_motion_event(view, state, event)
                     action = int(event.getActionMasked())

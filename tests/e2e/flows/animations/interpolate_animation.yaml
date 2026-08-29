@@ -1,0 +1,32 @@
+# Tests AnimatedNode.interpolate and derived (operator) nodes.
+#
+# Demo screen: examples/e2e-suite/app/screens/animations/interpolate_animation.py
+# Source under test: src/pythonnative/animated.py :: AnimatedNode.interpolate
+#
+# The demo animates one driver 0 -> 1 and derives a 120 pt shift, a
+# color crossfade, and an opacity from it. The "Shift" readout renders
+# the interpolated output at re-render time, so asserting "Shift: 120"
+# proves the interpolation graph evaluated, not just the timing.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Animations
+      DEMO_TITLE: Animated.interpolate
+- assertVisible: "Status: idle"
+- assertVisible: "Shift: 0"
+- tapOn: "Run interpolate"
+- extendedWaitUntil:
+    visible: "Status: done"
+    timeout: 5000
+- assertVisible: "Shift: 120"
+- tapOn: "Reset"
+- extendedWaitUntil:
+    visible: "Status: idle"
+    timeout: 5000
+- assertVisible: "Shift: 0"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Animations

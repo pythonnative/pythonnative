@@ -128,6 +128,130 @@ async def _intro():
 `Animated.sequence` runs animations one-after-another. Both are also
 awaitable.
 
+`Animated.stagger` is `parallel` with an offset: each animation starts
+`delay` milliseconds after the previous one, which is the classic
+"cards cascade in" effect:
+
+```python
+await pn.Animated.stagger(120, [
+    pn.Animated.timing(card_a, to=1.0, duration=200),
+    pn.Animated.timing(card_b, to=1.0, duration=200),
+    pn.Animated.timing(card_c, to=1.0, duration=200),
+])
+```
+
+`Animated.loop` repeats any animation (including a `sequence` or
+`parallel`). By default it loops forever until you `.stop()` it; pass
+`iterations` for a fixed count:
+
+```python
+pulse = pn.Animated.loop(
+    pn.Animated.sequence([
+        pn.Animated.timing(scale, to=1.15, duration=300),
+        pn.Animated.timing(scale, to=1.0, duration=300),
+    ]),
+).start()
+# Later, e.g. when loading finishes:
+pulse.stop()
+```
+
+## Interpolation
+
+Every animated node has an `interpolate` method that maps an input
+range onto an output range. Drive one value and derive as many styled
+properties from it as you like; the derived nodes update whenever the
+driver moves:
+
+```python
+progress = pn.use_animated_value(0.0)
+
+shift = progress.interpolate([0, 1], [0, 120])
+color = progress.interpolate([0, 1], ["#6366F1", "#10B981"])
+angle = progress.interpolate([0, 1], ["0deg", "90deg"])
+
+pn.Animated.View(
+    style={
+        "background_color": color,
+        "transform": [{"translate_x": shift}, {"rotate": angle}],
+    },
+)
+```
+
+Input ranges can have any number of monotonically increasing
+breakpoints, and output ranges accept numbers, color strings, or
+angle strings (`"deg"` or `"rad"`). The `extrapolate` argument
+controls what happens outside the input range: `"extend"` (default)
+continues the edge segment linearly, `"clamp"` pins to the edge
+output, and `"identity"` passes the input through unchanged.
+`extrapolate_left` and `extrapolate_right` set the two sides
+independently. Interpolations chain: `node.interpolate(...)` returns
+another node you can interpolate again.
+
+## Derived values with operators
+
+Animated nodes support Python arithmetic, so simple math doesn't need
+an interpolation:
+
+```python
+opacity = progress * 0.5 + 0.5      # 0.5 .. 1.0
+inverse = 1.0 - progress
+centered = (progress - 0.5) * 2.0
+```
+
+`+`, `-`, `*`, `/`, `%`, and unary `-` all work, between nodes and
+plain numbers or between two nodes. The result is a read-only node:
+bind it into styles like any `AnimatedValue`, but drive the underlying
+source value.
+
+One thing to know: a value with derived dependents animates on the
+Python ticker rather than the fully native driver, because the graph
+has to be re-evaluated per frame to push the derived outputs. The
+API and end state are identical; for most UI work the difference isn't
+observable.
+
+## Scroll-driven animation with `Animated.event`
+
+`Animated.event` builds an event handler that writes fields from the
+event payload straight into `AnimatedValue`s. The classic use is
+binding a scroll offset:
+
+```python
+scroll_y = pn.use_animated_value(0.0)
+
+pn.ScrollView(
+    content,
+    on_scroll=pn.Animated.event(y=scroll_y),
+)
+```
+
+Each keyword names a payload field (`x` and `y` for scroll events) and
+the value it feeds. Pass a positional callable as the first argument
+if you also want a plain Python listener to run per event.
+
+`Animated.diff_clamp` pairs naturally with scroll offsets: it tracks
+the *change* in its input and clamps the running total, which is
+exactly the collapsing-header behavior (hide after N points of
+downward travel, reappear on any upward travel):
+
+```python
+clamped = pn.Animated.diff_clamp(scroll_y, 0, HEADER_HEIGHT)
+header_shift = clamped.interpolate([0, HEADER_HEIGHT], [0, -HEADER_HEIGHT])
+
+pn.Animated.View(
+    header_content,
+    style={
+        "position": "absolute",
+        "top": 0, "left": 0, "right": 0,
+        "height": HEADER_HEIGHT,
+        "z_index": 2,
+        "transform": [{"translate_y": header_shift}],
+    },
+)
+```
+
+The e2e-suite app ships this exact pattern as the "Collapsing header"
+demo under Animations.
+
 ## Easing
 
 `Animated.timing` accepts an `easing` argument: `"linear"`,

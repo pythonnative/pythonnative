@@ -46,8 +46,8 @@ def test_serialize_gestures_emits_config_and_routers() -> None:
         ]
     )
     assert specs == [
-        {"kind": "tap", "n_taps": 1, "max_distance": 12.0},
-        {"kind": "pan", "min_distance": 4.0, "min_pointers": 1},
+        {"kind": "tap", "n_taps": 1, "max_distance": 12.0, "simultaneous": [1], "wait_for": []},
+        {"kind": "pan", "min_distance": 4.0, "min_pointers": 1, "simultaneous": [0], "wait_for": []},
     ]
     assert set(events) == {"gesture:0", "gesture:1"}
 
@@ -57,7 +57,7 @@ def test_serialize_gestures_emits_config_and_routers() -> None:
 
 def test_serialize_passes_plain_dicts_through() -> None:
     specs, events = serialize_gestures([{"kind": "tap", "n_taps": 3}])
-    assert specs == [{"kind": "tap", "n_taps": 3}]
+    assert specs == [{"kind": "tap", "n_taps": 3, "simultaneous": [], "wait_for": []}]
     assert events == {}
 
 
@@ -325,7 +325,9 @@ def test_gesture_events_route_through_view_tag() -> None:
 
     # The native payload received serialized specs (no closures).
     view = backend.views[tag]
-    assert view.props["gestures"] == [{"kind": "tap", "n_taps": 1, "max_distance": 12.0}]
+    assert view.props["gestures"] == [
+        {"kind": "tap", "n_taps": 1, "max_distance": 12.0, "simultaneous": [], "wait_for": []}
+    ]
 
     # A handler-side arbiter (as Android/desktop run) feeds dispatch_event.
     def _emit(i: int, payload: Dict[str, Any]) -> None:

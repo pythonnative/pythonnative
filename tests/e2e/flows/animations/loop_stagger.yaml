@@ -1,0 +1,28 @@
+# Tests Animated.loop (finite iterations) and Animated.stagger.
+#
+# Demo screen: examples/e2e-suite/app/screens/animations/loop_stagger.py
+# Source under test: src/pythonnative/animated.py :: Animated.loop, Animated.stagger
+#
+# Both runners await their composite animation and flip the status
+# line on completion, so the assertions prove the loop ran to its
+# iteration count and the stagger resolved all three children.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Animations
+      DEMO_TITLE: Animated.loop & stagger
+- assertVisible: "Status: idle"
+- tapOn: "Run loop"
+- extendedWaitUntil:
+    visible: "Status: loop done"
+    timeout: 10000
+- tapOn: "Run stagger"
+- extendedWaitUntil:
+    visible: "Status: stagger done"
+    timeout: 10000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Animations

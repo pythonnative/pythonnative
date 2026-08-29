@@ -755,6 +755,8 @@ def View(
     *children: Element,
     style: StyleProp = None,
     gestures: Optional[List[Any]] = None,
+    hit_slop: Optional[Union[float, Dict[str, float]]] = None,
+    on_layout: Optional[Callable[[Dict[str, float]], None]] = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
     accessibility_role: Optional[str] = None,
@@ -797,6 +799,13 @@ def View(
         gestures: Optional list of gesture descriptors from
             `pythonnative.gestures` (e.g. ``[gestures.Pan(on_change=…)]``)
             recognized natively on this view.
+        hit_slop: Extend the touch target beyond the view's bounds
+            without changing layout: a uniform number of points, or a
+            dict with any of ``top`` / ``left`` / ``bottom`` /
+            ``right``.
+        on_layout: Callback invoked with
+            ``{"x", "y", "width", "height"}`` after this view is laid
+            out, and again whenever its frame changes.
         accessibility_label: Spoken description for screen readers.
         accessibility_hint: Spoken extra detail (iOS only).
         accessibility_role: Semantic role for assistive tech.
@@ -824,6 +833,8 @@ def View(
         ref=ref,
         key=key,
         gestures=gestures,
+        hit_slop=hit_slop,
+        on_layout=on_layout,
         accessibility_label=accessibility_label,
         accessibility_hint=accessibility_hint,
         accessibility_role=accessibility_role,
@@ -838,6 +849,7 @@ def View(
 def Column(
     *children: Element,
     style: StyleProp = None,
+    on_layout: Optional[Callable[[Dict[str, float]], None]] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -850,6 +862,9 @@ def Column(
     Args:
         *children: Child elements stacked top to bottom.
         style: Style dict (or list of dicts).
+        on_layout: Callback invoked with
+            ``{"x", "y", "width", "height"}`` after layout and on
+            frame changes.
         ref: Optional [`Ref`][pythonnative.Ref] for native-view access.
         key: Stable identity for keyed reconciliation.
 
@@ -860,6 +875,7 @@ def Column(
         "Column",
         *children,
         style=style,
+        on_layout=on_layout,
         ref=ref,
         key=key,
         _forced={"flex_direction": "column"},
@@ -869,6 +885,7 @@ def Column(
 def Row(
     *children: Element,
     style: StyleProp = None,
+    on_layout: Optional[Callable[[Dict[str, float]], None]] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -881,6 +898,9 @@ def Row(
     Args:
         *children: Child elements arranged left to right.
         style: Style dict (or list of dicts).
+        on_layout: Callback invoked with
+            ``{"x", "y", "width", "height"}`` after layout and on
+            frame changes.
         ref: Optional [`Ref`][pythonnative.Ref] for native-view access.
         key: Stable identity for keyed reconciliation.
 
@@ -891,6 +911,7 @@ def Row(
         "Row",
         *children,
         style=style,
+        on_layout=on_layout,
         ref=ref,
         key=key,
         _forced={"flex_direction": "row"},
@@ -1144,6 +1165,8 @@ def Pressable(
     on_press_out: Optional[Callable[[], None]] = None,
     pressed_opacity: float = 0.6,
     gestures: Optional[List[Any]] = None,
+    hit_slop: Optional[Union[float, Dict[str, float]]] = None,
+    on_layout: Optional[Callable[[Dict[str, float]], None]] = None,
     style: Union[StyleProp, Callable[[Dict[str, bool]], StyleProp]] = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
@@ -1174,6 +1197,14 @@ def Pressable(
         gestures: Optional list of gesture descriptors from
             `pythonnative.gestures` recognized natively on this view
             (pan / swipe / pinch / rotation / multi-tap).
+        hit_slop: Extend the touch target beyond the view's bounds
+            without changing layout: a uniform number of points, or a
+            dict with any of ``top`` / ``left`` / ``bottom`` /
+            ``right``. Essential for small touch targets (icons,
+            chips) that should honor the 44-point guideline.
+        on_layout: Callback invoked with
+            ``{"x", "y", "width", "height"}`` after layout and on
+            frame changes.
         style: Style dict applied to the wrapper, or a callable
             receiving the interaction state (``{"pressed": bool}``)
             and returning a style, re-evaluated on every press
@@ -1220,6 +1251,8 @@ def Pressable(
             on_press_out=on_press_out,
             pressed_opacity=pressed_opacity,
             gestures=gestures,
+            hit_slop=hit_slop,
+            on_layout=on_layout,
             accessibility_label=accessibility_label,
             accessibility_hint=accessibility_hint,
             accessibility_role=accessibility_role,
@@ -1240,6 +1273,8 @@ def Pressable(
         on_press_out=on_press_out,
         pressed_opacity=pressed_opacity,
         gestures=gestures,
+        hit_slop=hit_slop,
+        on_layout=on_layout,
         accessibility_label=accessibility_label,
         accessibility_hint=accessibility_hint,
         accessibility_role=accessibility_role,
@@ -2620,13 +2655,30 @@ def _KeyboardAvoidingContainer(**p: Any) -> Element:
       inside a full-height container).
     - ``"position"``: translates the whole container upward without
       resizing it (useful for pinned footers/toolbars).
+    - ``"height"``: shrinks the container's own height by the shift.
+      The resting height is captured via ``on_layout`` while the
+      keyboard is hidden, so flex-sized containers work too.
     """
-    height = use_keyboard_height()
+    keyboard = use_keyboard_height()
+    base_height, set_base_height = use_state(0.0)
     behavior = p.get("behavior") or "padding"
     offset = float(p.get("keyboard_vertical_offset") or 0.0)
-    shift = max(0.0, height - offset) if height > 0 else 0.0
+    shift = max(0.0, keyboard - offset) if keyboard > 0 else 0.0
     style: Dict[str, Any] = dict(p.get("style") or {})
-    if shift > 0:
+    props: Dict[str, Any] = style
+    if behavior == "height":
+
+        def _record_layout(frame: Dict[str, float]) -> None:
+            if keyboard <= 0:
+                measured = float(frame.get("height", 0.0))
+                if measured > 0 and abs(measured - base_height) > 0.5:
+                    set_base_height(measured)
+
+        props = dict(style)
+        props["on_layout"] = _record_layout
+        if shift > 0 and base_height > 0:
+            props["height"] = max(0.0, base_height - shift)
+    elif shift > 0:
         if behavior == "position":
             transform = list(style.get("transform") or [])
             transform.append({"translate_y": -shift})
@@ -2634,12 +2686,12 @@ def _KeyboardAvoidingContainer(**p: Any) -> Element:
         else:
             style["padding_bottom"] = _numeric_edge_padding(style, "bottom") + shift
     children = p.get("children") or []
-    return Element("KeyboardAvoidingView", style, list(children))
+    return Element("KeyboardAvoidingView", props, list(children))
 
 
 def KeyboardAvoidingView(
     *children: Element,
-    behavior: Literal["padding", "position"] = "padding",
+    behavior: Literal["padding", "position", "height"] = "padding",
     keyboard_vertical_offset: float = 0.0,
     style: StyleProp = None,
     key: Optional[str] = None,
@@ -2656,8 +2708,10 @@ def KeyboardAvoidingView(
     Args:
         *children: Children rendered inside the avoiding container.
         behavior: ``"padding"`` (adds bottom padding, resizing the
-            content) or ``"position"`` (translates the container
-            upward without resizing).
+            content), ``"position"`` (translates the container upward
+            without resizing), or ``"height"`` (shrinks the
+            container's height by the keyboard overlap, matching
+            React Native's ``"height"`` behavior).
         keyboard_vertical_offset: Distance in layout units already
             covered by other UI (e.g. a nav bar); subtracted from the
             keyboard height before applying the shift.

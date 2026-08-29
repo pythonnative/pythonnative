@@ -5,3 +5,6 @@ appId: ${APP_ID}
 - runFlow: ../flows/animations/spring_animation.yaml
 - runFlow: ../flows/animations/parallel_animation.yaml
 - runFlow: ../flows/animations/sequence_animation.yaml
+- runFlow: ../flows/animations/interpolate_animation.yaml
+- runFlow: ../flows/animations/loop_stagger.yaml
+- runFlow: ../flows/animations/collapsing_header.yaml

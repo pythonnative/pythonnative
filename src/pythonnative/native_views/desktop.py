@@ -36,15 +36,45 @@ parent-relative frames render correctly without reparenting.
 ScrollViews shift their children's placement by the current scroll
 offset, which yields real wheel scrolling in the preview.
 
+Interaction and stacking props
+------------------------------
+``z_index`` is honored among logical siblings: whenever a sibling set
+contains an explicit ``z_index``, the parent's children are re-lifted
+in ascending ``z_index`` order (missing values count as 0, ties keep
+insertion order), so higher values render above their siblings.
+``pointer_events`` is approximated by suspending a widget's Tk binding
+tags: ``"none"`` mutes the view and its descendants, ``"box_none"``
+mutes only the view itself, and ``"box_only"`` mutes only the
+descendants. Suspension is reversible (the original tags are restored
+when the prop returns to ``"auto"``), but it is coarser than the real
+platforms: all bindings go quiet (keyboard included), and muted
+widgets drop events rather than passing them through to whatever sits
+underneath. ``hit_slop`` can't grow the initial press target (Tk
+hit-tests presses strictly by widget bounds), but it does expand press
+*tracking*: once a press starts, Tk's implicit grab keeps streaming
+motion and release events to the pressed widget, and ``Pressable``
+treats positions within the slop insets of its frame as still inside
+when deciding whether a release fires ``on_press`` or a pending long
+press survives pointer drift.
+
 Scope
 -----
 This is a **preview** backend, not a production desktop target. It
 favors fidelity of layout and behavior over pixel-perfect chrome:
-rounded corners, shadows, per-widget opacity, and overflow clipping are
-approximated or omitted (Tkinter can't express them cheaply). Native
-animation is declined (``start_animation`` returns ``False``), so the
-Python ticker drives previews of animations through
-``set_animated_property``.
+shadows, per-widget opacity, and overflow clipping are approximated or
+omitted (Tkinter can't express them cheaply). Rounded corners
+(``border_radius`` plus the per-corner ``border_*_radius`` keys, which
+fall back to it) are approximated on Frame-based views by painting the
+background and a uniform border onto a covering ``Canvas``; the corner
+cutouts are filled with the parent's solid background rather than
+being truly transparent, and content leaves (Text, Button, Image)
+ignore radius entirely. Native animation is declined
+(``start_animation`` returns ``False``), so the Python ticker drives
+previews of animations through ``set_animated_property``: translation
+maps onto placement, animated ``background_color`` and ``color``
+(including interpolated ``"#AARRGGBB"`` strings) map onto ``configure``
+(or the rounded-corner canvas when one is active), and rotate, scale,
+and opacity frames are silently ignored.
 
 This module imports ``tkinter`` at import time, so it is only imported
 when ``PN_PLATFORM=desktop``. Off-device unit tests inject a mock
@@ -54,6 +84,7 @@ and never trigger this path.
 
 from __future__ import annotations
 
+import bisect
 import math
 import re
 import time
@@ -327,6 +358,16 @@ def _place(widget: Any) -> None:
         widget.lift()
     except Exception:
         diagnostics.swallowed("desktop._place")
+        return
+    # The unconditional lift above would put a low ``z_index`` sibling
+    # on top, so restack whenever this sibling set uses ``z_index``.
+    if parent is not None and getattr(parent, "_pn_has_z", False):
+        _restack(parent)
+    # Frames are the only reliable resize signal for unmapped widgets,
+    # so keep the rounded background in sync here (cheap when the
+    # paint signature is unchanged).
+    if getattr(widget, "_pn_radius_canvas", None) is not None:
+        _redraw_rounded_background(widget)
 
 
 def _register_child(parent: Any, child: Any, index: int) -> None:
@@ -345,6 +386,369 @@ def _unregister_child(parent: Any, child: Any) -> None:
     except ValueError:
         pass
     parent._pn_children = children
+
+
+def _z_index(widget: Any) -> float:
+    """Return the widget's ``z_index`` (missing or unparseable is 0)."""
+    merged = getattr(widget, "_pn_props", None) or {}
+    z = merged.get("z_index")
+    if z is None:
+        return 0.0
+    try:
+        return float(z)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _lift_subtree(widget: Any) -> None:
+    """Lift ``widget``, then its logical descendants in ``z_index`` order.
+
+    Every desktop widget is a Tk child of the shared stage, so
+    stacking is one global order: lifting a container doesn't carry
+    its subtree along. Pre-order lifting keeps each subtree above its
+    root and applies nested ``z_index`` ordering along the way.
+    """
+    try:
+        widget.lift()
+    except Exception:
+        diagnostics.swallowed("desktop._lift_subtree")
+    for child in sorted(getattr(widget, "_pn_children", None) or [], key=_z_index):
+        _lift_subtree(child)
+
+
+def _restack(parent: Any) -> None:
+    """Re-lift ``parent``'s children (and their subtrees) by ``z_index``.
+
+    ``sorted`` is stable, so siblings with equal ``z_index`` keep their
+    insertion order. Called whenever a sibling set contains an explicit
+    ``z_index`` (see ``_place`` and ``_apply_common``).
+    """
+    for child in sorted(getattr(parent, "_pn_children", None) or [], key=_z_index):
+        _lift_subtree(child)
+
+
+# ----------------------------------------------------------------------
+# ``pointer_events`` (best-effort via Tk binding tags)
+# ----------------------------------------------------------------------
+#
+# A muted widget gets a single dummy binding tag with no bindings, so
+# no event scripts (its own, its class's, or the global "all" tag's)
+# run while the mode is active; the original tags are saved and
+# restored when the prop returns to "auto". This is coarser than the
+# real platforms: keyboard bindings go quiet too, and Tk still routes
+# the event to the widget under the cursor, so muted widgets drop
+# events instead of letting them fall through to lower widgets.
+
+_PE_MUTED_TAG = "pn_pointer_events_off"
+
+
+def _pointer_mode(widget: Any) -> str:
+    """Return the widget's own ``pointer_events`` mode (default ``"auto"``)."""
+    merged = getattr(widget, "_pn_props", None) or {}
+    mode = merged.get("pointer_events")
+    return mode if mode in ("none", "box_none", "box_only") else "auto"
+
+
+def _pointer_muted(widget: Any) -> bool:
+    """Whether the widget should ignore pointer events right now.
+
+    True when its own mode mutes the view (``"none"`` / ``"box_none"``)
+    or when any logical ancestor mutes its subtree (``"none"`` /
+    ``"box_only"``).
+    """
+    if _pointer_mode(widget) in ("none", "box_none"):
+        return True
+    node = getattr(widget, "_pn_parent", None)
+    while node is not None:
+        if _pointer_mode(node) in ("none", "box_only"):
+            return True
+        node = getattr(node, "_pn_parent", None)
+    return False
+
+
+def _set_pointer_muted(widget: Any, muted: bool) -> None:
+    """Suspend or restore the widget's Tk binding tags (idempotent)."""
+    try:
+        current = tuple(widget.bindtags())
+        if muted:
+            if current != (_PE_MUTED_TAG,):
+                widget._pn_saved_bindtags = current
+                widget.bindtags((_PE_MUTED_TAG,))
+        elif current == (_PE_MUTED_TAG,):
+            saved = getattr(widget, "_pn_saved_bindtags", None)
+            if saved:
+                widget.bindtags(saved)
+    except Exception:
+        diagnostics.swallowed("desktop._set_pointer_muted")
+
+
+def _refresh_pointer_events(widget: Any) -> None:
+    """Recompute pointer muting for ``widget`` and its logical subtree."""
+    muted = _pointer_muted(widget)
+    _set_pointer_muted(widget, muted)
+    canvas = getattr(widget, "_pn_radius_canvas", None)
+    if canvas is not None:
+        # The rounded-corner canvas covers the widget and forwards
+        # events to it (see ``_set_rounded_background``), so it mutes
+        # exactly when its host does.
+        _set_pointer_muted(canvas, muted)
+    for child in getattr(widget, "_pn_children", None) or []:
+        _refresh_pointer_events(child)
+
+
+# ----------------------------------------------------------------------
+# ``hit_slop`` (press-tracking expansion)
+# ----------------------------------------------------------------------
+#
+# Tk delivers the initial press only to the widget under the cursor,
+# so the slop insets can't grow the press target the way they do on
+# device. They do expand the *tracking* rect: Tk's implicit grab keeps
+# streaming motion and release events to the pressed widget even past
+# its edges, and ``_within_hit_rect`` treats positions within the slop
+# insets of the widget's frame as inside.
+
+
+def _parse_hit_slop(value: Any) -> Tuple[float, float, float, float]:
+    """Normalize a ``hit_slop`` prop into ``(top, left, bottom, right)`` insets.
+
+    Accepts a uniform number or a dict with any of ``top`` / ``left``
+    / ``bottom`` / ``right``; missing or unparseable entries are 0.
+    """
+    if isinstance(value, dict):
+        return (
+            max(0.0, _finite(value.get("top"))),
+            max(0.0, _finite(value.get("left"))),
+            max(0.0, _finite(value.get("bottom"))),
+            max(0.0, _finite(value.get("right"))),
+        )
+    uniform = max(0.0, _finite(value))
+    return (uniform, uniform, uniform, uniform)
+
+
+def _within_hit_rect(widget: Any, x: float, y: float) -> bool:
+    """Whether a widget-relative point is inside the frame plus ``hit_slop``.
+
+    Falls back to the live Tk size when the layout frame isn't known
+    yet, and to "inside" when neither is available (never drop a press
+    for lack of geometry).
+    """
+    frame = getattr(widget, "_pn_frame", None)
+    if frame is not None:
+        w, h = frame[2], frame[3]
+    else:
+        try:
+            w, h = float(widget.winfo_width()), float(widget.winfo_height())
+        except Exception:
+            return True
+    top, left, bottom, right = getattr(widget, "_pn_hit_slop", (0.0, 0.0, 0.0, 0.0))
+    return (-left <= x <= w + right) and (-top <= y <= h + bottom)
+
+
+# ----------------------------------------------------------------------
+# Rounded corners (Canvas approximation)
+# ----------------------------------------------------------------------
+#
+# Tk widgets are rectangles and can't be clipped, so Frame-based views
+# with a border radius get a full-size Canvas child that paints the
+# background (and a uniform border outline) as a rounded polygon. The
+# corner cutouts can't be transparent; they're filled with the logical
+# parent's background color, which reads correctly whenever the parent
+# paints a solid color behind the view. Content leaves (Text, Button,
+# Image) skip the approximation entirely: a covering canvas would hide
+# what they draw.
+
+_RADIUS_ARC_STEPS = 8
+
+_SIDE_BORDER_WIDTH_KEYS = (
+    "border_left_width",
+    "border_top_width",
+    "border_right_width",
+    "border_bottom_width",
+)
+
+
+def _corner_radii(props: Dict[str, Any]) -> Tuple[float, float, float, float]:
+    """Resolve ``(top-left, top-right, bottom-right, bottom-left)`` radii.
+
+    Per-corner keys fall back to ``border_radius``; missing values are
+    0. Negative or unparseable values clamp to 0.
+    """
+    base = max(0.0, _finite(props.get("border_radius")))
+
+    def _one(key: str) -> float:
+        value = props.get(key)
+        if value is None:
+            return base
+        return max(0.0, _finite(value, base))
+
+    return (
+        _one("border_top_left_radius"),
+        _one("border_top_right_radius"),
+        _one("border_bottom_right_radius"),
+        _one("border_bottom_left_radius"),
+    )
+
+
+def _resolve_border(props: Dict[str, Any]) -> Tuple[float, str]:
+    """Resolve the uniform ``(width, color)`` border approximation.
+
+    Tk borders are uniform, so per-side borders collapse to the widest
+    side's width and the first nonzero side's color.
+    """
+    width = props.get("border_width")
+    color = _tk_color(props.get("border_color")) or "#3c3c43"
+    side_widths = [props.get(k) for k in _SIDE_BORDER_WIDTH_KEYS]
+    if any(w is not None for w in side_widths):
+        width = max(float(w) for w in side_widths if w is not None)
+        for side, w in zip(("left", "top", "right", "bottom"), side_widths):
+            if w is not None and float(w) > 0:
+                side_color = _tk_color(props.get(f"border_{side}_color"))
+                if side_color is not None:
+                    color = side_color
+                break
+    return (max(0.0, _finite(width)), color)
+
+
+def _underlay_color(widget: Any) -> str:
+    """Best-effort color of whatever paints behind ``widget``.
+
+    Used to fill the corner cutouts of a rounded view: the logical
+    parent's rounded fill when it has one, else its plain Tk
+    background. A solid guess is the documented limitation; gradients
+    or images behind a rounded view can't be matched.
+    """
+    parent = getattr(widget, "_pn_parent", None)
+    target = parent if parent is not None else get_root_container()
+    if target is not None:
+        state = getattr(target, "_pn_radius_state", None)
+        if state is not None and state.get("fill"):
+            return str(state["fill"])
+        try:
+            return str(target.cget("background"))
+        except Exception:
+            pass
+    return "#ffffff"
+
+
+def _rounded_rect_points(w: float, h: float, radii: Tuple[float, float, float, float]) -> List[float]:
+    """Vertices of a rounded rectangle, corner arcs sampled clockwise.
+
+    Radii are clamped proportionally so adjacent corners never
+    overlap. A zero radius degenerates to the plain corner point.
+    """
+    tl, tr, br, bl = radii
+    scale = min(
+        1.0,
+        w / max(1e-6, tl + tr),
+        w / max(1e-6, bl + br),
+        h / max(1e-6, tl + bl),
+        h / max(1e-6, tr + br),
+    )
+    tl, tr, br, bl = (r * scale for r in (tl, tr, br, bl))
+    points: List[float] = []
+
+    def _arc(cx: float, cy: float, r: float, start_deg: float) -> None:
+        if r <= 0:
+            points.extend((cx, cy))
+            return
+        for step in range(_RADIUS_ARC_STEPS + 1):
+            a = math.radians(start_deg - 90.0 * step / _RADIUS_ARC_STEPS)
+            points.extend((cx + r * math.cos(a), cy - r * math.sin(a)))
+
+    _arc(tl, tl, tl, 180.0)
+    _arc(w - tr, tr, tr, 90.0)
+    _arc(w - br, h - br, br, 0.0)
+    _arc(bl, h - bl, bl, -90.0)
+    return points
+
+
+def _redraw_rounded_background(widget: Any) -> None:
+    """Repaint the rounded background canvas if its inputs changed.
+
+    Sizes prefer the layout frame (kept current by ``_place``) over
+    ``winfo_*`` so the polygon is right even before Tk maps the
+    window. Redraws are skipped when the (size, colors, radii,
+    underlay) signature matches the last paint.
+    """
+    canvas = getattr(widget, "_pn_radius_canvas", None)
+    state = getattr(widget, "_pn_radius_state", None)
+    if canvas is None or state is None:
+        return
+    frame = getattr(widget, "_pn_frame", None)
+    if frame is not None and frame[2] > 0 and frame[3] > 0:
+        w, h = frame[2], frame[3]
+    else:
+        try:
+            w, h = float(canvas.winfo_width()), float(canvas.winfo_height())
+        except Exception:
+            return
+    if w <= 1 or h <= 1:
+        return
+    under = _underlay_color(widget)
+    signature = (w, h, state["radii"], state["fill"], state["outline"], state["outline_width"], under)
+    if state.get("drawn") == signature:
+        return
+    state["drawn"] = signature
+    try:
+        canvas.configure(background=under)
+        canvas.delete("all")
+        if state["fill"] or state["outline"]:
+            canvas.create_polygon(
+                _rounded_rect_points(w, h, state["radii"]),
+                fill=state["fill"] or "",
+                outline=state["outline"],
+                width=max(1.0, state["outline_width"]),
+            )
+    except Exception:
+        diagnostics.swallowed("desktop._redraw_rounded_background")
+
+
+def _set_rounded_background(widget: Any, radii: Tuple[float, float, float, float], props: Dict[str, Any]) -> None:
+    """Install (or refresh) the rounded background canvas on ``widget``."""
+    border_width, border_color = _resolve_border(props)
+    widget._pn_radius_state = {
+        "radii": radii,
+        "fill": _tk_color(props.get("background_color")),
+        "outline": border_color if border_width else "",
+        "outline_width": border_width,
+    }
+    canvas = getattr(widget, "_pn_radius_canvas", None)
+    if canvas is None:
+        try:
+            canvas = tk.Canvas(widget, highlightthickness=0, bd=0)
+            canvas.place(x=0, y=0, relwidth=1.0, relheight=1.0)
+            # Below any direct Tk children the handler owns (TabBar /
+            # SegmentedControl buttons); PythonNative children live on
+            # the stage and are lifted above the whole frame anyway.
+            # ``Canvas.lower`` is the canvas-item method, so reach for
+            # the widget-stacking ``Misc.lower`` explicitly.
+            tk.Misc.lower(canvas)
+            # Clicks over the frame now land on the covering canvas,
+            # so append the frame's bindtag: its gesture and press
+            # bindings keep firing, with matching coordinates (the
+            # canvas fills the frame exactly).
+            canvas.bindtags(tuple(canvas.bindtags()) + (str(widget),))
+            canvas.bind("<Configure>", lambda _e, w=widget: _redraw_rounded_background(w), add="+")
+        except Exception:
+            diagnostics.swallowed("desktop._set_rounded_background")
+            return
+        canvas._pn_parent = widget  # wheel hit-testing walks through
+        widget._pn_radius_canvas = canvas
+        _set_pointer_muted(canvas, _pointer_muted(widget))
+    _redraw_rounded_background(widget)
+
+
+def _clear_rounded_background(widget: Any) -> None:
+    """Drop the rounded background canvas when radii return to zero."""
+    canvas = getattr(widget, "_pn_radius_canvas", None)
+    if canvas is None:
+        return
+    widget._pn_radius_canvas = None
+    widget._pn_radius_state = None
+    try:
+        canvas.destroy()
+    except Exception:
+        diagnostics.swallowed("desktop._clear_rounded_background")
 
 
 def _set_translate_from_transform(widget: Any, spec: Any) -> None:
@@ -370,44 +774,40 @@ def _set_translate_from_transform(widget: Any, spec: Any) -> None:
 
 def _apply_common(widget: Any, props: Dict[str, Any]) -> None:
     """Apply visual props shared across most handlers (bg, border, transform)."""
-    if "background_color" in props:
+    radii = _corner_radii(props) if isinstance(widget, tk.Frame) else (0.0, 0.0, 0.0, 0.0)
+    rounded = any(r > 0 for r in radii)
+    if "background_color" in props and not rounded:
         color = _tk_color(props["background_color"])
         if color is not None:
             try:
                 widget.configure(background=color)
             except Exception:
                 diagnostics.swallowed("desktop._apply_common")
-    side_width_keys = (
-        "border_left_width",
-        "border_top_width",
-        "border_right_width",
-        "border_bottom_width",
-    )
-    if any(k in props for k in ("border_width", "border_color", *side_width_keys)):
+    if rounded:
+        # Background and border move onto the rounded canvas; the
+        # square highlight border would poke out of the corners.
         try:
-            width = props.get("border_width")
-            color = _tk_color(props.get("border_color")) or "#3c3c43"
-            # Tk highlight borders are uniform, so per-side borders are
-            # approximated with the widest side's width and its color.
-            side_widths = [props.get(k) for k in side_width_keys]
-            if any(w is not None for w in side_widths):
-                width = max(float(w) for w in side_widths if w is not None)
-                for side, w in zip(("left", "top", "right", "bottom"), side_widths):
-                    if w is not None and float(w) > 0:
-                        side_color = _tk_color(props.get(f"border_{side}_color"))
-                        if side_color is not None:
-                            color = side_color
-                        break
-            if width:
-                widget.configure(
-                    highlightthickness=int(round(_finite(width))),
-                    highlightbackground=color,
-                    highlightcolor=color,
-                )
-            else:
-                widget.configure(highlightthickness=0)
+            widget.configure(highlightthickness=0)
         except Exception:
             diagnostics.swallowed("desktop._apply_common")
+        _set_rounded_background(widget, radii, props)
+    else:
+        _clear_rounded_background(widget)
+        if any(k in props for k in ("border_width", "border_color", *_SIDE_BORDER_WIDTH_KEYS)):
+            try:
+                width, color = _resolve_border(props)
+                if width:
+                    widget.configure(
+                        highlightthickness=int(round(width)),
+                        highlightbackground=color,
+                        highlightcolor=color,
+                    )
+                else:
+                    widget.configure(highlightthickness=0)
+            except Exception:
+                diagnostics.swallowed("desktop._apply_common")
+    if "hit_slop" in props:
+        widget._pn_hit_slop = _parse_hit_slop(props.get("hit_slop"))
     if "test_id" in props and props["test_id"] is not None:
         # Stamped for introspection so preview-level tooling and tests
         # can locate widgets the same way Maestro does on device.
@@ -415,6 +815,13 @@ def _apply_common(widget: Any, props: Dict[str, Any]) -> None:
     if "transform" in props:
         _set_translate_from_transform(widget, props["transform"])
         _place(widget)
+    if "z_index" in props:
+        parent = getattr(widget, "_pn_parent", None)
+        if parent is not None:
+            parent._pn_has_z = True
+            _restack(parent)
+    if "pointer_events" in props:
+        _refresh_pointer_events(widget)
 
 
 # ======================================================================
@@ -538,7 +945,15 @@ def _install_wheel_bindings(container: Any) -> None:
 
 
 def _content_extent(widget: Any) -> Tuple[float, float]:
-    """Max (right, bottom) edge over the scroll container's children."""
+    """Max (right, bottom) edge over the scroll container's children.
+
+    Containers that window their children (``VirtualList``) publish
+    the full logical extent via ``_pn_content_extent`` so clamping
+    covers rows that aren't currently mounted.
+    """
+    override = getattr(widget, "_pn_content_extent", None)
+    if override is not None:
+        return override
     max_x = 0.0
     max_y = 0.0
     for child in getattr(widget, "_pn_children", []) or []:
@@ -565,7 +980,12 @@ def _scroll_to(widget: Any, x: float, y: float, fire_event: bool = True) -> None
     widget._pn_scroll_offset = new_offset
     for child in getattr(widget, "_pn_children", []) or []:
         _place(child)
-    if fire_event:
+    hook = getattr(widget, "_pn_scroll_hook", None)
+    if hook is not None:
+        # ``VirtualList`` re-windows its rows and reports the richer
+        # native-list scroll payload instead of the default event.
+        hook(new_offset, fire_event)
+    elif fire_event:
         _fire(widget, "on_scroll", {"x": new_offset[0], "y": new_offset[1]})
 
 
@@ -622,6 +1042,15 @@ class DesktopViewHandler(ViewHandler):
         child._pn_parent = parent
         _register_child(parent, child, index)
         _place(child)
+        # ``z_index`` applies before insertion (create-time props run
+        # first), so stacking and pointer muting settle here, once the
+        # parent chain is known.
+        merged = getattr(child, "_pn_props", None) or {}
+        if merged.get("z_index") is not None:
+            parent._pn_has_z = True
+        if getattr(parent, "_pn_has_z", False):
+            _restack(parent)
+        _refresh_pointer_events(child)
 
     def remove_child(self, parent: Any, child: Any) -> None:
         _unregister_child(parent, child)
@@ -653,9 +1082,14 @@ class DesktopViewHandler(ViewHandler):
     def set_animated_property(self, native_view: Any, prop_name: str, value: Any) -> None:
         """Apply one frame of a Python-driven animation.
 
-        Translation maps onto placement; background color maps onto
-        ``configure``. Opacity, scale, and rotation have no cheap Tk
-        analogue and are skipped (a documented preview limitation).
+        Translation maps onto placement; ``background_color`` and
+        ``color`` map onto ``configure`` and accept every color form
+        ``_tk_color`` understands, including the ``"#AARRGGBB"``
+        strings that color interpolations emit (alpha is dropped).
+        Opacity, scale, and rotation (numeric degrees) have no cheap
+        Tk analogue, and other animated style keys have no desktop
+        mapping; those frames are silently skipped (a documented
+        preview limitation).
         """
         if native_view is None:
             return
@@ -670,8 +1104,22 @@ class DesktopViewHandler(ViewHandler):
         elif prop_name == "background_color":
             color = _tk_color(value)
             if color is not None:
+                state = getattr(native_view, "_pn_radius_state", None)
+                if state is not None:
+                    # A rounded view paints its background on the
+                    # radius canvas, not the frame itself.
+                    state["fill"] = color
+                    _redraw_rounded_background(native_view)
+                    return
                 try:
                     native_view.configure(background=color)
+                except Exception:
+                    diagnostics.swallowed("desktop.DesktopViewHandler.set_animated_property")
+        elif prop_name == "color":
+            color = _tk_color(value)
+            if color is not None:
+                try:
+                    native_view.configure(foreground=color)
                 except Exception:
                     diagnostics.swallowed("desktop.DesktopViewHandler.set_animated_property")
 
@@ -741,6 +1189,257 @@ class ScrollViewHandler(FlexContainerHandler):
         # Keep the offset clamped when the viewport grows.
         sx, sy = getattr(native_view, "_pn_scroll_offset", (0.0, 0.0))
         _scroll_to(native_view, sx, sy, fire_event=False)
+
+
+# ======================================================================
+# VirtualList (natively virtualized list preview)
+# ======================================================================
+
+
+class VirtualListHandler(ScrollViewHandler):
+    """Preview twin of the native ``VirtualList`` handlers.
+
+    Android backs ``VirtualList`` with a ``RecyclerView`` and iOS with
+    a ``UITableView``; the desktop preview reuses the ScrollView
+    machinery and does its own row windowing so trees that target the
+    native-list contract behave the same way here. Rows within one
+    viewport of the scroll window host a live subtree driven by a
+    nested reconciler (see ``pythonnative.virtual_rows``); rows that
+    leave the window are unmounted.
+
+    Expects props:
+
+    - ``count``: total number of rows.
+    - ``row_height``: uniform row extent in points, or
+    - ``row_heights``: per-row extents.
+    - ``render_row``: ``render_row(index) -> Element`` producing one
+      row's subtree. Called lazily as rows enter the window.
+    - ``shows_scroll_indicator``: accepted and ignored (the preview
+      draws no scroll bar).
+
+    Events (dispatched by tag): ``on_scroll`` with
+    ``{"x", "y", "extent", "range"}`` in points, matching the device
+    handlers. ``on_row_press`` is not synthesized: preview rows are
+    live widgets, so presses land on the row's own Pressable / Button
+    children.
+
+    Commands: ``scroll_to_offset`` / ``scroll_to_index`` /
+    ``scroll_to_end`` / ``get_scroll_offset``. The ``animated`` flag
+    is accepted and ignored (the preview jumps, like ScrollView).
+    """
+
+    def build(self, props: Dict[str, Any]) -> Any:
+        from ..virtual_rows import RowHostPool
+
+        frame = super().build(props)
+        frame._pn_vl = {
+            "count": 0,
+            "row_height": 44.0,
+            "row_heights": None,
+            "render_row": None,
+            "starts": [0.0],
+            "pool": RowHostPool(),
+            "cells": {},
+            "cell_width": 0.0,
+        }
+        frame._pn_content_extent = (0.0, 0.0)
+
+        def _hook(offset: Tuple[float, float], fire_event: bool) -> None:
+            self._rewindow(frame)
+            if fire_event:
+                viewport = getattr(frame, "_pn_frame", None)
+                _fire(
+                    frame,
+                    "on_scroll",
+                    {
+                        "x": 0.0,
+                        "y": offset[1],
+                        "extent": viewport[3] if viewport else 0.0,
+                        "range": frame._pn_vl["starts"][-1],
+                    },
+                )
+
+        frame._pn_scroll_hook = _hook
+        return frame
+
+    def apply(self, frame: Any, props: Dict[str, Any]) -> None:
+        super().apply(frame, props)
+        layout_changed, content_changed = self._read_data_props(frame, props)
+        if layout_changed:
+            # Geometry changed under the mounted window; rebuild it.
+            self._release_rows(frame)
+            self._rewindow(frame)
+        elif content_changed:
+            # Only ``render_row`` changed (a fresh closure every
+            # render); reconcile the live rows in place, mirroring
+            # the device handlers' reload-on-render behavior.
+            self._rebind_rows(frame)
+
+    def set_frame(self, native_view: Any, x: float, y: float, width: float, height: float) -> None:
+        super().set_frame(native_view, x, y, width, height)
+        self._rewindow(native_view)
+
+    def measure_intrinsic(self, native_view: Any, max_width: float, max_height: float) -> Tuple[float, float]:
+        # Fill the available space, like a ScrollView clamped to its
+        # parent; collapse to 0 on unbounded axes (nested lists don't
+        # scroll, matching the device handlers).
+        w = max_width if math.isfinite(max_width) else 0.0
+        h = max_height if math.isfinite(max_height) else 0.0
+        return (max(0.0, w), max(0.0, h))
+
+    def command(self, native_view: Any, name: str, args: Dict[str, Any]) -> Any:
+        info = getattr(native_view, "_pn_vl", None)
+        if info is None:
+            return None
+        if name == "scroll_to_offset":
+            _scroll_to(native_view, 0.0, _finite(args.get("y", 0.0)))
+            return True
+        if name == "scroll_to_index":
+            count = info["count"]
+            index = max(0, min(int(_finite(args.get("index", 0))), max(0, count - 1)))
+            _scroll_to(native_view, 0.0, info["starts"][index] if count else 0.0)
+            return True
+        if name == "scroll_to_end":
+            _scroll_to(native_view, 0.0, info["starts"][-1])
+            return True
+        if name == "get_scroll_offset":
+            sx, sy = getattr(native_view, "_pn_scroll_offset", (0.0, 0.0))
+            return {"x": sx, "y": sy}
+        return None
+
+    def destroy(self, native_view: Any) -> None:
+        info = getattr(native_view, "_pn_vl", None)
+        if info is not None:
+            self._release_rows(native_view)
+            try:
+                info["pool"].release_all()
+            except Exception:
+                diagnostics.swallowed("desktop.VirtualListHandler.destroy")
+        super().destroy(native_view)
+
+    # -- data + windowing ----------------------------------------------
+
+    def _read_data_props(self, frame: Any, props: Dict[str, Any]) -> Tuple[bool, bool]:
+        """Fold changed data props into ``_pn_vl``.
+
+        Returns ``(layout_changed, content_changed)``: the first is
+        true when row geometry changed (count or extents) and the
+        window must be rebuilt; the second when ``render_row`` changed
+        and live rows only need a rebind.
+        """
+        info = frame._pn_vl
+        layout_changed = False
+        if "count" in props:
+            info["count"] = int(props.get("count") or 0)
+            layout_changed = True
+        if "row_height" in props and props.get("row_height") is not None:
+            info["row_height"] = max(0.0, _finite(props["row_height"], 44.0))
+            layout_changed = True
+        if "row_heights" in props:
+            heights = props.get("row_heights")
+            info["row_heights"] = [max(0.0, _finite(h)) for h in heights] if heights else None
+            layout_changed = True
+        content_changed = False
+        if "render_row" in props:
+            info["render_row"] = props.get("render_row")
+            content_changed = True
+        if layout_changed:
+            n = info["count"]
+            heights = info["row_heights"]
+            starts = [0.0] * (n + 1)
+            acc = 0.0
+            for i in range(n):
+                starts[i] = acc
+                extent = heights[i] if heights is not None and i < len(heights) else info["row_height"]
+                acc += max(0.0, extent)
+            starts[n] = acc
+            info["starts"] = starts
+            # Publish the full content extent so ``_scroll_to`` clamps
+            # against every row, not just the mounted window.
+            frame._pn_content_extent = (0.0, acc)
+        return (layout_changed, content_changed)
+
+    def _rewindow(self, frame: Any) -> None:
+        """Mount rows within one viewport of the window, unmount the rest."""
+        info = getattr(frame, "_pn_vl", None)
+        if info is None or info["render_row"] is None:
+            return
+        viewport = getattr(frame, "_pn_frame", None)
+        if viewport is None:
+            return
+        n = info["count"]
+        width = max(0.0, viewport[2])
+        height = max(0.0, viewport[3])
+        if n <= 0 or width <= 0 or height <= 0:
+            self._release_rows(frame)
+            return
+        if width != info["cell_width"]:
+            # Mounted rows were laid out against a different width.
+            self._release_rows(frame)
+            info["cell_width"] = width
+        starts = info["starts"]
+        offset = getattr(frame, "_pn_scroll_offset", (0.0, 0.0))[1]
+        lo = max(0.0, offset - height)
+        hi = offset + 2.0 * height
+        first = max(0, bisect.bisect_right(starts, lo, 0, n) - 1)
+        last = min(n - 1, bisect.bisect_left(starts, hi, 0, n))
+        cells: Dict[int, Any] = info["cells"]
+        for index in [i for i in cells if i < first or i > last]:
+            self._release_row(frame, index)
+        for index in range(first, last + 1):
+            if index in cells:
+                continue
+            cell = tk.Frame(_master(), highlightthickness=0, bd=0)
+            cell._pn_parent = frame
+            cells[index] = cell
+            _register_child(frame, cell, len(getattr(frame, "_pn_children", None) or []))
+            cell._pn_frame = (0.0, starts[index], width, starts[index + 1] - starts[index])
+            _place(cell)
+            self._attach_row(frame, cell, index)
+
+    def _attach_row(self, frame: Any, cell: Any, index: int) -> None:
+        """Mount (or rebind) row ``index`` into ``cell`` and place its root."""
+        info = frame._pn_vl
+        render_row = info["render_row"]
+        cell_frame = getattr(cell, "_pn_frame", (0.0, 0.0, 0.0, 0.0))
+        try:
+            root = info["pool"].bind(index, lambda: render_row(index), cell_frame[2], cell_frame[3])
+        except Exception:
+            diagnostics.swallowed("desktop.VirtualListHandler._attach_row")
+            return
+        if root is None:
+            return
+        # A rebind can replace the subtree's root, so reset the cell's
+        # child list instead of accumulating stale widgets.
+        root._pn_parent = cell
+        cell._pn_children = [root]
+        _place(root)
+
+    def _rebind_rows(self, frame: Any) -> None:
+        info = frame._pn_vl
+        for index, cell in list(info["cells"].items()):
+            self._attach_row(frame, cell, index)
+
+    def _release_row(self, frame: Any, index: int) -> None:
+        info = frame._pn_vl
+        cell = info["cells"].pop(index, None)
+        try:
+            info["pool"].release(index)
+        except Exception:
+            diagnostics.swallowed("desktop.VirtualListHandler._release_row")
+        if cell is not None:
+            _unregister_child(frame, cell)
+            try:
+                cell.destroy()
+            except Exception:
+                diagnostics.swallowed("desktop.VirtualListHandler._release_row")
+
+    def _release_rows(self, frame: Any) -> None:
+        info = getattr(frame, "_pn_vl", None)
+        if info is None:
+            return
+        for index in list(info["cells"]):
+            self._release_row(frame, index)
 
 
 # ======================================================================
@@ -1239,7 +1938,16 @@ class WebViewHandler(DesktopViewHandler):
 
 
 class PressableHandler(DesktopViewHandler):
-    """A frame that forwards press / long-press / gestures."""
+    """A frame that forwards press / long-press / gestures.
+
+    ``hit_slop`` support is partial (see ``_within_hit_rect``): the
+    slop insets can't grow the initial press target, but they expand
+    the tracking rect, so a release (or pointer drift during a pending
+    long press) within the slop of the frame's edges still counts as
+    inside. A release outside the expanded rect fires ``on_press_out``
+    without ``on_press``, matching the device backends' cancel-on-exit
+    behavior.
+    """
 
     def build(self, props: Dict[str, Any]) -> Any:
         frame = tk.Frame(_master(), highlightthickness=0, bd=0, cursor="hand2")
@@ -1252,7 +1960,8 @@ class PressableHandler(DesktopViewHandler):
             frame._pn_long_fired = False
             self._cancel_long(frame)
             _fire(frame, "on_press_out")
-            if not fired_long:
+            inside = event is None or _within_hit_rect(frame, float(event.x), float(event.y))
+            if not fired_long and inside:
                 _fire(frame, "on_press")
 
         def _on_press_down(_event: Any = None) -> None:
@@ -1265,13 +1974,19 @@ class PressableHandler(DesktopViewHandler):
             frame._pn_long_fired = True
             _fire(frame, "on_long_press")
 
-        def _on_leave(_event: Any = None) -> None:
-            self._cancel_long(frame)
+        def _on_drift(event: Any = None) -> None:
+            # A pending long press survives pointer drift inside the
+            # hit rect (frame plus hit_slop). <Leave> fires once at
+            # the edge crossing, so <B1-Motion> covers travel beyond
+            # it; Tk's implicit grab keeps reporting positions.
+            if event is None or not _within_hit_rect(frame, float(event.x), float(event.y)):
+                self._cancel_long(frame)
 
         try:
             frame.bind("<ButtonRelease-1>", _on_release, add="+")
             frame.bind("<ButtonPress-1>", _on_press_down, add="+")
-            frame.bind("<Leave>", _on_leave, add="+")
+            frame.bind("<B1-Motion>", _on_drift, add="+")
+            frame.bind("<Leave>", _on_drift, add="+")
         except Exception:
             diagnostics.swallowed("desktop.PressableHandler._bind")
 
@@ -1597,9 +2312,12 @@ def register_handlers(registry: Any) -> None:
     """Register every built-in desktop handler on ``registry``.
 
     Mirrors ``register_handlers`` in the iOS / Android backends so the
-    desktop registry services the same element types. Lists
-    (``FlatList`` / ``SectionList``) need no handler: they are Python
-    components that virtualize on top of ``ScrollView``.
+    desktop registry services the same element types, including
+    ``VirtualList``. ``FlatList`` and ``SectionList`` still pick the
+    Python-windowed engine on desktop (``_native_lists_supported`` is
+    false here), but trees that emit ``VirtualList`` directly, and
+    tests that exercise the native-list routing, get the same command
+    and prop contract in the preview.
     """
     flex = FlexContainerHandler()
     registry.register("View", flex)
@@ -1627,3 +2345,4 @@ def register_handlers(registry: Any) -> None:
     registry.register("Checkbox", CheckboxHandler())
     registry.register("SegmentedControl", SegmentedControlHandler())
     registry.register("DatePicker", DatePickerHandler())
+    registry.register("VirtualList", VirtualListHandler())

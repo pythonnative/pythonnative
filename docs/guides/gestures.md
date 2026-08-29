@@ -1,13 +1,17 @@
 # Gestures
 
 `pythonnative.gestures` attaches native gesture recognition to any
-view-like element through the `gestures=` prop. Six recognizers ship
+view-like element through the `gestures=` prop. Seven recognizers ship
 out of the box: [`Tap`][pythonnative.gestures.Tap],
 [`LongPress`][pythonnative.gestures.LongPress],
 [`Pan`][pythonnative.gestures.Pan],
 [`Swipe`][pythonnative.gestures.Swipe],
+[`Fling`][pythonnative.gestures.Fling],
 [`Pinch`][pythonnative.gestures.Pinch], and
-[`Rotation`][pythonnative.gestures.Rotation].
+[`Rotation`][pythonnative.gestures.Rotation], plus three composition
+combinators: [`Simultaneous`][pythonnative.gestures.Simultaneous],
+[`Race`][pythonnative.gestures.Race], and
+[`Exclusive`][pythonnative.gestures.Exclusive].
 
 ```python
 import pythonnative as pn
@@ -45,7 +49,65 @@ Recognition itself is native:
 - **Desktop preview** feeds Tk pointer events into the same arbiter,
   so gesture code is testable on a laptop.
 
-All gestures attached to one view recognize *simultaneously*.
+Gestures listed side by side in the `gestures=` list recognize
+*simultaneously*. Use the composition combinators below when you need
+them to compete instead.
+
+## Composition: Race, Exclusive, Simultaneous
+
+Real interactions rarely involve one recognizer at a time. Three
+combinators, nestable to any depth, control how recognizers relate:
+
+- `Race(a, b, ...)`: the first gesture to activate wins and the
+  others are cancelled. Use it when gestures are alternatives, like
+  "either long-press to preview or drag to reorder."
+- `Exclusive(a, b, ...)`: earlier entries take priority; a later
+  entry only fires once every earlier one has *failed*. The canonical
+  case is single tap vs. double tap.
+- `Simultaneous(a, b, ...)`: the wrapped gestures recognize together,
+  like pinch-to-zoom plus rotate on a photo.
+
+```python
+from pythonnative import gestures
+
+pn.View(
+    photo,
+    gestures=[
+        gestures.Exclusive(
+            gestures.Tap(n_taps=2, on_tap=zoom_in),
+            gestures.Tap(on_tap=show_toolbar),   # waits for the double tap to fail
+        ),
+        gestures.Simultaneous(
+            gestures.Pinch(on_change=on_pinch),
+            gestures.Rotation(on_change=on_rotate),
+        ),
+    ],
+)
+```
+
+With `Exclusive`, a single tap reports only after the double-tap
+window closes, and a double tap suppresses the single-tap callback
+entirely; you get exactly one of the two. On iOS this maps to
+`requireGestureRecognizerToFail`; on Android and desktop the
+pure-Python arbiter implements the same waiting semantics, so behavior
+matches across platforms.
+
+## Fling
+
+[`Fling`][pythonnative.gestures.Fling] recognizes a quick directional
+flick, optionally with multiple pointers, and reports the resolved
+`direction` on release:
+
+```python
+gestures.Fling(direction="down", n_pointers=2, on_fling=dismiss)
+gestures.Fling(on_fling=lambda e: print(e.direction, e.velocity_x))
+```
+
+It differs from `Swipe` in intent: `Swipe` is a single-pointer
+directional gesture with a velocity threshold; `Fling` mirrors React
+Native Gesture Handler's fling semantics (including the multi-pointer
+requirement) and is what you want for "two-finger swipe down to
+close."
 
 ## Drag with spring-back
 

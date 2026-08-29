@@ -1,0 +1,30 @@
+# Tests the declarative on_layout prop reporting computed frames.
+#
+# Demo screen: examples/e2e-suite/app/screens/layout/on_layout.py
+# Source under test: src/pythonnative/reconciler.py :: on_layout dispatch
+#
+# The readout is set exclusively from the on_layout callback, so the
+# assertions prove the callback fired with the box's real computed
+# frame after the initial mount and again after the width change.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Layout
+      DEMO_TITLE: on_layout
+- extendedWaitUntil:
+    visible: "Measured: 120x60"
+    timeout: 5000
+- tapOn: "Widen box"
+- extendedWaitUntil:
+    visible: "Measured: 200x60"
+    timeout: 5000
+- tapOn: "Shrink box"
+- extendedWaitUntil:
+    visible: "Measured: 120x60"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Layout

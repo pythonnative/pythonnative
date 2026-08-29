@@ -29,6 +29,9 @@ from typing import Callable, List
 import pythonnative as pn
 from app.screens.alerts.confirm_alert import ConfirmAlertDemo
 from app.screens.alerts.simple_alert import SimpleAlertDemo
+from app.screens.animations.collapsing_header import CollapsingHeaderDemo
+from app.screens.animations.interpolate_animation import InterpolateAnimationDemo
+from app.screens.animations.loop_stagger import LoopStaggerDemo
 from app.screens.animations.parallel_animation import ParallelAnimationDemo
 from app.screens.animations.sequence_animation import SequenceAnimationDemo
 from app.screens.animations.spring_animation import SpringAnimationDemo
@@ -64,6 +67,7 @@ from app.screens.components.text_input import TextInputDemo
 from app.screens.components.touchable_opacity import TouchableOpacityDemo
 from app.screens.components.view_column_row import ViewColumnRowDemo
 from app.screens.components.web_view import WebViewDemo
+from app.screens.gestures.gesture_composition import GestureCompositionDemo
 from app.screens.gestures.gestures import GesturesDemo
 from app.screens.hooks.async_effect import AsyncEffectDemo
 from app.screens.hooks.batch_updates_demo import BatchUpdatesDemo
@@ -91,6 +95,7 @@ from app.screens.layout.absolute_position import AbsolutePositionDemo
 from app.screens.layout.alignment import AlignmentDemo
 from app.screens.layout.aspect_ratio import AspectRatioDemo
 from app.screens.layout.flex_layout import FlexLayoutDemo
+from app.screens.layout.on_layout import OnLayoutDemo
 from app.screens.layout.padding_margin import PaddingMarginDemo
 from app.screens.navigation.drawer_navigator import DrawerNavigatorDemo
 from app.screens.navigation.focus_effect import FocusEffectDemo
@@ -101,6 +106,7 @@ from app.screens.runtime.run_async_demo import RunAsyncDemo
 from app.screens.sdk.custom_component import CustomComponentDemo
 from app.screens.storage.async_storage_demo import AsyncStorageDemo
 from app.screens.styling.borders_shadows import BordersShadowsDemo
+from app.screens.styling.interaction_props import InteractionPropsDemo
 from app.screens.styling.stylesheet_demo import StyleSheetDemo
 from app.screens.styling.transform import TransformDemo
 from app.screens.styling.typography import TypographyDemo
@@ -329,6 +335,7 @@ DEMOS: List[DemoEntry] = [
         PaddingMarginDemo,
     ),
     DemoEntry("alignment", "Layout", "Alignment", "layout::alignment", AlignmentDemo),
+    DemoEntry("on_layout", "Layout", "on_layout", "layout::on_layout", OnLayoutDemo),
     # ------------------------------------------------------------------
     # Styling
     # ------------------------------------------------------------------
@@ -342,6 +349,13 @@ DEMOS: List[DemoEntry] = [
     ),
     DemoEntry("transform", "Styling", "Transforms", "styling::transform", TransformDemo),
     DemoEntry("stylesheet", "Styling", "StyleSheet", "StyleSheet", StyleSheetDemo),
+    DemoEntry(
+        "interaction_props",
+        "Styling",
+        "Interaction props",
+        "styling::interaction_props",
+        InteractionPropsDemo,
+    ),
     # ------------------------------------------------------------------
     # Animations
     # ------------------------------------------------------------------
@@ -367,10 +381,38 @@ DEMOS: List[DemoEntry] = [
         "animated::sequence",
         SequenceAnimationDemo,
     ),
+    DemoEntry(
+        "interpolate_animation",
+        "Animations",
+        "Animated.interpolate",
+        "animated::interpolate",
+        InterpolateAnimationDemo,
+    ),
+    DemoEntry(
+        "loop_stagger",
+        "Animations",
+        "Animated.loop & stagger",
+        "animated::loop",
+        LoopStaggerDemo,
+    ),
+    DemoEntry(
+        "collapsing_header",
+        "Animations",
+        "Collapsing header",
+        "animated::event",
+        CollapsingHeaderDemo,
+    ),
     # ------------------------------------------------------------------
     # Gestures
     # ------------------------------------------------------------------
     DemoEntry("gestures", "Gestures", "gestures", "gestures", GesturesDemo),
+    DemoEntry(
+        "gesture_composition",
+        "Gestures",
+        "Gesture composition",
+        "gestures::composition",
+        GestureCompositionDemo,
+    ),
     # ------------------------------------------------------------------
     # Alerts, storage, runtime, platform, SDK
     # ------------------------------------------------------------------

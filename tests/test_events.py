@@ -77,7 +77,9 @@ def test_extract_serializes_gestures_to_plain_specs() -> None:
     taps: List[Any] = []
     clean, events = extract_events({"gestures": [Tap(on_tap=taps.append, n_taps=2)]})
 
-    assert clean["gestures"] == [{"kind": "tap", "n_taps": 2, "max_distance": 12.0}]
+    assert clean["gestures"] == [
+        {"kind": "tap", "n_taps": 2, "max_distance": 12.0, "simultaneous": [], "wait_for": []}
+    ]
     assert set(events) == {"gesture:0"}
     assert clean[EVENTS_PROP] == frozenset({"gesture:0"})
     # The router converts the raw payload into a GestureEvent.

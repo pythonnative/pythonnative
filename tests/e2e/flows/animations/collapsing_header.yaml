@@ -1,0 +1,47 @@
+# Tests Animated.event scroll binding driving a collapsing header.
+#
+# Demo screen: examples/e2e-suite/app/screens/animations/collapsing_header.py
+# Source under test: src/pythonnative/animated.py :: Animated.event, Animated.diff_clamp
+#
+# The demo binds the inner scroll offset to an AnimatedValue via
+# Animated.event; the listener mirrors the offset into state. Scrolling
+# deep into the list must flip the readout to "collapsed", proving the
+# scroll payload reached both the animated graph and the listener.
+#
+# The inner scroll is 400 dp (matching scroll_view.yaml) so Maestro's
+# scrollUntilVisible, which swipes from screen center, lands inside it
+# on both CI emulators. See scroll_view.yaml for why the target row
+# must start beyond the physical screen (60 rows).
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Animations
+      DEMO_TITLE: Collapsing header
+- assertVisible: "Header state: expanded"
+- scrollUntilVisible:
+    element: "HeaderRow 60"
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: false
+- extendedWaitUntil:
+    visible: "Header state: collapsed"
+    timeout: 5000
+# Surface the back button on Android's shorter viewport (the inner
+# scroll bottoms out and bubbles the over-scroll to the outer page;
+# see scroll_view.yaml for the full rationale).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: "Back to list"
+          direction: DOWN
+          timeout: 20000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Animations
