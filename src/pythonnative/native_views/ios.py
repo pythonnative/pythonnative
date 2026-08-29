@@ -754,6 +754,7 @@ def _set_recognizer_delegate(recognizer: Any) -> None:
 _pn_action_handlers: Dict[int, Any] = {}
 
 _ACTION_IMP_TYPE = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
+_CONTROL_ACTION_IMP_TYPE = _ct.CFUNCTYPE(None, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_void_p)
 
 
 def _action_imp(_self_ptr: int, _cmd_ptr: int, sender_ptr: int) -> None:
@@ -769,7 +770,65 @@ def _action_imp(_self_ptr: int, _cmd_ptr: int, sender_ptr: int) -> None:
 
 _action_imp_ref = _ACTION_IMP_TYPE(_action_imp)
 
+# ----------------------------------------------------------------------
+# UIControl action dedupe
+# ----------------------------------------------------------------------
+#
+# The simulator's XCTest event-injection stack sometimes delivers a
+# single synthesized tap as *two* back-to-back "send control actions"
+# bursts for the same UIEvent (~1ms apart; the unified log shows one
+# UIEvent delivered to one window, then the doubled sends). Every
+# non-idempotent ``on_press`` then fires twice: reducer counters jump
+# by two, alerts present twice, pickers reopen after selecting. The
+# control action selector therefore takes the ``forEvent:`` argument
+# and drops a second send whose UIEvent timestamp matches the last one
+# delivered to the same control. Distinct taps (even rapid ones) carry
+# distinct event timestamps, and continuous ValueChanged streams
+# (slider drags) tick the timestamp per touch move, so only the
+# duplicated sends are filtered. Programmatic ``sendActions...`` calls
+# pass a nil event and are never deduped.
+
+# Maps control ptr -> UIEvent.timestamp of the last delivered action.
+_pn_last_control_event_ts: Dict[int, float] = {}
+
+_objc_msgSend_double = _ct.CFUNCTYPE(_ct.c_double, _ct.c_void_p, _ct.c_void_p)(("objc_msgSend", _libobjc))
+
+_SEL_TIMESTAMP = _sel_reg(b"timestamp")
+
+
+def _control_action_imp(_self_ptr: int, _cmd_ptr: int, sender_ptr: int, event_ptr: int) -> None:
+    """Raw C callback for every PythonNative UIControl event action."""
+    key = int(sender_ptr or 0)
+    handler = _pn_action_handlers.get(key)
+    if handler is None:
+        return
+    if event_ptr:
+        try:
+            timestamp = float(_objc_msgSend_double(event_ptr, _SEL_TIMESTAMP))
+        except Exception:
+            timestamp = None
+        if timestamp is not None:
+            if _pn_last_control_event_ts.get(key) == timestamp:
+                diagnostics.warn_once(
+                    "ios._control_action_imp dropped a duplicated control action "
+                    "(one UIEvent, two sends; a simulator event-injection quirk)",
+                    key=f"control_action_dedupe:{key}",
+                )
+                return
+            _pn_last_control_event_ts[key] = timestamp
+    try:
+        handler()
+    except Exception:
+        diagnostics.swallowed("ios._control_action_imp")
+
+
+_control_action_imp_ref = _CONTROL_ACTION_IMP_TYPE(_control_action_imp)
+
+# Gesture recognizers only support zero- or one-argument action
+# selectors, so recognizers keep the plain variant while controls use
+# the two-argument ``forEvent:`` variant for the dedupe above.
 _SEL_ON_ACTION = _sel_reg(b"onPNAction:")
+_SEL_ON_CONTROL_ACTION = _sel_reg(b"onPNControlAction:forEvent:")
 
 _PN_ACTION_TARGET_CLS = _alloc_cls(_NS_OBJECT_CLS, b"_PNActionTargetCTypes", 0)
 if _PN_ACTION_TARGET_CLS:
@@ -778,6 +837,12 @@ if _PN_ACTION_TARGET_CLS:
         _SEL_ON_ACTION,
         _ct.cast(_action_imp_ref, _ct.c_void_p),
         b"v@:@",
+    )
+    _add_method(
+        _PN_ACTION_TARGET_CLS,
+        _SEL_ON_CONTROL_ACTION,
+        _ct.cast(_control_action_imp_ref, _ct.c_void_p),
+        b"v@:@@",
     )
     _reg_cls(_PN_ACTION_TARGET_CLS)
 
@@ -831,7 +896,7 @@ def _register_control_action(control: Any, events_mask: int, handler: Any) -> No
     _objc_msgSend.restype = None
     _objc_msgSend.argtypes = [_ct.c_void_p, _ct.c_void_p, _ct.c_void_p, _ct.c_ulong]
     ctl_ptr = control.ptr if hasattr(control, "ptr") else control
-    _objc_msgSend(ctl_ptr, _SEL_ADD_TARGET_ACTION_EVENTS, target_ptr, _SEL_ON_ACTION, events_mask)
+    _objc_msgSend(ctl_ptr, _SEL_ADD_TARGET_ACTION_EVENTS, target_ptr, _SEL_ON_CONTROL_ACTION, events_mask)
     _pn_action_handlers[_recognizer_ptr(control)] = handler
 
 
@@ -1167,6 +1232,7 @@ class IOSViewHandler(ViewHandler):
         # Controls register their own pointer as the action-handler key
         # (see _register_control_action); drop it with the view.
         _pn_action_handlers.pop(_recognizer_ptr(native_view), None)
+        _pn_last_control_event_ts.pop(_recognizer_ptr(native_view), None)
         _pn_view_border_radius_map.pop(id(native_view), None)
         _pn_side_border_map.pop(id(native_view), None)
         try:
@@ -1797,6 +1863,7 @@ class ScrollViewHandler(IOSViewHandler):
                 if existing is not None:
                     existing.endRefreshing()
                     _pn_action_handlers.pop(_recognizer_ptr(existing), None)
+                    _pn_last_control_event_ts.pop(_recognizer_ptr(existing), None)
                     sv.setRefreshControl_(None)
                     sv.setAlwaysBounceVertical_(False)
             except Exception:
