@@ -17,8 +17,8 @@ tap, double-tap, long-press, and swipe to verify arbitration.
 from __future__ import annotations
 
 import pythonnative as pn
-from pythonnative.gestures import Exclusive, Fling, LongPress, Pan, Race, Tap
 from app.screens.scaffold import demo_screen, hint, result_text, section
+from pythonnative.gestures import Exclusive, Fling, LongPress, Pan, Race, Tap
 
 
 @pn.component

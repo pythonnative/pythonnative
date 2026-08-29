@@ -511,9 +511,7 @@ def serialize_gestures(
             spec = dict(leaf)
         else:
             spec = {"kind": ""}
-        spec["simultaneous"] = sorted(
-            {b for a, b in sim_pairs if a == i} | {a for a, b in sim_pairs if b == i}
-        )
+        spec["simultaneous"] = sorted({b for a, b in sim_pairs if a == i} | {a for a, b in sim_pairs if b == i})
         spec["wait_for"] = sorted({t for w, t in wait_pairs if w == i})
         clean.append(spec)
     return clean, events

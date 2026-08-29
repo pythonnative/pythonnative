@@ -728,7 +728,7 @@ def _set_rounded_background(widget: Any, radii: Tuple[float, float, float, float
             # bindings keep firing, with matching coordinates (the
             # canvas fills the frame exactly).
             canvas.bindtags(tuple(canvas.bindtags()) + (str(widget),))
-            canvas.bind("<Configure>", lambda _e, w=widget: _redraw_rounded_background(w), add="+")
+            canvas.bind("<Configure>", lambda _e: _redraw_rounded_background(widget), add="+")
         except Exception:
             diagnostics.swallowed("desktop._set_rounded_background")
             return

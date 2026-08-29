@@ -567,9 +567,7 @@ def _update_corner_mask(view: Any, width: float, height: float) -> None:
             path.addArcWithCenter_radius_startAngle_endAngle_clockwise_((bl, height - bl), bl, half_pi, math.pi, True)
         path.addLineToPoint_((0.0, tl))
         if tl > 0.0:
-            path.addArcWithCenter_radius_startAngle_endAngle_clockwise_(
-                (tl, tl), tl, math.pi, math.pi + half_pi, True
-            )
+            path.addArcWithCenter_radius_startAngle_endAngle_clockwise_((tl, tl), tl, math.pi, math.pi + half_pi, True)
         path.closePath()
         # On raw-registered outbound wrappers rubicon sometimes resolves
         # ``CGPath`` as a bound method rather than a property.

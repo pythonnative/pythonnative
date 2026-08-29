@@ -66,9 +66,7 @@ def test_new_style_keys_flow_to_native_props() -> None:
 
 
 def test_hit_slop_passes_through_as_plain_prop() -> None:
-    _, _, backend = _mount(
-        Pressable(Text("tiny"), on_press=lambda: None, hit_slop={"top": 8.0, "bottom": 8.0})
-    )
+    _, _, backend = _mount(Pressable(Text("tiny"), on_press=lambda: None, hit_slop={"top": 8.0, "bottom": 8.0}))
     view = next(v for v in backend.views.values() if v.type_name == "Pressable")
     assert view.props["hit_slop"] == {"top": 8.0, "bottom": 8.0}
 
@@ -134,9 +132,7 @@ def test_keyboard_avoiding_height_shrinks_by_keyboard_overlap() -> None:
 
     platform_metrics.reset_keyboard_height()
     try:
-        _, rec, backend = _mount(
-            View(KeyboardAvoidingView(Text("hi"), behavior="height", style={"height": 300}))
-        )
+        _, rec, backend = _mount(View(KeyboardAvoidingView(Text("hi"), behavior="height", style={"height": 300})))
         # The mount layout captured the resting height via on_layout.
         rec.flush_dirty()
 

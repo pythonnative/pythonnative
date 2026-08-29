@@ -82,7 +82,7 @@ import math
 import threading
 import time
 import weakref
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from .element import Element
 from .hooks import use_effect, use_ref
@@ -162,9 +162,8 @@ class AnimatedNode:
     Derived nodes are constructed with
     [`interpolate`][pythonnative.animated.AnimatedNode.interpolate],
     with Python arithmetic operators (``+``, ``-``, ``*``, ``/``,
-    ``%``, unary ``-``), or with
-    [`Animated.diff_clamp`][pythonnative.animated._AnimatedNamespace.diff_clamp].
-    They are read-only: only [`AnimatedValue`][pythonnative.AnimatedValue]
+    ``%``, unary ``-``), or with ``Animated.diff_clamp``. They are
+    read-only: only [`AnimatedValue`][pythonnative.AnimatedValue]
     leaves can be set or animated directly.
     """
 
@@ -531,7 +530,7 @@ class AnimatedInterpolation(AnimatedNode):
 
         self._parent = parent
         self._inputs = inputs
-        self._outputs = outputs
+        self._outputs: List[Any] = outputs
         self._kind = kind
         self._left = extrapolate_left or extrapolate
         self._right = extrapolate_right or extrapolate
@@ -539,6 +538,7 @@ class AnimatedInterpolation(AnimatedNode):
 
     @property
     def value(self) -> Any:
+        """Return the interpolated output for the parent's current value."""
         return self._compute(float(self._parent))
 
     def _compute(self, x: float) -> Any:
@@ -677,6 +677,15 @@ class AnimatedEvent:
         self._listener = listener
 
     def __call__(self, payload: Any = None, *args: Any) -> None:
+        """Write bound payload fields into their values, then run the listener.
+
+        Args:
+            payload: The event payload; a dict is read by key, any
+                other object by attribute. Missing or non-numeric
+                fields are skipped.
+            *args: Extra positional arguments forwarded to the
+                listener.
+        """
         for name, node in self._bindings.items():
             raw: Any = None
             if isinstance(payload, dict):
