@@ -3255,7 +3255,9 @@ the documented behavior never drifts from the code.</p>
   <code>--width</code>, <code>--height</code>, <code>--title</code>, <code>--no-hot-reload</code>. See the
   <a href="../../guides/desktop-preview/">Desktop preview guide</a>.</li>
 <li><code>pn devices [android|ios]</code>: list connected devices, emulators, and
-  simulators with the identifiers <code>--device</code> accepts.</li>
+  simulators with the identifiers <code>--device</code> accepts. Flag: <code>--json</code> to
+  print a JSON array to stdout for scripting; the "no devices" hints go
+  to stderr instead, and an empty list prints <code>[]</code> and exits 0.</li>
 <li><code>pn run android|ios</code>: build and run on a connected device or
   simulator. Flags: <code>--device</code> (target a specific device by identifier
   or name), <code>--prepare-only</code>, <code>--hot-reload</code>, <code>--no-logs</code>.</li>
@@ -3268,6 +3270,7 @@ the documented behavior never drifts from the code.</p>
 <li><code>pn app-id android|ios</code>: print the resolved application id (Android)
   or bundle id (iOS), handy for scripts and CI.</li>
 <li><code>pn clean</code>: remove the local <code>build/</code> directory.</li>
+<li><code>pn --version</code> (<code>-V</code>): print the installed PythonNative version.</li>
 </ul>
 
 
@@ -3288,7 +3291,7 @@ the documented behavior never drifts from the code.</p>
 <li><code>pn preview [component]</code>: render the app in a desktop (Tkinter) window
   with Fast Refresh, the fast inner dev loop, no device required.</li>
 <li><code>pn devices [platform]</code>: list connected devices, emulators, and
-  simulators.</li>
+  simulators, as a table or as JSON with <code>--json</code>.</li>
 <li><code>pn run android|ios [--device D]</code>: stage + build + install + launch on
   a device, emulator, or simulator, with optional on-device hot reload.</li>
 <li><code>pn logs android|ios</code>: stream logs from the running app without
@@ -3709,6 +3712,12 @@ Tkinter backend, then hands off to <code>pythonnative.preview.run_preview</code>
     <div class="doc doc-contents ">
 
         <p>List connected devices, emulators, and simulators.</p>
+<p>Prints an aligned table and exits 1 when nothing is connected.</p>
+<p>With <code>--json</code>, stdout carries a JSON array and nothing else, one
+object per device (see <code>Device.to_dict</code>), so it stays parseable.
+The "no devices" hints go to stderr instead, an empty result prints
+<code>[]</code>, and the exit status is 0 either way, since "no devices" is a
+valid answer for a script rather than a failure.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3731,7 +3740,7 @@ Tkinter backend, then hands off to <code>pythonnative.preview.run_preview</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parsed namespace with optional <code>platform</code>.</p>
+                <p>Parsed namespace with optional <code>platform</code> and <code>json</code>.</p>
               </div>
             </td>
             <td>
