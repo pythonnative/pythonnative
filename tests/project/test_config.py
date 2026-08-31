@@ -190,3 +190,12 @@ def test_rendered_default_toml_parses_and_loads() -> None:
     assert cfg.app_id == "com.example.my_app"
     assert cfg.display_name == "My App"
     assert cfg.requirements == []
+
+
+def test_rendered_default_toml_escapes_special_characters() -> None:
+    text = render_default_toml(name='bad"name\nwith\\backslash', app_id="com.example.myapp")
+    data = tomllib.loads(text)
+    cfg = AppConfig.from_dict(data)
+    assert cfg.name == 'bad"name\nwith\\backslash'
+    assert cfg.app_id == "com.example.myapp"
+    assert cfg.display_name == 'Bad"Name\nWith\\Backslash'

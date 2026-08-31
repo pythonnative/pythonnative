@@ -95,6 +95,21 @@ def test_cli_init_creates_named_directory(tmp_path: Path) -> None:
     assert os.listdir(str(tmp_path)) == ["my_app"]
 
 
+def test_cli_init_escapes_special_characters_in_toml(tmp_path: Path) -> None:
+    result = run_pn(["init", 'bad"name'], str(tmp_path))
+    assert result.returncode == 0, result.stderr
+
+    project_dir = tmp_path / 'bad"name'
+    config_path = project_dir / "pythonnative.toml"
+    assert config_path.is_file()
+
+    from pythonnative.project.config import AppConfig
+
+    cfg = AppConfig.load(project_dir)
+    assert cfg.name == 'bad"name'
+    assert cfg.app_id == "com.example.badname"
+
+
 def test_cli_init_without_name_uses_cwd(tmp_path: Path) -> None:
     project_dir = tmp_path / "widgets"
     project_dir.mkdir()

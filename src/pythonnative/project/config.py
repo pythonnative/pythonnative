@@ -56,6 +56,7 @@ key_alias = "myapp"
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -599,20 +600,25 @@ def render_default_toml(*, name: str, app_id: str, python_version: str = "3.11")
         for the optional tables.
     """
     display = name.replace("_", " ").replace("-", " ").strip().title() or name
+    escaped_app_id = json.dumps(app_id)
+    escaped_name = json.dumps(name)
+    escaped_display = json.dumps(display)
+    escaped_python_version = json.dumps(python_version)
+    comment_name = name.replace("\n", " ").replace("\r", " ")
     return f"""# PythonNative project configuration.
 # Docs: https://pythonnative.com/guides/configuration/
 
 [app]
-id = "{app_id}"
-name = "{name}"
-display_name = "{display}"
+id = {escaped_app_id}
+name = {escaped_name}
+display_name = {escaped_display}
 version = "1.0.0"
 build = 1
-python_version = "{python_version}"
+python_version = {escaped_python_version}
 orientation = "portrait"        # portrait | landscape | all
 entry_point = "app/main.py"
-# Custom URL schemes for deep links (e.g. "{name}" opens {name}://...).
-# url_schemes = ["{name}"]
+# Custom URL schemes for deep links (e.g. {escaped_name} opens {comment_name}://...).
+# url_schemes = [{escaped_name}]
 
 # Declare the device capabilities your app needs. A string becomes the
 # iOS permission prompt text; `true` uses a sensible default.
@@ -637,7 +643,7 @@ packages = []
 [ios]
 deployment_target = "13.0"
 # development_team = "ABCDE12345"
-# bundle_id = "{app_id}"
+# bundle_id = {escaped_app_id}
 
 [ios.signing]
 export_method = "development"   # development | ad-hoc | app-store | enterprise
@@ -652,5 +658,5 @@ target_sdk = 34
 
 [android.signing]
 # keystore = "release.keystore"
-# key_alias = "{name}"
+# key_alias = {escaped_name}
 """
