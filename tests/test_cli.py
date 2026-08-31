@@ -1,3 +1,4 @@
+import argparse
 import os
 import shutil
 import subprocess
@@ -278,3 +279,69 @@ def test_run_hot_reload_imports_top_level_watcher(
     )
 
     assert events == ["start", "stop"]
+
+
+# ---------------------------------------------------------------------------
+# pn devices --json
+# ---------------------------------------------------------------------------
+
+
+def test_devices_json_output(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from pythonnative.project.devices import Device
+
+    fake_devices = [
+        Device(
+            platform="android",
+            kind="emulator",
+            identifier="emulator-5554",
+            name="sdk_gphone64_arm64",
+            state="connected",
+        ),
+        Device(
+            platform="ios",
+            kind="simulator",
+            identifier="AAAA-1111",
+            name="iPhone 15",
+            os_version="iOS 17.5",
+            state="booted",
+        ),
+    ]
+    monkeypatch.setattr(pn_cli.devices_mod, "list_devices", lambda platform=None: fake_devices)
+
+    args = argparse.Namespace(platform=None, json=True)
+    pn_cli.devices_command(args)
+
+    captured = capsys.readouterr()
+    import json
+
+    data = json.loads(captured.out)
+    assert isinstance(data, list)
+    assert len(data) == 2
+    assert data[0]["identifier"] == "emulator-5554"
+    assert data[0]["platform"] == "android"
+    assert data[1]["identifier"] == "AAAA-1111"
+    assert data[1]["os_version"] == "iOS 17.5"
+    # No hint text on stdout.
+    assert "No devices" not in captured.out
+
+
+def test_devices_json_empty(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(pn_cli.devices_mod, "list_devices", lambda platform=None: [])
+
+    args = argparse.Namespace(platform=None, json=True)
+    pn_cli.devices_command(args)
+
+    captured = capsys.readouterr()
+    import json
+
+    data = json.loads(captured.out)
+    assert data == []
+    # Hints go to stderr, not stdout.
+    assert "No devices" in captured.err
+

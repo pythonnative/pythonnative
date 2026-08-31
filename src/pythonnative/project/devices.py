@@ -64,6 +64,22 @@ class Device:
             return self.state in ("booted", "shutdown")
         return self.state in ("booted", "connected")
 
+    def to_dict(self) -> Dict[str, str]:
+        """Return a JSON-serialisable dict of the device's public fields.
+
+        Returns:
+            A dict with keys ``identifier``, ``kind``, ``state``,
+            ``name``, ``platform``, and ``os_version``.
+        """
+        return {
+            "identifier": self.identifier,
+            "kind": self.kind,
+            "state": self.state,
+            "name": self.name,
+            "platform": self.platform,
+            "os_version": self.os_version,
+        }
+
     def format(self) -> str:
         """Return one aligned listing row for the CLI."""
         os_part = f" ({self.os_version})" if self.os_version else ""

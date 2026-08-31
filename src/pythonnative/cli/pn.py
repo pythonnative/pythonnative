@@ -256,10 +256,21 @@ def devices_command(args: argparse.Namespace) -> None:
     """List connected devices, emulators, and simulators.
 
     Args:
-        args: Parsed namespace with optional ``platform``.
+        args: Parsed namespace with optional ``platform`` and ``json``.
     """
     platform: Optional[str] = getattr(args, "platform", None)
+    as_json: bool = getattr(args, "json", False)
     devices = devices_mod.list_devices(platform)
+
+    if as_json:
+        print(json.dumps([d.to_dict() for d in devices], indent=2))
+        if not devices:
+            print(
+                "No devices found. Start an emulator or connect a device.",
+                file=sys.stderr,
+            )
+        return
+
     if not devices:
         print("No devices found.")
         print("Android: start an emulator or connect a device with USB debugging enabled.")
@@ -897,6 +908,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser_devices = subparsers.add_parser("devices", help="List devices, emulators, and simulators")
     parser_devices.add_argument("platform", nargs="?", choices=["android", "ios"], help="Restrict to a platform")
+    parser_devices.add_argument("--json", action="store_true", help="Print JSON array to stdout for scripting")
     parser_devices.set_defaults(func=devices_command)
 
     parser_run = subparsers.add_parser("run", help="Build, install, and launch on a device/simulator")

@@ -96,3 +96,24 @@ def test_find_device_prefers_ready() -> None:
         Device(platform="android", kind="device", identifier="two", name="Pixel", state="connected"),
     ]
     assert find_device(devices, "Pixel").identifier == "two"
+
+
+def test_device_to_dict() -> None:
+    device = Device(
+        platform="ios",
+        kind="simulator",
+        identifier="AAAA-1111",
+        name="iPhone 15",
+        os_version="iOS 17.5",
+        state="booted",
+    )
+    result = device.to_dict()
+    assert result == {
+        "identifier": "AAAA-1111",
+        "kind": "simulator",
+        "state": "booted",
+        "name": "iPhone 15",
+        "platform": "ios",
+        "os_version": "iOS 17.5",
+    }
+
