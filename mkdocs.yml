@@ -124,6 +124,9 @@ nav:
     - Navigation: api/navigation.md
     - Native modules: api/native_modules.md
     - Native views: api/native_views.md
+    - Events: api/events.md
+    - Mutations: api/mutations.md
+    - Platform metrics: api/platform_metrics.md
     - SDK: api/sdk.md
     - Hot reload: api/hot_reload.md
     - Diagnostics: api/diagnostics.md

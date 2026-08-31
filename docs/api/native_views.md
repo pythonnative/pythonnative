@@ -18,24 +18,6 @@ the platform-specific handlers are registered lazily so importing
       members_order: source
       filters: ["!^_"]
 
-## Mutation ops
-
-::: pythonnative.mutations
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      members_order: source
-      filters: ["!^_"]
-
-## Event routing
-
-::: pythonnative.events
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      members_order: source
-      filters: ["!^_"]
-
 ## Base classes
 
 ::: pythonnative.native_views.base
@@ -56,6 +38,9 @@ the platform-specific handlers are registered lazily so importing
 
 ## Next steps
 
+- See the mutation ops protocol in [Mutations](mutations.md).
+- See tag-based event routing in [Events](events.md).
 - Read the high-level model in
   [Native views (concept)](../concepts/native-views.md).
 - See how the reconciler drives handlers in [Reconciler](reconciler.md).
+
