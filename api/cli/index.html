@@ -3335,7 +3335,8 @@ the documented behavior never drifts from the code.</p>
 <ul>
 <li><code>pn init [name]</code>: scaffold a new project (creates <code>app/</code>,
   <code>pythonnative.toml</code>, <code>.gitignore</code>). With a name it creates <code>./&lt;name&gt;/</code>
-  and scaffolds into it; without one it uses the current directory.
+  and scaffolds into it; the name must match <code>^[a-z][a-z0-9_-]*$</code>.
+  Without one it uses the current directory, whatever it's called.
   Flag: <code>--force</code> to overwrite existing files or scaffold into a
   non-empty directory. See <a href="../../guides/configuration/">Configuration</a>.</li>
 <li><code>pn doctor [android|ios]</code>: diagnose the local toolchain and validate
@@ -3586,9 +3587,16 @@ reload) that can't be unit tested.</p>
 one, it scaffolds into the current directory and names the project after
 it. Either way it writes <code>app/main.py</code>, <code>pythonnative.toml</code>, and
 <code>.gitignore</code>.</p>
-<p>The name has to be a single directory name, so the project always lands
-inside the current directory. Anything that reads as a path, such as
-<code>a/b</code>, <code>..</code>, or <code>/tmp/app</code>, is refused, and so is a name that
+<p>A name you pass has to match <code>^[a-z][a-z0-9_-]*$</code>: lowercase letters,
+digits, <code>-</code>, and <code>_</code>, starting with a letter. Anything else is
+refused with a legal suggestion. That keeps the directory name and the
+<code>name</code> field in the generated config identical, in the same spirit as
+<code>flutter create</code> and <code>cargo new</code>. The name taken from the current
+directory when you pass none is used as-is, so an existing directory
+with any name still works.</p>
+<p>The name also has to be a single directory name, so the project always
+lands inside the current directory. Anything that reads as a path, such
+as <code>a/b</code>, <code>..</code>, or <code>/tmp/app</code>, is refused, and so is a name that
 resolves somewhere else, such as a symlink to another directory.</p>
 <p>It won't scaffold into a target directory that already holds files, and it
 won't overwrite any of the three paths above; pass <code>--force</code> to override

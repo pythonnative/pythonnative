@@ -3006,6 +3006,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#invalid-project-name-myapp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invalid project name: 'MyApp'
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#refusing-to-scaffold-through-a-link-or-outside-the-current-directory-link" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3464,6 +3475,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#invalid-project-name-myapp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invalid project name: 'MyApp'
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#refusing-to-scaffold-through-a-link-or-outside-the-current-directory-link" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3851,6 +3873,17 @@ Remove or rename it, or choose a different project name.</p>
 lands inside the current directory. Pass a plain name like <code>my_app</code>, or
 <code>cd</code> to the directory you want the project in and run <code>pn init</code> with no
 name at all. <code>--force</code> doesn't lift this one.</p>
+<h3 id="invalid-project-name-myapp"><code>Invalid project name: 'MyApp'</code><a class="headerlink" href="#invalid-project-name-myapp" title="Permanent link">&para;</a></h3>
+<p>A name you pass to <code>pn init</code> has to match <code>^[a-z][a-z0-9_-]*$</code>: lowercase
+letters, digits, <code>-</code>, and <code>_</code>, starting with a letter. That's the same
+spirit as <code>flutter create</code> and <code>cargo new</code>, and it keeps the directory
+name and the <code>name</code> field in the config identical. The error suggests a
+legal name you can paste straight back, so <code>MyApp</code> suggests <code>myapp</code> and
+<code>my app</code> suggests <code>my_app</code>. <code>--force</code> doesn't lift this one.</p>
+<p>This applies only to a name you type. <code>pn init</code> with no name takes the
+current directory's name as-is, so a directory called <code>MyProject</code> is
+fine. To use a display name outside this set, edit <code>display_name</code> in
+<code>pythonnative.toml</code> after scaffolding.</p>
 <h3 id="refusing-to-scaffold-through-a-link-or-outside-the-current-directory-link"><code>Refusing to scaffold through a link or outside the current directory: link</code><a class="headerlink" href="#refusing-to-scaffold-through-a-link-or-outside-the-current-directory-link" title="Permanent link">&para;</a></h3>
 <p>The name resolves somewhere other than a directory directly inside the
 current one, so <code>pn init</code> stops rather than writing through it. A symlink

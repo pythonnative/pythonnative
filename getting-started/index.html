@@ -3241,10 +3241,10 @@
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pn<span class="w"> </span>--help
 </span></code></pre></div>
 <h2 id="create-a-project">Create a project<a class="headerlink" href="#create-a-project" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pn<span class="w"> </span>init<span class="w"> </span>MyApp
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>MyApp
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pn<span class="w"> </span>init<span class="w"> </span>my_app
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>my_app
 </span></code></pre></div>
-<p>This creates a <code>MyApp/</code> directory containing:</p>
+<p>This creates a <code>my_app/</code> directory containing:</p>
 <ul>
 <li><code>app/</code> with a minimal <code>main.py</code></li>
 <li><code>pythonnative.toml</code>: your project configuration (app id, version,
@@ -3252,8 +3252,10 @@
   <a href="../guides/configuration/">Configuration</a>.</li>
 <li><code>.gitignore</code></li>
 </ul>
-<p>Run <code>pn init</code> without a name to scaffold into the current directory
-instead, named after it.</p>
+<p>A name has to be lowercase letters, digits, <code>-</code>, and <code>_</code>, starting with
+a letter, so the directory name and the <code>name</code> field in the generated
+config stay identical. Run <code>pn init</code> without a name to scaffold into the
+current directory instead, named after it; that name is used as-is.</p>
 <p>A minimal <code>app/main.py</code> looks like:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
@@ -3304,8 +3306,8 @@ display name, version, the device permissions it requests, its icon and
 splash, third-party packages, and signing) lives in a single
 <code>pythonnative.toml</code> at the project root:</p>
 <div class="language-toml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[app]</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"com.example.myapp"</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myapp"</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"com.example.my_app"</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_app"</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"My App"</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.0.0"</span>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">build</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
