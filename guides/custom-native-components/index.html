@@ -1996,6 +1996,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -2618,6 +2624,90 @@
     
   
     Native views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/mutations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutation ops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/platform_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform metrics
   
 
     
@@ -3382,7 +3472,7 @@ built-in handlers; see
 <p>The <code>tag</code> argument is the view's stable identity in the mutation
 protocol. Handlers that fire events use it to dispatch back into
 Python: wire the platform listener once in <code>create</code> and call
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;dispatch_event&lt;/span&gt;" href="../../api/native_views/#pythonnative.events.dispatch_event"><code>dispatch_event(tag, "on_change", value)</code></a>;
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;dispatch_event&lt;/span&gt;" href="../../api/events/#pythonnative.events.dispatch_event"><code>dispatch_event(tag, "on_change", value)</code></a>;
 the reconciler keeps the <code>(tag, name) -&gt; callback</code> registry up to date
 across re-renders without any further native calls.</p>
 <h3 id="4-wire-it-into-your-project">4. Wire it into your project<a class="headerlink" href="#4-wire-it-into-your-project" title="Permanent link">&para;</a></h3>

@@ -12,13 +12,13 @@
         <meta name="author" content="Owen Carey">
       
       
-        <link rel="canonical" href="https://pythonnative.com/concepts/layout/">
+        <link rel="canonical" href="https://pythonnative.com/api/mutations/">
       
       
-        <link rel="prev" href="../reconciliation/">
+        <link rel="prev" href="../native_views/">
       
       
-        <link rel="next" href="../native-views/">
+        <link rel="next" href="../events/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Layout Engine - PythonNative</title>
+        <title>Mutation ops - PythonNative</title>
       
     
     
@@ -67,17 +67,17 @@
     
   
 <meta property="og:type" content="website" />
-<meta property="og:title" content="Layout Engine - PythonNative" />
+<meta property="og:title" content="Mutation ops - PythonNative" />
 <meta property="og:description" content="Cross-platform native UI toolkit for Android and iOS" />
-<meta property="og:image" content="https://pythonnative.com/assets/images/social/concepts/layout.png" />
+<meta property="og:image" content="https://pythonnative.com/assets/images/social/api/mutations.png" />
 <meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:url" content="https://pythonnative.com/concepts/layout/" />
+<meta property="og:url" content="https://pythonnative.com/api/mutations/" />
 <meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:title" content="Layout Engine - PythonNative" />
+<meta property="twitter:title" content="Mutation ops - PythonNative" />
 <meta property="twitter:description" content="Cross-platform native UI toolkit for Android and iOS" />
-<meta property="twitter:image" content="https://pythonnative.com/assets/images/social/concepts/layout.png" />
+<meta property="twitter:image" content="https://pythonnative.com/assets/images/social/api/mutations.png" />
 </head>
   
   
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#layout-engine" class="md-skip">
+        <a href="#mutation-ops" class="md-skip">
           Skip to content
         </a>
       
@@ -132,7 +132,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Layout Engine
+              Mutation ops
             
           </span>
         </div>
@@ -280,13 +280,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../mental-model/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../concepts/mental-model/" class="md-tabs__link">
           
   
   
@@ -370,11 +368,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../api/pythonnative/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../pythonnative/" class="md-tabs__link">
           
   
   
@@ -518,10 +518,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -545,22 +543,21 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
@@ -578,7 +575,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -596,7 +593,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../mental-model/" class="md-nav__link">
+      <a href="../../concepts/mental-model/" class="md-nav__link">
         
   
   
@@ -624,7 +621,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../architecture/" class="md-nav__link">
+      <a href="../../concepts/architecture/" class="md-nav__link">
         
   
   
@@ -652,7 +649,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/" class="md-nav__link">
+      <a href="../../concepts/components/" class="md-nav__link">
         
   
   
@@ -680,7 +677,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../hooks/" class="md-nav__link">
+      <a href="../../concepts/hooks/" class="md-nav__link">
         
   
   
@@ -708,7 +705,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../lifecycle/" class="md-nav__link">
+      <a href="../../concepts/lifecycle/" class="md-nav__link">
         
   
   
@@ -736,7 +733,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reconciliation/" class="md-nav__link">
+      <a href="../../concepts/reconciliation/" class="md-nav__link">
         
   
   
@@ -761,37 +758,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout Engine
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../concepts/layout/" class="md-nav__link">
         
   
   
@@ -807,125 +777,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#why-a-python-engine" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why a Python engine?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#where-it-sits-in-the-render-loop" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Where it sits in the render loop
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-layoutnode-tree" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The LayoutNode tree
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#style-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Style keys
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#intrinsic-measurement" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Intrinsic measurement
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#absolute-positioning" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Absolute positioning
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing-layouts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Testing layouts
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#limits" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Limits
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -938,7 +789,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../native-views/" class="md-nav__link">
+      <a href="../../concepts/native-views/" class="md-nav__link">
         
   
   
@@ -1909,8 +1760,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -1978,21 +1831,22 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   
@@ -2010,7 +1864,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2028,7 +1882,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/pythonnative/" class="md-nav__link">
+      <a href="../pythonnative/" class="md-nav__link">
         
   
   
@@ -2056,7 +1910,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/components/" class="md-nav__link">
+      <a href="../components/" class="md-nav__link">
         
   
   
@@ -2084,7 +1938,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/hooks/" class="md-nav__link">
+      <a href="../hooks/" class="md-nav__link">
         
   
   
@@ -2112,7 +1966,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../animated/" class="md-nav__link">
         
   
   
@@ -2140,7 +1994,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/gestures/" class="md-nav__link">
+      <a href="../gestures/" class="md-nav__link">
         
   
   
@@ -2168,7 +2022,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/alerts/" class="md-nav__link">
+      <a href="../alerts/" class="md-nav__link">
         
   
   
@@ -2196,7 +2050,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/runtime/" class="md-nav__link">
+      <a href="../runtime/" class="md-nav__link">
         
   
   
@@ -2224,7 +2078,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/suspense/" class="md-nav__link">
+      <a href="../suspense/" class="md-nav__link">
         
   
   
@@ -2252,7 +2106,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/appearance/" class="md-nav__link">
+      <a href="../appearance/" class="md-nav__link">
         
   
   
@@ -2280,7 +2134,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/images/" class="md-nav__link">
+      <a href="../images/" class="md-nav__link">
         
   
   
@@ -2308,7 +2162,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/net/" class="md-nav__link">
+      <a href="../net/" class="md-nav__link">
         
   
   
@@ -2336,7 +2190,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/storage/" class="md-nav__link">
+      <a href="../storage/" class="md-nav__link">
         
   
   
@@ -2364,7 +2218,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/platform/" class="md-nav__link">
+      <a href="../platform/" class="md-nav__link">
         
   
   
@@ -2392,7 +2246,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/element/" class="md-nav__link">
+      <a href="../element/" class="md-nav__link">
         
   
   
@@ -2420,7 +2274,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/screen/" class="md-nav__link">
+      <a href="../screen/" class="md-nav__link">
         
   
   
@@ -2448,7 +2302,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/reconciler/" class="md-nav__link">
+      <a href="../reconciler/" class="md-nav__link">
         
   
   
@@ -2476,7 +2330,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
+      <a href="../layout/" class="md-nav__link">
         
   
   
@@ -2504,7 +2358,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/style/" class="md-nav__link">
+      <a href="../style/" class="md-nav__link">
         
   
   
@@ -2532,7 +2386,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/navigation/" class="md-nav__link">
+      <a href="../navigation/" class="md-nav__link">
         
   
   
@@ -2560,7 +2414,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/native_modules/" class="md-nav__link">
+      <a href="../native_modules/" class="md-nav__link">
         
   
   
@@ -2588,7 +2442,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/native_views/" class="md-nav__link">
+      <a href="../native_views/" class="md-nav__link">
         
   
   
@@ -2613,10 +2467,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../api/mutations/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutation ops
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2632,6 +2513,120 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.mutations.Mutation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;Mutation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.mutations.CreateOp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CreateOp
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.mutations.UpdateOp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;UpdateOp
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.mutations.InsertOp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;InsertOp
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.mutations.DestroyOp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;DestroyOp
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.mutations.SetFrameOp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;SetFrameOp
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" SetFrameOp">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pythonnative.mutations.SetFrameOp.frame" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;frame
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2644,7 +2639,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/events/" class="md-nav__link">
+      <a href="../events/" class="md-nav__link">
         
   
   
@@ -2672,7 +2667,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/platform_metrics/" class="md-nav__link">
+      <a href="../platform_metrics/" class="md-nav__link">
         
   
   
@@ -2700,7 +2695,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/sdk/" class="md-nav__link">
+      <a href="../sdk/" class="md-nav__link">
         
   
   
@@ -2728,7 +2723,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/hot_reload/" class="md-nav__link">
+      <a href="../hot_reload/" class="md-nav__link">
         
   
   
@@ -2756,7 +2751,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/diagnostics/" class="md-nav__link">
+      <a href="../diagnostics/" class="md-nav__link">
         
   
   
@@ -2784,7 +2779,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/utils/" class="md-nav__link">
+      <a href="../utils/" class="md-nav__link">
         
   
   
@@ -2812,7 +2807,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/cli/" class="md-nav__link">
+      <a href="../cli/" class="md-nav__link">
         
   
   
@@ -2840,7 +2835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/component-properties/" class="md-nav__link">
+      <a href="../component-properties/" class="md-nav__link">
         
   
   
@@ -3108,10 +3103,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#why-a-python-engine" class="md-nav__link">
+  <a href="#pythonnative.mutations.Mutation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Why a Python engine?
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;Mutation
       
     </span>
   </a>
@@ -3119,10 +3114,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#where-it-sits-in-the-render-loop" class="md-nav__link">
+  <a href="#pythonnative.mutations.CreateOp" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Where it sits in the render loop
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CreateOp
       
     </span>
   </a>
@@ -3130,10 +3125,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-layoutnode-tree" class="md-nav__link">
+  <a href="#pythonnative.mutations.UpdateOp" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The LayoutNode tree
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;UpdateOp
       
     </span>
   </a>
@@ -3141,10 +3136,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#style-keys" class="md-nav__link">
+  <a href="#pythonnative.mutations.InsertOp" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Style keys
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;InsertOp
       
     </span>
   </a>
@@ -3152,10 +3147,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#intrinsic-measurement" class="md-nav__link">
+  <a href="#pythonnative.mutations.DestroyOp" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Intrinsic measurement
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;DestroyOp
       
     </span>
   </a>
@@ -3163,35 +3158,30 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#absolute-positioning" class="md-nav__link">
+  <a href="#pythonnative.mutations.SetFrameOp" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Absolute positioning
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;SetFrameOp
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" SetFrameOp">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pythonnative.mutations.SetFrameOp.frame" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;frame
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#testing-layouts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Testing layouts
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#limits" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Limits
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3223,7 +3213,7 @@
 
 
   
-    <a href="https://github.com/pythonnative/pythonnative/edit/main/docs/concepts/layout.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/pythonnative/pythonnative/edit/main/docs/api/mutations.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -3232,199 +3222,647 @@
     
       
     
-    <a href="https://github.com/pythonnative/pythonnative/raw/main/docs/concepts/layout.md" title="View source of this page" class="md-content__button md-icon">
+    <a href="https://github.com/pythonnative/pythonnative/raw/main/docs/api/mutations.md" title="View source of this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0 8a5 5 0 0 1-5-5 5 5 0 0 1 5-5 5 5 0 0 1 5 5 5 5 0 0 1-5 5m0-12.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5"/></svg>
     </a>
   
 
 
-<h1 id="layout-engine">Layout engine<a class="headerlink" href="#layout-engine" title="Permanent link">&para;</a></h1>
-<p>PythonNative ships its own pure-Python flexbox engine. It is a small,
-React-Native-compatible re-implementation of the subset of the
-<a href="https://www.yogalayout.com/">Yoga</a> algorithm that real apps use.
-Every screen on every platform is sized and positioned by the same
-Python code; the native handlers only get told <em>what frame to apply</em>.</p>
-<p>This page covers what the engine does, where it sits in the render
-pipeline, what <code>style</code> keys it understands, and how to test layouts
-without a device.</p>
-<h2 id="why-a-python-engine">Why a Python engine?<a class="headerlink" href="#why-a-python-engine" title="Permanent link">&para;</a></h2>
-<p>The handlers used to delegate to <code>LinearLayout</code> (Android) and
-<code>UIStackView</code> (iOS), which made <code>View</code> / <code>Column</code> / <code>Row</code> look right
-"on average" but came with three problems:</p>
+<h1 id="mutation-ops">Mutation ops<a class="headerlink" href="#mutation-ops" title="Permanent link">&para;</a></h1>
+<p>Five record types describe every change to the native view tree:
+create, update, insert, destroy, and set frame. The
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../reconciler/#pythonnative.reconciler.Reconciler"><code>Reconciler</code></a> emits them; the
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NativeViewRegistry&lt;/span&gt;" href="../native_views/#pythonnative.native_views.NativeViewRegistry"><code>NativeViewRegistry</code></a>
+applies them.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+
+    <div class="doc doc-contents first">
+
+        <p>Batched mutation protocol between the reconciler and native backends.</p>
+<p>The reconciler no longer talks to the native layer one call at a time.
+Instead, every commit pass produces an ordered list of small mutation
+ops referencing integer <strong>tags</strong> (stable per-view identifiers), and the
+whole list is applied in a single
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply_mutations&lt;/span&gt;" href="../native_views/#pythonnative.native_views.NativeViewRegistry.apply_mutations"><code>apply_mutations</code></a>
+call. This mirrors React Native's Fabric mounting layer: the diff phase
+is pure, and the native side sees one coherent transaction per commit.</p>
+<p>Why tags instead of view objects?</p>
+<ul>
+<li>The diff phase runs <em>before</em> any native view exists, so ops cannot
+  reference views directly.</li>
+<li>Tags give the native side a stable identity to key its own view
+  registry, event routing, and animation bookkeeping on.</li>
+<li>A flat list of <code>(op, tag, payload)</code> tuples is trivially serializable,
+  which keeps the door open for applying mutations from a background
+  thread or through a single JNI/ObjC crossing in the future.</li>
+</ul>
+<p>Op ordering rules (the reconciler guarantees these):</p>
 <ol>
-<li><strong>Platform drift.</strong> The two stacks have subtly different alignment
-   semantics, padding handling, and weight rules. A layout that looked
-   correct on iOS could be off by a few points on Android.</li>
-<li><strong>No <code>position: "absolute"</code>.</strong> Neither container natively supports
-   removing a child from the flow and pinning it by edge offsets.</li>
-<li><strong>Limited expressiveness.</strong> <code>flex_basis</code>, <code>aspect_ratio</code>,
-   percentage sizes, <code>min_*</code> / <code>max_*</code> constraints, and <code>align_self</code>
-   were either missing or partial.</li>
+<li>A <code>CreateOp</code> for a tag precedes any other op referencing that tag.</li>
+<li><code>InsertOp</code> ops appear after both the parent and child exist.</li>
+<li><code>DestroyOp</code> ops are emitted children-first; handlers detach the view
+   from its parent as part of destruction.</li>
+<li><code>SetFrameOp</code> ops are only emitted for frames that actually changed
+   since the last layout pass (frame diffing).</li>
 </ol>
-<p>Centralising layout in Python fixes all three: the rules are written
-once, exercised by unit tests, and produce identical frames on Android
-and iOS.</p>
-<h2 id="where-it-sits-in-the-render-loop">Where it sits in the render loop<a class="headerlink" href="#where-it-sits-in-the-render-loop" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>render -&gt; commit (create / update native views via handlers)
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>      -&gt; flush effects
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>      -&gt; build LayoutNode tree from VNodes
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>      -&gt; calculate_layout(viewport_w, viewport_h)
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>      -&gt; backend.set_frame(view, x, y, w, h) for every node
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Classes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;CreateOp&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.mutations.CreateOp&lt;/code&gt;)" href="#pythonnative.mutations.CreateOp">CreateOp</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>Create a native view for <code>tag</code> of element type <code>type_name</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;UpdateOp&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.mutations.UpdateOp&lt;/code&gt;)" href="#pythonnative.mutations.UpdateOp">UpdateOp</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>Apply <code>changed_props</code> to the view registered under <code>tag</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;InsertOp&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.mutations.InsertOp&lt;/code&gt;)" href="#pythonnative.mutations.InsertOp">InsertOp</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>Ensure the child view sits at <code>index</code> inside the parent view.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;DestroyOp&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.mutations.DestroyOp&lt;/code&gt;)" href="#pythonnative.mutations.DestroyOp">DestroyOp</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>Release the native view registered under <code>tag</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SetFrameOp&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.mutations.SetFrameOp&lt;/code&gt;)" href="#pythonnative.mutations.SetFrameOp">SetFrameOp</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>Position and size the view registered under <code>tag</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;Mutation&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.mutations.Mutation&lt;/code&gt;)" href="#pythonnative.mutations.Mutation">Mutation</a></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Union of every op type carried by a commit transaction.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="pythonnative.mutations.Mutation" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">Mutation</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#pythonnative.mutations.Mutation" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">Mutation</span> <span class="o">=</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Union&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Union">Union</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;CreateOp&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.mutations.CreateOp&lt;/code&gt;)" href="#pythonnative.mutations.CreateOp">CreateOp</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;UpdateOp&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.mutations.UpdateOp&lt;/code&gt;)" href="#pythonnative.mutations.UpdateOp">UpdateOp</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;InsertOp&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.mutations.InsertOp&lt;/code&gt;)" href="#pythonnative.mutations.InsertOp">InsertOp</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;DestroyOp&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.mutations.DestroyOp&lt;/code&gt;)" href="#pythonnative.mutations.DestroyOp">DestroyOp</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SetFrameOp&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.mutations.SetFrameOp&lt;/code&gt;)" href="#pythonnative.mutations.SetFrameOp">SetFrameOp</a></span><span class="p">]</span>
 </span></code></pre></div>
-<p>The layout pass runs after the commit and effect phases, so by the
-time it executes:</p>
-<ul>
-<li>All native views exist.</li>
-<li>All visual props are up to date.</li>
-<li>All effects have run (including any that may set state and trigger
-  another render).</li>
-</ul>
-<p>A render that does not change the tree still triggers a layout pass
-when the viewport size changes (e.g., on rotation).</p>
-<h2 id="the-layoutnode-tree">The <code>LayoutNode</code> tree<a class="headerlink" href="#the-layoutnode-tree" title="Permanent link">&para;</a></h2>
-<p>The reconciler walks the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;VNode&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.VNode"><code>VNode</code></a>
-tree and builds a parallel tree of
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LayoutNode&lt;/span&gt;" href="../../api/layout/#pythonnative.layout.LayoutNode"><code>LayoutNode</code></a> objects. Each node
-carries:</p>
-<ul>
-<li>The element <code>type</code> and the resolved <code>style</code> dict.</li>
-<li>A reference back to the <code>VNode</code> (so frames can be applied to its
-  native handle).</li>
-<li>An optional <code>measure</code> callback for leaf widgets that need to ask
-  their handler for an intrinsic content size.</li>
-</ul>
-<p>The reconciler always wraps the user's root in a synthetic
-<em>viewport node</em> sized to the current screen so that <code>flex: 1</code> / <code>100%</code>
-at the top level "just work".</p>
-<h2 id="style-keys">Style keys<a class="headerlink" href="#style-keys" title="Permanent link">&para;</a></h2>
-<p>The engine recognises (and the reconciler routes to it) the following
-style keys, listed as <code>pythonnative.layout.LAYOUT_STYLE_KEYS</code>:</p>
-<table>
-<thead>
-<tr>
-<th>Group</th>
-<th>Keys</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Sizing</td>
-<td><code>width</code>, <code>height</code>, <code>min_width</code>, <code>max_width</code>, <code>min_height</code>, <code>max_height</code>, <code>aspect_ratio</code></td>
-</tr>
-<tr>
-<td>Flex</td>
-<td><code>flex</code>, <code>flex_grow</code>, <code>flex_shrink</code>, <code>flex_basis</code>, <code>align_self</code></td>
-</tr>
-<tr>
-<td>Container</td>
-<td><code>flex_direction</code>, <code>justify_content</code>, <code>align_items</code>, <code>spacing</code>, <code>gap</code></td>
-</tr>
-<tr>
-<td>Spacing</td>
-<td><code>margin</code>, <code>padding</code></td>
-</tr>
-<tr>
-<td>Position</td>
-<td><code>position</code>, <code>top</code>, <code>right</code>, <code>bottom</code>, <code>left</code></td>
-</tr>
-</tbody>
-</table>
-<p>Numbers are interpreted as dp (Android) / pt (iOS). Percentage
-strings (<code>"50%"</code>, <code>"100%"</code>) are resolved against the parent's
-content box.</p>
-<p><code>flex: N</code> is shorthand for <code>flex_grow: N</code>, <code>flex_shrink: 1</code>,
-<code>flex_basis: 0</code> (matching React Native semantics).</p>
-<p><code>margin</code> and <code>padding</code> accept either a number (applied to all sides)
-or a dict with any of <code>horizontal</code>, <code>vertical</code>, <code>left</code>, <code>top</code>,
-<code>right</code>, <code>bottom</code>.</p>
-<h2 id="intrinsic-measurement">Intrinsic measurement<a class="headerlink" href="#intrinsic-measurement" title="Permanent link">&para;</a></h2>
-<p>Leaf widgets (<code>Text</code>, <code>Button</code>, <code>Image</code>, <code>TextInput</code>, <code>Switch</code>,
-<code>Slider</code>, <code>ProgressBar</code>, <code>ActivityIndicator</code>) ask their backend for
-an intrinsic size when neither dimension is fixed. The handler
-implements <code>measure_intrinsic(view, max_w, max_h)</code>:</p>
-<ul>
-<li>iOS uses <code>UIView.sizeThatFits_(CGSize(max_w, max_h))</code>.</li>
-<li>Android wraps <code>View.measure(...)</code> with <code>MeasureSpec.AT_MOST</code> /
-  <code>UNSPECIFIED</code>.</li>
-</ul>
-<p>The engine respects whatever size the widget returns, then clamps it
-to the active <code>min_*</code> / <code>max_*</code> constraints.</p>
-<p><code>ScrollView</code> is a special case: the engine deliberately makes the
-scroll axis unbounded so that children can be larger than the
-viewport, and the wrapper itself is clipped to the available space.</p>
-<h2 id="absolute-positioning">Absolute positioning<a class="headerlink" href="#absolute-positioning" title="Permanent link">&para;</a></h2>
-<p>Setting <code>position: "absolute"</code> on a child takes it out of the flex
-flow. Its size and position come from a combination of <code>top</code> /
-<code>right</code> / <code>bottom</code> / <code>left</code> and explicit <code>width</code> / <code>height</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>        <span class="s2">"position"</span><span class="p">:</span> <span class="s2">"absolute"</span><span class="p">,</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="s2">"top"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"left"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="s2">"width"</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#F00"</span><span class="p">,</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="p">}),</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="s2">"position"</span><span class="p">:</span> <span class="s2">"absolute"</span><span class="p">,</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="s2">"bottom"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"right"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="s2">"width"</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#0A0"</span><span class="p">,</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="p">}),</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span>  <span class="c1"># centered, sized by both edges</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>        <span class="s2">"position"</span><span class="p">:</span> <span class="s2">"absolute"</span><span class="p">,</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>        <span class="s2">"top"</span><span class="p">:</span> <span class="s2">"25%"</span><span class="p">,</span> <span class="s2">"left"</span><span class="p">:</span> <span class="s2">"25%"</span><span class="p">,</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>        <span class="s2">"right"</span><span class="p">:</span> <span class="s2">"25%"</span><span class="p">,</span> <span class="s2">"bottom"</span><span class="p">:</span> <span class="s2">"25%"</span><span class="p">,</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>        <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#00F"</span><span class="p">,</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="p">}),</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#EEE"</span><span class="p">},</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="p">)</span>
+
+    <div class="doc doc-contents ">
+
+        <p>Union of every op type carried by a commit transaction.</p>
+
+    </div>
+
+</div>
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="pythonnative.mutations.CreateOp" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">CreateOp</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#pythonnative.mutations.CreateOp" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">CreateOp</span><span class="p">(</span><span class="n">tag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n">props</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">]</span> <span class="o">=</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></span><span class="p">())</span>
 </span></code></pre></div>
-<p>Absolute children are still constrained by the parent's padding box;
-edge offsets are measured from the inside of the padding, just like
-in CSS.</p>
-<h2 id="testing-layouts">Testing layouts<a class="headerlink" href="#testing-layouts" title="Permanent link">&para;</a></h2>
-<p>The layout engine is pure Python, so it is trivial to test in
-isolation:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">LayoutNode</span><span class="p">,</span> <span class="n">calculate_layout</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">root</span> <span class="o">=</span> <span class="n">LayoutNode</span><span class="p">(</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex_direction"</span><span class="p">:</span> <span class="s2">"row"</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>           <span class="s2">"width"</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">100</span><span class="p">},</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">children</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="n">LayoutNode</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">20</span><span class="p">}),</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="n">LayoutNode</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">20</span><span class="p">}),</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="p">],</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">)</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">calculate_layout</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="mi">400</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">x</span> <span class="o">==</span> <span class="mi">10</span>  <span class="c1"># padding-left</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">x</span> <span class="o">==</span> <span class="mi">65</span>  <span class="c1"># 10 + 50 + 5</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">width</span> <span class="o">==</span> <span class="mi">125</span>  <span class="c1"># 200 - 10 - 10 - 50 - 5</span>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Create a native view for <code>tag</code> of element type <code>type_name</code>.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="pythonnative.mutations.CreateOp.tag">tag</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Unique integer identity assigned by the reconciler.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="pythonnative.mutations.CreateOp.type_name">type_name</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Element type name (e.g. <code>"Text"</code>).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="pythonnative.mutations.CreateOp.props">props</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a>, <a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Initial <em>clean</em> props; callables have already been
+routed to the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../events/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a>
+and replaced by the <code>_pn_events</code> name set.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="pythonnative.mutations.UpdateOp" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">UpdateOp</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#pythonnative.mutations.UpdateOp" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">UpdateOp</span><span class="p">(</span><span class="n">tag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span><span class="p">,</span> <span class="n">changed_props</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">]</span> <span class="o">=</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></span><span class="p">())</span>
 </span></code></pre></div>
-<p>The reconciler also exposes
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;compute_layout_for_test&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.Reconciler.compute_layout_for_test"><code>Reconciler.compute_layout_for_test</code></a>
-so you can render a real component tree (with the mock registry) and
-inspect the computed <code>LayoutNode</code> tree without having to dig into
-private attributes.</p>
-<h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h2>
-<p>The engine intentionally does <strong>not</strong> implement:</p>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Apply <code>changed_props</code> to the view registered under <code>tag</code>.</p>
+<p>Removed props are signaled with a value of <code>None</code>, matching the
+pre-existing handler contract.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="pythonnative.mutations.InsertOp" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">InsertOp</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#pythonnative.mutations.InsertOp" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">InsertOp</span><span class="p">(</span><span class="n">parent_tag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span><span class="p">,</span> <span class="n">child_tag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Ensure the child view sits at <code>index</code> inside the parent view.</p>
+<p>Handlers must treat this as <em>move-aware</em>: if the child is already
+attached to the parent at a different position, it is moved rather
+than duplicated. <code>index</code> is clamped by handlers to the current
+child count.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="pythonnative.mutations.DestroyOp" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">DestroyOp</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#pythonnative.mutations.DestroyOp" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">DestroyOp</span><span class="p">(</span><span class="n">tag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Release the native view registered under <code>tag</code>.</p>
+<p>The registry drops its tag record and calls the handler's
+<code>destroy</code> hook so platform resources (listeners, timers, image
+loads) can be released eagerly instead of waiting for GC.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="pythonnative.mutations.SetFrameOp" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">SetFrameOp</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#pythonnative.mutations.SetFrameOp" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">SetFrameOp</span><span class="p">(</span><span class="n">tag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Position and size the view registered under <code>tag</code>.</p>
+<p>Coordinates are points relative to the parent's content origin,
+exactly as computed by the layout engine.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;frame&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.mutations.SetFrameOp.frame&lt;/code&gt;)" href="#pythonnative.mutations.SetFrameOp.frame">frame</a></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Tuple&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Tuple">Tuple</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a>, <a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a>, <a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a>, <a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Return <code>(x, y, width, height)</code> as a tuple.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="pythonnative.mutations.SetFrameOp.frame" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">frame</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#pythonnative.mutations.SetFrameOp.frame" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">frame</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Tuple&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Tuple">Tuple</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return <code>(x, y, width, height)</code> as a tuple.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>position: "fixed"</code>.</li>
-<li>Float / inline / table / grid layouts.</li>
-</ul>
-<p>Wrapping (<code>flex_wrap: "wrap"</code> / <code>"wrap_reverse"</code>) and RTL flipping
-(<code>direction: "rtl"</code>, with <code>start</code> / <code>end</code> edge insets resolving against
-the inherited direction) are both supported.</p>
-<p>Everything else from the React Native flexbox cheat-sheet is
-supported.</p>
-<h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Browse the <code>style</code> keys you can use:
-  <a href="../../api/component-properties/">Component properties</a>.</li>
-<li>Read about how the engine is wired in:
-  <a href="../reconciliation/">Reconciliation</a>.</li>
-<li>See the platform side of <code>set_frame</code> /
-  <code>measure_intrinsic</code>: <a href="../native-views/">Native views</a>.</li>
+<li>See where the callables stripped from these payloads go in
+  <a href="../events/">Events</a>.</li>
+<li>See how each op is applied to a concrete widget in
+  <a href="../native_views/">Native views</a>.</li>
+<li>Read what handlers size themselves against in
+  <a href="../platform_metrics/">Platform metrics</a>.</li>
+<li>Read the diffing pass that produces these lists in
+  <a href="../../concepts/reconciliation/">Reconciliation</a>.</li>
 </ul>
 
 

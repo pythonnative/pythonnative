@@ -1821,6 +1821,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -2704,6 +2710,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../mutations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutation ops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platform_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../sdk/" class="md-nav__link">
         
   
@@ -3362,7 +3452,7 @@ appends ops (<code>pythonnative.mutations</code>) to a transaction list, and the
 commit applies them through a single
 <code>backend.apply_mutations(ops)</code> call. Event callbacks never cross into
 the native layer at all; they live in the Python-side
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../native_views/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a>, keyed by tag, so
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../events/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a>, keyed by tag, so
 re-renders that only produce fresh closures cost nothing natively.</p>
 <p>Supports:</p>
 <ul>

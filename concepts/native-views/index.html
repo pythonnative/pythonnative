@@ -1968,6 +1968,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -2590,6 +2596,90 @@
     
   
     Native views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/mutations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutation ops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/platform_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform metrics
   
 
     
@@ -3247,7 +3337,7 @@ objects:</p>
 </table>
 <p>Handlers receive the <code>tag</code> at creation so they can wire their platform
 listeners <strong>once</strong>, dispatching back through
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;dispatch_event&lt;/span&gt;" href="../../api/native_views/#pythonnative.events.dispatch_event"><code>dispatch_event</code></a>:</p>
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;dispatch_event&lt;/span&gt;" href="../../api/events/#pythonnative.events.dispatch_event"><code>dispatch_event</code></a>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.events</span><span class="w"> </span><span class="kn">import</span> <span class="n">dispatch_event</span><span class="p">,</span> <span class="n">event_names</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
@@ -3276,7 +3366,7 @@ those are interpreted by <code>pythonnative.layout</code> and turned into
 <h2 id="events-never-cross-the-bridge">Events never cross the bridge<a class="headerlink" href="#events-never-cross-the-bridge" title="Permanent link">&para;</a></h2>
 <p>Callable props (<code>on_press</code>, <code>on_change</code>, …) are stripped before a
 <code>CreateOp</code>/<code>UpdateOp</code> is built and registered in the process-wide
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../../api/native_views/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a> keyed by
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../../api/events/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a> keyed by
 <code>(tag, name)</code>. The native payload carries only <code>_pn_events</code> (a
 <code>frozenset</code> of the event names present) so handlers can wire expensive
 listeners (scroll delegates, gesture recognizers) conditionally.</p>

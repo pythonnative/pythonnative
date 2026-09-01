@@ -2068,6 +2068,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -2690,6 +2696,90 @@
     
   
     Native views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/mutations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutation ops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/platform_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform metrics
   
 
     
@@ -3486,7 +3576,7 @@ and a new one is created.</p>
    re-rendered subtree into mutation ops referencing view tags, and
    flushes them all in a single <code>apply_mutations</code> transaction. Event
    callbacks are routed to the Python-side
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../../api/native_views/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a> instead of
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../../api/events/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a> instead of
    crossing the bridge, so callback-identity churn costs nothing.</li>
 <li><strong>Layout phase</strong>: a layout pass recomputes frames and emits
    <code>SetFrameOp</code>s only for frames that changed. Leaves whose
@@ -3651,8 +3741,8 @@ lazily imports only the relevant platform module at runtime, so the
 package can be imported on any platform for testing.</p>
 <p>Native events flow back through a single channel: handlers wire their
 platform listeners once at view creation and call
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;dispatch_event&lt;/span&gt;" href="../../api/native_views/#pythonnative.events.dispatch_event"><code>dispatch_event</code></a> with the view's
-tag; the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../../api/native_views/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a> resolves
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;dispatch_event&lt;/span&gt;" href="../../api/events/#pythonnative.events.dispatch_event"><code>dispatch_event</code></a> with the view's
+tag; the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../../api/events/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a> resolves
 the current Python callback. Gestures
 (<a href="../../api/gestures/"><code>pythonnative.gestures</code></a>) and natively-driven
 animations (the <code>Animated</code> API) ride the same tag infrastructure.</p>

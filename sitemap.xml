@@ -2,270 +2,282 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://pythonnative.com/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/examples/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/getting-started/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/alerts/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/animated/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/appearance/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/cli/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/component-properties/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/components/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/diagnostics/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/element/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
+    </url>
+    <url>
+         <loc>https://pythonnative.com/api/events/</loc>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/gestures/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/hooks/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/hot_reload/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/images/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/layout/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
+    </url>
+    <url>
+         <loc>https://pythonnative.com/api/mutations/</loc>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/native_modules/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/native_views/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/navigation/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/net/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/platform/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
+    </url>
+    <url>
+         <loc>https://pythonnative.com/api/platform_metrics/</loc>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/pythonnative/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/reconciler/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/runtime/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/screen/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/sdk/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/storage/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/style/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/suspense/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/api/utils/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/concepts/architecture/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/concepts/components/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/concepts/hooks/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/concepts/layout/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/concepts/lifecycle/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/concepts/mental-model/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/concepts/native-views/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/concepts/reconciliation/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/examples/collapsing-header/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/examples/counter/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/examples/forms/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/examples/hello-world/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/examples/lists/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/examples/navigation/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/android/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/animations/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/async/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/building-for-release/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/configuration/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/custom-native-components/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/desktop-preview/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/error-boundaries/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/gestures/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/hot-reload/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/ios/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/lists/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/native-modules/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/navigation/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/permissions/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/platform-accessibility/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/styling/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/guides/testing/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/meta/changelog/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/meta/contributing/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/meta/faq/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/meta/style-guide/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://pythonnative.com/meta/troubleshooting/</loc>
-         <lastmod>2026-08-30</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
 </urlset>

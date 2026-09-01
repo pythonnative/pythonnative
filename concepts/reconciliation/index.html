@@ -1990,6 +1990,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -2632,6 +2638,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/mutations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutation ops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/platform_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/sdk/" class="md-nav__link">
         
   
@@ -3220,7 +3310,7 @@ tree:</p>
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/native_views/#pythonnative.mutations.UpdateOp"><code>UpdateOp</code></a> carrying only the
+  &lt;/span&gt;" href="../../api/mutations/#pythonnative.mutations.UpdateOp"><code>UpdateOp</code></a> carrying only the
   props that changed (removed props arrive as <code>None</code>).</li>
 <li>If their <code>type</code> differs, <strong>replace</strong>: emit destroy ops for the old
   subtree, create ops for the new one, and recurse into its children.</li>
@@ -3231,13 +3321,13 @@ tree:</p>
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/native_views/#pythonnative.mutations.InsertOp"><code>InsertOp</code></a> /
+  &lt;/span&gt;" href="../../api/mutations/#pythonnative.mutations.InsertOp"><code>InsertOp</code></a> /
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;DestroyOp&lt;/span&gt;
 
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/native_views/#pythonnative.mutations.DestroyOp"><code>DestroyOp</code></a>.</li>
+  &lt;/span&gt;" href="../../api/mutations/#pythonnative.mutations.DestroyOp"><code>DestroyOp</code></a>.</li>
 </ul>
 <p>That's it. There's no "fiber tree", no time slicing, and no priority
 lanes. The reconciler runs synchronously to completion; if a render is
@@ -3252,7 +3342,7 @@ call. The native side sees one coherent transaction per commit
 makes <code>flush_dirty</code> batches cheap: several dirty components re-render,
 and their combined mutations land as one batch.</p>
 <p>Callable props never enter the transaction at all. They're registered
-in the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../../api/native_views/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a> keyed by
+in the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../../api/events/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a> keyed by
 <code>(tag, event name)</code>, so a render that only changes callback identities
 emits <strong>zero</strong> ops.</p>
 <h2 id="keyed-children">Keyed children<a class="headerlink" href="#keyed-children" title="Permanent link">&para;</a></h2>
