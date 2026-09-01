@@ -46,6 +46,24 @@ def App():
 
 ## Run it
 
+### Preview on desktop
+
+For the fastest feedback loop, run the example in the desktop preview
+before opening an emulator or simulator. The preview imports the real
+app code, so install the example's declared package first:
+
+```bash
+pip install emoji
+pn preview
+```
+
+A desktop window opens with `app/main.py`'s `App`. Edit a component,
+save, and the preview refreshes in place. See the
+[Desktop preview guide](../guides/desktop-preview.md) for platform
+notes and more options.
+
+### Run on a device or simulator
+
 From the project root:
 
 ```bash
