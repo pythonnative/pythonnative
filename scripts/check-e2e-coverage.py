@@ -159,6 +159,11 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # --------------------------------------------------------------
     "diagnostics",
     "HookOrderError",
+    # --------------------------------------------------------------
+    # Thin functional aliases: one-line wrappers over a value that is
+    # already covered elsewhere.
+    # --------------------------------------------------------------
+    "get_platform",  # thin functional alias of Platform.OS
 }
 
 
