@@ -77,6 +77,10 @@ class Response:
         """``True`` if the status is in the 2xx range."""
         return 200 <= self.status < 300
 
+    def __repr__(self) -> str:
+        cls = type(self).__name__
+        return f"{cls}(status={self.status}, url={self.url!r}, ok={self.ok}, content={len(self.content)} bytes)"
+
     def text(self, encoding: Optional[str] = None) -> str:
         """Decode ``content`` to ``str``.
 

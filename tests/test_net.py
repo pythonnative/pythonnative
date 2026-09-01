@@ -118,6 +118,17 @@ def test_get_json(echo_server: str) -> None:
     assert resp.json() == {"ok": True}
 
 
+def test_repr_summarizes_body(echo_server: str) -> None:
+    async def run() -> Response:
+        return await fetch(echo_server + "/text")
+
+    resp = asyncio.run(run())
+    text = repr(resp)
+    assert "status=200" in text
+    assert f"{len(resp.content)} bytes" in text
+    assert resp.text() not in text
+
+
 def test_non_2xx_does_not_raise_but_keeps_body(echo_server: str) -> None:
     async def run() -> Response:
         return await fetch(echo_server + "/status/418")
