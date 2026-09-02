@@ -20,17 +20,24 @@ with the native UI through a versioned bridge.
 
 Yes. Two patterns:
 
-- **Branch on `IS_ANDROID` / `IS_IOS`** for small differences inside
-  a shared component:
+- **Branch on `IS_ANDROID` / `IS_IOS` / `IS_DESKTOP`** for small
+  differences inside a shared component:
 
     ```python
-    from pythonnative.utils import IS_ANDROID, IS_IOS
+    from pythonnative.utils import IS_ANDROID, IS_IOS, IS_DESKTOP
 
     if IS_ANDROID:
         ...
     elif IS_IOS:
         ...
+    elif IS_DESKTOP:
+        ...
     ```
+
+    `pn preview` runs the app with `IS_DESKTOP` set; see the
+    [Desktop preview guide](../guides/desktop-preview.md).
+    For a declarative alternative, use `Platform.select({...})`; see the
+    [Platform API](../api/platform.md).
 
 - **Per-platform native modules** for larger pieces (a custom widget,
   a device API). Implement once per platform behind a single Python
