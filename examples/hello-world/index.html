@@ -1681,6 +1681,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Run it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#preview-on-desktop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview on desktop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-on-a-device-or-simulator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run on a device or simulator
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3083,6 +3111,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Run it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#preview-on-desktop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview on desktop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-on-a-device-or-simulator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run on a device or simulator
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3171,8 +3227,21 @@
   the same geometry on Android and iOS.</li>
 </ul>
 <h2 id="run-it">Run it<a class="headerlink" href="#run-it" title="Permanent link">&para;</a></h2>
+<h3 id="preview-on-desktop">Preview on desktop<a class="headerlink" href="#preview-on-desktop" title="Permanent link">&para;</a></h3>
+<p>For the fastest feedback loop, run the example in the desktop preview
+before opening an emulator or simulator. The preview imports your real
+app code, so if your project declares packages in
+<code>[requirements].packages</code>, <code>pip install</code> them first. From the project
+root:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pn<span class="w"> </span>preview
+</span></code></pre></div>
+<p>A desktop window opens with <code>app/main.py</code>'s <code>App</code>. Edit a component,
+save, and the preview refreshes in place. See the
+<a href="../../guides/desktop-preview/">Desktop preview guide</a> for platform
+notes and more options.</p>
+<h3 id="run-on-a-device-or-simulator">Run on a device or simulator<a class="headerlink" href="#run-on-a-device-or-simulator" title="Permanent link">&para;</a></h3>
 <p>From the project root:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w">   </span><span class="c1"># or: pn run ios</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w">   </span><span class="c1"># or: pn run ios</span>
 </span></code></pre></div>
 <p><code>pn run</code> will:</p>
 <ol>
@@ -3183,7 +3252,7 @@
 <li>Stream logs back to the terminal.</li>
 </ol>
 <p>For an even tighter loop while iterating, add <code>--hot-reload</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--hot-reload
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--hot-reload
 </span></code></pre></div>
 <p>See <a href="../../guides/hot-reload/">Hot reload guide</a> for the details.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
