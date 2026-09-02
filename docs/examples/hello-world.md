@@ -5,7 +5,7 @@ The smallest possible PythonNative app. You'll learn how to:
 - Define a component with `@pn.component`.
 - Manage state with `use_state`.
 - Compose elements with `pn.Column`.
-- Run it with `pn run`.
+- Run it with `pn preview` and `pn run`.
 
 ## The code
 
