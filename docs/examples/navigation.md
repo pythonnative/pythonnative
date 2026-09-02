@@ -9,6 +9,13 @@ For the conceptual model and the full API, see the
 [Navigation guide](../guides/navigation.md) and the
 [Navigation API reference](../api/navigation.md).
 
+Paste any of the snippets below into `app/main.py` of a project
+scaffolded with `pn init`, then run `pn preview` (or `pn run android`
+/ `pn run ios`). The Stack, Tab, and Drawer examples define `App`
+directly and run as they are. The Nesting and Focus-aware effects
+snippets show a piece of a larger app; see the note at the end of
+each of those sections for what to run instead.
+
 ## Stack navigator
 
 A pushable, poppable stack. The default for "go from screen A to
@@ -160,6 +167,12 @@ def HomeStack():
 Pushing onto the inner stack leaves the tab bar visible; switching
 tabs preserves each stack's own history.
 
+This snippet sketches the composition rather than a complete app:
+`Feed` is defined in the Tab navigator example above, and `Post`
+isn't shown. To try it, add a `Post` screen and use this `App` in
+place of the Tab navigator's `App`, then follow the same `pn init`
+and `pn preview` steps as the other examples on this page.
+
 ## Focus-aware effects
 
 When you need to start something only while a screen is on screen
@@ -178,6 +191,12 @@ def CameraScreen():
 
 The cleanup runs as soon as the user navigates away, even if the
 screen stays mounted.
+
+`CameraScreen` isn't wrapped in a navigator here. Define stand-ins
+for `start_camera` and `stop_camera`, then preview it on its own
+with `pn preview app.main.CameraScreen` instead of mounting it as
+`App`. See the Stack navigator example above for the full shape of
+an `App` that wraps a screen in a `NavigationContainer`.
 
 ## Next steps
 
