@@ -49,11 +49,12 @@ def App():
 ### Preview on desktop
 
 For the fastest feedback loop, run the example in the desktop preview
-before opening an emulator or simulator. The preview imports the real
-app code, so install the example's declared package first:
+before opening an emulator or simulator. The preview imports your real
+app code, so if your project declares packages in
+`[requirements].packages`, `pip install` them first. From the project
+root:
 
 ```bash
-pip install emoji
 pn preview
 ```
 
