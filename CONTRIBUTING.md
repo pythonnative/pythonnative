@@ -352,7 +352,7 @@ When you add a new public symbol you must also:
 ### CI
 
 - **CI** (`ci.yml`): runs formatter, linter, type checker, and tests on every push and PR.
-- **E2E** (`e2e.yml`): builds the hello-world example on Android (Linux emulator) and iOS (macOS simulator), then runs Maestro flows. Triggers on pushes to `main`, PRs, and manual dispatch.
+- **E2E** (`e2e.yml`): builds `examples/e2e-suite` on Android (Linux emulator) and iOS (macOS simulator), then runs Maestro flows by category. Triggers on pushes to `main`, PRs, and manual dispatch.
 - **PR Lint** (`pr-lint.yml`): validates the PR title against Conventional Commits format (protects squash merges) and checks individual commit messages via commitlint (protects rebase merges). Recommended: add the **PR title** job as a required status check in branch-protection settings.
 - **Release** (`release.yml`): runs on merge to `main`; computes version, generates changelog, tags, creates GitHub Release, and (when `DRAFT_RELEASE` is `"false"`) publishes to PyPI.
 - **Docs** (`docs.yml`): builds the MkDocs site in strict mode on every push and pull request, and deploys to GitHub Pages on push to `main`.
