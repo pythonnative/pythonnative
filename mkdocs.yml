@@ -129,6 +129,7 @@ nav:
     - Platform metrics: api/platform_metrics.md
     - SDK: api/sdk.md
     - Hot reload: api/hot_reload.md
+    - Preview: api/preview.md
     - Diagnostics: api/diagnostics.md
     - Utilities: api/utils.md
     - CLI (pn): api/cli.md

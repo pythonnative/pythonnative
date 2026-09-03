@@ -62,7 +62,7 @@ No other dependencies are required; the desktop backend is pure Python.
 ## How it works
 
 `pn preview` sets `PN_PLATFORM=desktop` and starts
-`pythonnative.preview.run_preview`, which:
+[`run_preview`](../api/preview.md), which:
 
 1. Opens a single Tk window with one *stage* frame.
 2. Selects the Tkinter
