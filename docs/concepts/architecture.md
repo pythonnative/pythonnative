@@ -26,7 +26,7 @@ platform APIs synchronously from Python.
    [`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations].
    State-driven renders are
    **local**: a setter marks only its own component subtree dirty, and
-   [`flush_dirty`][pythonnative.reconciler.Reconciler.flush_dirty]
+   [`flush_dirty`][pythonnative.reconciler.core.Reconciler.flush_dirty]
    re-runs just those components instead of the whole app from the
    root (the full tree is only rebuilt on mount, navigation, and hot
    reload). Sibling and ancestor components whose state did not change
@@ -41,7 +41,7 @@ platform APIs synchronously from Python.
 5. **State batching.** Multiple state updates triggered during a
    render pass (e.g., from effects) are automatically batched into a
    single re-render. Explicit batching is available via
-   [`batch_updates`][pythonnative.batch_updates].
+   [`batch_updates`][pythonnative.scheduler.batch_updates].
 6. **Key-based reconciliation.** Children can be assigned stable
    `key` values to preserve identity across re-renders, which is
    critical for lists and dynamic content.
@@ -201,7 +201,7 @@ component. App code does not call it directly.
   compose them with
   [`StyleSheet.compose`][pythonnative.style.StyleSheet.compose].
 - **Theming**: use [`ThemeContext`][pythonnative.style.ThemeContext]
-  with [`Provider`][pythonnative.Provider] and
+  with [`Context.Provider`][pythonnative.hooks.Context.Provider] and
   [`use_context`][pythonnative.use_context] to propagate theme
   values through the tree.
 
@@ -401,21 +401,27 @@ PythonNative navigation is **declarative** and **native-backed**:
   [`NavigationContainer`][pythonnative.NavigationContainer], and
   names the root component `App` so the native templates can find
   it.
-- The outermost `Stack.Navigator` delegates `navigate(...)`,
-  `go_back()`, and `reset(...)` to the platform's native navigation
-  controller: `UINavigationController` on iOS and the AndroidX
-  Navigation Component on Android. Nested navigators (tabs inside a
-  stack, stacks inside tabs) stay in Python and reuse the existing
+- The outermost `Stack.Navigator` delegates `push`, `pop`, `replace`,
+  and `reset` to the platform's native navigation controller
+  (`UINavigationController` on iOS, the AndroidX Navigation Component
+  on Android) through the
+  [`HostNavigator`][pythonnative.navigation.HostNavigator] protocol.
+  Nested navigators (tabs inside a stack, stacks inside tabs) stay in
+  Python, keep their screens mounted, and reuse the existing
   reconciler.
-- Each pushed native screen is a fresh host with its own reconciler
-  and `_ScreenHost`. Initial routes are forwarded via host arguments
-  (`__pn_initial_route__` / `__pn_initial_params__`), so a pushed
-  screen knows which `Stack.Screen` to render on its first frame.
+- Each pushed native screen is a fresh
+  [`ScreenHost`][pythonnative.hosts.base.ScreenHost] with its own
+  reconciler. The host receives the *serialized*
+  [`NavigationState`][pythonnative.navigation.NavigationState] as its
+  launch argument, so the pushed screen's navigator boots with the
+  full history and renders the right `Stack.Screen` on its first
+  frame.
 - Inside any screen, [`use_navigation`][pythonnative.use_navigation]
-  returns a `NavigationHandle`; [`use_route`][pythonnative.use_route]
-  returns the current route name and params. Both are the same
-  hooks regardless of whether the active navigator is native-backed
-  or pure-Python.
+  returns a [`Navigation`][pythonnative.Navigation] handle and
+  [`use_route`][pythonnative.use_route] returns the current
+  [`Route`][pythonnative.navigation.Route]. Both are the same hooks
+  regardless of whether the active navigator is native-backed or
+  pure-Python.
 
 See the [Navigation guide](../guides/navigation.md) for the full
 walkthrough, including how `options={"title": ...}` flows into the

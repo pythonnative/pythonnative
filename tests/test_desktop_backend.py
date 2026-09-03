@@ -437,7 +437,8 @@ _NAV_SCRIPT = """
     import sys, types
     import tkinter as tk
     import pythonnative as pn
-    from pythonnative import preview, screen as sc
+    from pythonnative import preview
+    from pythonnative.hosts import desktop as sc
     from pythonnative.native_views import desktop as dk
     from pythonnative.platform import Platform
     from pythonnative.utils import IS_DESKTOP
@@ -455,7 +456,7 @@ _NAV_SCRIPT = """
             pn.Text("HOME"),
             pn.Text("count=%d" % count),
             pn.Button("inc", on_press=lambda: set_count(count + 1)),
-            pn.Button("detail", on_press=lambda: nav.navigate("Detail", {"x": count})),
+            pn.Button("detail", on_press=lambda: nav.navigate("Detail", x=count)),
         )
 
     @pn.component
@@ -463,7 +464,7 @@ _NAV_SCRIPT = """
         nav = pn.use_navigation()
         p = pn.use_route()
         return pn.Column(
-            pn.Text("DETAIL x=%s" % p.get("x")),
+            pn.Text("DETAIL x=%s" % p.params.get("x")),
             pn.Button("back", on_press=nav.go_back),
         )
 

@@ -1,7 +1,7 @@
 # Tests ErrorBoundary catches a render error and shows the fallback.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/error_boundary.py
-# Source under test: src/pythonnative/components.py :: ErrorBoundary
+# Source under test: src/pythonnative/components/structural.py :: ErrorBoundary
 appId: ${APP_ID}
 ---
 - runFlow:

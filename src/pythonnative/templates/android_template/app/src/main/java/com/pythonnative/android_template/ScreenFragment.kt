@@ -38,18 +38,17 @@ class ScreenFragment : Fragment() {
         }
         try {
             val py = Python.getInstance()
-            // Default to "app.main": PythonNative imports the module
-            // and looks up its top-level `App` attribute. Override
-            // via fragment arguments / nav graph to load a different
-            // module or a specific dotted-attribute path (e.g.
-            // "app.main.RootScreen").
-            val screenPath = arguments?.getString("screen_path") ?: "app.main"
+            // PythonNative imports the entry module (app.entry_point in
+            // pythonnative.toml, staged into R.string.pn_entry_module)
+            // and looks up its top-level `App` attribute. Pushed screens
+            // pass an explicit path in the fragment arguments.
+            val screenPath = arguments?.getString("screen_path") ?: getString(R.string.pn_entry_module)
             val argsJson = arguments?.getString("args_json")
             val filesRoot = requireContext().filesDir.absolutePath
             val devRoot = "$filesRoot/pythonnative_dev"
             val hotReload = py.getModule("pythonnative.hot_reload")
             hotReload.callAttr("configure_dev_environment", filesRoot)
-            val pnScreen = py.getModule("pythonnative.screen")
+            val pnScreen = py.getModule("pythonnative.hosts")
             screen = pnScreen.callAttr("create_screen", screenPath, requireActivity(), argsJson)
             screen?.callAttr("enable_hot_reload", "$devRoot/reload.json", devRoot)
         } catch (e: Exception) {

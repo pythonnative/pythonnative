@@ -43,6 +43,8 @@ Reactive state (with hooks):
   [`use_net_info`][pythonnative.use_net_info]: connectivity.
 """
 
+from typing import Any, Sequence
+
 from .app_state import AppState, use_app_state
 from .battery import Battery
 from .biometrics import Biometrics
@@ -57,6 +59,25 @@ from .notifications import Notifications
 from .permissions import Permissions
 from .secure_store import SecureStore
 from .share import Share
+
+
+def dispatch_activity_result(request_code: int, result_code: int, data: Any) -> bool:
+    """Route an Android ``onActivityResult`` to whichever module is waiting on it.
+
+    Called by the screen host. Returns ``True`` when a pending request
+    consumed the result.
+    """
+    from .camera import deliver_android_activity_result
+
+    return deliver_android_activity_result(request_code, result_code, data)
+
+
+def dispatch_permissions_result(request_code: int, permissions: Sequence[str], grant_results: Sequence[int]) -> bool:
+    """Route an Android ``onRequestPermissionsResult`` to the pending ``Permissions.request``."""
+    from .permissions import deliver_android_permission_result
+
+    return deliver_android_permission_result(request_code, permissions, grant_results)
+
 
 __all__ = [
     "AppState",
@@ -74,6 +95,8 @@ __all__ = [
     "SecureStore",
     "Share",
     "Vibration",
+    "dispatch_activity_result",
+    "dispatch_permissions_result",
     "use_app_state",
     "use_net_info",
 ]

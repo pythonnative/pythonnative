@@ -1,8 +1,8 @@
 """Hook primitives for function components.
 
-Provides React-like hooks for managing state, effects, memoization,
-context, and navigation within function components decorated with
-[`component`][pythonnative.component]. Hooks must be called at the top
+Provides React-like hooks for managing state, effects, memoization, and
+context within components decorated with
+[`component`][pythonnative.component.component]. Hooks must be called at the top
 level of a component (not inside conditionals or loops) so they map to
 the same slot across renders. In dev mode the framework verifies this
 and raises [`HookOrderError`][pythonnative.diagnostics.HookOrderError]
@@ -25,12 +25,17 @@ than a plain global, so ``async def`` component bodies keep their hook
 identity across ``await`` boundaries even when several coroutine
 renders interleave on the event loop.
 
+Hooks talk to the reconciler through the small
+[`RenderOwner`][pythonnative.hooks.RenderOwner] protocol (mark a
+component dirty, request a render, defer a transition, register a back
+handler). That is the whole contract between the two modules.
+
 Example:
     ```python
     import pythonnative as pn
 
     @pn.component
-    def Counter(initial=0):
+    def Counter(initial: int = 0):
         count, set_count = pn.use_state(initial)
         return pn.Column(
             pn.Text(f"Count: {count}"),
@@ -39,18 +44,36 @@ Example:
     ```
 """
 
+from __future__ import annotations
+
 import asyncio
 import inspect
-from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field, replace
-from typing import Any, Awaitable, Callable, Dict, Generator, Generic, List, Optional, Tuple, TypeVar
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    TypeVar,
+    Union,
+    overload,
+)
 
 from . import diagnostics
-from .element import Element
+from .element import Element, Node
+from .scheduler import TransitionQueue, in_transition, run_in_transition, schedule_trigger
 from .suspense import CoroDriver, Resource
 
 T = TypeVar("T")
+
+StateSetter = Callable[[Union[T, Callable[[T], T]]], None]
+"""Setter returned by [`use_state`][pythonnative.use_state]: accepts a value or ``current -> new``."""
 
 _SENTINEL = object()
 
@@ -58,17 +81,30 @@ _SENTINEL = object()
 # global or thread-local) so coroutine component bodies resume with the
 # right hook state after every ``await``, no matter how renders
 # interleave on the loop.
-_hook_context: "ContextVar[Optional[HookState]]" = ContextVar("pn_hook_state", default=None)
+_hook_context: ContextVar[Optional["HookState"]] = ContextVar("pn_hook_state", default=None)
 
-# Depth of nested ``batch_updates`` blocks plus the trigger deferred by
-# the outermost block, per execution context.
-_batch_depth: "ContextVar[int]" = ContextVar("pn_batch_depth", default=0)
-_batch_pending: "ContextVar[Optional[List[Callable[[], None]]]]" = ContextVar("pn_batch_pending", default=None)
 
-# Whether state updates in the current execution context were marked as
-# transitions (see ``use_transition``). Transition updates defer their
-# re-render to a later loop turn so urgent updates stay responsive.
-_transition_var: "ContextVar[bool]" = ContextVar("pn_transition", default=False)
+# ======================================================================
+# Reconciler contract
+# ======================================================================
+
+
+class RenderOwner(Protocol):
+    """What a hook needs from the object that renders its component.
+
+    The reconciler implements this; tests may substitute a stub.
+    """
+
+    transitions: TransitionQueue
+
+    def mark_dirty(self, vnode: Any) -> None:
+        """Queue ``vnode``'s component for a local re-render."""
+
+    def request_render(self) -> None:
+        """Ask the host to flush dirty components (may be deferred)."""
+
+    def register_back_handler(self, handler: Callable[[], bool]) -> Callable[[], None]:
+        """Register a system back-press handler; returns an unregister callable."""
 
 
 # ======================================================================
@@ -120,7 +156,7 @@ class Ref(Generic[T]):
 class HookState:
     """Per-instance storage for one component's hooks.
 
-    Each `@component` instance owns one `HookState`. Hooks are matched
+    Each component instance owns one ``HookState``. Hooks are matched
     to slots by call order, so they must always be called in the same
     order across renders. Effects scheduled during render are deferred
     (layout effects into ``_pending_layout_effects``, passive effects
@@ -128,12 +164,15 @@ class HookState:
     phases after native mutations commit.
 
     Attributes:
-        states: One entry per `use_state` / `use_reducer` call.
-        effects: One `(deps, cleanup)` tuple per `use_effect` call.
-        layout_effects: One `(deps, cleanup)` tuple per
-            `use_layout_effect` call.
-        memos: One `(deps, value)` tuple per `use_memo` / `use_callback`.
-        refs: One [`Ref`][pythonnative.Ref] per `use_ref` call.
+        states: One entry per ``use_state`` / ``use_reducer`` call.
+        effects: One ``(deps, cleanup)`` tuple per ``use_effect`` call.
+        layout_effects: One ``(deps, cleanup)`` tuple per
+            ``use_layout_effect`` call.
+        memos: One ``(deps, value)`` tuple per ``use_memo`` / ``use_callback``.
+        refs: One [`Ref`][pythonnative.Ref] per ``use_ref`` call.
+        owner: The [`RenderOwner`][pythonnative.hooks.RenderOwner]
+            (reconciler) this component is mounted in, or ``None``.
+        vnode: The reconciler's node for this component, or ``None``.
     """
 
     __slots__ = (
@@ -150,14 +189,13 @@ class HookState:
         "ref_index",
         "resource_index",
         "context_deps",
-        "_trigger_render",
+        "owner",
+        "vnode",
         "_pending_effects",
         "_pending_layout_effects",
         "_pending_effects_mark",
         "_pending_layout_effects_mark",
         "_dirty",
-        "_vnode",
-        "_reconciler",
         "_hook_log",
         "_hook_signature",
         "_component_name",
@@ -183,22 +221,15 @@ class HookState:
         # Provider's value changes so consumers re-render even when a
         # memoized ancestor skipped (reactive context).
         self.context_deps: Dict[int, Any] = {}
-        self._trigger_render: Optional[Callable[[], None]] = None
+        self.owner: Optional[RenderOwner] = None
+        self.vnode: Any = None
         self._pending_effects: List[Tuple[int, Callable, Any]] = []
         self._pending_layout_effects: List[Tuple[int, Callable, Any]] = []
         # Cleared by the reconciler after each successful render.
         # ``use_state`` / ``use_reducer`` setters flip it to ``True``
-        # whenever they actually mutate state, so [`memo`][pythonnative.memo]
-        # knows that a memoized component still needs to re-render even
-        # when its props didn't change.
+        # whenever they actually mutate state, so a memoized component
+        # still re-renders even when its props didn't change.
         self._dirty: bool = False
-        # Back-references wired by the reconciler so a state setter can
-        # mark *its own* component subtree dirty for a local re-render
-        # (instead of forcing a whole-app re-render from the root). Both
-        # stay ``None`` until the component is mounted, and are cleared
-        # again when it unmounts.
-        self._vnode: Any = None
-        self._reconciler: Any = None
         # Dev-mode hook-order guard: the sequence of hook kinds called
         # during the in-flight render, and the signature captured from
         # the first successful render.
@@ -213,13 +244,12 @@ class HookState:
         self._pending_effects_mark: int = 0
         self._pending_layout_effects_mark: int = 0
 
-    def begin_render(self, component_name: str = "") -> None:
-        """Prepare for a render pass: reset cursors and the dev-mode hook log.
+    # ------------------------------------------------------------------
+    # Render lifecycle
+    # ------------------------------------------------------------------
 
-        Called by the reconciler before each invocation of the
-        component body so the next render reads slots in the same
-        order they were written.
-        """
+    def begin_render(self, component_name: str = "") -> None:
+        """Prepare for a render pass: reset cursors and the dev-mode hook log."""
         self.state_index = 0
         self.effect_index = 0
         self.layout_effect_index = 0
@@ -245,9 +275,6 @@ class HookState:
 
     def finish_render(self) -> None:
         """Finalize a successful render: lock in / verify the hook signature.
-
-        Only called when the component body returned without raising,
-        so a failed render never corrupts the signature.
 
         Raises:
             HookOrderError: In dev mode, when this render called fewer
@@ -297,13 +324,12 @@ class HookState:
             )
 
     def reset_hook_signature(self) -> None:
-        """Forget the recorded hook signature (used by Fast Refresh).
-
-        After a hot reload swaps in a new component body, the old
-        signature no longer applies; the next render records a fresh
-        one.
-        """
+        """Forget the recorded hook signature (used by Fast Refresh)."""
         self._hook_signature = None
+
+    # ------------------------------------------------------------------
+    # Effects
+    # ------------------------------------------------------------------
 
     def flush_layout_effects(self) -> None:
         """Run layout effects queued during render (commit phase, pre-paint)."""
@@ -312,11 +338,7 @@ class HookState:
         self._pending_layout_effects_mark = 0
         for idx, effect_fn, deps in pending:
             _, prev_cleanup = self.layout_effects[idx]
-            if callable(prev_cleanup):
-                try:
-                    prev_cleanup()
-                except Exception:
-                    pass
+            _run_cleanup(prev_cleanup)
             cleanup = _activate_effect(effect_fn)
             self.layout_effects[idx] = (list(deps) if deps is not None else None, cleanup)
 
@@ -335,11 +357,7 @@ class HookState:
         self._pending_effects_mark = 0
         for idx, effect_fn, deps in pending:
             _, prev_cleanup = self.effects[idx]
-            if callable(prev_cleanup):
-                try:
-                    prev_cleanup()
-                except Exception:
-                    pass
+            _run_cleanup(prev_cleanup)
             cleanup = _activate_effect(effect_fn)
             self.effects[idx] = (list(deps) if deps is not None else None, cleanup)
 
@@ -352,18 +370,10 @@ class HookState:
         component instance is unmounted by the reconciler.
         """
         for i, (_deps, cleanup) in enumerate(self.layout_effects):
-            if callable(cleanup):
-                try:
-                    cleanup()
-                except Exception:
-                    pass
+            _run_cleanup(cleanup)
             self.layout_effects[i] = (_SENTINEL, None)
         for i, (_deps, cleanup) in enumerate(self.effects):
-            if callable(cleanup):
-                try:
-                    cleanup()
-                except Exception:
-                    pass
+            _run_cleanup(cleanup)
             self.effects[i] = (_SENTINEL, None)
         self._pending_effects = []
         self._pending_layout_effects = []
@@ -380,25 +390,42 @@ class HookState:
         if driver is not None:
             driver.cancel()
 
+    def detach(self) -> None:
+        """Break the back-references to the reconciler (on unmount).
+
+        Lets the unmounted component's hook state (and the closures it
+        captured) be freed by plain refcounting, which matters on iOS
+        where the cyclic GC is disabled.
+        """
+        self.owner = None
+        self.vnode = None
+
 
 # ======================================================================
-# Context helpers
+# Context helpers (framework-internal)
 # ======================================================================
 
 
-def _get_hook_state() -> Optional[HookState]:
-    """Return the active `HookState`, or `None` if no render is in flight."""
+def current_hook_state() -> Optional[HookState]:
+    """Return the active ``HookState``, or ``None`` if no render is in flight."""
     return _hook_context.get()
 
 
-def _set_hook_state(state: Optional[HookState]) -> "Token[Optional[HookState]]":
-    """Install `state` as the active `HookState`; returns the reset token."""
+def install_hook_state(state: Optional[HookState]) -> Token[Optional[HookState]]:
+    """Install ``state`` as the active ``HookState``; returns the reset token."""
     return _hook_context.set(state)
 
 
-def _reset_hook_state(token: "Token[Optional[HookState]]") -> None:
-    """Restore the hook state that was active before `_set_hook_state`."""
+def restore_hook_state(token: Token[Optional[HookState]]) -> None:
+    """Restore the hook state that was active before ``install_hook_state``."""
     _hook_context.reset(token)
+
+
+def _require_hook_state(hook_name: str) -> HookState:
+    ctx = _hook_context.get()
+    if ctx is None:
+        raise RuntimeError(f"{hook_name} must be called inside a @component function")
+    return ctx
 
 
 def _deps_changed(prev: Any, current: Any) -> bool:
@@ -410,6 +437,17 @@ def _deps_changed(prev: Any, current: Any) -> bool:
     if len(prev) != len(current):
         return True
     return any(p is not c and p != c for p, c in zip(prev, current))
+
+
+def _run_cleanup(cleanup: Any) -> None:
+    if callable(cleanup):
+        try:
+            cleanup()
+        except Exception as exc:
+            # Never let a failing cleanup abort an unmount; surface it
+            # through the RedBox in dev mode, a warning otherwise.
+            if not diagnostics.report_error(exc, phase="effect cleanup"):
+                diagnostics.warn(f"Effect cleanup raised {exc!r}")
 
 
 def _activate_effect(effect_fn: Callable) -> Any:
@@ -462,143 +500,47 @@ def _activate_effect(effect_fn: Callable) -> Any:
     return _cleanup
 
 
-# ======================================================================
-# Batching and transition scheduling
-# ======================================================================
-
-
-def _schedule_trigger(trigger: Callable[[], None]) -> None:
-    """Run ``trigger`` immediately, or defer it inside a `batch_updates` block."""
-    pending = _batch_pending.get()
-    if _batch_depth.get() > 0 and pending is not None:
-        if trigger not in pending:
-            pending.append(trigger)
-    else:
-        trigger()
-
-
-# Transition scheduling state. Deferred triggers (and the callbacks
-# that flip ``is_pending`` back off) run together on a later loop turn.
-_deferred_triggers: List[Callable[[], None]] = []
-_post_transition_callbacks: List[Callable[[], None]] = []
-_transition_flush_scheduled = False
-
-
-def _flush_transitions() -> None:
-    """Run every deferred transition render, then the completion callbacks."""
-    global _transition_flush_scheduled
-    _transition_flush_scheduled = False
-    triggers = list(_deferred_triggers)
-    _deferred_triggers.clear()
-    callbacks = list(_post_transition_callbacks)
-    _post_transition_callbacks.clear()
-    for trigger in triggers:
-        try:
-            trigger()
-        except Exception as exc:
-            if not diagnostics.report_error(exc, phase="transition"):
-                raise
-    for callback in callbacks:
-        try:
-            callback()
-        except Exception as exc:
-            if not diagnostics.report_error(exc, phase="transition"):
-                raise
-
-
-def _schedule_transition_flush() -> None:
-    """Ensure a transition flush is queued on the framework loop."""
-    global _transition_flush_scheduled
-    if _transition_flush_scheduled:
-        return
-    _transition_flush_scheduled = True
-    from .runtime import get_loop
-
-    get_loop().call_soon(_flush_transitions)
-
-
-def _defer_transition_trigger(trigger: Callable[[], None]) -> None:
-    if trigger not in _deferred_triggers:
-        _deferred_triggers.append(trigger)
-    _schedule_transition_flush()
-
-
-def _run_in_transition(fn: Callable[[], None]) -> None:
-    """Run ``fn`` with its state updates marked as transitions."""
-    token = _transition_var.set(True)
-    try:
-        fn()
-    finally:
-        _transition_var.reset(token)
-
-
-def _notify_state_changed(ctx: "HookState") -> None:
+def _notify_state_changed(ctx: HookState) -> None:
     """Mark ``ctx``'s component dirty and schedule a render after a state change.
 
-    Enqueuing the owning ``VNode`` in the reconciler's dirty set is what
-    makes the subsequent render *local*: the screen host's trigger calls
-    ``flush_dirty``, which re-renders only the components marked here
-    rather than the whole app. The dirty mark is eager (so several
-    setters coalesce), while the render trigger respects
-    [`batch_updates`][pythonnative.batch_updates] and defers to a later
-    loop turn inside a transition (see
+    Enqueuing the owning node in the reconciler's dirty set is what
+    makes the subsequent render *local*: the host's trigger flushes
+    only the components marked here rather than the whole app. The
+    dirty mark is eager (so several setters coalesce), while the render
+    request respects [`batch_updates`][pythonnative.scheduler.batch_updates] and
+    defers to a later loop turn inside a transition (see
     [`use_transition`][pythonnative.use_transition]).
     """
     ctx._dirty = True
-    reconciler = ctx._reconciler
-    vnode = ctx._vnode
-    if reconciler is not None and vnode is not None:
-        reconciler.mark_dirty(vnode)
-    if ctx._trigger_render:
-        if _transition_var.get():
-            _defer_transition_trigger(ctx._trigger_render)
-        else:
-            _schedule_trigger(ctx._trigger_render)
-
-
-@contextmanager
-def batch_updates() -> Generator[None, None, None]:
-    """Coalesce multiple state updates into a single re-render.
-
-    State setters called inside the `with` block defer their
-    re-render trigger until the block exits, so any number of
-    `set_*` calls produce at most one render pass.
-
-    Yields:
-        None. The block executes normally; deferred renders fire on
-        exit.
-
-    Example:
-        ```python
-        import pythonnative as pn
-
-        with pn.batch_updates():
-            set_count(1)
-            set_name("hello")
-        ```
-    """
-    depth = _batch_depth.get()
-    depth_token = _batch_depth.set(depth + 1)
-    pending_token = None
-    if depth == 0:
-        pending_token = _batch_pending.set([])
-    try:
-        yield
-    finally:
-        _batch_depth.reset(depth_token)
-        if pending_token is not None:
-            triggers = _batch_pending.get() or []
-            _batch_pending.reset(pending_token)
-            for trigger in triggers:
-                trigger()
+    owner = ctx.owner
+    if owner is None:
+        return
+    if ctx.vnode is not None:
+        owner.mark_dirty(ctx.vnode)
+    if in_transition():
+        owner.transitions.defer(owner.request_render)
+    else:
+        schedule_trigger(owner.request_render)
 
 
 # ======================================================================
-# Public hooks
+# State hooks
 # ======================================================================
 
 
-def use_state(initial: Any = None) -> Tuple[Any, Callable]:
+@overload
+def use_state() -> Tuple[Optional[Any], StateSetter[Any]]: ...
+
+
+@overload
+def use_state(initial: Callable[[], T]) -> Tuple[T, StateSetter[T]]: ...
+
+
+@overload
+def use_state(initial: T) -> Tuple[T, StateSetter[T]]: ...
+
+
+def use_state(initial: Any = None) -> Tuple[Any, StateSetter[Any]]:
     """Return ``(value, setter)`` for component-local state.
 
     State persists across re-renders of the same component instance.
@@ -614,7 +556,7 @@ def use_state(initial: Any = None) -> Tuple[Any, Callable]:
         state and ``setter`` updates it (and triggers a re-render).
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
+        RuntimeError: If called outside a ``@component`` function.
 
     Example:
         ```python
@@ -629,9 +571,7 @@ def use_state(initial: Any = None) -> Tuple[Any, Callable]:
             )
         ```
     """
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_state must be called inside a @component function")
+    ctx = _require_hook_state("use_state")
     ctx.record_hook("use_state")
 
     idx = ctx.state_index
@@ -653,7 +593,9 @@ def use_state(initial: Any = None) -> Tuple[Any, Callable]:
     return current, setter
 
 
-def use_reducer(reducer: Callable[[Any, Any], Any], initial_state: Any) -> Tuple[Any, Callable]:
+def use_reducer(
+    reducer: Callable[[T, Any], T], initial_state: Union[T, Callable[[], T]]
+) -> Tuple[T, Callable[[Any], None]]:
     """Return ``(state, dispatch)`` for reducer-based state management.
 
     A reducer is a pure function that takes the current state and an
@@ -664,41 +606,19 @@ def use_reducer(reducer: Callable[[Any, Any], Any], initial_state: Any) -> Tuple
 
     Args:
         reducer: ``reducer(current_state, action) -> new_state``.
-            The component re-renders only when `reducer` returns a
+            The component re-renders only when ``reducer`` returns a
             value different from the current state.
         initial_state: Initial state value, or a callable invoked once
             on the first render.
 
     Returns:
-        A 2-tuple ``(state, dispatch)`` where `dispatch` runs the
+        A 2-tuple ``(state, dispatch)`` where ``dispatch`` runs the
         reducer with the supplied action.
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
-
-    Example:
-        ```python
-        import pythonnative as pn
-
-        def reducer(state, action):
-            if action == "increment":
-                return state + 1
-            if action == "reset":
-                return 0
-            return state
-
-        @pn.component
-        def Counter():
-            count, dispatch = pn.use_reducer(reducer, 0)
-            return pn.Row(
-                pn.Button("+", on_press=lambda: dispatch("increment")),
-                pn.Button("Reset", on_press=lambda: dispatch("reset")),
-            )
-        ```
+        RuntimeError: If called outside a ``@component`` function.
     """
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_reducer must be called inside a @component function")
+    ctx = _require_hook_state("use_reducer")
     ctx.record_hook("use_reducer")
 
     idx = ctx.state_index
@@ -719,7 +639,12 @@ def use_reducer(reducer: Callable[[Any, Any], Any], initial_state: Any) -> Tuple
     return current, dispatch
 
 
-def use_effect(effect: Callable, deps: Optional[list] = None) -> None:
+# ======================================================================
+# Effect hooks
+# ======================================================================
+
+
+def use_effect(effect: Callable[[], Any], deps: Optional[list] = None) -> None:
     """Schedule a side effect to run after the native commit.
 
     Effects are queued during the render pass and flushed once the
@@ -727,17 +652,17 @@ def use_effect(effect: Callable, deps: Optional[list] = None) -> None:
     means effect callbacks can safely measure layout or interact with
     committed native views.
 
-    The `deps` argument controls when the effect re-runs:
+    The ``deps`` argument controls when the effect re-runs:
 
-    - `None`: every render.
-    - `[]`: mount only.
-    - `[a, b]`: when `a` or `b` change (compared by identity, then `==`).
+    - ``None``: every render.
+    - ``[]``: mount only.
+    - ``[a, b]``: when ``a`` or ``b`` change (compared by identity, then ``==``).
 
-    A synchronous `effect` may return a cleanup callable; the previous
+    A synchronous ``effect`` may return a cleanup callable; the previous
     cleanup runs before the next effect (and on unmount).
 
-    An **async** `effect` (an ``async def``) runs as a task on the
-    framework loop. When `deps` change or the component unmounts, the
+    An **async** ``effect`` (an ``async def``) runs as a task on the
+    framework loop. When ``deps`` change or the component unmounts, the
     in-flight task is cancelled (:class:`asyncio.CancelledError` is
     raised at its current ``await``), giving async effects structured
     cancellation for free. If the coroutine finishes and returns a
@@ -747,14 +672,15 @@ def use_effect(effect: Callable, deps: Optional[list] = None) -> None:
         effect: A zero-arg callable invoked after commit: either a
             synchronous function (optionally returning a cleanup
             callable) or an ``async def``.
-        deps: Dependency list, or `None` to run on every render.
+        deps: Dependency list, or ``None`` to run on every render.
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
+        RuntimeError: If called outside a ``@component`` function.
 
     Example:
         ```python
         import asyncio
+        import time
 
         import pythonnative as pn
 
@@ -771,9 +697,7 @@ def use_effect(effect: Callable, deps: Optional[list] = None) -> None:
             return pn.Text(now)
         ```
     """
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_effect must be called inside a @component function")
+    ctx = _require_hook_state("use_effect")
     ctx.record_hook("use_effect")
 
     idx = ctx.effect_index
@@ -789,7 +713,7 @@ def use_effect(effect: Callable, deps: Optional[list] = None) -> None:
         ctx._pending_effects.append((idx, effect, deps))
 
 
-def use_layout_effect(effect: Callable, deps: Optional[list] = None) -> None:
+def use_layout_effect(effect: Callable[[], Any], deps: Optional[list] = None) -> None:
     """Schedule a side effect that runs synchronously inside the commit.
 
     Like [`use_effect`][pythonnative.use_effect], but the callback
@@ -799,36 +723,18 @@ def use_layout_effect(effect: Callable, deps: Optional[list] = None) -> None:
     imperative view command before the user sees the new frame, for
     example scrolling a list into position on mount.
 
-    Prefer `use_effect` for everything else; layout effects block the
+    Prefer ``use_effect`` for everything else; layout effects block the
     commit, so heavy work here delays the frame.
 
     Args:
         effect: A zero-arg callable invoked during commit. Optionally
             returns a cleanup callable.
-        deps: Dependency list, or `None` to run on every render.
+        deps: Dependency list, or ``None`` to run on every render.
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
-
-    Example:
-        ```python
-        import pythonnative as pn
-
-        @pn.component
-        def AutoScrollList(items):
-            list_ref = pn.use_ref()
-
-            def scroll_to_bottom():
-                if list_ref.current is not None:
-                    list_ref.current.scroll_to_end(animated=False)
-
-            pn.use_layout_effect(scroll_to_bottom, [len(items)])
-            return pn.FlatList(items, render_item=Row, ref=list_ref)
-        ```
+        RuntimeError: If called outside a ``@component`` function.
     """
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_layout_effect must be called inside a @component function")
+    ctx = _require_hook_state("use_layout_effect")
     ctx.record_hook("use_layout_effect")
 
     idx = ctx.layout_effect_index
@@ -844,8 +750,13 @@ def use_layout_effect(effect: Callable, deps: Optional[list] = None) -> None:
         ctx._pending_layout_effects.append((idx, effect, deps))
 
 
+# ======================================================================
+# Memoization hooks
+# ======================================================================
+
+
 def use_memo(factory: Callable[[], T], deps: list) -> T:
-    """Return a memoized value that is recomputed only when `deps` change.
+    """Return a memoized value that is recomputed only when ``deps`` change.
 
     Use this for expensive computations whose inputs change rarely. For
     cheap computations, plain inline code is faster (memoization itself
@@ -860,11 +771,9 @@ def use_memo(factory: Callable[[], T], deps: list) -> T:
         The cached or freshly computed value.
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
+        RuntimeError: If called outside a ``@component`` function.
     """
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_memo must be called inside a @component function")
+    ctx = _require_hook_state("use_memo")
     ctx.record_hook("use_memo")
 
     idx = ctx.memo_index
@@ -884,19 +793,22 @@ def use_memo(factory: Callable[[], T], deps: list) -> T:
     return value
 
 
-def use_callback(callback: Callable, deps: list) -> Callable:
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+def use_callback(callback: F, deps: list) -> F:
     """Return a stable reference to ``callback``, refreshed when ``deps`` change.
 
-    Equivalent to `use_memo(lambda: callback, deps)`. Useful when passing
-    a function as a prop to a memoized child component, so the child
-    doesn't see a fresh function identity on every render.
+    Equivalent to ``use_memo(lambda: callback, deps)``. Useful when
+    passing a function as a prop to a memoized child component, so the
+    child doesn't see a fresh function identity on every render.
 
     Args:
         callback: The callable to memoize.
         deps: Dependency list controlling when the reference refreshes.
 
     Returns:
-        A callable with stable identity across renders (until `deps` change).
+        A callable with stable identity across renders (until ``deps`` change).
     """
     return use_memo(lambda: callback, deps)
 
@@ -908,10 +820,9 @@ def use_ref(initial: Optional[T] = None) -> Ref[T]:
     triggering them: timers, last-seen values, native handles, and so on.
 
     ``ref.current`` is also populated by the reconciler with the
-    underlying native view (`UIView` on iOS, `android.view.View` on
-    Android, a Tk widget on desktop) when the ref is passed via the
-    ``ref=`` prop on a built-in element, and cleared to ``None`` when
-    that element unmounts. Composite components such as
+    underlying native view when the ref is passed via the ``ref=`` prop
+    on a built-in element, and cleared to ``None`` when that element
+    unmounts. Composite components such as
     [`FlatList`][pythonnative.FlatList] publish a typed controller
     object instead (see
     [`use_imperative_handle`][pythonnative.use_imperative_handle]).
@@ -924,11 +835,9 @@ def use_ref(initial: Optional[T] = None) -> Ref[T]:
         *not* trigger re-renders.
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
+        RuntimeError: If called outside a ``@component`` function.
     """
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_ref must be called inside a @component function")
+    ctx = _require_hook_state("use_ref")
     ctx.record_hook("use_ref")
 
     idx = ctx.ref_index
@@ -943,7 +852,7 @@ def use_ref(initial: Optional[T] = None) -> Ref[T]:
 
 
 def use_imperative_handle(
-    ref: Optional[Ref],
+    ref: Optional[Ref[Any]],
     factory: Callable[[], Any],
     deps: Optional[list] = None,
 ) -> None:
@@ -962,18 +871,15 @@ def use_imperative_handle(
             request a handle), in which case this is a no-op.
         factory: Zero-arg callable returning the handle object.
         deps: Dependency list controlling when the handle is rebuilt.
-            Defaults to ``[]`` semantics only if you pass ``[]``;
             ``None`` rebuilds on every render, matching effects.
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
+        RuntimeError: If called outside a ``@component`` function.
 
     Example:
         ```python
-        import pythonnative as pn
-
         @pn.component
-        def VideoPlayer(source, ref=None):
+        def VideoPlayer(source: str, ref: pn.Ref | None = None):
             pn.use_imperative_handle(ref, lambda: PlayerController(...), [source])
             return pn.View(...)
         ```
@@ -1028,20 +934,15 @@ def use_resource(fetcher: Callable[[], Any], deps: Optional[list] = None) -> Res
 
     Example:
         ```python
-        import pythonnative as pn
-
-
         @pn.component
-        async def UserCard(user_id):
+        async def UserCard(user_id: str):
             user = await pn.use_resource(lambda: api.get_user(user_id), [user_id])
             return pn.Text(user["name"])
         ```
     """
     from .suspense import start_resource
 
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_resource must be called inside a @component function")
+    ctx = _require_hook_state("use_resource")
     ctx.record_hook("use_resource")
 
     idx = ctx.resource_index
@@ -1082,9 +983,6 @@ def use_transition() -> Tuple[bool, Callable[[Callable[[], None]], None]]:
 
     Example:
         ```python
-        import pythonnative as pn
-
-
         @pn.component
         def Search():
             query, set_query = pn.use_state("")
@@ -1101,23 +999,24 @@ def use_transition() -> Tuple[bool, Callable[[Callable[[], None]], None]]:
             )
         ```
     """
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_transition must be called inside a @component function")
+    ctx = _require_hook_state("use_transition")
 
     is_pending, set_pending = use_state(False)
 
     def start_transition(fn: Callable[[], None]) -> None:
+        owner = ctx.owner
+        if owner is None:
+            fn()
+            return
         set_pending(True)
-        _run_in_transition(fn)
-        _post_transition_callbacks.append(lambda: set_pending(False))
-        _schedule_transition_flush()
+        run_in_transition(fn)
+        owner.transitions.on_complete(lambda: set_pending(False))
 
     start = use_callback(start_transition, [])
     return is_pending, start
 
 
-def use_deferred_value(value: Any) -> Any:
+def use_deferred_value(value: T) -> T:
     """Return a copy of ``value`` that lags behind during fast updates.
 
     The returned value updates in a deferred (transition-priority)
@@ -1136,14 +1035,12 @@ def use_deferred_value(value: Any) -> Any:
     Raises:
         RuntimeError: If called outside a ``@component`` function.
     """
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_deferred_value must be called inside a @component function")
+    _require_hook_state("use_deferred_value")
 
     deferred, set_deferred = use_state(value)
 
     def _adopt() -> None:
-        _run_in_transition(lambda: set_deferred(value))
+        run_in_transition(lambda: set_deferred(value))
 
     use_effect(_adopt, [value])
     return deferred
@@ -1197,14 +1094,11 @@ def use_query(
 
     Example:
         ```python
-        import pythonnative as pn
-
-
         @pn.component
-        def UserCard(user_id):
+        def UserCard(user_id: str):
             q = pn.use_query(lambda: api.get_user(user_id), [user_id])
             if q.loading:
-                return pn.Text("Loading…")
+                return pn.Text("Loading...")
             if q.error:
                 return pn.Text(f"Error: {q.error}")
             return pn.Text(q.data["name"])
@@ -1231,7 +1125,8 @@ def use_query(
             except asyncio.CancelledError:
                 raise
             except BaseException as exc:  # pragma: no cover - surfaced to user
-                set_state(lambda s, e=exc: replace(s, loading=False, error=e))
+                failure = exc
+                set_state(lambda s: replace(s, loading=False, error=failure))
 
         future = run_async(_runner())
 
@@ -1288,7 +1183,7 @@ class MutationCall(Generic[T]):
 
     __slots__ = ("_future",)
 
-    def __init__(self, future: "Any") -> None:
+    def __init__(self, future: Any) -> None:
         self._future = future
 
     def __await__(self) -> Any:
@@ -1326,17 +1221,14 @@ def use_mutation(
 
     Example:
         ```python
-        import pythonnative as pn
-
-
         @pn.component
         def NewPostForm():
             state, save = pn.use_mutation(api.create_post)
 
             return pn.Column(
                 pn.Button("Save", on_press=lambda: save(post)),
-                pn.Text("Saving…") if state.loading else pn.Text(""),
-                pn.Text(str(state.error)) if state.error else pn.Text(""),
+                state.loading and pn.Text("Saving..."),
+                state.error and pn.Text(str(state.error)),
             )
         ```
     """
@@ -1356,7 +1248,8 @@ def use_mutation(
                 set_state(lambda s: replace(s, loading=False))
                 raise
             except BaseException as exc:
-                set_state(lambda s, e=exc: replace(s, loading=False, error=e))
+                failure = exc
+                set_state(lambda s: replace(s, loading=False, error=failure))
                 raise
 
         future = run_async(_runner())
@@ -1366,8 +1259,39 @@ def use_mutation(
 
 
 # ======================================================================
-# Platform-metric hooks (window dimensions, safe-area insets, keyboard)
+# External subscriptions
 # ======================================================================
+
+
+def use_subscription(subscribe: Callable[[Callable[[], None]], Callable[[], None]], get_snapshot: Callable[[], T]) -> T:
+    """Subscribe to an external store and re-render when its snapshot changes.
+
+    The Pythonic counterpart of React's ``useSyncExternalStore``: the
+    platform-metric hooks below are built on it, and it's the right
+    primitive for app-level stores that live outside the component
+    tree.
+
+    Args:
+        subscribe: ``subscribe(on_change) -> unsubscribe``. Called once
+            on mount; ``on_change`` must be invoked whenever the store
+            changes.
+        get_snapshot: Zero-arg callable returning the current value.
+            Re-read on every render.
+
+    Returns:
+        The current snapshot.
+
+    Raises:
+        RuntimeError: If called outside a ``@component`` function.
+    """
+    _require_hook_state("use_subscription")
+    _, set_tick = use_state(0)
+
+    def _subscribe() -> Callable[[], None]:
+        return subscribe(lambda: set_tick(lambda n: n + 1))
+
+    use_effect(_subscribe, [])
+    return get_snapshot()
 
 
 def use_window_dimensions() -> Dict[str, float]:
@@ -1383,32 +1307,11 @@ def use_window_dimensions() -> Dict[str, float]:
         screen host has run its first layout pass.
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
-
-    Example:
-        ```python
-        import pythonnative as pn
-
-        @pn.component
-        def MyView():
-            dims = pn.use_window_dimensions()
-            return pn.Text(f"{dims['width']:.0f} x {dims['height']:.0f}")
-        ```
+        RuntimeError: If called outside a ``@component`` function.
     """
     from . import platform_metrics
 
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_window_dimensions must be called inside a @component function")
-
-    _, set_tick = use_state(0)
-
-    def subscribe() -> Callable[[], None]:
-        return platform_metrics.subscribe(lambda: set_tick(lambda n: n + 1))
-
-    use_effect(subscribe, [])
-
-    dims = platform_metrics.get_window_dimensions()
+    dims = use_subscription(platform_metrics.subscribe, platform_metrics.get_window_dimensions)
     return {"width": dims.width, "height": dims.height}
 
 
@@ -1422,28 +1325,12 @@ def use_safe_area_insets() -> Dict[str, float]:
         floats in layout units (pt on iOS, dp on Android).
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
+        RuntimeError: If called outside a ``@component`` function.
     """
     from . import platform_metrics
 
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_safe_area_insets must be called inside a @component function")
-
-    _, set_tick = use_state(0)
-
-    def subscribe() -> Callable[[], None]:
-        return platform_metrics.subscribe(lambda: set_tick(lambda n: n + 1))
-
-    use_effect(subscribe, [])
-
-    insets = platform_metrics.get_safe_area_insets()
-    return {
-        "top": insets.top,
-        "bottom": insets.bottom,
-        "left": insets.left,
-        "right": insets.right,
-    }
+    insets = use_subscription(platform_metrics.subscribe, platform_metrics.get_safe_area_insets)
+    return {"top": insets.top, "bottom": insets.bottom, "left": insets.left, "right": insets.right}
 
 
 def use_keyboard_height() -> float:
@@ -1455,22 +1342,11 @@ def use_keyboard_height() -> float:
     of reading this directly.
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
+        RuntimeError: If called outside a ``@component`` function.
     """
     from . import platform_metrics
 
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_keyboard_height must be called inside a @component function")
-
-    _, set_tick = use_state(0)
-
-    def subscribe() -> Callable[[], None]:
-        return platform_metrics.subscribe(lambda: set_tick(lambda n: n + 1))
-
-    use_effect(subscribe, [])
-
-    return platform_metrics.get_keyboard_height()
+    return use_subscription(platform_metrics.subscribe, platform_metrics.get_keyboard_height)
 
 
 def use_color_scheme() -> str:
@@ -1485,33 +1361,11 @@ def use_color_scheme() -> str:
         ``"light"`` or ``"dark"``.
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
-
-    Example:
-        ```python
-        import pythonnative as pn
-
-        @pn.component
-        def Banner():
-            scheme = pn.use_color_scheme()
-            bg = "#000000" if scheme == "dark" else "#FFFFFF"
-            return pn.View(style=pn.style(background_color=bg))
-        ```
+        RuntimeError: If called outside a ``@component`` function.
     """
     from . import appearance
 
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_color_scheme must be called inside a @component function")
-
-    _, set_tick = use_state(0)
-
-    def subscribe() -> Callable[[], None]:
-        return appearance.subscribe(lambda: set_tick(lambda n: n + 1))
-
-    use_effect(subscribe, [])
-
-    return appearance.get_color_scheme()
+    return use_subscription(appearance.subscribe, appearance.get_color_scheme)
 
 
 # ======================================================================
@@ -1519,247 +1373,119 @@ def use_color_scheme() -> str:
 # ======================================================================
 
 
-class Context:
-    """Container for a value shared across a subtree.
+class Context(Generic[T]):
+    """A value shared with a subtree, created by [`create_context`][pythonnative.create_context].
 
-    Created by [`create_context`][pythonnative.create_context]; consumed
-    via [`use_context`][pythonnative.use_context]. Use
-    [`Provider`][pythonnative.Provider] to set the value for a subtree.
+    Provide a value with [`Provider`][pythonnative.hooks.Context.Provider]
+    and read it with [`use_context`][pythonnative.use_context]. A
+    ``Context`` is itself an element type: ``ctx.Provider(value, ...)``
+    returns an element whose ``type`` is ``ctx``.
 
     Context is *reactive*: when a Provider's value changes, every
     component that read the context on its last render re-renders,
     even if a memoized ancestor skipped its own re-render.
 
     Attributes:
-        default: The value returned when no `Provider` ancestor exists.
+        default: The value returned when no Provider ancestor exists.
+        name: Optional label for diagnostics.
     """
 
-    def __init__(self, default: Any = None) -> None:
-        self.default = default
-        self._stack: List[Any] = []
+    __slots__ = ("default", "name", "_stack")
 
-    def _current(self) -> Any:
+    def __init__(self, default: T, name: Optional[str] = None) -> None:
+        self.default = default
+        self.name = name
+        self._stack: List[T] = []
+
+    def Provider(self, value: T, *children: Node, key: Optional[str] = None) -> Element:
+        """Provide ``value`` to every descendant of ``children``.
+
+        A Provider contributes no native view of its own; its children
+        mount directly into the surrounding native parent.
+
+        When ``value`` differs from the previous render (identity, then
+        ``==``), every descendant that read the context re-renders,
+        including descendants of memoized components that skipped.
+
+        Args:
+            value: Value made available to descendants.
+            *children: Subtree(s) under which the provider applies.
+            key: Stable identity for keyed reconciliation.
+
+        Example:
+            ```python
+            Theme = pn.create_context({"primary": "#007AFF"})
+
+            @pn.component
+            def App():
+                return Theme.Provider({"primary": "#FF0000"}, Header(), Body())
+            ```
+        """
+        return Element(self, {"value": value}, children, key=key)
+
+    def current(self) -> T:
+        """Return the innermost provided value, or ``default``."""
         return self._stack[-1] if self._stack else self.default
 
+    def __repr__(self) -> str:
+        return f"<Context {self.name or id(self):x}>" if self.name is None else f"<Context {self.name}>"
 
-def create_context(default: Any = None) -> Context:
+    # Rendering support: the reconciler pushes/pops provided values
+    # while it walks a Provider's subtree.
+
+    def _push(self, value: T) -> None:
+        self._stack.append(value)
+
+    def _pop(self) -> None:
+        self._stack.pop()
+
+
+def create_context(default: T = None, *, name: Optional[str] = None) -> Context[T]:  # type: ignore[assignment,unused-ignore]
     """Create a new context with an optional default value.
 
     Args:
         default: Returned by [`use_context`][pythonnative.use_context]
-            when there is no enclosing
-            [`Provider`][pythonnative.Provider].
+            when there is no enclosing Provider.
+        name: Optional label shown in diagnostics.
 
     Returns:
-        A fresh `Context` instance.
+        A fresh [`Context`][pythonnative.Context].
 
     Example:
         ```python
-        import pythonnative as pn
-
-        ThemeContext = pn.create_context({"primary": "#007AFF"})
+        Theme = pn.create_context({"primary": "#007AFF"}, name="Theme")
         ```
     """
-    return Context(default)
+    return Context(default, name=name)
 
 
-def use_context(context: Context) -> Any:
-    """Read the current value of `context` from the nearest `Provider`.
+def use_context(context: Context[T]) -> T:
+    """Read the current value of ``context`` from the nearest Provider.
 
-    If no enclosing `Provider` exists, returns the context's default.
+    If no enclosing Provider exists, returns the context's default.
     The component is registered as a subscriber: when the nearest
     Provider's value changes, the component re-renders even if a
     memoized ancestor skipped.
 
     Args:
-        context: The `Context` to read from.
+        context: The [`Context`][pythonnative.Context] to read from.
 
     Returns:
-        The current value for `context`.
+        The current value for ``context``.
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
+        RuntimeError: If called outside a ``@component`` function.
     """
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_context must be called inside a @component function")
+    ctx = _require_hook_state("use_context")
     ctx.record_hook("use_context")
-    value = context._current()
+    value = context.current()
     ctx.context_deps[id(context)] = value
     return value
 
 
 # ======================================================================
-# Provider element helper
+# System back button
 # ======================================================================
-
-
-def Provider(context: "Context", value: Any, *children: Element) -> Element:
-    """Provide ``value`` for ``context`` to all descendants of ``children``.
-
-    Accepts any number of children (varargs). A Provider contributes no
-    native view of its own; its children mount directly into the
-    surrounding native parent.
-
-    When ``value`` differs from the previous render (identity, then
-    ``==``), every descendant that read the context via
-    [`use_context`][pythonnative.use_context] re-renders, including
-    descendants of memoized components that skipped.
-
-    Args:
-        context: The [`Context`][pythonnative.hooks.Context] to set.
-        value: Value made available to descendants via
-            [`use_context`][pythonnative.use_context].
-        *children: Subtree(s) under which the provider applies.
-
-    Returns:
-        An [`Element`][pythonnative.Element] that the reconciler treats
-        as a context boundary.
-
-    Example:
-        ```python
-        import pythonnative as pn
-
-        ThemeContext = pn.create_context({"primary": "#007AFF"})
-
-        @pn.component
-        def App():
-            return pn.Provider(
-                ThemeContext,
-                {"primary": "#FF0000"},
-                Header(),
-                Body(),
-            )
-        ```
-    """
-    return Element("__Provider__", {"__context__": context, "__value__": value}, list(children))
-
-
-def memo(component_fn: Callable[..., Element]) -> Callable[..., Element]:
-    """Skip a function component's render when its props haven't changed.
-
-    Decorate a ``@component``-wrapped function to opt into shallow-prop
-    memoization. When the reconciler re-renders the parent tree, a
-    memoized child is skipped (its previously-rendered subtree is
-    reused) iff:
-
-    - Its props are shallowly equal to the previous render's props
-      (callables compared by identity, scalars by ``==``).
-    - None of its internal ``use_state`` / ``use_reducer`` setters fired
-      since the last render.
-
-    Pair with [`use_callback`][pythonnative.use_callback] when passing
-    callbacks as props, otherwise a fresh closure will defeat the memo.
-
-    Args:
-        component_fn: A function previously decorated with
-            [`component`][pythonnative.component].
-
-    Returns:
-        The same function, marked for memoization.
-
-    Example:
-        ```python
-        import pythonnative as pn
-
-        @pn.memo
-        @pn.component
-        def ExpensiveRow(label: str):
-            ...
-        ```
-    """
-    component_fn._pn_memo = True
-    # ``@component`` builds a wrapper that emits an ``Element`` whose
-    # ``type`` is the underlying function, so propagate the marker to
-    # ``__wrapped__`` so the reconciler can find it via ``Element.type``.
-    wrapped = getattr(component_fn, "__wrapped__", None)
-    if wrapped is not None:
-        wrapped._pn_memo = True
-    return component_fn
-
-
-# ======================================================================
-# Navigation
-# ======================================================================
-
-_NavigationContext: Context = create_context(None)
-
-
-class NavigationHandle:
-    """Handle returned by [`use_navigation`][pythonnative.use_navigation].
-
-    Wraps the host's push/pop primitives so screens can navigate
-    without knowing the underlying native navigation stack. The
-    typical user-facing surface is the declarative handle returned by
-    a [`Stack`][pythonnative.create_stack_navigator]; this class is
-    the lower-level fallback used when no navigator is rendered (and
-    as the bridge that declarative navigators delegate to when they
-    need to push real native screens).
-
-    Example:
-        ```python
-        import pythonnative as pn
-
-        @pn.component
-        def HomeScreen():
-            nav = pn.use_navigation()
-            return pn.Button(
-                "Open Detail",
-                on_press=lambda: nav.navigate("Detail", {"id": 42}),
-            )
-        ```
-    """
-
-    def __init__(self, host: Any) -> None:
-        self._host = host
-
-    def navigate(self, component: Any, params: Optional[Dict[str, Any]] = None) -> None:
-        """Push ``component`` onto the navigation stack.
-
-        Args:
-            component: A ``@component`` function or a dotted Python
-                path (e.g. ``"app.detail.DetailScreen"``). When a
-                Stack navigator is the root of the app, prefer the
-                declarative ``nav.navigate("Detail", params)`` form
-                returned by ``use_navigation()`` (it pushes by route
-                name and the host re-uses its own ``App`` component).
-            params: Optional dict of arguments serialized into the
-                target screen.
-        """
-        self._host._push(component, params)
-
-    def go_back(self) -> None:
-        """Pop the current screen and return to the previous one."""
-        self._host._pop()
-
-    def get_params(self) -> Dict[str, Any]:
-        """Return the params dict passed to this screen.
-
-        Returns:
-            The dict supplied by the caller's
-            [`navigate`][pythonnative.hooks.NavigationHandle.navigate]
-            call, or an empty dict if none was supplied.
-        """
-        return self._host._get_nav_args()
-
-
-def use_navigation() -> NavigationHandle:
-    """Return a [`NavigationHandle`][pythonnative.hooks.NavigationHandle] for the screen.
-
-    Returns:
-        The handle bound to the current screen's host.
-
-    Raises:
-        RuntimeError: If called outside a component rendered via
-            [`create_screen`][pythonnative.create_screen].
-    """
-    handle = use_context(_NavigationContext)
-    if handle is None:
-        raise RuntimeError(
-            "use_navigation() called outside a PythonNative screen. "
-            "Ensure your component is rendered via create_screen()."
-        )
-    return handle
 
 
 def use_back_handler(handler: Callable[[], bool]) -> None:
@@ -1786,12 +1512,10 @@ def use_back_handler(handler: Callable[[], bool]) -> None:
             the back action.
 
     Raises:
-        RuntimeError: If called outside a `@component` function.
+        RuntimeError: If called outside a ``@component`` function.
 
     Example:
         ```python
-        import pythonnative as pn
-
         @pn.component
         def Editor():
             dirty, set_dirty = pn.use_state(False)
@@ -1799,16 +1523,14 @@ def use_back_handler(handler: Callable[[], bool]) -> None:
             ...
         ```
     """
-    ctx = _get_hook_state()
-    if ctx is None:
-        raise RuntimeError("use_back_handler must be called inside a @component function")
+    ctx = _require_hook_state("use_back_handler")
 
     latest: Ref[Callable[[], bool]] = use_ref(handler)
     latest.current = handler
 
     def _register() -> Optional[Callable[[], None]]:
-        reconciler = ctx._reconciler
-        if reconciler is None or not hasattr(reconciler, "register_back_handler"):
+        owner = ctx.owner
+        if owner is None:
             return None
 
         def _trampoline() -> bool:
@@ -1822,68 +1544,41 @@ def use_back_handler(handler: Callable[[], bool]) -> None:
                     raise
                 return True
 
-        return reconciler.register_back_handler(_trampoline)
+        return owner.register_back_handler(_trampoline)
 
     use_effect(_register, [])
 
 
-# ======================================================================
-# @component decorator
-# ======================================================================
-
-
-def component(func: Callable) -> Callable[..., Element]:
-    """Mark a function as a PythonNative component.
-
-    The decorated function may use hooks (`use_state`, `use_effect`,
-    etc.) and returns an [`Element`][pythonnative.Element] tree.
-    Each call site creates an independent component instance with its
-    own hook state.
-
-    Positional arguments are mapped onto the function's positional
-    parameters. If the function declares `*args`, positional arguments
-    instead become the special `children` prop.
-
-    Args:
-        func: The function to wrap.
-
-    Returns:
-        A wrapper that, when called, returns an `Element` whose `type`
-        is `func` itself.
-
-    Example:
-        ```python
-        import pythonnative as pn
-
-        @pn.component
-        def Greeting(name: str = "World"):
-            return pn.Text(f"Hello, {name}!")
-        ```
-    """
-    sig = inspect.signature(func)
-    positional_params = [
-        name
-        for name, p in sig.parameters.items()
-        if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-    ]
-    has_var_positional = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in sig.parameters.values())
-
-    def wrapper(*args: Any, **kwargs: Any) -> Element:
-        props: dict = dict(kwargs)
-
-        if args:
-            if has_var_positional:
-                props["children"] = list(args)
-            else:
-                for i, arg in enumerate(args):
-                    if i < len(positional_params):
-                        props[positional_params[i]] = arg
-
-        key = props.pop("key", None)
-        return Element(func, props, [], key=key)
-
-    wrapper.__wrapped__ = func  # noqa: B010
-    wrapper.__name__ = func.__name__
-    wrapper.__qualname__ = func.__qualname__
-    wrapper._pn_component = True  # noqa: B010
-    return wrapper
+__all__ = [
+    "Context",
+    "HookState",
+    "MutationCall",
+    "MutationState",
+    "QueryResult",
+    "Ref",
+    "RenderOwner",
+    "create_context",
+    "current_hook_state",
+    "install_hook_state",
+    "restore_hook_state",
+    "use_back_handler",
+    "use_callback",
+    "use_color_scheme",
+    "use_context",
+    "use_deferred_value",
+    "use_effect",
+    "use_imperative_handle",
+    "use_keyboard_height",
+    "use_layout_effect",
+    "use_memo",
+    "use_mutation",
+    "use_query",
+    "use_reducer",
+    "use_ref",
+    "use_resource",
+    "use_safe_area_insets",
+    "use_state",
+    "use_subscription",
+    "use_transition",
+    "use_window_dimensions",
+]

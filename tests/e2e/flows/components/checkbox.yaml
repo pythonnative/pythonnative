@@ -6,7 +6,7 @@
 # Android), which the buttons bypass entirely.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/checkbox.py
-# Source under test: src/pythonnative/components.py :: Checkbox
+# Source under test: src/pythonnative/components/controls.py :: Checkbox
 appId: ${APP_ID}
 ---
 - runFlow:

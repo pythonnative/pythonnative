@@ -14,7 +14,7 @@ Dev mode turns on:
   immediately instead of cross-wiring state.
 - **The RedBox**: uncaught errors from render, effects, and event
   handlers are routed to the screen host, which presents a full-screen
-  error overlay (see `pythonnative.screen`) instead of crashing or
+  error overlay (see `pythonnative.hosts`) instead of crashing or
   swallowing the traceback.
 
 In production none of this runs: validation is skipped, hook-order

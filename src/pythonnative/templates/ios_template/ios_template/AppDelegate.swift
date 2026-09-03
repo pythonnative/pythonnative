@@ -16,7 +16,40 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        registerBatteryObservers()
         return true
+    }
+
+    // MARK: - Battery forwarding
+
+    // UIDevice only posts battery notifications while monitoring is on;
+    // Battery.add_listener subscribers receive {"level", "state"}.
+    private func registerBatteryObservers() {
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        let center = NotificationCenter.default
+        for name in [UIDevice.batteryLevelDidChangeNotification, UIDevice.batteryStateDidChangeNotification] {
+            center.addObserver(forName: name, object: nil, queue: .main) { _ in
+                self.dispatchBattery()
+            }
+        }
+    }
+
+    private func dispatchBattery() {
+        guard PythonRuntime.shared.started else { return }
+        let device = UIDevice.current
+        let state: String
+        switch device.batteryState {
+        case .unplugged: state = "unplugged"
+        case .charging: state = "charging"
+        case .full: state = "full"
+        default: state = "unknown"
+        }
+        PythonRuntime.shared.notify(
+            module: "pythonnative.native_modules.battery",
+            function: "dispatch_battery",
+            Double(device.batteryLevel),
+            state
+        )
     }
 
     // MARK: - Remote notifications (APNs)

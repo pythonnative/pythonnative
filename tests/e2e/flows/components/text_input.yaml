@@ -1,7 +1,7 @@
 # Tests TextInput: typing into a single-line input mirrors into the echo line.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/text_input.py
-# Source under test: src/pythonnative/components.py :: TextInput
+# Source under test: src/pythonnative/components/text.py :: TextInput
 appId: ${APP_ID}
 ---
 - runFlow:

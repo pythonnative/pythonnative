@@ -1,6 +1,6 @@
 """Platform-level metrics shared between screen hosts and view handlers.
 
-The screen host (`pythonnative.screen`) is the only place that knows
+The screen host (`pythonnative.hosts`) is the only place that knows
 about native window/safe-area state because it is the only piece of
 code that holds a reference to the native ``UIViewController``
 (iOS) or ``Activity`` (Android). Native view handlers, however, need

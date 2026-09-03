@@ -253,6 +253,35 @@ def App():
 Changing one `Counter` doesn't affect the other; each has its own
 hook state.
 
+### Children and keys
+
+Children are positional, for your components exactly as for the
+built-in containers. A component that accepts children declares
+`*children`:
+
+```python
+@pn.component
+def Card(*children: pn.Element, title: str):
+    return pn.Column(
+        pn.Text(title, style={"bold": True}),
+        *children,
+        style={"padding": 12, "border_radius": 8},
+    )
+
+
+Card(pn.Text("Body"), pn.Button("OK"), title="Hello")
+```
+
+`@pn.component` preserves the function's signature for type checkers,
+so `Card(titel="x")` is a static error and editors autocomplete props.
+Every component also accepts `key=` for keyed reconciliation; when a
+strict type checker complains about it, declare `key: str | None =
+None` in the signature or call `.with_key(...)` on the element.
+
+Components that return a `list` of elements render them as siblings;
+`None` and `False` are dropped, so `cond and pn.Text("...")` is a
+fine way to render conditionally.
+
 ### Available hooks
 
 - [`use_state(initial)`][pythonnative.use_state]: local component
@@ -284,10 +313,11 @@ hook state.
   the canonical way to drive `Animated.View`.
 - [`use_context(context)`][pythonnative.use_context]: read from a
   context provider.
-- [`use_navigation()`][pythonnative.use_navigation]: navigation
-  handle for navigate/go_back/get_params.
-- [`use_route()`][pythonnative.use_route]: convenience hook for
-  current route params.
+- [`use_navigation()`][pythonnative.use_navigation]: the
+  [`Navigation`][pythonnative.Navigation] handle for navigate, push,
+  go_back, set_options, and listeners.
+- [`use_route()`][pythonnative.use_route]: the current
+  [`Route`][pythonnative.navigation.Route] (name, params, key).
 - [`use_focus_effect(effect, deps)`][pythonnative.use_focus_effect]:
   like `use_effect` but only runs when the screen is focused.
 - [`use_window_dimensions()`][pythonnative.use_window_dimensions]:
@@ -321,9 +351,7 @@ theme = pn.create_context({"primary": "#007AFF"})
 
 @pn.component
 def App():
-    return pn.Provider(theme, {"primary": "#FF0000"},
-        MyComponent()
-    )
+    return theme.Provider({"primary": "#FF0000"}, MyComponent())
 
 @pn.component
 def MyComponent():

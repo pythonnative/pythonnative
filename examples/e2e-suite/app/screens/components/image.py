@@ -14,8 +14,7 @@ from app.screens.scaffold import demo_screen, hint, section
 # A 1x1 transparent PNG. Bundling an inline data URI means the demo
 # works even when the CI runner has no internet access.
 TRANSPARENT_PNG = (
-    "data:image/png;base64,"
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
 )
 
 

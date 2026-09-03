@@ -196,8 +196,7 @@ def init_project(args: argparse.Namespace) -> None:
     # ``is_symlink()`` so the whole class is closed, not one spelling of it.
     if name and (target.is_symlink() or target.resolve().parent != cwd.resolve()):
         print(
-            f"Refusing to scaffold through a link or outside the current directory: {name}. "
-            "Use a plain directory name."
+            f"Refusing to scaffold through a link or outside the current directory: {name}. Use a plain directory name."
         )
         sys.exit(1)
 

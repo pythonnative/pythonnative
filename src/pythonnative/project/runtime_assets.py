@@ -143,7 +143,7 @@ def prepare_ios_runtime(
     if pinned is None:
         supported = ", ".join(sorted(PINNED_ASSETS))
         raise RuntimeError(
-            f"No pinned iOS runtime for Python {python_version}. " f"Set app.python_version to one of: {supported}."
+            f"No pinned iOS runtime for Python {python_version}. Set app.python_version to one of: {supported}."
         )
     tag, asset_name, expected_sha = pinned
 

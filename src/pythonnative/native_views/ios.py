@@ -63,7 +63,15 @@ from rubicon.objc import SEL, ObjCClass, ObjCInstance, objc_method
 from .. import diagnostics
 from ..events import dispatch_event, event_names
 from . import _tripwire_log
-from .base import ViewHandler, _safe_max, parse_color_int
+from .base import (
+    TEXT_SHADOW_STYLE_KEYS,
+    ViewHandler,
+    _safe_max,
+    parse_color_int,
+    shadow_offset_xy,
+    transform_spans,
+    transform_text,
+)
 
 
 def _safe_finite(value: Any, default: float = 0.0) -> float:
@@ -624,6 +632,30 @@ def _apply_shadow(view: Any, props: Dict[str, Any]) -> None:
             diagnostics.swallowed("ios._apply_shadow")
 
 
+def _text_shadow(props: Dict[str, Any]) -> Any:
+    """Build an ``NSShadow`` from the ``text_shadow_*`` style keys, or ``None``.
+
+    Text shadows are attached to the attributed string
+    (``NSShadowAttributeName``) rather than the label's layer so they
+    follow the glyphs instead of the label's frame and don't interfere
+    with the view-level ``shadow_*`` props.
+    """
+    if not any(props.get(k) is not None for k in TEXT_SHADOW_STYLE_KEYS):
+        return None
+    try:
+        shadow = ObjCClass("NSShadow").alloc().init()
+        color = props.get("text_shadow_color")
+        shadow.setShadowColor_(_uicolor(color if color is not None else "#000000"))
+        dx, dy = shadow_offset_xy(props.get("text_shadow_offset"))
+        shadow.setShadowOffset_((dx, dy))
+        radius = props.get("text_shadow_radius")
+        shadow.setShadowBlurRadius_(float(radius) if radius is not None else 0.0)
+        return shadow
+    except Exception:
+        diagnostics.swallowed("ios._text_shadow")
+        return None
+
+
 def _make_transform(spec: Any) -> Any:
     """Build a `CGAffineTransform` from a list of transform dicts.
 
@@ -821,6 +853,14 @@ def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
             diagnostics.swallowed("ios._apply_common_visual")
     if "overflow" in props:
         view.setClipsToBounds_(props["overflow"] == "hidden")
+    if "display" in props:
+        # Layout already zeroes the subtree; hiding also removes it from
+        # hit testing and the accessibility tree (inactive tabs, covered
+        # stack screens).
+        try:
+            view.setHidden_(props["display"] == "none")
+        except Exception:
+            diagnostics.swallowed("ios._apply_common_visual")
     if "opacity" in props and props["opacity"] is not None:
         try:
             view.setAlpha_(float(props["opacity"]))
@@ -1969,25 +2009,32 @@ class TextHandler(IOSViewHandler):
                 diagnostics.swallowed("ios.TextHandler._font_for")
         return font
 
+    # Keys that need the plain string re-rendered as an attributed
+    # string (plain ``setText_`` can't express them).
+    _ATTRIBUTED_KEYS = (
+        "letter_spacing",
+        "line_height",
+        "text_decoration",
+    ) + TEXT_SHADOW_STYLE_KEYS
+
     _SPAN_REBUILD_KEYS = (
         "spans",
         "text",
+        "text_transform",
         "font_size",
         "font_weight",
         "font_family",
         "italic",
         "bold",
         "color",
-        "letter_spacing",
-        "line_height",
-        "text_decoration",
-    )
+    ) + _ATTRIBUTED_KEYS
 
     def _apply(self, label: Any, props: Dict[str, Any], initial: bool) -> None:
         merged_state = _state_of(label).get("props") or props
         has_spans = bool(merged_state.get("spans"))
-        if "text" in props and not has_spans:
-            label.setText_(str(props["text"]) if props["text"] is not None else "")
+        text_changed = "text" in props or "text_transform" in props
+        if text_changed and not has_spans:
+            label.setText_(transform_text(merged_state.get("text"), merged_state.get("text_transform")))
         # Font requires combining size + weight + family + italic + bold.
         font_keys_present = any(k in props for k in ("font_size", "font_weight", "font_family", "italic", "bold"))
         if font_keys_present:
@@ -2018,8 +2065,13 @@ class TextHandler(IOSViewHandler):
                 self._apply_spans(label, merged_state)
         elif "spans" in props:
             # Rich -> plain transition: restore the plain string.
-            label.setText_(str(merged_state.get("text") or ""))
-        elif "letter_spacing" in props or "line_height" in props or "text_decoration" in props:
+            label.setText_(transform_text(merged_state.get("text"), merged_state.get("text_transform")))
+        elif any(k in props for k in self._ATTRIBUTED_KEYS) or (
+            # ``setText_`` drops attributes, so a text change re-renders
+            # the attributed string when any attributed key is active.
+            text_changed
+            and any(merged_state.get(k) is not None for k in self._ATTRIBUTED_KEYS)
+        ):
             self._apply_attributed(label, merged_state)
         _apply_view_border(label, props)
         _apply_shadow(label, props)
@@ -2041,6 +2093,7 @@ class TextHandler(IOSViewHandler):
         """
         try:
             spans = [s for s in (merged.get("spans") or []) if isinstance(s, dict)]
+            spans = transform_spans(spans, merged.get("text_transform"))
             full_text = "".join(str(s.get("text", "")) for s in spans)
             NSMutableAttributedString = ObjCClass("NSMutableAttributedString")
             NSMutableParagraphStyle = ObjCClass("NSMutableParagraphStyle")
@@ -2062,6 +2115,9 @@ class TextHandler(IOSViewHandler):
                 attr.addAttribute_value_range_("NSUnderline", 1, full_range)
             elif merged.get("text_decoration") == "line_through":
                 attr.addAttribute_value_range_("NSStrikethrough", 1, full_range)
+            shadow = _text_shadow(merged)
+            if shadow is not None:
+                attr.addAttribute_value_range_("NSShadow", shadow, full_range)
 
             pos = 0
             for span in spans:
@@ -2095,7 +2151,7 @@ class TextHandler(IOSViewHandler):
             label.setAttributedText_(attr)
         except Exception:
             try:
-                label.setText_(str(merged.get("text") or ""))
+                label.setText_(transform_text(merged.get("text"), merged.get("text_transform")))
             except Exception:
                 diagnostics.swallowed("ios.TextHandler._apply_spans")
 
@@ -2103,8 +2159,9 @@ class TextHandler(IOSViewHandler):
         """Re-render the label's text as an NSAttributedString.
 
         Needed for ``letter_spacing`` (NSKernAttributeName),
-        ``line_height`` (paragraph style), and ``text_decoration``
-        (underline/strikethrough). Plain text setters do not support
+        ``line_height`` (paragraph style), ``text_decoration``
+        (underline/strikethrough), and the ``text_shadow_*`` keys
+        (NSShadowAttributeName). Plain text setters do not support
         these attributes.
         """
         try:
@@ -2140,6 +2197,9 @@ class TextHandler(IOSViewHandler):
                 attr.addAttribute_value_range_("NSUnderline", 1, full_range)
             elif decoration == "line_through":
                 attr.addAttribute_value_range_("NSStrikethrough", 1, full_range)
+            shadow = _text_shadow(props)
+            if shadow is not None:
+                attr.addAttribute_value_range_("NSShadow", shadow, full_range)
             label.setAttributedText_(attr)
         except Exception:
             diagnostics.swallowed("ios.TextHandler._apply_attributed")

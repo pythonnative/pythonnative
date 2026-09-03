@@ -170,7 +170,11 @@ pn.Button("Tap", style={"background_color": "#FF1E88E5", "color": "#FFFFFF"})
 | `letter_spacing` | number | Tracking in points |
 | `line_height` | number | Multiple of font size |
 | `text_decoration` | `"underline"`, `"line_through"`, or `None` | |
+| `text_transform` | `"none"`, `"uppercase"`, `"lowercase"`, `"capitalize"` | Applied before measurement |
 | `max_lines` | int | Truncate after N lines |
+| `text_shadow_color` | hex string | |
+| `text_shadow_offset` | `{"width": x, "height": y}` or `(x, y)` | |
+| `text_shadow_radius` | number (blur radius) | |
 
 ```python
 pn.Text(
@@ -181,6 +185,29 @@ pn.Text(
         "letter_spacing": -0.5,
         "line_height": 32,
         "color": "#0F172A",
+    },
+)
+```
+
+`text_transform` is applied in Python before the string reaches the
+native label, so the layout engine measures the transformed text and
+rich-text spans inherit the outer element's transform. `"capitalize"`
+upper-cases the first character of each word and leaves the rest as
+written (it doesn't lower-case like `str.title()`).
+
+Text shadows render through `NSShadow` on iOS and
+`TextView.setShadowLayer` on Android. The desktop preview accepts the
+keys but draws no shadow, since Tk has no text shadow primitive:
+
+```python
+pn.Text(
+    "Overlay caption",
+    style={
+        "color": "#FFFFFF",
+        "text_transform": "uppercase",
+        "text_shadow_color": "#00000099",
+        "text_shadow_offset": {"width": 0, "height": 1},
+        "text_shadow_radius": 3,
     },
 )
 ```
@@ -262,6 +289,12 @@ pn.View(
 )
 ```
 
+Borders take up space inside the element's frame, exactly like
+padding: a child inside a `border_width: 4` parent starts 4 points in
+from the parent's edge, and a content-sized parent grows by its border
+on every side. This matches Yoga's box model, so styles ported from
+React Native line up without adjustment.
+
 Per-side border props override the uniform `border_width` /
 `border_color` for the sides they name, so an "underline" card is
 just:
@@ -332,10 +365,18 @@ These go in the `style` dict of `View`, `Column`, or `Row`:
   `"center"`, `"flex_end"`, `"space_between"`, `"space_around"`,
   `"space_evenly"`.
 - `align_items`: cross-axis alignment: `"stretch"`, `"flex_start"`,
-  `"center"`, `"flex_end"`.
+  `"center"`, `"flex_end"`, `"baseline"`.
 - `overflow`: `"visible"` (default), `"hidden"`.
 - `spacing`: gap between children (dp / pt).
 - `padding`: inner spacing (int for all sides, or dict).
+
+`align_items: "baseline"` (rows only) lines children up along a shared
+baseline instead of their top edges. Native text handlers report a
+size but not the position of the first line's baseline, so the engine
+approximates: a leaf's baseline is its height (leaves align along
+their bottom edges), and a container's baseline is that of its first
+in-flow child. Columns treat `"baseline"` as `"flex_start"`, matching
+Yoga.
 
 ### Child layout properties
 
@@ -349,9 +390,15 @@ All components accept these in `style`:
   (`width / height`).
 - `flex`: shorthand for `flex_grow: N, flex_shrink: 1, flex_basis: 0`.
 - `flex_grow`, `flex_shrink`, `flex_basis`: explicit flex properties.
-- `margin`: outer spacing (number for all sides, or dict).
+- `margin`: outer spacing (number for all sides, a dict, or `"auto"`;
+  per-edge keys such as `margin_left` also accept `"auto"`).
 - `align_self`: override parent alignment: `"auto"`, `"flex_start"`,
-  `"center"`, `"flex_end"`, `"stretch"`.
+  `"center"`, `"flex_end"`, `"stretch"`, `"baseline"`.
+- `display`: `"flex"` (default) or `"none"`. A `"none"` element and
+  its subtree are removed from layout entirely: no size, gap, or
+  margin is reserved for it and every frame in the subtree is zero.
+  Toggle it to hide content without unmounting it (state and native
+  views are kept).
 - `position`: `"relative"` (default) or `"absolute"`.
 - `top`, `right`, `bottom`, `left`: edge offsets when
   `position: "absolute"` (number or percentage string).
@@ -379,6 +426,29 @@ pn.Row(
     pn.Spacer(flex=1),
     pn.Text("Right"),
     style={"padding": 16, "align_items": "center"},
+)
+```
+
+**Auto margins instead of a spacer:**
+
+Auto margins absorb the free space on the main axis before
+`justify_content` is applied, following CSS and Yoga. When any child
+on a line has an auto main-axis margin, the remaining space is split
+equally among every auto margin on that line and `justify_content` has
+no effect. On the cross axis, `margin_top: "auto"` and friends center
+or push the child and override `align_items` / `align_self` (including
+`stretch`):
+
+```python
+pn.Row(
+    pn.Text("Left"),
+    pn.Text("Right", style={"margin_left": "auto"}),   # pushed to the trailing edge
+    style={"padding": 16},
+)
+
+pn.Column(
+    pn.Text("Centered", style={"margin_horizontal": "auto"}),  # centered without align_items
+    style={"flex": 1},
 )
 ```
 
@@ -450,7 +520,8 @@ pn.Column(
 `style`:
 
 - **`align_items`**: cross-axis alignment: `"stretch"`,
-  `"flex_start"`, `"center"`, `"flex_end"`, `"leading"`, `"trailing"`.
+  `"flex_start"`, `"center"`, `"flex_end"`, `"baseline"`, `"leading"`,
+  `"trailing"`.
 - **`justify_content`**: main-axis distribution: `"flex_start"`,
   `"center"`, `"flex_end"`, `"space_between"`, `"space_around"`,
   `"space_evenly"`.
@@ -590,11 +661,12 @@ from pythonnative.style import DEFAULT_DARK_THEME
 
 @pn.component
 def DarkPage():
-    return pn.Provider(pn.ThemeContext, DEFAULT_DARK_THEME,
+    return pn.ThemeContext.Provider(
+        DEFAULT_DARK_THEME,
         pn.Column(
             ThemedText(text="Always dark!"),
             style={"spacing": 8},
-        )
+        ),
     )
 ```
 

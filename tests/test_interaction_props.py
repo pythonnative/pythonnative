@@ -6,18 +6,17 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
-from fake_backend import FakeBackend
-
 from pythonnative.components import KeyboardAvoidingView, Pressable, Text, View
 from pythonnative.element import Element
 from pythonnative.reconciler import Reconciler
 from pythonnative.style import Style
+from pythonnative.testing import FakeBackend
 
 
 def _mount(el: Element) -> Tuple[Any, Reconciler, FakeBackend]:
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     root = rec.mount(el)
     # Layout (and therefore on_layout) only runs once the host supplies
     # a viewport size.

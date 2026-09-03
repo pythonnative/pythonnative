@@ -40,7 +40,7 @@ def HomeScreen():
     return pn.Column(
         pn.Text(f"Count: {count}", style={"font_size": 24}),
         pn.Button("Tap me", on_press=lambda: set_count(count + 1)),
-        pn.Button("Open details", on_press=lambda: nav.navigate("Detail", {"count": count})),
+        pn.Button("Open details", on_press=lambda: nav.navigate("Detail", count=count)),
         style={"spacing": 12, "padding": 16},
     )
 
@@ -48,16 +48,15 @@ def HomeScreen():
 @pn.component
 def DetailScreen():
     route = pn.use_route()
-    return pn.Text(f"Count was {route.get('count', 0)}", style={"padding": 16})
+    return pn.Text(f"Count was {route.params.get('count', 0)}", style={"padding": 16})
 
 
 @pn.component
 def App():
     return pn.NavigationContainer(
         Stack.Navigator(
-            Stack.Screen("Home", component=HomeScreen, options={"title": "Home"}),
-            Stack.Screen("Detail", component=DetailScreen, options={"title": "Detail"}),
-            initial_route="Home",
+            Stack.Screen("Home", HomeScreen, title="Home"),
+            Stack.Screen("Detail", DetailScreen, title="Detail"),
         )
     )
 ```
@@ -167,7 +166,7 @@ edits under `app/` are copied into the running app's writable source
 overlay and the active page refreshes without a full rebuild.
 
 PythonNative prefers a **Fast Refresh** path: each
-[`@pn.component`][pythonnative.component] function is matched by
+[`@pn.component`][pythonnative.component.component] function is matched by
 qualified name across the reloaded module, the live VNode tree's
 function references are swapped in place, and the next render reuses
 the existing hook state. So edits to the body of a component preserve

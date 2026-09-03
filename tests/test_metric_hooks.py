@@ -10,17 +10,17 @@ from __future__ import annotations
 from typing import Dict, Generator, List
 
 import pytest
-from fake_backend import FakeBackend as MockBackend
 
 from pythonnative import platform_metrics as pm
+from pythonnative.component import component
 from pythonnative.element import Element
 from pythonnative.hooks import (
-    component,
     use_keyboard_height,
     use_safe_area_insets,
     use_window_dimensions,
 )
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend as MockBackend
 
 
 @pytest.fixture(autouse=True)
@@ -58,7 +58,7 @@ def test_use_window_dimensions_re_renders_on_change() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: rec.reconcile(comp())
+    rec.on_render_requested = lambda: rec.reconcile(comp())
     rec.mount(comp())
     initial_render_count = len(rendered)
 
@@ -92,7 +92,7 @@ def test_use_safe_area_insets_re_renders_on_change() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: rec.reconcile(comp())
+    rec.on_render_requested = lambda: rec.reconcile(comp())
     rec.mount(comp())
     before = len(rendered)
 
@@ -125,7 +125,7 @@ def test_use_keyboard_height_re_renders_on_change() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: rec.reconcile(comp())
+    rec.on_render_requested = lambda: rec.reconcile(comp())
     rec.mount(comp())
     before = len(rendered)
 
@@ -174,7 +174,7 @@ def test_safe_area_view_updates_when_insets_change() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     rec.mount(SafeAreaView(Text("safe")))
     assert "padding_top" not in _safe_area_props(backend)
 

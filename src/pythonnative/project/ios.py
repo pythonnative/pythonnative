@@ -126,6 +126,7 @@ def configure_info_plist(info_plist: Path, config: AppConfig) -> None:
 
     plist["CFBundleDisplayName"] = config.display_name
     plist["CFBundleName"] = config.name
+    plist["PNEntryModule"] = config.entry_module
 
     orientations = _ORIENTATIONS.get(config.orientation, _ORIENTATIONS["portrait"])
     plist["UISupportedInterfaceOrientations"] = list(orientations)

@@ -167,7 +167,7 @@ assert root.children[1].width == 125  # 200 - 10 - 10 - 50 - 5
 ```
 
 The reconciler also exposes
-[`Reconciler.compute_layout_for_test`][pythonnative.reconciler.Reconciler.compute_layout_for_test]
+[`Reconciler.compute_layout_for_test`][pythonnative.reconciler.core.Reconciler.compute_layout_for_test]
 so you can render a real component tree (with the mock registry) and
 inspect the computed `LayoutNode` tree without having to dig into
 private attributes.

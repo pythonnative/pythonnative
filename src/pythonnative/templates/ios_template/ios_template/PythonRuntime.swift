@@ -392,6 +392,6 @@ final class PythonRuntime {
 public func pn_schedule_render_drain() {
     DispatchQueue.main.async {
         guard PythonRuntime.shared.started else { return }
-        PythonRuntime.shared.notify(module: "pythonnative.screen", function: "drain_ios_scheduled_renders")
+        PythonRuntime.shared.notify(module: "pythonnative.hosts", function: "drain_ios_scheduled_renders")
     }
 }

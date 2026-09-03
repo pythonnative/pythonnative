@@ -1,6 +1,6 @@
 """Demo screen for [`pn.use_context`][pythonnative.use_context],
 [`pn.create_context`][pythonnative.create_context], and
-[`pn.Provider`][pythonnative.Provider].
+[`Context.Provider`][pythonnative.Context.Provider].
 
 A trivial theme context with a Provider at the top and a consumer
 child shows the value flowing through the tree. A button at the
@@ -36,7 +36,7 @@ def UseContextDemo() -> pn.Element:
         section(
             "Theme context",
             result_text("Current theme", theme),
-            pn.Provider(_ThemeContext, theme, _Consumer()),
+            _ThemeContext.Provider(theme, _Consumer()),
             buttons_row(
                 pn.Button("Set light", on_press=lambda: set_theme("light")),
                 pn.Button("Set dark", on_press=lambda: set_theme("dark")),

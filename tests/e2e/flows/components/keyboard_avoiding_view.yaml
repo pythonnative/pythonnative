@@ -1,7 +1,7 @@
 # Tests KeyboardAvoidingView renders its body without crashing.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/keyboard_avoiding_view.py
-# Source under test: src/pythonnative/components.py :: KeyboardAvoidingView
+# Source under test: src/pythonnative/components/layout.py :: KeyboardAvoidingView
 appId: ${APP_ID}
 ---
 - runFlow:

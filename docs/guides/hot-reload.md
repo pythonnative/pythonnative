@@ -67,7 +67,7 @@ place:
    `HookState`, so state survives.
 
 The next render runs through
-[`Reconciler.reconcile`][pythonnative.reconciler.Reconciler.reconcile]
+[`Reconciler.reconcile`][pythonnative.reconciler.core.Reconciler.reconcile]
 just like a normal re-render, so layout and native views are
 updated incrementally. Component state (`use_state`, `use_reducer`,
 refs) is preserved across the swap.

@@ -9,13 +9,13 @@ from pathlib import Path
 from typing import Generator
 
 import pytest
-from fake_backend import FakeBackend as _StubBackend
 
+from pythonnative.component import component
 from pythonnative.element import Element
-from pythonnative.hooks import component
 from pythonnative.reconciler import Reconciler
 from pythonnative.runtime import drain, run_blocking
 from pythonnative.storage import AsyncStorage, _desktop_store, use_persisted_state
+from pythonnative.testing import FakeBackend as _StubBackend
 
 
 @pytest.fixture(autouse=True)

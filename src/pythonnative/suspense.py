@@ -386,26 +386,22 @@ def lazy(loader: Callable[[], Any]) -> Callable[..., Any]:
             )
         ```
     """
-    from .hooks import component
+    from .component import Component
 
     state: dict = {}
 
-    @component
-    def Lazy(**props: Any) -> Any:
+    def Lazy(*children: Any, **props: Any) -> Any:
         resource = state.get("resource")
         if resource is None:
             resource = start_resource(loader)
             state["resource"] = resource
         loaded = resource.read()
-        children = props.pop("children", None)
-        if children:
-            return loaded(*children, **props)
-        return loaded(**props)
+        return loaded(*children, **props)
 
-    Lazy.__name__ = getattr(loader, "__name__", "Lazy")
-    if Lazy.__name__ == "<lambda>":
-        Lazy.__name__ = "Lazy"
-    return Lazy
+    name = getattr(loader, "__name__", "Lazy")
+    if name == "<lambda>":
+        name = "Lazy"
+    return Component(Lazy, display_name=name)
 
 
 __all__ = [

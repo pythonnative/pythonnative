@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fake_backend import FakeBackend as _MockBackend
 
+from pythonnative.component import component
 from pythonnative.element import Element
 from pythonnative.hot_reload import (
     DEV_ROOT_DIR,
@@ -18,6 +18,7 @@ from pythonnative.hot_reload import (
     manifest_path_for,
 )
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend as _MockBackend
 
 
 def _write_module(path: Path, value: str) -> None:
@@ -395,7 +396,7 @@ def test_refresh_in_place_swaps_components_and_preserves_state(
     (pkg / "comp.py").write_text(
         "import pythonnative as pn\n"
         "from pythonnative.element import Element\n"
-        "from pythonnative.hooks import component, use_state\n\n"
+        "from pythonnative.component import component\nfrom pythonnative.hooks import use_state\n\n"
         "@component\n"
         "def Counter():\n"
         "    count, set_count = use_state(0)\n"
@@ -417,7 +418,7 @@ def test_refresh_in_place_swaps_components_and_preserves_state(
 
     backend = _MockBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
 
     root = rec.mount(module.Counter())
 
@@ -435,13 +436,13 @@ def test_refresh_in_place_swaps_components_and_preserves_state(
     # Bump the counter so the hook state is non-default.
     module.set_counter._set_count(5)
     rec.reconcile(module.Counter())
-    assert get_text(rec._tree.native_view) == "A:5"
+    assert get_text(rec.root.native_view) == "A:5"
 
     # Edit the module (change the prefix from "A:" to "B:").
     (pkg / "comp.py").write_text(
         "import pythonnative as pn\n"
         "from pythonnative.element import Element\n"
-        "from pythonnative.hooks import component, use_state\n\n"
+        "from pythonnative.component import component\nfrom pythonnative.hooks import use_state\n\n"
         "@component\n"
         "def Counter():\n"
         "    count, set_count = use_state(0)\n"
@@ -467,7 +468,7 @@ def test_refresh_in_place_swaps_components_and_preserves_state(
     # called against the same VNode (and HookState), so state survives.
     new_module = sys.modules["rstate_pkg.comp"]
     rec.reconcile(new_module.Counter())
-    assert get_text(rec._tree.native_view) == "B:5"
+    assert get_text(rec.root.native_view) == "B:5"
 
 
 def test_refresh_in_place_returns_false_for_unreloaded_modules() -> None:
@@ -475,7 +476,7 @@ def test_refresh_in_place_returns_false_for_unreloaded_modules() -> None:
 
     backend = _MockBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     rec.mount(Element("Text", {"text": "static"}, []))
 
     refreshed = ModuleReloader.refresh_in_place(rec, ["some.other.module"])
@@ -500,8 +501,8 @@ def test_build_replacement_map_skips_nested_functions() -> None:
     inner = make_nested()
     backend = _MockBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
-    rec.mount(Element(inner, {}, []))
+    rec.on_render_requested = lambda: None
+    rec.mount(component(inner)())
 
     mapping = ModuleReloader.build_replacement_map(rec, [inner.__module__])
     assert mapping == {}

@@ -13,15 +13,12 @@ from typing import Iterator
 
 import pytest
 
-from pythonnative import hooks, runtime
+from pythonnative import runtime
+from pythonnative.events import get_event_registry
 
 
 @pytest.fixture(autouse=True)
 def _fresh_framework_loop() -> Iterator[None]:
     yield
     runtime._shutdown_for_tests()
-    # Transition flushes scheduled on the closed loop never ran; drop
-    # them so they can't leak into the next test.
-    hooks._deferred_triggers.clear()
-    hooks._post_transition_callbacks.clear()
-    hooks._transition_flush_scheduled = False
+    get_event_registry().reset()

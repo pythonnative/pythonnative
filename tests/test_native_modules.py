@@ -13,7 +13,6 @@ import asyncio
 from typing import Dict, Generator, List
 
 import pytest
-from fake_backend import FakeBackend as MockBackend
 
 from pythonnative import (
     AppState,
@@ -30,10 +29,11 @@ from pythonnative import (
     use_app_state,
     use_net_info,
 )
+from pythonnative.component import component
 from pythonnative.element import Element
-from pythonnative.hooks import component
 from pythonnative.native_modules import app_state, battery, linking, net_info, secure_store
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend as MockBackend
 
 
 @pytest.fixture(autouse=True)
@@ -107,7 +107,7 @@ def test_use_app_state_returns_current_and_rerenders() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: rec.reconcile(comp())
+    rec.on_render_requested = lambda: rec.reconcile(comp())
     rec.mount(comp())
     before = len(rendered)
     assert rendered[0] == "active"
@@ -146,7 +146,7 @@ def test_use_net_info_rerenders_on_change() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: rec.reconcile(comp())
+    rec.on_render_requested = lambda: rec.reconcile(comp())
     rec.mount(comp())
     before = len(rendered)
 

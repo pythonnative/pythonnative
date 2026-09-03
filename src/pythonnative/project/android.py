@@ -234,7 +234,7 @@ def configure_settings_gradle(project_dir: Path, config: AppConfig) -> None:
 
 
 def configure_strings(project_dir: Path, config: AppConfig) -> None:
-    """Set the ``app_name`` string resource to the display name.
+    """Set the ``app_name`` and ``pn_entry_module`` string resources.
 
     Args:
         project_dir: The staged Android project root.
@@ -248,6 +248,12 @@ def configure_strings(project_dir: Path, config: AppConfig) -> None:
     content = re.sub(
         r'(<string name="app_name">)(.*?)(</string>)',
         rf"\g<1>{escaped}\g<3>",
+        content,
+        flags=re.DOTALL,
+    )
+    content = re.sub(
+        r'(<string name="pn_entry_module"[^>]*>)(.*?)(</string>)',
+        rf"\g<1>{_xml_escape(config.entry_module)}\g<3>",
         content,
         flags=re.DOTALL,
     )

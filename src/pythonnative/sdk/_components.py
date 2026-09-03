@@ -170,9 +170,7 @@ def native_component(
 
     def decorator(handler_cls: Type[H]) -> Type[H]:
         if not isinstance(handler_cls, type) or not issubclass(handler_cls, ViewHandler):
-            raise TypeError(
-                f"@native_component({name!r}) must decorate a ViewHandler subclass; " f"got {handler_cls!r}"
-            )
+            raise TypeError(f"@native_component({name!r}) must decorate a ViewHandler subclass; got {handler_cls!r}")
         register_component(name=name, props=props, handlers={plat: handler_cls() for plat in plats})
         return handler_cls
 
@@ -385,7 +383,7 @@ def element_factory(name: str) -> Callable[..., Element]:
     """
     if name not in _REGISTRY:
         raise KeyError(
-            f"No component registered under name {name!r}. " "Use @native_component or register_component first."
+            f"No component registered under name {name!r}. Use @native_component or register_component first."
         )
 
     def factory(*children: Element, key: Optional[str] = None, props: Any = None, **kwargs: Any) -> Element:

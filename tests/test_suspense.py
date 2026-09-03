@@ -7,14 +7,15 @@ import time
 from typing import Any
 
 import pytest
-from fake_backend import FakeBackend, FakeView
 
+from pythonnative.component import component
 from pythonnative.components import ErrorBoundary, Suspense, Text, View
 from pythonnative.element import Element
-from pythonnative.hooks import component, use_resource, use_state
+from pythonnative.hooks import use_resource, use_state
 from pythonnative.reconciler import Reconciler
 from pythonnative.runtime import create_future, drain, resolve_future
 from pythonnative.suspense import CoroDriver, Suspend, lazy, start_resource
+from pythonnative.testing import FakeBackend, FakeView
 
 
 def _settle(rec: Reconciler, predicate: Any, timeout: float = 2.0) -> bool:

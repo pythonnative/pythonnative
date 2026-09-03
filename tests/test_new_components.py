@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Any, Tuple
 
-from fake_backend import FakeBackend
-
 from pythonnative.components import (
     FlatList,
     KeyboardAvoidingView,
@@ -17,12 +15,13 @@ from pythonnative.components import (
 )
 from pythonnative.element import Element
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend
 
 
 def _mount(el: Element) -> Tuple[Any, Reconciler, FakeBackend]:
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     root = rec.mount(el)
     return root, rec, backend
 
@@ -55,7 +54,7 @@ def test_keyboard_avoiding_default_behavior() -> None:
     el = KeyboardAvoidingView(Text("hi"))
     assert callable(el.type)  # hook-driven composite
     assert el.props["behavior"] == "padding"
-    assert len(el.props["children"]) == 1
+    assert len(el.children) == 1
 
     _, _, backend = _mount(el)
     inner = [v for v in backend.views.values() if v.type_name == "KeyboardAvoidingView"]
@@ -214,7 +213,7 @@ def test_flatlist_window_shifts_on_scroll() -> None:
 
     # Simulate the native scroll event landing deep in the list, then
     # flush the dirty component to re-render the shifted window.
-    scroll_tag = rec.root_tag()
+    scroll_tag = rec.root_tag
     assert dispatch_event(scroll_tag, "on_scroll", {"x": 0.0, "y": 44.0 * 300}) is True
     rec.flush_dirty()
 

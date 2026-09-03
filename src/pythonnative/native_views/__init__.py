@@ -220,7 +220,7 @@ class NativeViewRegistry:
         if not finite:
             _tripwire_log(
                 "set_frame:nan",
-                f"[set_frame:nan] type={record.type_name!r} " f"x={op.x!r} y={op.y!r} w={op.width!r} h={op.height!r}",
+                f"[set_frame:nan] type={record.type_name!r} x={op.x!r} y={op.y!r} w={op.width!r} h={op.height!r}",
             )
         record.handler.set_frame(record.view, op.x, op.y, op.width, op.height)
 

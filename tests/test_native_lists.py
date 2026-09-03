@@ -11,7 +11,6 @@ from __future__ import annotations
 from typing import Any, List, Tuple
 
 import pytest
-from fake_backend import FakeBackend
 
 import pythonnative.components as components
 from pythonnative.components import FlatList, SectionList, Text
@@ -19,6 +18,7 @@ from pythonnative.element import Element
 from pythonnative.events import dispatch_event
 from pythonnative.native_views import set_registry
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend
 from pythonnative.virtual_rows import RowHostPool, RowSubtree
 
 
@@ -31,7 +31,7 @@ def native_lists(monkeypatch: Any) -> None:
 def _mount(el: Element) -> Tuple[Any, Reconciler, FakeBackend]:
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     root = rec.mount(el)
     return root, rec, backend
 
@@ -159,7 +159,7 @@ def test_unstyled_native_list_fills_available_space(native_lists: None) -> None:
     )
     backend = _FillBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     root = rec.mount(el)
     rec.set_viewport_size(390, 800)
     vlist = root.find_first("VirtualList")
@@ -219,7 +219,8 @@ def test_row_host_pool_bind_rebind_release() -> None:
 
 
 def test_row_subtree_state_re_renders_row() -> None:
-    from pythonnative.hooks import component, use_state
+    from pythonnative.component import component
+    from pythonnative.hooks import use_state
 
     setters: List[Any] = []
 
@@ -256,7 +257,7 @@ def test_native_list_end_reached_fires_once(native_lists: None) -> None:
         on_end_reached=lambda: calls.append(1),
     )
     _root, rec, _backend = _mount(el)
-    tag = rec.root_tag()
+    tag = rec.root_tag
 
     # Far from the end: no callback.
     assert dispatch_event(tag, "on_scroll", {"y": 0.0, "extent": 800.0, "range": 4400.0}) is True
@@ -278,7 +279,7 @@ def test_native_list_viewable_items_changed(native_lists: None) -> None:
         on_viewable_items_changed=lambda infos: seen.append([i["index"] for i in infos]),
     )
     _root, rec, _backend = _mount(el)
-    tag = rec.root_tag()
+    tag = rec.root_tag
 
     dispatch_event(tag, "on_scroll", {"y": 0.0, "extent": 440.0, "range": 4400.0})
     assert seen, "initial scroll must report the visible rows"
@@ -296,7 +297,7 @@ def test_native_list_forwards_user_on_scroll(native_lists: None) -> None:
         on_scroll=lambda payload: payloads.append(payload),
     )
     _root, rec, _backend = _mount(el)
-    dispatch_event(rec.root_tag(), "on_scroll", {"y": 123.0, "extent": 800.0, "range": 4400.0})
+    dispatch_event(rec.root_tag, "on_scroll", {"y": 123.0, "extent": 800.0, "range": 4400.0})
     assert payloads == [{"x": 0.0, "y": 123.0}]
 
 

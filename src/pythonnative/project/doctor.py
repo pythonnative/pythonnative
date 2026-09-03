@@ -181,7 +181,7 @@ def check_ios(config: Optional[AppConfig]) -> List[CheckResult]:
                 CheckResult(
                     "iOS embedded Python",
                     WARN,
-                    f"app.python_version={config.python_version}; pinned iOS builds " f"exist for {supported}",
+                    f"app.python_version={config.python_version}; pinned iOS builds exist for {supported}",
                 )
             )
         if config.ios.development_team:

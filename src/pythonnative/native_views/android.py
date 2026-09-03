@@ -60,7 +60,15 @@ from .. import diagnostics
 from ..events import dispatch_event, event_names
 from ..gestures import make_arbiter
 from ..utils import get_android_context
-from .base import ViewHandler, _safe_max, parse_color_int
+from .base import (
+    TEXT_SHADOW_STYLE_KEYS,
+    ViewHandler,
+    _safe_max,
+    parse_color_int,
+    shadow_offset_xy,
+    transform_spans,
+    transform_text,
+)
 
 _SIDE_BORDER_WIDTH_KEYS = (
     "border_left_width",
@@ -674,6 +682,15 @@ def _apply_common_visual(view: Any, props: Dict[str, Any]) -> None:
         try:
             view.setClipChildren(clip)
             view.setClipToPadding(clip)
+        except Exception:
+            diagnostics.swallowed("android._apply_common_visual")
+    if "display" in props:
+        # Layout already zeroes the subtree; ``INVISIBLE`` (not ``GONE``,
+        # since Python owns layout) also drops it from touch delivery and
+        # the accessibility tree (inactive tabs, covered stack screens).
+        try:
+            View = jclass("android.view.View")
+            view.setVisibility(View.INVISIBLE if props["display"] == "none" else View.VISIBLE)
         except Exception:
             diagnostics.swallowed("android._apply_common_visual")
     if "opacity" in props and props["opacity"] is not None:
@@ -1305,21 +1322,21 @@ class TextHandler(AndroidViewHandler):
         return jclass("android.widget.TextView")(_ctx())
 
     def _apply(self, tv: Any, props: Dict[str, Any], initial: bool) -> None:
-        if "spans" in props or "text" in props:
+        if "spans" in props or "text" in props or "text_transform" in props:
             # ``update()`` merges changed props into the view state
             # before calling ``_apply``, so the merged dict always has
             # the latest text/spans pair (covering rich -> plain
             # transitions where only ``spans`` changed).
             merged = _state_of(tv).get("props") or props
+            transform = merged.get("text_transform")
             spans = merged.get("spans")
             if spans:
                 try:
-                    tv.setText(_build_spannable(spans))
+                    tv.setText(_build_spannable(transform_spans(spans, transform)))
                 except Exception:
-                    tv.setText(str(merged.get("text") or ""))
+                    tv.setText(transform_text(merged.get("text"), transform))
             else:
-                text = merged.get("text")
-                tv.setText(str(text) if text is not None else "")
+                tv.setText(transform_text(merged.get("text"), transform))
         if "font_size" in props and props["font_size"] is not None:
             tv.setTextSize(float(props["font_size"]))
         if "color" in props and props["color"] is not None:
@@ -1372,7 +1389,34 @@ class TextHandler(AndroidViewHandler):
                 tv.setPaintFlags(flags)
             except Exception:
                 diagnostics.swallowed("android.TextHandler._apply")
+        if any(k in props for k in TEXT_SHADOW_STYLE_KEYS):
+            self._apply_text_shadow(tv, _state_of(tv).get("props") or props)
         _apply_common_visual(tv, props)
+
+    @staticmethod
+    def _apply_text_shadow(tv: Any, merged: Dict[str, Any]) -> None:
+        """Map the ``text_shadow_*`` keys onto ``TextView.setShadowLayer``.
+
+        The offset and radius are in dp (converted to pixels like every
+        other length); the platform disables the shadow when every
+        parameter is zero, which is also what clearing the keys does.
+        """
+        try:
+            if not any(merged.get(k) is not None for k in TEXT_SHADOW_STYLE_KEYS):
+                tv.setShadowLayer(0.0, 0.0, 0.0, 0)
+                return
+            color = merged.get("text_shadow_color")
+            argb = parse_color_int(color if color is not None else "#000000")
+            dx, dy = shadow_offset_xy(merged.get("text_shadow_offset"))
+            radius = merged.get("text_shadow_radius")
+            radius_px = float(_dp(float(radius))) if radius is not None else 0.0
+            # A zero radius with a non-zero offset would hide the shadow
+            # on some renderers; use a hairline blur so it still draws.
+            if radius_px <= 0.0 and (dx or dy):
+                radius_px = 0.01
+            tv.setShadowLayer(radius_px, float(_dp(dx)), float(_dp(dy)), argb)
+        except Exception:
+            diagnostics.swallowed("android.TextHandler._apply_text_shadow")
 
 
 class ButtonHandler(AndroidViewHandler):

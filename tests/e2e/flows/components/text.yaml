@@ -2,7 +2,7 @@
 # built from nested spans (SpannableString / NSAttributedString).
 #
 # Demo screen: examples/e2e-suite/app/screens/components/text.py
-# Source under test: src/pythonnative/components.py :: Text
+# Source under test: src/pythonnative/components/text.py :: Text
 appId: ${APP_ID}
 ---
 - runFlow:

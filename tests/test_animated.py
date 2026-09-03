@@ -7,12 +7,12 @@ import time
 from typing import Any
 
 import pytest
-from fake_backend import FakeBackend as _StubBackend
 
 from pythonnative.animated import Animated, AnimatedValue, use_animated_value
+from pythonnative.component import component
 from pythonnative.element import Element
-from pythonnative.hooks import component
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend as _StubBackend
 
 # ======================================================================
 # AnimatedValue

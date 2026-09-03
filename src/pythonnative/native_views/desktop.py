@@ -96,7 +96,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .. import diagnostics
 from ..events import dispatch_event, event_names
 from ..gestures import make_arbiter
-from .base import ViewHandler
+from .base import ViewHandler, transform_text
 
 # ======================================================================
 # Stage / root container
@@ -1452,13 +1452,21 @@ _JUSTIFY_FOR_ALIGN = {"left": "left", "center": "center", "right": "right"}
 
 
 class TextHandler(DesktopViewHandler):
+    """Tk ``Label`` text leaf.
+
+    ``text_transform`` is applied to the string before it is stored, so
+    ``measure_intrinsic`` and the rendered label agree. The
+    ``text_shadow_*`` keys are accepted but ignored: Tk has no text
+    shadow primitive, and the preview stays faithful to layout rather
+    than approximating one with a second label.
+    """
+
     def build(self, props: Dict[str, Any]) -> Any:
         return tk.Label(_master(), highlightthickness=0, bd=0, padx=0, pady=0)
 
     def apply(self, label: Any, props: Dict[str, Any]) -> None:
         merged = getattr(label, "_pn_props", props)
-        text = merged.get("text")
-        label._pn_text = "" if text is None else str(text)
+        label._pn_text = transform_text(merged.get("text"), merged.get("text_transform"))
         font = _make_font(merged)
         label._pn_font = font
         opts: Dict[str, Any] = {"text": label._pn_text, "font": font}

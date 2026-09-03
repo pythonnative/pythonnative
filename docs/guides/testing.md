@@ -2,194 +2,168 @@
 
 PythonNative is built so that the bulk of your application logic can
 be tested without a device or simulator. The reconciler talks to
-native widgets exclusively through the batched mutation protocol
-(see [Native views](../concepts/native-views.md)); swap the backend
-for an in-memory fake and a render produces a tree of plain Python
-objects that `pytest` can introspect.
+native widgets exclusively through the batched mutation protocol (see
+[Native views](../concepts/native-views.md)); `pythonnative.testing`
+swaps in an in-memory backend so a render produces a tree of plain
+Python objects that `pytest` can introspect, and gives you Testing
+Library-style queries to do it.
 
 ## What to test
 
-- **Components**: assert that a component renders the expected
-  element type with the expected props for a given input.
-- **Hooks**: drive state transitions and verify outputs after each
-  render.
-- **Reducers**: pure functions; test them as you would any other
-  Python function.
-- **Native modules**: skip platform-only paths or mock them at the
-  boundary.
+- **Components**: render them, find things by text or `test_id`, fire
+  events, assert on what's visible.
+- **Hooks**: drive state transitions with
+  [`render_hook`][pythonnative.testing.render_hook].
+- **Navigation flows**: render the whole app and press through it.
+- **Reducers and helpers**: pure functions; test them as you would any
+  other Python code.
 
 What *not* to test (or to test sparingly): the platform handler
 implementations themselves. Those run only on the device and are
 covered by the Maestro E2E suite (`tests/e2e/`).
 
-## A minimal fake backend
+## Rendering a component
 
-A test backend implements the registry protocol: `apply_mutations`,
-`resolve_view`, `measure_intrinsic`, and `command`. PythonNative's own
-suite keeps a full-featured one in `tests/fake_backend.py`; copy it
-into your project or use this trimmed version:
-
-```python
-from pythonnative.mutations import (
-    CreateOp, UpdateOp, InsertOp, DestroyOp, SetFrameOp,
-)
-
-
-class FakeView:
-    def __init__(self, tag, type_name, props):
-        self.tag, self.type_name, self.props = tag, type_name, dict(props)
-        self.children, self.frame = [], (0, 0, 0, 0)
-
-    def find_all(self, type_name):
-        out = [self] if self.type_name == type_name else []
-        for child in self.children:
-            out.extend(child.find_all(type_name))
-        return out
-
-
-class FakeBackend:
-    def __init__(self):
-        self.views = {}
-
-    def apply_mutations(self, ops):
-        for op in ops:
-            if isinstance(op, CreateOp):
-                self.views[op.tag] = FakeView(op.tag, op.type_name, op.props)
-            elif isinstance(op, UpdateOp):
-                self.views[op.tag].props.update(op.changed_props)
-            elif isinstance(op, InsertOp):
-                child = self.views[op.child_tag]
-                self.views[op.parent_tag].children.insert(op.index, child)
-            elif isinstance(op, DestroyOp):
-                self.views.pop(op.tag, None)
-            elif isinstance(op, SetFrameOp):
-                self.views[op.tag].frame = op.frame
-
-    def resolve_view(self, tag):
-        return self.views.get(tag)
-
-    def measure_intrinsic(self, tag, max_w, max_h):
-        return (0.0, 0.0)
-
-    def command(self, tag, name, args=None):
-        return None
-
-    def set_animated_property(self, tag, prop, value): ...
-    def start_animation(self, tag, anim_id, prop, spec): return False
-    def cancel_animation(self, tag, anim_id): return None
-```
-
-## Rendering a component in a test
-
-Construct the reconciler with the fake backend directly:
+[`render`][pythonnative.testing.render] mounts an element and returns a
+[`RenderResult`][pythonnative.testing.RenderResult]:
 
 ```python
 import pythonnative as pn
-from pythonnative.reconciler import Reconciler
+from pythonnative.testing import render
 
 
-def render(element):
-    """Mount `element` and return (root FakeView, reconciler)."""
-    backend = FakeBackend()
-    rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None  # no screen host in tests
-    rec.mount(element)
-    return backend.views[rec.root_tag()], rec
-```
-
-(For a longer-running test (effects, navigation), use `create_screen` so
-you get the full lifecycle plumbing.)
-
-## Asserting on rendered output
-
-Event callbacks live in the event registry, not on the view; drive
-them with [`dispatch_event`][pythonnative.events.dispatch_event]
-exactly like a native listener would:
-
-```python
-from pythonnative.events import dispatch_event
+@pn.component
+def Counter():
+    count, set_count = pn.use_state(0)
+    return pn.Column(
+        pn.Text(f"Count: {count}"),
+        pn.Button("+", on_press=lambda: set_count(count + 1)),
+    )
 
 
 def test_counter_increments():
-    @pn.component
-    def Counter():
-        count, set_count = pn.use_state(0)
-        return pn.Column(
-            pn.Text(f"Count: {count}", key="t"),
-            pn.Button("+", on_press=lambda: set_count(count + 1), key="b"),
-        )
-
-    root, rec = render(Counter())
-
-    label, button = root.children
-    assert label.props["text"] == "Count: 0"
-
-    dispatch_event(button.tag, "on_press")
-    rec.flush_dirty()  # state changes commit on the next flush
-    assert root.children[0].props["text"] == "Count: 1"
+    result = render(Counter())
+    result.press(result.get_by_text("+"))
+    assert result.get_by_text("Count: 1")
 ```
 
-Notes:
+`press` (and the general `fire(target, "on_event", *args)`) dispatch
+the event exactly as a native listener would, then settle: pending
+re-renders, effects, and async work run before the call returns, so
+the next line can assert on the new tree.
 
-- `key="t"` and `key="b"` aren't required for a two-child column, but
-  using them in tests makes assertions more robust as the component
-  evolves.
-- Callable props never appear in `props`; the view carries a
-  `_pn_events` frozenset naming the wired events, and
-  `dispatch_event(tag, name, *args)` invokes the current callback.
+### Queries
+
+Queries mirror Testing Library:
+
+| Query | Returns |
+|---|---|
+| `get_by_text`, `get_by_test_id`, `get_by_label`, `get_by_type` | exactly one view, or raises `LookupError` with the tree dumped in the message |
+| `query_by_*` | the view or `None` |
+| `get_all_by_*` | every match |
+
+Matchers are exact strings, compiled regexes, or predicates;
+`get_by_text("Count", exact=False)` matches substrings. Views inside a
+`display: "none"` subtree (inactive tabs, screens beneath the top of a
+stack) are skipped unless you pass `hidden=True`, which is how you
+assert that a hidden screen kept its state.
+
+Each match is a [`FakeView`][pythonnative.testing.FakeView] with
+`type_name`, `props`, `children`, `parent`, `frame`, and `text`.
+`result.text()` lists the visible strings in order, and
+`result.dump()` prints the tree when a test is confusing.
+
+### Other helpers
+
+- `change_text(input, "value")` fires `on_change_text`.
+- `back()` simulates the system back action and returns whether a
+  handler consumed it.
+- `rerender(element)` reconciles new root props from outside the tree.
+- `settle()` pumps the framework loop until async work is done.
+- `unmount()` tears down and runs effect cleanups; `RenderResult` is
+  also a context manager.
 
 ## Testing hooks in isolation
 
-For complex hook compositions (a custom hook that wraps several
-built-ins), wrap the hook in a tiny throwaway component and assert on
-its rendered shape:
+```python
+from pythonnative.testing import render_hook
+
+
+def use_toggle(initial=False):
+    on, set_on = pn.use_state(initial)
+    return on, lambda: set_on(not on)
+
+
+def test_use_toggle():
+    hook = render_hook(use_toggle, True)
+    assert hook.current[0] is True
+    hook.act(lambda: hook.current[1]())
+    assert hook.current[0] is False
+    assert hook.render_count == 2
+```
+
+`hook.rerender(*args, **kwargs)` re-renders with new arguments, which
+is how you test hooks that react to prop changes.
+
+## Testing navigation
+
+Navigators render in Python when no host is present, so a whole flow
+fits in one test:
 
 ```python
-def test_use_toggle():
-    def use_toggle(initial=False):
-        on, set_on = pn.use_state(initial)
-        return on, lambda: set_on(not on)
-
-    @pn.component
-    def Probe():
-        on, toggle = use_toggle()
-        return pn.Text("on" if on else "off", on_press=toggle, key="t")
-
-    root, rec = render(Probe())
-    assert root.props["text"] == "off"
-    dispatch_event(root.tag, "on_press")
-    rec.flush_dirty()
-    assert root.props["text"] == "on"
+def test_home_to_detail_and_back():
+    result = render(App())
+    result.press(result.get_by_text("Open item 42"))
+    assert result.get_by_text("Detail #42")
+    assert result.back() is True
+    assert result.get_by_text("Home")
 ```
+
+To test what a root stack asks the *platform* to do, render under a
+[`FakeHost`][pythonnative.testing.FakeHost]. It records `pushed`,
+`popped`, `replaced`, `resets`, and `options`, exposes the latest
+`title`, and lets you simulate focus changes with `set_focused`:
+
+```python
+from pythonnative.testing import FakeHost
+
+
+def test_detail_pushes_native_screen():
+    host = FakeHost()
+    result = render(App(), host=host)
+    result.press(result.get_by_text("Open item 42"))
+    state, options = host.pushed[0]
+    assert [r["name"] for r in state["routes"]] == ["Home", "Detail"]
+    assert options["title"] == "Item 42"
+```
+
+Booting a screen "mid-stack" the way a pushed native screen does is
+`FakeHost(initial_state=state.to_dict())`.
 
 ## Testing layouts
 
-The flexbox engine in `pythonnative.layout` is pure Python and easy
-to test in isolation. For a single tree:
+The flexbox engine in `pythonnative.layout` is pure Python. Rendered
+views carry their computed `frame` (`x, y, width, height`) once
+`render` runs the layout pass for the default 390x844 viewport (pass
+`viewport=(w, h)` to change it, or `viewport=None` to skip layout):
 
 ```python
-from pythonnative.layout import LayoutNode, calculate_layout
-
-
 def test_row_distributes_flex_children():
-    root = LayoutNode(
-        style={"flex_direction": "row", "width": 300, "height": 50,
-               "spacing": 10},
-        children=[
-            LayoutNode(style={"flex": 1, "height": 50}),
-            LayoutNode(style={"flex": 2, "height": 50}),
-        ],
+    result = render(
+        pn.Row(
+            pn.View(test_id="a", style={"flex": 1, "height": 50}),
+            pn.View(test_id="b", style={"flex": 2, "height": 50}),
+            style={"width": 300, "spacing": 10},
+        )
     )
-    calculate_layout(root, 400, 600)
-
-    a, b = root.children
-    assert a.x == 0 and a.width == (300 - 10) / 3
-    assert b.x == a.width + 10 and b.width == 2 * (300 - 10) / 3
+    a, b = result.get_by_test_id("a"), result.get_by_test_id("b")
+    assert a.frame[2] == pytest.approx((300 - 10) / 3)
+    assert b.frame[0] == pytest.approx(a.frame[2] + 10)
 ```
 
-To test the layout pass for a real component (with the mock registry),
-use [`Reconciler.compute_layout_for_test`][pythonnative.reconciler.Reconciler.compute_layout_for_test]
-which returns the computed `LayoutNode` tree.
+For the engine alone, build `LayoutNode` trees and call
+`calculate_layout` directly (see
+[`pythonnative.layout`](../api/layout.md)).
 
 ## Testing native modules
 
@@ -201,8 +175,10 @@ it's enough to inject a fake at the boundary:
 class FakeFs:
     def __init__(self):
         self.store = {}
+
     def write_text(self, path, content):
         self.store[path] = content
+
     def read_text(self, path):
         return self.store[path]
 ```
@@ -212,19 +188,34 @@ or a module-level injection) and assert on `store`.
 
 ## Testing async code
 
-The framework's `asyncio` loop is a guest of whatever thread creates
-it, so synchronous tests drive it explicitly:
+`render` and every event helper settle the framework's `asyncio` loop
+before returning, so `use_effect` coroutines, `use_resource`,
+`use_query`, and transitions complete without extra plumbing. When you
+trigger async work outside the helpers (a module-level task, a
+mutation started from a fixture), call `result.settle()` or
+[`settle()`][pythonnative.testing.settle], or use
+[`pn.runtime.drain()`][pythonnative.runtime.drain] /
+[`pn.run_blocking(coro)`][pythonnative.runtime.run_blocking] directly.
+See [Testing async code](async.md#testing-async-code).
 
-- [`pn.runtime.drain()`][pythonnative.runtime.drain] pumps the loop
-  until it goes idle (or a predicate holds), settling async effects,
-  resources, and transitions deterministically.
-- [`pn.run_blocking(coro)`][pythonnative.runtime.run_blocking] runs a
-  single awaitable to completion and returns its result.
+## Going lower level
 
-After draining, call the reconciler's `flush_dirty()` to apply any
-re-renders the async work queued. See
-[Testing async code](async.md#testing-async-code) in the async guide
-for worked examples.
+`render` is a thin layer over
+[`Reconciler`][pythonnative.reconciler.Reconciler] and
+[`FakeBackend`][pythonnative.testing.FakeBackend]. Tests that need to
+assert on the *mutations* themselves (how many `InsertOp`s a reorder
+produced, which props an `UpdateOp` changed) can pass their own
+backend and read `backend.ops`, or construct the reconciler directly:
+
+```python
+from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend
+
+backend = FakeBackend()
+rec = Reconciler(backend)
+rec.mount(pn.Text("hi"))
+assert [type(op).__name__ for op in backend.ops] == ["CreateOp"]
+```
 
 ## Running the suite
 
@@ -232,11 +223,7 @@ PythonNative uses `pytest` plus the standard CI matrix (Ruff, Black,
 MyPy). Run them all locally before pushing:
 
 ```bash
-ruff check src/pythonnative
-ruff format --check
-black --check src/pythonnative
-mypy src/pythonnative
-pytest
+./scripts/check.sh
 ```
 
 The same commands run in CI on every push and pull request.
@@ -245,4 +232,5 @@ The same commands run in CI on every push and pull request.
 
 - Wrap subtrees with [Error boundaries](error-boundaries.md) so test
   failures don't crash unrelated assertions.
-- See how mocks are wired underneath: [Native views](../concepts/native-views.md).
+- See how the fake backend fits underneath: [Native views](../concepts/native-views.md).
+- Browse the API: [Testing](../api/testing.md).

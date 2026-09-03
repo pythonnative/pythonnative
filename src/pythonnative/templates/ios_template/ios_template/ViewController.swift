@@ -11,7 +11,8 @@ import UIKit
 
 class ViewController: UIViewController {
     // Optional keys for dynamic screen navigation. Push navigation sets
-    // these before presenting the controller; nil means "app.main".
+    // these before presenting the controller; nil means the app's entry
+    // module (Info.plist `PNEntryModule`, default "app.main").
     @objc dynamic var requestedScreenPath: String? = nil
     @objc dynamic var requestedScreenArgsJSON: String? = nil
 
@@ -32,21 +33,22 @@ class ViewController: UIViewController {
         }
 
         // PythonNative's convention is "import the module and grab its
-        // top-level `App` attribute", so the default is the module path
-        // "app.main". Push navigation overrides this via
-        // `requestedScreenPath`, which may also be a dotted-attribute
-        // path like "app.main.RootScreen".
-        let screenPath: String = requestedScreenPath ?? "app.main"
+        // top-level `App` attribute". The entry module comes from
+        // `app.entry_point` in pythonnative.toml (written to Info.plist as
+        // `PNEntryModule` by `pn build`); push navigation overrides it via
+        // `requestedScreenPath`.
+        let entryModule = Bundle.main.object(forInfoDictionaryKey: "PNEntryModule") as? String
+        let screenPath: String = requestedScreenPath ?? entryModule ?? "app.main"
         let addr = UInt(bitPattern: Unmanaged.passUnretained(self).toOpaque())
         do {
             let screen: PyRef
             if let argsJSON = requestedScreenArgsJSON {
                 screen = try PythonRuntime.shared.call(
-                    module: "pythonnative.screen", function: "create_screen", screenPath, addr, argsJSON
+                    module: "pythonnative.hosts", function: "create_screen", screenPath, addr, argsJSON
                 )
             } else {
                 screen = try PythonRuntime.shared.call(
-                    module: "pythonnative.screen", function: "create_screen", screenPath, addr
+                    module: "pythonnative.hosts", function: "create_screen", screenPath, addr
                 )
             }
             self.screen = screen
@@ -69,7 +71,7 @@ class ViewController: UIViewController {
         guard screen != nil else { return }
         let addr = UInt(bitPattern: Unmanaged.passUnretained(self).toOpaque())
         PythonRuntime.shared.notify(
-            module: "pythonnative.screen", function: "forward_lifecycle", addr, event
+            module: "pythonnative.hosts", function: "forward_lifecycle", addr, event
         )
     }
 
@@ -119,7 +121,7 @@ class ViewController: UIViewController {
         if screen != nil {
             let addr = UInt(bitPattern: Unmanaged.passUnretained(self).toOpaque())
             PythonRuntime.shared.notify(
-                module: "pythonnative.screen", function: "forward_lifecycle", addr, "on_destroy"
+                module: "pythonnative.hosts", function: "forward_lifecycle", addr, "on_destroy"
             )
         }
     }

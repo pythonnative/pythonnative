@@ -1,7 +1,7 @@
 # Tests ActivityIndicator toggle flips its animating prop.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/activity_indicator.py
-# Source under test: src/pythonnative/components.py :: ActivityIndicator
+# Source under test: src/pythonnative/components/controls.py :: ActivityIndicator
 appId: ${APP_ID}
 ---
 - runFlow:

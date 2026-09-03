@@ -1356,20 +1356,14 @@ def _make_animated_factory(
     accept_children: bool,
 ) -> Callable[..., Element]:
     """Build an animated wrapper for ``element_type``."""
-    from .hooks import component  # local import to avoid cycle
+    from .component import Component
 
-    @component
-    def _animated(*args: Any, **kwargs: Any) -> Element:
+    def _animated(*children: Any, **kwargs: Any) -> Element:
         from .components import Image as _Image
         from .components import Text as _Text
         from .components import View as _View
 
-        # ``@component`` packs positional children into the ``children``
-        # prop (this function declares ``*args``), and the reconciler
-        # re-invokes it with keyword props only, so at render time the
-        # payload arrives in ``kwargs``, never in ``args``.
-        children = list(args) or list(kwargs.pop("children", ()) or ())
-
+        kids: List[Any] = list(children)
         style = kwargs.pop("style", None)
         plain_style, bindings = _resolve_style_with_values(style)
 
@@ -1397,13 +1391,13 @@ def _make_animated_factory(
             text = children[0] if children else kwargs.pop("text", "")
             return _Text(text, style=plain_style, ref=ref, **kwargs)
         if element_type == "Image":
-            source = children[0] if children else kwargs.pop("source", "")
+            source = kids[0] if kids else kwargs.pop("source", "")
             return _Image(source, style=plain_style, ref=ref, **kwargs)
         if not accept_children:
-            children = []
-        return _View(*children, style=plain_style, ref=ref, **kwargs)
+            kids = []
+        return _View(*kids, style=plain_style, ref=ref, **kwargs)
 
-    return _animated
+    return Component(_animated, display_name=f"Animated.{element_type}")
 
 
 def _animated_prop_name(prop: str) -> str:

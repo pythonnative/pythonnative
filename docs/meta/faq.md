@@ -112,7 +112,7 @@ details.
 Two main options:
 
 - [`use_context`][pythonnative.use_context] /
-  [`Provider`][pythonnative.Provider] for tree-scoped values
+  [`Context.Provider`][pythonnative.hooks.Context.Provider] for tree-scoped values
   (themes, current user). The provider sits at the top of the
   navigator and descendants subscribe.
 - A plain Python module-level object (a "store") for app-wide,

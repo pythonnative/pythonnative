@@ -15,7 +15,8 @@ for content-sized leaves (text, buttons, images).
 """
 
 import math
-from typing import Any, Dict, Tuple, Union
+import re
+from typing import Any, Dict, Optional, Tuple, Union
 
 
 class ViewHandler:
@@ -239,6 +240,68 @@ def parse_color_int(color: Union[str, int]) -> int:
     if val > 0x7FFFFFFF:
         val -= 0x100000000
     return val
+
+
+# ======================================================================
+# Text helpers shared by every backend's Text handler
+# ======================================================================
+
+_WORD_START = re.compile(r"(?<!\S)(\S)")
+
+
+def transform_text(text: Any, mode: Optional[str]) -> str:
+    """Apply a ``text_transform`` style value to ``text``.
+
+    Runs in Python before the string is handed to the native label, so
+    the displayed text and the intrinsic measurement agree on every
+    backend. ``"capitalize"`` upper-cases the first character of each
+    whitespace-separated word and leaves the rest untouched (matching
+    CSS / React Native rather than ``str.title()``, which would
+    lower-case the remainder). Unknown modes and ``"none"`` return the
+    text unchanged.
+    """
+    s = "" if text is None else str(text)
+    if mode == "uppercase":
+        return s.upper()
+    if mode == "lowercase":
+        return s.lower()
+    if mode == "capitalize":
+        return _WORD_START.sub(lambda m: m.group(1).upper(), s)
+    return s
+
+
+def transform_spans(spans: Any, mode: Optional[str]) -> Any:
+    """Return ``spans`` with `transform_text` applied to each span's ``text``.
+
+    Rich text is flattened into one native string, so a run-by-run
+    transform matches what a single-string transform would produce for
+    ``uppercase`` / ``lowercase``. ``capitalize`` is evaluated per span,
+    which is also how CSS treats inline boxes.
+    """
+    if not mode or mode == "none" or not isinstance(spans, list):
+        return spans
+    out = []
+    for span in spans:
+        if isinstance(span, dict) and "text" in span:
+            copy = dict(span)
+            copy["text"] = transform_text(span.get("text"), mode)
+            out.append(copy)
+        else:
+            out.append(span)
+    return out
+
+
+def shadow_offset_xy(value: Any) -> Tuple[float, float]:
+    """Coerce a ``shadow_offset`` / ``text_shadow_offset`` value to ``(dx, dy)``."""
+    if isinstance(value, dict):
+        return (float(value.get("width", 0) or 0), float(value.get("height", 0) or 0))
+    if isinstance(value, (tuple, list)) and len(value) >= 2:
+        return (float(value[0]), float(value[1]))
+    return (0.0, 0.0)
+
+
+TEXT_SHADOW_STYLE_KEYS = ("text_shadow_color", "text_shadow_offset", "text_shadow_radius")
+"""Style keys that together describe a text shadow."""
 
 
 # ======================================================================

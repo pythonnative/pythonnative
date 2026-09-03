@@ -12,9 +12,9 @@ Architecture
   navigation stack gets its own child container inside the stage; the
   desktop view handlers create widgets under the active container.
 - [`DesktopApp`][pythonnative.preview.DesktopApp] owns the navigation
-  stack of [`screen`][pythonnative.screen] hosts and the push/pop/reset
-  primitives the declarative navigators call through ``host._push`` /
-  ``host._pop``.
+  stack of [`hosts`][pythonnative.hosts] and the push/pop/reset
+  primitives a root ``Stack.Navigator`` reaches through the host's
+  [`HostNavigator`][pythonnative.navigation.HostNavigator] methods.
 - The Tk event loop runs on the main thread. A lightweight poll
   (`~60 Hz`) drains (a) UI work marshaled from the asyncio runtime
   thread via [`runtime.call_on_main_thread`][pythonnative.runtime.call_on_main_thread],
@@ -77,7 +77,7 @@ class DesktopApp:
     """Navigation-stack controller for the desktop preview window.
 
     One instance backs a preview session. It is handed to each
-    [`screen`][pythonnative.screen] host as the ``native_instance`` so
+    [`DesktopScreenHost`][pythonnative.hosts.desktop.DesktopScreenHost] as the ``native_instance`` so
     hosts can drive navigation (``push_screen`` / ``pop_screen`` /
     ``reset_to_root``), report the viewport size, and set the window
     title, mirroring the role a ``UIViewController`` / ``Activity``
@@ -116,7 +116,7 @@ class DesktopApp:
         return frame
 
     def _show_container(self, host: Any) -> None:
-        container = getattr(host, "_pn_container", None)
+        container = getattr(host, "container", None)
         if container is not None:
             try:
                 container.place(in_=self._stage, x=0, y=0, relwidth=1.0, relheight=1.0)
@@ -125,7 +125,7 @@ class DesktopApp:
                 pass
 
     def _forget_container(self, host: Any) -> None:
-        container = getattr(host, "_pn_container", None)
+        container = getattr(host, "container", None)
         if container is not None:
             try:
                 container.place_forget()
@@ -136,19 +136,19 @@ class DesktopApp:
         """Make ``host`` the rendering target and reflow it to the viewport."""
         from .native_views import desktop as desktop_backend
 
-        desktop_backend.set_root_container(getattr(host, "_pn_container", None))
+        desktop_backend.set_root_container(getattr(host, "container", None))
         self._show_container(host)
 
     # -- lifecycle ----------------------------------------------------
 
     def _make_host(self, component_path: str, args: Optional[dict] = None) -> Any:
-        from . import screen as screen_module
+        from .hosts import create_screen
         from .native_views import desktop as desktop_backend
 
         container = self._new_container()
         desktop_backend.set_root_container(container)
-        host = screen_module.create_screen(component_path, self)
-        host._pn_container = container
+        host = create_screen(component_path, self)
+        host.container = container
         if args:
             host.set_args(args)
         return host
@@ -178,8 +178,8 @@ class DesktopApp:
             self._mount_failed = True
             self._show_error(traceback.format_exc())
 
-    def push_screen(self, component_path: str, args: Optional[dict] = None) -> None:
-        """Push a new screen, suspending the current one (declarative nav)."""
+    def push_screen(self, component_path: str, args: Optional[dict] = None, options: Optional[dict] = None) -> None:
+        """Push a new screen, suspending the current one (root stack navigation)."""
         if self._stack:
             current = self._stack[-1]
             try:
@@ -196,6 +196,8 @@ class DesktopApp:
         try:
             host.on_create()
             host.on_resume()
+            if options and options.get("title"):
+                self.set_title(str(options["title"]))
         except Exception:
             self._show_error(traceback.format_exc())
 
@@ -233,12 +235,12 @@ class DesktopApp:
             pass
         # ``on_destroy`` unmounts the host's reconciler: effect cleanups
         # run, native widgets are destroyed, and event registrations are
-        # released (see ``screen._destroy_host``).
+        # released.
         try:
             host.on_destroy()
         except Exception:
             pass
-        container = getattr(host, "_pn_container", None)
+        container = getattr(host, "container", None)
         if container is not None:
             try:
                 container.destroy()
@@ -305,14 +307,14 @@ class DesktopApp:
 
         self._clear_error()
         for host in self._stack:
-            desktop_backend.set_root_container(getattr(host, "_pn_container", None))
+            desktop_backend.set_root_container(getattr(host, "container", None))
             try:
                 host.reload(changed_modules)
             except Exception:
                 self._show_error(traceback.format_exc())
         active = self.active_host()
         if active is not None:
-            desktop_backend.set_root_container(getattr(active, "_pn_container", None))
+            desktop_backend.set_root_container(getattr(active, "container", None))
 
     def _remount_root(self) -> None:
         for host in list(self._stack):
@@ -383,7 +385,7 @@ def run_preview(
     Args:
         component_path: Module path (``"app.main"`` → its ``App``) or a
             dotted ``module.Component`` path, same convention as
-            [`create_screen`][pythonnative.create_screen].
+            [`create_screen`][pythonnative.hosts.create_screen].
         project_root: Directory added to ``sys.path`` so the component
             imports. Defaults to the current working directory.
         watch_dir: Directory watched for ``.py`` changes. Defaults to
@@ -449,7 +451,7 @@ def run_preview(
         watcher.start()
         print(f"[pn preview] watching {watched} for changes", file=sys.stderr)
 
-    from . import screen as screen_module
+    from .hosts import drain_desktop_scheduled_renders
 
     def _poll() -> None:
         for _ in range(128):
@@ -462,7 +464,7 @@ def run_preview(
             except Exception:
                 traceback.print_exc()
         try:
-            screen_module.drain_desktop_scheduled_renders()
+            drain_desktop_scheduled_renders()
         except Exception:
             traceback.print_exc()
         try:

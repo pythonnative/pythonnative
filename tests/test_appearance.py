@@ -5,11 +5,11 @@ from __future__ import annotations
 from typing import Any, Dict, Generator, List
 
 import pytest
-from fake_backend import FakeBackend
 
 from pythonnative import appearance
+from pythonnative.component import component
 from pythonnative.element import Element
-from pythonnative.hooks import Provider, component, use_color_scheme
+from pythonnative.hooks import use_color_scheme
 from pythonnative.reconciler import Reconciler
 from pythonnative.style import (
     DEFAULT_DARK_THEME,
@@ -18,6 +18,7 @@ from pythonnative.style import (
     default_theme,
     use_theme,
 )
+from pythonnative.testing import FakeBackend
 
 
 @pytest.fixture(autouse=True)
@@ -113,7 +114,7 @@ def test_use_color_scheme_re_renders_on_change() -> None:
         return Element("Text", {"text": "ok"}, [])
 
     rec = Reconciler(FakeBackend())
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     rec.mount(comp())
     before = len(seen)
 
@@ -148,7 +149,7 @@ def test_use_theme_follows_system_scheme() -> None:
         return Element("Text", {"text": "ok"}, [])
 
     rec = Reconciler(FakeBackend())
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     rec.mount(comp())
     assert seen[-1] is DEFAULT_LIGHT_THEME
 
@@ -168,10 +169,10 @@ def test_use_theme_provider_pins_explicit_theme() -> None:
 
     @component
     def app() -> Element:
-        return Provider(ThemeContext, custom, consumer())
+        return ThemeContext.Provider(custom, consumer())
 
     rec = Reconciler(FakeBackend())
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     rec.mount(app())
     assert seen[-1] is custom
 

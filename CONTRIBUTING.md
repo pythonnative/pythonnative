@@ -133,27 +133,30 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `alerts`: imperative Alert/Picker helpers (`alerts.py`)
   - `animated`: Animated namespace and animation primitives (`animated.py`)
   - `cli`: CLI tool and `pn` command (`src/pythonnative/cli/`)
-  - `components`: declarative element-creating functions (`components.py`)
+  - `component`: the `@component` decorator, `Component`, and `memo` (`component.py`)
+  - `components`: declarative element-creating functions (`components/`)
   - `element`: Element descriptor class (`element.py`)
   - `events`: tag-based event routing between native views and Python callbacks (`events.py`)
   - `gestures`: gesture descriptors and the pure-Python recognition arbiter (`gestures.py`)
-  - `hooks`: function components and hooks (`hooks.py`)
+  - `hooks`: hooks and contexts (`hooks.py`)
+  - `hosts`: screen hosts, native lifecycle bridge, and render scheduling (`hosts/`)
   - `hot_reload`: file watcher and module reloader (`hot_reload.py`)
   - `layout`: pure-Python flexbox engine (`layout.py`)
   - `mutations`: batched mutation ops between reconciler and native backends (`mutations.py`)
   - `native_modules`: native API modules for device capabilities (`native_modules/`)
   - `native_views`: platform-specific native view creation and updates (`native_views/`)
-  - `navigation`: navigation containers and stack/tab/drawer navigators (`navigation.py`)
+  - `navigation`: navigation state, container, navigators, hooks, and linking (`navigation/`)
   - `net`: awaitable HTTP client (`net.py`)
   - `package`: `src/pythonnative/__init__.py` exports and package boundary
   - `platform`: `Platform.OS`/`Platform.select` and version detection (`platform.py`)
   - `platform_metrics`: platform-reported metrics like safe-area insets and bar heights (`platform_metrics.py`)
-  - `reconciler`: virtual view tree diffing and reconciliation (`reconciler.py`)
+  - `reconciler`: virtual view tree diffing, boundaries, and the layout pass (`reconciler/`)
   - `runtime`: framework-wide asyncio loop and thread-safe future helpers (`runtime.py`)
-  - `screen`: screen host, native lifecycle bridge, and render scheduling (`screen.py`)
   - `sdk`: public extension SDK for custom native components (`sdk/`)
   - `storage`: AsyncStorage key/value persistence and `use_persisted_state` (`storage.py`)
+  - `scheduler`: render batching and transition queues (`scheduler.py`)
   - `style`: StyleSheet and theming (`style.py`)
+  - `testing`: public test utilities (`testing/`)
   - `utils`: shared utilities (`utils.py`)
 
 - Other scopes:
@@ -196,7 +199,7 @@ Breaking changes:
 - Use `!` after the type/scope or a `BREAKING CHANGE:` footer.
 
 ```text
-feat(screen)!: rename create_page to create_screen
+feat(hosts)!: rename create_page to create_screen
 
 BREAKING CHANGE: API renamed; update app code and templates.
 ```

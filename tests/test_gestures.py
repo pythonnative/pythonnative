@@ -308,19 +308,18 @@ def test_multiple_gestures_recognize_simultaneously() -> None:
 
 
 def test_gesture_events_route_through_view_tag() -> None:
-    from fake_backend import FakeBackend
-
     from pythonnative.element import Element
     from pythonnative.events import dispatch_event
     from pythonnative.reconciler import Reconciler
+    from pythonnative.testing import FakeBackend
 
     taps: List[GestureEvent] = []
     el = Element("View", {"gestures": [Tap(on_tap=taps.append)]}, [])
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     rec.mount(el)
-    tag = rec.root_tag()
+    tag = rec.root_tag
     assert tag is not None
 
     # The native payload received serialized specs (no closures).

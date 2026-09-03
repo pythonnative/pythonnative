@@ -35,7 +35,7 @@ Example:
 """
 
 import difflib
-from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union, get_args
 
 from . import diagnostics
 from .hooks import Context, create_context, use_color_scheme, use_context
@@ -105,6 +105,11 @@ class ShadowOffset(TypedDict):
 
     width: float
     height: float
+
+
+ShadowOffsetValue = Union[ShadowOffset, Tuple[float, float], List[float]]
+"""``shadow_offset`` / ``text_shadow_offset`` value: an
+[`ShadowOffset`][pythonnative.ShadowOffset] dict or an ``(x, y)`` pair."""
 
 
 # ----------------------------------------------------------------------
@@ -192,6 +197,7 @@ AlignItems = Literal[
     "flex_start",
     "center",
     "flex_end",
+    "baseline",
     "auto",
     "start",
     "leading",
@@ -203,9 +209,18 @@ AlignItems = Literal[
 ]
 AlignSelf = AlignItems
 Position = Literal["relative", "absolute"]
+Display = Literal["flex", "none"]
+"""``display`` style value. ``"none"`` removes the node and its subtree
+from layout entirely (no size, gap, or margin contribution; every frame
+in the subtree is ``(0, 0, 0, 0)``)."""
 Overflow = Literal["visible", "hidden", "scroll"]
 TextAlign = Literal["left", "center", "right", "justify", "start", "end"]
 TextDecoration = Literal["none", "underline", "line_through"]
+TextTransform = Literal["none", "uppercase", "lowercase", "capitalize"]
+"""``text_transform`` style value. Applied in Python before the string
+reaches the native label, so measurement and rendering agree."""
+MarginValue = Union[Dimension, Literal["auto"]]
+"""A margin length: points, a ``"%"`` string, or ``"auto"`` to absorb free space."""
 FontWeight = Literal[
     "normal",
     "bold",
@@ -294,6 +309,7 @@ class Style(TypedDict, total=False):
     align_self: AlignSelf
     align_content: AlignContent
     direction: LayoutDirection
+    display: Display
 
     # --- Layout: position ---
     position: Position
@@ -314,15 +330,15 @@ class Style(TypedDict, total=False):
     padding_end: Dimension
     padding_horizontal: Dimension
     padding_vertical: Dimension
-    margin: EdgeValue
-    margin_top: Dimension
-    margin_bottom: Dimension
-    margin_left: Dimension
-    margin_right: Dimension
-    margin_start: Dimension
-    margin_end: Dimension
-    margin_horizontal: Dimension
-    margin_vertical: Dimension
+    margin: Union[MarginValue, EdgeInsets]
+    margin_top: MarginValue
+    margin_bottom: MarginValue
+    margin_left: MarginValue
+    margin_right: MarginValue
+    margin_start: MarginValue
+    margin_end: MarginValue
+    margin_horizontal: MarginValue
+    margin_vertical: MarginValue
     spacing: float
     gap: float
     row_gap: float
@@ -362,13 +378,17 @@ class Style(TypedDict, total=False):
     italic: bool
     text_align: TextAlign
     text_decoration: TextDecoration
+    text_transform: TextTransform
     line_height: float
     letter_spacing: float
     max_lines: int
+    text_shadow_color: Color
+    text_shadow_offset: ShadowOffsetValue
+    text_shadow_radius: float
 
     # --- Visual: shadows / effects ---
     shadow_color: Color
-    shadow_offset: Union[ShadowOffset, Tuple[float, float], List[float]]
+    shadow_offset: ShadowOffsetValue
     shadow_opacity: float
     shadow_radius: float
     elevation: float
@@ -447,6 +467,49 @@ def resolve_style(value: StyleProp) -> Dict[str, Any]:
 _KNOWN_STYLE_KEYS = frozenset(Style.__annotations__)
 """Every key declared on the [`Style`][pythonnative.Style] TypedDict."""
 
+_STYLE_VALUE_CHOICES: Dict[str, frozenset] = {
+    "display": frozenset(get_args(Display)),
+    "position": frozenset(get_args(Position)),
+    "direction": frozenset(get_args(LayoutDirection)),
+    "text_decoration": frozenset(get_args(TextDecoration)),
+    "text_transform": frozenset(get_args(TextTransform)),
+    "pointer_events": frozenset(get_args(PointerEvents)),
+}
+"""Keys whose string values are checked against their ``Literal`` choices
+in dev mode. Only keys whose handlers accept exactly the declared
+literals are listed, so friendly aliases (``align_items: "leading"``,
+``font_weight: "semibold"``) never trigger false positives."""
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _text_shadow_offset_ok(value: Any) -> bool:
+    if isinstance(value, dict):
+        return all(_is_number(value.get(k, 0)) for k in ("width", "height"))
+    if isinstance(value, (tuple, list)) and len(value) == 2:
+        return all(_is_number(v) for v in value)
+    return False
+
+
+def _bad_value_message(key: str, value: Any) -> Optional[str]:
+    """Return a description of why ``value`` is invalid for ``key``, or ``None``."""
+    choices = _STYLE_VALUE_CHOICES.get(key)
+    if choices is not None:
+        if not isinstance(value, str) or value not in choices:
+            allowed = ", ".join(repr(c) for c in sorted(choices))
+            return f"Invalid value {value!r} for style key {key!r}; expected one of {allowed}."
+        return None
+    if key == "text_shadow_offset" and not _text_shadow_offset_ok(value):
+        return (
+            f"Invalid value {value!r} for style key 'text_shadow_offset'; "
+            "expected {'width': x, 'height': y} or an (x, y) pair."
+        )
+    if key == "text_shadow_radius" and (not _is_number(value) or value < 0):
+        return f"Invalid value {value!r} for style key 'text_shadow_radius'; expected a non-negative number."
+    return None
+
 
 def validate_style_keys(style_dict: Dict[str, Any], owner: str = "") -> None:
     """Warn (once per key) about style keys no built-in handler reads.
@@ -457,6 +520,13 @@ def validate_style_keys(style_dict: Dict[str, Any], owner: str = "") -> None:
     to handlers untouched, so custom components that read extra keys
     keep working (at the cost of one dev warning).
 
+    A small set of enum-shaped keys (``display``, ``position``,
+    ``direction``, ``text_decoration``, ``text_transform``,
+    ``pointer_events``) and the ``text_shadow_*`` keys also have their
+    values checked; a bad value warns once per key/value pair and is
+    otherwise passed through (the engine and handlers ignore values
+    they don't recognize).
+
     Args:
         style_dict: The flattened style dict about to be merged into an
             element's props.
@@ -465,8 +535,16 @@ def validate_style_keys(style_dict: Dict[str, Any], owner: str = "") -> None:
     """
     if not diagnostics.is_dev() or not style_dict:
         return
-    for key in style_dict:
+    for key, value in style_dict.items():
         if key in _KNOWN_STYLE_KEYS:
+            if value is None:
+                continue
+            problem = _bad_value_message(key, value)
+            if problem is not None:
+                diagnostics.warn_once(
+                    problem + (f" (on {owner})" if owner else ""),
+                    key=f"style-value:{owner}:{key}:{value!r}",
+                )
             continue
         matches = difflib.get_close_matches(str(key), _KNOWN_STYLE_KEYS, n=1)
         hint = f" Did you mean {matches[0]!r}?" if matches else ""
@@ -621,7 +699,7 @@ Without a provider, [`use_theme`][pythonnative.use_theme] resolves to
 [`DEFAULT_LIGHT_THEME`][pythonnative.style.DEFAULT_LIGHT_THEME] or
 [`DEFAULT_DARK_THEME`][pythonnative.style.DEFAULT_DARK_THEME] based on
 the current appearance. Wrap a subtree in
-[`Provider(ThemeContext, my_theme, ...)`][pythonnative.Provider] to
+[`ThemeContext.Provider(my_theme, ...)`][pythonnative.hooks.Context.Provider] to
 pin an explicit theme for that subtree, then read it inside
 descendants via [`use_theme`][pythonnative.use_theme] (or
 [`use_context(ThemeContext)`][pythonnative.use_context]).
@@ -676,23 +754,27 @@ __all__ = [
     "DEFAULT_DARK_THEME",
     "DEFAULT_LIGHT_THEME",
     "Dimension",
+    "Display",
     "EdgeInsets",
     "EdgeValue",
     "FlexDirection",
     "FontWeight",
     "JustifyContent",
     "KeyboardType",
+    "MarginValue",
     "Overflow",
     "PointerEvents",
     "Position",
     "ReturnKeyType",
     "ScaleType",
     "ShadowOffset",
+    "ShadowOffsetValue",
     "Style",
     "StyleProp",
     "StyleSheet",
     "TextAlign",
     "TextDecoration",
+    "TextTransform",
     "ThemeContext",
     "TransformEntry",
     "TransformRotate",

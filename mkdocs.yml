@@ -104,6 +104,7 @@ nav:
     - Collapsing Header & Bottom Sheet: examples/collapsing-header.md
   - API Reference:
     - Package: api/pythonnative.md
+    - Component: api/component.md
     - Components: api/components.md
     - Hooks: api/hooks.md
     - Animated: api/animated.md
@@ -117,11 +118,12 @@ nav:
     - Storage: api/storage.md
     - Platform: api/platform.md
     - Element: api/element.md
-    - Screen: api/screen.md
+    - Hosts: api/hosts.md
     - Reconciler: api/reconciler.md
     - Layout: api/layout.md
     - Style: api/style.md
     - Navigation: api/navigation.md
+    - Testing: api/testing.md
     - Native modules: api/native_modules.md
     - Native views: api/native_views.md
     - Mutation ops: api/mutations.md

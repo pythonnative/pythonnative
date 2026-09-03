@@ -92,7 +92,7 @@ This is intentional and the source of the suite's speed. When debugging a flow, 
 Gate conditions in `open_demo` deliberately use signals that work on **both** platforms. The two cross-platform asymmetries that matter here:
 
 - **Scroll preservation.** iOS preserves a ScrollView's offset across navigation; Android resets it to the top. A condition like `visible: "Back to home"` (button at the bottom of a category list) works on iOS after a return-from-demo but fails on Android because the list is back at the top. The helper gates on `"Demos in .*"` (top of the list, visible on both) and `notVisible: "Back to list"` (i.e. we left the demo screen) instead.
-- **Native-view recreation on Android.** The Android FragmentManager destroys and rebuilds a screen's view tree on pop-back; `pythonnative.screen._on_create` short-circuits the second call so hook state, `use_focus_effect` subscriptions, and `use_navigation` handles persist. If a future change to `screen.py` or `ScreenFragment.kt` breaks that idempotency, `flows/navigation/focus_effect.yaml` is the canary; it'll regress to `Focus count: 1` on pop-back.
+- **Native-view recreation on Android.** The Android FragmentManager destroys and rebuilds a screen's view tree on pop-back; `ScreenHost.on_create` (in `pythonnative.hosts`) short-circuits the second call so hook state, `use_focus_effect` subscriptions, and `use_navigation` handles persist. If a future change to `hosts/base.py` or `ScreenFragment.kt` breaks that idempotency, `flows/navigation/focus_effect.yaml` is the canary; it'll regress to `Focus count: 1` on pop-back.
 
 ### Scrolling fixed-height containers (ScrollView / FlatList)
 

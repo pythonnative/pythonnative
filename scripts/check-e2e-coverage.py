@@ -67,6 +67,11 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "ReturnKeyType",
     "ScaleType",
     "ScreenOptions",
+    "Navigation",  # handle type returned by use_navigation; exercised by every screen
+    "NavigationState",  # pure state value; unit-tested in tests/test_navigation.py
+    "Route",  # pure state value; observed via use_route in the params_passing demo
+    "Component",  # object returned by @pn.component; every screen is one
+    "Context",  # object returned by create_context; covered by use_context demo
     "ShadowOffset",
     "Style",
     "StyleProp",
@@ -93,9 +98,13 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "create_stack_navigator",  # used by main.py; every flow pushes screens
     "create_screen",  # platform bridge invoked by the native templates
     "use_navigation",  # used by every screen for go_back
+    "use_is_focused",  # underlies use_focus_effect; covered by the focus_effect demo
+    "use_subscription",  # underlies use_color_scheme / use_window_dimensions demos
     "use_animated_value",  # used in every animation demo
-    "Provider",  # covered by use_context demo
-    "create_context",  # covered by use_context demo
+    "create_context",  # covered by use_context demo (Context.Provider)
+    # Deep linking needs the OS to deliver a URL to the app; the URL <->
+    # state mapping is unit-tested in tests/test_navigation.py.
+    "LinkingConfig",
     "style",  # the style helper itself is exercised by every styled demo
     "resolve_style",  # internal helper exposed for SDK authors
     # --------------------------------------------------------------

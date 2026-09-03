@@ -1,7 +1,7 @@
 # Tests SafeAreaView renders its child without crashing.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/safe_area_view.py
-# Source under test: src/pythonnative/components.py :: SafeAreaView
+# Source under test: src/pythonnative/components/layout.py :: SafeAreaView
 appId: ${APP_ID}
 ---
 - runFlow:

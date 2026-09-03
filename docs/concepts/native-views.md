@@ -172,21 +172,17 @@ recreating views.
 
 Production handlers require Chaquopy (Android) or rubicon-objc (iOS),
 neither of which is available on a developer laptop. The test suite
-sidesteps this with `tests/fake_backend.py`, a shared in-memory
-backend implementing the same mutation protocol while keeping a real
-tree of `FakeView` objects:
+sidesteps this with [`FakeBackend`][pythonnative.testing.FakeBackend],
+an in-memory backend implementing the same mutation protocol while
+keeping a real tree of [`FakeView`][pythonnative.testing.FakeView]
+objects. [`render`][pythonnative.testing.render] wires it up:
 
 ```python
-from fake_backend import FakeBackend
-from pythonnative.reconciler import Reconciler
+from pythonnative.testing import render
 
-backend = FakeBackend()
-rec = Reconciler(backend)
-rec.mount(MyComponent())
-
-root = backend.views[rec.root_tag()]
-assert root.find_first("Text").props["text"] == "Hello"
-assert backend.ops_of("create")  # every applied op is recorded
+result = render(MyComponent())
+assert result.get_by_text("Hello")
+assert result.backend.ops_of("create")  # every applied op is recorded
 ```
 
 Unlike the production registry, the fake **raises** on malformed

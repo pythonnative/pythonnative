@@ -31,7 +31,7 @@ def SettingsScreen() -> pn.Element:
         pn.run_async(_run())
 
     def _view_showcase() -> None:
-        nav.navigate("Showcase", {"message": "Visual showcase"})
+        nav.navigate("Showcase", message="Visual showcase")
 
     return pn.ScrollView(
         pn.Column(

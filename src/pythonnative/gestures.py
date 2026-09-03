@@ -107,7 +107,7 @@ class GestureState:
 
 GestureStateName = Literal["began", "changed", "ended", "cancelled"]
 
-GestureCallback = Callable[["GestureEvent"], None]
+GestureCallback = Callable[["GestureEvent"], Any]
 
 SwipeDirection = Literal["any", "left", "right", "up", "down"]
 

@@ -1,7 +1,7 @@
 # Tests Spacer renders and labels remain visible around it.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/spacer.py
-# Source under test: src/pythonnative/components.py :: Spacer
+# Source under test: src/pythonnative/components/layout.py :: Spacer
 appId: ${APP_ID}
 ---
 - runFlow:

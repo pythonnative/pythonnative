@@ -81,8 +81,7 @@ def Header():
 
 @pn.component
 def App():
-    return pn.Provider(
-        ThemeContext,
+    return ThemeContext.Provider(
         {"primary": "#222", "bg": "#fafafa"},
         pn.Column(Header(), style={"padding": 16}),
     )

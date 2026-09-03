@@ -1,7 +1,7 @@
 # Tests Fragment merges its children into the parent.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/fragment.py
-# Source under test: src/pythonnative/components.py :: Fragment
+# Source under test: src/pythonnative/components/structural.py :: Fragment
 appId: ${APP_ID}
 ---
 - runFlow:

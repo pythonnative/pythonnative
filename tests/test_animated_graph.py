@@ -8,7 +8,6 @@ import time
 from typing import Any, List
 
 import pytest
-from fake_backend import FakeBackend
 
 from pythonnative.animated import (
     Animated,
@@ -18,6 +17,7 @@ from pythonnative.animated import (
 )
 from pythonnative.gestures import GestureEvent
 from pythonnative.native_views import set_registry
+from pythonnative.testing import FakeBackend
 
 # ======================================================================
 # interpolate: numbers

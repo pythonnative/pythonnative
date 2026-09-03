@@ -82,7 +82,7 @@ def HomeScreen() -> pn.Element:
 
     def view_showcase() -> None:
         print("[HomeScreen] navigating to Showcase")
-        nav.navigate("Showcase", {"message": "Greetings from Home"})
+        nav.navigate("Showcase", message="Greetings from Home")
 
     return pn.ScrollView(
         pn.Column(

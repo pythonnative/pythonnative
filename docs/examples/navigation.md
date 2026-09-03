@@ -27,7 +27,7 @@ def HomeScreen():
         pn.Text("Home", style={"font_size": 28, "bold": True}),
         pn.Button(
             "View profile",
-            on_press=lambda: nav.navigate("Profile", {"user_id": 42}),
+            on_press=lambda: nav.navigate("Profile", user_id=42),
         ),
         style={"spacing": 12, "padding": 16},
     )
@@ -38,7 +38,7 @@ def ProfileScreen():
     route = pn.use_route()
     nav = pn.use_navigation()
     return pn.Column(
-        pn.Text(f"User #{route['user_id']}", style={"font_size": 24}),
+        pn.Text(f"User #{route.params['user_id']}", style={"font_size": 24}),
         pn.Button("Back", on_press=nav.go_back),
         style={"spacing": 12, "padding": 16},
     )
@@ -48,15 +48,16 @@ def ProfileScreen():
 def App():
     return pn.NavigationContainer(
         Stack.Navigator(
-            Stack.Screen(name="Home", component=HomeScreen),
-            Stack.Screen(name="Profile", component=ProfileScreen),
+            Stack.Screen("Home", HomeScreen, title="Home"),
+            Stack.Screen("Profile", ProfileScreen, title="Profile"),
         )
     )
 ```
 
-`nav.navigate("Profile", {...})` pushes onto the stack;
-`nav.go_back()` pops one frame. To replace the entire stack (e.g.,
-after login), use `nav.reset(...)`.
+`nav.navigate("Profile", user_id=42)` pushes onto the stack (or
+returns to an existing `Profile` entry); `nav.push(...)` always adds a
+new one; `nav.go_back()` pops one frame. To replace the entire stack
+(e.g., after login), use `nav.reset("Home")`.
 
 ## Tab navigator
 

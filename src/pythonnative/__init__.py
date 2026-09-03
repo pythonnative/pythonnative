@@ -65,6 +65,7 @@ __version__ = "0.33.0"
 from . import appearance, diagnostics, gestures, images, runtime, sdk
 from .alerts import Alert
 from .animated import Animated, AnimatedValue, use_animated_value
+from .component import Component, component, memo
 from .components import (
     ActivityIndicator,
     Button,
@@ -103,15 +104,12 @@ from .components import (
 from .diagnostics import HookOrderError
 from .element import Element
 from .hooks import (
+    Context,
     MutationCall,
     MutationState,
-    Provider,
     QueryResult,
     Ref,
-    batch_updates,
-    component,
     create_context,
-    memo,
     use_back_handler,
     use_callback,
     use_color_scheme,
@@ -123,16 +121,17 @@ from .hooks import (
     use_layout_effect,
     use_memo,
     use_mutation,
-    use_navigation,
     use_query,
     use_reducer,
     use_ref,
     use_resource,
     use_safe_area_insets,
     use_state,
+    use_subscription,
     use_transition,
     use_window_dimensions,
 )
+from .hosts import create_screen
 from .native_modules import (
     AppState,
     Battery,
@@ -153,18 +152,24 @@ from .native_modules import (
     use_net_info,
 )
 from .navigation import (
+    LinkingConfig,
+    Navigation,
     NavigationContainer,
+    NavigationState,
+    Route,
     ScreenOptions,
     create_drawer_navigator,
     create_stack_navigator,
     create_tab_navigator,
     use_focus_effect,
+    use_is_focused,
+    use_navigation,
     use_route,
 )
 from .net import HTTPError, Response, fetch
 from .platform import Platform
 from .runtime import run_async, run_blocking
-from .screen import create_screen
+from .scheduler import batch_updates
 from .sdk import (
     Props,
     ViewHandler,
@@ -245,51 +250,58 @@ __all__ = [
     "View",
     "WebView",
     # Core
+    "Component",
     "Element",
-    "create_screen",
-    # Hooks
-    "batch_updates",
     "component",
-    "create_context",
+    "create_screen",
     "memo",
+    # Hooks
+    "Context",
     "MutationCall",
     "MutationState",
     "QueryResult",
     "Ref",
+    "batch_updates",
+    "create_context",
     "use_back_handler",
     "use_callback",
     "use_color_scheme",
     "use_context",
     "use_deferred_value",
     "use_effect",
-    "use_focus_effect",
     "use_imperative_handle",
     "use_keyboard_height",
     "use_layout_effect",
     "use_memo",
     "use_mutation",
-    "use_navigation",
     "use_persisted_state",
     "use_query",
     "use_reducer",
     "use_ref",
     "use_resource",
-    "use_route",
     "use_safe_area_insets",
     "use_state",
+    "use_subscription",
     "use_transition",
     "use_window_dimensions",
-    "Provider",
     # Suspense and async rendering
     "Resource",
     "lazy",
     "start_resource",
     # Navigation
+    "LinkingConfig",
+    "Navigation",
     "NavigationContainer",
+    "NavigationState",
+    "Route",
     "ScreenOptions",
     "create_drawer_navigator",
     "create_stack_navigator",
     "create_tab_navigator",
+    "use_focus_effect",
+    "use_is_focused",
+    "use_navigation",
+    "use_route",
     # Styling - typed primitives
     "AccessibilityState",
     "AlignContent",

@@ -1,7 +1,10 @@
 package com.pythonnative.android_template
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.ConnectivityManager
@@ -20,6 +23,7 @@ class MainActivity : AppCompatActivity() {
     private val TAG = javaClass.simpleName
     private var pythonReady = false
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var batteryReceiver: BroadcastReceiver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,7 +46,7 @@ class MainActivity : AppCompatActivity() {
             }
             // Import the entry module now so a broken app fails here,
             // with a full traceback, instead of inside the first fragment.
-            py.getModule("app.main")
+            py.getModule(getString(R.string.pn_entry_module))
             pythonReady = true
         } catch (e: Exception) {
             Log.e("PythonNative", "Bootstrap failed", e)
@@ -54,10 +58,19 @@ class MainActivity : AppCompatActivity() {
         intent?.dataString?.let { dispatchUrl(it) }
 
         registerNetworkCallback()
+        registerBatteryReceiver()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        batteryReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                Log.e("PythonNative", "unregisterReceiver(battery) failed", e)
+            }
+            batteryReceiver = null
+        }
         networkCallback?.let {
             try {
                 (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
@@ -66,6 +79,35 @@ class MainActivity : AppCompatActivity() {
                 Log.e("PythonNative", "unregisterNetworkCallback failed", e)
             }
             networkCallback = null
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (!pythonReady) return
+        try {
+            Python.getInstance()
+                .getModule("pythonnative.native_modules")
+                .callAttr("dispatch_activity_result", requestCode, resultCode, data)
+        } catch (e: Exception) {
+            Log.e("PythonNative", "dispatch_activity_result failed", e)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (!pythonReady) return
+        try {
+            Python.getInstance()
+                .getModule("pythonnative.native_modules")
+                .callAttr("dispatch_permissions_result", requestCode, permissions.toList(), grantResults.toList())
+        } catch (e: Exception) {
+            Log.e("PythonNative", "dispatch_permissions_result failed", e)
         }
     }
 
@@ -140,6 +182,48 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Log.e("PythonNative", "dispatch_android_change failed", e)
             }
+        }
+    }
+
+    // MARK: - Battery forwarding
+
+    // ACTION_BATTERY_CHANGED is a sticky broadcast, so registering also
+    // delivers the current level immediately.
+    private fun registerBatteryReceiver() {
+        if (!pythonReady || batteryReceiver != null) return
+        try {
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    if (intent == null) return
+                    val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                    val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                    val fraction = if (level >= 0 && scale > 0) level.toDouble() / scale.toDouble() else -1.0
+                    val state = when (status) {
+                        BatteryManager.BATTERY_STATUS_CHARGING -> "charging"
+                        BatteryManager.BATTERY_STATUS_FULL -> "full"
+                        BatteryManager.BATTERY_STATUS_DISCHARGING,
+                        BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "unplugged"
+                        else -> "unknown"
+                    }
+                    dispatchBattery(fraction, state)
+                }
+            }
+            registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            batteryReceiver = receiver
+        } catch (e: Exception) {
+            Log.e("PythonNative", "registerReceiver(battery) failed", e)
+        }
+    }
+
+    private fun dispatchBattery(level: Double, state: String) {
+        if (!pythonReady) return
+        try {
+            Python.getInstance()
+                .getModule("pythonnative.native_modules.battery")
+                .callAttr("dispatch_battery", level, state)
+        } catch (e: Exception) {
+            Log.e("PythonNative", "dispatch_battery failed", e)
         }
     }
 

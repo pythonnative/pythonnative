@@ -1,14 +1,14 @@
 """Unit tests for the reconciler using a mock native backend."""
 
-from typing import Any
+from typing import Any, Optional
 
 import pytest
-from fake_backend import FakeBackend as MockBackend
-from fake_backend import FakeView as MockView
 
-from pythonnative.element import Element
-from pythonnative.hooks import component
+from pythonnative.component import component
+from pythonnative.element import ERROR_BOUNDARY, Element
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend as MockBackend
+from pythonnative.testing import FakeView as MockView
 
 # ======================================================================
 # Tests: mount
@@ -181,7 +181,7 @@ def test_reconcile_callback_swap_costs_no_native_traffic() -> None:
     calls: list = []
     el1 = Element("Button", {"title": "x", "on_press": lambda: calls.append("first")}, [])
     rec.mount(el1)
-    tag = rec.root_tag()
+    tag = rec.root_tag
     assert tag is not None
 
     backend.ops.clear()
@@ -202,7 +202,7 @@ def test_callback_routed_through_event_registry_on_mount() -> None:
     rec = Reconciler(backend)
     calls: list = []
     root = rec.mount(Element("Button", {"title": "x", "on_press": lambda: calls.append(1)}, []))
-    tag = rec.root_tag()
+    tag = rec.root_tag
 
     # The callable never reaches the backend; only the event-name set does.
     assert "on_press" not in root.props
@@ -217,7 +217,7 @@ def test_event_registry_cleared_on_destroy() -> None:
     backend = MockBackend()
     rec = Reconciler(backend)
     rec.mount(Element("Button", {"title": "x", "on_press": lambda: None}, []))
-    tag = rec.root_tag()
+    tag = rec.root_tag
     assert get_event_registry().has(tag, "on_press")
 
     rec.reconcile(Element("Text", {"text": "replaced"}, []))
@@ -259,8 +259,8 @@ def test_multiple_reconcile_cycles() -> None:
     for i in range(1, 5):
         rec.reconcile(Element("Column", {}, [Element("Text", {"text": str(i)}, [])]))
 
-    assert rec._tree is not None
-    assert rec._tree.children[0].element.props["text"] == "4"
+    assert rec.root is not None
+    assert rec.root.children[0].element.props["text"] == "4"
 
 
 # ======================================================================
@@ -282,9 +282,9 @@ def test_keyed_children_preserve_identity() -> None:
         ],
     )
     root = rec.mount(el1)
-    view_a = rec._tree.children[0].native_view
-    view_b = rec._tree.children[1].native_view
-    view_c = rec._tree.children[2].native_view
+    view_a = rec.root.children[0].native_view
+    view_b = rec.root.children[1].native_view
+    view_c = rec.root.children[2].native_view
 
     backend.ops.clear()
     el2 = Element(
@@ -298,9 +298,9 @@ def test_keyed_children_preserve_identity() -> None:
     )
     rec.reconcile(el2)
 
-    assert rec._tree.children[0].native_view is view_c
-    assert rec._tree.children[1].native_view is view_a
-    assert rec._tree.children[2].native_view is view_b
+    assert rec.root.children[0].native_view is view_c
+    assert rec.root.children[1].native_view is view_a
+    assert rec.root.children[2].native_view is view_b
 
     # Native children must also reflect the new order
     assert root.children[0] is view_c
@@ -333,9 +333,9 @@ def test_keyed_children_remove_by_key() -> None:
     )
     rec.reconcile(el2)
 
-    assert len(rec._tree.children) == 2
-    assert rec._tree.children[0].element.key == "a"
-    assert rec._tree.children[1].element.key == "c"
+    assert len(rec.root.children) == 2
+    assert rec.root.children[0].element.key == "a"
+    assert rec.root.children[1].element.key == "c"
 
 
 def test_keyed_children_insert_new() -> None:
@@ -363,8 +363,8 @@ def test_keyed_children_insert_new() -> None:
     )
     rec.reconcile(el2)
 
-    assert len(rec._tree.children) == 3
-    assert rec._tree.children[1].element.key == "b"
+    assert len(rec.root.children) == 3
+    assert rec.root.children[1].element.key == "b"
 
 
 # ======================================================================
@@ -380,8 +380,8 @@ def test_error_boundary_catches_mount_error() -> None:
         raise ValueError("boom")
 
     fallback = Element("Text", {"text": "error caught"}, [])
-    child = Element(bad_component, {}, [])
-    eb = Element("__ErrorBoundary__", {"__fallback__": fallback}, [child])
+    child = component(bad_component)()
+    eb = Element(ERROR_BOUNDARY, {"fallback": fallback}, [child])
 
     root = rec.mount(eb)
     assert root.type_name == "Text"
@@ -398,8 +398,8 @@ def test_error_boundary_callable_fallback() -> None:
     def fallback_fn(exc: Exception) -> Element:
         return Element("Text", {"text": f"caught: {exc}"}, [])
 
-    child = Element(bad_component, {}, [])
-    eb = Element("__ErrorBoundary__", {"__fallback__": fallback_fn}, [child])
+    child = component(bad_component)()
+    eb = Element(ERROR_BOUNDARY, {"fallback": fallback_fn}, [child])
 
     root = rec.mount(eb)
     assert root.type_name == "Text"
@@ -412,7 +412,7 @@ def test_error_boundary_no_error_renders_child() -> None:
 
     child = Element("Text", {"text": "ok"}, [])
     fallback = Element("Text", {"text": "error"}, [])
-    eb = Element("__ErrorBoundary__", {"__fallback__": fallback}, [child])
+    eb = Element(ERROR_BOUNDARY, {"fallback": fallback}, [child])
 
     root = rec.mount(eb)
     assert root.type_name == "Text"
@@ -435,11 +435,11 @@ def test_error_boundary_catches_reconcile_error() -> None:
     def fallback_fn(exc: Exception) -> Element:
         return Element("Text", {"text": f"recovered: {exc}"}, [])
 
-    eb1 = Element("__ErrorBoundary__", {"__fallback__": fallback_fn}, [flaky()])
+    eb1 = Element(ERROR_BOUNDARY, {"fallback": fallback_fn}, [flaky()])
     root = rec.mount(eb1)
     assert root.props["text"] == "ok"
 
-    eb2 = Element("__ErrorBoundary__", {"__fallback__": fallback_fn}, [flaky()])
+    eb2 = Element(ERROR_BOUNDARY, {"fallback": fallback_fn}, [flaky()])
     root = rec.reconcile(eb2)
     assert "recovered" in root.props["text"]
 
@@ -451,8 +451,8 @@ def test_error_boundary_without_fallback_propagates() -> None:
     def bad(**props: Any) -> Element:
         raise ValueError("no fallback")
 
-    child = Element(bad, {}, [])
-    eb = Element("__ErrorBoundary__", {}, [child])
+    child = component(bad)()
+    eb = Element(ERROR_BOUNDARY, {}, [child])
 
     with pytest.raises(ValueError, match="no fallback"):
         rec.mount(eb)
@@ -524,9 +524,9 @@ def test_effect_cleanup_runs_on_rerun() -> None:
 def test_provider_child_native_view_swap() -> None:
     """When a Provider wraps different component types across renders,
     the parent native container must swap the old native subview for the new one."""
-    from pythonnative.hooks import Provider, create_context
+    from pythonnative.hooks import Context, create_context
 
-    ctx = create_context(None)
+    ctx: Context[Optional[str]] = create_context(None)
 
     @component
     def CompA() -> Element:
@@ -539,13 +539,13 @@ def test_provider_child_native_view_swap() -> None:
     backend = MockBackend()
     rec = Reconciler(backend)
 
-    tree1 = Element("View", {}, [Provider(ctx, "v1", CompA())])
+    tree1 = Element("View", {}, [ctx.Provider("v1", CompA())])
     root = rec.mount(tree1)
     assert len(root.children) == 1
     assert root.children[0].props["text"] == "A"
     old_child_id = root.children[0].id
 
-    tree2 = Element("View", {}, [Provider(ctx, "v2", CompB())])
+    tree2 = Element("View", {}, [ctx.Provider("v2", CompB())])
     rec.reconcile(tree2)
     assert len(root.children) == 1
     assert root.children[0].props["text"] == "B"

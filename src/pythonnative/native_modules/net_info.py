@@ -151,7 +151,11 @@ def use_net_info() -> NetInfoState:
 
     def _subscribe() -> Callable[[], None]:
         set_state(NetInfo.fetch())
-        return NetInfo.add_listener(set_state)
+
+        def on_change(snapshot: NetInfoState) -> None:
+            set_state(snapshot)
+
+        return NetInfo.add_listener(on_change)
 
     use_effect(_subscribe, [])
     return state

@@ -433,7 +433,7 @@ class ModuleReloader:
         """Force a screen re-render after a module reload.
 
         Args:
-            screen_instance: A `_ScreenHost` instance (or duck-typed
+            screen_instance: A `ScreenHost` instance (or duck-typed
                 equivalent) that exposes a `_reconciler` attribute.
             module_names: Optional modules that changed. Reload-aware
                 screen hosts use this to refresh imports before re-render.
@@ -442,21 +442,17 @@ class ModuleReloader:
         if callable(reload_fn):
             reload_fn(list(module_names or []))
             return
-
-        from .screen import _request_render
-
-        if hasattr(screen_instance, "_reconciler") and screen_instance._reconciler is not None:
-            _request_render(screen_instance)
+        request = getattr(screen_instance, "request_render", None)
+        if callable(request):
+            request()
 
     @staticmethod
     def find_replacement_function(old_fn: Any) -> Optional[Any]:
         """Locate a function's post-reload counterpart by qualname.
 
-        Functions decorated with [`component`][pythonnative.component]
-        store the user's original function on the wrapper's
-        ``__wrapped__`` attribute and forward ``__module__`` /
-        ``__qualname__`` so that the reconciler's stored
-        ``element.type`` (the unwrapped function) still has the
+        [`Component`][pythonnative.Component] objects forward
+        ``__module__`` / ``__qualname__`` from the render function they
+        wrap, so the reconciler's stored ``element.type`` carries the
         information needed to re-resolve after a module reload.
 
         Args:
@@ -486,9 +482,6 @@ class ModuleReloader:
             if obj is None:
                 return None
 
-        if getattr(obj, "_pn_component", False):
-            obj = getattr(obj, "__wrapped__", obj)
-
         if obj is old_fn:
             return None
         return obj
@@ -505,8 +498,7 @@ class ModuleReloader:
         for its successor.
 
         Args:
-            reconciler: The reconciler whose
-                ``_tree`` should be inspected.
+            reconciler: The reconciler whose mounted ``root`` should be inspected.
             reloaded_modules: Set of module names that were just
                 reloaded (only callables from these modules are
                 considered).
@@ -516,7 +508,7 @@ class ModuleReloader:
             [`swap_components_in_tree`][pythonnative.hot_reload.ModuleReloader.swap_components_in_tree].
         """
         modules: Set[str] = {m for m in reloaded_modules if m}
-        if not modules or reconciler is None or getattr(reconciler, "_tree", None) is None:
+        if not modules or reconciler is None or getattr(reconciler, "root", None) is None:
             return {}
 
         seen: Set[int] = set()
@@ -538,7 +530,7 @@ class ModuleReloader:
             for child in getattr(vnode, "children", []) or []:
                 visit(child)
 
-        visit(reconciler._tree)
+        visit(reconciler.root)
         return mapping
 
     @staticmethod
@@ -547,14 +539,14 @@ class ModuleReloader:
 
         Mutates ``vnode.element.type`` directly so the NEXT diff sees
         identical types and reuses VNodes (preserving hook state).
-        Pending ``Element`` trees stored on ``vnode._rendered`` are
-        rewritten too because the reconciler reads from them when
-        comparing keys across renders.
+        The element lists stored on ``vnode.rendered`` are rewritten
+        too because the reconciler reads from them when comparing keys
+        across renders.
 
         Returns:
             The number of element type references that were rewritten.
         """
-        if not replacement_map or reconciler is None or getattr(reconciler, "_tree", None) is None:
+        if not replacement_map or reconciler is None or getattr(reconciler, "root", None) is None:
             return 0
 
         rewrites = 0
@@ -575,7 +567,7 @@ class ModuleReloader:
                 return
             if getattr(vnode, "element", None) is not None:
                 rewrite_element_tree(vnode.element)
-            rendered = getattr(vnode, "_rendered", None)
+            rendered = getattr(vnode, "rendered", None)
             if isinstance(rendered, (list, tuple)):
                 for rendered_el in rendered:
                     rewrite_element_tree(rendered_el)
@@ -584,7 +576,7 @@ class ModuleReloader:
             for child in getattr(vnode, "children", []) or []:
                 visit(child)
 
-        visit(reconciler._tree)
+        visit(reconciler.root)
         return rewrites
 
     @staticmethod
