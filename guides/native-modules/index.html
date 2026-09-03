@@ -539,6 +539,8 @@
       
         
       
+        
+      
     
     
     
@@ -797,6 +799,34 @@
     
   
     Native Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Native Bridge
   
 
     
@@ -1426,6 +1456,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Writing your own native module">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#native-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native side
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python facade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#desktop-and-test-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Desktop and test implementation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2001,6 +2070,8 @@
   
     
     
+      
+        
       
         
       
@@ -2764,6 +2835,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/mutations/" class="md-nav__link">
         
   
@@ -3429,6 +3528,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Writing your own native module">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#native-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native side
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python facade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#desktop-and-test-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Desktop and test implementation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3479,12 +3617,13 @@
 <p>Native modules are PythonNative's wrappers around device APIs that
 aren't part of the view tree: the camera, GPS, file I/O, clipboard,
 share sheet, deep links, permissions, connectivity, secure storage,
-battery, haptics, and biometrics. Each module is implemented twice
-(once per platform) and dispatches at runtime based on
-<code>utils.IS_ANDROID</code> / <code>utils.IS_IOS</code>, so app code stays single-source.
-Off-device (desktop), each module falls back to a safe default
-(in-memory buffers, <code>"unknown"</code> states, no-op feedback) so the same
-code runs in the desktop mock and in unit tests.</p>
+battery, haptics, and biometrics. Each module is a Swift class in
+<code>PythonNativeKit</code> and a Kotlin class in the <code>pythonnative</code> Gradle
+module, registered by name; the Python class you call is a thin facade
+that routes through the <a href="../../concepts/bridge/">native bridge</a>. Off
+device (<code>pn preview</code>, <code>pytest</code>), the same facade resolves to a Python
+implementation with safe defaults (in-memory buffers, <code>"unknown"</code>
+states, no-op feedback), so app code stays single-source.</p>
 <p>Both synchronous and coroutine APIs exist, chosen to match the
 underlying platform call:</p>
 <ul>
@@ -3736,50 +3875,138 @@ Touch ID / fingerprint.</p>
 </span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>        <span class="n">show_secrets</span><span class="p">()</span>
 </span></code></pre></div>
 <h2 id="writing-your-own-native-module">Writing your own native module<a class="headerlink" href="#writing-your-own-native-module" title="Permanent link">&para;</a></h2>
-<p>A native module is just a class with two implementations behind a
-runtime dispatch. The built-in modules above all follow this shape.
-Coroutine wrappers should bridge native delegates through the
-<a href="../../api/runtime/"><code>pn.runtime</code></a> helpers:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>
-</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_future</span>
-</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">IS_ANDROID</span><span class="p">,</span> <span class="n">IS_IOS</span>
-</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>
-</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>
-</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="k">class</span><span class="w"> </span><span class="nc">Compass</span><span class="p">:</span>
-</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>    <span class="nd">@staticmethod</span>
-</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">heading</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-</span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>        <span class="n">loop</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_running_loop</span><span class="p">()</span>
-</span><span id="__span-20-11"><a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a>        <span class="n">future</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Future</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">loop</span><span class="o">.</span><span class="n">create_future</span><span class="p">()</span>
-</span><span id="__span-20-12"><a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a>
-</span><span id="__span-20-13"><a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a>        <span class="k">if</span> <span class="n">IS_ANDROID</span><span class="p">:</span>
-</span><span id="__span-20-14"><a id="__codelineno-20-14" name="__codelineno-20-14" href="#__codelineno-20-14"></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">java</span><span class="w"> </span><span class="kn">import</span> <span class="n">jclass</span>  <span class="c1"># noqa: F401</span>
-</span><span id="__span-20-15"><a id="__codelineno-20-15" name="__codelineno-20-15" href="#__codelineno-20-15"></a>
-</span><span id="__span-20-16"><a id="__codelineno-20-16" name="__codelineno-20-16" href="#__codelineno-20-16"></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_android_context</span>
-</span><span id="__span-20-17"><a id="__codelineno-20-17" name="__codelineno-20-17" href="#__codelineno-20-17"></a>
-</span><span id="__span-20-18"><a id="__codelineno-20-18" name="__codelineno-20-18" href="#__codelineno-20-18"></a>            <span class="n">ctx</span> <span class="o">=</span> <span class="n">get_android_context</span><span class="p">()</span>
-</span><span id="__span-20-19"><a id="__codelineno-20-19" name="__codelineno-20-19" href="#__codelineno-20-19"></a>            <span class="c1"># ... subscribe to the SensorManager and resolve_future(future, deg)</span>
-</span><span id="__span-20-20"><a id="__codelineno-20-20" name="__codelineno-20-20" href="#__codelineno-20-20"></a>            <span class="n">resolve_future</span><span class="p">(</span><span class="n">future</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
-</span><span id="__span-20-21"><a id="__codelineno-20-21" name="__codelineno-20-21" href="#__codelineno-20-21"></a>        <span class="k">elif</span> <span class="n">IS_IOS</span><span class="p">:</span>
-</span><span id="__span-20-22"><a id="__codelineno-20-22" name="__codelineno-20-22" href="#__codelineno-20-22"></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">rubicon.objc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ObjCClass</span>  <span class="c1"># noqa: F401</span>
-</span><span id="__span-20-23"><a id="__codelineno-20-23" name="__codelineno-20-23" href="#__codelineno-20-23"></a>
-</span><span id="__span-20-24"><a id="__codelineno-20-24" name="__codelineno-20-24" href="#__codelineno-20-24"></a>            <span class="c1"># ... start CLLocationManager heading updates, resolve on the first fix</span>
-</span><span id="__span-20-25"><a id="__codelineno-20-25" name="__codelineno-20-25" href="#__codelineno-20-25"></a>            <span class="n">resolve_future</span><span class="p">(</span><span class="n">future</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
-</span><span id="__span-20-26"><a id="__codelineno-20-26" name="__codelineno-20-26" href="#__codelineno-20-26"></a>        <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-20-27"><a id="__codelineno-20-27" name="__codelineno-20-27" href="#__codelineno-20-27"></a>            <span class="n">resolve_future</span><span class="p">(</span><span class="n">future</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>  <span class="c1"># desktop fallback</span>
-</span><span id="__span-20-28"><a id="__codelineno-20-28" name="__codelineno-20-28" href="#__codelineno-20-28"></a>
-</span><span id="__span-20-29"><a id="__codelineno-20-29" name="__codelineno-20-29" href="#__codelineno-20-29"></a>        <span class="k">return</span> <span class="k">await</span> <span class="n">future</span>
+<p>A native module has three parts: a Swift class, a Kotlin class, and a
+Python facade. The two native classes are registered under one name by
+a plugin entry (the same <code>pn_plugin.json</code> layout used for
+<a href="../custom-native-components/">custom components</a>); the facade calls
+them by that name and never imports platform code.</p>
+<h3 id="native-side">Native side<a class="headerlink" href="#native-side" title="Permanent link">&para;</a></h3>
+<p>Each platform's base type is one method that settles a promise:</p>
+<div class="language-swift highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1">// native/ios/CompassModule.swift</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="kd">import</span><span class="w"> </span><span class="nc">CoreLocation</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="kd">import</span><span class="w"> </span><span class="nc">PythonNativeKit</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="kd">public</span><span class="w"> </span><span class="kr">final</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">CompassModule</span><span class="p">:</span><span class="w"> </span><span class="bp">NSObject</span><span class="p">,</span><span class="w"> </span><span class="n">PNNativeModule</span><span class="p">,</span><span class="w"> </span><span class="bp">CLLocationManagerDelegate</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nv">name</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">"Compass"</span>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nv">manager</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="bp">CLLocationManager</span><span class="p">()</span>
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">pending</span><span class="p">:</span><span class="w"> </span><span class="n">PNPromise</span><span class="p">?</span>
+</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>
+</span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kr">override</span><span class="w"> </span><span class="kr">required</span><span class="w"> </span><span class="kd">init</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-20-11"><a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a><span class="w">        </span><span class="kc">super</span><span class="p">.</span><span class="kd">init</span><span class="p">()</span>
+</span><span id="__span-20-12"><a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a><span class="w">        </span><span class="n">manager</span><span class="p">.</span><span class="n">delegate</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">self</span>
+</span><span id="__span-20-13"><a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-20-14"><a id="__codelineno-20-14" name="__codelineno-20-14" href="#__codelineno-20-14"></a>
+</span><span id="__span-20-15"><a id="__codelineno-20-15" name="__codelineno-20-15" href="#__codelineno-20-15"></a><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kd">func</span><span class="w"> </span><span class="nf">call</span><span class="p">(</span><span class="kc">_</span><span class="w"> </span><span class="n">method</span><span class="p">:</span><span class="w"> </span><span class="nb">String</span><span class="p">,</span><span class="w"> </span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="nb">String</span><span class="p">:</span><span class="w"> </span><span class="nb">Any</span><span class="p">],</span><span class="w"> </span><span class="n">promise</span><span class="p">:</span><span class="w"> </span><span class="n">PNPromise</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-20-16"><a id="__codelineno-20-16" name="__codelineno-20-16" href="#__codelineno-20-16"></a><span class="w">        </span><span class="k">switch</span><span class="w"> </span><span class="n">method</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-20-17"><a id="__codelineno-20-17" name="__codelineno-20-17" href="#__codelineno-20-17"></a><span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="s">"is_available"</span><span class="p">:</span>
+</span><span id="__span-20-18"><a id="__codelineno-20-18" name="__codelineno-20-18" href="#__codelineno-20-18"></a><span class="w">            </span><span class="n">promise</span><span class="p">.</span><span class="n">resolve</span><span class="p">(</span><span class="bp">CLLocationManager</span><span class="p">.</span><span class="n">headingAvailable</span><span class="p">())</span>
+</span><span id="__span-20-19"><a id="__codelineno-20-19" name="__codelineno-20-19" href="#__codelineno-20-19"></a><span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="s">"heading"</span><span class="p">:</span>
+</span><span id="__span-20-20"><a id="__codelineno-20-20" name="__codelineno-20-20" href="#__codelineno-20-20"></a><span class="w">            </span><span class="n">pending</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">promise</span><span class="w">               </span><span class="c1">// settled later from the delegate</span>
+</span><span id="__span-20-21"><a id="__codelineno-20-21" name="__codelineno-20-21" href="#__codelineno-20-21"></a><span class="w">            </span><span class="n">manager</span><span class="p">.</span><span class="n">startUpdatingHeading</span><span class="p">()</span>
+</span><span id="__span-20-22"><a id="__codelineno-20-22" name="__codelineno-20-22" href="#__codelineno-20-22"></a><span class="w">        </span><span class="k">default</span><span class="p">:</span>
+</span><span id="__span-20-23"><a id="__codelineno-20-23" name="__codelineno-20-23" href="#__codelineno-20-23"></a><span class="w">            </span><span class="n">promise</span><span class="p">.</span><span class="n">reject</span><span class="p">(</span><span class="s">"Compass has no method '</span><span class="si">\(</span><span class="n">method</span><span class="si">)</span><span class="s">'"</span><span class="p">,</span><span class="w"> </span><span class="n">code</span><span class="p">:</span><span class="w"> </span><span class="s">"unknown_method"</span><span class="p">)</span>
+</span><span id="__span-20-24"><a id="__codelineno-20-24" name="__codelineno-20-24" href="#__codelineno-20-24"></a><span class="w">        </span><span class="p">}</span>
+</span><span id="__span-20-25"><a id="__codelineno-20-25" name="__codelineno-20-25" href="#__codelineno-20-25"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-20-26"><a id="__codelineno-20-26" name="__codelineno-20-26" href="#__codelineno-20-26"></a>
+</span><span id="__span-20-27"><a id="__codelineno-20-27" name="__codelineno-20-27" href="#__codelineno-20-27"></a><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kd">func</span><span class="w"> </span><span class="nf">locationManager</span><span class="p">(</span><span class="kc">_</span><span class="w"> </span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="bp">CLLocationManager</span><span class="p">,</span><span class="w"> </span><span class="n">didUpdateHeading</span><span class="w"> </span><span class="n">heading</span><span class="p">:</span><span class="w"> </span><span class="bp">CLHeading</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-20-28"><a id="__codelineno-20-28" name="__codelineno-20-28" href="#__codelineno-20-28"></a><span class="w">        </span><span class="n">manager</span><span class="p">.</span><span class="n">stopUpdatingHeading</span><span class="p">()</span>
+</span><span id="__span-20-29"><a id="__codelineno-20-29" name="__codelineno-20-29" href="#__codelineno-20-29"></a><span class="w">        </span><span class="n">pending</span><span class="p">?.</span><span class="n">resolve</span><span class="p">(</span><span class="n">heading</span><span class="p">.</span><span class="n">trueHeading</span><span class="p">)</span>
+</span><span id="__span-20-30"><a id="__codelineno-20-30" name="__codelineno-20-30" href="#__codelineno-20-30"></a><span class="w">        </span><span class="n">pending</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">nil</span>
+</span><span id="__span-20-31"><a id="__codelineno-20-31" name="__codelineno-20-31" href="#__codelineno-20-31"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-20-32"><a id="__codelineno-20-32" name="__codelineno-20-32" href="#__codelineno-20-32"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>Keep platform imports inside the platform branch so the desktop
-import path doesn't pull in Chaquopy or rubicon-objc. Prefer a safe
-desktop fallback (a default value / no-op) over raising, so the same
-code stays runnable in the desktop mock and in unit tests.</p>
+<div class="language-kotlin highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1">// native/android/com/example/compass/CompassModule.kt</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="k">package</span><span class="w"> </span><span class="nn">com.example.compass</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="k">import</span><span class="w"> </span><span class="nn">com.pythonnative.runtime.modules.NativeModule</span>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="k">import</span><span class="w"> </span><span class="nn">com.pythonnative.runtime.modules.Promise</span>
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="k">import</span><span class="w"> </span><span class="nn">org.json.JSONObject</span>
+</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>
+</span><span id="__span-21-8"><a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a><span class="kd">class</span><span class="w"> </span><span class="nc">CompassModule</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">NativeModule</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-21-9"><a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a><span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="nv">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"Compass"</span>
+</span><span id="__span-21-10"><a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>
+</span><span id="__span-21-11"><a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a><span class="w">    </span><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">call</span><span class="p">(</span><span class="n">method</span><span class="p">:</span><span class="w"> </span><span class="kt">String</span><span class="p">,</span><span class="w"> </span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="n">JSONObject</span><span class="p">,</span><span class="w"> </span><span class="n">promise</span><span class="p">:</span><span class="w"> </span><span class="n">Promise</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-21-12"><a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a><span class="w">        </span><span class="k">when</span><span class="w"> </span><span class="p">(</span><span class="n">method</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-21-13"><a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a><span class="w">            </span><span class="s">"is_available"</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">promise</span><span class="p">.</span><span class="na">resolve</span><span class="p">(</span><span class="kc">true</span><span class="p">)</span>
+</span><span id="__span-21-14"><a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a><span class="w">            </span><span class="s">"heading"</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">readHeadingOnce</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">degrees</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">promise</span><span class="p">.</span><span class="na">resolve</span><span class="p">(</span><span class="n">degrees</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-21-15"><a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a><span class="w">            </span><span class="k">else</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">promise</span><span class="p">.</span><span class="na">rejectUnknownMethod</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+</span><span id="__span-21-16"><a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a><span class="w">        </span><span class="p">}</span>
+</span><span id="__span-21-17"><a id="__codelineno-21-17" name="__codelineno-21-17" href="#__codelineno-21-17"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-21-18"><a id="__codelineno-21-18" name="__codelineno-21-18" href="#__codelineno-21-18"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Settling the promise before <code>call</code> returns answers Python inline (a
+plain synchronous return). Settling it later, from any thread, delivers
+the result through the bridge's event channel on the main thread. Push
+unsolicited events with <code>PNModuleEvents.emit(module:event:payload:)</code> /
+<code>ModuleEvents.emit(module, event, payload)</code>.</p>
+<p>Register both in the plugin entry next to any component managers:</p>
+<div class="language-swift highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">registry</span><span class="p">.</span><span class="n">registerModule</span><span class="p">(</span><span class="n">CompassModule</span><span class="p">.</span><span class="kc">self</span><span class="p">)</span>
+</span></code></pre></div>
+<div class="language-kotlin highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">registry</span><span class="p">.</span><span class="na">registerModule</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">CompassModule</span><span class="p">()</span><span class="w"> </span><span class="p">}</span>
+</span></code></pre></div>
+<h3 id="python-facade">Python facade<a class="headerlink" href="#python-facade" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># compass/__init__.py</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.native_modules.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">native_module</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>
+</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="n">_compass</span> <span class="o">=</span> <span class="n">native_module</span><span class="p">(</span><span class="s2">"Compass"</span><span class="p">)</span>
+</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>
+</span><span id="__span-24-8"><a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>
+</span><span id="__span-24-9"><a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">Compass</span><span class="p">:</span>
+</span><span id="__span-24-10"><a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a>    <span class="nd">@staticmethod</span>
+</span><span id="__span-24-11"><a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">is_available</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-24-12"><a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a>        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">_compass</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="s2">"is_available"</span><span class="p">))</span>
+</span><span id="__span-24-13"><a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a>
+</span><span id="__span-24-14"><a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a>    <span class="nd">@staticmethod</span>
+</span><span id="__span-24-15"><a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">heading</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+</span><span id="__span-24-16"><a id="__codelineno-24-16" name="__codelineno-24-16" href="#__codelineno-24-16"></a>        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="k">await</span> <span class="n">_compass</span><span class="o">.</span><span class="n">call_async</span><span class="p">(</span><span class="s2">"heading"</span><span class="p">))</span>
+</span><span id="__span-24-17"><a id="__codelineno-24-17" name="__codelineno-24-17" href="#__codelineno-24-17"></a>
+</span><span id="__span-24-18"><a id="__codelineno-24-18" name="__codelineno-24-18" href="#__codelineno-24-18"></a>    <span class="nd">@staticmethod</span>
+</span><span id="__span-24-19"><a id="__codelineno-24-19" name="__codelineno-24-19" href="#__codelineno-24-19"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">add_listener</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">callable</span><span class="p">:</span>
+</span><span id="__span-24-20"><a id="__codelineno-24-20" name="__codelineno-24-20" href="#__codelineno-24-20"></a>        <span class="k">return</span> <span class="n">_compass</span><span class="o">.</span><span class="n">add_listener</span><span class="p">(</span><span class="s2">"change"</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>call</code> is for methods that answer inline; it raises
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NativeModuleError&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.registry.NativeModuleError"><code>NativeModuleError</code></a>
+when native rejects. <code>call_async</code> awaits methods that settle later.
+<code>add_listener</code> subscribes to module events and returns an unsubscribe
+callable.</p>
+<h3 id="desktop-and-test-implementation">Desktop and test implementation<a class="headerlink" href="#desktop-and-test-implementation" title="Permanent link">&para;</a></h3>
+<p><code>native_module("Compass")</code> returns a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;BridgeModule&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.registry.BridgeModule"><code>BridgeModule</code></a> on
+device. Off device it looks for a Python implementation registered
+under the same name, so register one for <code>pn preview</code> and unit tests:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.native_modules.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_python_module</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">DesktopCompass</span><span class="p">:</span>
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">is_available</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>        <span class="k">return</span> <span class="kc">False</span>
+</span><span id="__span-25-7"><a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>
+</span><span id="__span-25-8"><a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">heading</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+</span><span id="__span-25-9"><a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>        <span class="k">return</span> <span class="mf">0.0</span>
+</span><span id="__span-25-10"><a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a>
+</span><span id="__span-25-11"><a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a>
+</span><span id="__span-25-12"><a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a><span class="n">register_python_module</span><span class="p">(</span><span class="s2">"Compass"</span><span class="p">,</span> <span class="n">DesktopCompass</span><span class="p">())</span>
+</span></code></pre></div>
+<p>Methods are looked up by name and called with the same keyword
+arguments the facade passed; a coroutine function is awaited by
+<code>call_async</code>. Packages register their desktop implementations through
+the <code>pythonnative.modules</code> entry point group so they are found without
+an explicit import:</p>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="k">[project.entry-points.</span><span class="s2">"pythonnative.modules"</span><span class="k">]</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="n">compass</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"compass.desktop"</span>
+</span></code></pre></div>
+<p>Tests can push module events directly with
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;emit&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.registry.emit"><code>emit</code></a> to exercise
+listeners without a device.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Reference: <a href="../../api/native_modules/">Native modules API</a>.</li>
 <li>Async hooks and data fetching: <a href="../async/">Async + data</a>.</li>
 <li>See how device APIs interact with focus: <a href="../../concepts/lifecycle/">Lifecycle</a>.</li>
-<li>Wrap a custom widget instead of an API: <a href="../../concepts/native-views/">Native views</a>.</li>
+<li>Wrap a custom widget instead of an API: <a href="../custom-native-components/">Custom native components</a>.</li>
+<li>Wire protocol and plugin layout: <a href="../../concepts/bridge/">The native bridge</a>.</li>
 </ul>
 
 

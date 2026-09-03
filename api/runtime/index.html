@@ -539,6 +539,8 @@
       
         
       
+        
+      
     
     
     
@@ -797,6 +799,34 @@
     
   
     Native Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Native Bridge
   
 
     
@@ -1831,6 +1861,8 @@
       
         
       
+        
+      
     
     
     
@@ -2689,6 +2721,34 @@
     
   
     Native views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge
   
 
     
@@ -4094,13 +4154,9 @@ window closes.</p>
 
         <p>Run <code>fn()</code> on the platform UI thread.</p>
 <ul>
-<li><strong>iOS</strong>: dispatches <code>fn</code> onto the main dispatch queue via
-  <code>libdispatch.dispatch_async_f</code> (called through
-  :class:<code>ctypes.PyDLL</code> to keep the GIL held), or runs inline when
-  already on the main thread.</li>
-<li><strong>Android</strong>: posts a <code>Runnable</code> to
-  <code>Handler(Looper.getMainLooper())</code>, or runs inline on the main
-  looper thread.</li>
+<li><strong>iOS / Android</strong>: runs inline when already on the main thread,
+  otherwise queues <code>fn</code> through the bridge (one native crossing
+  per batch of queued callables).</li>
 <li><strong>Desktop</strong>: enqueues <code>fn</code> for the <code>pn preview</code> poll loop
   (or runs inline if no preview is live).</li>
 <li><strong>Tests</strong>: runs <code>fn()</code> inline.</li>

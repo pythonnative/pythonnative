@@ -539,6 +539,8 @@
       
         
       
+        
+      
     
     
     
@@ -797,6 +799,34 @@
     
   
     Native Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Native Bridge
   
 
     
@@ -1829,6 +1859,8 @@
       
         
       
+        
+      
     
     
     
@@ -2507,6 +2539,34 @@
     
   
     Native views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge
   
 
     
@@ -3531,8 +3591,14 @@ way:</p>
 <ul>
 <li><code>src/pythonnative/</code>: installable library and CLI</li>
 <li><code>pythonnative/</code>: core cross‑platform UI components and utilities</li>
+<li><code>bridge/</code>: JSON codec and per-platform transports into the native rendering core</li>
 <li><code>cli/</code>: <code>pn</code> command</li>
-<li><code>templates/</code>: Android/iOS project templates (bundled with the package)</li>
+<li><code>project/</code>: config loading, template configuration, native plugin staging, and the builder behind <code>pn</code></li>
+<li><code>templates/</code>: Android/iOS project templates (bundled with the package)<ul>
+<li><code>ios_template/PythonNativeKit/</code>: Swift package with the iOS rendering core (component managers, gestures, animations, native modules) and its XCTest target</li>
+<li><code>android_template/pythonnative/</code>: Gradle library module with the Android rendering core and its JUnit target</li>
+</ul>
+</li>
 <li><code>tests/</code>: unit tests for the library, plus the Maestro E2E suite</li>
 <li><code>e2e/</code>: the comprehensive E2E suite (see <a href="#e2e-tests-maestro">E2E tests</a> below and <code>tests/e2e/AGENTS.md</code>)</li>
 <li><code>examples/</code>: runnable example apps</li>
@@ -3545,7 +3611,8 @@ way:</p>
 <ul>
 <li>Style: Black; lint: Ruff; typing where useful. Keep APIs stable.</li>
 <li>Prefer explicit, descriptive names; keep platform abstractions clean.</li>
-<li>Add/extend tests under <code>tests/</code> for new behavior.</li>
+<li>Python never imports platform code. Everything that touches <code>UIView</code> or <code>android.view.View</code> lives in Swift (<code>PythonNativeKit</code>) or Kotlin (the <code>pythonnative</code> Gradle module) and is reached through <code>pythonnative.bridge</code>; see <code>docs/concepts/bridge.md</code> for the protocol. Bump <code>PROTOCOL_VERSION</code> on both sides when the wire format changes.</li>
+<li>Add/extend tests under <code>tests/</code> for new behavior. Native changes get XCTest / JUnit coverage next to the code they touch.</li>
 <li>Don't commit generated artifacts or large binaries; templates live under <code>src/pythonnative/templates/</code>.</li>
 <li>Docstrings: Google style throughout. Ruff is configured with the Google
   convention (<code>pydocstyle.convention = "google"</code>) and enforces the <code>D</code> rule
@@ -3560,6 +3627,10 @@ way:</p>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>check<span class="w"> </span>.<span class="w">             </span><span class="c1"># lint</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>uv<span class="w"> </span>run<span class="w"> </span>black<span class="w"> </span>src<span class="w"> </span>examples<span class="w"> </span>tests<span class="w"> </span><span class="c1"># format</span>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>uv<span class="w"> </span>run<span class="w"> </span>--group<span class="w"> </span>docs<span class="w"> </span>mkdocs<span class="w"> </span>serve<span class="w"> </span><span class="c1"># preview the docs site locally</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># native rendering core (macOS with Xcode for the Swift package; JDK 17 for Gradle)</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="o">(</span><span class="nb">cd</span><span class="w"> </span>src/pythonnative/templates/ios_template/PythonNativeKit<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>xcodebuild<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-scheme<span class="w"> </span>PythonNativeKit<span class="w"> </span>-destination<span class="w"> </span><span class="s1">'platform=iOS Simulator,name=iPhone 15 Pro'</span><span class="o">)</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="o">(</span><span class="nb">cd</span><span class="w"> </span>src/pythonnative/templates/android_template<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>./gradlew<span class="w"> </span>:pythonnative:testDebugUnitTest<span class="o">)</span>
 </span></code></pre></div>
 <h2 id="conventional-commits">Conventional Commits<a class="headerlink" href="#conventional-commits" title="Permanent link">&para;</a></h2>
 <p>This project uses Conventional Commits. Use the form:</p>
@@ -3593,6 +3664,8 @@ way:</p>
 <li>Module/directory scopes:</li>
 <li><code>alerts</code>: imperative Alert/Picker helpers (<code>alerts.py</code>)</li>
 <li><code>animated</code>: Animated namespace and animation primitives (<code>animated.py</code>)</li>
+<li><code>bootstrap</code>: on-device runtime start-up called by the templates (<code>bootstrap.py</code>)</li>
+<li><code>bridge</code>: wire codec, transports, handshake, and native-to-Python callback (<code>bridge/</code>)</li>
 <li><code>cli</code>: CLI tool and <code>pn</code> command (<code>src/pythonnative/cli/</code>)</li>
 <li><code>component</code>: the <code>@component</code> decorator, <code>Component</code>, and <code>memo</code> (<code>component.py</code>)</li>
 <li><code>components</code>: declarative element-creating functions (<code>components/</code>)</li>
@@ -3600,17 +3673,18 @@ way:</p>
 <li><code>events</code>: tag-based event routing between native views and Python callbacks (<code>events.py</code>)</li>
 <li><code>gestures</code>: gesture descriptors and the pure-Python recognition arbiter (<code>gestures.py</code>)</li>
 <li><code>hooks</code>: hooks and contexts (<code>hooks.py</code>)</li>
-<li><code>hosts</code>: screen hosts, native lifecycle bridge, and render scheduling (<code>hosts/</code>)</li>
+<li><code>hosts</code>: screen hosts, lifecycle forwarding, and render scheduling (<code>hosts/</code>)</li>
 <li><code>hot_reload</code>: file watcher and module reloader (<code>hot_reload.py</code>)</li>
 <li><code>layout</code>: pure-Python flexbox engine (<code>layout.py</code>)</li>
 <li><code>mutations</code>: batched mutation ops between reconciler and native backends (<code>mutations.py</code>)</li>
-<li><code>native_modules</code>: native API modules for device capabilities (<code>native_modules/</code>)</li>
-<li><code>native_views</code>: platform-specific native view creation and updates (<code>native_views/</code>)</li>
+<li><code>native_modules</code>: native module registry, Python facades, and desktop implementations (<code>native_modules/</code>)</li>
+<li><code>native_views</code>: view registry protocol, bridge backend, and desktop handlers (<code>native_views/</code>)</li>
 <li><code>navigation</code>: navigation state, container, navigators, hooks, and linking (<code>navigation/</code>)</li>
 <li><code>net</code>: awaitable HTTP client (<code>net.py</code>)</li>
 <li><code>package</code>: <code>src/pythonnative/__init__.py</code> exports and package boundary</li>
 <li><code>platform</code>: <code>Platform.OS</code>/<code>Platform.select</code> and version detection (<code>platform.py</code>)</li>
 <li><code>platform_metrics</code>: platform-reported metrics like safe-area insets and bar heights (<code>platform_metrics.py</code>)</li>
+<li><code>project</code>: <code>pythonnative.toml</code> config, template configurators, plugin staging, and the builder (<code>project/</code>)</li>
 <li><code>reconciler</code>: virtual view tree diffing, boundaries, and the layout pass (<code>reconciler/</code>)</li>
 <li><code>runtime</code>: framework-wide asyncio loop and thread-safe future helpers (<code>runtime.py</code>)</li>
 <li><code>sdk</code>: public extension SDK for custom native components (<code>sdk/</code>)</li>
@@ -3631,6 +3705,8 @@ way:</p>
 <li><code>repo</code>: repository metadata and top‑level files (<code>README.md</code>, <code>CONTRIBUTING.md</code>, <code>.gitignore</code>, licenses)</li>
 <li><code>scripts</code>: developer scripts under <code>scripts/</code> (e.g., <code>check.sh</code>)</li>
 <li><code>templates</code>: Android/iOS project templates under <code>src/pythonnative/templates/</code></li>
+<li><code>kit</code>: the Swift rendering core (<code>templates/ios_template/PythonNativeKit/</code>)</li>
+<li><code>runtime-android</code>: the Kotlin rendering core (<code>templates/android_template/pythonnative/</code>)</li>
 <li><code>tests</code>: unit/integration/E2E tests under <code>tests/</code></li>
 <li><code>workflows</code>: CI pipelines under <code>.github/workflows/</code></li>
 </ul>

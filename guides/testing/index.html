@@ -539,6 +539,8 @@
       
         
       
+        
+      
     
     
     
@@ -797,6 +799,34 @@
     
   
     Native Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Native Bridge
   
 
     
@@ -1459,6 +1489,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#testing-the-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing the bridge
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-native-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing native code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#testing-async-code" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1952,6 +2004,8 @@
   
     
     
+      
+        
       
         
       
@@ -2715,6 +2769,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/mutations/" class="md-nav__link">
         
   
@@ -3301,6 +3383,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#testing-the-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing the bridge
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-native-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing native code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#testing-async-code" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3532,21 +3636,50 @@ views carry their computed <code>frame</code> (<code>x, y, width, height</code>)
 <code>calculate_layout</code> directly (see
 <a href="../../api/layout/"><code>pythonnative.layout</code></a>).</p>
 <h2 id="testing-native-modules">Testing native modules<a class="headerlink" href="#testing-native-modules" title="Permanent link">&para;</a></h2>
-<p>Native modules call into platform SDKs directly, so unit-testing them
-with the real implementation requires a device. For most app tests
-it's enough to inject a fake at the boundary:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">FakeFs</span><span class="p">:</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">store</span> <span class="o">=</span> <span class="p">{}</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">write_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">content</span><span class="p">):</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">store</span><span class="p">[</span><span class="n">path</span><span class="p">]</span> <span class="o">=</span> <span class="n">content</span>
+<p>Off device every native module facade resolves to a Python
+implementation, so <code>pn.Clipboard</code>, <code>pn.SecureStore</code>, <code>pn.AsyncStorage</code>,
+and friends work in <code>pytest</code> with in-memory state. To control what a
+module answers, register your own implementation under the module's
+name before the component under test runs:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.native_modules.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">emit</span><span class="p">,</span> <span class="n">register_python_module</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">FakeLocation</span><span class="p">:</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_current</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">options</span><span class="p">):</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">"latitude"</span><span class="p">:</span> <span class="mf">59.91</span><span class="p">,</span> <span class="s2">"longitude"</span><span class="p">:</span> <span class="mf">10.75</span><span class="p">}</span>
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">read_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">store</span><span class="p">[</span><span class="n">path</span><span class="p">]</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">register_python_module</span><span class="p">(</span><span class="s2">"Location"</span><span class="p">,</span> <span class="n">FakeLocation</span><span class="p">())</span>
 </span></code></pre></div>
-<p>Pass the fake into your component (via a context, a default argument,
-or a module-level injection) and assert on <code>store</code>.</p>
+<p>Methods are matched by name and receive the keyword arguments the
+facade passed. Module events (<code>AppState</code> changes, <code>NetInfo</code> updates,
+your own module's notifications) can be pushed with
+<code>emit("NetInfo", "change", {"type": "none", "is_connected": False})</code>;
+listeners registered through the facades or the <code>use_*</code> hooks fire the
+same way they would on device.</p>
+<p>Use <code>unregister_python_module(name)</code> in a fixture teardown to restore
+the built-in desktop implementation.</p>
+<h2 id="testing-the-bridge">Testing the bridge<a class="headerlink" href="#testing-the-bridge" title="Permanent link">&para;</a></h2>
+<p>The reconciler's on-device backend serializes commits to JSON. To assert
+on what native would receive (or to test a custom component's props at
+the wire level), install a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeTransport&lt;/span&gt;" href="../../api/bridge/#pythonnative.bridge.fake.FakeTransport"><code>FakeTransport</code></a>: it decodes
+transactions and keeps a native-style view tree, and lets tests inject
+events, module results, and host lifecycle from the "native" side.
+<code>tests/test_bridge.py</code> in the repository is the reference for this
+style.</p>
+<h2 id="testing-native-code">Testing native code<a class="headerlink" href="#testing-native-code" title="Permanent link">&para;</a></h2>
+<p>The Swift and Kotlin halves have their own suites next to the code:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">cd</span><span class="w"> </span>src/pythonnative/templates/ios_template/PythonNativeKit
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>xcodebuild<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-scheme<span class="w"> </span>PythonNativeKit<span class="w"> </span>-destination<span class="w"> </span><span class="s1">'platform=iOS Simulator,name=iPhone 15 Pro'</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nb">cd</span><span class="w"> </span>src/pythonnative/templates/android_template
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>./gradlew<span class="w"> </span>:pythonnative:testDebugUnitTest
+</span></code></pre></div>
+<p>Both drive component managers and modules with decoded transactions and
+promise envelopes, so a wire-format change is caught on every side. Add
+cases there when you change a manager or module rather than relying on
+the Maestro E2E suite alone.</p>
 <h2 id="testing-async-code">Testing async code<a class="headerlink" href="#testing-async-code" title="Permanent link">&para;</a></h2>
 <p><code>render</code> and every event helper settle the framework's <code>asyncio</code> loop
 before returning, so <code>use_effect</code> coroutines, <code>use_resource</code>,
@@ -3564,18 +3697,18 @@ See <a href="../async/#testing-async-code">Testing async code</a>.</p>
 assert on the <em>mutations</em> themselves (how many <code>InsertOp</code>s a reorder
 produced, which props an <code>UpdateOp</code> changed) can pass their own
 backend and read <code>backend.ops</code>, or construct the reconciler directly:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.reconciler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reconciler</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeBackend</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">FakeBackend</span><span class="p">()</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">rec</span> <span class="o">=</span> <span class="n">Reconciler</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">rec</span><span class="o">.</span><span class="n">mount</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"hi"</span><span class="p">))</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="k">assert</span> <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">op</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">backend</span><span class="o">.</span><span class="n">ops</span><span class="p">]</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"CreateOp"</span><span class="p">]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.reconciler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reconciler</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeBackend</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">FakeBackend</span><span class="p">()</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">rec</span> <span class="o">=</span> <span class="n">Reconciler</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">rec</span><span class="o">.</span><span class="n">mount</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"hi"</span><span class="p">))</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="k">assert</span> <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">op</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">backend</span><span class="o">.</span><span class="n">ops</span><span class="p">]</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"CreateOp"</span><span class="p">]</span>
 </span></code></pre></div>
 <h2 id="running-the-suite">Running the suite<a class="headerlink" href="#running-the-suite" title="Permanent link">&para;</a></h2>
 <p>PythonNative uses <code>pytest</code> plus the standard CI matrix (Ruff, Black,
 MyPy). Run them all locally before pushing:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>./scripts/check.sh
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>./scripts/check.sh
 </span></code></pre></div>
 <p>The same commands run in CI on every push and pull request.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>

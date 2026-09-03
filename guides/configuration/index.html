@@ -539,6 +539,8 @@
       
         
       
+        
+      
     
     
     
@@ -797,6 +799,34 @@
     
   
     Native Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Native Bridge
   
 
     
@@ -1506,6 +1536,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [plugins]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ios" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1925,6 +1966,8 @@
   
     
     
+      
+        
       
         
       
@@ -2688,6 +2731,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/mutations/" class="md-nav__link">
         
   
@@ -3224,6 +3295,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [plugins]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ios" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3353,23 +3435,26 @@ other command (<code>pn run</code>, <code>pn build</code>, <code>pn doctor</code
 </span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="k">[requirements]</span>
 </span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="n">packages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"humanize"</span><span class="p">,</span><span class="w"> </span><span class="s2">"httpx"</span><span class="p">]</span>
 </span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="k">[ios]</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="n">deployment_target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"13.0"</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="n">development_team</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ABCDE12345"</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="c1"># bundle_id = "com.example.myapp"</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="k">[ios.signing]</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="n">export_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"development"</span><span class="w">   </span><span class="c1"># development | ad-hoc | app-store | enterprise</span>
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="c1"># provisioning_profile = "My App Distribution"</span>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="k">[android]</span>
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="n">min_sdk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">24</span>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="n">target_sdk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">34</span>
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a><span class="c1"># abi_filters = ["arm64-v8a", "x86_64"]   # the default; add 32-bit ABIs if needed</span>
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="k">[android.signing]</span>
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="c1"># keystore = "release.keystore"</span>
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="c1"># key_alias = "myapp"</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="k">[plugins]</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="c1"># paths = ["native/my_plugin"]  # project-local Swift/Kotlin plugins</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="k">[ios]</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="n">deployment_target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"13.0"</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="n">development_team</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ABCDE12345"</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="c1"># bundle_id = "com.example.myapp"</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="k">[ios.signing]</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="n">export_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"development"</span><span class="w">   </span><span class="c1"># development | ad-hoc | app-store | enterprise</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="c1"># provisioning_profile = "My App Distribution"</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a><span class="k">[android]</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="n">min_sdk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">24</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="n">target_sdk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">34</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="c1"># abi_filters = ["arm64-v8a", "x86_64"]   # the default; add 32-bit ABIs if needed</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a><span class="k">[android.signing]</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a><span class="c1"># keystore = "release.keystore"</span>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a><span class="c1"># key_alias = "myapp"</span>
 </span></code></pre></div>
 <p>Paths (icon, splash, keystore) are resolved relative to the project
 root. Invalid configuration fails fast with a specific, actionable
@@ -3534,6 +3619,37 @@ Validation rejects it.</p>
 (<code>arm64-v8a</code>/<code>armeabi-v7a</code> on Android; <code>arm64</code>/<code>x86_64</code> for the iOS
 Simulator). Many popular extensions have no upstream mobile wheels yet.</p>
 <hr />
+<h2 id="plugins"><code>[plugins]</code><a class="headerlink" href="#plugins" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>paths</code></td>
+<td>list of strings</td>
+<td><code>[]</code></td>
+<td>Project-relative directories containing a native plugin (<code>pn_plugin.json</code> plus <code>ios/</code> and <code>android/</code> sources).</td>
+</tr>
+</tbody>
+</table>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[plugins]</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">paths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"native/badge"</span><span class="p">]</span>
+</span></code></pre></div>
+<p>Native plugins add Swift and Kotlin component managers and native
+modules to the app. Installed packages contribute theirs through the
+<code>pythonnative.plugins</code> entry point group automatically; <code>paths</code> is for
+native code that lives in the app repository itself. At build time each
+plugin's <code>ios/*.swift</code> is copied into <code>PythonNativeKit</code> and its
+<code>android/**/*.kt</code> into the <code>pythonnative</code> Gradle module, and the
+generated registration file calls every plugin's <code>register</code>. See
+<a href="../custom-native-components/">Custom native components</a>.</p>
+<hr />
 <h2 id="ios"><code>[ios]</code><a class="headerlink" href="#ios" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3596,13 +3712,13 @@ Simulator). Many popular extensions have no upstream mobile wheels yet.</p>
 </tr>
 </tbody>
 </table>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[ios]</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">deployment_target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"13.0"</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">development_team</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ABCDE12345"</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">[ios.signing]</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">export_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app-store"</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">provisioning_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"My App Distribution"</span>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">[ios]</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">deployment_target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"13.0"</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">development_team</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ABCDE12345"</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">[ios.signing]</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">export_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app-store"</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">provisioning_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"My App Distribution"</span>
 </span></code></pre></div>
 <hr />
 <h2 id="android"><code>[android]</code><a class="headerlink" href="#android" title="Permanent link">&para;</a></h2>

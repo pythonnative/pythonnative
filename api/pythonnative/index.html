@@ -539,6 +539,8 @@
       
         
       
+        
+      
     
     
     
@@ -797,6 +799,34 @@
     
   
     Native Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Native Bridge
   
 
     
@@ -1831,6 +1861,8 @@
       
         
       
+        
+      
     
     
     
@@ -2610,6 +2642,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../mutations/" class="md-nav__link">
         
   
@@ -3198,9 +3258,11 @@ an explicit dotted path like <code>"app.main.RootScreen"</code> instead.</p>
         <p>PythonNative: declarative native UI for Android and iOS.</p>
 <p>PythonNative is a cross-platform toolkit that turns Python <code>@component</code>
 functions into real, native Android and iOS views. The component model
-is React-like (function components plus hooks), but rendering happens
-through direct platform bindings: Chaquopy on Android (Java) and
-rubicon-objc on iOS (Objective-C). There is no JavaScript bridge.</p>
+is React-like (function components plus hooks). Python owns the
+component tree, reconciliation, and layout; each commit crosses once
+into a native rendering core (Swift <code>PythonNativeKit</code> on iOS, the
+Kotlin <code>pythonnative</code> module on Android) that owns every platform
+view, gesture, animation, and device API. There is no JavaScript.</p>
 <p>Key building blocks:</p>
 <ul>
 <li><strong>Element factories</strong> (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Text&lt;/span&gt;" href="../components/#pythonnative.components.Text"><code>Text</code></a>,
@@ -3491,7 +3553,7 @@ rubicon-objc on iOS (Objective-C). There is no JavaScript bridge.</p>
 <tr>
 <td>Utilities</td>
 <td><a href="../utils/">Utilities</a></td>
-<td><code>IS_ANDROID</code>, <code>IS_IOS</code>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;get_android_context&lt;/span&gt;" href="../utils/#pythonnative.utils.get_android_context"><code>get_android_context</code></a></td>
+<td><code>IS_ANDROID</code>, <code>IS_IOS</code>, <code>IS_DESKTOP</code></td>
 </tr>
 <tr>
 <td>CLI</td>

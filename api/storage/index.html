@@ -539,6 +539,8 @@
       
         
       
+        
+      
     
     
     
@@ -797,6 +799,34 @@
     
   
     Native Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Native Bridge
   
 
     
@@ -1831,6 +1861,8 @@
       
         
       
+        
+      
     
     
     
@@ -2704,6 +2736,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../mutations/" class="md-nav__link">
         
   
@@ -3371,24 +3431,19 @@ don't block the framework loop.</p>
 
         <p>Cross-platform key/value persistence (<code>AsyncStorage</code>).</p>
 <p>Mirrors React Native's <code>AsyncStorage</code> API but with native <code>async</code>
-coroutines and a JSON convenience layer. Values are persisted using
-the platform-appropriate key/value store:</p>
+coroutines and a JSON convenience layer. Values are persisted by the
+native <code>Storage</code> module:</p>
 <ul>
 <li><strong>iOS</strong>: <code>NSUserDefaults</code> (standard user defaults).</li>
 <li><strong>Android</strong>: <code>SharedPreferences</code> (file <code>"pn_async_storage"</code>).</li>
 <li><strong>Desktop / tests</strong>: an in-memory dict optionally backed by a JSON
-  file under
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;app_dir&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-staticmethod&quot;&gt;&lt;code&gt;staticmethod&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../native_modules/#pythonnative.native_modules.file_system.FileSystem.app_dir"><code>FileSystem.app_dir</code></a>
-  for inter-run persistence during local development.</li>
+  file under <code>PN_STORAGE_DIR</code> for inter-run persistence during local
+  development (see
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;DesktopStorage&lt;/span&gt;" href="../native_modules/#pythonnative.native_modules.desktop.DesktopStorage"><code>DesktopStorage</code></a>).</li>
 </ul>
-<p>All operations are coroutines so they don't block the framework loop;
-the underlying native calls are dispatched via
-:func:<code>asyncio.to_thread</code>.</p>
+<p>Every operation is a coroutine. The platform stores answer in
+microseconds, so calls complete inline on the framework loop without
+a thread hop.</p>
 
 
 <details class="example" open>

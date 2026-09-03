@@ -650,6 +650,8 @@
       
         
       
+        
+      
     
     
     
@@ -908,6 +910,34 @@
     
   
     Native Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="concepts/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Native Bridge
   
 
     
@@ -1940,6 +1970,8 @@
       
         
       
+        
+      
     
     
     
@@ -2638,6 +2670,34 @@
   
   
     <li class="md-nav__item">
+      <a href="api/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="api/mutations/" class="md-nav__link">
         
   
@@ -3231,11 +3291,9 @@
 <h1 id="pythonnative">PythonNative<a class="headerlink" href="#pythonnative" title="Permanent link">&para;</a></h1>
 <p>PythonNative is a cross-platform toolkit for building native <strong>Android</strong>
 and <strong>iOS</strong> apps in plain Python. The component model is React-style
-(function components plus hooks plus a reconciler); the runtime calls
-into the platform's real widget libraries directly via
-<a href="https://chaquo.com/chaquopy/">Chaquopy</a> on Android and
-<a href="https://rubicon-objc.readthedocs.io/">rubicon-objc</a> on iOS. There is
-no JavaScript bridge.</p>
+(function components plus hooks plus a reconciler); rendering and
+device APIs are native Swift and Kotlin, driven over a small bridge
+with one transaction per commit. There is no JavaScript anywhere.</p>
 <h2 id="a-taste">A taste<a class="headerlink" href="#a-taste" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>

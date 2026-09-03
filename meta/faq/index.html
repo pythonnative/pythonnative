@@ -539,6 +539,8 @@
       
         
       
+        
+      
     
     
     
@@ -797,6 +799,34 @@
     
   
     Native Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Native Bridge
   
 
     
@@ -1829,6 +1859,8 @@
       
         
       
+        
+      
     
     
     
@@ -2507,6 +2539,34 @@
     
   
     Native views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge
   
 
     
@@ -3457,8 +3517,8 @@
 <p>Conceptual questions about PythonNative. For specific error messages
 and their fixes, see <a href="../troubleshooting/">Troubleshooting</a>.</p>
 <h2 id="why-pythonnative-and-not-say-toga-or-kivy">Why "PythonNative" and not, say, Toga or Kivy?<a class="headerlink" href="#why-pythonnative-and-not-say-toga-or-kivy" title="Permanent link">&para;</a></h2>
-<p>PythonNative renders <strong>real</strong> native widgets via Chaquopy on Android
-and rubicon-objc on iOS. A <code>pn.Text</code> becomes a <code>UILabel</code> /
+<p>PythonNative renders <strong>real</strong> native widgets through Swift and Kotlin
+component managers. A <code>pn.Text</code> becomes a <code>UILabel</code> /
 <code>TextView</code>; a <code>pn.Button</code> becomes a <code>UIButton</code> / <code>Button</code>.
 Accessibility, theming, and platform behaviors come along for free.</p>
 <p>The component model is React-style (functions plus hooks plus a
@@ -3612,7 +3672,7 @@ synchronous event handler, kick off work with
 <tr>
 <td><strong>PythonNative</strong></td>
 <td>Declarative components plus reconciler</td>
-<td>Real native (<code>UILabel</code>, <code>TextView</code>) via Chaquopy / rubicon-objc</td>
+<td>Real native (<code>UILabel</code>, <code>TextView</code>) via Swift / Kotlin component managers</td>
 </tr>
 <tr>
 <td>Toga</td>

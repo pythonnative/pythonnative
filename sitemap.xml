@@ -25,6 +25,10 @@
          <lastmod>2026-09-03</lastmod>
     </url>
     <url>
+         <loc>https://pythonnative.com/api/bridge/</loc>
+         <lastmod>2026-09-03</lastmod>
+    </url>
+    <url>
          <loc>https://pythonnative.com/api/cli/</loc>
          <lastmod>2026-09-03</lastmod>
     </url>
@@ -142,6 +146,10 @@
     </url>
     <url>
          <loc>https://pythonnative.com/concepts/architecture/</loc>
+         <lastmod>2026-09-03</lastmod>
+    </url>
+    <url>
+         <loc>https://pythonnative.com/concepts/bridge/</loc>
          <lastmod>2026-09-03</lastmod>
     </url>
     <url>

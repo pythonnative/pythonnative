@@ -539,6 +539,8 @@
       
         
       
+        
+      
     
     
     
@@ -797,6 +799,34 @@
     
   
     Native Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Native Bridge
   
 
     
@@ -1831,6 +1861,8 @@
       
         
       
+        
+      
     
     
     
@@ -2510,6 +2542,34 @@
     
   
     Native views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge
   
 
     
@@ -4139,9 +4199,9 @@ so the bar reaches the home indicator. The iOS screen host
 deliberately extends the root view past the bottom safe area for
 this very reason; the tab bar absorbs the inset and UIKit
 renders the pill with internal padding for the home indicator.
-Used by <code>pythonnative.native_views.ios.TabBarHandler</code>; exposed
-here so the formula is testable without importing the iOS
-handler module (which requires <code>rubicon-objc</code>).</p>
+The Swift <code>TabBarManager</code> applies the same formula natively;
+this Python copy keeps the layout engine's expectations testable
+off device.</p>
 
 
     </div>

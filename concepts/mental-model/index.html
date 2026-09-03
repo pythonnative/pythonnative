@@ -541,6 +541,8 @@
       
         
       
+        
+      
     
     
     
@@ -913,6 +915,34 @@
     
   
     Native Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Native Bridge
   
 
     
@@ -1945,6 +1975,8 @@
       
         
       
+        
+      
     
     
     
@@ -2643,6 +2675,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/mutations/" class="md-nav__link">
         
   
@@ -3249,9 +3309,10 @@ runtime, however, is meaningfully different.</p>
   State updates are batched per render pass.</li>
 <li>Re-rendering produces a new tree; the reconciler diffs it against
   the previous one and applies the smallest set of native mutations.</li>
-<li>Native widgets are created and updated by direct platform calls
-  (Chaquopy on Android, rubicon-objc on iOS). There is no JavaScript
-  bridge and no V8 / Hermes runtime.</li>
+<li>Native widgets are created and updated by Swift and Kotlin
+  component managers that receive one serialized transaction per
+  commit over the <a href="../bridge/">native bridge</a>. There is no JavaScript
+  and no V8 / Hermes runtime.</li>
 </ul>
 <h2 id="the-runtime-in-one-diagram">The runtime in one diagram<a class="headerlink" href="#the-runtime-in-one-diagram" title="Permanent link">&para;</a></h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>@pn.component fn   ---&gt;   Element tree   ---&gt;   Reconciler   ---&gt;   Native views
@@ -3293,8 +3354,8 @@ that prevents render storms).</p>
 </tr>
 <tr>
 <td>Bridge</td>
-<td>Async JS bridge (or JSI in newer versions)</td>
-<td>None; direct platform calls</td>
+<td>Fabric: one C++ shadow tree commit per render; TurboModules for device APIs</td>
+<td>One JSON transaction per commit applied by Swift / Kotlin component managers; named native modules for device APIs</td>
 </tr>
 <tr>
 <td>Threading</td>
@@ -3313,8 +3374,8 @@ that prevents render storms).</p>
 </tr>
 <tr>
 <td>Native widgets</td>
-<td>Wrapped via React Native's bridge</td>
-<td>Wrapped via <code>ViewHandler</code> classes calling Chaquopy / rubicon-objc directly</td>
+<td>Wrapped by Fabric component managers</td>
+<td>Wrapped by <code>PNComponentManager</code> (Swift) / <code>ComponentManager</code> (Kotlin) classes</td>
 </tr>
 </tbody>
 </table>
