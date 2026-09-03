@@ -127,28 +127,36 @@ jobs:
     runs-on: macos-15
     # Budget for the worst case: ~8 min build/boot plus two full suite
     # attempts (run-e2e.sh retries the whole suite once after a driver
-    # flake) at up to ~20 min each on a slow runner. 40 was enough for
-    # a clean pass but cut the retry off mid-suite.
+    # flake). The test step gets its own, shorter timeout so a hung
+    # attempt still leaves time for the debug-output upload below;
+    # a job-level timeout kills the runner before that step can run.
     timeout-minutes: 55
     # iOS simulators are stable for the full suite (unlike the Android
     # emulator; see the e2e-android note), so this split is purely a
     # speed optimization: the iOS Maestro run is ~22 minutes and is the
-    # critical path for the whole E2E workflow. Sharding it across three
+    # critical path for the whole E2E workflow. Sharding it across
     # simulators (same balanced groups as Android) runs them in parallel
     # and roughly halves wall-clock time. macOS minutes are free on this
     # public repo, so the extra per-shard build/boot overhead is fine.
+    # Shards are sized so a single attempt is ~10-12 minutes of driving:
+    # ``components`` alone was ~21 minutes per attempt on a hosted
+    # runner, so one retry (build + two attempts) overran the job budget.
     # ``fail-fast: false`` so one shard's failure still lets the others
     # report.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: components
-            suites: components
-          - name: hooks-nav-gestures
-            suites: hooks navigation gestures
-          - name: layout-styling-anim-misc
-            suites: layout styling animations misc
+          - name: components-a
+            suites: components-a
+          - name: components-b
+            suites: components-b
+          - name: hooks
+            suites: hooks
+          - name: nav-gestures-layout-styling
+            suites: navigation gestures layout styling
+          - name: anim-misc
+            suites: animations misc
 
     name: e2e-ios (${{ matrix.name }})
 
@@ -175,13 +183,15 @@ jobs:
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
       - name: Build and run E2E tests
+        timeout-minutes: 48
         run: uv run ./scripts/run-e2e.sh ios ${{ matrix.suites }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Maestro writes per-flow debug output (command log, view-hierarchy
       # dumps, failure screenshots) under ~/.maestro/tests. Surface it when
-      # a shard fails so CI-only failures are diagnosable without guesswork.
+      # a shard fails (or hits the step timeout above) so CI-only failures
+      # are diagnosable without guesswork.
       - name: Upload Maestro debug output
         if: failure()
         uses: actions/upload-artifact@v4
