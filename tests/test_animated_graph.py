@@ -15,7 +15,7 @@ from pythonnative.animated import (
     AnimatedValue,
     _resolve_style_with_values,
 )
-from pythonnative.gestures import GestureEvent
+from pythonnative.gestures import GestureEvent, GestureState
 from pythonnative.native_views import set_registry
 from pythonnative.testing import FakeBackend
 
@@ -226,7 +226,7 @@ def test_event_binds_dict_payload_fields() -> None:
 def test_event_binds_gesture_event_attributes() -> None:
     tx = AnimatedValue(0.0)
     handler = Animated.event(translation_x=tx)
-    handler(GestureEvent(kind="pan", state="changed", translation_x=7.0))
+    handler(GestureEvent(kind="pan", state=GestureState.CHANGED, translation_x=7.0))
     assert tx.value == 7.0
 
 

@@ -55,6 +55,7 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "AutoCapitalize",
     "Color",
     "Dimension",
+    "Display",
     "EdgeInsets",
     "FlexDirection",
     "FlexWrap",
@@ -63,6 +64,7 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "KeyboardType",
     "LayoutDirection",
     "Overflow",
+    "PointerEvents",
     "Position",
     "ReturnKeyType",
     "ScaleType",
@@ -77,6 +79,7 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "StyleProp",
     "TextAlign",
     "TextDecoration",
+    "TextTransform",
     "ThemeContext",
     "TransformSpec",
     "AnimatedValue",  # observed via use_animated_value usage in animations
@@ -144,8 +147,9 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # Theming data: observed through the use_theme demo, which flips
     # the scheme and asserts the built-in light/dark values render.
     # --------------------------------------------------------------
-    "DEFAULT_LIGHT_THEME",  # constant dict; values asserted in use_theme demo
-    "DEFAULT_DARK_THEME",  # constant dict; values asserted in use_theme demo
+    "Theme",  # frozen dataclass returned by use_theme; fields asserted in use_theme demo
+    "DEFAULT_LIGHT_THEME",  # constant Theme; values asserted in use_theme demo
+    "DEFAULT_DARK_THEME",  # constant Theme; values asserted in use_theme demo
     "default_theme",  # pure lookup over the two constants; use_theme demo
     # --------------------------------------------------------------
     # SDK re-exports: module-level names mirroring submodule content.

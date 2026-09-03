@@ -37,7 +37,7 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from urllib.parse import urlparse
 
 from .config import AppConfig
@@ -384,7 +384,7 @@ class Resolution:
         """Packages that resolved to an older release than the desktop would get."""
         return [pkg for pkg in self.packages if pkg.downgraded]
 
-    def to_dict(self) -> Dict[str, object]:
+    def to_dict(self) -> Dict[str, Any]:
         """Serialize for ``pn deps --json`` and the compatibility matrix job."""
         return {
             "platform": self.target.platform,
