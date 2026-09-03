@@ -1,7 +1,7 @@
 """Desktop preview runtime, the engine behind ``pn preview``.
 
 ``pn preview`` renders a PythonNative app in a real OS window using the
-Tkinter backend (``pythonnative.native_views.desktop``),
+Tkinter backend ([`pythonnative.native_views.desktop`][pythonnative.native_views.desktop]),
 with **instant Fast Refresh** on every file save. It exists to make the
 inner development loop fast: see your UI and iterate in seconds without
 booting a simulator or deploying to a device.
@@ -12,7 +12,7 @@ Architecture
   navigation stack gets its own child container inside the stage; the
   desktop view handlers create widgets under the active container.
 - [`DesktopApp`][pythonnative.preview.DesktopApp] owns the navigation
-  stack of ``pythonnative.screen`` hosts and the push/pop/reset
+  stack of [`screen`][pythonnative.screen] hosts and the push/pop/reset
   primitives the declarative navigators call through ``host._push`` /
   ``host._pop``.
 - The Tk event loop runs on the main thread. A lightweight poll
@@ -77,7 +77,7 @@ class DesktopApp:
     """Navigation-stack controller for the desktop preview window.
 
     One instance backs a preview session. It is handed to each
-    ``pythonnative.screen`` host as the ``native_instance`` so
+    [`screen`][pythonnative.screen] host as the ``native_instance`` so
     hosts can drive navigation (``push_screen`` / ``pop_screen`` /
     ``reset_to_root``), report the viewport size, and set the window
     title, mirroring the role a ``UIViewController`` / ``Activity``
