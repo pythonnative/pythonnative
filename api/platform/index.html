@@ -3974,14 +3974,14 @@ introspection from non-component code.</p>
 <tbody>
 <tr>
 <td><code>Platform.OS</code></td>
-<td><code>"ios"</code>, <code>"android"</code>, or <code>"test"</code></td>
+<td><code>"ios"</code>, <code>"android"</code>, <code>"desktop"</code>, or <code>"test"</code></td>
 </tr>
 <tr>
 <td><code>Platform.Version</code></td>
 <td>Best-effort OS version string</td>
 </tr>
 <tr>
-<td><code>Platform.is_ios</code> / <code>Platform.is_android</code> / <code>Platform.is_test</code></td>
+<td><code>Platform.is_ios</code> / <code>Platform.is_android</code> / <code>Platform.is_desktop</code> / <code>Platform.is_test</code></td>
 <td>Booleans</td>
 </tr>
 <tr>
@@ -3990,6 +3990,9 @@ introspection from non-component code.</p>
 </tr>
 </tbody>
 </table>
+<ul>
+<li><code>"desktop"</code> means the <code>pn preview</code> Tkinter backend.</li>
+</ul>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../hooks/">Window dimensions, safe area, keyboard hooks</a> for
