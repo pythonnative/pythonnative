@@ -78,6 +78,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, Tuple
 
 __all__ = [
@@ -99,16 +100,30 @@ __all__ = [
 ]
 
 
-class GestureState:
-    """States reported on [`GestureEvent.state`][pythonnative.gestures.GestureEvent]."""
+class GestureState(str, Enum):
+    """Lifecycle states reported on [`GestureEvent.state`][pythonnative.gestures.GestureEvent].
+
+    A ``str`` enum, so members compare equal to their wire value
+    (``GestureState.ENDED == "ended"``) and serialize as plain strings
+    across the native bridge, while callers get exhaustive
+    ``match`` support and autocomplete.
+
+    Attributes:
+        BEGAN: The gesture activated (first callback).
+        CHANGED: A continuous gesture updated (pan, pinch, rotation).
+        ENDED: The gesture completed successfully.
+        CANCELLED: The gesture was interrupted (lost arbitration, view
+            unmounted, pointer left the window).
+    """
 
     BEGAN = "began"
     CHANGED = "changed"
     ENDED = "ended"
     CANCELLED = "cancelled"
 
+    def __str__(self) -> str:
+        return self.value
 
-GestureStateName = Literal["began", "changed", "ended", "cancelled"]
 
 GestureCallback = Callable[["GestureEvent"], Any]
 
@@ -141,7 +156,7 @@ class GestureEvent:
     """
 
     kind: str
-    state: GestureStateName
+    state: GestureState
     x: float = 0.0
     y: float = 0.0
     translation_x: float = 0.0
@@ -152,6 +167,12 @@ class GestureEvent:
     rotation: float = 0.0
     pointer_count: int = 1
     direction: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        # Payloads from the native bridge carry plain strings; coerce
+        # so ``event.state`` is always a ``GestureState`` member.
+        if not isinstance(self.state, GestureState):
+            object.__setattr__(self, "state", GestureState(self.state))
 
 
 _EVENT_FIELDS = frozenset(
@@ -576,8 +597,8 @@ class _Recognizer:
         self.config = config
         self._emit_fn = emit
 
-    def emit(self, state: str, **fields: Any) -> None:
-        payload: Dict[str, Any] = {"kind": self.kind(), "state": state}
+    def emit(self, state: GestureState, **fields: Any) -> None:
+        payload: Dict[str, Any] = {"kind": self.kind(), "state": state.value}
         payload.update(fields)
         self._emit_fn(self.index, payload)
 

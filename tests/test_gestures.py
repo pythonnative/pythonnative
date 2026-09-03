@@ -8,12 +8,16 @@ the contract the platform handlers rely on.
 
 from __future__ import annotations
 
+import json
 import math
 from typing import Any, Dict, List, Tuple
+
+import pytest
 
 from pythonnative.gestures import (
     GestureArbiter,
     GestureEvent,
+    GestureState,
     Pan,
     Tap,
     serialize_gestures,
@@ -66,6 +70,23 @@ def test_router_drops_unknown_payload_keys() -> None:
     _specs, events = serialize_gestures([Tap(on_tap=seen.append)])
     events["gesture:0"]({"kind": "tap", "state": "ended", "x": 1.0, "_debug": "extra"})
     assert seen[0].x == 1.0
+
+
+def test_gesture_state_is_a_str_enum_coerced_from_wire_strings() -> None:
+    event = GestureEvent(kind="tap", state="ended")  # type: ignore[arg-type]
+    assert event.state is GestureState.ENDED
+    assert event.state == "ended"
+    assert str(GestureState.BEGAN) == "began"
+    assert json.dumps({"state": GestureState.CANCELLED}) == '{"state": "cancelled"}'
+    with pytest.raises(ValueError):
+        GestureEvent(kind="tap", state="exploded")  # type: ignore[arg-type]
+
+
+def test_arbiter_emits_plain_string_states() -> None:
+    arbiter, emitted = _arbiter({"kind": "tap"})
+    arbiter.pointer_down(0, 10.0, 10.0, 0.0)
+    arbiter.pointer_up(0, 10.0, 10.0, 0.05)
+    assert emitted and all(type(p["state"]) is str for _i, p in emitted)
 
 
 def test_descriptor_callback_routing_by_state() -> None:

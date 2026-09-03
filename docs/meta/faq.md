@@ -77,21 +77,25 @@ Play Console / App Store Connect).
 
 ## Can I use any Python package?
 
-Pure-Python packages, mostly yes. List them in
-`[requirements].packages` in `pythonnative.toml` and the `pn` CLI
-bundles them into the app:
+Most of them. List packages in `[requirements].packages` in
+`pythonnative.toml` and the `pn` CLI resolves them **for the phone,
+not for your laptop**, then bundles them into the app:
 
-- **Android**: the packages are written to the staged template's
-  `requirements.txt` and Chaquopy installs them into the APK at build
-  time.
-- **iOS**: pure-Python packages are copied into the app bundle's
-  `platform-site/`.
+- **Pure-Python packages** (requests, httpx, pydantic-core-free
+  libraries, and so on) work everywhere.
+- **Binary wheels** work when the package publishes wheels for the
+  target: iOS wheels (PEP 730, `ios_13_0_arm64_iphoneos` and the
+  Simulator tags) from the BeeWare index, and Android wheels from the
+  Chaquopy index. numpy, Pillow, cryptography, cffi, lxml, and pandas
+  all resolve out of the box today.
+- **No wheel for the target** is a build-time error, reported by
+  `pn deps` with the package name and the target that failed, never a
+  silent import error on the device.
 
-C extensions are harder. You need a wheel that targets the right
-platform / architecture (`armeabi-v7a` and `arm64-v8a` on Android,
-`arm64`, `x86_64` for iOS Simulator on iOS). Many popular
-extensions (numpy, Pillow) have no upstream iOS wheels yet, so you'd
-need to build them locally.
+Run `pn deps` to see how every requirement resolves for each iOS and
+Android target before you build. The
+[PyPI packages guide](../guides/pypi-packages.md) covers the details
+and the live compatibility matrix.
 
 Don't put `pythonnative` itself in `[requirements].packages`; the CLI
 bundles the installed copy directly.

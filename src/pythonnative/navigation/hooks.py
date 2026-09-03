@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Dict, Optional, Sequence, overload
 
 from ..hooks import use_context, use_effect
 from .handle import FocusContext, Navigation, NavigationContext
-from .state import Route
+from .state import Route, RouteParams
 
 __all__ = ["use_focus_effect", "use_is_focused", "use_navigation", "use_route"]
 
@@ -34,25 +34,64 @@ def use_navigation() -> Navigation:
     return nav
 
 
-def use_route() -> Route:
+@overload
+def use_route() -> Route[Dict[str, Any]]: ...
+
+
+@overload
+def use_route[P: RouteParams](params_type: type[P], /) -> Route[P]: ...
+
+
+def use_route(params_type: Optional[type] = None, /) -> Route[Any]:
     """Return the current screen's [`Route`][pythonnative.navigation.Route].
 
+    Pass a ``TypedDict`` class as ``params_type`` to get a
+    ``Route[MyParams]`` whose ``params`` attribute is typed for editors
+    and type checkers. At runtime the hook also verifies that every
+    *required* key of the ``TypedDict`` is present on the active route,
+    so a screen opened with the wrong params fails at its first render
+    with a message naming the missing keys, instead of a ``KeyError``
+    deep inside the render.
+
     Outside any navigator a placeholder route named ``"__root__"`` with
-    empty params is returned, so components can be rendered standalone
-    (previews, tests) without special-casing.
+    empty params is returned (and no validation is performed), so
+    components can be rendered standalone (previews, tests) without
+    special-casing.
+
+    Args:
+        params_type: Optional ``TypedDict`` describing this screen's
+            params.
+
+    Raises:
+        TypeError: If the active route is missing a required param
+            declared by ``params_type``.
 
     Example:
         ```python
+        class DetailParams(TypedDict):
+            id: int
+            title: NotRequired[str]
+
         @pn.component
         def DetailScreen():
-            route = pn.use_route()
+            route = pn.use_route(DetailParams)
             return pn.Text(f"Item {route.params['id']}")
         ```
     """
     nav = use_context(NavigationContext)
     if nav is None:
         return Route("__root__", {}, key="__root__")
-    return nav.route
+    route = nav.route
+    if params_type is not None:
+        required = getattr(params_type, "__required_keys__", None)
+        if required:
+            missing = sorted(k for k in required if k not in route.params)
+            if missing:
+                raise TypeError(
+                    f"Screen {route.name!r} is missing required params {missing} "
+                    f"declared by {params_type.__name__}; got {sorted(route.params)}"
+                )
+    return route
 
 
 def use_is_focused() -> bool:

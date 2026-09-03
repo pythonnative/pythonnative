@@ -66,7 +66,7 @@ from .navigators import (
     create_tab_navigator,
 )
 from .screen import HeaderSlot, ScreenDef, ScreenOptions
-from .state import NavigationState, Route
+from .state import NavigationState, Route, RouteParams
 
 __all__ = [
     "NAV_STATE_ARG",
@@ -87,6 +87,7 @@ __all__ = [
     "NavigationState",
     "NavigatorCore",
     "Route",
+    "RouteParams",
     "ScreenDef",
     "ScreenOptions",
     "StackNavigator",

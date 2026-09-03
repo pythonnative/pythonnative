@@ -70,11 +70,30 @@ def _tkinter_available() -> bool:
     return True
 
 
-def check_common() -> List[CheckResult]:
-    """Run platform-agnostic checks (interpreter and optional dependencies).
+def build_python_for(python_version: str) -> Optional[str]:
+    """Locate an interpreter matching ``python_version`` (e.g. ``python3.13``) on ``PATH``.
+
+    Args:
+        python_version: CPython ``major.minor``.
 
     Returns:
-        Check results for the host Python and optional dependencies.
+        The interpreter path, or ``None`` when none is installed.
+    """
+    host = f"{sys.version_info.major}.{sys.version_info.minor}"
+    if host == python_version:
+        return sys.executable
+    return shutil.which(f"python{python_version}")
+
+
+def check_common(config: Optional[AppConfig] = None) -> List[CheckResult]:
+    """Run platform-agnostic checks (interpreters, requirements, optional dependencies).
+
+    Args:
+        config: The loaded app config, or ``None`` if unavailable.
+
+    Returns:
+        Check results for the host and build Pythons, the declared
+        requirements, and optional dependencies.
     """
     results: List[CheckResult] = []
     py_version = f"{sys.version_info.major}.{sys.version_info.minor}"
@@ -88,6 +107,36 @@ def check_common() -> List[CheckResult]:
                 f"{py_version} (PythonNative targets {', '.join(SUPPORTED_PYTHON_VERSIONS)})",
             )
         )
+
+    if config is not None:
+        # pip cross-resolves iOS wheels from any interpreter, but Chaquopy
+        # needs a matching python3.X on the build machine whenever there
+        # are requirements, and release bytecode is version-specific.
+        build_python = build_python_for(config.python_version)
+        label = f"Build Python {config.python_version} (matches app.python_version)"
+        if build_python:
+            results.append(CheckResult(label, OK, build_python))
+        else:
+            level = WARN if config.requirements else INFO
+            results.append(
+                CheckResult(
+                    label,
+                    level,
+                    f"python{config.python_version} not found on PATH; Android builds with [requirements] and "
+                    "release bytecode compilation need it (e.g. uv python install "
+                    f"{config.python_version})",
+                )
+            )
+        if config.requirements:
+            count = len(config.requirements)
+            results.append(
+                CheckResult(
+                    "Requirements",
+                    INFO,
+                    f"{count} package(s) declared; run 'pn deps' to check device wheel availability",
+                )
+            )
+
     if icons.pillow_available():
         results.append(CheckResult("Pillow (icon/splash generation)", OK))
     else:
@@ -228,7 +277,7 @@ def run_doctor(project_root: Path, *, platform: Optional[str] = None) -> List[Ch
         All check results in display order.
     """
     config, results = check_config(project_root)
-    results.extend(check_common())
+    results.extend(check_common(config))
     if platform in (None, "android"):
         results.extend(check_android(config))
     if platform in (None, "ios"):

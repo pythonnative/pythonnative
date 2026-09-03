@@ -1,4 +1,4 @@
-# Alerts / storage / runtime / platform / SDK category suite.
+# Alerts / storage / runtime / platform / packages / SDK category suite.
 appId: ${APP_ID}
 ---
 - runFlow: ../flows/alerts/simple_alert.yaml
@@ -6,4 +6,5 @@ appId: ${APP_ID}
 - runFlow: ../flows/storage/async_storage.yaml
 - runFlow: ../flows/runtime/run_async.yaml
 - runFlow: ../flows/platform/platform_info.yaml
+- runFlow: ../flows/packages/pypi_packages.yaml
 - runFlow: ../flows/sdk/custom_component.yaml

@@ -311,9 +311,18 @@ pn.Animated.timing(opacity, to=1.0, duration=300).start()
 Read a value from the nearest `Provider` ancestor:
 
 ```python
-theme = pn.use_context(pn.ThemeContext)
-color = theme["primary_color"]
+Locale = pn.create_context("en")
+
+
+@pn.component
+def Greeting():
+    locale = pn.use_context(Locale)
+    return pn.Text("Hello" if locale == "en" else "Hola")
 ```
+
+For theming specifically, prefer [`use_theme`][pythonnative.use_theme],
+which returns a typed [`Theme`][pythonnative.Theme] and falls back to
+the built-in light or dark theme when no provider is mounted.
 
 ### Async hooks
 

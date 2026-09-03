@@ -19,7 +19,6 @@
 		AA0000000000000000000004 /* Python.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000003 /* Python.xcframework */; };
 		AA0000000000000000000005 /* Python.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000003 /* Python.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		AA0000000000000000000007 /* app in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000006 /* app */; };
-		AA0000000000000000000009 /* app_packages in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000008 /* app_packages */; };
 		AA000000000000000000000D /* PythonNativeKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000000C /* PythonNativeKit */; };
 /* End PBXBuildFile section */
 
@@ -56,7 +55,8 @@
 		AA0000000000000000000001 /* PythonRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PythonRuntime.swift; sourceTree = "<group>"; };
 		AA0000000000000000000003 /* Python.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Python.xcframework; sourceTree = "<group>"; };
 		AA0000000000000000000006 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
-		AA0000000000000000000008 /* app_packages */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app_packages; sourceTree = "<group>"; };
+		AA0000000000000000000008 /* app_packages.iphoneos */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app_packages.iphoneos; sourceTree = "<group>"; };
+		AA000000000000000000000F /* app_packages.iphonesimulator */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app_packages.iphonesimulator; sourceTree = "<group>"; };
 		AA000000000000000000000B /* BridgingHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BridgingHeader.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -95,7 +95,8 @@
 				146EBBA12A40CCCE00E4A2B3 /* ios_templateUITests */,
 				AA0000000000000000000003 /* Python.xcframework */,
 				AA0000000000000000000006 /* app */,
-				AA0000000000000000000008 /* app_packages */,
+				AA0000000000000000000008 /* app_packages.iphoneos */,
+				AA000000000000000000000F /* app_packages.iphonesimulator */,
 				146EBB7F2A40CCC900E4A2B3 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -271,7 +272,6 @@
 				146EBB8E2A40CCCE00E4A2B3 /* LaunchScreen.storyboard in Resources */,
 				146EBB8B2A40CCCE00E4A2B3 /* Assets.xcassets in Resources */,
 				AA0000000000000000000007 /* app in Resources */,
-				AA0000000000000000000009 /* app_packages in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -309,7 +309,33 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nif [ ! -d \"$PROJECT_DIR/Python.xcframework\" ]; then\n    echo \"error: Python.xcframework is missing from the project. Build with 'pn run ios' or 'pn build ios' so the PythonNative CLI links the embedded runtime; the raw template cannot be built directly.\"\n    exit 1\nfi\nif [ ! -d \"$PROJECT_DIR/app\" ] || [ ! -d \"$PROJECT_DIR/app_packages\" ]; then\n    echo \"error: app/ or app_packages/ has not been staged. Build with 'pn run ios' or 'pn build ios' so the PythonNative CLI stages the Python sources.\"\n    exit 1\nfi\nif [ ! -d \"$PROJECT_DIR/app_packages/pythonnative\" ]; then\n    echo \"error: the pythonnative package is missing from app_packages/. Re-run 'pn run ios' or 'pn build ios'.\"\n    exit 1\nfi\nsource \"$PROJECT_DIR/Python.xcframework/build/utils.sh\"\ninstall_python Python.xcframework app app_packages\n";
+			shellScript = "set -e
+if [ ! -d \"$PROJECT_DIR/Python.xcframework\" ]; then
+    echo \"error: Python.xcframework is missing from the project. Build with 'pn run ios' or 'pn build ios' so the PythonNative CLI links the embedded runtime; the raw template cannot be built directly.\"
+    exit 1
+fi
+# Third-party packages are resolved per destination (device vs simulator)
+# because binary wheels differ between the two. The pn CLI stages one
+# folder per platform; install the one matching this build.
+case \"$EFFECTIVE_PLATFORM_NAME\" in
+    -iphoneos) PACKAGES_SLICE=\"app_packages.iphoneos\" ;;
+    -iphonesimulator) PACKAGES_SLICE=\"app_packages.iphonesimulator\" ;;
+    *) echo \"error: unsupported platform '$EFFECTIVE_PLATFORM_NAME' (expected -iphoneos or -iphonesimulator).\"; exit 1 ;;
+esac
+if [ ! -d \"$PROJECT_DIR/app\" ] || [ ! -d \"$PROJECT_DIR/$PACKAGES_SLICE\" ]; then
+    echo \"error: app/ or $PACKAGES_SLICE/ has not been staged. Build with 'pn run ios' or 'pn build ios' so the PythonNative CLI stages the Python sources.\"
+    exit 1
+fi
+if [ ! -d \"$PROJECT_DIR/$PACKAGES_SLICE/pythonnative\" ]; then
+    echo \"error: the pythonnative package is missing from $PACKAGES_SLICE/. Re-run 'pn run ios' or 'pn build ios'.\"
+    exit 1
+fi
+echo \"Installing $PACKAGES_SLICE into the app bundle\"
+mkdir -p \"$CODESIGNING_FOLDER_PATH/app_packages\"
+rsync -au --delete \"$PROJECT_DIR/$PACKAGES_SLICE/\" \"$CODESIGNING_FOLDER_PATH/app_packages/\"
+source \"$PROJECT_DIR/Python.xcframework/build/utils.sh\"
+install_python Python.xcframework app app_packages
+";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -420,7 +446,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -474,7 +500,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
@@ -593,7 +619,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pythonnative.ios-templateTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -613,7 +639,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pythonnative.ios-templateTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";

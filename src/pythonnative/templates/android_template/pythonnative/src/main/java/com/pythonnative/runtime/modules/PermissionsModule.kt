@@ -12,6 +12,12 @@ import org.json.JSONObject
  * `Permissions.check(permission)` (sync) and `request(permission)`
  * (async, routed through `onRequestPermissionsResult`). Statuses are
  * `granted`, `denied`, `blocked`, and `undetermined`.
+ *
+ * Permission names are the `[permissions]` keys from pythonnative.toml
+ * (`camera`, `microphone`, `photo_library`, `location_when_in_use`,
+ * `contacts`, `notifications`); the Python facade validates them before
+ * the call reaches this module, so an unknown name here is a bug rather
+ * than user input, and is rejected rather than answered.
  */
 class PermissionsModule : NativeModule {
     override val name = "Permissions"
@@ -19,6 +25,11 @@ class PermissionsModule : NativeModule {
 
     override fun call(method: String, args: JSONObject, promise: Promise) {
         val permission = args.str("permission") ?: ""
+        if (method == "check" || method == "request") {
+            if (!MANIFEST.containsKey(permission)) {
+                return promise.reject("unknown permission '$permission'", "bad_args")
+            }
+        }
         when (method) {
             "check" -> promise.resolve(check(permission))
             "request" -> request(permission) { promise.resolve(it) }
@@ -30,7 +41,7 @@ class PermissionsModule : NativeModule {
     fun check(permission: String): String {
         val manifest = MANIFEST[permission] ?: return UNDETERMINED
         if (permission == "notifications" && Build.VERSION.SDK_INT < 33) return GRANTED
-        if (permission == "photos" && Build.VERSION.SDK_INT < 33) {
+        if (permission == "photo_library" && Build.VERSION.SDK_INT < 33) {
             return statusOf("android.permission.READ_EXTERNAL_STORAGE")
         }
         return statusOf(manifest)
@@ -50,7 +61,7 @@ class PermissionsModule : NativeModule {
         val manifest = MANIFEST[permission] ?: return onDone(UNDETERMINED)
         if (check(permission) == GRANTED) return onDone(GRANTED)
         val activity = PNBridge.activity() ?: return onDone(check(permission))
-        val target = if (permission == "photos" && Build.VERSION.SDK_INT < 33) "android.permission.READ_EXTERNAL_STORAGE" else manifest
+        val target = if (permission == "photo_library" && Build.VERSION.SDK_INT < 33) "android.permission.READ_EXTERNAL_STORAGE" else manifest
         val code = RequestCodes.next()
         pending[code] = target to onDone
         try {
@@ -79,10 +90,10 @@ class PermissionsModule : NativeModule {
         val MANIFEST = mapOf(
             "camera" to "android.permission.CAMERA",
             "microphone" to "android.permission.RECORD_AUDIO",
-            "location" to "android.permission.ACCESS_FINE_LOCATION",
+            "photo_library" to "android.permission.READ_MEDIA_IMAGES",
+            "location_when_in_use" to "android.permission.ACCESS_FINE_LOCATION",
             "contacts" to "android.permission.READ_CONTACTS",
             "notifications" to "android.permission.POST_NOTIFICATIONS",
-            "photos" to "android.permission.READ_MEDIA_IMAGES",
         )
     }
 }

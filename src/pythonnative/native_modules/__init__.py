@@ -17,6 +17,25 @@ feedback), so the same code stays runnable off device. Third-party
 packages ship their own native modules the same way; see
 ``docs/guides/native-modules.md``.
 
+Two rules hold across every facade, so you never have to look one up:
+
+1. **Sync or async is decided by what the OS has to do.** A method is
+   a plain function when the answer is already on the device and
+   returns on the calling thread (read the pasteboard, check a
+   permission, read the battery level, Keychain get/set, file I/O).
+   It is a coroutine when the OS has to prompt the user, drive
+   hardware, or hand off to another process (camera and gallery
+   pickers, biometric prompts, permission requests, the share sheet,
+   GPS fixes, notification scheduling, remote push registration).
+2. **Failures raise; "nothing happened" returns a value.** A native
+   error (a rejected promise, a missing module, a bad argument) is a
+   [`NativeModuleError`][pythonnative.native_modules.NativeModuleError]
+   and propagates to the caller like any other Python exception. Outcomes
+   that are not errors, such as the user cancelling a picker, denying a
+   permission, or dismissing the share sheet, come back as ``None``,
+   ``False``, or a status string, and are documented per method. No
+   facade converts an exception into a default value.
+
 Hardware / media:
 
 - [`Camera`][pythonnative.native_modules.Camera]: photo capture and

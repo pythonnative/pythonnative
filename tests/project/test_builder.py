@@ -54,7 +54,7 @@ name = "cool"
 display_name = "Cool App"
 version = "3.0.0"
 build = 5
-python_version = "3.11"
+python_version = "3.13"
 [android]
 min_sdk = 24
 target_sdk = 34
@@ -95,7 +95,7 @@ def _fake_ios_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> runtim
     xcframework = tmp_path / "fake_runtime" / "Python.xcframework"
     (xcframework / "build").mkdir(parents=True)
     (xcframework / "build" / "utils.sh").write_text("install_python() { :; }\n", encoding="utf-8")
-    runtime = runtime_assets.IOSRuntime(python_version="3.11", xcframework_dir=xcframework)
+    runtime = runtime_assets.IOSRuntime(python_version="3.13", xcframework_dir=xcframework)
     monkeypatch.setattr(builder_mod.runtime_assets, "prepare_ios_runtime", lambda *a, **k: runtime)
     return runtime
 
@@ -113,11 +113,15 @@ def test_prepare_ios_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     plist = plistlib.loads(prepared.ios.info_plist.read_bytes())
     assert plist["CFBundleDisplayName"] == "Cool App"
 
-    # Python sources and the library are staged at the Xcode project root.
+    # Python sources are staged at the Xcode project root, and the library
+    # goes into one package slice per iOS SDK (the build phase picks the
+    # slice matching the destination).
     assert (prepared.project_dir / "app" / "main.py").is_file()
-    lib = prepared.project_dir / "app_packages" / "pythonnative"
-    assert (lib / "__init__.py").is_file()
-    assert not (lib / "templates").exists()
+    assert not (prepared.project_dir / "app_packages").exists()
+    for sdk in ("iphoneos", "iphonesimulator"):
+        lib = prepared.project_dir / f"app_packages.{sdk}" / "pythonnative"
+        assert (lib / "__init__.py").is_file()
+        assert not (lib / "templates").exists()
     # The pinned runtime is linked into the project.
     xcframework = prepared.project_dir / "Python.xcframework"
     assert xcframework.is_dir() or xcframework.is_symlink()
@@ -143,9 +147,39 @@ def test_prepare_ios_release_compiles_bytecode_when_versions_match(
     app_dir = prepared.project_dir / "app"
     assert (app_dir / "main.pyc").is_file()
     assert not (app_dir / "main.py").exists()
-    lib = prepared.project_dir / "app_packages" / "pythonnative"
+    lib = prepared.project_dir / "app_packages.iphoneos" / "pythonnative"
     assert not list(lib.rglob("*.py"))
     assert list(lib.rglob("*.pyc"))
+
+
+def test_prepare_ios_narrows_slices_to_requested_sdks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _fake_ios_runtime(tmp_path, monkeypatch)
+    root = _project(tmp_path, _TOML)
+    cfg = AppConfig.load(root)
+    prepared = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", ios_sdks=("iphonesimulator",))
+    assert (prepared.project_dir / "app_packages.iphonesimulator" / "pythonnative").is_dir()
+    assert not (prepared.project_dir / "app_packages.iphoneos").exists()
+
+
+def test_prepare_ios_installs_requirements_per_slice(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _fake_ios_runtime(tmp_path, monkeypatch)
+    root = _project(tmp_path, _TOML + '\n[requirements]\npackages = ["httpx==0.27.0", "numpy"]\n')
+    cfg = AppConfig.load(root)
+    runner = RecordingRunner()
+    Builder(cfg, runner=runner, log=lambda _m: None).prepare("ios")
+
+    pip_cmds = [cmd for cmd in runner.commands if "pip" in cmd]
+    assert len(pip_cmds) == 2
+    targets = {cmd[cmd.index("--target") + 1].rsplit("/", 1)[-1] for cmd in pip_cmds}
+    assert targets == {"app_packages.iphoneos", "app_packages.iphonesimulator"}
+    for cmd in pip_cmds:
+        assert "--only-binary=:all:" in cmd
+        assert "httpx==0.27.0" in cmd and "numpy" in cmd
+        platforms = [cmd[i + 1] for i, a in enumerate(cmd) if a == "--platform"]
+        assert platforms, cmd
+        assert all(p.startswith("ios_") for p in platforms)
+    assert any("arm64_iphoneos" in p for cmd in pip_cmds for p in cmd)
+    assert any("iphonesimulator" in p for cmd in pip_cmds for p in cmd if p.startswith("ios_"))
 
 
 def test_prepare_ios_release_skips_bytecode_on_version_mismatch(
@@ -156,7 +190,7 @@ def test_prepare_ios_release_skips_bytecode_on_version_mismatch(
     cfg = AppConfig.load(root)
     host = f"{sys.version_info[0]}.{sys.version_info[1]}"
     if cfg.python_version == host:
-        cfg.python_version = "3.10" if host != "3.10" else "3.12"
+        cfg.python_version = "3.14" if host != "3.14" else "3.13"
     messages: List[str] = []
     prepared = Builder(cfg, runner=RecordingRunner(), log=messages.append).prepare("ios", release=True)
 

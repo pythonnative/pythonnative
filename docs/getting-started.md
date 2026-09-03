@@ -1,5 +1,9 @@
 # Getting Started
 
+PythonNative requires Python 3.13 or newer on your development
+machine: the same interpreter version your app embeds, so packages
+resolve identically on both.
+
 ```bash
 pip install pythonnative
 pn --help
@@ -163,7 +167,10 @@ pn run ios --hot-reload
 
 The first run still builds and launches the native app. After that,
 edits under `app/` are copied into the running app's writable source
-overlay and the active page refreshes without a full rebuild.
+overlay and the active page refreshes without a full rebuild. This
+works on Android devices and emulators and on the iOS Simulator;
+physical iPhones don't support hot reload yet (see the
+[Hot reload guide](guides/hot-reload.md)).
 
 PythonNative prefers a **Fast Refresh** path: each
 [`@pn.component`][pythonnative.component.component] function is matched by

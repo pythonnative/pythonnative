@@ -26,7 +26,7 @@ jobs:
         uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
-          python-version: '3.12'
+          python-version: '3.13'
 
       # TEMPORARY: inlined replacement for the
       # python-semantic-release/python-semantic-release@v9 action. That

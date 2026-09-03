@@ -18,7 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
       - name: Check E2E coverage of pythonnative.__all__
         run: python scripts/check-e2e-coverage.py
 
@@ -64,7 +64,7 @@ jobs:
         uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -168,7 +168,7 @@ jobs:
         uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Install PythonNative
         run: uv sync --locked

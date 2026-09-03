@@ -56,12 +56,9 @@ async def _present(
     implementation records the call and answers from the queue set by
     [`Alert.set_test_response`][pythonnative.alerts.Alert.set_test_response].
     """
-    try:
-        result = await native_module("Alert").call_async(
-            "present", title=title, message=message, buttons=buttons, style=style
-        )
-    except Exception:
-        return -1
+    result = await native_module("Alert").call_async(
+        "present", title=title, message=message, buttons=buttons, style=style
+    )
     try:
         return int(result)
     except (TypeError, ValueError):
@@ -135,14 +132,9 @@ class Alert:
         [`choose`][pythonnative.alerts.Alert.choose] and ``await``
         the result.
         """
-        try:
-            native_module("Alert").call(
-                "show", title=title, message=message, buttons=[{"label": button, "style": "default"}], style="alert"
-            )
-        except Exception:
-            from . import diagnostics
-
-            diagnostics.swallowed("alerts.Alert.show")
+        native_module("Alert").call(
+            "show", title=title, message=message, buttons=[{"label": button, "style": "default"}], style="alert"
+        )
 
     @staticmethod
     async def confirm(

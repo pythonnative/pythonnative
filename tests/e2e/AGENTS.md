@@ -33,6 +33,7 @@ examples/e2e-suite/
 │       ├── storage/           # AsyncStorage demos
 │       ├── runtime/           # run_async demo
 │       ├── platform/          # Platform info demo
+│       ├── packages/          # PyPI packages demo ([requirements].packages on device)
 │       └── sdk/               # SDK surface demo
 └── pythonnative.toml
 

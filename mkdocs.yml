@@ -87,6 +87,7 @@ nav:
     - Async + Data: guides/async.md
     - Platform & Accessibility: guides/platform-accessibility.md
     - Native Modules: guides/native-modules.md
+    - PyPI Packages: guides/pypi-packages.md
     - Custom Native Components: guides/custom-native-components.md
     - Hot Reload: guides/hot-reload.md
     - Error Boundaries: guides/error-boundaries.md

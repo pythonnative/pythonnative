@@ -17,11 +17,14 @@ android {
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
-            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            abiFilters "arm64-v8a", "x86_64"
         }
         python {
-            version "3.11"
+            // Rewritten from app.python_version by the pn CLI (project/android.py).
+            version "3.13"
             pip {
+                // `options` lines for [requirements].extra_index_urls are
+                // injected above `install` by the pn CLI.
                 install "-r", "requirements.txt"
             }
         }

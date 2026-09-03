@@ -14,7 +14,7 @@ name = "myapp"                  # short project name (required)
 display_name = "My App"         # home-screen label (defaults to name)
 version = "1.0.0"               # marketing version
 build = 1                       # integer build number
-python_version = "3.11"         # embedded CPython version
+python_version = "3.13"         # embedded CPython version (3.13 or 3.14)
 orientation = "portrait"        # portrait | landscape | all
 entry_point = "app/main.py"     # module whose `App` is mounted
 url_schemes = ["myapp"]         # deep-link schemes the app handles
@@ -29,7 +29,8 @@ icon = "assets/icon.png"        # 1024x1024 source icon
 splash = "assets/splash.png"    # splash / launch image
 
 [requirements]
-packages = ["humanize", "httpx"]
+packages = ["humanize", "httpx", "numpy"]
+# extra_index_urls = ["https://wheels.example.com/simple"]
 
 [plugins]
 # paths = ["native/my_plugin"]  # project-local Swift/Kotlin plugins
@@ -70,7 +71,7 @@ Core identity, shared by both platforms.
 | `display_name` | string | `name` | The label shown under the icon on the home screen. |
 | `version` | string | `"1.0.0"` | Marketing version (`CFBundleShortVersionString` / `versionName`). One to four dot-separated numbers. |
 | `build` | integer | `1` | Build number (`CFBundleVersion` / `versionCode`). Must be a positive integer; bump it for every store upload. |
-| `python_version` | string | `"3.11"` | Embedded CPython version. One of `3.10`, `3.11`, `3.12`; every listed version has a pinned, checksum-verified iOS runtime. |
+| `python_version` | string | `"3.13"` | Embedded CPython version. One of `3.13`, `3.14`; every listed version has a pinned, checksum-verified iOS runtime and a matching Chaquopy build. Packages are resolved for this version, not your host's (see [PyPI packages](pypi-packages.md)). |
 | `orientation` | string | `"portrait"` | `portrait`, `landscape`, or `all`. |
 | `url_schemes` | list of strings | `[]` | Custom deep-link URL schemes (e.g. `["myapp"]` handles `myapp://…`). Wired into `CFBundleURLTypes` on iOS and a `VIEW` intent filter on Android; inbound URLs reach `pn.Linking`. |
 | `entry_point` | string | `"app/main.py"` | The module whose top-level `App` component is mounted. `app/main.py` → imported as `app.main`. |
@@ -126,17 +127,25 @@ reports whether Pillow is available. See
 
 | Key | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `packages` | list of strings | `[]` | Third-party pip requirements bundled into the app. |
+| `packages` | list of strings | `[]` | Third-party pip requirements bundled into the app. Resolved per device target with `--only-binary`, so binary packages need a wheel for each target. |
+| `extra_index_urls` | list of strings | `[]` | Additional package indexes searched after PyPI and the platform indexes (BeeWare for iOS, Chaquopy for Android). Must be `http(s)` URLs. |
 
 ```toml
 [requirements]
-packages = ["humanize", "httpx>=0.27"]
+packages = ["humanize", "httpx>=0.27", "numpy"]
+extra_index_urls = ["https://wheels.mycompany.example/simple"]
 ```
 
-- **Android**: written into the staged template's `requirements.txt` and
-  installed by Chaquopy into the APK at build time.
-- **iOS**: pure-Python packages are copied into the app bundle's
-  Python site directory.
+- **iOS**: the CLI resolves and installs one `app_packages.<sdk>` slice
+  per SDK (device and Simulator); the Xcode run script bundles the
+  matching one.
+- **Android**: written into the staged template's `requirements.txt`
+  (with the index options) and installed by Chaquopy into the APK at
+  build time, once per ABI.
+
+Run `pn deps` to see how each requirement resolves for every target
+before building. See [PyPI packages](pypi-packages.md) for what works
+and why.
 
 !!! warning "Don't list `pythonnative`"
     The CLI bundles the installed `pythonnative` package directly, so
@@ -175,7 +184,7 @@ generated registration file calls every plugin's `register`. See
 
 | Key | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `deployment_target` | string | `"13.0"` | Minimum iOS version. |
+| `deployment_target` | string | `"13.0"` | Minimum iOS version. Must be at least `13.0`, the floor of BeeWare's CPython builds and of every iOS wheel on PyPI. |
 | `development_team` | string | – | Apple Developer Team ID used for signing. |
 | `bundle_id` | string | `app.id` | Override the iOS bundle identifier. |
 | `extra_info_plist` | table | `{}` | Arbitrary extra `Info.plist` keys merged verbatim into the generated plist. |
@@ -203,11 +212,11 @@ provisioning_profile = "My App Distribution"
 
 | Key | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `min_sdk` | integer | `24` | Minimum API level. Must be ≥ 21 (Chaquopy requirement). |
+| `min_sdk` | integer | `24` | Minimum API level. Must be at least 24 (Chaquopy 17 requirement). |
 | `target_sdk` | integer | `34` | Target API level. Must be ≥ `min_sdk`. |
 | `compile_sdk` | integer | `34` | SDK level the project compiles against. |
 | `application_id` | string | `app.id` | Override the Android application id (and package). |
-| `abi_filters` | list of strings | `["arm64-v8a", "x86_64"]` | Native ABIs to include. The default covers 64-bit devices and emulators; add `armeabi-v7a` or `x86` only if you must support 32-bit hardware (each ABI adds roughly 30 MB). |
+| `abi_filters` | list of strings | `["arm64-v8a", "x86_64"]` | Native ABIs to include: `arm64-v8a` (devices) and `x86_64` (emulators). CPython 3.13+ on Chaquopy and PEP 738 wheels are 64-bit only, so 32-bit ABIs are rejected. Drop `x86_64` for a smaller release APK. |
 | `permissions` | list of strings | `[]` | Extra **raw** Android permission strings appended to the ones derived from `[permissions]`. |
 
 ### `[android.signing]`

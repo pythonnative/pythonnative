@@ -12,7 +12,7 @@ from ..component import component
 from ..element import Element
 from ..hooks import Ref, use_keyboard_height, use_safe_area_insets, use_state
 from ..style import AccessibilityState, StyleProp, resolve_style
-from ._base import _make_element
+from ._base import _make_element, _refresh_control_props
 
 
 def View(
@@ -281,7 +281,7 @@ def Spacer(
 
 def ScrollView(
     *children: Element,
-    refresh_control: Optional[Dict[str, Any]] = None,
+    refresh_control: Optional[Element] = None,
     scroll_axis: Optional[Literal["vertical", "horizontal"]] = None,
     on_scroll: Optional[Callable[[Dict[str, float]], None]] = None,
     shows_scroll_indicator: bool = True,
@@ -302,11 +302,8 @@ def ScrollView(
 
     Args:
         *children: Child elements to scroll.
-        refresh_control: Optional pull-to-refresh spec, typically
-            constructed via
-            [`RefreshControl`][pythonnative.RefreshControl]. The dict
-            must have ``refreshing`` (bool) and ``on_refresh``
-            (callable).
+        refresh_control: Optional [`RefreshControl`][pythonnative.RefreshControl]
+            element attached to the scroll view for pull-to-refresh.
         scroll_axis: ``"vertical"`` (default) or ``"horizontal"``.
         on_scroll: Callback invoked with ``{"x": …, "y": …}`` content
             offsets as the user scrolls.
@@ -333,7 +330,7 @@ def ScrollView(
         style=style,
         ref=ref,
         key=key,
-        refresh_control=refresh_control,
+        refresh_control=_refresh_control_props(refresh_control, owner="ScrollView"),
         scroll_axis=scroll_axis,
         on_scroll=on_scroll,
         shows_scroll_indicator=False if shows_scroll_indicator is False else None,

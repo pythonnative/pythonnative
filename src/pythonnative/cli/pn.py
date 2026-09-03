@@ -6,6 +6,9 @@ The console script `pn` (declared in `pyproject.toml`) dispatches to:
   ``app/``) into ``./name/``, or into the current directory when no name
   is given.
 - `pn doctor [platform]`: diagnose the local toolchain and config.
+- `pn deps [platform]`: resolve ``[requirements].packages`` for every
+  device target and report which wheels would be used (or why a package
+  can't be installed), without building anything.
 - `pn preview [component]`: render the app in a desktop (Tkinter) window
   with Fast Refresh, the fast inner dev loop, no device required.
 - `pn devices [platform]`: list connected devices, emulators, and
@@ -41,6 +44,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TextIO
 
 from ..project import builder as builder_mod
+from ..project import deps as deps_mod
 from ..project import devices as devices_mod
 from ..project import doctor as doctor_mod
 from ..project.android import collect_logcat_filters
@@ -54,22 +58,29 @@ HOT_RELOAD_DEV_ROOT = "pythonnative_dev"
 # init
 # ======================================================================
 
-_MAIN_TEMPLATE = """import pythonnative as pn
+_MAIN_TEMPLATE = """from typing import TypedDict
+
+import pythonnative as pn
 
 Stack = pn.create_stack_navigator()
+
+
+class DetailParams(TypedDict):
+    count: int
 
 
 @pn.component
 def HomeScreen():
     count, set_count = pn.use_state(0)
     nav = pn.use_navigation()
+    theme = pn.use_theme()
     return pn.ScrollView(
         pn.Column(
-            pn.Text("Hello from PythonNative!", style={"font_size": 24, "bold": True}),
+            pn.Text("Hello from PythonNative!", style={"font_size": theme.font_size_title, "bold": True}),
             pn.Text(f"Tapped {count} times"),
             pn.Button("Tap me", on_press=lambda: set_count(count + 1)),
-            pn.Button("Open detail", on_press=lambda: nav.navigate("Detail", {"count": count})),
-            style={"spacing": 12, "padding": 16, "align_items": "stretch"},
+            pn.Button("Open detail", on_press=lambda: nav.navigate("Detail", count=count)),
+            style={"spacing": theme.spacing_large, "padding": 16, "align_items": "stretch"},
         )
     )
 
@@ -77,9 +88,9 @@ def HomeScreen():
 @pn.component
 def DetailScreen():
     nav = pn.use_navigation()
-    params = pn.use_route()
+    route = pn.use_route(DetailParams)
     return pn.Column(
-        pn.Text(f"Detail: count was {params.get('count', 0)}", style={"font_size": 20}),
+        pn.Text(f"Detail: count was {route.params['count']}", style={"font_size": 20}),
         pn.Button("Back", on_press=nav.go_back),
         style={"spacing": 12, "padding": 16},
     )
@@ -89,8 +100,8 @@ def DetailScreen():
 def App():
     return pn.NavigationContainer(
         Stack.Navigator(
-            Stack.Screen("Home", component=HomeScreen, options={"title": "Home"}),
-            Stack.Screen("Detail", component=DetailScreen, options={"title": "Detail"}),
+            Stack.Screen("Home", HomeScreen, title="Home"),
+            Stack.Screen("Detail", DetailScreen, title="Detail"),
         )
     )
 """
@@ -279,6 +290,56 @@ def app_id_command(args: argparse.Namespace) -> None:
 
 
 # ======================================================================
+# deps
+# ======================================================================
+
+
+def deps_command(args: argparse.Namespace) -> None:
+    """Report how ``[requirements].packages`` resolve for each device target.
+
+    Runs pip in its cross-platform dry-run mode once per target (iOS
+    device, iOS Simulator, and one per Android ABI) and prints the
+    wheel each package would use, flagging binary wheels and their
+    source index. Exits non-zero when any target can't be satisfied,
+    so it doubles as a CI gate. ``--json`` emits the same data as a
+    machine-readable document.
+
+    Args:
+        args: Parsed namespace with optional ``platform``, ``json``, and
+            ``python`` (the interpreter to run pip with).
+    """
+    platform: Optional[str] = getattr(args, "platform", None)
+    as_json: bool = getattr(args, "json", False)
+    python: Optional[str] = getattr(args, "python", None)
+
+    config = _load_config_or_exit()
+    targets = deps_mod.targets_for(config, platform)
+    runner = builder_mod.SubprocessRunner()
+    if not as_json and config.requirements:
+        print(
+            f"Resolving {len(config.requirements)} requirement(s) for Python {config.python_version} "
+            f"across {len(targets)} target(s)...\n"
+        )
+    resolutions = deps_mod.resolve_all(config, targets, runner=runner, python=python)
+
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "python_version": config.python_version,
+                    "requirements": list(config.requirements),
+                    "targets": [res.to_dict() for res in resolutions],
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(deps_mod.format_report(resolutions, requirements=config.requirements))
+    if any(not res.ok for res in resolutions):
+        sys.exit(1)
+
+
+# ======================================================================
 # preview
 # ======================================================================
 
@@ -426,8 +487,18 @@ def run_project(args: argparse.Namespace) -> None:
     config = _load_config_or_exit()
     builder = builder_mod.Builder(config, log=print)
 
+    # Resolve third-party packages only for the destination being built
+    # (device wheels and Simulator wheels differ); prepare-only keeps both
+    # slices so the staged project builds for either in Xcode.
+    if prepare_only:
+        ios_sdks: tuple = deps_mod.IOS_SDKS
+    elif device is not None and device.kind == "device":
+        ios_sdks = ("iphoneos",)
+    else:
+        ios_sdks = ("iphonesimulator",)
+
     try:
-        prepared = builder.prepare(platform)
+        prepared = builder.prepare(platform, ios_sdks=ios_sdks)
     except builder_mod.BuildError as exc:
         print(f"Error: {exc}")
         sys.exit(1)
@@ -593,7 +664,11 @@ def build_project(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     try:
-        prepared = builder.prepare(platform, release=not debug)
+        prepared = builder.prepare(
+            platform,
+            release=not debug,
+            ios_sdks=("iphonesimulator",) if debug else ("iphoneos",),
+        )
         if platform == "android":
             artifacts = builder.build_android(prepared, debug=debug)
         else:
@@ -1019,6 +1094,17 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_doctor = subparsers.add_parser("doctor", help="Diagnose the local toolchain and config")
     parser_doctor.add_argument("platform", nargs="?", choices=["android", "ios"], help="Restrict checks to a platform")
     parser_doctor.set_defaults(func=doctor_command)
+
+    parser_deps = subparsers.add_parser(
+        "deps", help="Check which wheels [requirements].packages resolve to on each device target"
+    )
+    parser_deps.add_argument("platform", nargs="?", choices=["android", "ios"], help="Restrict to a platform")
+    parser_deps.add_argument("--json", action="store_true", help="Print a JSON report for scripting")
+    parser_deps.add_argument(
+        "--python",
+        help="Interpreter to run pip with (default: the one running pn; any version works, pip cross-resolves)",
+    )
+    parser_deps.set_defaults(func=deps_command)
 
     parser_preview = subparsers.add_parser("preview", help="Render the app in a desktop window")
     parser_preview.add_argument(

@@ -28,14 +28,17 @@ class TestIosDetection:
         monkeypatch.setattr(sys, "platform", "ios")
         assert _detect_ios() is True
 
-    def test_detects_via_core_simulator_home(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_core_simulator_home_alone_is_not_ios(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A macOS process whose HOME happens to point into a Simulator
+        # container (e.g. a host tool spawned by simctl) is still macOS;
+        # the embedded runtime reports sys.platform == "ios" itself.
         monkeypatch.delenv("PN_PLATFORM", raising=False)
         monkeypatch.setattr(sys, "platform", "darwin")
         monkeypatch.setenv(
             "HOME",
             "/Users/x/Library/Developer/CoreSimulator/Devices/ABCD/data",
         )
-        assert _detect_ios() is True
+        assert _detect_ios() is False
 
     def test_plain_macos_is_not_ios(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("PN_PLATFORM", raising=False)

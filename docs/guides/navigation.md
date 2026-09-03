@@ -221,6 +221,32 @@ def DetailScreen():
 `initial_params` on `Screen(...)` fill in defaults; `navigate` /
 `push` params merge on top.
 
+### Typed params
+
+Declare a screen's params as a `TypedDict` and pass it to `use_route`.
+`route.params` is then typed for your editor and type checker, and the
+hook verifies at the screen's first render that every required key is
+present, naming the missing ones instead of failing later with a
+`KeyError`:
+
+```python
+from typing import NotRequired, TypedDict
+
+
+class DetailParams(TypedDict):
+    id: int
+    title: NotRequired[str]
+
+
+@pn.component
+def DetailScreen():
+    route = pn.use_route(DetailParams)
+    return pn.Text(f"Item #{route.params['id']}")  # id: int
+```
+
+Params travel over the bridge as JSON, so keep them to JSON-friendly
+values (strings, numbers, booleans, lists, and dicts).
+
 ## Focus
 
 [`use_is_focused`][pythonnative.use_is_focused] is `True` only for the

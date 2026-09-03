@@ -199,7 +199,7 @@ _TOML = """
 [app]
 id = "com.acme.cool"
 name = "cool"
-python_version = "3.11"
+python_version = "3.13"
 [plugins]
 paths = ["native/blur"]
 """
@@ -233,7 +233,7 @@ def test_builder_bundles_local_plugins_into_ios(tmp_path: Path, monkeypatch: pyt
     monkeypatch.setattr(plugins_mod, "_entry_points", lambda: {})
     xcframework = tmp_path / "fake_runtime" / "Python.xcframework"
     (xcframework / "build").mkdir(parents=True)
-    runtime = runtime_assets.IOSRuntime(python_version="3.11", xcframework_dir=xcframework)
+    runtime = runtime_assets.IOSRuntime(python_version="3.13", xcframework_dir=xcframework)
     monkeypatch.setattr(builder_mod.runtime_assets, "prepare_ios_runtime", lambda *a, **k: runtime)
     cfg = AppConfig.load(_project(tmp_path))
 

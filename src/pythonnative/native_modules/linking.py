@@ -5,9 +5,9 @@
 app can hand a URL (``https:``, ``mailto:``, ``tel:``, a custom
 scheme, ...) to the OS.
 
-Outbound methods are synchronous and return a ``bool`` describing
-whether the platform accepted the request. On desktop they return
-``False``.
+Outbound methods hand the URL to the OS and return at once, so they
+are synchronous; the ``bool`` says whether the platform accepted the
+request. On desktop they return ``False``.
 
 Inbound deep links flow the other way: declare your schemes in
 ``pythonnative.toml`` (``app.url_schemes``) and the native module
@@ -39,14 +39,15 @@ _url_listeners: List[Callable[[str], None]] = []
 
 
 def _call_bool(method: str, **args: Any) -> bool:
-    try:
-        return bool(native_module("Linking").call(method, **args))
-    except Exception:
-        return False
+    return bool(native_module("Linking").call(method, **args))
 
 
 class Linking:
-    """System URL / deep-link interface (synchronous)."""
+    """System URL / deep-link interface (synchronous).
+
+    Raises:
+        NativeModuleError: If the native module fails.
+    """
 
     @staticmethod
     def open_url(url: str) -> bool:

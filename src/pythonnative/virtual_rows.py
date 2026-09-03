@@ -15,7 +15,9 @@ a different row index (recycling), and tears everything down when the
 list is destroyed.
 
 State inside rows works: hooks like ``use_state`` mark the row's own
-reconciler dirty and a guarded flush re-renders just that row.
+reconciler dirty and the reconciler's inline flush (its default when
+no host render callback is set) re-renders just that row. Re-entrant
+requests during a flush are drained by the reconciler itself.
 """
 
 from typing import Any, Callable, Dict
@@ -39,27 +41,15 @@ class RowSubtree:
         from .reconciler import Reconciler
 
         self._reconciler = Reconciler(get_registry())
-        # Guarded synchronous flush so ``use_state`` inside a row
-        # re-renders the row. Re-entrant requests (a setter firing
-        # during the flush itself) are queued and drained after.
-        self._flushing = False
-        self._flush_queued = False
-        self._reconciler._screen_re_render = self._request_flush
+        # Rows flush synchronously: a ``use_state`` setter inside a row
+        # re-renders that row before the setter returns. The reconciler
+        # queues and drains re-entrant requests on its own, so no
+        # extra guard is needed here.
+        self._reconciler.on_render_requested = self._flush
         self.native_root: Any = None
 
-    def _request_flush(self) -> None:
-        if self._flushing:
-            self._flush_queued = True
-            return
-        self._flushing = True
-        try:
-            for _ in range(8):
-                self._flush_queued = False
-                self.native_root = self._reconciler.flush_dirty()
-                if not self._flush_queued:
-                    break
-        finally:
-            self._flushing = False
+    def _flush(self) -> None:
+        self.native_root = self._reconciler.flush_dirty()
 
     def mount(self, element: Element, width: float, height: float) -> Any:
         """Mount ``element`` at the given cell size; returns the native root."""

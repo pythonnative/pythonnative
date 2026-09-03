@@ -38,8 +38,12 @@ class Camera:
                 ``allow_editing``, ...). Unknown keys are ignored.
 
         Returns:
-            The saved image path, or ``None`` if the user cancelled or
-            no camera is available.
+            The saved image path, or ``None`` if the user cancelled (or
+            there is no camera to present, as on desktop).
+
+        Raises:
+            NativeModuleError: If the picker can't be presented, for
+                example because another picker is already open.
         """
         return await _launch("take_photo", options)
 
@@ -49,13 +53,13 @@ class Camera:
 
         Returns:
             The selected image path, or ``None`` if the user cancelled.
+
+        Raises:
+            NativeModuleError: If the picker can't be presented.
         """
         return await _launch("pick_from_gallery", options)
 
 
 async def _launch(method: str, options: Any) -> Optional[str]:
-    try:
-        result = await native_module("Camera").call_async(method, **options)
-    except Exception:
-        return None
+    result = await native_module("Camera").call_async(method, **options)
     return str(result) if result else None

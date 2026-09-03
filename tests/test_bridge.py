@@ -370,10 +370,24 @@ def test_facades_use_bridge_modules_on_device(transport: FakeTransport) -> None:
         return store.pop(args["key"], None) is not None
 
     transport.module_handlers["SecureStore"] = secure
-    assert pn.SecureStore.set_item("token", "abc") is True
+    assert pn.SecureStore.set_item("token", "abc") is None
     assert pn.SecureStore.get_item("token") == "abc"
     assert pn.SecureStore.delete_item("token") is True
     assert pn.SecureStore.get_item("token") is None
+
+
+def test_facade_surfaces_native_errors(transport: FakeTransport) -> None:
+    """Facades don't turn a rejected native call into a default value."""
+
+    def failing(method: str, args: Dict[str, Any]) -> Any:
+        raise RuntimeError("keychain locked")
+
+    transport.module_handlers["SecureStore"] = failing
+    with pytest.raises(modules.NativeModuleError, match="keychain locked"):
+        pn.SecureStore.get_item("token")
+    transport.module_handlers["Clipboard"] = failing
+    with pytest.raises(modules.NativeModuleError, match="keychain locked"):
+        pn.Clipboard.get_string()
 
 
 def test_module_event_from_native_reaches_listeners(transport: FakeTransport) -> None:

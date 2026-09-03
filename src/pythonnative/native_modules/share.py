@@ -43,9 +43,9 @@ class Share:
 
         Returns:
             ``True`` if the user completed a share, ``False`` if they
-            cancelled or no share UI is available.
+            dismissed the sheet or the platform has no share UI (desktop).
+
+        Raises:
+            NativeModuleError: If the sheet could not be presented.
         """
-        try:
-            return bool(await native_module("Share").call_async("share", message=message, url=url, title=title))
-        except Exception:
-            return False
+        return bool(await native_module("Share").call_async("share", message=message, url=url, title=title))

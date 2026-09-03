@@ -11,21 +11,35 @@ device (`pn preview`, `pytest`), the same facade resolves to a Python
 implementation with safe defaults (in-memory buffers, `"unknown"`
 states, no-op feedback), so app code stays single-source.
 
-Both synchronous and coroutine APIs exist, chosen to match the
-underlying platform call:
+Every facade follows the same two rules, so you never need to look
+one up:
 
-- **Synchronous**: `Clipboard`, `Linking`, `Haptics` / `Vibration`,
-  `Battery`, `NetInfo`, `SecureStore`, `AppState`, `FileSystem`,
-  `Permissions.check`. These answer immediately.
-- **Coroutines** (`await` them): `Camera.take_photo`,
-  `Location.get_current`, `Share.share`, `Permissions.request`,
-  `Biometrics.authenticate`, `Notifications.*`. Inside a component,
-  drive them with an `async def`
-  [`use_effect`][pythonnative.use_effect] callback,
-  [`use_resource`][pythonnative.use_resource],
-  [`use_query`][pythonnative.hooks.use_query], or
-  [`pn.run_async(coro)`][pythonnative.runtime.run_async] from a sync
-  handler.
+1. **Sync or async is decided by what the OS has to do.** A method is a
+   plain function when the answer is already on the device and returns
+   on the calling thread: `Clipboard`, `Linking`, `Haptics` /
+   `Vibration`, `Battery`, `NetInfo.fetch`, `SecureStore`, `AppState`,
+   `FileSystem`, `Permissions.check`, `Biometrics.is_available`. It is
+   a coroutine when the OS has to prompt the user, drive hardware, or
+   hand off to another process: `Camera.take_photo` /
+   `pick_from_gallery`, `Location.get_current`, `Share.share`,
+   `Permissions.request`, `Biometrics.authenticate`, `Notifications.*`,
+   `Alert.confirm` / `choose`, and all of `AsyncStorage`. Inside a
+   component, drive coroutines with an `async def`
+   [`use_effect`][pythonnative.use_effect] callback,
+   [`use_resource`][pythonnative.use_resource],
+   [`use_query`][pythonnative.hooks.use_query], or
+   [`pn.run_async(coro)`][pythonnative.runtime.run_async] from a sync
+   handler.
+2. **Failures raise; "nothing happened" returns a value.** A native
+   error (a rejected call, a missing module, a bad argument) is a
+   [`NativeModuleError`][pythonnative.native_modules.NativeModuleError]
+   and propagates like any other exception; `FileSystem` raises the
+   standard `OSError` family. Outcomes that are not errors, such as the
+   user cancelling a picker (`None`), dismissing the share sheet
+   (`False`), or denying a permission (`"blocked"`), come back as
+   values and are documented per method. No facade turns an exception
+   into a default. Off device the desktop implementations never raise;
+   they answer with the "nothing happened" value.
 
 Two modules also ship reactive hooks:
 [`use_app_state`][pythonnative.use_app_state] and
@@ -33,32 +47,24 @@ Two modules also ship reactive hooks:
 
 ## Permissions: declare them once, request at runtime
 
-PythonNative does not edit `Info.plist` or `AndroidManifest.xml` for
-you. You declare what your app needs in the platform manifests, and
-the operating system shows the permission prompt the first time you
-call into the API.
+Declare the capabilities your app uses in the `[permissions]` table of
+`pythonnative.toml`. `pn` writes the matching `Info.plist` usage
+strings, `AndroidManifest.xml` `<uses-permission>` entries, background
+modes, and entitlements into the native projects for you (the full
+catalog is in the [configuration reference](configuration.md#permissions)):
 
-=== "Android (`android_template/app/src/main/AndroidManifest.xml`)"
+```toml
+[permissions]
+camera = "So you can take photos in MyApp."
+location_when_in_use = "So MyApp can show nearby content."
+photo_library = "So you can pick photos from your library."
+notifications = true
+```
 
-    ```xml
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    ```
-
-=== "iOS (`ios_template/Info.plist`)"
-
-    ```xml
-    <key>NSCameraUsageDescription</key>
-    <string>So you can take photos in MyApp.</string>
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>So MyApp can show nearby content.</string>
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>So you can pick photos from your library.</string>
-    ```
-
-The exact strings on iOS appear in the system permission dialog, so
-write them as you would want a user to read them.
+The strings appear in the system permission dialog on iOS, so write
+them as you would want a user to read them. The same keys are the
+names you pass to [`Permissions`](#permissions-runtime) at runtime, so
+there is one vocabulary to learn.
 
 ## Camera
 
@@ -119,12 +125,15 @@ to `CLLocationManagerDelegate` (iOS) or `LocationManager.requestUpdates`
 
 ## File system
 
-[`FileSystem`][pythonnative.native_modules.file_system.FileSystem] is
-scoped to your app's documents directory; relative paths are resolved
-inside that sandbox automatically. Unlike the other modules, the file
-system surface is synchronous; local disk reads are typically
-faster than the cost of hopping onto the asyncio loop. For large
-files you can opt into a worker thread:
+[`FileSystem`][pythonnative.native_modules.file_system.FileSystem]
+answers the one question the standard library can't, "where may this
+app write?", and then gets out of the way. `app_dir()` is the app's
+sandboxed documents directory; `path("notes/today.txt")` resolves a
+relative name inside it and returns a `pathlib.Path` you use like any
+other. The read/write helpers are thin conveniences over that path and
+raise the same `OSError` subclasses `open` does (`FileNotFoundError`,
+`PermissionError`, ...). Everything is synchronous, exactly like the
+standard library it wraps; for large files, offload to a worker thread:
 
 ```python
 import asyncio
@@ -133,6 +142,10 @@ import pythonnative as pn
 # Sync: fine for small files (preferences, JSON state, etc.)
 pn.FileSystem.write_text("notes.txt", "hello")
 text = pn.FileSystem.read_text("notes.txt")
+
+# Work with the Path directly when you need more than the helpers.
+for entry in sorted(pn.FileSystem.path("notes").iterdir()):
+    print(entry.name)
 
 # Async: explicitly offload to a worker thread for big payloads.
 text = await asyncio.to_thread(pn.FileSystem.read_text, "big.txt")
@@ -236,9 +249,11 @@ unsubscribe = pn.Linking.add_listener(lambda url: navigate_to(url))
 
 [`Permissions`][pythonnative.Permissions] normalizes the iOS/Android
 permission models. `check` is synchronous; `request` prompts and is a
-coroutine. Names: `"camera"`, `"microphone"`, `"location"`, `"photos"`,
-`"notifications"`, `"contacts"`. Statuses: `"granted"`, `"denied"`,
-`"blocked"`, `"undetermined"`.
+coroutine. Names are the `[permissions]` keys from `pythonnative.toml`
+that have a runtime prompt: `"camera"`, `"microphone"`,
+`"photo_library"`, `"location_when_in_use"`, `"contacts"`,
+`"notifications"` (any other name raises `ValueError`). Statuses:
+`"granted"`, `"denied"`, `"blocked"`, `"undetermined"`.
 
 ```python
 if pn.Permissions.check("camera") != "granted":
@@ -247,8 +262,8 @@ if pn.Permissions.check("camera") != "granted":
         pn.Linking.open_settings()  # user must enable it in Settings
 ```
 
-You still declare the permission in the platform manifest (above); the
-OS shows the prompt the first time you `request` it.
+Declaring the capability in `[permissions]` is what puts the usage
+string in the manifest; `request` is what shows the prompt.
 
 ## App state
 
@@ -292,9 +307,9 @@ not [`AsyncStorage`][pythonnative.storage.AsyncStorage], which is
 unencrypted.
 
 ```python
-pn.SecureStore.set_item("auth_token", token)
-token = pn.SecureStore.get_item("auth_token")
-pn.SecureStore.delete_item("auth_token")
+pn.SecureStore.set_item("auth_token", token)      # raises NativeModuleError on failure
+token = pn.SecureStore.get_item("auth_token")     # None when absent
+pn.SecureStore.delete_item("auth_token")          # True if it existed
 ```
 
 ## Battery
@@ -444,6 +459,13 @@ class Compass:
 when native rejects. `call_async` awaits methods that settle later.
 `add_listener` subscribes to module events and returns an unsubscribe
 callable.
+
+Follow the two rules the built-in facades follow: pick sync or async by
+what the OS does (a heading read is a coroutine here because the sensor
+has to spin up), and let `NativeModuleError` propagate rather than
+catching it and returning a placeholder. A caller who wants a fallback
+can write the `try` themselves; a caller who wanted to know it failed
+can't undo a swallowed exception.
 
 ### Desktop and test implementation
 

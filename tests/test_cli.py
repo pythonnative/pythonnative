@@ -68,6 +68,33 @@ def test_cli_init_and_clean() -> None:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+def test_cli_init_scaffold_renders_and_navigates() -> None:
+    """The generated app must actually run: mount, tap, open Detail, go back."""
+    import importlib.util
+
+    from pythonnative.testing import render
+
+    tmpdir = tempfile.mkdtemp(prefix="pn_cli_test_")
+    try:
+        result = run_pn(["init", "my_app"], tmpdir)
+        assert result.returncode == 0, result.stderr
+        main_path = Path(tmpdir, "my_app", "app", "main.py")
+        spec = importlib.util.spec_from_file_location("pn_scaffold_main", main_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        screen = render(module.App())
+        screen.press(screen.get_by_text("Tap me"))
+        assert screen.get_by_text("Tapped 1 times")
+        screen.press(screen.get_by_text("Open detail"))
+        assert screen.get_by_text("Detail: count was 1")
+        screen.press(screen.get_by_text("Back"))
+        assert screen.get_by_text("Tapped 1 times")
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
 def test_cli_init_refuses_overwrite() -> None:
     tmpdir = tempfile.mkdtemp(prefix="pn_cli_test_")
     try:
@@ -382,8 +409,134 @@ def test_cli_run_prepare_only_android_and_ios() -> None:
         assert os.path.isdir(ios_root)
         info_plist = Path(os.path.join(ios_root, "ios_template", "Info.plist")).read_bytes()
         assert b"CFBundleDisplayName" in info_plist
+        # Both package slices are staged; the build phase picks one per SDK.
+        assert os.path.isdir(os.path.join(ios_root, "app_packages.iphoneos", "pythonnative"))
+        assert os.path.isdir(os.path.join(ios_root, "app_packages.iphonesimulator", "pythonnative"))
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------
+# pn deps
+# ---------------------------------------------------------------------------
+
+
+def _deps_project(tmp_path: Path, packages: str = '["httpx", "numpy"]') -> Path:
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "main.py").write_text("import pythonnative as pn\n", encoding="utf-8")
+    (tmp_path / "pythonnative.toml").write_text(
+        '[app]\nid = "com.acme.deps"\nname = "deps"\npython_version = "3.13"\n'
+        f"[requirements]\npackages = {packages}\n",
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+_NUMPY_IOS_WHEEL = "https://pypi.anaconda.org/beeware/simple/numpy/numpy-2.2.1-cp313-cp313-ios_13_0_arm64_iphoneos.whl"
+_HTTPX_WHEEL = "https://files.pythonhosted.org/packages/x/httpx-0.27.0-py3-none-any.whl"
+
+
+class _FakePipRunner:
+    """Answers pip dry-run reports per target, failing where ``fail_when`` matches."""
+
+    def __init__(self, fail_when: Callable[[List[str]], bool] = lambda _args: False) -> None:
+        self.fail_when = fail_when
+        self.commands: List[List[str]] = []
+
+    def run(self, args, *, cwd=None, env=None, capture=False):  # type: ignore[no-untyped-def]
+        from pythonnative.project.builder import CommandResult
+
+        self.commands.append(list(args))
+        if self.fail_when(list(args)):
+            return CommandResult(1, "", "ERROR: No matching distribution found for numpy")
+        report = {
+            "install": [
+                {"metadata": {"name": "httpx", "version": "0.27.0"}, "download_info": {"url": _HTTPX_WHEEL}},
+                {"metadata": {"name": "numpy", "version": "2.2.1"}, "download_info": {"url": _NUMPY_IOS_WHEEL}},
+            ]
+        }
+        return CommandResult(0, json.dumps(report), "")
+
+
+def test_deps_command_reports_every_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(_deps_project(tmp_path))
+    runner = _FakePipRunner()
+    monkeypatch.setattr(pn_cli.builder_mod, "SubprocessRunner", lambda: runner)
+    monkeypatch.setattr(pn_cli.deps_mod, "host_simulator_arch", lambda: "arm64")
+
+    pn_cli.deps_command(argparse.Namespace(platform=None, json=False, python=None))
+
+    out = capsys.readouterr().out
+    assert "iOS device (arm64, iOS 13.0+)" in out
+    assert "iOS Simulator (arm64, iOS 13.0+)" in out
+    assert "Android arm64-v8a (API 24+)" in out and "Android x86_64 (API 24+)" in out
+    assert "[ok] numpy 2.2.1" in out and "(BeeWare)" in out
+    assert "All 4 targets resolved." in out
+    # One pip dry-run per target, each pinned to the target's tags, never
+    # the host's, plus one unconstrained reference run for downgrade detection.
+    target_cmds = [c for c in runner.commands if "--platform" in c]
+    assert len(target_cmds) == 4 and len(runner.commands) == 5
+    for cmd in target_cmds:
+        assert "--dry-run" in cmd and "--only-binary=:all:" in cmd
+        assert cmd[cmd.index("--python-version") + 1] == "3.13"
+    android_cmds = [c for c in target_cmds if any(a.startswith("android_") for a in c)]
+    assert len(android_cmds) == 2
+
+
+def test_deps_command_platform_filter_and_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(_deps_project(tmp_path))
+    runner = _FakePipRunner()
+    monkeypatch.setattr(pn_cli.builder_mod, "SubprocessRunner", lambda: runner)
+
+    pn_cli.deps_command(argparse.Namespace(platform="android", json=True, python="/opt/python3.13"))
+
+    data = json.loads(capsys.readouterr().out)
+    assert data["python_version"] == "3.13"
+    assert data["requirements"] == ["httpx", "numpy"]
+    assert [t["platform"] for t in data["targets"]] == ["android", "android"]
+    assert all(t["ok"] for t in data["targets"])
+    assert data["targets"][0]["packages"][0]["name"] == "httpx"
+    assert all(cmd[0] == "/opt/python3.13" for cmd in runner.commands)
+
+
+def test_deps_command_exits_nonzero_when_a_target_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(_deps_project(tmp_path))
+    runner = _FakePipRunner(fail_when=lambda args: any("iphonesimulator" in a for a in args))
+    monkeypatch.setattr(pn_cli.builder_mod, "SubprocessRunner", lambda: runner)
+
+    with pytest.raises(SystemExit) as info:
+        pn_cli.deps_command(argparse.Namespace(platform="ios", json=False, python=None))
+    assert info.value.code == 1
+    out = capsys.readouterr().out
+    assert "[x] ERROR: No matching distribution found for numpy" in out
+    assert "1 of 2 targets cannot be satisfied" in out
+
+
+def test_deps_command_without_requirements(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(_deps_project(tmp_path, packages="[]"))
+    runner = _FakePipRunner()
+    monkeypatch.setattr(pn_cli.builder_mod, "SubprocessRunner", lambda: runner)
+
+    pn_cli.deps_command(argparse.Namespace(platform=None, json=False, python=None))
+
+    assert "nothing to resolve" in capsys.readouterr().out
+    assert runner.commands == []
+
+
+def test_cli_deps_help_lists_flags() -> None:
+    result = run_pn(["deps", "--help"], os.getcwd())
+    assert result.returncode == 0
+    assert "--json" in result.stdout
+    assert "--python" in result.stdout
+    assert "android" in result.stdout and "ios" in result.stdout
 
 
 # ---------------------------------------------------------------------------

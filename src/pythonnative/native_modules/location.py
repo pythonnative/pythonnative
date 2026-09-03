@@ -2,7 +2,8 @@
 
 [`Location.get_current`][pythonnative.native_modules.location.Location.get_current]
 is a coroutine that resolves to a ``(latitude, longitude)`` tuple, or
-``None`` if no recent fix is available or the user denies permission.
+``None`` if no fix is available (the user denied permission, location
+services are off, or the request timed out).
 The native ``Location`` module owns the ``CLLocationManager`` /
 ``LocationManager`` session and resolves the call with
 ``{"latitude", "longitude", "accuracy", "altitude", "timestamp"}``.
@@ -29,7 +30,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
 
-from .registry import native_module
+from .registry import NativeModuleError, native_module
 
 Coords = Tuple[float, float]
 
@@ -48,6 +49,9 @@ class Location:
         Returns:
             ``(latitude, longitude)`` if a fix was obtained, otherwise
             ``None``.
+
+        Raises:
+            NativeModuleError: If the native module fails.
         """
         fix = await Location.get_current_fix(**options)
         if fix is None:
@@ -62,16 +66,10 @@ class Location:
         them ``accuracy`` (meters), ``altitude`` (meters), ``speed``
         (m/s), ``heading`` (degrees), ``timestamp`` (Unix seconds).
         """
-        try:
-            result = await native_module("Location").call_async("get_current", **options)
-        except Exception:
-            return None
+        result = await native_module("Location").call_async("get_current", **options)
         if not isinstance(result, dict):
             return None
-        try:
-            fix: Dict[str, float] = {k: float(v) for k, v in result.items() if v is not None}
-            fix["latitude"]
-            fix["longitude"]
-        except (KeyError, TypeError, ValueError):
-            return None
+        fix: Dict[str, float] = {k: float(v) for k, v in result.items() if v is not None}
+        if "latitude" not in fix or "longitude" not in fix:
+            raise NativeModuleError("Location", "get_current", f"fix is missing coordinates: {sorted(result)}")
         return fix

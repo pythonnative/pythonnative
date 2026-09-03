@@ -34,7 +34,9 @@ Example:
     ```
 """
 
+import dataclasses
 import difflib
+from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union, get_args
 
 from . import diagnostics
@@ -649,44 +651,89 @@ class StyleSheet:
 # Theming
 # ======================================================================
 
-DEFAULT_LIGHT_THEME: Dict[str, Any] = {
-    "primary_color": "#007AFF",
-    "secondary_color": "#5856D6",
-    "background_color": "#FFFFFF",
-    "surface_color": "#F2F2F7",
-    "text_color": "#000000",
-    "text_secondary_color": "#8E8E93",
-    "error_color": "#FF3B30",
-    "success_color": "#34C759",
-    "warning_color": "#FF9500",
-    "font_size": 16,
-    "font_size_small": 13,
-    "font_size_large": 20,
-    "font_size_title": 28,
-    "spacing": 8,
-    "spacing_large": 16,
-    "border_radius": 8,
-}
+
+@dataclass(frozen=True)
+class Theme:
+    """Design tokens read through [`use_theme`][pythonnative.use_theme].
+
+    A ``Theme`` is an immutable, fully typed record, so
+    ``theme.text_color`` autocompletes and a typo is a static error
+    rather than a runtime ``KeyError``. Derive a custom theme from a
+    built-in one with [`replace`][pythonnative.style.Theme.replace]:
+
+    ```python
+    brand = pn.DEFAULT_LIGHT_THEME.replace(primary_color="#FF2D55")
+    ```
+
+    Attributes:
+        primary_color: Main accent color.
+        secondary_color: Secondary accent color.
+        background_color: Screen background.
+        surface_color: Raised surfaces such as cards and sheets.
+        text_color: Primary text.
+        text_secondary_color: De-emphasized text.
+        error_color: Destructive and error states.
+        success_color: Success states.
+        warning_color: Warning states.
+        font_size: Body text size, in points.
+        font_size_small: Caption size, in points.
+        font_size_large: Subtitle size, in points.
+        font_size_title: Title size, in points.
+        spacing: Base spacing unit, in points.
+        spacing_large: Large spacing unit, in points.
+        border_radius: Default corner radius, in points.
+    """
+
+    primary_color: Color
+    secondary_color: Color
+    background_color: Color
+    surface_color: Color
+    text_color: Color
+    text_secondary_color: Color
+    error_color: Color
+    success_color: Color
+    warning_color: Color
+    font_size: float = 16
+    font_size_small: float = 13
+    font_size_large: float = 20
+    font_size_title: float = 28
+    spacing: float = 8
+    spacing_large: float = 16
+    border_radius: float = 8
+
+    def replace(self, **changes: Any) -> "Theme":
+        """Return a copy of this theme with the given fields replaced.
+
+        Raises:
+            TypeError: If ``changes`` names a field that doesn't exist.
+        """
+        return dataclasses.replace(self, **changes)
+
+
+DEFAULT_LIGHT_THEME = Theme(
+    primary_color="#007AFF",
+    secondary_color="#5856D6",
+    background_color="#FFFFFF",
+    surface_color="#F2F2F7",
+    text_color="#000000",
+    text_secondary_color="#8E8E93",
+    error_color="#FF3B30",
+    success_color="#34C759",
+    warning_color="#FF9500",
+)
 """Built-in light theme selected by [`use_theme`][pythonnative.use_theme]."""
 
-DEFAULT_DARK_THEME: Dict[str, Any] = {
-    "primary_color": "#0A84FF",
-    "secondary_color": "#5E5CE6",
-    "background_color": "#000000",
-    "surface_color": "#1C1C1E",
-    "text_color": "#FFFFFF",
-    "text_secondary_color": "#8E8E93",
-    "error_color": "#FF453A",
-    "success_color": "#30D158",
-    "warning_color": "#FF9F0A",
-    "font_size": 16,
-    "font_size_small": 13,
-    "font_size_large": 20,
-    "font_size_title": 28,
-    "spacing": 8,
-    "spacing_large": 16,
-    "border_radius": 8,
-}
+DEFAULT_DARK_THEME = Theme(
+    primary_color="#0A84FF",
+    secondary_color="#5E5CE6",
+    background_color="#000000",
+    surface_color="#1C1C1E",
+    text_color="#FFFFFF",
+    text_secondary_color="#8E8E93",
+    error_color="#FF453A",
+    success_color="#30D158",
+    warning_color="#FF9F0A",
+)
 """Built-in dark theme selected by [`use_theme`][pythonnative.use_theme]."""
 
 _FOLLOW_SYSTEM_THEME = object()
@@ -706,22 +753,22 @@ descendants via [`use_theme`][pythonnative.use_theme] (or
 """
 
 
-def default_theme(scheme: str) -> Dict[str, Any]:
-    """Return the built-in theme dict for ``scheme`` (``"light"`` / ``"dark"``)."""
+def default_theme(scheme: str) -> Theme:
+    """Return the built-in [`Theme`][pythonnative.Theme] for ``scheme`` (``"light"`` / ``"dark"``)."""
     return DEFAULT_DARK_THEME if scheme == "dark" else DEFAULT_LIGHT_THEME
 
 
-def use_theme() -> Dict[str, Any]:
-    """Return the active theme, following the system appearance by default.
+def use_theme() -> Theme:
+    """Return the active [`Theme`][pythonnative.Theme], following the system appearance by default.
 
-    If an ancestor mounted a ``Provider(ThemeContext, ...)``, that
+    If an ancestor mounted a ``ThemeContext.Provider(...)``, that
     theme is returned as-is. Otherwise the built-in light or dark
     theme is selected from the effective color scheme (via
     [`use_color_scheme`][pythonnative.use_color_scheme], so the
     component re-renders when the system appearance flips).
 
     Returns:
-        The active theme dict.
+        The active theme.
 
     Raises:
         RuntimeError: If called outside a `@component` function.
@@ -734,8 +781,8 @@ def use_theme() -> Dict[str, Any]:
         def Card():
             theme = pn.use_theme()
             return pn.View(
-                pn.Text("Hello", style=pn.style(color=theme["text_color"])),
-                style=pn.style(background_color=theme["surface_color"]),
+                pn.Text("Hello", style=pn.style(color=theme.text_color)),
+                style=pn.style(background_color=theme.surface_color),
             )
         ```
     """
@@ -743,6 +790,8 @@ def use_theme() -> Dict[str, Any]:
     theme = use_context(ThemeContext)
     if theme is _FOLLOW_SYSTEM_THEME:
         return default_theme(scheme)
+    if not isinstance(theme, Theme):
+        raise TypeError(f"ThemeContext.Provider expects a pn.Theme, got {type(theme).__name__}: {theme!r}")
     return theme
 
 
@@ -775,6 +824,7 @@ __all__ = [
     "TextAlign",
     "TextDecoration",
     "TextTransform",
+    "Theme",
     "ThemeContext",
     "TransformEntry",
     "TransformRotate",

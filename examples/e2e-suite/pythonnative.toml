@@ -7,7 +7,7 @@ name = "e2e_suite"
 display_name = "PythonNative E2E"
 version = "1.0.0"
 build = 1
-python_version = "3.11"
+python_version = "3.13"
 orientation = "portrait"
 entry_point = "app/main.py"
 
@@ -24,7 +24,7 @@ notifications = true
 vibration = true
 
 [requirements]
-packages = []
+packages = ["httpx", "numpy"]
 
 [ios]
 deployment_target = "13.0"
@@ -32,4 +32,4 @@ deployment_target = "13.0"
 [android]
 min_sdk = 24
 target_sdk = 34
-abi_filters = ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
+abi_filters = ["arm64-v8a", "x86_64"]

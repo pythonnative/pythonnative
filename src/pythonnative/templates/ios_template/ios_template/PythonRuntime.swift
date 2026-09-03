@@ -136,8 +136,9 @@ final class PythonRuntime {
             )
         }
 
-        // Signal to pythonnative that we're running on iOS. Read on the
-        // Python side (pythonnative.utils.IS_IOS) before the first import.
+        // The embedded CPython (3.13+) reports sys.platform == "ios" on its
+        // own; this explicit override is belt-and-braces for
+        // pythonnative.utils.IS_IOS and costs nothing.
         setenv("PN_PLATFORM", "ios", 1)
 
         var preconfig = PyPreConfig()

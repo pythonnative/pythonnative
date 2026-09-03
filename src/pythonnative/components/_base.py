@@ -77,6 +77,37 @@ def _make_element(
 
 
 # ======================================================================
+# RefreshControl attachment
+# ======================================================================
+
+REFRESH_CONTROL_TYPE = "RefreshControl"
+"""Element type produced by [`RefreshControl`][pythonnative.RefreshControl]."""
+
+
+def _refresh_control_props(control: Optional[Element], *, owner: str) -> Optional[Dict[str, Any]]:
+    """Turn a ``RefreshControl`` element into the ``refresh_control`` wire prop.
+
+    Scroll containers hold their refresh control as a prop rather than
+    a child (the native side attaches a ``UIRefreshControl`` /
+    ``SwipeRefreshLayout`` to the scroll view itself), so the element
+    is unwrapped here into the flat dict the bridge and the event
+    extractor expect. Keeping it an element on the Python side means
+    users build it like every other piece of UI and get a clear error
+    if they pass the wrong thing.
+
+    Raises:
+        TypeError: If ``control`` is not a ``RefreshControl`` element.
+    """
+    if control is None:
+        return None
+    if not isinstance(control, Element) or control.type != REFRESH_CONTROL_TYPE:
+        raise TypeError(
+            f"{owner}(refresh_control=...) expects pn.RefreshControl(...), got {type(control).__name__}: {control!r}"
+        )
+    return dict(control.props)
+
+
+# ======================================================================
 # Rich text spans
 # ======================================================================
 

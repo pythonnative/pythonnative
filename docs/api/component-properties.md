@@ -185,7 +185,7 @@ pn.ScrollView(
 - `content_container_style`: style for the inner content wrapper (padding,
   alignment, spacing), distinct from `style` (the scroll frame)
 - `keyboard_dismiss_mode`: `"none"`, `"on_drag"`, or `"interactive"`
-- `refresh_control`: pull-to-refresh spec (see [`RefreshControl`](#refreshcontrol))
+- `refresh_control`: pull-to-refresh element (see [`RefreshControl`](#refreshcontrol))
 
 ## TextInput
 
@@ -429,7 +429,7 @@ pn.ScrollView(child, refresh_control=pn.RefreshControl(
     refreshing=loading, on_refresh=reload, tint_color="#007AFF"))
 ```
 
-Pull-to-refresh spec (a plain dict) passed to a `ScrollView` or `FlatList`.
+Pull-to-refresh control, an element of type `"RefreshControl"`, passed as the `refresh_control=` prop of a `ScrollView`, `FlatList`, or `SectionList`. The scroll container attaches it to its native scroll view rather than rendering it as a child, and raises `TypeError` for anything that isn't a `RefreshControl`.
 
 - `refreshing`: drive the spinner from state
 - `on_refresh`: callback `() -> None` when pulled past threshold
@@ -487,4 +487,4 @@ pn.FlatList(data=items, render_item=render_fn, key_extractor=key_fn,
 - `on_end_reached`: callback `() -> None` near the end (virtualized)
 - `on_end_reached_threshold`: fraction-of-viewport trigger distance
 - `content_container_style`: style for the inner content wrapper
-- `refresh_control`: pull-to-refresh spec (see [`RefreshControl`](#refreshcontrol))
+- `refresh_control`: pull-to-refresh element (see [`RefreshControl`](#refreshcontrol))

@@ -195,6 +195,13 @@ same way they would on device.
 Use `unregister_python_module(name)` in a fixture teardown to restore
 the built-in desktop implementation.
 
+Facades don't swallow errors: a fake that raises
+[`NativeModuleError`][pythonnative.native_modules.NativeModuleError]
+surfaces through the facade to the component, which is the right way
+to test your error handling. User cancellations and denials are
+ordinary return values (`None` from `Camera.launch_camera`, `False`
+from `Permissions.request`), so fake those by returning them.
+
 ## Testing the bridge
 
 The reconciler's on-device backend serializes commits to JSON. To assert
@@ -264,6 +271,16 @@ MyPy). Run them all locally before pushing:
 ```
 
 The same commands run in CI on every push and pull request.
+
+Two optional suites need the network and are skipped by default:
+
+- `uv run pytest tests/packages -m network` resolves every package in
+  `tests/packages/matrix.toml` against the live PyPI, BeeWare, and
+  Chaquopy indexes and asserts the outcome matches the manifest. The
+  `packages` workflow runs it weekly. See
+  [PyPI packages](pypi-packages.md#compatibility-matrix).
+- The Maestro E2E suite under `tests/e2e/` drives the example apps on
+  an emulator and a Simulator; see `tests/e2e/AGENTS.md`.
 
 ## Next steps
 

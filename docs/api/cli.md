@@ -13,7 +13,16 @@ the documented behavior never drifts from the code.
   Flag: `--force` to overwrite existing files or scaffold into a
   non-empty directory. See [Configuration](../guides/configuration.md).
 - `pn doctor [android|ios]`: diagnose the local toolchain and validate
-  `pythonnative.toml`. Exits non-zero when something will block a build.
+  `pythonnative.toml`, including that a `python3.X` matching
+  `[app].python_version` is available for package resolution. Exits
+  non-zero when something will block a build.
+- `pn deps [android|ios]`: resolve `[requirements].packages` for every
+  device target (iOS device, iOS Simulator, and each Android ABI)
+  without installing anything, and report the wheel each package would
+  use, flagging binary wheels, their index, and downgrades. Flags:
+  `--json` for a machine-readable report, `--python` to pick the
+  interpreter that runs pip. Exits non-zero when any target can't be
+  satisfied. See [PyPI packages](../guides/pypi-packages.md).
 - `pn preview [component]`: render the app in a desktop (Tkinter) window
   with Fast Refresh, the fastest way to iterate on UI. Flags:
   `--width`, `--height`, `--title`, `--no-hot-reload`. See the

@@ -30,21 +30,20 @@ from typing import Callable, Optional
 # Pinned, checksum-verified Python-Apple-support assets. Every version in
 # ``config.SUPPORTED_PYTHON_VERSIONS`` must have an entry here; iOS builds
 # refuse to run against an unpinned, unverified runtime.
+#
+# Both builds target iOS 13.0 and ship ``ios-arm64`` (device) and
+# ``ios-arm64_x86_64-simulator`` slices, so a single package covers every
+# ``pn run ios`` / ``pn build ios`` destination.
 PINNED_ASSETS = {
-    "3.10": (
-        "3.10-b14",
-        "Python-3.10-iOS-support.b14.tar.gz",
-        "a6da479a67be74569813af77179dc8ac83a5e685324408110bfc04632166e404",
+    "3.13": (
+        "3.13-b14",
+        "Python-3.13-iOS-support.b14.tar.gz",
+        "8b5cb76ef8d8a2946052479358eeec9d54b4496cb60920e175ec1489b5cf7963",
     ),
-    "3.11": (
-        "3.11-b9",
-        "Python-3.11-iOS-support.b9.tar.gz",
-        "56810335d2b73558f7a16b6b2f7ad855b88c3007b200cbaecae9d6a25a2d1ecc",
-    ),
-    "3.12": (
-        "3.12-b9",
-        "Python-3.12-iOS-support.b9.tar.gz",
-        "a3be9e278c742911db54dd3045bd7451928813508771c9acf14b4af75294edd2",
+    "3.14": (
+        "3.14-b10",
+        "Python-3.14-iOS-support.b10.tar.gz",
+        "200ef60eb67be0483ceb638daa9048f84f41a9a952707a5ad4c3198037c7b583",
     ),
 }
 
@@ -113,7 +112,7 @@ def _locate_runtime(extract_root: Path, python_version: str) -> IOSRuntime:
 
 def prepare_ios_runtime(
     cache_dir: Path,
-    python_version: str = "3.12",
+    python_version: str = "3.13",
     *,
     log: Optional[Logger] = None,
 ) -> IOSRuntime:

@@ -186,10 +186,33 @@ def configure_gradle(project_dir: Path, config: AppConfig) -> None:
     abi_csv = ", ".join(f'"{abi}"' for abi in config.android.abi_filters)
     content = re.sub(r"abiFilters[^\n]*", f"abiFilters {abi_csv}", content)
 
+    if config.extra_index_urls:
+        content = _inject_pip_options(content, config)
+
     if config.android.signing.is_configured:
         content = _inject_signing(content, config)
 
     gradle_path.write_text(content, encoding="utf-8")
+
+
+def _inject_pip_options(content: str, config: AppConfig) -> str:
+    """Add ``--extra-index-url`` pip options for ``[requirements].extra_index_urls``.
+
+    Chaquopy runs pip at Gradle build time; ``options`` lines inside the
+    ``pip { }`` block are passed straight through, so a private index
+    declared once in ``pythonnative.toml`` applies to Android too.
+    """
+    marker = '                install "-r", "requirements.txt"'
+    if marker not in content:
+        return content
+    lines = "".join(
+        f'                options "--extra-index-url", "{_gradle_escape(url)}"\n' for url in config.extra_index_urls
+    )
+    return content.replace(marker, lines + marker, 1)
+
+
+def _gradle_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _inject_signing(content: str, config: AppConfig) -> str:

@@ -10,6 +10,10 @@ On iOS, the staged project is self-contained: ``Python.xcframework`` is
 linked at build time and an Xcode build phase installs the standard
 library and app code into the bundle, so ``xcodebuild`` output is
 directly runnable and archivable with no post-build patching.
+Third-party packages are resolved per destination (see
+[`deps`][pythonnative.project.deps]) into ``app_packages.iphoneos`` and
+``app_packages.iphonesimulator``; the build phase installs the slice
+matching the SDK being built.
 
 All shell-outs go through a small
 [`CommandRunner`][pythonnative.project.builder.CommandRunner] abstraction
@@ -37,9 +41,9 @@ from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Union
 
 from . import android as android_config
+from . import deps, runtime_assets
 from . import ios as ios_config
 from . import plugins as native_plugins
-from . import runtime_assets
 from .android import AndroidLayout
 from .config import AppConfig
 from .ios import IOSLayout
@@ -272,7 +276,13 @@ class Builder:
 
     # -- Preparation ----------------------------------------------------
 
-    def prepare(self, platform: str, *, release: bool = False) -> PreparedProject:
+    def prepare(
+        self,
+        platform: str,
+        *,
+        release: bool = False,
+        ios_sdks: Sequence[str] = deps.IOS_SDKS,
+    ) -> PreparedProject:
         """Stage and configure the native project for ``platform``.
 
         Args:
@@ -281,12 +291,20 @@ class Builder:
                 byte-compiles the staged Python code and drops the
                 ``.py`` sources from the bundle. (Chaquopy does the
                 equivalent on Android automatically.)
+            ios_sdks: Which iOS SDKs to resolve third-party packages
+                for: ``"iphoneos"`` (devices, archives) and/or
+                ``"iphonesimulator"``. Each becomes an
+                ``app_packages.<sdk>`` slice in the staged project.
+                Defaults to both; the CLI narrows it to the destination
+                it is about to build so a package that only has a
+                Simulator wheel doesn't block a Simulator run.
 
         Returns:
             A [`PreparedProject`][pythonnative.project.builder.PreparedProject].
 
         Raises:
-            BuildError: For an unknown platform or a staging failure.
+            BuildError: For an unknown platform, a staging failure, or a
+                requirement with no wheel for a requested iOS SDK.
         """
         if platform not in _TEMPLATE_NAMES:
             raise BuildError(f"Unknown platform: {platform!r} (expected 'android' or 'ios').")
@@ -314,7 +332,7 @@ class Builder:
 
         ios_layout = ios_config.configure(project_dir, self.config, log=self.log)
         native_plugins.stage_ios_plugins(project_dir, plugins, log=self.log)
-        self._stage_ios_python(project_dir, release=release)
+        self._stage_ios_python(project_dir, release=release, sdks=ios_sdks)
         self._link_ios_runtime(project_dir)
         return PreparedProject(
             platform=platform,
@@ -338,46 +356,57 @@ class Builder:
         except native_plugins.PluginError as exc:
             raise BuildError(f"Invalid native plugin: {exc}") from exc
 
-    def _stage_ios_python(self, project_dir: Path, *, release: bool) -> None:
-        """Stage ``app/`` and ``app_packages/`` at the Xcode project root.
+    def _stage_ios_python(self, project_dir: Path, *, release: bool, sdks: Sequence[str]) -> None:
+        """Stage ``app/`` and one ``app_packages.<sdk>/`` slice per SDK.
 
-        The Xcode project references both folders as bundle resources
-        and the "Install Python runtime" build phase converts any
-        binary modules inside them into signed frameworks.
+        ``app/`` is a bundle resource. The package slices are not: the
+        "Install Python runtime" build phase copies the slice matching
+        ``EFFECTIVE_PLATFORM_NAME`` into the bundle as ``app_packages``
+        and converts any binary modules inside it into signed
+        frameworks. Every slice carries the ``pythonnative`` package
+        (pure Python) plus the project's requirements resolved for that
+        SDK's wheel tags.
         """
         app_dir = project_dir / "app"
-        packages_dir = project_dir / "app_packages"
-        for directory in (app_dir, packages_dir):
-            if directory.exists():
-                shutil.rmtree(directory)
-            directory.mkdir(parents=True, exist_ok=True)
+        if app_dir.exists():
+            shutil.rmtree(app_dir)
+        for stale in project_dir.glob("app_packages*"):
+            if stale.is_dir():
+                shutil.rmtree(stale)
+            else:
+                stale.unlink()
 
         app_src = self.config.project_root / "app"
         if not app_src.is_dir():
             raise BuildError(f"No app/ directory found at {app_src}; nothing to bundle.")
-        shutil.copytree(app_src, app_dir, dirs_exist_ok=True)
+        shutil.copytree(app_src, app_dir)
 
-        if self.dev_lib_root.is_dir():
-            shutil.copytree(
-                self.dev_lib_root,
-                packages_dir / "pythonnative",
-                dirs_exist_ok=True,
-                ignore=android_config.LIB_IGNORE,
-            )
+        slices: List[Path] = []
+        for target in deps.ios_targets(self.config, sdks=sdks):
+            packages_dir = project_dir / target.slice_name
+            packages_dir.mkdir(parents=True, exist_ok=True)
+            slices.append(packages_dir)
 
-        # The framework has no Python-side native dependencies (the
-        # bridge into PythonNativeKit is ctypes); only user requirements
-        # are installed into the site directory.
-        if self.config.requirements:
-            result = self.runner.run(
-                [sys.executable, "-m", "pip", "install", "-t", str(packages_dir), *self.config.requirements],
-                capture=True,
-            )
-            if not result.ok:
-                raise BuildError(f"pip install of [requirements].packages failed:\n{result.stderr}")
+            # The framework has no Python-side native dependencies (the
+            # bridge into PythonNativeKit is ctypes), so it is copied
+            # verbatim into every slice.
+            if self.dev_lib_root.is_dir():
+                shutil.copytree(
+                    self.dev_lib_root,
+                    packages_dir / "pythonnative",
+                    dirs_exist_ok=True,
+                    ignore=android_config.LIB_IGNORE,
+                )
+
+            if self.config.requirements:
+                self.log(f"Resolving {len(self.config.requirements)} requirement(s) for {target.label}...")
+                try:
+                    deps.install(self.config, target, packages_dir, runner=self.runner)
+                except deps.DependencyError as exc:
+                    raise BuildError(str(exc)) from exc
 
         if release:
-            self._compile_ios_bytecode(app_dir, packages_dir)
+            self._compile_ios_bytecode(app_dir, *slices)
 
     def _compile_ios_bytecode(self, *roots: Path) -> None:
         """Byte-compile staged Python code and drop the ``.py`` sources.

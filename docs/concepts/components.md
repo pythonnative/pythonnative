@@ -108,8 +108,8 @@ pn.Column(
 - [`KeyboardAvoidingView(*children, behavior)`][pythonnative.KeyboardAvoidingView]:
   shift content up when the software keyboard appears.
 - [`RefreshControl(refreshing, on_refresh)`][pythonnative.RefreshControl]:
-  pull-to-refresh spec for `ScrollView` and `FlatList` (passed via
-  the `refresh_control=` prop).
+  pull-to-refresh control for `ScrollView`, `FlatList`, and
+  `SectionList` (passed via the `refresh_control=` prop).
 - [`Picker(value, items, on_change, placeholder)`][pythonnative.Picker]:
   select / dropdown widget backed by an action sheet.
 

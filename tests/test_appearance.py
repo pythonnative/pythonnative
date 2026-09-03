@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Generator, List
+from typing import Generator, List
 
 import pytest
 
@@ -14,6 +14,7 @@ from pythonnative.reconciler import Reconciler
 from pythonnative.style import (
     DEFAULT_DARK_THEME,
     DEFAULT_LIGHT_THEME,
+    Theme,
     ThemeContext,
     default_theme,
     use_theme,
@@ -141,7 +142,7 @@ def test_default_theme_selects_by_scheme() -> None:
 
 
 def test_use_theme_follows_system_scheme() -> None:
-    seen: List[Dict[str, Any]] = []
+    seen: List[Theme] = []
 
     @component
     def comp() -> Element:
@@ -159,8 +160,8 @@ def test_use_theme_follows_system_scheme() -> None:
 
 
 def test_use_theme_provider_pins_explicit_theme() -> None:
-    custom = {"text_color": "#ABCDEF"}
-    seen: List[Dict[str, Any]] = []
+    custom = DEFAULT_LIGHT_THEME.replace(text_color="#ABCDEF")
+    seen: List[Theme] = []
 
     @component
     def consumer() -> Element:
@@ -180,3 +181,19 @@ def test_use_theme_provider_pins_explicit_theme() -> None:
     appearance.set_system_color_scheme("dark")
     rec.flush_dirty()
     assert seen[-1] is custom
+
+
+def test_use_theme_rejects_untyped_provider_values() -> None:
+    @component
+    def consumer() -> Element:
+        use_theme()
+        return Element("Text", {"text": "ok"}, [])
+
+    @component
+    def app() -> Element:
+        return ThemeContext.Provider({"text_color": "#ABCDEF"}, consumer())
+
+    rec = Reconciler(FakeBackend())
+    rec.on_render_requested = lambda: None
+    with pytest.raises(TypeError, match="expects a pn.Theme"):
+        rec.mount(app())

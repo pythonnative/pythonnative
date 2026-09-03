@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from typing import Any, Tuple
 
+import pytest
+
 from pythonnative.components import (
     FlatList,
     KeyboardAvoidingView,
     Picker,
     RefreshControl,
+    ScrollView,
     SectionList,
     StatusBar,
     Text,
@@ -107,18 +110,31 @@ def test_keyboard_avoiding_position_translates_upward() -> None:
 # ======================================================================
 
 
-def test_refresh_control_dict_shape() -> None:
+def test_refresh_control_is_an_element() -> None:
     cb = lambda: None  # noqa: E731
-    spec = RefreshControl(refreshing=True, on_refresh=cb, tint_color="#FF0000")
-    assert isinstance(spec, dict)
-    assert spec["refreshing"] is True
-    assert spec["on_refresh"] is cb
-    assert spec["tint_color"] == "#FF0000"
+    control = RefreshControl(refreshing=True, on_refresh=cb, tint_color="#FF0000")
+    assert isinstance(control, Element)
+    assert control.type == "RefreshControl"
+    assert control.props == {"refreshing": True, "on_refresh": cb, "tint_color": "#FF0000"}
+    assert control.children == []
 
 
 def test_refresh_control_minimal() -> None:
-    spec = RefreshControl()
-    assert spec == {"refreshing": False}
+    assert RefreshControl().props == {"refreshing": False}
+
+
+def test_scroll_view_unwraps_refresh_control_into_the_wire_prop() -> None:
+    cb = lambda: None  # noqa: E731
+    el = ScrollView(Text("x"), refresh_control=RefreshControl(refreshing=True, on_refresh=cb))
+    # The scroll container holds the control as a prop, not a child.
+    assert el.props["refresh_control"] == {"refreshing": True, "on_refresh": cb}
+    assert len(el.children) == 1
+
+
+@pytest.mark.parametrize("bad", [{"refreshing": True}, Text("nope"), "RefreshControl"])
+def test_scroll_view_rejects_non_refresh_control(bad: object) -> None:
+    with pytest.raises(TypeError, match="expects pn.RefreshControl"):
+        ScrollView(Text("x"), refresh_control=bad)  # type: ignore[arg-type]
 
 
 # ======================================================================
@@ -233,12 +249,9 @@ def test_flatlist_separator_adds_to_row_extent() -> None:
 
 
 def test_flatlist_with_refresh_control() -> None:
-    el = FlatList(
-        data=[1, 2],
-        item_height=20,
-        refresh_control={"refreshing": True, "on_refresh": lambda: None},
-    )
-    assert el.props["refresh_control"]["refreshing"] is True
+    control = RefreshControl(refreshing=True, on_refresh=lambda: None)
+    el = FlatList(data=[1, 2], item_height=20, refresh_control=control)
+    assert el.props["refresh_control"] is control
 
     # The spec flows through to the mounted ScrollView (callback hoisted
     # to the event registry, data props kept).

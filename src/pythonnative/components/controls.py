@@ -2,7 +2,7 @@
 
 ``Switch``, ``Slider``, ``ProgressBar``, ``ActivityIndicator``,
 ``Checkbox``, ``SegmentedControl``, ``DatePicker``, ``Picker``, the
-``RefreshControl`` spec helper, and ``StatusBar``.
+``RefreshControl``, and ``StatusBar``.
 """
 
 from typing import Any, Callable, Dict, List, Literal, Optional
@@ -10,7 +10,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional
 from ..element import Element
 from ..hooks import Ref
 from ..style import AccessibilityState, Color, StyleProp
-from ._base import _make_element
+from ._base import REFRESH_CONTROL_TYPE, _make_element
 
 
 def Switch(
@@ -426,13 +426,17 @@ def RefreshControl(
     refreshing: bool = False,
     on_refresh: Optional[Callable[[], Any]] = None,
     tint_color: Optional[Color] = None,
-) -> Dict[str, Any]:
-    """Pull-to-refresh spec for [`ScrollView`][pythonnative.ScrollView] / [`FlatList`][pythonnative.FlatList].
+) -> Element:
+    """Pull-to-refresh control for [`ScrollView`][pythonnative.ScrollView] and the list components.
 
-    Returns a plain dict that should be passed as the
-    ``refresh_control=`` prop. Modeled as a dict (not an
-    [`Element`][pythonnative.Element]) so the host scroll container can
-    hold one without it appearing as a child node.
+    Pass the result as the ``refresh_control=`` prop of a
+    [`ScrollView`][pythonnative.ScrollView],
+    [`FlatList`][pythonnative.FlatList], or
+    [`SectionList`][pythonnative.SectionList]. It is a regular
+    [`Element`][pythonnative.Element] (type ``"RefreshControl"``) built
+    like every other piece of UI; the scroll container attaches it to
+    its native scroll view rather than rendering it as a child, and
+    rejects anything else with a ``TypeError``.
 
     Args:
         refreshing: Drive the spinner's visibility from a use_state
@@ -443,8 +447,7 @@ def RefreshControl(
         tint_color: Color of the spinner.
 
     Returns:
-        Dict suitable for the ``refresh_control`` prop on a scroll
-        container.
+        An [`Element`][pythonnative.Element] of type ``"RefreshControl"``.
 
     Example:
         ```python
@@ -467,12 +470,12 @@ def RefreshControl(
             )
         ```
     """
-    spec: Dict[str, Any] = {"refreshing": bool(refreshing)}
-    if on_refresh is not None:
-        spec["on_refresh"] = on_refresh
-    if tint_color is not None:
-        spec["tint_color"] = tint_color
-    return spec
+    return _make_element(
+        REFRESH_CONTROL_TYPE,
+        refreshing=bool(refreshing),
+        on_refresh=on_refresh,
+        tint_color=tint_color,
+    )
 
 
 def StatusBar(

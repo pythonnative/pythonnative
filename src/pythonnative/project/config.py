@@ -18,7 +18,7 @@ name = "myapp"                # short project name (required)
 display_name = "My App"       # home-screen label (defaults to name)
 version = "1.0.0"             # marketing version
 build = 1                     # integer build number
-python_version = "3.11"      # embedded CPython version
+python_version = "3.13"      # embedded CPython version (3.13 or 3.14)
 orientation = "portrait"     # portrait | landscape | all
 entry_point = "app/main.py"  # module whose `App` is mounted
 url_schemes = ["myapp"]      # custom deep-link URL schemes
@@ -33,6 +33,9 @@ splash = "assets/splash.png"  # splash/launch image
 
 [requirements]
 packages = ["humanize", "httpx"]
+# Extra package indexes searched after PyPI and the platform wheel
+# repositories (BeeWare for iOS, Chaquopy for Android).
+extra_index_urls = ["https://wheels.example.com/simple"]
 
 [plugins]
 paths = ["native/my_plugin"]  # local native plugins (pn_plugin.json + ios/ + android/)
@@ -49,7 +52,7 @@ provisioning_profile = "My App Distribution"
 [android]
 min_sdk = 24
 target_sdk = 34
-abi_filters = ["arm64-v8a", "x86_64"]  # the default; add armeabi-v7a/x86 if needed
+abi_filters = ["arm64-v8a", "x86_64"]  # the default and the full set (64-bit only)
 
 [android.signing]
 keystore = "release.keystore"
@@ -60,31 +63,61 @@ key_alias = "myapp"
 from __future__ import annotations
 
 import re
+import tomllib as _toml
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional
 
 from . import permissions as _permissions
 
-try:  # Python 3.11+
-    import tomllib as _toml
-except ModuleNotFoundError:  # Python 3.10
-    import tomli as _toml
-
-
 CONFIG_FILENAME = "pythonnative.toml"
 """The fixed config filename looked up at the project root."""
 
-SUPPORTED_PYTHON_VERSIONS = ("3.10", "3.11", "3.12")
+SUPPORTED_PYTHON_VERSIONS = ("3.13", "3.14")
 """CPython versions accepted in ``app.python_version``.
 
 Every listed version has a pinned, checksum-verified iOS runtime (see
 ``runtime_assets.PINNED_ASSETS``) and is supported by Chaquopy on
-Android.
+Android. The floor is 3.13 because that is the first CPython with
+official iOS (PEP 730) and Android (PEP 738) platform support, which is
+what lets binary wheels from PyPI install on both platforms.
 """
+
+DEFAULT_PYTHON_VERSION = "3.13"
+"""The ``app.python_version`` used when the config leaves it out.
+
+3.13 rather than 3.14 because binary wheel coverage (BeeWare's iOS
+index, Chaquopy's Android index, PyPI itself) is far wider for 3.13.
+"""
+
+_URL_RE = re.compile(r"^https?://\S+$")
 
 VALID_ORIENTATIONS = ("portrait", "landscape", "all")
 """Accepted values for ``app.orientation``."""
+
+MIN_IOS_DEPLOYMENT_TARGET = "13.0"
+"""Lowest ``[ios].deployment_target`` accepted.
+
+BeeWare's CPython builds and every iOS wheel on PyPI target iOS 13.0
+(the ``ios_13_0_*`` platform tags), so lower values can't be satisfied.
+"""
+
+MIN_ANDROID_SDK = 24
+"""Lowest ``[android].min_sdk`` accepted (Chaquopy 17 requirement)."""
+
+VALID_ANDROID_ABIS = ("arm64-v8a", "x86_64")
+"""Android ABIs the embedded runtime supports.
+
+CPython 3.12+ on Chaquopy ships 64-bit only, and PEP 738 Android wheels
+on PyPI are published for these two ABIs.
+"""
+
+_IOS_VERSION_RE = re.compile(r"^\d+(\.\d+){1,2}$")
+
+
+def _version_tuple(version: str) -> tuple:
+    return tuple(int(part) for part in version.split("."))
+
 
 VALID_IOS_EXPORT_METHODS = ("development", "ad-hoc", "app-store", "enterprise")
 """Accepted values for ``[ios.signing].export_method``."""
@@ -200,9 +233,9 @@ class AndroidConfig:
     target_sdk: int = 34
     compile_sdk: int = 34
     application_id: Optional[str] = None
-    # arm64 devices plus x86_64 emulators. 32-bit ABIs (armeabi-v7a, x86)
-    # roughly double the native payload and are opt-in.
-    abi_filters: List[str] = field(default_factory=lambda: ["arm64-v8a", "x86_64"])
+    # arm64 devices plus x86_64 emulators: the only ABIs CPython 3.12+
+    # on Chaquopy (and PEP 738 wheels on PyPI) are built for.
+    abi_filters: List[str] = field(default_factory=lambda: list(VALID_ANDROID_ABIS))
     permissions: List[str] = field(default_factory=list)
     signing: AndroidSigning = field(default_factory=AndroidSigning)
 
@@ -238,6 +271,9 @@ class AppConfig:
         icon: Optional source icon path (``[assets].icon``).
         splash: Optional splash image path (``[assets].splash``).
         requirements: Third-party pip packages (``[requirements].packages``).
+        extra_index_urls: Additional package indexes
+            (``[requirements].extra_index_urls``) searched after PyPI and
+            the platform wheel repositories.
         plugin_paths: Project-local native plugin directories
             (``[plugins].paths``); installed packages contribute plugins
             through the ``pythonnative.plugins`` entry point group instead.
@@ -252,7 +288,7 @@ class AppConfig:
     display_name: str
     version: str = "1.0.0"
     build: int = 1
-    python_version: str = "3.11"
+    python_version: str = DEFAULT_PYTHON_VERSION
     orientation: str = "portrait"
     entry_point: str = "app/main.py"
     url_schemes: List[str] = field(default_factory=list)
@@ -260,6 +296,7 @@ class AppConfig:
     icon: Optional[str] = None
     splash: Optional[str] = None
     requirements: List[str] = field(default_factory=list)
+    extra_index_urls: List[str] = field(default_factory=list)
     plugin_paths: List[str] = field(default_factory=list)
     ios: IOSConfig = field(default_factory=IOSConfig)
     android: AndroidConfig = field(default_factory=AndroidConfig)
@@ -372,7 +409,7 @@ class AppConfig:
             display_name=_opt_str(app, "display_name") or _require_str(app, "name", "app"),
             version=_opt_str(app, "version") or "1.0.0",
             build=_opt_int(app, "build", default=1),
-            python_version=_opt_str(app, "python_version") or "3.11",
+            python_version=_opt_str(app, "python_version") or DEFAULT_PYTHON_VERSION,
             orientation=(_opt_str(app, "orientation") or "portrait").lower(),
             entry_point=_opt_str(app, "entry_point") or "app/main.py",
             url_schemes=_opt_str_list(app, "url_schemes"),
@@ -388,6 +425,7 @@ class AppConfig:
 
         requirements = _expect_table(data, "requirements", optional=True)
         config.requirements = _opt_str_list(requirements, "packages")
+        config.extra_index_urls = _opt_str_list(requirements, "extra_index_urls")
 
         plugins = _expect_table(data, "plugins", optional=True)
         config.plugin_paths = _opt_str_list(plugins, "paths")
@@ -440,17 +478,36 @@ class AppConfig:
             raise ConfigError("Unknown permission(s): " + ", ".join(unknown) + f".\nValid capabilities: {known}")
 
         _validate_requirements(self.requirements)
+        for url in self.extra_index_urls:
+            if not _URL_RE.match(url):
+                raise ConfigError(
+                    f"[requirements].extra_index_urls entry {url!r} is invalid; use a full http(s) URL "
+                    "to a PEP 503 simple index (e.g. 'https://wheels.example.com/simple')."
+                )
 
         if self.ios.signing.export_method not in VALID_IOS_EXPORT_METHODS:
             valid = ", ".join(VALID_IOS_EXPORT_METHODS)
             raise ConfigError(
                 f"[ios.signing].export_method {self.ios.signing.export_method!r} is invalid (choose one of: {valid})."
             )
+        if not _IOS_VERSION_RE.match(self.ios.deployment_target):
+            raise ConfigError(
+                f"[ios].deployment_target {self.ios.deployment_target!r} must look like '13.0' or '16.4'."
+            )
+        if _version_tuple(self.ios.deployment_target) < _version_tuple(MIN_IOS_DEPLOYMENT_TARGET):
+            raise ConfigError(
+                f"[ios].deployment_target must be at least {MIN_IOS_DEPLOYMENT_TARGET} "
+                "(the embedded CPython runtime and iOS binary wheels target that floor)."
+            )
 
-        if self.android.min_sdk < 21:
-            raise ConfigError("[android].min_sdk must be at least 21 (Chaquopy requirement).")
+        if self.android.min_sdk < MIN_ANDROID_SDK:
+            raise ConfigError(f"[android].min_sdk must be at least {MIN_ANDROID_SDK} (Chaquopy requirement).")
         if self.android.target_sdk < self.android.min_sdk:
             raise ConfigError("[android].target_sdk must be >= min_sdk.")
+        for abi in self.android.abi_filters:
+            if abi not in VALID_ANDROID_ABIS:
+                valid = ", ".join(VALID_ANDROID_ABIS)
+                raise ConfigError(f"[android].abi_filters entry {abi!r} is invalid (choose from: {valid}).")
 
 
 # ======================================================================
@@ -635,7 +692,7 @@ def _toml_escape(value: str) -> str:
     return "".join(out)
 
 
-def render_default_toml(*, name: str, app_id: str, python_version: str = "3.11") -> str:
+def render_default_toml(*, name: str, app_id: str, python_version: str = DEFAULT_PYTHON_VERSION) -> str:
     """Render a starter ``pythonnative.toml`` for ``pn init``.
 
     Every interpolated value is escaped for a TOML basic string, so a
@@ -686,13 +743,16 @@ entry_point = "app/main.py"
 # icon = "assets/icon.png"
 # splash = "assets/splash.png"
 
-# Third-party pip packages bundled into the app (pure-Python or, on
-# Android, anything Chaquopy can build). Do NOT list "pythonnative".
+# Third-party pip packages bundled into the app. Pure-Python packages
+# always work; packages with C extensions need a wheel for each device
+# platform. Run `pn deps` to see what resolves before you build.
+# Do NOT list "pythonnative". Docs: https://pythonnative.com/guides/pypi-packages/
 [requirements]
 packages = []
+# extra_index_urls = ["https://wheels.example.com/simple"]
 
 [ios]
-deployment_target = "13.0"
+deployment_target = "{MIN_IOS_DEPLOYMENT_TARGET}"
 # development_team = "ABCDE12345"
 # bundle_id = "{app_id}"
 
@@ -701,10 +761,10 @@ export_method = "development"   # development | ad-hoc | app-store | enterprise
 # provisioning_profile = "My App Distribution"
 
 [android]
-min_sdk = 24
+min_sdk = {MIN_ANDROID_SDK}
 target_sdk = 34
-# arm64 devices + x86_64 emulators (the default). Add "armeabi-v7a" or
-# "x86" only if you must support 32-bit hardware; each ABI adds ~30 MB.
+# arm64 devices + x86_64 emulators. These are the only ABIs the embedded
+# CPython (3.12+) and Android wheels on PyPI ship for.
 # abi_filters = ["arm64-v8a", "x86_64"]
 
 [android.signing]

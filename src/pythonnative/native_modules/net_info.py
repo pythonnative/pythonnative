@@ -41,10 +41,7 @@ class NetInfo:
     def fetch() -> NetInfoState:
         """Return a fresh snapshot of connectivity state."""
         global _last_state
-        try:
-            snapshot = native_module("NetInfo").call("fetch")
-        except Exception:
-            snapshot = None
+        snapshot = native_module("NetInfo").call("fetch")
         if isinstance(snapshot, dict):
             _last_state = _normalize(snapshot)
         return dict(_last_state)

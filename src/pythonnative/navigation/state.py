@@ -15,9 +15,16 @@ pushed screen the full history it belongs to.
 from __future__ import annotations
 
 import itertools
-from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence, Tuple, cast
 
-__all__ = ["NavigationState", "Route"]
+__all__ = ["NavigationState", "Route", "RouteParams"]
+
+type RouteParams = Mapping[str, Any]
+"""Bound for the ``P`` type parameter of [`Route`][pythonnative.navigation.Route].
+
+Declare a screen's params as a ``TypedDict`` and read them with
+``use_route(MyParams)`` for a fully typed ``route.params``.
+"""
 
 _route_keys = itertools.count(1)
 
@@ -26,13 +33,27 @@ def _new_key(name: str) -> str:
     return f"{name}-{next(_route_keys)}"
 
 
-class Route:
+class Route[P: RouteParams = Dict[str, Any]]:
     """One entry in a navigator's state.
+
+    ``Route`` is generic in its params type. Bare ``Route`` is
+    ``Route[dict[str, Any]]``; pass a ``TypedDict`` to
+    [`use_route`][pythonnative.use_route] to get ``Route[MyParams]``
+    with a typed ``params`` attribute:
+
+    ```python
+    class DetailParams(TypedDict):
+        id: int
+
+    route = pn.use_route(DetailParams)
+    route.params["id"]  # int
+    ```
 
     Attributes:
         name: The screen name this route renders.
         params: Parameters passed to the screen (read with
-            [`use_route`][pythonnative.use_route]).
+            [`use_route`][pythonnative.use_route]). Always a plain
+            ``dict`` at runtime.
         key: Stable identity for this particular visit to the screen,
             unique per process. Two pushes of the same screen have
             different keys, so their component state never mixes.
@@ -51,16 +72,16 @@ class Route:
         state: Optional["NavigationState"] = None,
     ) -> None:
         self.name = name
-        self.params: Dict[str, Any] = dict(params or {})
+        self.params: P = cast(P, dict(params or {}))
         self.key = key or _new_key(name)
         self.state = state
 
-    def with_params(self, params: Mapping[str, Any], *, merge: bool = True) -> "Route":
+    def with_params(self, params: Mapping[str, Any], *, merge: bool = True) -> "Route[P]":
         """Return a copy carrying ``params`` (merged over the current ones by default)."""
         merged = {**self.params, **params} if merge else dict(params)
         return Route(self.name, merged, key=self.key, state=self.state)
 
-    def with_state(self, state: Optional["NavigationState"]) -> "Route":
+    def with_state(self, state: Optional["NavigationState"]) -> "Route[P]":
         """Return a copy carrying a nested navigator seed ``state``."""
         return Route(self.name, self.params, key=self.key, state=state)
 
@@ -72,11 +93,11 @@ class Route:
         return out
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "Route":
+    def from_dict(cls, data: Mapping[str, Any]) -> "Route[Dict[str, Any]]":
         """Rebuild a route from ``to_dict`` output, keeping its ``key`` so component state carries over."""
         params = data.get("params")
         nested = data.get("state")
-        return cls(
+        return Route(
             str(data["name"]),
             params if isinstance(params, Mapping) else {},
             key=data.get("key"),

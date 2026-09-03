@@ -124,7 +124,7 @@ def _VirtualizedList(
     header: Optional[Element] = None,
     footer: Optional[Element] = None,
     empty: Optional[Element] = None,
-    refresh_control: Optional[Dict[str, Any]] = None,
+    refresh_control: Optional[Element] = None,
     on_end_reached: Optional[Callable[[], Any]] = None,
     on_end_reached_threshold: Optional[float] = None,
     on_viewable_items_changed: Optional[Callable[[List[Dict[str, Any]]], None]] = None,
@@ -464,7 +464,7 @@ def FlatList(
     get_item_height: Optional[Callable[[Any, int], float]] = None,
     estimated_item_height: Optional[float] = None,
     separator_height: float = 0,
-    refresh_control: Optional[Dict[str, Any]] = None,
+    refresh_control: Optional[Element] = None,
     horizontal: bool = False,
     num_columns: int = 1,
     list_header: Optional[Element] = None,
@@ -509,8 +509,8 @@ def FlatList(
         estimated_item_height: Starting extent estimate for rows whose
             true size isn't known yet (default 44).
         separator_height: Gap below each row, in points.
-        refresh_control: Optional pull-to-refresh spec from
-            [`RefreshControl`][pythonnative.RefreshControl].
+        refresh_control: Optional [`RefreshControl`][pythonnative.RefreshControl]
+            element for pull-to-refresh.
         horizontal: Scroll horizontally (extents become widths).
         num_columns: Render items in a grid of this many columns.
         list_header: Element rendered once before all rows.
@@ -666,7 +666,7 @@ def SectionList(
     estimated_item_height: Optional[float] = None,
     section_header_height: Optional[float] = None,
     separator_height: float = 0,
-    refresh_control: Optional[Dict[str, Any]] = None,
+    refresh_control: Optional[Element] = None,
     list_header: Optional[Element] = None,
     list_footer: Optional[Element] = None,
     list_empty: Optional[Element] = None,
@@ -699,7 +699,7 @@ def SectionList(
         estimated_item_height: Starting estimate for unmeasured rows.
         section_header_height: Header extent in points, when known.
         separator_height: Gap below each item, in points.
-        refresh_control: Optional pull-to-refresh spec.
+        refresh_control: Optional [`RefreshControl`][pythonnative.RefreshControl] element.
         list_header: Element rendered once before everything.
         list_footer: Element rendered once after everything.
         list_empty: Element rendered when there are no sections.

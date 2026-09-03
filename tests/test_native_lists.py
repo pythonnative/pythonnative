@@ -13,7 +13,7 @@ from typing import Any, List, Tuple
 import pytest
 
 import pythonnative.components as components
-from pythonnative.components import FlatList, SectionList, Text
+from pythonnative.components import FlatList, RefreshControl, SectionList, Text
 from pythonnative.element import Element
 from pythonnative.events import dispatch_event
 from pythonnative.native_views import set_registry
@@ -79,7 +79,7 @@ def test_flatlist_stays_windowed_with_refresh_control(native_lists: None) -> Non
     el = FlatList(
         data=list(range(10)),
         item_height=44,
-        refresh_control={"refreshing": False, "on_refresh": lambda: None},
+        refresh_control=RefreshControl(refreshing=False, on_refresh=lambda: None),
     )
     root, _rec, _backend = _mount(el)
     assert root.type_name == "ScrollView"

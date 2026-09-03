@@ -6,10 +6,20 @@ import Photos
 import UIKit
 import UserNotifications
 
-/// `Permissions`: `check` (sync) and `request` (async) for camera,
-/// microphone, location, photos, notifications, and contacts.
+/// `Permissions`: `check` (sync) and `request` (async).
+///
+/// Permission names are the `[permissions]` keys from pythonnative.toml
+/// (`camera`, `microphone`, `photo_library`, `location_when_in_use`,
+/// `contacts`, `notifications`). The Python facade validates them before
+/// the call reaches this module, so an unknown name here is a bug rather
+/// than user input, and is rejected rather than answered.
 public final class PermissionsModule: PNNativeModule {
     public static let name = "Permissions"
+
+    /// Every accepted permission name, in the `[permissions]` vocabulary.
+    public static let names: Set<String> = [
+        "camera", "microphone", "photo_library", "location_when_in_use", "contacts", "notifications",
+    ]
 
     private var locationRequester: PNLocationPermissionRequester?
 
@@ -18,10 +28,15 @@ public final class PermissionsModule: PNNativeModule {
     public func call(_ method: String, args: [String: Any], promise: PNPromise) {
         let permission = PNProps.string(args["permission"]) ?? ""
         switch method {
-        case "check":
-            check(permission) { promise.resolve($0) }
-        case "request":
-            request(permission) { promise.resolve($0) }
+        case "check", "request":
+            guard PermissionsModule.names.contains(permission) else {
+                return promise.reject("unknown permission '\(permission)'", code: "bad_args")
+            }
+            if method == "check" {
+                check(permission) { promise.resolve($0) }
+            } else {
+                request(permission) { promise.resolve($0) }
+            }
         default:
             promise.reject("Permissions has no method '\(method)'", code: "unknown_method")
         }
@@ -35,11 +50,11 @@ public final class PermissionsModule: PNNativeModule {
             done(PermissionsModule.status(AVCaptureDevice.authorizationStatus(for: .video)))
         case "microphone":
             done(PermissionsModule.status(AVCaptureDevice.authorizationStatus(for: .audio)))
-        case "photos":
+        case "photo_library":
             done(PermissionsModule.status(PHPhotoLibrary.pnReadWriteAuthorizationStatus()))
         case "contacts":
             done(PermissionsModule.status(CNContactStore.authorizationStatus(for: .contacts)))
-        case "location":
+        case "location_when_in_use":
             done(PermissionsModule.status(CLLocationManager().pnAuthorizationStatus))
         case "notifications":
             UNUserNotificationCenter.current().getNotificationSettings { settings in
@@ -66,7 +81,7 @@ public final class PermissionsModule: PNNativeModule {
             AVCaptureDevice.requestAccess(for: .video) { finish($0 ? "granted" : "blocked") }
         case "microphone":
             AVCaptureDevice.requestAccess(for: .audio) { finish($0 ? "granted" : "blocked") }
-        case "photos":
+        case "photo_library":
             PHPhotoLibrary.pnRequestReadWriteAuthorization { finish(PermissionsModule.status($0)) }
         case "contacts":
             CNContactStore().requestAccess(for: .contacts) { granted, _ in finish(granted ? "granted" : "blocked") }
@@ -74,7 +89,7 @@ public final class PermissionsModule: PNNativeModule {
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
                 finish(granted ? "granted" : "blocked")
             }
-        case "location":
+        case "location_when_in_use":
             let requester = PNLocationPermissionRequester { [weak self] status in
                 self?.locationRequester = nil
                 finish(status)

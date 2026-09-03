@@ -145,11 +145,14 @@ project. On the first iOS build, `pn` downloads the pinned, checksum-
 verified runtime for your `app.python_version` and caches it under
 `build/ios/ios_runtime/`. The Xcode build links `Python.xcframework`,
 installs the standard library, and bundles your `app/` sources, the
-`pythonnative` package, and any pure-Python `[requirements].packages`.
+`pythonnative` package, and the `[requirements].packages` resolved for
+the SDK being built (device or Simulator), binary wheels included.
 
-Pinned, verified runtimes exist for **Python 3.10, 3.11, and 3.12**;
-set `python_version` in `[app]` accordingly. Unpinned versions are
-rejected rather than fetched unverified.
+Pinned, verified runtimes exist for **Python 3.13 and 3.14**; set
+`python_version` in `[app]` accordingly. Unpinned versions are
+rejected rather than fetched unverified. See
+[PyPI packages](pypi-packages.md) for how requirements are resolved
+per target.
 
 ---
 

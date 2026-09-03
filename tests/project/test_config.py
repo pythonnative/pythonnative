@@ -28,7 +28,7 @@ def test_minimal_config_defaults() -> None:
     assert cfg.display_name == "app"  # falls back to name
     assert cfg.version == "1.0.0"
     assert cfg.build == 1
-    assert cfg.python_version == "3.11"
+    assert cfg.python_version == "3.13"
     assert cfg.orientation == "portrait"
     assert cfg.entry_point == "app/main.py"
     assert cfg.entry_module == "app.main"
@@ -58,7 +58,7 @@ def test_full_config_parsing() -> None:
             "display_name": "Cool App",
             "version": "2.5.0",
             "build": 9,
-            "python_version": "3.12",
+            "python_version": "3.14",
             "orientation": "landscape",
             "entry_point": "src/start.py",
         },
@@ -84,7 +84,7 @@ def test_full_config_parsing() -> None:
     cfg = AppConfig.from_dict(data)
     assert cfg.display_name == "Cool App"
     assert cfg.version == "2.5.0"
-    assert cfg.python_version == "3.12"
+    assert cfg.python_version == "3.14"
     assert cfg.orientation == "landscape"
     assert cfg.entry_module == "src.start"
     assert cfg.bundle_id == "com.acme.cool.ios"

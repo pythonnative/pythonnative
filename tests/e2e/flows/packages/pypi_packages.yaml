@@ -1,0 +1,32 @@
+# Tests that [requirements].packages resolve for the device platform,
+# ship in the app bundle, and import on the embedded CPython, including
+# a binary wheel whose compiled extension modules must load.
+#
+# Demo screen: examples/e2e-suite/app/screens/packages/pypi_packages.py
+# Source under test: src/pythonnative/project/deps.py, project/builder.py :: _stage_ios_python,
+#                    project/android.py :: configure_gradle (Chaquopy pip block)
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Packages
+      DEMO_TITLE: PyPI packages
+# Pure-Python wheel imported and versioned.
+- assertVisible:
+    text: "httpx: [0-9].*"
+- assertNotVisible: "httpx: missing"
+# Binary wheel imported, and a computation ran through its C core.
+- assertVisible:
+    text: "numpy: [0-9].*"
+- assertNotVisible: "numpy: missing"
+- scrollUntilVisible:
+    element:
+      text: "numpy sum: 6 \\(binary module loaded: yes\\)"
+    direction: DOWN
+- assertNotVisible:
+    text: "Error: .*"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Packages

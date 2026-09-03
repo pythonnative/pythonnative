@@ -6,10 +6,10 @@ native ``SecureStore`` module), the right place for auth tokens and
 other secrets that [`AsyncStorage`][pythonnative.AsyncStorage] (plain,
 unencrypted) should never hold.
 
-All methods are synchronous and return a ``bool`` (writes/deletes) or
-``Optional[str]`` (reads). On desktop the module falls back to an
-in-process dict so code paths stay exercisable without a device
-Keychain.
+Both backing stores complete on the calling thread, so every method is
+synchronous. Reads return ``Optional[str]``; writes return nothing and
+raise on failure. On desktop the module falls back to an in-process dict
+so code paths stay exercisable without a device Keychain.
 
 Example:
     ```python
@@ -28,29 +28,25 @@ from .registry import native_module
 
 
 class SecureStore:
-    """Encrypted secret storage (synchronous)."""
+    """Encrypted secret storage (synchronous).
+
+    Raises:
+        NativeModuleError: If the Keychain / EncryptedSharedPreferences
+            operation fails (for example a Keychain entitlement problem).
+    """
 
     @staticmethod
-    def set_item(key: str, value: str) -> bool:
-        """Store ``value`` under ``key``. Returns ``True`` on success."""
-        try:
-            return bool(native_module("SecureStore").call("set_item", key=key, value=value))
-        except Exception:
-            return False
+    def set_item(key: str, value: str) -> None:
+        """Store ``value`` under ``key``, replacing any previous value."""
+        native_module("SecureStore").call("set_item", key=key, value=value)
 
     @staticmethod
     def get_item(key: str) -> Optional[str]:
         """Return the value for ``key``, or ``None`` if absent."""
-        try:
-            value = native_module("SecureStore").call("get_item", key=key)
-        except Exception:
-            return None
+        value = native_module("SecureStore").call("get_item", key=key)
         return None if value is None else str(value)
 
     @staticmethod
     def delete_item(key: str) -> bool:
-        """Delete ``key``. Returns ``True`` if it existed and was removed."""
-        try:
-            return bool(native_module("SecureStore").call("delete_item", key=key))
-        except Exception:
-            return False
+        """Delete ``key``. Returns ``True`` if it existed, ``False`` if there was nothing to delete."""
+        return bool(native_module("SecureStore").call("delete_item", key=key))

@@ -39,7 +39,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from .registry import NativeModuleError, native_module
+from .registry import native_module
 
 
 class Notifications:
@@ -55,13 +55,13 @@ class Notifications:
         is shown if the user hasn't decided yet.
 
         Returns:
-            ``True`` if granted (or no prompt is needed), ``False``
-            otherwise.
+            ``True`` if granted (or no prompt is needed), ``False`` if
+            the user declined (always ``False`` on desktop).
+
+        Raises:
+            NativeModuleError: If the native module fails.
         """
-        try:
-            return bool(await native_module("Notifications").call_async("request_permission"))
-        except Exception:
-            return False
+        return bool(await native_module("Notifications").call_async("request_permission"))
 
     @staticmethod
     async def schedule(
@@ -86,30 +86,26 @@ class Notifications:
                 ``badge``, ...). Unknown keys are ignored.
 
         Returns:
-            ``True`` on success, ``False`` if the underlying native
-            call failed or (on Android 13+) the user denied the
-            notification permission.
+            ``True`` once scheduled, ``False`` if the user has denied
+            notification permission (so nothing was scheduled).
+
+        Raises:
+            NativeModuleError: If the native module fails.
         """
-        try:
-            result = await native_module("Notifications").call_async(
-                "schedule",
-                title=title,
-                body=body,
-                delay_seconds=float(delay_seconds),
-                identifier=identifier,
-                **options,
-            )
-        except Exception:
-            return False
+        result = await native_module("Notifications").call_async(
+            "schedule",
+            title=title,
+            body=body,
+            delay_seconds=float(delay_seconds),
+            identifier=identifier,
+            **options,
+        )
         return bool(result)
 
     @staticmethod
     async def cancel(identifier: str = "default") -> None:
-        """Cancel a pending notification by its identifier."""
-        try:
-            await native_module("Notifications").call_async("cancel", identifier=identifier)
-        except Exception:
-            pass
+        """Cancel a pending notification by its identifier (a no-op when none is pending)."""
+        await native_module("Notifications").call_async("cancel", identifier=identifier)
 
     @staticmethod
     async def get_device_token() -> Optional[str]:
@@ -126,11 +122,8 @@ class Notifications:
             remote push support (Android and desktop).
 
         Raises:
-            RuntimeError: If APNs registration fails, with the native
-                error description.
+            NativeModuleError: If APNs registration fails; ``code`` is
+                ``"apns"`` and the message carries the system's error.
         """
-        try:
-            token = await native_module("Notifications").call_async("get_device_token")
-        except NativeModuleError as exc:
-            raise RuntimeError(f"APNs registration failed: {exc.message}") from exc
+        token = await native_module("Notifications").call_async("get_device_token")
         return str(token) if token else None

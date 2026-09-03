@@ -631,13 +631,15 @@ def Wallpaper():
 any provider it resolves the built-in
 [`DEFAULT_LIGHT_THEME`][pythonnative.style.DEFAULT_LIGHT_THEME] or
 [`DEFAULT_DARK_THEME`][pythonnative.style.DEFAULT_DARK_THEME] from the
-current scheme, so themed components are dark-mode aware by default:
+current scheme, so themed components are dark-mode aware by default.
+Themes are typed [`Theme`][pythonnative.Theme] records, so
+`theme.text_color` autocompletes and a typo is a static error:
 
 ```python
 @pn.component
 def ThemedText(text: str = ""):
     theme = pn.use_theme()
-    return pn.Text(text, style={"color": theme["text_color"], "font_size": theme["font_size"]})
+    return pn.Text(text, style={"color": theme.text_color, "font_size": theme.font_size})
 ```
 
 An in-app appearance toggle overrides the system setting through the
@@ -648,21 +650,24 @@ pn.appearance.set_color_scheme("dark")  # force dark everywhere
 pn.appearance.set_color_scheme(None)  # follow the system again
 ```
 
-### Pinning a theme with a provider
+### Custom themes and providers
 
-To pin an explicit theme for a subtree (ignoring the color scheme),
-mount a `ThemeContext` provider; `use_theme` returns the provided
-value as-is:
+Derive a brand theme from a built-in one with
+[`Theme.replace`][pythonnative.style.Theme.replace], then pin it for a
+subtree (ignoring the color scheme) with a `ThemeContext` provider.
+`use_theme` returns the provided value as-is, and rejects anything
+that isn't a `Theme` with a `TypeError`:
 
 ```python
 import pythonnative as pn
-from pythonnative.style import DEFAULT_DARK_THEME
+
+BRAND = pn.DEFAULT_DARK_THEME.replace(primary_color="#FF2D55", border_radius=12)
 
 
 @pn.component
 def DarkPage():
     return pn.ThemeContext.Provider(
-        DEFAULT_DARK_THEME,
+        BRAND,
         pn.Column(
             ThemedText(text="Always dark!"),
             style={"spacing": 8},
@@ -670,9 +675,9 @@ def DarkPage():
     )
 ```
 
-### Theme properties
+### Theme fields
 
-Both light and dark themes include:
+Every `Theme` has these fields:
 
 - `primary_color`, `secondary_color`: accent colors.
 - `background_color`, `surface_color`: background colors.

@@ -10,16 +10,15 @@ Two interfaces live here, both backed by the native ``Haptics`` module:
   milliseconds" interface for cases where you want an explicit
   duration.
 
-Every method is synchronous and best-effort: on a device that lacks a
-Taptic Engine / vibrator, or on desktop, calls are silent no-ops rather
-than errors.
+Every method is synchronous (the OS queues the effect and returns).
+Missing hardware is not an error: on a device without a Taptic Engine
+or vibrator, and on desktop, the native module simply does nothing.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from .. import diagnostics
 from .registry import native_module
 
 ImpactStyle = str  # "light" | "medium" | "heavy" | "soft" | "rigid"
@@ -27,14 +26,15 @@ NotificationType = str  # "success" | "warning" | "error"
 
 
 def _call(method: str, **args: Any) -> None:
-    try:
-        native_module("Haptics").call(method, **args)
-    except Exception:
-        diagnostics.swallowed(f"haptics.{method}")
+    native_module("Haptics").call(method, **args)
 
 
 class Haptics:
-    """Semantic haptic feedback (synchronous, best-effort)."""
+    """Semantic haptic feedback (synchronous).
+
+    Raises:
+        NativeModuleError: If the native module fails.
+    """
 
     @staticmethod
     def impact(style: ImpactStyle = "medium") -> None:
@@ -53,7 +53,11 @@ class Haptics:
 
 
 class Vibration:
-    """Raw vibration control (synchronous, best-effort)."""
+    """Raw vibration control (synchronous).
+
+    Raises:
+        NativeModuleError: If the native module fails.
+    """
 
     @staticmethod
     def vibrate(duration_ms: int = 400) -> None:

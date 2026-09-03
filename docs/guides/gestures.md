@@ -172,10 +172,26 @@ gestures.Pan(min_distance=4, min_pointers=2)
 gestures.Swipe(direction="left", min_velocity=200)
 ```
 
-`GestureEvent.state` is one of
-[`GestureState`][pythonnative.gestures.GestureState] (`"began"`,
-`"changed"`, `"ended"`, `"cancelled"`), which matters mostly when you
-share one handler across slots.
+`GestureEvent.state` is a
+[`GestureState`][pythonnative.gestures.GestureState] enum member
+(`BEGAN`, `CHANGED`, `ENDED`, `CANCELLED`), which matters mostly when
+you share one handler across slots:
+
+```python
+from pythonnative.gestures import GestureState
+
+
+def on_pan(event):
+    match event.state:
+        case GestureState.BEGAN:
+            grab()
+        case GestureState.CHANGED:
+            move(event.translation_x, event.translation_y)
+        case GestureState.ENDED | GestureState.CANCELLED:
+            release()
+```
+
+It is a `str` enum, so `event.state == "ended"` also works.
 
 ## Gestures vs. `Pressable`
 

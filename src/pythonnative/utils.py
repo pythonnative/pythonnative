@@ -7,12 +7,12 @@ results are cached the first time
 [`IS_IOS`][pythonnative.utils.IS_IOS] are read.
 
 Attributes:
-    IS_ANDROID: `True` when running inside an Android process (either
-        because `ANDROID_*` env vars are present or because Chaquopy's
-        `java` module imports successfully).
-    IS_IOS: `True` when running inside an iOS app bundle (signaled by
-        `PN_PLATFORM=ios`, `sys.platform == "ios"`, or a Simulator
-        `HOME` path).
+    IS_ANDROID: `True` when running inside an Android process
+        (`sys.platform == "android"` on the embedded CPython 3.13+, or
+        Chaquopy's `java` module imports successfully).
+    IS_IOS: `True` when running inside an iOS app bundle
+        (`sys.platform == "ios"` on the embedded CPython 3.13+, or the
+        explicit `PN_PLATFORM=ios` override).
     IS_DESKTOP: `True` when running the desktop preview backend
         (signaled by `PN_PLATFORM=desktop`, set by ``pn preview``).
         This drives the Tkinter native-view registry so a PythonNative
@@ -33,9 +33,12 @@ _is_desktop: Optional[bool] = None
 
 
 def _detect_android() -> bool:
-    """Return whether we're running inside an Android process."""
-    env = os.environ
-    if "ANDROID_BOOTLOGO" in env or "ANDROID_ROOT" in env or "ANDROID_DATA" in env or "ANDROID_ARGUMENT" in env:
+    """Return whether we're running inside an Android process.
+
+    CPython 3.13+ reports ``sys.platform == "android"`` (PEP 738); the
+    Chaquopy ``java`` module import is kept as a secondary signal.
+    """
+    if sys.platform == "android":
         return True
     try:
         from java import jclass  # noqa: F401
@@ -51,25 +54,18 @@ def _detect_ios() -> bool:
 
     Signals, in priority order:
 
-    - Explicit `PN_PLATFORM=ios` env var (set by the iOS template's
-      `ViewController.swift` before Python starts). This is the
-      canonical signal and survives even on hosts where `sys.platform`
-      is generic `darwin`.
-    - `sys.platform == "ios"` (CPython 3.13+ native iOS builds).
-    - `/CoreSimulator/Devices/` in `$HOME` (iOS Simulator fallback if
-      the template signal is missing for some reason).
+    - `sys.platform == "ios"`: CPython 3.13+ reports this on both
+      devices and the Simulator (PEP 730), so it is the canonical
+      signal for the embedded runtime.
+    - Explicit `PN_PLATFORM=ios` env var: set by the iOS template before
+      Python starts as a belt-and-braces override, and by tests.
 
     Running on macOS is never enough on its own: the desktop preview
     and unit tests run there and must not be mistaken for iOS.
     """
-    if os.environ.get("PN_PLATFORM") == "ios":
-        return True
     if sys.platform == "ios":
         return True
-    home = os.environ.get("HOME", "")
-    if "/CoreSimulator/Devices/" in home:
-        return True
-    return False
+    return os.environ.get("PN_PLATFORM") == "ios"
 
 
 def _detect_desktop() -> bool:
@@ -121,16 +117,15 @@ def _get_is_desktop() -> bool:
 IS_ANDROID: bool = _get_is_android()
 """``True`` when running inside an Android process.
 
-The flag is computed once at import time, by checking for `ANDROID_*`
-environment variables and trying to import Chaquopy's `java` module.
+The flag is computed once at import time, from ``sys.platform ==
+"android"`` or a successful import of Chaquopy's `java` module.
 """
 
 IS_IOS: bool = _get_is_ios()
 """``True`` when running inside an iOS app bundle.
 
-The flag is computed once at import time, by checking
-`PN_PLATFORM=ios`, `sys.platform == "ios"`, and the iOS Simulator
-`HOME` path.
+The flag is computed once at import time, from ``sys.platform ==
+"ios"`` or the explicit `PN_PLATFORM=ios` override.
 """
 
 IS_DESKTOP: bool = _get_is_desktop()

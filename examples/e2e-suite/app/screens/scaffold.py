@@ -17,7 +17,7 @@ needs to learn stays small.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Optional
+from typing import Iterable, Optional
 
 import pythonnative as pn
 from app.theme import styles
@@ -27,7 +27,7 @@ def demo_screen(
     title: str,
     summary: str,
     *body: pn.Element,
-    refresh_control: Optional[Dict[str, Any]] = None,
+    refresh_control: Optional[pn.Element] = None,
 ) -> pn.Element:
     """Render a demo screen with a stable header, body, and back button.
 
@@ -37,8 +37,8 @@ def demo_screen(
         summary: One-line description of what the demo demonstrates.
             Shown beneath the title in the secondary text style.
         *body: Children that contain the actual demo content.
-        refresh_control: Optional pull-to-refresh spec attached to the
-            page scroll view. A page-level pull gives the gesture the
+        refresh_control: Optional [`pn.RefreshControl`][pythonnative.RefreshControl]
+            attached to the page scroll view. A page-level pull gives the gesture the
             full screen of travel it needs to cross the platform's
             activation threshold.
 

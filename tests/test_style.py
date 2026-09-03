@@ -1,5 +1,6 @@
 """Unit tests for StyleSheet, resolve_style, theming, and typed Style."""
 
+import dataclasses
 from typing import Any, List
 
 import pytest
@@ -10,6 +11,7 @@ from pythonnative.style import (
     DEFAULT_LIGHT_THEME,
     Style,
     StyleSheet,
+    Theme,
     ThemeContext,
     resolve_style,
     style,
@@ -100,8 +102,21 @@ def test_theme_context_defaults_to_follow_system_sentinel() -> None:
 
 
 def test_light_and_dark_themes_differ() -> None:
-    assert DEFAULT_LIGHT_THEME["background_color"] != DEFAULT_DARK_THEME["background_color"]
-    assert DEFAULT_LIGHT_THEME["text_color"] != DEFAULT_DARK_THEME["text_color"]
+    assert DEFAULT_LIGHT_THEME.background_color != DEFAULT_DARK_THEME.background_color
+    assert DEFAULT_LIGHT_THEME.text_color != DEFAULT_DARK_THEME.text_color
+
+
+def test_theme_is_immutable_and_replaceable() -> None:
+    brand = DEFAULT_LIGHT_THEME.replace(primary_color="#FF2D55", spacing=12)
+    assert isinstance(brand, Theme)
+    assert brand.primary_color == "#FF2D55"
+    assert brand.spacing == 12
+    assert brand.text_color == DEFAULT_LIGHT_THEME.text_color
+    assert DEFAULT_LIGHT_THEME.primary_color == "#007AFF"
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        brand.primary_color = "#000000"  # type: ignore[misc]
+    with pytest.raises(TypeError):
+        DEFAULT_LIGHT_THEME.replace(primary_colour="#000000")
 
 
 # ---------------------------------------------------------------------------

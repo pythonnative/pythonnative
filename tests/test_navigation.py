@@ -1,6 +1,6 @@
 """Tests for the navigation package: state, core, navigators, hooks, linking."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, NotRequired, TypedDict
 
 import pytest
 
@@ -832,6 +832,47 @@ def test_use_route_outside_navigator_returns_placeholder() -> None:
     hook = render_hook(use_route)
     assert hook.current.name == "__root__"
     assert hook.current.params == {}
+
+
+class _DetailParams(TypedDict):
+    id: int
+    title: NotRequired[str]
+
+
+def test_use_route_with_params_type_returns_typed_route() -> None:
+    Stack = create_stack_navigator()
+    seen: List[Route[_DetailParams]] = []
+
+    @component
+    def Detail() -> Any:
+        route = use_route(_DetailParams)
+        seen.append(route)
+        return Text(f"id={route.params['id']}")
+
+    result = render(
+        Stack.Navigator(
+            Stack.Screen("Detail", Detail, initial_params={"id": 7}),
+        )
+    )
+    assert result.get_by_text("id=7")
+    assert seen[-1].params == {"id": 7}
+
+
+def test_use_route_with_params_type_reports_missing_required_keys() -> None:
+    Stack = create_stack_navigator()
+
+    @component
+    def Detail() -> Any:
+        route = use_route(_DetailParams)
+        return Text(str(route.params))
+
+    with pytest.raises(TypeError, match=r"missing required params \['id'\] declared by _DetailParams"):
+        render(Stack.Navigator(Stack.Screen("Detail", Detail, initial_params={"title": "x"})))
+
+
+def test_use_route_with_params_type_skips_validation_outside_navigator() -> None:
+    hook = render_hook(lambda: use_route(_DetailParams))
+    assert hook.current.name == "__root__"
 
 
 def test_use_is_focused_defaults_true_outside_navigator() -> None:

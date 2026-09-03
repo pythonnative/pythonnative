@@ -64,25 +64,25 @@ def SignUp():
     )
 ```
 
-### Theming via context
+### Theming
 
 ```python
-ThemeContext = pn.create_context({"primary": "#0a84ff", "bg": "#fff"})
+BRAND = pn.DEFAULT_LIGHT_THEME.replace(primary_color="#0a84ff")
 
 
 @pn.component
 def Header():
-    theme = pn.use_context(ThemeContext)
+    theme = pn.use_theme()  # follows light/dark mode unless a provider pins one
     return pn.Text(
         "Hello",
-        style={"color": theme["primary"], "font_size": 28, "bold": True},
+        style={"color": theme.primary_color, "font_size": theme.font_size_title, "bold": True},
     )
 
 
 @pn.component
 def App():
-    return ThemeContext.Provider(
-        {"primary": "#222", "bg": "#fafafa"},
+    return pn.ThemeContext.Provider(
+        BRAND,
         pn.Column(Header(), style={"padding": 16}),
     )
 ```

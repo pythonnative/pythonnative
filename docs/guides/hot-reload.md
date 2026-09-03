@@ -15,6 +15,12 @@ pn run android --hot-reload
 pn run ios --hot-reload
 ```
 
+Hot reload works on Android devices and emulators (over `adb`) and on
+the iOS Simulator. Physical iPhones aren't supported yet: the CLI has
+no way to write into a sandboxed app's container over USB, so
+`pn run ios --hot-reload` against a physical device prints a note and
+runs without the watcher.
+
 `pn` will:
 
 1. Build and install the app once (the standard `run` flow).
@@ -150,7 +156,7 @@ reloaded modules. Pass `--no-logs` to suppress the stream:
 pn run android --hot-reload --no-logs
 ```
 
-On iOS hot reload currently targets the Simulator flow. Use Console.app
+On iOS the CLI prints hot-reload notifications only. Use Console.app
 or Xcode for full live logs while the CLI keeps the watcher process in
 the foreground.
 
