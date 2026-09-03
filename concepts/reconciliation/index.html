@@ -1996,6 +1996,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2058,6 +2062,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/component/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component
   
 
     
@@ -2442,14 +2474,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/screen/" class="md-nav__link">
+      <a href="../../api/hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screen
+    Hosts
   
 
     
@@ -2562,6 +2594,34 @@
     
   
     Navigation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -3297,7 +3357,7 @@ widgets every render would be slow (Auto Layout passes, JNI roundtrips)
 and would lose user state (text selections, scroll position, focus).</p>
 <p>The reconciler instead asks: what is the <em>minimal</em> list of native
 mutations that turns the previous tree into the new one? It maintains a
-parallel virtual tree of <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;VNode&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.VNode"><code>VNode</code></a>s, each
+parallel virtual tree of <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;VNode&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.vnode.VNode"><code>VNode</code></a>s, each
 of which holds an integer <strong>tag</strong> (the view's stable identity on the
 native side) and the props last applied.</p>
 <h2 id="the-diff-algorithm-in-one-paragraph">The diff algorithm in one paragraph<a class="headerlink" href="#the-diff-algorithm-in-one-paragraph" title="Permanent link">&para;</a></h2>
@@ -3397,8 +3457,9 @@ portal children against the viewport instead of the parent box. State,
 context, and events still flow through the normal component tree; only
 the native views live elsewhere.</p>
 <h2 id="context-providers">Context providers<a class="headerlink" href="#context-providers" title="Permanent link">&para;</a></h2>
-<p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Provider&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.Provider"><code>Provider</code></a> is itself an element type. When the
-reconciler mounts one, it pushes a value onto a per-context stack;
+<p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Provider&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.Context.Provider"><code>Context.Provider</code></a> returns an element
+whose type is the context itself. When the reconciler mounts one, it
+pushes a value onto a per-context stack;
 descendants reading via <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_context&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_context"><code>use_context</code></a>
 observe the topmost value. Context is reactive: when a re-render
 changes a Provider's value, the reconciler marks every recorded
@@ -3408,16 +3469,12 @@ memoized ancestor in between skips its subtree.</p>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">Screen</span><span class="p">():</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="n">ThemeContext</span><span class="p">,</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="p">{</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#222"</span><span class="p">},</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">Header</span><span class="p">(),</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="p">)</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="k">def</span><span class="w"> </span><span class="nf">Header</span><span class="p">():</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">theme</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_context</span><span class="p">(</span><span class="n">ThemeContext</span><span class="p">)</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Hi"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">theme</span><span class="p">[</span><span class="s2">"primary"</span><span class="p">]})</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">return</span> <span class="n">ThemeContext</span><span class="o">.</span><span class="n">Provider</span><span class="p">({</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#222"</span><span class="p">},</span> <span class="n">Header</span><span class="p">())</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">Header</span><span class="p">():</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">theme</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_context</span><span class="p">(</span><span class="n">ThemeContext</span><span class="p">)</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Hi"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">theme</span><span class="p">[</span><span class="s2">"primary"</span><span class="p">]})</span>
 </span></code></pre></div>
 <h2 id="error-boundaries">Error boundaries<a class="headerlink" href="#error-boundaries" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;ErrorBoundary&lt;/span&gt;" href="../../api/components/#pythonnative.components.ErrorBoundary"><code>ErrorBoundary</code></a> is a special-cased

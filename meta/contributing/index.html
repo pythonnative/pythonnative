@@ -1825,6 +1825,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1887,6 +1891,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/component/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component
   
 
     
@@ -2271,14 +2303,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/screen/" class="md-nav__link">
+      <a href="../../api/hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screen
+    Hosts
   
 
     
@@ -2391,6 +2423,34 @@
     
   
     Navigation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -3534,27 +3594,30 @@ way:</p>
 <li><code>alerts</code>: imperative Alert/Picker helpers (<code>alerts.py</code>)</li>
 <li><code>animated</code>: Animated namespace and animation primitives (<code>animated.py</code>)</li>
 <li><code>cli</code>: CLI tool and <code>pn</code> command (<code>src/pythonnative/cli/</code>)</li>
-<li><code>components</code>: declarative element-creating functions (<code>components.py</code>)</li>
+<li><code>component</code>: the <code>@component</code> decorator, <code>Component</code>, and <code>memo</code> (<code>component.py</code>)</li>
+<li><code>components</code>: declarative element-creating functions (<code>components/</code>)</li>
 <li><code>element</code>: Element descriptor class (<code>element.py</code>)</li>
 <li><code>events</code>: tag-based event routing between native views and Python callbacks (<code>events.py</code>)</li>
 <li><code>gestures</code>: gesture descriptors and the pure-Python recognition arbiter (<code>gestures.py</code>)</li>
-<li><code>hooks</code>: function components and hooks (<code>hooks.py</code>)</li>
+<li><code>hooks</code>: hooks and contexts (<code>hooks.py</code>)</li>
+<li><code>hosts</code>: screen hosts, native lifecycle bridge, and render scheduling (<code>hosts/</code>)</li>
 <li><code>hot_reload</code>: file watcher and module reloader (<code>hot_reload.py</code>)</li>
 <li><code>layout</code>: pure-Python flexbox engine (<code>layout.py</code>)</li>
 <li><code>mutations</code>: batched mutation ops between reconciler and native backends (<code>mutations.py</code>)</li>
 <li><code>native_modules</code>: native API modules for device capabilities (<code>native_modules/</code>)</li>
 <li><code>native_views</code>: platform-specific native view creation and updates (<code>native_views/</code>)</li>
-<li><code>navigation</code>: navigation containers and stack/tab/drawer navigators (<code>navigation.py</code>)</li>
+<li><code>navigation</code>: navigation state, container, navigators, hooks, and linking (<code>navigation/</code>)</li>
 <li><code>net</code>: awaitable HTTP client (<code>net.py</code>)</li>
 <li><code>package</code>: <code>src/pythonnative/__init__.py</code> exports and package boundary</li>
 <li><code>platform</code>: <code>Platform.OS</code>/<code>Platform.select</code> and version detection (<code>platform.py</code>)</li>
 <li><code>platform_metrics</code>: platform-reported metrics like safe-area insets and bar heights (<code>platform_metrics.py</code>)</li>
-<li><code>reconciler</code>: virtual view tree diffing and reconciliation (<code>reconciler.py</code>)</li>
+<li><code>reconciler</code>: virtual view tree diffing, boundaries, and the layout pass (<code>reconciler/</code>)</li>
 <li><code>runtime</code>: framework-wide asyncio loop and thread-safe future helpers (<code>runtime.py</code>)</li>
-<li><code>screen</code>: screen host, native lifecycle bridge, and render scheduling (<code>screen.py</code>)</li>
 <li><code>sdk</code>: public extension SDK for custom native components (<code>sdk/</code>)</li>
 <li><code>storage</code>: AsyncStorage key/value persistence and <code>use_persisted_state</code> (<code>storage.py</code>)</li>
+<li><code>scheduler</code>: render batching and transition queues (<code>scheduler.py</code>)</li>
 <li><code>style</code>: StyleSheet and theming (<code>style.py</code>)</li>
+<li><code>testing</code>: public test utilities (<code>testing/</code>)</li>
 <li>
 <p><code>utils</code>: shared utilities (<code>utils.py</code>)</p>
 </li>
@@ -3592,7 +3655,7 @@ way:</p>
 <ul>
 <li>Use <code>!</code> after the type/scope or a <code>BREAKING CHANGE:</code> footer.</li>
 </ul>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>feat(screen)!: rename create_page to create_screen
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>feat(hosts)!: rename create_page to create_screen
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>BREAKING CHANGE: API renamed; update app code and templates.
 </span></code></pre></div>

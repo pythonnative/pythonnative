@@ -1376,35 +1376,41 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#a-minimal-fake-backend" class="md-nav__link">
+  <a href="#rendering-a-component" class="md-nav__link">
     <span class="md-ellipsis">
       
-        A minimal fake backend
+        Rendering a component
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Rendering a component">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queries
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#rendering-a-component-in-a-test" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#other-helpers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rendering a component in a test
+        Other helpers
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#asserting-on-rendered-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Asserting on rendered output
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1413,6 +1419,17 @@
     <span class="md-ellipsis">
       
         Testing hooks in isolation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-navigation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing navigation
       
     </span>
   </a>
@@ -1446,6 +1463,17 @@
     <span class="md-ellipsis">
       
         Testing async code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#going-lower-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Going lower level
       
     </span>
   </a>
@@ -1985,6 +2013,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2047,6 +2079,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/component/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component
   
 
     
@@ -2431,14 +2491,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/screen/" class="md-nav__link">
+      <a href="../../api/hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screen
+    Hosts
   
 
     
@@ -2551,6 +2611,34 @@
     
   
     Navigation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -3130,35 +3218,41 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#a-minimal-fake-backend" class="md-nav__link">
+  <a href="#rendering-a-component" class="md-nav__link">
     <span class="md-ellipsis">
       
-        A minimal fake backend
+        Rendering a component
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Rendering a component">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queries
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#rendering-a-component-in-a-test" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#other-helpers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rendering a component in a test
+        Other helpers
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#asserting-on-rendered-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Asserting on rendered output
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3167,6 +3261,17 @@
     <span class="md-ellipsis">
       
         Testing hooks in isolation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-navigation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing navigation
       
     </span>
   </a>
@@ -3200,6 +3305,17 @@
     <span class="md-ellipsis">
       
         Testing async code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#going-lower-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Going lower level
       
     </span>
   </a>
@@ -3264,171 +3380,157 @@
 <h1 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h1>
 <p>PythonNative is built so that the bulk of your application logic can
 be tested without a device or simulator. The reconciler talks to
-native widgets exclusively through the batched mutation protocol
-(see <a href="../../concepts/native-views/">Native views</a>); swap the backend
-for an in-memory fake and a render produces a tree of plain Python
-objects that <code>pytest</code> can introspect.</p>
+native widgets exclusively through the batched mutation protocol (see
+<a href="../../concepts/native-views/">Native views</a>); <code>pythonnative.testing</code>
+swaps in an in-memory backend so a render produces a tree of plain
+Python objects that <code>pytest</code> can introspect, and gives you Testing
+Library-style queries to do it.</p>
 <h2 id="what-to-test">What to test<a class="headerlink" href="#what-to-test" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Components</strong>: assert that a component renders the expected
-  element type with the expected props for a given input.</li>
-<li><strong>Hooks</strong>: drive state transitions and verify outputs after each
-  render.</li>
-<li><strong>Reducers</strong>: pure functions; test them as you would any other
-  Python function.</li>
-<li><strong>Native modules</strong>: skip platform-only paths or mock them at the
-  boundary.</li>
+<li><strong>Components</strong>: render them, find things by text or <code>test_id</code>, fire
+  events, assert on what's visible.</li>
+<li><strong>Hooks</strong>: drive state transitions with
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;render_hook&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.render_hook"><code>render_hook</code></a>.</li>
+<li><strong>Navigation flows</strong>: render the whole app and press through it.</li>
+<li><strong>Reducers and helpers</strong>: pure functions; test them as you would any
+  other Python code.</li>
 </ul>
 <p>What <em>not</em> to test (or to test sparingly): the platform handler
 implementations themselves. Those run only on the device and are
 covered by the Maestro E2E suite (<code>tests/e2e/</code>).</p>
-<h2 id="a-minimal-fake-backend">A minimal fake backend<a class="headerlink" href="#a-minimal-fake-backend" title="Permanent link">&para;</a></h2>
-<p>A test backend implements the registry protocol: <code>apply_mutations</code>,
-<code>resolve_view</code>, <code>measure_intrinsic</code>, and <code>command</code>. PythonNative's own
-suite keeps a full-featured one in <code>tests/fake_backend.py</code>; copy it
-into your project or use this trimmed version:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.mutations</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">CreateOp</span><span class="p">,</span> <span class="n">UpdateOp</span><span class="p">,</span> <span class="n">InsertOp</span><span class="p">,</span> <span class="n">DestroyOp</span><span class="p">,</span> <span class="n">SetFrameOp</span><span class="p">,</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span>
+<h2 id="rendering-a-component">Rendering a component<a class="headerlink" href="#rendering-a-component" title="Permanent link">&para;</a></h2>
+<p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;render&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.render"><code>render</code></a> mounts an element and returns a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RenderResult&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.RenderResult"><code>RenderResult</code></a>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">FakeView</span><span class="p">:</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">type_name</span><span class="p">,</span> <span class="n">props</span><span class="p">):</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">type_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">props</span> <span class="o">=</span> <span class="n">tag</span><span class="p">,</span> <span class="n">type_name</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">props</span><span class="p">)</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">find_all</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">type_name</span><span class="p">):</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        <span class="n">out</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">]</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">type_name</span> <span class="o">==</span> <span class="n">type_name</span> <span class="k">else</span> <span class="p">[]</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="p">:</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>            <span class="n">out</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">child</span><span class="o">.</span><span class="n">find_all</span><span class="p">(</span><span class="n">type_name</span><span class="p">))</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>        <span class="k">return</span> <span class="n">out</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="k">class</span><span class="w"> </span><span class="nc">FakeBackend</span><span class="p">:</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">views</span> <span class="o">=</span> <span class="p">{}</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">apply_mutations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ops</span><span class="p">):</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>        <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">ops</span><span class="p">:</span>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">CreateOp</span><span class="p">):</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">views</span><span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">tag</span><span class="p">]</span> <span class="o">=</span> <span class="n">FakeView</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">op</span><span class="o">.</span><span class="n">type_name</span><span class="p">,</span> <span class="n">op</span><span class="o">.</span><span class="n">props</span><span class="p">)</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">UpdateOp</span><span class="p">):</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">views</span><span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">tag</span><span class="p">]</span><span class="o">.</span><span class="n">props</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">changed_props</span><span class="p">)</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">InsertOp</span><span class="p">):</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>                <span class="n">child</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">views</span><span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">child_tag</span><span class="p">]</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">views</span><span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">parent_tag</span><span class="p">]</span><span class="o">.</span><span class="n">children</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">child</span><span class="p">)</span>
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">DestroyOp</span><span class="p">):</span>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">views</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">SetFrameOp</span><span class="p">):</span>
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">views</span><span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">tag</span><span class="p">]</span><span class="o">.</span><span class="n">frame</span> <span class="o">=</span> <span class="n">op</span><span class="o">.</span><span class="n">frame</span>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">resolve_view</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">):</span>
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">views</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">measure_intrinsic</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">max_w</span><span class="p">,</span> <span class="n">max_h</span><span class="p">):</span>
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>        <span class="k">return</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">command</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>        <span class="k">return</span> <span class="kc">None</span>
-</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>
-</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">set_animated_property</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">prop</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span> <span class="o">...</span>
-</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">start_animation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">anim_id</span><span class="p">,</span> <span class="n">prop</span><span class="p">,</span> <span class="n">spec</span><span class="p">):</span> <span class="k">return</span> <span class="kc">False</span>
-</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cancel_animation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">anim_id</span><span class="p">):</span> <span class="k">return</span> <span class="kc">None</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">Counter</span><span class="p">():</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">count</span><span class="p">,</span> <span class="n">set_count</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Count: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"+"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_count</span><span class="p">(</span><span class="n">count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)),</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="p">)</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_counter_increments</span><span class="p">():</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">Counter</span><span class="p">())</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">result</span><span class="o">.</span><span class="n">press</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"+"</span><span class="p">))</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Count: 1"</span><span class="p">)</span>
 </span></code></pre></div>
-<h2 id="rendering-a-component-in-a-test">Rendering a component in a test<a class="headerlink" href="#rendering-a-component-in-a-test" title="Permanent link">&para;</a></h2>
-<p>Construct the reconciler with the fake backend directly:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.reconciler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reconciler</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">render</span><span class="p">(</span><span class="n">element</span><span class="p">):</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="sd">"""Mount `element` and return (root FakeView, reconciler)."""</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">backend</span> <span class="o">=</span> <span class="n">FakeBackend</span><span class="p">()</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">rec</span> <span class="o">=</span> <span class="n">Reconciler</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">rec</span><span class="o">.</span><span class="n">_screen_re_render</span> <span class="o">=</span> <span class="k">lambda</span><span class="p">:</span> <span class="kc">None</span>  <span class="c1"># no screen host in tests</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">rec</span><span class="o">.</span><span class="n">mount</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="k">return</span> <span class="n">backend</span><span class="o">.</span><span class="n">views</span><span class="p">[</span><span class="n">rec</span><span class="o">.</span><span class="n">root_tag</span><span class="p">()],</span> <span class="n">rec</span>
-</span></code></pre></div>
-<p>(For a longer-running test (effects, navigation), use <code>create_screen</code> so
-you get the full lifecycle plumbing.)</p>
-<h2 id="asserting-on-rendered-output">Asserting on rendered output<a class="headerlink" href="#asserting-on-rendered-output" title="Permanent link">&para;</a></h2>
-<p>Event callbacks live in the event registry, not on the view; drive
-them with <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;dispatch_event&lt;/span&gt;" href="../../api/events/#pythonnative.events.dispatch_event"><code>dispatch_event</code></a>
-exactly like a native listener would:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.events</span><span class="w"> </span><span class="kn">import</span> <span class="n">dispatch_event</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_counter_increments</span><span class="p">():</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">Counter</span><span class="p">():</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="n">count</span><span class="p">,</span> <span class="n">set_count</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Count: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s2">"t"</span><span class="p">),</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"+"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_count</span><span class="p">(</span><span class="n">count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">key</span><span class="o">=</span><span class="s2">"b"</span><span class="p">),</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="p">)</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="n">root</span><span class="p">,</span> <span class="n">rec</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">Counter</span><span class="p">())</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="n">label</span><span class="p">,</span> <span class="n">button</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">children</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="k">assert</span> <span class="n">label</span><span class="o">.</span><span class="n">props</span><span class="p">[</span><span class="s2">"text"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"Count: 0"</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="n">dispatch_event</span><span class="p">(</span><span class="n">button</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="s2">"on_press"</span><span class="p">)</span>
-</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>    <span class="n">rec</span><span class="o">.</span><span class="n">flush_dirty</span><span class="p">()</span>  <span class="c1"># state changes commit on the next flush</span>
-</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>    <span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">props</span><span class="p">[</span><span class="s2">"text"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"Count: 1"</span>
-</span></code></pre></div>
-<p>Notes:</p>
+<p><code>press</code> (and the general <code>fire(target, "on_event", *args)</code>) dispatch
+the event exactly as a native listener would, then settle: pending
+re-renders, effects, and async work run before the call returns, so
+the next line can assert on the new tree.</p>
+<h3 id="queries">Queries<a class="headerlink" href="#queries" title="Permanent link">&para;</a></h3>
+<p>Queries mirror Testing Library:</p>
+<table>
+<thead>
+<tr>
+<th>Query</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_by_text</code>, <code>get_by_test_id</code>, <code>get_by_label</code>, <code>get_by_type</code></td>
+<td>exactly one view, or raises <code>LookupError</code> with the tree dumped in the message</td>
+</tr>
+<tr>
+<td><code>query_by_*</code></td>
+<td>the view or <code>None</code></td>
+</tr>
+<tr>
+<td><code>get_all_by_*</code></td>
+<td>every match</td>
+</tr>
+</tbody>
+</table>
+<p>Matchers are exact strings, compiled regexes, or predicates;
+<code>get_by_text("Count", exact=False)</code> matches substrings. Views inside a
+<code>display: "none"</code> subtree (inactive tabs, screens beneath the top of a
+stack) are skipped unless you pass <code>hidden=True</code>, which is how you
+assert that a hidden screen kept its state.</p>
+<p>Each match is a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeView&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.FakeView"><code>FakeView</code></a> with
+<code>type_name</code>, <code>props</code>, <code>children</code>, <code>parent</code>, <code>frame</code>, and <code>text</code>.
+<code>result.text()</code> lists the visible strings in order, and
+<code>result.dump()</code> prints the tree when a test is confusing.</p>
+<h3 id="other-helpers">Other helpers<a class="headerlink" href="#other-helpers" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>key="t"</code> and <code>key="b"</code> aren't required for a two-child column, but
-  using them in tests makes assertions more robust as the component
-  evolves.</li>
-<li>Callable props never appear in <code>props</code>; the view carries a
-  <code>_pn_events</code> frozenset naming the wired events, and
-  <code>dispatch_event(tag, name, *args)</code> invokes the current callback.</li>
+<li><code>change_text(input, "value")</code> fires <code>on_change_text</code>.</li>
+<li><code>back()</code> simulates the system back action and returns whether a
+  handler consumed it.</li>
+<li><code>rerender(element)</code> reconciles new root props from outside the tree.</li>
+<li><code>settle()</code> pumps the framework loop until async work is done.</li>
+<li><code>unmount()</code> tears down and runs effect cleanups; <code>RenderResult</code> is
+  also a context manager.</li>
 </ul>
 <h2 id="testing-hooks-in-isolation">Testing hooks in isolation<a class="headerlink" href="#testing-hooks-in-isolation" title="Permanent link">&para;</a></h2>
-<p>For complex hook compositions (a custom hook that wraps several
-built-ins), wrap the hook in a tiny throwaway component and assert on
-its rendered shape:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_use_toggle</span><span class="p">():</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">use_toggle</span><span class="p">(</span><span class="n">initial</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        <span class="n">on</span><span class="p">,</span> <span class="n">set_on</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="n">initial</span><span class="p">)</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>        <span class="k">return</span> <span class="n">on</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="n">set_on</span><span class="p">(</span><span class="ow">not</span> <span class="n">on</span><span class="p">)</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">Probe</span><span class="p">():</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="n">on</span><span class="p">,</span> <span class="n">toggle</span> <span class="o">=</span> <span class="n">use_toggle</span><span class="p">()</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"on"</span> <span class="k">if</span> <span class="n">on</span> <span class="k">else</span> <span class="s2">"off"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">toggle</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s2">"t"</span><span class="p">)</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">root</span><span class="p">,</span> <span class="n">rec</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">Probe</span><span class="p">())</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">props</span><span class="p">[</span><span class="s2">"text"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"off"</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="n">dispatch_event</span><span class="p">(</span><span class="n">root</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="s2">"on_press"</span><span class="p">)</span>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    <span class="n">rec</span><span class="o">.</span><span class="n">flush_dirty</span><span class="p">()</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    <span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">props</span><span class="p">[</span><span class="s2">"text"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"on"</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render_hook</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">use_toggle</span><span class="p">(</span><span class="n">initial</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">on</span><span class="p">,</span> <span class="n">set_on</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="n">initial</span><span class="p">)</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="k">return</span> <span class="n">on</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="n">set_on</span><span class="p">(</span><span class="ow">not</span> <span class="n">on</span><span class="p">)</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_use_toggle</span><span class="p">():</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">hook</span> <span class="o">=</span> <span class="n">render_hook</span><span class="p">(</span><span class="n">use_toggle</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="k">assert</span> <span class="n">hook</span><span class="o">.</span><span class="n">current</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">True</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">hook</span><span class="o">.</span><span class="n">act</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">hook</span><span class="o">.</span><span class="n">current</span><span class="p">[</span><span class="mi">1</span><span class="p">]())</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="k">assert</span> <span class="n">hook</span><span class="o">.</span><span class="n">current</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">False</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="k">assert</span> <span class="n">hook</span><span class="o">.</span><span class="n">render_count</span> <span class="o">==</span> <span class="mi">2</span>
 </span></code></pre></div>
+<p><code>hook.rerender(*args, **kwargs)</code> re-renders with new arguments, which
+is how you test hooks that react to prop changes.</p>
+<h2 id="testing-navigation">Testing navigation<a class="headerlink" href="#testing-navigation" title="Permanent link">&para;</a></h2>
+<p>Navigators render in Python when no host is present, so a whole flow
+fits in one test:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_home_to_detail_and_back</span><span class="p">():</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">App</span><span class="p">())</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">result</span><span class="o">.</span><span class="n">press</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Open item 42"</span><span class="p">))</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Detail #42"</span><span class="p">)</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">back</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">True</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Home"</span><span class="p">)</span>
+</span></code></pre></div>
+<p>To test what a root stack asks the <em>platform</em> to do, render under a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeHost&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.FakeHost"><code>FakeHost</code></a>. It records <code>pushed</code>,
+<code>popped</code>, <code>replaced</code>, <code>resets</code>, and <code>options</code>, exposes the latest
+<code>title</code>, and lets you simulate focus changes with <code>set_focused</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeHost</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_detail_pushes_native_screen</span><span class="p">():</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">host</span> <span class="o">=</span> <span class="n">FakeHost</span><span class="p">()</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">App</span><span class="p">(),</span> <span class="n">host</span><span class="o">=</span><span class="n">host</span><span class="p">)</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">result</span><span class="o">.</span><span class="n">press</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Open item 42"</span><span class="p">))</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">state</span><span class="p">,</span> <span class="n">options</span> <span class="o">=</span> <span class="n">host</span><span class="o">.</span><span class="n">pushed</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="k">assert</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">state</span><span class="p">[</span><span class="s2">"routes"</span><span class="p">]]</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"Home"</span><span class="p">,</span> <span class="s2">"Detail"</span><span class="p">]</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="k">assert</span> <span class="n">options</span><span class="p">[</span><span class="s2">"title"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"Item 42"</span>
+</span></code></pre></div>
+<p>Booting a screen "mid-stack" the way a pushed native screen does is
+<code>FakeHost(initial_state=state.to_dict())</code>.</p>
 <h2 id="testing-layouts">Testing layouts<a class="headerlink" href="#testing-layouts" title="Permanent link">&para;</a></h2>
-<p>The flexbox engine in <code>pythonnative.layout</code> is pure Python and easy
-to test in isolation. For a single tree:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">LayoutNode</span><span class="p">,</span> <span class="n">calculate_layout</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_row_distributes_flex_children</span><span class="p">():</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">root</span> <span class="o">=</span> <span class="n">LayoutNode</span><span class="p">(</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex_direction"</span><span class="p">:</span> <span class="s2">"row"</span><span class="p">,</span> <span class="s2">"width"</span><span class="p">:</span> <span class="mi">300</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>               <span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">10</span><span class="p">},</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="n">children</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>            <span class="n">LayoutNode</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">50</span><span class="p">}),</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>            <span class="n">LayoutNode</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">50</span><span class="p">}),</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>        <span class="p">],</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="p">)</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">calculate_layout</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="mi">400</span><span class="p">,</span> <span class="mi">600</span><span class="p">)</span>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">children</span>
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="k">assert</span> <span class="n">a</span><span class="o">.</span><span class="n">x</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">a</span><span class="o">.</span><span class="n">width</span> <span class="o">==</span> <span class="p">(</span><span class="mi">300</span> <span class="o">-</span> <span class="mi">10</span><span class="p">)</span> <span class="o">/</span> <span class="mi">3</span>
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="k">assert</span> <span class="n">b</span><span class="o">.</span><span class="n">x</span> <span class="o">==</span> <span class="n">a</span><span class="o">.</span><span class="n">width</span> <span class="o">+</span> <span class="mi">10</span> <span class="ow">and</span> <span class="n">b</span><span class="o">.</span><span class="n">width</span> <span class="o">==</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="mi">300</span> <span class="o">-</span> <span class="mi">10</span><span class="p">)</span> <span class="o">/</span> <span class="mi">3</span>
+<p>The flexbox engine in <code>pythonnative.layout</code> is pure Python. Rendered
+views carry their computed <code>frame</code> (<code>x, y, width, height</code>) once
+<code>render</code> runs the layout pass for the default 390x844 viewport (pass
+<code>viewport=(w, h)</code> to change it, or <code>viewport=None</code> to skip layout):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_row_distributes_flex_children</span><span class="p">():</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">test_id</span><span class="o">=</span><span class="s2">"a"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">50</span><span class="p">}),</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">test_id</span><span class="o">=</span><span class="s2">"b"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">50</span><span class="p">}),</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">300</span><span class="p">,</span> <span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">10</span><span class="p">},</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="p">)</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="p">)</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_test_id</span><span class="p">(</span><span class="s2">"a"</span><span class="p">),</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_test_id</span><span class="p">(</span><span class="s2">"b"</span><span class="p">)</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="k">assert</span> <span class="n">a</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">pytest</span><span class="o">.</span><span class="n">approx</span><span class="p">((</span><span class="mi">300</span> <span class="o">-</span> <span class="mi">10</span><span class="p">)</span> <span class="o">/</span> <span class="mi">3</span><span class="p">)</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="k">assert</span> <span class="n">b</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">pytest</span><span class="o">.</span><span class="n">approx</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="mi">10</span><span class="p">)</span>
 </span></code></pre></div>
-<p>To test the layout pass for a real component (with the mock registry),
-use <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;compute_layout_for_test&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.Reconciler.compute_layout_for_test"><code>Reconciler.compute_layout_for_test</code></a>
-which returns the computed <code>LayoutNode</code> tree.</p>
+<p>For the engine alone, build <code>LayoutNode</code> trees and call
+<code>calculate_layout</code> directly (see
+<a href="../../api/layout/"><code>pythonnative.layout</code></a>).</p>
 <h2 id="testing-native-modules">Testing native modules<a class="headerlink" href="#testing-native-modules" title="Permanent link">&para;</a></h2>
 <p>Native modules call into platform SDKs directly, so unit-testing them
 with the real implementation requires a device. For most app tests
@@ -3436,42 +3538,52 @@ it's enough to inject a fake at the boundary:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">FakeFs</span><span class="p">:</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">store</span> <span class="o">=</span> <span class="p">{}</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">write_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">content</span><span class="p">):</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">store</span><span class="p">[</span><span class="n">path</span><span class="p">]</span> <span class="o">=</span> <span class="n">content</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">read_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">store</span><span class="p">[</span><span class="n">path</span><span class="p">]</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">write_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">content</span><span class="p">):</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">store</span><span class="p">[</span><span class="n">path</span><span class="p">]</span> <span class="o">=</span> <span class="n">content</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">read_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">store</span><span class="p">[</span><span class="n">path</span><span class="p">]</span>
 </span></code></pre></div>
 <p>Pass the fake into your component (via a context, a default argument,
 or a module-level injection) and assert on <code>store</code>.</p>
 <h2 id="testing-async-code">Testing async code<a class="headerlink" href="#testing-async-code" title="Permanent link">&para;</a></h2>
-<p>The framework's <code>asyncio</code> loop is a guest of whatever thread creates
-it, so synchronous tests drive it explicitly:</p>
-<ul>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;drain&lt;/span&gt;" href="../../api/runtime/#pythonnative.runtime.drain"><code>pn.runtime.drain()</code></a> pumps the loop
-  until it goes idle (or a predicate holds), settling async effects,
-  resources, and transitions deterministically.</li>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;run_blocking&lt;/span&gt;" href="../../api/runtime/#pythonnative.runtime.run_blocking"><code>pn.run_blocking(coro)</code></a> runs a
-  single awaitable to completion and returns its result.</li>
-</ul>
-<p>After draining, call the reconciler's <code>flush_dirty()</code> to apply any
-re-renders the async work queued. See
-<a href="../async/#testing-async-code">Testing async code</a> in the async guide
-for worked examples.</p>
+<p><code>render</code> and every event helper settle the framework's <code>asyncio</code> loop
+before returning, so <code>use_effect</code> coroutines, <code>use_resource</code>,
+<code>use_query</code>, and transitions complete without extra plumbing. When you
+trigger async work outside the helpers (a module-level task, a
+mutation started from a fixture), call <code>result.settle()</code> or
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;settle&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.settle"><code>settle()</code></a>, or use
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;drain&lt;/span&gt;" href="../../api/runtime/#pythonnative.runtime.drain"><code>pn.runtime.drain()</code></a> /
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;run_blocking&lt;/span&gt;" href="../../api/runtime/#pythonnative.runtime.run_blocking"><code>pn.run_blocking(coro)</code></a> directly.
+See <a href="../async/#testing-async-code">Testing async code</a>.</p>
+<h2 id="going-lower-level">Going lower level<a class="headerlink" href="#going-lower-level" title="Permanent link">&para;</a></h2>
+<p><code>render</code> is a thin layer over
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> and
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeBackend&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.FakeBackend"><code>FakeBackend</code></a>. Tests that need to
+assert on the <em>mutations</em> themselves (how many <code>InsertOp</code>s a reorder
+produced, which props an <code>UpdateOp</code> changed) can pass their own
+backend and read <code>backend.ops</code>, or construct the reconciler directly:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.reconciler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reconciler</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeBackend</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">FakeBackend</span><span class="p">()</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">rec</span> <span class="o">=</span> <span class="n">Reconciler</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">rec</span><span class="o">.</span><span class="n">mount</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"hi"</span><span class="p">))</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="k">assert</span> <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">op</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">backend</span><span class="o">.</span><span class="n">ops</span><span class="p">]</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"CreateOp"</span><span class="p">]</span>
+</span></code></pre></div>
 <h2 id="running-the-suite">Running the suite<a class="headerlink" href="#running-the-suite" title="Permanent link">&para;</a></h2>
 <p>PythonNative uses <code>pytest</code> plus the standard CI matrix (Ruff, Black,
 MyPy). Run them all locally before pushing:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>ruff<span class="w"> </span>check<span class="w"> </span>src/pythonnative
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>ruff<span class="w"> </span>format<span class="w"> </span>--check
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>black<span class="w"> </span>--check<span class="w"> </span>src/pythonnative
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>mypy<span class="w"> </span>src/pythonnative
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>pytest
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>./scripts/check.sh
 </span></code></pre></div>
 <p>The same commands run in CI on every push and pull request.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Wrap subtrees with <a href="../error-boundaries/">Error boundaries</a> so test
   failures don't crash unrelated assertions.</li>
-<li>See how mocks are wired underneath: <a href="../../concepts/native-views/">Native views</a>.</li>
+<li>See how the fake backend fits underneath: <a href="../../concepts/native-views/">Native views</a>.</li>
+<li>Browse the API: <a href="../../api/testing/">Testing</a>.</li>
 </ul>
 
 

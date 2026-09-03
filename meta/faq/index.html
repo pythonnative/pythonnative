@@ -1825,6 +1825,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1887,6 +1891,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/component/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component
   
 
     
@@ -2271,14 +2303,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/screen/" class="md-nav__link">
+      <a href="../../api/hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screen
+    Hosts
   
 
     
@@ -2391,6 +2423,34 @@
     
   
     Navigation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -3488,7 +3548,7 @@ details.</p>
 <p>Two main options:</p>
 <ul>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_context&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_context"><code>use_context</code></a> /
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Provider&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.Provider"><code>Provider</code></a> for tree-scoped values
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Provider&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.Context.Provider"><code>Context.Provider</code></a> for tree-scoped values
   (themes, current user). The provider sits at the top of the
   navigator and descendants subscribe.</li>
 <li>A plain Python module-level object (a "store") for app-wide,
@@ -3499,11 +3559,11 @@ details.</p>
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_reducer&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_reducer"><code>use_reducer</code></a> hook covers most cases
 without one.</p>
 <h2 id="how-do-i-navigate-between-screens">How do I navigate between screens?<a class="headerlink" href="#how-do-i-navigate-between-screens" title="Permanent link">&para;</a></h2>
-<p>Use <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;NavigationContainer&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.NavigationContainer"><code>NavigationContainer</code></a> plus one
-of <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_stack_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.create_stack_navigator"><code>create_stack_navigator</code></a>,
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_tab_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.create_tab_navigator"><code>create_tab_navigator</code></a>, or
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_drawer_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.create_drawer_navigator"><code>create_drawer_navigator</code></a>.
-From a screen, call <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_navigation"><code>use_navigation</code></a>
+<p>Use <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;NavigationContainer&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.container.NavigationContainer"><code>NavigationContainer</code></a> plus one
+of <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_stack_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.navigators.create_stack_navigator"><code>create_stack_navigator</code></a>,
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_tab_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.navigators.create_tab_navigator"><code>create_tab_navigator</code></a>, or
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_drawer_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.navigators.create_drawer_navigator"><code>create_drawer_navigator</code></a>.
+From a screen, call <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.hooks.use_navigation"><code>use_navigation</code></a>
 to get an imperative handle (<code>navigate</code>, <code>go_back</code>, etc.). See the
 <a href="../../guides/navigation/">Navigation guide</a>.</p>
 <h2 id="why-hooks-instead-of-class-components">Why hooks instead of class components?<a class="headerlink" href="#why-hooks-instead-of-class-components" title="Permanent link">&para;</a></h2>

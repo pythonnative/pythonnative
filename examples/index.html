@@ -1969,6 +1969,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2031,6 +2035,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/component/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component
   
 
     
@@ -2415,14 +2447,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/screen/" class="md-nav__link">
+      <a href="../api/hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screen
+    Hosts
   
 
     
@@ -2535,6 +2567,34 @@
     
   
     Navigation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -3323,11 +3383,10 @@ on a real device or simulator.</p>
 </span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
 </span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
 </span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="n">ThemeContext</span><span class="p">,</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        <span class="p">{</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#222"</span><span class="p">,</span> <span class="s2">"bg"</span><span class="p">:</span> <span class="s2">"#fafafa"</span><span class="p">},</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span><span class="n">Header</span><span class="p">(),</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">}),</span>
-</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>    <span class="p">)</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="k">return</span> <span class="n">ThemeContext</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="p">{</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#222"</span><span class="p">,</span> <span class="s2">"bg"</span><span class="p">:</span> <span class="s2">"#fafafa"</span><span class="p">},</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span><span class="n">Header</span><span class="p">(),</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">}),</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <h3 id="wrapping-with-an-error-boundary">Wrapping with an error boundary<a class="headerlink" href="#wrapping-with-an-error-boundary" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>

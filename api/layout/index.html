@@ -1827,6 +1827,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1890,6 +1894,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../component/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component
   
 
     
@@ -2274,14 +2306,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../screen/" class="md-nav__link">
+      <a href="../hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screen
+    Hosts
   
 
     
@@ -2496,6 +2528,34 @@
     
   
     Navigation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -3154,7 +3214,7 @@
 <h1 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">&para;</a></h1>
 <p>The pure-Python flexbox engine that computes a frame
 <code>(x, y, width, height)</code> for every node in the rendered tree. The
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../reconciler/#pythonnative.reconciler.Reconciler"><code>Reconciler</code></a> runs
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> runs
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;calculate_layout&lt;/span&gt;" href="#pythonnative.layout.calculate_layout"><code>calculate_layout</code></a> after every
 commit and forwards the resulting frames to the platform handlers via
 <code>set_frame</code>.</p>
@@ -3193,7 +3253,14 @@ PythonNative does not depend on a native layout library.</p>
   reverse variants), <code>justify_content</code> (<code>flex_start</code> / <code>center</code> /
   <code>flex_end</code> / <code>space_between</code> / <code>space_around</code> / <code>space_evenly</code>),
   <code>align_items</code> (<code>stretch</code> / <code>flex_start</code> / <code>center</code> /
-  <code>flex_end</code>), and <code>align_self</code> overrides per child.</li>
+  <code>flex_end</code> / <code>baseline</code>), and <code>align_self</code> overrides per child.
+  Baseline alignment (rows only) uses each leaf's height as its
+  baseline, since native text handlers report a size but not the
+  first line's baseline; containers use the baseline of their first
+  in-flow child.</li>
+<li><strong>Visibility</strong>: <code>display: "none"</code> removes a node (and its subtree)
+  from layout entirely: it contributes no size, gap, or margin to its
+  parent and every node in the subtree gets a zero frame.</li>
 <li><strong>Wrapping</strong>: <code>flex_wrap</code> (<code>nowrap</code> / <code>wrap</code> / <code>wrap_reverse</code>)
   with <code>align_content</code> controlling how lines share leftover
   cross-axis space (<code>stretch</code> default, plus the justify palette).</li>
@@ -3212,7 +3279,14 @@ PythonNative does not depend on a native layout library.</p>
   and do not participate in flex distribution.</li>
 <li><strong>Spacing</strong>: <code>padding</code> / <code>margin</code> (scalar, dict, or per-edge
   keys), inter-child <code>spacing</code> (aliases: <code>gap</code>, <code>column_gap</code> /
-  <code>row_gap</code> per axis).</li>
+  <code>row_gap</code> per axis). <code>border_width</code> (and the per-edge
+  <code>border_*_width</code> keys) sit inside the frame like padding, so the
+  content box shrinks by the border as in Yoga.</li>
+<li><strong>Auto margins</strong>: <code>margin: "auto"</code> (or any per-edge margin key set
+  to <code>"auto"</code>) absorbs free space. On the main axis the free space is
+  split equally among every auto margin on the line and
+  <code>justify_content</code> is ignored; on the cross axis auto margins center
+  or push the item and override <code>align_items</code> / <code>align_self</code>.</li>
 </ul>
 
 
@@ -3388,17 +3462,23 @@ PythonNative does not depend on a native layout library.</p>
 </span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>        <span class="s2">"padding_end"</span><span class="p">,</span>
 </span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>        <span class="s2">"padding_horizontal"</span><span class="p">,</span>
 </span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>        <span class="s2">"padding_vertical"</span><span class="p">,</span>
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>        <span class="s2">"flex_direction"</span><span class="p">,</span>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>        <span class="s2">"justify_content"</span><span class="p">,</span>
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>        <span class="s2">"align_items"</span><span class="p">,</span>
-</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>        <span class="s2">"spacing"</span><span class="p">,</span>
-</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>        <span class="s2">"gap"</span><span class="p">,</span>
-</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>        <span class="s2">"row_gap"</span><span class="p">,</span>
-</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>        <span class="s2">"column_gap"</span><span class="p">,</span>
-</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>        <span class="s2">"aspect_ratio"</span><span class="p">,</span>
-</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>        <span class="s2">"direction"</span><span class="p">,</span>
-</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>    <span class="p">}</span>
-</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="p">)</span>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>        <span class="s2">"border_width"</span><span class="p">,</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>        <span class="s2">"border_top_width"</span><span class="p">,</span>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>        <span class="s2">"border_right_width"</span><span class="p">,</span>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>        <span class="s2">"border_bottom_width"</span><span class="p">,</span>
+</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>        <span class="s2">"border_left_width"</span><span class="p">,</span>
+</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>        <span class="s2">"flex_direction"</span><span class="p">,</span>
+</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>        <span class="s2">"justify_content"</span><span class="p">,</span>
+</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>        <span class="s2">"align_items"</span><span class="p">,</span>
+</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>        <span class="s2">"spacing"</span><span class="p">,</span>
+</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>        <span class="s2">"gap"</span><span class="p">,</span>
+</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>        <span class="s2">"row_gap"</span><span class="p">,</span>
+</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>        <span class="s2">"column_gap"</span><span class="p">,</span>
+</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>        <span class="s2">"aspect_ratio"</span><span class="p">,</span>
+</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>        <span class="s2">"direction"</span><span class="p">,</span>
+</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a>        <span class="s2">"display"</span><span class="p">,</span>
+</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>    <span class="p">}</span>
+</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -3619,7 +3699,7 @@ space.</p>
 <p>Sizes the root from its own style and content. Callers that want
 the root to fill its viewport should wrap it in a synthetic outer
 node with explicit <code>width</code> / <code>height</code> (the
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../reconciler/#pythonnative.reconciler.Reconciler"><code>Reconciler</code></a> does this when
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> does this when
 running the layout pass after a commit).</p>
 
 

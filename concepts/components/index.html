@@ -835,6 +835,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#children-and-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Children and keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#available-hooks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2058,6 +2069,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2120,6 +2135,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/component/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component
   
 
     
@@ -2504,14 +2547,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/screen/" class="md-nav__link">
+      <a href="../../api/hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screen
+    Hosts
   
 
     
@@ -2624,6 +2667,34 @@
     
   
     Navigation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -3315,6 +3386,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#children-and-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Children and keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#available-hooks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3415,7 +3497,7 @@ handles creating and updating native views.</p>
 <p>UI is built with element-creating functions. Each returns a
 lightweight <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> descriptor; no native
 objects are created until the
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.Reconciler"><code>Reconciler</code></a> mounts the tree.</p>
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> mounts the tree.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Hello"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">18</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#333333"</span><span class="p">})</span>
@@ -3601,7 +3683,7 @@ element tree:</p>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">name</span><span class="p">,</span> <span class="n">set_name</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="s2">"World"</span><span class="p">)</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Hello, </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">!"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">24</span><span class="p">})</span>
 </span></code></pre></div>
-<p>The entry point <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="../../api/screen/#pythonnative.screen.create_screen"><code>create_screen</code></a> is called
+<p>The entry point <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="../../api/hosts/#pythonnative.hosts.create_screen"><code>create_screen</code></a> is called
 internally by native templates to bootstrap your root component. You
 don't call it directly: name your top-level component <code>App</code> (so the
 templates can find it by convention) and <code>app.entry_point</code> in
@@ -3649,6 +3731,29 @@ Each instance has <strong>independent state</strong>:</p>
 </span></code></pre></div>
 <p>Changing one <code>Counter</code> doesn't affect the other; each has its own
 hook state.</p>
+<h3 id="children-and-keys">Children and keys<a class="headerlink" href="#children-and-keys" title="Permanent link">&para;</a></h3>
+<p>Children are positional, for your components exactly as for the
+built-in containers. A component that accepts children declares
+<code>*children</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Card</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Element</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"bold"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}),</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>        <span class="o">*</span><span class="n">children</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"border_radius"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="p">)</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="n">Card</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Body"</span><span class="p">),</span> <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"OK"</span><span class="p">),</span> <span class="n">title</span><span class="o">=</span><span class="s2">"Hello"</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>@pn.component</code> preserves the function's signature for type checkers,
+so <code>Card(titel="x")</code> is a static error and editors autocomplete props.
+Every component also accepts <code>key=</code> for keyed reconciliation; when a
+strict type checker complains about it, declare <code>key: str | None =
+None</code> in the signature or call <code>.with_key(...)</code> on the element.</p>
+<p>Components that return a <code>list</code> of elements render them as siblings;
+<code>None</code> and <code>False</code> are dropped, so <code>cond and pn.Text("...")</code> is a
+fine way to render conditionally.</p>
 <h3 id="available-hooks">Available hooks<a class="headerlink" href="#available-hooks" title="Permanent link">&para;</a></h3>
 <ul>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_state&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_state"><code>use_state(initial)</code></a>: local component
@@ -3680,11 +3785,12 @@ hook state.</p>
   the canonical way to drive <code>Animated.View</code>.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_context&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_context"><code>use_context(context)</code></a>: read from a
   context provider.</li>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_navigation"><code>use_navigation()</code></a>: navigation
-  handle for navigate/go_back/get_params.</li>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_route&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.use_route"><code>use_route()</code></a>: convenience hook for
-  current route params.</li>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_focus_effect&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.use_focus_effect"><code>use_focus_effect(effect, deps)</code></a>:
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.hooks.use_navigation"><code>use_navigation()</code></a>: the
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Navigation&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.handle.Navigation"><code>Navigation</code></a> handle for navigate, push,
+  go_back, set_options, and listeners.</li>
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_route&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.hooks.use_route"><code>use_route()</code></a>: the current
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Route&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.state.Route"><code>Route</code></a> (name, params, key).</li>
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_focus_effect&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.hooks.use_focus_effect"><code>use_focus_effect(effect, deps)</code></a>:
   like <code>use_effect</code> but only runs when the screen is focused.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_window_dimensions&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_window_dimensions"><code>use_window_dimensions()</code></a>:
   reactive viewport size.</li>
@@ -3692,42 +3798,40 @@ hook state.</p>
   reactive safe-area insets.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_keyboard_height&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_keyboard_height"><code>use_keyboard_height()</code></a>:
   reactive software-keyboard height.</li>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;memo&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.memo"><code>@memo</code></a>: decorator that skips a function
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;memo&lt;/span&gt;" href="../../api/component/#pythonnative.component.memo"><code>@memo</code></a>: decorator that skips a function
   component's re-render when its props are shallowly equal and its
   internal state is unchanged.</li>
 </ul>
 <h3 id="custom-hooks">Custom hooks<a class="headerlink" href="#custom-hooks" title="Permanent link">&para;</a></h3>
 <p>Extract reusable stateful logic into plain functions:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">use_toggle</span><span class="p">(</span><span class="n">initial</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">value</span><span class="p">,</span> <span class="n">set_value</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="n">initial</span><span class="p">)</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">toggle</span><span class="p">():</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        <span class="n">set_value</span><span class="p">(</span><span class="ow">not</span> <span class="n">value</span><span class="p">)</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="k">return</span> <span class="n">value</span><span class="p">,</span> <span class="n">toggle</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">use_toggle</span><span class="p">(</span><span class="n">initial</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">value</span><span class="p">,</span> <span class="n">set_value</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="n">initial</span><span class="p">)</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">toggle</span><span class="p">():</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>        <span class="n">set_value</span><span class="p">(</span><span class="ow">not</span> <span class="n">value</span><span class="p">)</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="k">return</span> <span class="n">value</span><span class="p">,</span> <span class="n">toggle</span>
 </span></code></pre></div>
 <h3 id="context-and-provider">Context and Provider<a class="headerlink" href="#context-and-provider" title="Permanent link">&para;</a></h3>
 <p>Share values across the tree without prop drilling:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">theme</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">create_context</span><span class="p">({</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#007AFF"</span><span class="p">})</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span><span class="n">theme</span><span class="p">,</span> <span class="p">{</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#FF0000"</span><span class="p">},</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>        <span class="n">MyComponent</span><span class="p">()</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="p">)</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="k">def</span><span class="w"> </span><span class="nf">MyComponent</span><span class="p">():</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="n">t</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_context</span><span class="p">(</span><span class="n">theme</span><span class="p">)</span>
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Click"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">t</span><span class="p">[</span><span class="s2">"primary"</span><span class="p">]})</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">theme</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">create_context</span><span class="p">({</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#007AFF"</span><span class="p">})</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="k">return</span> <span class="n">theme</span><span class="o">.</span><span class="n">Provider</span><span class="p">({</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#FF0000"</span><span class="p">},</span> <span class="n">MyComponent</span><span class="p">())</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">MyComponent</span><span class="p">():</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>    <span class="n">t</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_context</span><span class="p">(</span><span class="n">theme</span><span class="p">)</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Click"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">t</span><span class="p">[</span><span class="s2">"primary"</span><span class="p">]})</span>
 </span></code></pre></div>
 <h2 id="platform-detection">Platform detection<a class="headerlink" href="#platform-detection" title="Permanent link">&para;</a></h2>
 <p>The recommended way to write platform-aware code is via
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Platform&lt;/span&gt;" href="../../api/platform/#pythonnative.platform.Platform"><code>Platform</code></a>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">title</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">Platform</span><span class="o">.</span><span class="n">select</span><span class="p">({</span><span class="s2">"ios"</span><span class="p">:</span> <span class="s2">"iOS App"</span><span class="p">,</span> <span class="s2">"android"</span><span class="p">:</span> <span class="s2">"Android App"</span><span class="p">})</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="k">if</span> <span class="n">pn</span><span class="o">.</span><span class="n">Platform</span><span class="o">.</span><span class="n">is_ios</span><span class="p">:</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">margin</span> <span class="o">=</span> <span class="mi">16</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">title</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">Platform</span><span class="o">.</span><span class="n">select</span><span class="p">({</span><span class="s2">"ios"</span><span class="p">:</span> <span class="s2">"iOS App"</span><span class="p">,</span> <span class="s2">"android"</span><span class="p">:</span> <span class="s2">"Android App"</span><span class="p">})</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="k">if</span> <span class="n">pn</span><span class="o">.</span><span class="n">Platform</span><span class="o">.</span><span class="n">is_ios</span><span class="p">:</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">margin</span> <span class="o">=</span> <span class="mi">16</span>
 </span></code></pre></div>
 <p><code>pn.Platform.OS</code> is <code>"ios"</code>, <code>"android"</code>, <code>"desktop"</code> (the <code>pn preview</code>
 backend, see the <a href="../../guides/desktop-preview/">Desktop preview guide</a>),
@@ -3737,7 +3841,7 @@ still available.</p>
 <p><code>Platform.select</code> matches on the exact key; a <code>"native"</code> key is shared
 by iOS <strong>and</strong> Android (but not desktop), and a <code>"default"</code> key catches
 anything unmatched:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">pad</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">Platform</span><span class="o">.</span><span class="n">select</span><span class="p">({</span><span class="s2">"native"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"desktop"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"default"</span><span class="p">:</span> <span class="mi">8</span><span class="p">})</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">pad</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">Platform</span><span class="o">.</span><span class="n">select</span><span class="p">({</span><span class="s2">"native"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"desktop"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"default"</span><span class="p">:</span> <span class="mi">8</span><span class="p">})</span>
 </span></code></pre></div>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>

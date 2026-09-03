@@ -1827,6 +1827,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1890,6 +1894,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../component/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component
   
 
     
@@ -2274,14 +2306,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../screen/" class="md-nav__link">
+      <a href="../hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screen
+    Hosts
   
 
     
@@ -2394,6 +2426,34 @@
     
   
     Navigation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -4849,7 +4909,7 @@ If empty, <code>file_path</code> is treated as already relative.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>A <code>_ScreenHost</code> instance (or duck-typed
+                <p>A <code>ScreenHost</code> instance (or duck-typed
 equivalent) that exposes a <code>_reconciler</code> attribute.</p>
               </div>
             </td>
@@ -4900,11 +4960,9 @@ screen hosts use this to refresh imports before re-render.</p>
     <div class="doc doc-contents ">
 
         <p>Locate a function's post-reload counterpart by qualname.</p>
-<p>Functions decorated with <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;component&lt;/span&gt;" href="../hooks/#pythonnative.hooks.component"><code>component</code></a>
-store the user's original function on the wrapper's
-<code>__wrapped__</code> attribute and forward <code>__module__</code> /
-<code>__qualname__</code> so that the reconciler's stored
-<code>element.type</code> (the unwrapped function) still has the
+<p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Component&lt;/span&gt;" href="../component/#pythonnative.component.Component"><code>Component</code></a> objects forward
+<code>__module__</code> / <code>__qualname__</code> from the render function they
+wrap, so the reconciler's stored <code>element.type</code> carries the
 information needed to re-resolve after a module reload.</p>
 
 
@@ -5050,8 +5108,7 @@ for its successor.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The reconciler whose
-<code>_tree</code> should be inspected.</p>
+                <p>The reconciler whose mounted <code>root</code> should be inspected.</p>
               </div>
             </td>
             <td>
@@ -5144,9 +5201,9 @@ considered).</p>
         <p>Apply a <code>{old: new}</code> map to every node in the reconciler tree.</p>
 <p>Mutates <code>vnode.element.type</code> directly so the NEXT diff sees
 identical types and reuses VNodes (preserving hook state).
-Pending <code>Element</code> trees stored on <code>vnode._rendered</code> are
-rewritten too because the reconciler reads from them when
-comparing keys across renders.</p>
+The element lists stored on <code>vnode.rendered</code> are rewritten
+too because the reconciler reads from them when comparing keys
+across renders.</p>
 
 
     <p><span class="doc-section-title">Returns:</span></p>

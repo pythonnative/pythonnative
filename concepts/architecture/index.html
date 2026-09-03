@@ -2074,6 +2074,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2136,6 +2140,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/component/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component
   
 
     
@@ -2520,14 +2552,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/screen/" class="md-nav__link">
+      <a href="../../api/hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screen
+    Hosts
   
 
     
@@ -2640,6 +2672,34 @@
     
   
     Navigation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -3453,10 +3513,10 @@ platform APIs synchronously from Python.</p>
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_state&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_state"><code>use_state</code></a>,
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_reducer&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_reducer"><code>use_reducer</code></a>,
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a>,
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_navigation"><code>use_navigation</code></a>, and friends. The
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.hooks.use_navigation"><code>use_navigation</code></a>, and friends. The
    API is inspired by React hooks but designed for Python.</li>
 <li><strong>Reconciler.</strong> On first render, the
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.Reconciler"><code>Reconciler</code></a> walks the tree
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> walks the tree
    and creates real native views via the platform backend. On
    subsequent renders it diffs against the previous tree and emits the
    minimal list of mutation ops (create / update / insert / remove /
@@ -3465,7 +3525,7 @@ platform APIs synchronously from Python.</p>
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply_mutations&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.NativeViewRegistry.apply_mutations"><code>apply_mutations</code></a>.
    State-driven renders are
    <strong>local</strong>: a setter marks only its own component subtree dirty, and
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;flush_dirty&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.Reconciler.flush_dirty"><code>flush_dirty</code></a>
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;flush_dirty&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.core.Reconciler.flush_dirty"><code>flush_dirty</code></a>
    re-runs just those components instead of the whole app from the
    root (the full tree is only rebuilt on mount, navigation, and hot
    reload). Sibling and ancestor components whose state did not change
@@ -3480,7 +3540,7 @@ platform APIs synchronously from Python.</p>
 <li><strong>State batching.</strong> Multiple state updates triggered during a
    render pass (e.g., from effects) are automatically batched into a
    single re-render. Explicit batching is available via
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;batch_updates&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.batch_updates"><code>batch_updates</code></a>.</li>
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;batch_updates&lt;/span&gt;" href="../../api/hooks/#pythonnative.scheduler.batch_updates"><code>batch_updates</code></a>.</li>
 <li><strong>Key-based reconciliation.</strong> Children can be assigned stable
    <code>key</code> values to preserve identity across re-renders, which is
    critical for lists and dynamic content.</li>
@@ -3506,7 +3566,7 @@ platform APIs synchronously from Python.</p>
      the JNI bridge.</li>
 <li><strong>Thin native bootstrap.</strong> The host app remains native (Android
    <code>Activity</code> or iOS <code>UIViewController</code>). It calls
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="../../api/screen/#pythonnative.screen.create_screen"><code>create_screen</code></a> internally to bootstrap
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="../../api/hosts/#pythonnative.hosts.create_screen"><code>create_screen</code></a> internally to bootstrap
    your Python component, and the reconciler drives the UI from
    there.</li>
 <li><strong><code>App</code> entry point.</strong> The user's app module (<code>app/main.py</code>)
@@ -3608,13 +3668,13 @@ decorated with <code>@pn.component</code>.</p>
 <li>Uses hooks for state (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_state&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_state"><code>use_state</code></a>,
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_reducer&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_reducer"><code>use_reducer</code></a>), side effects
   (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a>), navigation
-  (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_navigation"><code>use_navigation</code></a>), and more.</li>
+  (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.hooks.use_navigation"><code>use_navigation</code></a>), and more.</li>
 <li>Returns an <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> tree describing the
   UI.</li>
 <li>Has its own hook state per call site (each instance gets its own
   slot table).</li>
 </ul>
-<p>The entry point <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="../../api/screen/#pythonnative.screen.create_screen"><code>create_screen</code></a> is called
+<p>The entry point <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="../../api/hosts/#pythonnative.hosts.create_screen"><code>create_screen</code></a> is called
 internally by the bundled native templates to bootstrap your root
 component. App code does not call it directly.</p>
 <h2 id="styling">Styling<a class="headerlink" href="#styling" title="Permanent link">&para;</a></h2>
@@ -3641,7 +3701,7 @@ component. App code does not call it directly.</p>
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
   &lt;/span&gt;" href="../../api/style/#pythonnative.style.ThemeContext"><code>ThemeContext</code></a>
-  with <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Provider&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.Provider"><code>Provider</code></a> and
+  with <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Provider&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.Context.Provider"><code>Context.Provider</code></a> and
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_context&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_context"><code>use_context</code></a> to propagate theme
   values through the tree.</li>
 </ul>
@@ -3765,7 +3825,7 @@ React-like hooks that NativeScript does not have by default.</p>
 <h2 id="ios-flow-rubicon-objc">iOS flow (rubicon-objc)<a class="headerlink" href="#ios-flow-rubicon-objc" title="Permanent link">&para;</a></h2>
 <ul>
 <li>The iOS template (Swift with CPython embedded through the C API) boots Python and calls
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="../../api/screen/#pythonnative.screen.create_screen"><code>create_screen</code></a> internally with the
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="../../api/hosts/#pythonnative.hosts.create_screen"><code>create_screen</code></a> internally with the
   current <code>UIViewController</code> pointer.</li>
 <li>The reconciler creates UIKit views and attaches them to the
   controller's view.</li>
@@ -3776,7 +3836,7 @@ React-like hooks that NativeScript does not have by default.</p>
 <ul>
 <li>The Android template (Kotlin plus Chaquopy) initializes Python in
   <code>MainActivity</code> and passes the <code>Activity</code> to Python.</li>
-<li><code>ScreenFragment</code> calls <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="../../api/screen/#pythonnative.screen.create_screen"><code>create_screen</code></a>
+<li><code>ScreenFragment</code> calls <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="../../api/hosts/#pythonnative.hosts.create_screen"><code>create_screen</code></a>
   internally, which renders the root component and attaches views to
   the fragment container.</li>
 <li>State changes trigger re-render; the reconciler patches Android
@@ -3817,28 +3877,34 @@ near-instant UI updates without full rebuilds.</p>
 <p>PythonNative navigation is <strong>declarative</strong> and <strong>native-backed</strong>:</p>
 <ul>
 <li>The user describes their app as a tree of navigators
-  (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_stack_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.create_stack_navigator"><code>create_stack_navigator</code></a>,
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_tab_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.create_tab_navigator"><code>create_tab_navigator</code></a>,
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_drawer_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.create_drawer_navigator"><code>create_drawer_navigator</code></a>)
+  (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_stack_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.navigators.create_stack_navigator"><code>create_stack_navigator</code></a>,
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_tab_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.navigators.create_tab_navigator"><code>create_tab_navigator</code></a>,
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_drawer_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.navigators.create_drawer_navigator"><code>create_drawer_navigator</code></a>)
   wrapped in
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;NavigationContainer&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.NavigationContainer"><code>NavigationContainer</code></a>, and
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;NavigationContainer&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.container.NavigationContainer"><code>NavigationContainer</code></a>, and
   names the root component <code>App</code> so the native templates can find
   it.</li>
-<li>The outermost <code>Stack.Navigator</code> delegates <code>navigate(...)</code>,
-  <code>go_back()</code>, and <code>reset(...)</code> to the platform's native navigation
-  controller: <code>UINavigationController</code> on iOS and the AndroidX
-  Navigation Component on Android. Nested navigators (tabs inside a
-  stack, stacks inside tabs) stay in Python and reuse the existing
+<li>The outermost <code>Stack.Navigator</code> delegates <code>push</code>, <code>pop</code>, <code>replace</code>,
+  and <code>reset</code> to the platform's native navigation controller
+  (<code>UINavigationController</code> on iOS, the AndroidX Navigation Component
+  on Android) through the
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;HostNavigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.handle.HostNavigator"><code>HostNavigator</code></a> protocol.
+  Nested navigators (tabs inside a stack, stacks inside tabs) stay in
+  Python, keep their screens mounted, and reuse the existing
   reconciler.</li>
-<li>Each pushed native screen is a fresh host with its own reconciler
-  and <code>_ScreenHost</code>. Initial routes are forwarded via host arguments
-  (<code>__pn_initial_route__</code> / <code>__pn_initial_params__</code>), so a pushed
-  screen knows which <code>Stack.Screen</code> to render on its first frame.</li>
-<li>Inside any screen, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_navigation"><code>use_navigation</code></a>
-  returns a <code>NavigationHandle</code>; <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_route&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.use_route"><code>use_route</code></a>
-  returns the current route name and params. Both are the same
-  hooks regardless of whether the active navigator is native-backed
-  or pure-Python.</li>
+<li>Each pushed native screen is a fresh
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ScreenHost&lt;/span&gt;" href="../../api/hosts/#pythonnative.hosts.base.ScreenHost"><code>ScreenHost</code></a> with its own
+  reconciler. The host receives the <em>serialized</em>
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NavigationState&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.state.NavigationState"><code>NavigationState</code></a> as its
+  launch argument, so the pushed screen's navigator boots with the
+  full history and renders the right <code>Stack.Screen</code> on its first
+  frame.</li>
+<li>Inside any screen, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.hooks.use_navigation"><code>use_navigation</code></a>
+  returns a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Navigation&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.handle.Navigation"><code>Navigation</code></a> handle and
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_route&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.hooks.use_route"><code>use_route</code></a> returns the current
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Route&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.state.Route"><code>Route</code></a>. Both are the same hooks
+  regardless of whether the active navigator is native-backed or
+  pure-Python.</li>
 </ul>
 <p>See the <a href="../../guides/navigation/">Navigation guide</a> for the full
 walkthrough, including how <code>options={"title": ...}</code> flows into the

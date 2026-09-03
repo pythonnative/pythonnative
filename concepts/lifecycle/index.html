@@ -1952,6 +1952,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2014,6 +2018,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/component/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component
   
 
     
@@ -2398,14 +2430,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/screen/" class="md-nav__link">
+      <a href="../../api/hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screen
+    Hosts
   
 
     
@@ -2518,6 +2550,34 @@
     
   
     Navigation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -3203,7 +3263,7 @@ fold into it, and where you can hook in.</p>
 <h2 id="a-single-render-pass">A single render pass<a class="headerlink" href="#a-single-render-pass" title="Permanent link">&para;</a></h2>
 <p>A render pass is triggered by:</p>
 <ul>
-<li>Initial mount via <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="../../api/screen/#pythonnative.screen.create_screen"><code>create_screen</code></a>.</li>
+<li>Initial mount via <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="../../api/hosts/#pythonnative.hosts.create_screen"><code>create_screen</code></a>.</li>
 <li>A setter from <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_state&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_state"><code>use_state</code></a> or a <code>dispatch</code>
   from <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_reducer&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_reducer"><code>use_reducer</code></a>.</li>
 <li>A navigation event (<code>navigate</code>, <code>go_back</code>, <code>replace</code>).</li>
@@ -3221,7 +3281,7 @@ components keep their existing native views and hook state untouched.</p>
    queue effects, and capture closures. No native widgets change yet,
    so this phase is cheap and pure (modulo <code>use_state</code> updates).</li>
 <li><strong>Commit</strong>. The
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.Reconciler"><code>Reconciler</code></a> diffs the
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> diffs the
    re-rendered subtree against the previous one, applies the smallest
    set of native mutations through the registered
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a>s, and
@@ -3245,7 +3305,7 @@ components keep their existing native views and hook state untouched.</p>
 commit when its <code>deps</code> list changes (or every commit if <code>deps</code> is
 omitted). This is right for subscriptions, timers, and synchronization
 with mutable globals.</p>
-<p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_focus_effect&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.use_focus_effect"><code>use_focus_effect(fn, deps)</code></a> is
+<p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_focus_effect&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.hooks.use_focus_effect"><code>use_focus_effect(fn, deps)</code></a> is
 identical in shape but only fires when the screen is focused (and its
 cleanup runs when the screen is blurred). Use it for camera streams,
 GPS subscriptions, and anything that should be released as soon as the
@@ -3318,7 +3378,7 @@ and effects:</p>
 </ul>
 <p>You can opt into these directly in app code by writing an effect that
 checks the navigation handle's <code>is_focused()</code> state, but most apps
-should reach for the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_focus_effect&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.use_focus_effect"><code>use_focus_effect</code></a>
+should reach for the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_focus_effect&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.hooks.use_focus_effect"><code>use_focus_effect</code></a>
 hook instead.</p>
 <h2 id="putting-it-together-a-subscription">Putting it together: a subscription<a class="headerlink" href="#putting-it-together-a-subscription" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>

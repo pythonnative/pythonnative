@@ -1974,6 +1974,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2036,6 +2040,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/component/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component
   
 
     
@@ -2420,14 +2452,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/screen/" class="md-nav__link">
+      <a href="../../api/hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screen
+    Hosts
   
 
     
@@ -2540,6 +2572,34 @@
     
   
     Navigation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -3283,7 +3343,7 @@ time it executes:</p>
 <p>A render that does not change the tree still triggers a layout pass
 when the viewport size changes (e.g., on rotation).</p>
 <h2 id="the-layoutnode-tree">The <code>LayoutNode</code> tree<a class="headerlink" href="#the-layoutnode-tree" title="Permanent link">&para;</a></h2>
-<p>The reconciler walks the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;VNode&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.VNode"><code>VNode</code></a>
+<p>The reconciler walks the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;VNode&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.vnode.VNode"><code>VNode</code></a>
 tree and builds a parallel tree of
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LayoutNode&lt;/span&gt;" href="../../api/layout/#pythonnative.layout.LayoutNode"><code>LayoutNode</code></a> objects. Each node
 carries:</p>
@@ -3402,7 +3462,7 @@ isolation:</p>
 </span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">width</span> <span class="o">==</span> <span class="mi">125</span>  <span class="c1"># 200 - 10 - 10 - 50 - 5</span>
 </span></code></pre></div>
 <p>The reconciler also exposes
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;compute_layout_for_test&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.Reconciler.compute_layout_for_test"><code>Reconciler.compute_layout_for_test</code></a>
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;compute_layout_for_test&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.core.Reconciler.compute_layout_for_test"><code>Reconciler.compute_layout_for_test</code></a>
 so you can render a real component tree (with the mock registry) and
 inspect the computed <code>LayoutNode</code> tree without having to dig into
 private attributes.</p>

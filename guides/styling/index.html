@@ -2269,6 +2269,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2331,6 +2335,34 @@
     
   
     Package
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/component/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component
   
 
     
@@ -2715,14 +2747,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/screen/" class="md-nav__link">
+      <a href="../../api/hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Screen
+    Hosts
   
 
     
@@ -2835,6 +2867,34 @@
     
   
     Navigation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
   
 
     
@@ -4019,9 +4079,29 @@ losing any keys you didn't override.</p>
 <td></td>
 </tr>
 <tr>
+<td><code>text_transform</code></td>
+<td><code>"none"</code>, <code>"uppercase"</code>, <code>"lowercase"</code>, <code>"capitalize"</code></td>
+<td>Applied before measurement</td>
+</tr>
+<tr>
 <td><code>max_lines</code></td>
 <td>int</td>
 <td>Truncate after N lines</td>
+</tr>
+<tr>
+<td><code>text_shadow_color</code></td>
+<td>hex string</td>
+<td></td>
+</tr>
+<tr>
+<td><code>text_shadow_offset</code></td>
+<td><code>{"width": x, "height": y}</code> or <code>(x, y)</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>text_shadow_radius</code></td>
+<td>number (blur radius)</td>
+<td></td>
 </tr>
 </tbody>
 </table>
@@ -4036,19 +4116,38 @@ losing any keys you didn't override.</p>
 </span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="p">},</span>
 </span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="p">)</span>
 </span></code></pre></div>
+<p><code>text_transform</code> is applied in Python before the string reaches the
+native label, so the layout engine measures the transformed text and
+rich-text spans inherit the outer element's transform. <code>"capitalize"</code>
+upper-cases the first character of each word and leaves the rest as
+written (it doesn't lower-case like <code>str.title()</code>).</p>
+<p>Text shadows render through <code>NSShadow</code> on iOS and
+<code>TextView.setShadowLayer</code> on Android. The desktop preview accepts the
+keys but draws no shadow, since Tk has no text shadow primitive:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="s2">"Overlay caption"</span><span class="p">,</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>        <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#FFFFFF"</span><span class="p">,</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>        <span class="s2">"text_transform"</span><span class="p">:</span> <span class="s2">"uppercase"</span><span class="p">,</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>        <span class="s2">"text_shadow_color"</span><span class="p">:</span> <span class="s2">"#00000099"</span><span class="p">,</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>        <span class="s2">"text_shadow_offset"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>        <span class="s2">"text_shadow_radius"</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>    <span class="p">},</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="p">)</span>
+</span></code></pre></div>
 <h3 id="rich-text-nested-spans">Rich text (nested spans)<a class="headerlink" href="#rich-text-nested-spans" title="Permanent link">&para;</a></h3>
 <p><code>Text</code> accepts a mix of strings and nested <code>Text</code> elements, which
 flatten into one native label (a <code>SpannableString</code> on Android, an
 <code>NSAttributedString</code> on iOS). Each nested <code>Text</code> styles its own run
 and inherits everything it doesn't override from the outer element:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="s2">"Every plan includes "</span><span class="p">,</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"unlimited builds"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"bold"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}),</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="s2">" and "</span><span class="p">,</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"priority support"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#DC2626"</span><span class="p">,</span> <span class="s2">"text_decoration"</span><span class="p">:</span> <span class="s2">"underline"</span><span class="p">}),</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="s2">"."</span><span class="p">,</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">15</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#0F172A"</span><span class="p">},</span>
-</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="s2">"Every plan includes "</span><span class="p">,</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"unlimited builds"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"bold"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}),</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="s2">" and "</span><span class="p">,</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"priority support"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#DC2626"</span><span class="p">,</span> <span class="s2">"text_decoration"</span><span class="p">:</span> <span class="s2">"underline"</span><span class="p">}),</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="s2">"."</span><span class="p">,</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">15</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#0F172A"</span><span class="p">},</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>Because the result is a single label, it wraps, truncates
 (<code>max_lines</code>), and measures as one paragraph; there's no need to
@@ -4059,15 +4158,15 @@ inline.</p>
 callable receiving a state dict, mirroring React Native's
 function-style prop. It's called with <code>{"pressed": bool}</code> and
 re-applied as the press state changes:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Pressable</span><span class="p">(</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Save"</span><span class="p">),</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    <span class="n">on_press</span><span class="o">=</span><span class="n">save</span><span class="p">,</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="n">style</span><span class="o">=</span><span class="k">lambda</span> <span class="n">state</span><span class="p">:</span> <span class="p">{</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>        <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>        <span class="s2">"border_radius"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>        <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#1D4ED8"</span> <span class="k">if</span> <span class="n">state</span><span class="p">[</span><span class="s2">"pressed"</span><span class="p">]</span> <span class="k">else</span> <span class="s2">"#3B82F6"</span><span class="p">,</span>
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="p">},</span>
-</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Pressable</span><span class="p">(</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Save"</span><span class="p">),</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">on_press</span><span class="o">=</span><span class="n">save</span><span class="p">,</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">style</span><span class="o">=</span><span class="k">lambda</span> <span class="n">state</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>        <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>        <span class="s2">"border_radius"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>        <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#1D4ED8"</span> <span class="k">if</span> <span class="n">state</span><span class="p">[</span><span class="s2">"pressed"</span><span class="p">]</span> <span class="k">else</span> <span class="s2">"#3B82F6"</span><span class="p">,</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="p">},</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="borders-shadows-and-shape">Borders, shadows, and shape<a class="headerlink" href="#borders-shadows-and-shape" title="Permanent link">&para;</a></h2>
 <p>Every element accepts these visual props in <code>style</code>:</p>
@@ -4136,52 +4235,57 @@ re-applied as the press state changes:</p>
 <p>Per-corner radius props override the uniform <code>border_radius</code> for the
 corners they name, so a "speech bubble" or "top-rounded sheet" shape
 needs no images:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="n">content</span><span class="p">,</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>        <span class="s2">"border_top_left_radius"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>        <span class="s2">"border_top_right_radius"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>        <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFFFFF"</span><span class="p">,</span>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="p">},</span>
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>    <span class="n">content</span><span class="p">,</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>        <span class="s2">"border_top_left_radius"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>        <span class="s2">"border_top_right_radius"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>        <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFFFFF"</span><span class="p">,</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    <span class="p">},</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="p">)</span>
 </span></code></pre></div>
+<p>Borders take up space inside the element's frame, exactly like
+padding: a child inside a <code>border_width: 4</code> parent starts 4 points in
+from the parent's edge, and a content-sized parent grows by its border
+on every side. This matches Yoga's box model, so styles ported from
+React Native line up without adjustment.</p>
 <p>Per-side border props override the uniform <code>border_width</code> /
 <code>border_color</code> for the sides they name, so an "underline" card is
 just:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Active tab"</span><span class="p">),</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"border_bottom_width"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">"border_bottom_color"</span><span class="p">:</span> <span class="s2">"#007AFF"</span><span class="p">},</span>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Active tab"</span><span class="p">),</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"border_bottom_width"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">"border_bottom_color"</span><span class="p">:</span> <span class="s2">"#007AFF"</span><span class="p">},</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>On Android, <code>shadow_color</code> and <code>shadow_opacity</code> apply on API 28+;
 older versions fall back to the elevation shadow's default color.
 When <code>shadow_radius</code> is set without <code>elevation</code>, the elevation is
 derived from it so shadows show up without extra Android-only props.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Card"</span><span class="p">),</span>
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>        <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>        <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFFFFF"</span><span class="p">,</span>
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>        <span class="s2">"border_radius"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span>
-</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>        <span class="s2">"border_width"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
-</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>        <span class="s2">"border_color"</span><span class="p">:</span> <span class="s2">"#E5E7EB"</span><span class="p">,</span>
-</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>        <span class="s2">"shadow_color"</span><span class="p">:</span> <span class="s2">"#000000"</span><span class="p">,</span>
-</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>        <span class="s2">"shadow_offset"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">4</span><span class="p">},</span>
-</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>        <span class="s2">"shadow_opacity"</span><span class="p">:</span> <span class="mf">0.08</span><span class="p">,</span>
-</span><span id="__span-15-12"><a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>        <span class="s2">"shadow_radius"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span>
-</span><span id="__span-15-13"><a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a>        <span class="s2">"elevation"</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
-</span><span id="__span-15-14"><a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a>    <span class="p">},</span>
-</span><span id="__span-15-15"><a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Card"</span><span class="p">),</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>        <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>        <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFFFFF"</span><span class="p">,</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>        <span class="s2">"border_radius"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>        <span class="s2">"border_width"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>        <span class="s2">"border_color"</span><span class="p">:</span> <span class="s2">"#E5E7EB"</span><span class="p">,</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>        <span class="s2">"shadow_color"</span><span class="p">:</span> <span class="s2">"#000000"</span><span class="p">,</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>        <span class="s2">"shadow_offset"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">4</span><span class="p">},</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>        <span class="s2">"shadow_opacity"</span><span class="p">:</span> <span class="mf">0.08</span><span class="p">,</span>
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>        <span class="s2">"shadow_radius"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span>
+</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>        <span class="s2">"elevation"</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>    <span class="p">},</span>
+</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="transforms">Transforms<a class="headerlink" href="#transforms" title="Permanent link">&para;</a></h2>
 <p><code>transform</code> is either a 6-element CGAffineTransform-style array or a
 shorthand mapping:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Tilted"</span><span class="p">),</span>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>        <span class="s2">"transform"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"rotate"</span><span class="p">:</span> <span class="mi">15</span><span class="p">,</span> <span class="s2">"scale"</span><span class="p">:</span> <span class="mf">1.1</span><span class="p">,</span> <span class="s2">"translate_x"</span><span class="p">:</span> <span class="mi">10</span><span class="p">},</span>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    <span class="p">},</span>
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Tilted"</span><span class="p">),</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>        <span class="s2">"transform"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"rotate"</span><span class="p">:</span> <span class="mi">15</span><span class="p">,</span> <span class="s2">"scale"</span><span class="p">:</span> <span class="mf">1.1</span><span class="p">,</span> <span class="s2">"translate_x"</span><span class="p">:</span> <span class="mi">10</span><span class="p">},</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="p">},</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>Supported keys: <code>rotate</code> (degrees), <code>scale</code>, <code>scale_x</code>, <code>scale_y</code>,
 <code>translate_x</code>, <code>translate_y</code>. For animated transforms, see
@@ -4201,11 +4305,18 @@ wrappers that fix the direction.</p>
   <code>"center"</code>, <code>"flex_end"</code>, <code>"space_between"</code>, <code>"space_around"</code>,
   <code>"space_evenly"</code>.</li>
 <li><code>align_items</code>: cross-axis alignment: <code>"stretch"</code>, <code>"flex_start"</code>,
-  <code>"center"</code>, <code>"flex_end"</code>.</li>
+  <code>"center"</code>, <code>"flex_end"</code>, <code>"baseline"</code>.</li>
 <li><code>overflow</code>: <code>"visible"</code> (default), <code>"hidden"</code>.</li>
 <li><code>spacing</code>: gap between children (dp / pt).</li>
 <li><code>padding</code>: inner spacing (int for all sides, or dict).</li>
 </ul>
+<p><code>align_items: "baseline"</code> (rows only) lines children up along a shared
+baseline instead of their top edges. Native text handlers report a
+size but not the position of the first line's baseline, so the engine
+approximates: a leaf's baseline is its height (leaves align along
+their bottom edges), and a container's baseline is that of its first
+in-flow child. Columns treat <code>"baseline"</code> as <code>"flex_start"</code>, matching
+Yoga.</p>
 <h3 id="child-layout-properties">Child layout properties<a class="headerlink" href="#child-layout-properties" title="Permanent link">&para;</a></h3>
 <p>All components accept these in <code>style</code>:</p>
 <ul>
@@ -4217,9 +4328,15 @@ wrappers that fix the direction.</p>
   (<code>width / height</code>).</li>
 <li><code>flex</code>: shorthand for <code>flex_grow: N, flex_shrink: 1, flex_basis: 0</code>.</li>
 <li><code>flex_grow</code>, <code>flex_shrink</code>, <code>flex_basis</code>: explicit flex properties.</li>
-<li><code>margin</code>: outer spacing (number for all sides, or dict).</li>
+<li><code>margin</code>: outer spacing (number for all sides, a dict, or <code>"auto"</code>;
+  per-edge keys such as <code>margin_left</code> also accept <code>"auto"</code>).</li>
 <li><code>align_self</code>: override parent alignment: <code>"auto"</code>, <code>"flex_start"</code>,
-  <code>"center"</code>, <code>"flex_end"</code>, <code>"stretch"</code>.</li>
+  <code>"center"</code>, <code>"flex_end"</code>, <code>"stretch"</code>, <code>"baseline"</code>.</li>
+<li><code>display</code>: <code>"flex"</code> (default) or <code>"none"</code>. A <code>"none"</code> element and
+  its subtree are removed from layout entirely: no size, gap, or
+  margin is reserved for it and every frame in the subtree is zero.
+  Toggle it to hide content without unmounting it (state and native
+  views are kept).</li>
 <li><code>position</code>: <code>"relative"</code> (default) or <code>"absolute"</code>.</li>
 <li><code>top</code>, <code>right</code>, <code>bottom</code>, <code>left</code>: edge offsets when
   <code>position: "absolute"</code> (number or percentage string).</li>
@@ -4230,81 +4347,101 @@ wrappers that fix the direction.</p>
 </ul>
 <h3 id="layout-examples">Layout examples<a class="headerlink" href="#layout-examples" title="Permanent link">&para;</a></h3>
 <p><strong>Centering content:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Centered!"</span><span class="p">),</span>
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"justify_content"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">,</span> <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">},</span>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Centered!"</span><span class="p">),</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"justify_content"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">,</span> <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">},</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>Horizontal row with spacer:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Left"</span><span class="p">),</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Spacer</span><span class="p">(</span><span class="n">flex</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Right"</span><span class="p">),</span>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">},</span>
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="p">)</span>
-</span></code></pre></div>
-<p><strong>Child with flex grow:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Header"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span> <span class="s2">"bold"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}),</span>
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Content area"</span><span class="p">),</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Footer"</span><span class="p">),</span>
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Left"</span><span class="p">),</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Spacer</span><span class="p">(</span><span class="n">flex</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Right"</span><span class="p">),</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">},</span>
 </span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="p">)</span>
 </span></code></pre></div>
-<p><strong>Horizontal button bar:</strong></p>
+<p><strong>Auto margins instead of a spacer:</strong></p>
+<p>Auto margins absorb the free space on the main axis before
+<code>justify_content</code> is applied, following CSS and Yoga. When any child
+on a line has an auto main-axis margin, the remaining space is split
+equally among every auto margin on that line and <code>justify_content</code> has
+no effect. On the cross axis, <code>margin_top: "auto"</code> and friends center
+or push the child and override <code>align_items</code> / <code>align_self</code> (including
+<code>stretch</code>):</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Cancel"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span>
-</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"OK"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#007AFF"</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">}),</span>
-</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Left"</span><span class="p">),</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Right"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"margin_left"</span><span class="p">:</span> <span class="s2">"auto"</span><span class="p">}),</span>   <span class="c1"># pushed to the trailing edge</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
 </span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="p">)</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Centered"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"margin_horizontal"</span><span class="p">:</span> <span class="s2">"auto"</span><span class="p">}),</span>  <span class="c1"># centered without align_items</span>
+</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
+</span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Child with flex grow:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Header"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span> <span class="s2">"bold"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}),</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Content area"</span><span class="p">),</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Footer"</span><span class="p">),</span>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Horizontal button bar:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Cancel"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"OK"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#007AFF"</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">}),</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>Absolute positioning:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
-</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"position"</span><span class="p">:</span> <span class="s2">"absolute"</span><span class="p">,</span> <span class="s2">"top"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"left"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>                   <span class="s2">"width"</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#F00"</span><span class="p">}),</span>
-</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"position"</span><span class="p">:</span> <span class="s2">"absolute"</span><span class="p">,</span> <span class="s2">"bottom"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"right"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>                   <span class="s2">"width"</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#0A0"</span><span class="p">}),</span>
-</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Centered overlay"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>        <span class="s2">"position"</span><span class="p">:</span> <span class="s2">"absolute"</span><span class="p">,</span>
-</span><span id="__span-21-8"><a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>        <span class="s2">"top"</span><span class="p">:</span> <span class="s2">"50%"</span><span class="p">,</span> <span class="s2">"left"</span><span class="p">:</span> <span class="s2">"10%"</span><span class="p">,</span> <span class="s2">"right"</span><span class="p">:</span> <span class="s2">"10%"</span><span class="p">,</span>
-</span><span id="__span-21-9"><a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>        <span class="s2">"text_align"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">,</span>
-</span><span id="__span-21-10"><a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>    <span class="p">}),</span>
-</span><span id="__span-21-11"><a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">240</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">160</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#EEE"</span><span class="p">},</span>
-</span><span id="__span-21-12"><a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"position"</span><span class="p">:</span> <span class="s2">"absolute"</span><span class="p">,</span> <span class="s2">"top"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"left"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>                   <span class="s2">"width"</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#F00"</span><span class="p">}),</span>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"position"</span><span class="p">:</span> <span class="s2">"absolute"</span><span class="p">,</span> <span class="s2">"bottom"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"right"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>                   <span class="s2">"width"</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">40</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#0A0"</span><span class="p">}),</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Centered overlay"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>        <span class="s2">"position"</span><span class="p">:</span> <span class="s2">"absolute"</span><span class="p">,</span>
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>        <span class="s2">"top"</span><span class="p">:</span> <span class="s2">"50%"</span><span class="p">,</span> <span class="s2">"left"</span><span class="p">:</span> <span class="s2">"10%"</span><span class="p">,</span> <span class="s2">"right"</span><span class="p">:</span> <span class="s2">"10%"</span><span class="p">,</span>
+</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>        <span class="s2">"text_align"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">,</span>
+</span><span id="__span-23-10"><a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>    <span class="p">}),</span>
+</span><span id="__span-23-11"><a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">240</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">160</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#EEE"</span><span class="p">},</span>
+</span><span id="__span-23-12"><a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>Aspect-ratio thumbnail grid cell:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
-</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">"cover.jpg"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span>
-</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="s2">"33%"</span><span class="p">,</span> <span class="s2">"aspect_ratio"</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">4</span><span class="p">},</span>
-</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">"cover.jpg"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="s2">"33%"</span><span class="p">,</span> <span class="s2">"aspect_ratio"</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">4</span><span class="p">},</span>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="layout-with-column-and-row">Layout with Column and Row<a class="headerlink" href="#layout-with-column-and-row" title="Permanent link">&para;</a></h2>
 <p><code>Column</code> (vertical) and <code>Row</code> (horizontal) are convenience wrappers for <code>View</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Username"</span><span class="p">),</span>
-</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">TextInput</span><span class="p">(</span><span class="n">placeholder</span><span class="o">=</span><span class="s2">"Enter username"</span><span class="p">),</span>
-</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Password"</span><span class="p">),</span>
-</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">TextInput</span><span class="p">(</span><span class="n">placeholder</span><span class="o">=</span><span class="s2">"Enter password"</span><span class="p">,</span> <span class="n">secure</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
-</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Login"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">handle_login</span><span class="p">),</span>
-</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"stretch"</span><span class="p">},</span>
-</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Username"</span><span class="p">),</span>
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">TextInput</span><span class="p">(</span><span class="n">placeholder</span><span class="o">=</span><span class="s2">"Enter username"</span><span class="p">),</span>
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Password"</span><span class="p">),</span>
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">TextInput</span><span class="p">(</span><span class="n">placeholder</span><span class="o">=</span><span class="s2">"Enter password"</span><span class="p">,</span> <span class="n">secure</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Login"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">handle_login</span><span class="p">),</span>
+</span><span id="__span-25-7"><a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"stretch"</span><span class="p">},</span>
+</span><span id="__span-25-8"><a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="alignment-properties">Alignment properties<a class="headerlink" href="#alignment-properties" title="Permanent link">&para;</a></h3>
 <p><code>Column</code> and <code>Row</code> support <code>align_items</code> and <code>justify_content</code> inside
 <code>style</code>:</p>
 <ul>
 <li><strong><code>align_items</code></strong>: cross-axis alignment: <code>"stretch"</code>,
-  <code>"flex_start"</code>, <code>"center"</code>, <code>"flex_end"</code>, <code>"leading"</code>, <code>"trailing"</code>.</li>
+  <code>"flex_start"</code>, <code>"center"</code>, <code>"flex_end"</code>, <code>"baseline"</code>, <code>"leading"</code>,
+  <code>"trailing"</code>.</li>
 <li><strong><code>justify_content</code></strong>: main-axis distribution: <code>"flex_start"</code>,
   <code>"center"</code>, <code>"flex_end"</code>, <code>"space_between"</code>, <code>"space_around"</code>,
   <code>"space_evenly"</code>.</li>
 </ul>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Left"</span><span class="p">),</span>
-</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Spacer</span><span class="p">(</span><span class="n">flex</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
-</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Right"</span><span class="p">),</span>
-</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">,</span> <span class="s2">"justify_content"</span><span class="p">:</span> <span class="s2">"space_between"</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
-</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Left"</span><span class="p">),</span>
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Spacer</span><span class="p">(</span><span class="n">flex</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Right"</span><span class="p">),</span>
+</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">,</span> <span class="s2">"justify_content"</span><span class="p">:</span> <span class="s2">"space_between"</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
+</span><span id="__span-26-6"><a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="spacing">Spacing<a class="headerlink" href="#spacing" title="Permanent link">&para;</a></h3>
 <ul>
@@ -4332,32 +4469,32 @@ subtree) takes part in hit testing:</p>
   containers that host a few interactive widgets.</li>
 <li><code>"box_only"</code>: the view receives touches but its children don't.</li>
 </ul>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
-</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>    <span class="n">style</span><span class="o">=</span><span class="p">[</span><span class="n">pn</span><span class="o">.</span><span class="n">StyleSheet</span><span class="o">.</span><span class="n">absolute_fill</span><span class="p">(),</span> <span class="p">{</span>
-</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>        <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#00000022"</span><span class="p">,</span>
-</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>        <span class="s2">"pointer_events"</span><span class="p">:</span> <span class="s2">"none"</span><span class="p">,</span>   <span class="c1"># decorative scrim; taps pass through</span>
-</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>    <span class="p">}],</span>
-</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>    <span class="n">style</span><span class="o">=</span><span class="p">[</span><span class="n">pn</span><span class="o">.</span><span class="n">StyleSheet</span><span class="o">.</span><span class="n">absolute_fill</span><span class="p">(),</span> <span class="p">{</span>
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>        <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#00000022"</span><span class="p">,</span>
+</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>        <span class="s2">"pointer_events"</span><span class="p">:</span> <span class="s2">"none"</span><span class="p">,</span>   <span class="c1"># decorative scrim; taps pass through</span>
+</span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>    <span class="p">}],</span>
+</span><span id="__span-27-6"><a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="hit_slop"><code>hit_slop</code><a class="headerlink" href="#hit_slop" title="Permanent link">&para;</a></h3>
 <p><code>hit_slop</code> expands a pressable area beyond the view's visual bounds,
 so small controls stay comfortably tappable. Pass a number for a
 uniform expansion or a dict with <code>top</code> / <code>left</code> / <code>bottom</code> / <code>right</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Pressable</span><span class="p">(</span>
-</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">"close.png"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">16</span><span class="p">}),</span>
-</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>    <span class="n">on_press</span><span class="o">=</span><span class="n">dismiss</span><span class="p">,</span>
-</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>    <span class="n">hit_slop</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>   <span class="c1"># 40 x 40 effective target</span>
-</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Pressable</span><span class="p">(</span>
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">"close.png"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">16</span><span class="p">}),</span>
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>    <span class="n">on_press</span><span class="o">=</span><span class="n">dismiss</span><span class="p">,</span>
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>    <span class="n">hit_slop</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>   <span class="c1"># 40 x 40 effective target</span>
+</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="p">)</span>
 </span></code></pre></div>
 <p><code>View</code>, <code>Column</code>, <code>Row</code>, and <code>Pressable</code> all accept it.</p>
 <h3 id="on_layout"><code>on_layout</code><a class="headerlink" href="#on_layout" title="Permanent link">&para;</a></h3>
 <p>The <code>on_layout</code> prop reports the element's computed frame after each
 layout pass in which it changed. The payload carries <code>x</code>, <code>y</code>,
 <code>width</code>, and <code>height</code> in the parent's coordinate space:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">handle_layout</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>    <span class="n">set_width</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="s2">"width"</span><span class="p">])</span>
-</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>
-</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="n">on_layout</span><span class="o">=</span><span class="n">handle_layout</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">handle_layout</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>    <span class="n">set_width</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="s2">"width"</span><span class="p">])</span>
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>
+</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="n">on_layout</span><span class="o">=</span><span class="n">handle_layout</span><span class="p">)</span>
 </span></code></pre></div>
 <p>The callback runs post-commit, so setting state inside it is safe and
 schedules a normal re-render. Use it for measure-then-position
@@ -4369,14 +4506,14 @@ sizing.</p>
 effective scheme (<code>"light"</code> or <code>"dark"</code>) and re-renders the component
 when it changes, including live when the user flips the system
 setting while the app is open:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
-</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>
-</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>
-</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">Wallpaper</span><span class="p">():</span>
-</span><span id="__span-28-6"><a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>    <span class="n">scheme</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_color_scheme</span><span class="p">()</span>
-</span><span id="__span-28-7"><a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>    <span class="n">bg</span> <span class="o">=</span> <span class="s2">"#000000"</span> <span class="k">if</span> <span class="n">scheme</span> <span class="o">==</span> <span class="s2">"dark"</span> <span class="k">else</span> <span class="s2">"#FFFFFF"</span>
-</span><span id="__span-28-8"><a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="n">bg</span><span class="p">})</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>
+</span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>
+</span><span id="__span-30-4"><a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-30-5"><a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">Wallpaper</span><span class="p">():</span>
+</span><span id="__span-30-6"><a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a>    <span class="n">scheme</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_color_scheme</span><span class="p">()</span>
+</span><span id="__span-30-7"><a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a>    <span class="n">bg</span> <span class="o">=</span> <span class="s2">"#000000"</span> <span class="k">if</span> <span class="n">scheme</span> <span class="o">==</span> <span class="s2">"dark"</span> <span class="k">else</span> <span class="s2">"#FFFFFF"</span>
+</span><span id="__span-30-8"><a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="n">bg</span><span class="p">})</span>
 </span></code></pre></div>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_theme&lt;/span&gt;" href="../../api/style/#pythonnative.style.use_theme"><code>use_theme</code></a> goes one step further: without
 any provider it resolves the built-in
@@ -4393,32 +4530,33 @@ any provider it resolves the built-in
       &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
   &lt;/span&gt;" href="../../api/style/#pythonnative.style.DEFAULT_DARK_THEME"><code>DEFAULT_DARK_THEME</code></a> from the
 current scheme, so themed components are dark-mode aware by default:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">ThemedText</span><span class="p">(</span><span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">):</span>
-</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>    <span class="n">theme</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_theme</span><span class="p">()</span>
-</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">theme</span><span class="p">[</span><span class="s2">"text_color"</span><span class="p">],</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="n">theme</span><span class="p">[</span><span class="s2">"font_size"</span><span class="p">]})</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">ThemedText</span><span class="p">(</span><span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">):</span>
+</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>    <span class="n">theme</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_theme</span><span class="p">()</span>
+</span><span id="__span-31-4"><a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">theme</span><span class="p">[</span><span class="s2">"text_color"</span><span class="p">],</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="n">theme</span><span class="p">[</span><span class="s2">"font_size"</span><span class="p">]})</span>
 </span></code></pre></div>
 <p>An in-app appearance toggle overrides the system setting through the
 <a href="../../api/appearance/"><code>appearance</code></a> module:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">appearance</span><span class="o">.</span><span class="n">set_color_scheme</span><span class="p">(</span><span class="s2">"dark"</span><span class="p">)</span>  <span class="c1"># force dark everywhere</span>
-</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="n">pn</span><span class="o">.</span><span class="n">appearance</span><span class="o">.</span><span class="n">set_color_scheme</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>  <span class="c1"># follow the system again</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">appearance</span><span class="o">.</span><span class="n">set_color_scheme</span><span class="p">(</span><span class="s2">"dark"</span><span class="p">)</span>  <span class="c1"># force dark everywhere</span>
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="n">pn</span><span class="o">.</span><span class="n">appearance</span><span class="o">.</span><span class="n">set_color_scheme</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>  <span class="c1"># follow the system again</span>
 </span></code></pre></div>
 <h3 id="pinning-a-theme-with-a-provider">Pinning a theme with a provider<a class="headerlink" href="#pinning-a-theme-with-a-provider" title="Permanent link">&para;</a></h3>
 <p>To pin an explicit theme for a subtree (ignoring the color scheme),
 mount a <code>ThemeContext</code> provider; <code>use_theme</code> returns the provided
 value as-is:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
-</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.style</span><span class="w"> </span><span class="kn">import</span> <span class="n">DEFAULT_DARK_THEME</span>
-</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>
-</span><span id="__span-31-4"><a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>
-</span><span id="__span-31-5"><a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-31-6"><a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">DarkPage</span><span class="p">():</span>
-</span><span id="__span-31-7"><a id="__codelineno-31-7" name="__codelineno-31-7" href="#__codelineno-31-7"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">ThemeContext</span><span class="p">,</span> <span class="n">DEFAULT_DARK_THEME</span><span class="p">,</span>
-</span><span id="__span-31-8"><a id="__codelineno-31-8" name="__codelineno-31-8" href="#__codelineno-31-8"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-31-9"><a id="__codelineno-31-9" name="__codelineno-31-9" href="#__codelineno-31-9"></a>            <span class="n">ThemedText</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="s2">"Always dark!"</span><span class="p">),</span>
-</span><span id="__span-31-10"><a id="__codelineno-31-10" name="__codelineno-31-10" href="#__codelineno-31-10"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
-</span><span id="__span-31-11"><a id="__codelineno-31-11" name="__codelineno-31-11" href="#__codelineno-31-11"></a>        <span class="p">)</span>
-</span><span id="__span-31-12"><a id="__codelineno-31-12" name="__codelineno-31-12" href="#__codelineno-31-12"></a>    <span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.style</span><span class="w"> </span><span class="kn">import</span> <span class="n">DEFAULT_DARK_THEME</span>
+</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>
+</span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a>
+</span><span id="__span-33-5"><a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-33-6"><a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">DarkPage</span><span class="p">():</span>
+</span><span id="__span-33-7"><a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">ThemeContext</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span>
+</span><span id="__span-33-8"><a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a>        <span class="n">DEFAULT_DARK_THEME</span><span class="p">,</span>
+</span><span id="__span-33-9"><a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-33-10"><a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a>            <span class="n">ThemedText</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="s2">"Always dark!"</span><span class="p">),</span>
+</span><span id="__span-33-11"><a id="__codelineno-33-11" name="__codelineno-33-11" href="#__codelineno-33-11"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
+</span><span id="__span-33-12"><a id="__codelineno-33-12" name="__codelineno-33-12" href="#__codelineno-33-12"></a>        <span class="p">),</span>
+</span><span id="__span-33-13"><a id="__codelineno-33-13" name="__codelineno-33-13" href="#__codelineno-33-13"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <h3 id="theme-properties">Theme properties<a class="headerlink" href="#theme-properties" title="Permanent link">&para;</a></h3>
 <p>Both light and dark themes include:</p>
@@ -4434,13 +4572,13 @@ value as-is:</p>
 </ul>
 <h2 id="scrollview">ScrollView<a class="headerlink" href="#scrollview" title="Permanent link">&para;</a></h2>
 <p>Wrap content in a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;ScrollView&lt;/span&gt;" href="../../api/components/#pythonnative.components.ScrollView"><code>ScrollView</code></a>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">ScrollView</span><span class="p">(</span>
-</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Item 1"</span><span class="p">),</span>
-</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Item 2"</span><span class="p">),</span>
-</span><span id="__span-32-5"><a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
-</span><span id="__span-32-6"><a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a>    <span class="p">)</span>
-</span><span id="__span-32-7"><a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">ScrollView</span><span class="p">(</span>
+</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Item 1"</span><span class="p">),</span>
+</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Item 2"</span><span class="p">),</span>
+</span><span id="__span-34-5"><a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
+</span><span id="__span-34-6"><a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a>    <span class="p">)</span>
+</span><span id="__span-34-7"><a id="__codelineno-34-7" name="__codelineno-34-7" href="#__codelineno-34-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
