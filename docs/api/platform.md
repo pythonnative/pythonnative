@@ -16,9 +16,9 @@ branches throughout the codebase.
 
 | Attribute | Values |
 |---|---|
-| `Platform.OS` | `"ios"`, `"android"`, `"desktop"` or `"test"` |
+| `Platform.OS` | `"ios"`, `"android"`, `"desktop"`, or `"test"` |
 | `Platform.Version` | Best-effort OS version string |
-| `Platform.is_ios` / `Platform.is_android` / `Platform.is_test` / `Platform.is_desktop` | Booleans |
+| `Platform.is_ios` / `Platform.is_android` / `Platform.is_desktop` / `Platform.is_test` | Booleans |
 | `Platform.select(spec, default=None)` | Pick a value matching the current platform |
 
 - `"desktop"` means the `pn preview` Tkinter backend.
