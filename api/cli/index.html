@@ -3413,7 +3413,9 @@ the documented behavior never drifts from the code.</p>
   simulator. Flags: <code>--device</code> (target a specific device by identifier
   or name), <code>--prepare-only</code>, <code>--hot-reload</code>, <code>--no-logs</code>.</li>
 <li><code>pn logs android|ios</code>: stream logs from the running app without
-  rebuilding.</li>
+  rebuilding. Flag: <code>--device</code> (target a specific device by identifier
+  or name, same as <code>pn run</code>). Physical iOS devices aren't supported for
+  log streaming; use Console.app or Xcode &gt; Devices and Simulators.</li>
 <li><code>pn build android|ios</code>: build distributable artifacts (release by
   default). Flags: <code>--debug</code> for the debug variant, <code>--upload</code> to send
   an iOS release build to App Store Connect. See
@@ -3445,8 +3447,8 @@ the documented behavior never drifts from the code.</p>
   simulators, as a table or as JSON with <code>--json</code>.</li>
 <li><code>pn run android|ios [--device D]</code>: stage + build + install + launch on
   a device, emulator, or simulator, with optional on-device hot reload.</li>
-<li><code>pn logs android|ios</code>: stream logs from the running app without
-  rebuilding.</li>
+<li><code>pn logs android|ios [--device D]</code>: stream logs from the running app
+  without rebuilding.</li>
 <li><code>pn build android|ios</code>: produce standalone artifacts (signed APK/AAB,
   or an iOS archive/IPA, optionally uploaded to App Store Connect).</li>
 <li><code>pn app-id android|ios</code>: print the resolved application/bundle id
@@ -4052,7 +4054,7 @@ valid answer for a script rather than a failure.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parsed namespace (<code>platform</code>).</p>
+                <p>Parsed namespace (<code>platform</code>, <code>device</code>).</p>
               </div>
             </td>
             <td>
