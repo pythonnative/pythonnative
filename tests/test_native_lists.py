@@ -177,7 +177,7 @@ def test_render_row_produces_mountable_row_elements(native_lists: None) -> None:
     render_row = root.props["render_row"]
 
     row_backend = FakeBackend()
-    set_registry(row_backend)  # type: ignore[arg-type]
+    set_registry(row_backend)
     try:
         subtree = RowSubtree()
         row_root = subtree.mount(render_row(5), 320.0, 44.0)
@@ -192,7 +192,7 @@ def test_render_row_produces_mountable_row_elements(native_lists: None) -> None:
 
 def test_row_host_pool_bind_rebind_release() -> None:
     backend = FakeBackend()
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         pool = RowHostPool()
         root_a = pool.bind(1, lambda: Text("a"), 320.0, 44.0)
@@ -231,7 +231,7 @@ def test_row_subtree_state_re_renders_row() -> None:
         return Text(f"count-{count}")
 
     backend = FakeBackend()
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         subtree = RowSubtree()
         row_root = subtree.mount(Counter(), 320.0, 44.0)
@@ -316,7 +316,7 @@ def test_native_list_controller_dispatches_commands(native_lists: None) -> None:
     controller = ref.current
     assert controller is not None
 
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         controller.scroll_to_index(3, animated=False)
         controller.scroll_to_offset(120.0)

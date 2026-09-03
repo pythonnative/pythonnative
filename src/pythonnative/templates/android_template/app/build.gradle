@@ -49,18 +49,15 @@ android {
 
 dependencies {
 
+    // The PythonNative runtime: component managers, native modules,
+    // gestures, animations, and the screen fragment. Its AndroidX and
+    // Material dependencies are exposed transitively.
+    implementation project(':pythonnative')
+
     implementation 'androidx.core:core-ktx:1.8.0'
     implementation 'androidx.appcompat:appcompat:1.4.1'
     implementation 'com.google.android.material:material:1.5.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.3'
-    implementation 'androidx.recyclerview:recyclerview:1.3.2'
-    // Pull-to-refresh (ScrollView's refresh_control prop)
-    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
-    // SecureStore (EncryptedSharedPreferences)
-    implementation 'androidx.security:security-crypto:1.1.0'
-    // Biometrics (BiometricPrompt)
-    implementation 'androidx.biometric:biometric:1.1.0'
-    // AndroidX Navigation for Fragment-based navigation
+    // AndroidX Navigation for Fragment-based navigation (activity_main.xml)
     implementation 'androidx.navigation:navigation-fragment-ktx:2.7.7'
     implementation 'androidx.navigation:navigation-ui-ktx:2.7.7'
     testImplementation 'junit:junit:4.13.2'

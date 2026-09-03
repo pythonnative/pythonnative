@@ -1,34 +1,25 @@
-"""Platform-specific native-view creation and update logic.
+"""The view backend the reconciler commits to.
 
-This package provides the
-[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
-that maps element type names (e.g., `"Text"`, `"Button"`) to
-platform-specific
-[`ViewHandler`][pythonnative.native_views.base.ViewHandler]
-implementations, and owns the **tag table** mapping each
-reconciler-assigned integer tag to its live native view.
+The reconciler talks to exactly one object, obtained from
+[`get_registry`][pythonnative.native_views.get_registry], through a
+small protocol: ``apply_mutations`` (one ordered batch of
+create/update/insert/destroy/frame ops per commit, see
+`pythonnative.mutations`), ``resolve_view``, ``measure_intrinsic``,
+``command``, and the animation hooks. Two implementations exist:
 
-The reconciler communicates exclusively through
-[`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]:
-one ordered batch of create/update/insert/remove/destroy/frame ops per
-commit (see `pythonnative.mutations`). Imperative escape hatches
-(commands, animation control, intrinsic measurement) resolve views
-through the same tag table.
+- [`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]
+  (iOS and Android): serializes each commit and hands it to the native
+  runtime through the bridge; Swift and Kotlin component managers own
+  every platform view. Python holds no native objects.
+- [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
+  (desktop preview and tests): maps element type names to Python
+  [`ViewHandler`][pythonnative.native_views.base.ViewHandler]
+  implementations (`pythonnative.native_views.desktop` renders with
+  Tkinter) and owns the tag table itself.
 
-Platform handlers live in dedicated submodules:
-
-- `pythonnative.native_views.base`: shared `ViewHandler` protocol and
-  utilities.
-- `pythonnative.native_views.android`: Android handlers
-  (Chaquopy / Java bridge).
-- `pythonnative.native_views.ios`: iOS handlers (rubicon-objc).
-- `pythonnative.native_views.desktop`: Tkinter preview handlers.
-
-All platform-branching is handled at registration time via lazy
-imports, so this package can be imported on any platform for testing.
-A mock registry can be installed via
-[`set_registry`][pythonnative.native_views.set_registry] to drive the
-reconciler with no real native views.
+Platform selection happens lazily on first use, so this package
+imports on any platform. Tests install a mock with
+[`set_registry`][pythonnative.native_views.set_registry].
 """
 
 import math
@@ -292,98 +283,88 @@ class NativeViewRegistry:
 # Singleton registry
 # ======================================================================
 
-_registry: Optional[NativeViewRegistry] = None
+_registry: Any = None
 
 
-def _active_platform_name() -> str:
-    """Return ``"android"``, ``"desktop"``, or ``"ios"`` for the active runtime."""
-    from ..utils import IS_ANDROID, IS_DESKTOP
-
-    if IS_ANDROID:
-        return "android"
-    if IS_DESKTOP:
-        return "desktop"
-    return "ios"
-
-
-def _register_builtin_handlers(registry: NativeViewRegistry) -> None:
-    """Register every built-in handler for the active platform.
-
-    The desktop (Tkinter) backend is selected when ``pn preview`` sets
-    ``PN_PLATFORM=desktop``; otherwise this picks Android (on device) or
-    iOS (the default off-device path, exercised by the iOS templates and
-    by tests that install the ``[ios]`` extra). Off-device unit tests
-    typically inject a mock registry via ``set_registry`` instead.
-    """
-    from ..utils import IS_ANDROID, IS_DESKTOP
-
-    if IS_ANDROID:
-        from .android import register_handlers
-    elif IS_DESKTOP:
-        from .desktop import register_handlers
-    else:
-        from .ios import register_handlers
-    register_handlers(registry)
-
-
-def _install_sdk_handlers(registry: NativeViewRegistry) -> None:
+def _install_sdk_handlers(registry: Any) -> None:
     """Copy decorator-registered SDK handlers + entry-point plugins.
 
     Imported lazily so unit tests that never touch the SDK don't pay the
-    entry-point discovery cost.
+    entry-point discovery cost. Only meaningful for the Python-handler
+    registry (desktop / tests); on device the native runtime owns
+    component managers and Python handlers are recorded but never run.
     """
     try:
         from ..sdk._components import install_into_registry as _sdk_install
     except Exception:
         return
     try:
-        _sdk_install(registry, _active_platform_name())
+        _sdk_install(registry)
     except Exception:
         # A misbehaving plugin must not break PythonNative's startup.
         pass
 
 
-def get_registry() -> NativeViewRegistry:
-    """Return the process-wide registry, lazily registering handlers.
+def _create_backend() -> Any:
+    """Build the backend for the active platform.
 
-    The first call instantiates the registry, registers either the
-    Android or iOS handlers based on `IS_ANDROID`, then layers on every
-    decorator-registered SDK handler (and any handlers exposed by
-    third-party packages via the
-    [`pythonnative.handlers`][pythonnative.sdk.ENTRY_POINT_GROUP] entry
-    point group). Subsequent calls return the same instance.
+    iOS and Android get the bridge backend. ``pn preview``
+    (``PN_PLATFORM=desktop``) gets the Tkinter handler registry.
+    Anywhere else (plain unit tests) there is no renderer at all, so
+    the registry is empty: tests inject a
+    ``pythonnative.testing.FakeBackend`` with ``set_registry`` and a
+    stray commit raises a clear "unknown element type" rather than
+    silently importing a platform module.
+    """
+    from ..utils import IS_ANDROID, IS_DESKTOP, IS_IOS
+
+    if IS_IOS or IS_ANDROID:
+        from .bridge_backend import BridgeBackend
+
+        return BridgeBackend()
+    registry = NativeViewRegistry()
+    if IS_DESKTOP:
+        from .desktop import register_handlers
+
+        register_handlers(registry)
+    _install_sdk_handlers(registry)
+    return registry
+
+
+def get_registry() -> Any:
+    """Return the process-wide view backend, creating it on first use.
 
     Returns:
-        The active `NativeViewRegistry`.
+        A [`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]
+        on device, otherwise a `NativeViewRegistry` (Tkinter handlers
+        under ``pn preview``, plus every decorator-registered SDK
+        handler and any handlers exposed by third-party packages via
+        the [`pythonnative.handlers`][pythonnative.sdk.ENTRY_POINT_GROUP]
+        entry point group).
     """
     global _registry
     if _registry is not None:
         return _registry
-    _registry = NativeViewRegistry()
-    _register_builtin_handlers(_registry)
-    _install_sdk_handlers(_registry)
+    _registry = _create_backend()
     return _registry
 
 
-def refresh_registry() -> NativeViewRegistry:
-    """Re-run SDK handler installation against the existing registry.
+def refresh_registry() -> Any:
+    """Re-run SDK handler installation against the existing backend.
 
     Call this after registering a new component at runtime if the
     registry has already been instantiated. This is mostly useful in
     REPL sessions and tests; the normal flow is "register, then call
     [`get_registry`][pythonnative.native_views.get_registry]" and the
     handlers come along automatically.
-
-    Returns:
-        The active `NativeViewRegistry`.
     """
     registry = get_registry()
     _install_sdk_handlers(registry)
     return registry
 
 
-def set_registry(registry: Optional[NativeViewRegistry]) -> None:
-    """Install a custom registry (primarily for testing).
+def set_registry(registry: Any) -> None:
+    """Install a custom backend (primarily for testing).
 
     Replaces the lazy singleton so subsequent
     [`get_registry`][pythonnative.native_views.get_registry] calls
@@ -393,7 +374,7 @@ def set_registry(registry: Optional[NativeViewRegistry]) -> None:
     rebuild it from scratch.
 
     Args:
-        registry: The replacement registry, or ``None`` to clear.
+        registry: The replacement backend, or ``None`` to clear.
     """
     global _registry
     _registry = registry

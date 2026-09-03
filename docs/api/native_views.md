@@ -1,16 +1,17 @@
 # Native views
 
-The bridge between PythonNative's element tree and concrete native
+The boundary between PythonNative's element tree and concrete native
 widgets. Each commit's diff is expressed as a flat list of
 [mutation ops](mutations.md) referencing integer tags, applied through a
 single
 [`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]
-call. Every element type maps to a
-[`ViewHandler`][pythonnative.native_views.base.ViewHandler]
-implementation in the
-[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry];
-the platform-specific handlers are registered lazily so importing
-`pythonnative` on the desktop never pulls in Chaquopy or rubicon-objc.
+call on a [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry].
+On device that registry is the
+[`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend],
+which forwards the transaction to Swift and Kotlin component managers
+over the [native bridge](bridge.md). Off device it dispatches to Python
+[`ViewHandler`][pythonnative.native_views.base.ViewHandler] objects
+(Tkinter for `pn preview`, a fake for tests).
 
 ::: pythonnative.native_views
     options:
@@ -37,19 +38,27 @@ The registry and its dispatch entry point are documented in
       members_order: source
       filters: ["!^_"]
 
-!!! note "Platform handlers"
-    The Android and iOS handler implementations live in
-    `pythonnative.native_views.android` and
-    `pythonnative.native_views.ios` respectively. They are imported
-    only at runtime on the corresponding platform; we don't render
-    their API tables here because they're internal to the runtime and
-    require platform-only dependencies (Chaquopy / rubicon-objc) to
-    be importable for `mkdocstrings` to introspect them.
+## On-device backend
+
+::: pythonnative.native_views.bridge_backend
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
+
+!!! note "Component managers"
+    The native implementations live in the templates:
+    `PythonNativeKit/Sources/PythonNativeKit/Components` (Swift) and
+    `pythonnative/src/main/java/com/pythonnative/runtime/components`
+    (Kotlin). Their hooks are described in
+    [Native views (concept)](../concepts/native-views.md#component-managers).
 
 ## Next steps
 
 - Read the high-level model in
   [Native views (concept)](../concepts/native-views.md).
+- Read the wire protocol in [Bridge](bridge.md).
 - See how the reconciler drives handlers in [Reconciler](reconciler.md).
 - Read the op vocabulary handlers apply in [Mutation ops](mutations.md).
 - Read the callback registry handlers dispatch into in [Events](events.md).

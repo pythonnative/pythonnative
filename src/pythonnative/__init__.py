@@ -2,9 +2,11 @@
 
 PythonNative is a cross-platform toolkit that turns Python ``@component``
 functions into real, native Android and iOS views. The component model
-is React-like (function components plus hooks), but rendering happens
-through direct platform bindings: Chaquopy on Android (Java) and
-rubicon-objc on iOS (Objective-C). There is no JavaScript bridge.
+is React-like (function components plus hooks). Python owns the
+component tree, reconciliation, and layout; each commit crosses once
+into a native rendering core (Swift ``PythonNativeKit`` on iOS, the
+Kotlin ``pythonnative`` module on Android) that owns every platform
+view, gesture, animation, and device API. There is no JavaScript.
 
 Key building blocks:
 

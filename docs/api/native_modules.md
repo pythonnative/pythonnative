@@ -3,15 +3,35 @@
 Cross-platform wrappers around device APIs that are not part of the
 view tree: camera, GPS, file I/O, notifications, clipboard, share
 sheet, deep links, permissions, connectivity, secure storage, battery,
-haptics, and biometrics. Each module is implemented twice (once per
-platform) and dispatches at runtime based on the `IS_ANDROID` and
-`IS_IOS` flags from `pythonnative.utils`, with a safe desktop fallback.
+haptics, and biometrics. Each module is a Swift and a Kotlin class
+registered by name in the native runtime; the Python classes below are
+facades that call them through
+[`native_module`][pythonnative.native_modules.registry.native_module],
+with a Python implementation registered for the desktop and tests.
 
 Both synchronous and coroutine APIs exist (chosen to match the
 platform call). For the call-site patterns, the reactive
 `use_app_state` / `use_net_info` hooks, and the runtime coroutines are
 scheduled on, see the [Native modules guide](../guides/native-modules.md)
 and the [Async + data guide](../guides/async.md).
+
+## Registry
+
+::: pythonnative.native_modules.registry
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
+
+## Desktop implementations
+
+::: pythonnative.native_modules.desktop
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
 
 ## Camera
 
@@ -142,3 +162,4 @@ and the [Async + data guide](../guides/async.md).
 ## Next steps
 
 - See guidance and permission setup in [Native modules guide](../guides/native-modules.md).
+- Write your own: [Native modules guide](../guides/native-modules.md#writing-your-own-native-module).

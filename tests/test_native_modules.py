@@ -31,7 +31,8 @@ from pythonnative import (
 )
 from pythonnative.component import component
 from pythonnative.element import Element
-from pythonnative.native_modules import app_state, battery, linking, net_info, secure_store
+from pythonnative.native_modules import app_state, battery, linking, net_info
+from pythonnative.native_modules import registry as module_registry
 from pythonnative.reconciler import Reconciler
 from pythonnative.testing import FakeBackend as MockBackend
 
@@ -44,7 +45,7 @@ def _reset_module_state() -> Generator[None, None, None]:
     net_info._listeners.clear()
     net_info._last_state = {"is_connected": True, "type": "unknown", "is_internet_reachable": True}
     battery._listeners.clear()
-    secure_store._desktop_store.clear()
+    module_registry.native_module("SecureStore").impl.clear()  # type: ignore[attr-defined]
     linking.set_initial_url(None)
     Clipboard.set_string("")
     yield
@@ -260,38 +261,50 @@ def test_get_device_token_none_on_desktop() -> None:
     assert asyncio.run(Notifications.get_device_token()) is None
 
 
-def test_dispatch_device_token_resolves_waiters() -> None:
-    from pythonnative.native_modules import notifications
+def test_get_device_token_surfaces_native_error() -> None:
+    from pythonnative.native_modules.notifications import Notifications
 
-    async def scenario() -> str:
-        future: asyncio.Future = asyncio.get_running_loop().create_future()
-        notifications._token_waiters.append(future)
-        notifications.dispatch_device_token("aabbccdd")
-        return await future
+    class FailingNotifications:
+        def get_device_token(self) -> str:
+            raise module_registry.NativeModuleError("Notifications", "get_device_token", "no entitlement")
 
-    try:
-        assert asyncio.run(scenario()) == "aabbccdd"
-        assert notifications._device_token == "aabbccdd"
-    finally:
-        notifications._device_token = None
-        notifications._device_token_error = None
-
-
-def test_dispatch_device_token_error_rejects_waiters() -> None:
-    from pythonnative.native_modules import notifications
-
-    async def scenario() -> None:
-        future: asyncio.Future = asyncio.get_running_loop().create_future()
-        notifications._token_waiters.append(future)
-        notifications.dispatch_device_token_error("no entitlement")
-        await future
-
+    module_registry.register_python_module("Notifications", FailingNotifications())
     try:
         with pytest.raises(RuntimeError, match="no entitlement"):
-            asyncio.run(scenario())
+            asyncio.run(Notifications.get_device_token())
     finally:
-        notifications._device_token = None
-        notifications._device_token_error = None
+        module_registry.unregister_python_module("Notifications")
+
+
+# ======================================================================
+# Module events pushed from native
+# ======================================================================
+
+
+def test_native_module_events_reach_facade_listeners() -> None:
+    seen_states: List[str] = []
+    seen_urls: List[str] = []
+    seen_battery: List[Dict[str, object]] = []
+    seen_net: List[Dict[str, object]] = []
+    AppState.add_listener(seen_states.append)
+    Linking.add_listener(seen_urls.append)
+    Battery.add_listener(seen_battery.append)
+    NetInfo.add_listener(seen_net.append)
+
+    module_registry.dispatch_module_message("AppState", {"event": "change", "payload": "background"})
+    module_registry.dispatch_module_message("Linking", {"event": "url", "payload": "myapp://deep"})
+    module_registry.dispatch_module_message("Battery", {"event": "change", "payload": {"level": 0.25, "state": "full"}})
+    module_registry.dispatch_module_message(
+        "NetInfo", {"event": "change", "payload": {"is_connected": False, "type": "none"}}
+    )
+
+    assert seen_states == ["background"]
+    assert AppState.current_state() == "background"
+    assert seen_urls == ["myapp://deep"]
+    assert Linking.get_initial_url() == "myapp://deep"
+    assert seen_battery == [{"level": 0.25, "state": "full"}]
+    assert seen_net == [{"is_connected": False, "type": "none", "is_internet_reachable": False}]
+    assert net_info._last_state["type"] == "none"
 
 
 # ======================================================================

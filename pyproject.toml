@@ -30,9 +30,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ios = [
-  "rubicon-objc>=0.4.6,<0.5.0",
-]
 build = [
   "Pillow>=10.0",
 ]
@@ -47,9 +44,10 @@ dev = [
   "pytest>=8.0",
   "pytest-asyncio>=0.23",
   "Pillow>=10.0",
-  # `pn run ios` shells out to `sys.executable -m pip` to vendor
-  # rubicon-objc (project/builder.py), and the test suite exercises that
-  # path. `uv sync` does not seed pip the way `uv venv --seed` did.
+  # `pn run ios` shells out to `sys.executable -m pip` to vendor the
+  # app's [requirements].packages (project/builder.py), and the test
+  # suite exercises that path. `uv sync` does not seed pip the way
+  # `uv venv --seed` did.
   "pip>=24.0",
 ]
 docs = [
@@ -92,6 +90,7 @@ license-files = ["LICENSE*"]
 # Include template directories inside the package so importlib.resources can find them
 [tool.setuptools.package-data]
 pythonnative = [
+  "py.typed",
   "templates/**",
 ]
 

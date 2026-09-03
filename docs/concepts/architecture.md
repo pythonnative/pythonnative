@@ -1,8 +1,11 @@
 # Architecture
 
-PythonNative combines **direct native bindings** with a **declarative
-reconciler**, giving you React-like ergonomics while calling native
-platform APIs synchronously from Python.
+PythonNative combines a **declarative reconciler** in Python with a
+**native rendering core** in Swift and Kotlin. Python owns the
+component tree, reconciliation, and layout; `PythonNativeKit` (iOS) and
+the `pythonnative` Gradle module (Android) own every native view,
+gesture recognizer, animation, and device API. The two halves talk over
+a small, versioned [bridge](bridge.md), one transaction per commit.
 
 ## High-level model
 
@@ -58,18 +61,18 @@ platform APIs synchronously from Python.
    [`use_resource`][pythonnative.use_resource] starts fetches during
    render, and [`lazy`][pythonnative.lazy] code-splits components
    behind the same mechanism.
-9. **Direct bindings.** Under the hood, native views are created and
-   updated through direct platform calls:
-   - **iOS**: rubicon-objc exposes Objective-C/Swift classes
-     (`UILabel`, `UIButton`, `UIStackView`, etc.).
-   - **Android**: Chaquopy exposes Java classes
-     (`android.widget.TextView`, `android.widget.Button`, etc.) via
-     the JNI bridge.
+9. **Native rendering core.** Each commit's op list is serialized
+   and applied by native **component managers**: a Swift
+   `PNComponentManager` and a Kotlin `ComponentManager` per element
+   type create views, apply props, position children, and report
+   intrinsic sizes. Device APIs are **native modules** (Swift and
+   Kotlin classes registered by name) reached through the same
+   bridge. See [The native bridge](bridge.md).
 10. **Thin native bootstrap.** The host app remains native (Android
-   `Activity` or iOS `UIViewController`). It calls
-   [`create_screen`][pythonnative.create_screen] internally to bootstrap
-   your Python component, and the reconciler drives the UI from
-   there.
+   `Activity` or iOS `UIViewController`). It boots CPython, calls
+   `pythonnative.bootstrap.start()`, and asks the `Host` module to
+   create a screen for your root component; the reconciler drives the
+   UI from there.
 11. **`App` entry point.** The user's app module (`app/main.py`)
     defines a top-level component named `App`. Native templates
     import that module by path (`"app.main"`) and look up its `App`
@@ -89,8 +92,8 @@ Because UIKit and the Android view system own the main thread's run
 loop, the framework loop can't call `run_forever` and block. It runs
 as a *guest* instead: whenever async work is scheduled, the runtime
 asks the platform to pump the loop on the next main-queue turn
-(`dispatch_async` on iOS, `Handler.post` on Android, the Tk poll loop
-in `pn preview`). One pump runs every ready callback and due timer,
+(the bridge's `pump` callback on iOS and Android, the Tk poll loop in
+`pn preview`). One pump runs every ready callback and due timer,
 then hands control back to the platform.
 
 The payoff is that coroutines and rendering interleave on one thread:
@@ -143,8 +146,9 @@ and a new one is created.
    mutations happen yet.
 3. **Commit phase**: the reconciler turns the diff for each
    re-rendered subtree into mutation ops referencing view tags, and
-   flushes them all in a single `apply_mutations` transaction. Event
-   callbacks are routed to the Python-side
+   flushes them all in a single `apply_mutations` transaction, which
+   on device is one JSON payload handed to native. Event callbacks
+   are routed to the Python-side
    [`EventRegistry`][pythonnative.events.EventRegistry] instead of
    crossing the bridge, so callback-identity churn costs nothing.
 4. **Layout phase**: a layout pass recomputes frames and emits
@@ -261,97 +265,99 @@ Under the hood:
 
 - **Layout**: `pythonnative.layout.calculate_layout` computes a frame
   `(x, y, w, h)` for every node.
-- **Android**: every container is a `FrameLayout`; computed frames are
-  applied through `MarginLayoutParams` and `View.setX/setY/setLayoutParams`.
-- **iOS**: every container is a plain `UIView` with
-  `translatesAutoresizingMaskIntoConstraints = NO`; computed frames are
-  applied through `view.frame = CGRect(...)`.
-- **Intrinsic content size**: leaf widgets (`Text`, `Button`, `Image`,
-  `TextInput`, …) implement `measure_intrinsic` so the engine can ask
-  them how big they want to be when no explicit size is set.
+- **Android**: every container is a `PNFrameLayout`; computed frames
+  (in dp) are applied by the Kotlin manager through `MarginLayoutParams`.
+- **iOS**: every container is a `PNContainerView`; computed frames (in
+  points) are applied by the Swift manager through `bounds` and `center`.
+- **Intrinsic content size**: leaf managers (`Text`, `Button`, `Image`,
+  `TextInput`, ...) implement `measure` so the engine can ask them how
+  big they want to be when no explicit size is set. The call is
+  synchronous across the bridge.
 
 See the [Layout engine](layout.md) concept page for a full walkthrough.
 
-## Native view handlers
+## Native views and the bridge
 
-Platform-specific rendering logic lives in the
-`pythonnative.native_views` package, organized into dedicated
-submodules:
+The reconciler talks to a
+[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry],
+which owns the tag table and applies each commit's mutation list. On
+device that is the
+[`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]
+in `pythonnative.native_views.bridge_backend`: it encodes the batch as
+JSON and makes one call into native (`pn_bridge_apply` on iOS through
+`ctypes`, `PNBridge.apply` on Android through Chaquopy). Native decodes
+the transaction and dispatches each op to the component manager
+registered for the element type.
 
-- `native_views.base`: shared
-  [`ViewHandler`][pythonnative.native_views.base.ViewHandler] protocol
-  and common utilities (color parsing, padding resolution, container
-  visual keys).
-- `native_views.android`: Android handlers using Chaquopy's Java
-  bridge (`jclass`, `dynamic_proxy`).
-- `native_views.ios`: iOS handlers using rubicon-objc
-  (`ObjCClass`, `objc_method`).
+Everything else crosses the same boundary:
 
-Every handler implements two layout-facing methods:
+- `measure(tag, w, h)` asks a manager for an intrinsic size, synchronously.
+- `command(tag, name, args)` runs an imperative action (`focus`,
+  `scroll_to_offset`, ...).
+- `animate(tag, request)` starts, sets, or cancels a natively driven
+  `Animated` value.
+- `call(module, method, args)` invokes a native module method.
 
-- `set_frame(view, x, y, width, height)`: apply an absolute frame
-  computed by the layout engine.
-- `measure_intrinsic(view, max_width, max_height)`: return the
-  natural content size for leaf widgets (used as a hint by the layout
-  engine).
+Native reaches back through a single callback for view events, module
+results and events, screen lifecycle, animation completion, and loop
+pumps. Events are keyed by tag: managers wire their platform listeners
+once at view creation and emit `(tag, name, args)`; the
+[`EventRegistry`][pythonnative.events.EventRegistry] resolves the
+current Python callback. Gestures
+([`pythonnative.gestures`](../api/gestures.md)) are recognized natively
+and ride the same channel.
 
-`Column`, `Row`, and `View` share a single flex-container handler on
-each platform. Containers are simple `FrameLayout` (Android) /
-`UIView` (iOS) instances; all flex math lives in
-`pythonnative.layout`, so the handlers themselves contain no layout
-logic.
+Off device the registry dispatches to Python
+[`ViewHandler`][pythonnative.native_views.base.ViewHandler] objects
+instead: Tkinter handlers for `pn preview` and an in-memory fake for
+tests. The protocol is identical, so the reconciler never knows which
+backend it is driving.
 
-Each handler class maps an element type name (e.g., `"Text"`,
-`"Button"`) to platform-native widget creation, property updates, and
-child management. The
-[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
-owns the tag-to-view table, applies each commit's mutation list, and
-lazily imports only the relevant platform module at runtime, so the
-package can be imported on any platform for testing.
-
-Native events flow back through a single channel: handlers wire their
-platform listeners once at view creation and call
-[`dispatch_event`][pythonnative.events.dispatch_event] with the view's
-tag; the [`EventRegistry`][pythonnative.events.EventRegistry] resolves
-the current Python callback. Gestures
-([`pythonnative.gestures`](../api/gestures.md)) and natively-driven
-animations (the `Animated` API) ride the same tag infrastructure.
+See [Native views](native-views.md) for the manager hooks and
+[The native bridge](bridge.md) for the wire format.
 
 ## Comparisons
 
 !!! note "Versus React Native"
-    React Native uses JSX plus a JavaScript bridge (or JSI in newer
-    versions) plus Yoga layout. PythonNative uses Python plus direct
-    native calls plus a Python-implemented Yoga-style flex engine; no
-    JS bridge, no serialization overhead, and the same layout rules on
-    both platforms.
+    React Native's Fabric renderer and TurboModules have direct
+    equivalents here: one serialized transaction per commit applied by
+    native component managers, and named native modules with sync and
+    async calls. The differences are the language (Python instead of
+    JavaScript, no JSI), the layout engine (a Python Yoga port, so
+    layout is identical on both platforms), and the async model (one
+    asyncio loop on the main thread instead of a separate JS thread).
 
 !!! note "Versus NativeScript"
-    NativeScript shares the philosophy of direct, synchronous native
-    access, but PythonNative adds a declarative reconciler layer and
+    NativeScript exposes every platform API to JavaScript directly.
+    PythonNative deliberately keeps platform code in Swift and Kotlin
+    behind a small protocol, and adds a declarative reconciler layer and
     React-like hooks that NativeScript does not have by default.
 
 See [Mental model](mental-model.md) for a wider comparison table.
 
-## iOS flow (rubicon-objc)
+## iOS flow
 
-- The iOS template (Swift with CPython embedded through the C API) boots Python and calls
-  [`create_screen`][pythonnative.create_screen] internally with the
-  current `UIViewController` pointer.
-- The reconciler creates UIKit views and attaches them to the
-  controller's view.
-- State changes trigger re-renders; the reconciler patches UIKit
-  views in place.
+- The iOS template (Swift, CPython embedded through the C API) boots
+  Python and calls `pythonnative.bootstrap.start()`, which loads the
+  `PythonNativeKit` C entry points through `ctypes` and checks the
+  protocol version.
+- `PNViewController` asks Python (through the `Host` module callback)
+  to create a screen for the root component and attaches the root view.
+- Commits arrive as transactions; Swift component managers create and
+  update UIKit views. Events, module results, and lifecycle flow back
+  through the bridge callback on the main thread.
 
-## Android flow (Chaquopy)
+## Android flow
 
 - The Android template (Kotlin plus Chaquopy) initializes Python in
-  `MainActivity` and passes the `Activity` to Python.
-- `ScreenFragment` calls [`create_screen`][pythonnative.create_screen]
-  internally, which renders the root component and attaches views to
-  the fragment container.
-- State changes trigger re-render; the reconciler patches Android
-  views in place.
+  `MainActivity` and calls `pythonnative.bootstrap.start()`, which
+  resolves `com.pythonnative.runtime.PNBridge` (the only Java class
+  Python touches) and installs the Python callback.
+- `PNScreenFragment` asks Python to create a screen and attaches the
+  root view to the fragment container.
+- Commits arrive as transactions; Kotlin component managers create and
+  update Android views. The `pythonnative` Gradle module has no
+  Chaquopy dependency, so it is unit-tested with plain JUnit.
 
 ## Hot reload (Fast Refresh)
 
@@ -376,7 +382,9 @@ If Fast Refresh can't produce a clean swap, the host falls back to a
 
 ## Native API modules
 
-PythonNative provides cross-platform modules for common device APIs:
+Device APIs are native modules: Swift and Kotlin classes registered by
+name, called from thin Python facades through the bridge, with Python
+fallbacks for the desktop and tests. Built-ins include:
 
 - [`Camera`][pythonnative.native_modules.camera.Camera]: photo
   capture and gallery picker.
@@ -387,7 +395,9 @@ PythonNative provides cross-platform modules for common device APIs:
 - [`Notifications`][pythonnative.native_modules.notifications.Notifications]:
   local notifications.
 
-See [Native modules guide](../guides/native-modules.md).
+Packages can ship their own modules (and component managers) as native
+plugins that `pn build` compiles into the app. See the
+[Native modules guide](../guides/native-modules.md).
 
 ## Navigation
 
@@ -427,10 +437,14 @@ See the [Navigation guide](../guides/navigation.md) for the full
 walkthrough, including how `options={"title": ...}` flows into the
 native navigation bar.
 
-- iOS: one host `UIViewController` class, many instances pushed on a
+- iOS: one `PNViewController` class, many instances pushed on a
   `UINavigationController`.
 - Android: single host `Activity` with a `NavHostFragment` and a
-  stack of generic `ScreenFragment`s driven by a navigation graph.
+  stack of generic `PNScreenFragment`s driven by a navigation graph.
+
+Both are driven by the `Host` native module (`push`, `pop`, `replace`,
+`reset`, `set_options`), so the Python navigator has no platform
+branches.
 
 ## Next steps
 
@@ -438,5 +452,6 @@ native navigation bar.
   comparisons.
 - Walk through the render loop in [Lifecycle](lifecycle.md).
 - Dive into the flexbox engine in [Layout engine](layout.md).
-- See the platform handlers up close in [Native views](native-views.md).
+- See the component managers up close in [Native views](native-views.md).
+- Read the wire protocol in [The native bridge](bridge.md).
 - Browse the API: [Package overview](../api/pythonnative.md).

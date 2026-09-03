@@ -67,6 +67,7 @@ from typing import (
 
 from . import diagnostics
 from .element import Element, Node
+from .platform_metrics import SafeAreaInsets, WindowDimensions
 from .scheduler import TransitionQueue, in_transition, run_in_transition, schedule_trigger
 from .suspense import CoroDriver, Resource
 
@@ -1235,27 +1236,39 @@ def use_mutation(
     from .runtime import run_async
 
     state, set_state = use_state(lambda: MutationState[T]())
+    # The trigger is identity-stable across renders (like ``set_state``)
+    # so it can sit in effect deps or be passed to memoized children;
+    # it always calls the latest ``mutator``.
+    latest = use_ref(mutator)
+    latest.current = mutator
 
-    def mutate(*args: Any, **kwargs: Any) -> MutationCall[T]:
-        set_state(lambda s: replace(s, loading=True, error=None))
+    def _make_mutate() -> Callable[..., MutationCall[T]]:
+        def mutate(*args: Any, **kwargs: Any) -> MutationCall[T]:
+            set_state(lambda s: replace(s, loading=True, error=None))
+            fn = latest.current
 
-        async def _runner() -> T:
-            try:
-                data = await mutator(*args, **kwargs)
-                set_state(lambda s: replace(s, data=data, loading=False, error=None))
-                return data
-            except asyncio.CancelledError:
-                set_state(lambda s: replace(s, loading=False))
-                raise
-            except BaseException as exc:
-                failure = exc
-                set_state(lambda s: replace(s, loading=False, error=failure))
-                raise
+            async def _runner() -> T:
+                try:
+                    data = await fn(*args, **kwargs)
+                    set_state(lambda s: replace(s, data=data, loading=False, error=None))
+                    return data
+                except asyncio.CancelledError:
+                    set_state(lambda s: replace(s, loading=False))
+                    raise
+                except BaseException as exc:
+                    failure = exc
+                    set_state(lambda s: replace(s, loading=False, error=failure))
+                    raise
 
-        future = run_async(_runner())
-        return MutationCall[T](future)
+            future = run_async(_runner())
+            return MutationCall[T](future)
 
-    return state, mutate
+        return mutate
+
+    mutate_ref: Ref[Optional[Callable[..., MutationCall[T]]]] = use_ref(None)
+    if mutate_ref.current is None:
+        mutate_ref.current = _make_mutate()
+    return state, mutate_ref.current
 
 
 # ======================================================================
@@ -1294,7 +1307,7 @@ def use_subscription(subscribe: Callable[[Callable[[], None]], Callable[[], None
     return get_snapshot()
 
 
-def use_window_dimensions() -> Dict[str, float]:
+def use_window_dimensions() -> WindowDimensions:
     """Return the current viewport size and re-render when it changes.
 
     Equivalent to React Native's ``useWindowDimensions``. The values
@@ -1302,26 +1315,29 @@ def use_window_dimensions() -> Dict[str, float]:
     size (initial layout, rotation, multitasking split-view).
 
     Returns:
-        A dict with ``"width"`` and ``"height"`` floats in layout
+        A [`WindowDimensions`][pythonnative.platform_metrics.WindowDimensions]
+        named tuple with ``width`` and ``height`` floats in layout
         units (pt on iOS, dp on Android). Both are ``0.0`` until the
-        screen host has run its first layout pass.
+        screen host has run its first layout pass. Being a tuple, it
+        unpacks (``width, height = pn.use_window_dimensions()``) and
+        compares by value.
 
     Raises:
         RuntimeError: If called outside a ``@component`` function.
     """
     from . import platform_metrics
 
-    dims = use_subscription(platform_metrics.subscribe, platform_metrics.get_window_dimensions)
-    return {"width": dims.width, "height": dims.height}
+    return use_subscription(platform_metrics.subscribe, platform_metrics.get_window_dimensions)
 
 
-def use_safe_area_insets() -> Dict[str, float]:
+def use_safe_area_insets() -> SafeAreaInsets:
     """Return the current safe-area insets and re-render on change.
 
     Mirrors ``react-native-safe-area-context``'s ``useSafeAreaInsets``.
 
     Returns:
-        A dict with ``"top"``, ``"bottom"``, ``"left"``, and ``"right"``
+        A [`SafeAreaInsets`][pythonnative.platform_metrics.SafeAreaInsets]
+        named tuple with ``top``, ``left``, ``bottom``, and ``right``
         floats in layout units (pt on iOS, dp on Android).
 
     Raises:
@@ -1329,8 +1345,7 @@ def use_safe_area_insets() -> Dict[str, float]:
     """
     from . import platform_metrics
 
-    insets = use_subscription(platform_metrics.subscribe, platform_metrics.get_safe_area_insets)
-    return {"top": insets.top, "bottom": insets.bottom, "left": insets.left, "right": insets.right}
+    return use_subscription(platform_metrics.subscribe, platform_metrics.get_safe_area_insets)
 
 
 def use_keyboard_height() -> float:

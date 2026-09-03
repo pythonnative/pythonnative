@@ -12,24 +12,20 @@ import pytest
 
 from pythonnative.component import component
 from pythonnative.element import Element
+from pythonnative.native_modules.registry import native_module
 from pythonnative.reconciler import Reconciler
 from pythonnative.runtime import drain, run_blocking
-from pythonnative.storage import AsyncStorage, _desktop_store, use_persisted_state
+from pythonnative.storage import AsyncStorage, use_persisted_state
 from pythonnative.testing import FakeBackend as _StubBackend
 
 
 @pytest.fixture(autouse=True)
 def _reset_desktop_store(tmp_path: Path) -> Generator[None, None, None]:
-    """Isolate the desktop backend per test by pointing it at a temp dir."""
-    _desktop_store.clear()
-    # Reload flag is module-private; force reload-on-read.
-    import pythonnative.storage as storage_mod
-
-    storage_mod._desktop_loaded = False
+    """Isolate the desktop Storage module per test by pointing it at a temp dir."""
     os.environ["PN_STORAGE_DIR"] = str(tmp_path)
+    native_module("Storage").impl._reset()  # type: ignore[attr-defined]
     yield
-    _desktop_store.clear()
-    storage_mod._desktop_loaded = False
+    native_module("Storage").impl._reset()  # type: ignore[attr-defined]
     os.environ.pop("PN_STORAGE_DIR", None)
 
 

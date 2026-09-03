@@ -74,6 +74,7 @@ nav:
     - Reconciliation: concepts/reconciliation.md
     - Layout Engine: concepts/layout.md
     - Native Views: concepts/native-views.md
+    - The Native Bridge: concepts/bridge.md
   - Guides:
     - Android: guides/android.md
     - iOS: guides/ios.md
@@ -126,6 +127,7 @@ nav:
     - Testing: api/testing.md
     - Native modules: api/native_modules.md
     - Native views: api/native_views.md
+    - Bridge: api/bridge.md
     - Mutation ops: api/mutations.md
     - Events: api/events.md
     - Platform metrics: api/platform_metrics.md

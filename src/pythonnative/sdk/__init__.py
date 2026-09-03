@@ -2,46 +2,51 @@
 
 The ``pythonnative.sdk`` package collects the *stable* extension
 contract that third-party packages rely on: the
-[`ViewHandler`][pythonnative.sdk.ViewHandler] protocol, the
 [`Style`][pythonnative.sdk.Style] type, the
-[`@native_component`][pythonnative.sdk.native_component] registration
-decorator, and an
+[`@native_component`][pythonnative.sdk.native_component] /
+[`register_component`][pythonnative.sdk.register_component]
+registration helpers, the
 [`element_factory`][pythonnative.sdk.element_factory] helper for
-producing strongly-typed element constructors.
+producing strongly-typed element constructors, the
+[`ViewHandler`][pythonnative.sdk.ViewHandler] protocol for off-device
+stand-ins, and the native module registry
+([`native_module`][pythonnative.sdk.native_module],
+[`register_python_module`][pythonnative.sdk.register_python_module]).
 
 A custom native component is three things:
 
 1. A typed, frozen [`Props`][pythonnative.sdk.Props] dataclass listing
    the public properties the component accepts.
-2. One or more
-   [`ViewHandler`][pythonnative.sdk.ViewHandler] subclasses (one per
-   target platform) implementing creation, update, and child management
-   for the underlying native widget.
-3. A registration call (the
-   [`@native_component`][pythonnative.sdk.native_component] decorator,
-   or
-   [`register_component`][pythonnative.sdk.register_component] for
-   imperative use) that binds the props type and handler into the
-   process-wide registry.
+2. A Swift ``PNComponentManager`` and a Kotlin ``ComponentManager``
+   registered under the component's name by the package's native
+   plugin (``pn_plugin.json`` next to ``ios/`` and ``android/`` source
+   folders; see ``docs/guides/custom-components.md``).
+3. A registration call in Python
+   ([`register_component`][pythonnative.sdk.register_component], or the
+   [`@native_component`][pythonnative.sdk.native_component] decorator
+   when you also supply a desktop
+   [`ViewHandler`][pythonnative.sdk.ViewHandler] for ``pn preview``)
+   that declares the element name and binds its props type.
 
 Once registered, the component appears alongside the built-ins: the
 reconciler, layout engine, and Fast Refresh treat it identically.
 
-PyPI packages can ship handlers without users importing them
-explicitly by declaring an entry point in the
-``pythonnative.handlers`` group; PythonNative discovers and imports
-those modules the first time the registry is asked for a handler.
+A native module (device API without a view) follows the same split: a
+Swift / Kotlin class registered by name in the plugin, a Python facade
+that calls ``native_module(name).call(...)``, and optionally a Python
+implementation registered with ``register_python_module`` for desktop
+and tests.
+
+PyPI packages can ship both without users importing them explicitly
+by declaring entry points in the ``pythonnative.handlers`` (Python
+side) and ``pythonnative.plugins`` (native source) groups; ``pn build``
+compiles the native sources into the app.
 
 Example:
     ```python
     from dataclasses import dataclass
     import pythonnative as pn
-    from pythonnative.sdk import (
-        Props,
-        ViewHandler,
-        element_factory,
-        native_component,
-    )
+    from pythonnative.sdk import Props, element_factory, register_component
 
 
     @dataclass(frozen=True)
@@ -51,16 +56,9 @@ Example:
         style: pn.StyleProp = None
 
 
-    @native_component("Badge", props=BadgeProps, platforms=("ios",))
-    class IOSBadgeHandler(ViewHandler):
-        def create(self, props):
-            ...
-
-        def update(self, view, changed):
-            ...
-
-
+    register_component(name="Badge", props=BadgeProps)
     Badge = element_factory("Badge")
+
 
     @pn.component
     def App():
@@ -72,6 +70,14 @@ Example:
 """
 
 from ..element import Element
+from ..native_modules.registry import (
+    NativeModule,
+    NativeModuleError,
+    PythonModule,
+    emit,
+    native_module,
+    register_python_module,
+)
 from ..native_views.base import ViewHandler, parse_color_int
 from ..style import (
     Color,
@@ -91,6 +97,7 @@ from ._components import (
     ENTRY_POINT_GROUP,
     Props,
     element_factory,
+    get_desktop_handler,
     get_props_type,
     install_into_registry,
     list_components,
@@ -122,10 +129,18 @@ __all__ = [
     "ENTRY_POINT_GROUP",
     "Props",
     "element_factory",
+    "get_desktop_handler",
     "get_props_type",
     "install_into_registry",
     "list_components",
     "native_component",
     "register_component",
     "unregister_component",
+    # Native-module SDK
+    "NativeModule",
+    "NativeModuleError",
+    "PythonModule",
+    "emit",
+    "native_module",
+    "register_python_module",
 ]

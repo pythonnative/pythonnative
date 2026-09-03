@@ -167,24 +167,61 @@ For the engine alone, build `LayoutNode` trees and call
 
 ## Testing native modules
 
-Native modules call into platform SDKs directly, so unit-testing them
-with the real implementation requires a device. For most app tests
-it's enough to inject a fake at the boundary:
+Off device every native module facade resolves to a Python
+implementation, so `pn.Clipboard`, `pn.SecureStore`, `pn.AsyncStorage`,
+and friends work in `pytest` with in-memory state. To control what a
+module answers, register your own implementation under the module's
+name before the component under test runs:
 
 ```python
-class FakeFs:
-    def __init__(self):
-        self.store = {}
+from pythonnative.native_modules.registry import emit, register_python_module
 
-    def write_text(self, path, content):
-        self.store[path] = content
 
-    def read_text(self, path):
-        return self.store[path]
+class FakeLocation:
+    async def get_current(self, **options):
+        return {"latitude": 59.91, "longitude": 10.75}
+
+
+register_python_module("Location", FakeLocation())
 ```
 
-Pass the fake into your component (via a context, a default argument,
-or a module-level injection) and assert on `store`.
+Methods are matched by name and receive the keyword arguments the
+facade passed. Module events (`AppState` changes, `NetInfo` updates,
+your own module's notifications) can be pushed with
+`emit("NetInfo", "change", {"type": "none", "is_connected": False})`;
+listeners registered through the facades or the `use_*` hooks fire the
+same way they would on device.
+
+Use `unregister_python_module(name)` in a fixture teardown to restore
+the built-in desktop implementation.
+
+## Testing the bridge
+
+The reconciler's on-device backend serializes commits to JSON. To assert
+on what native would receive (or to test a custom component's props at
+the wire level), install a
+[`FakeTransport`][pythonnative.bridge.fake.FakeTransport]: it decodes
+transactions and keeps a native-style view tree, and lets tests inject
+events, module results, and host lifecycle from the "native" side.
+`tests/test_bridge.py` in the repository is the reference for this
+style.
+
+## Testing native code
+
+The Swift and Kotlin halves have their own suites next to the code:
+
+```bash
+cd src/pythonnative/templates/ios_template/PythonNativeKit
+xcodebuild test -scheme PythonNativeKit -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
+
+cd src/pythonnative/templates/android_template
+./gradlew :pythonnative:testDebugUnitTest
+```
+
+Both drive component managers and modules with decoded transactions and
+promise envelopes, so a wire-format change is caught on every side. Add
+cases there when you change a manager or module rather than relying on
+the Maestro E2E suite alone.
 
 ## Testing async code
 

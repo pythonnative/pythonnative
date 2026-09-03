@@ -6,8 +6,15 @@
 //  Python.xcframework is linked at build time, so a missing runtime is
 //  a build error, never a silent runtime fallback.
 //
+//  After the interpreter starts, `pythonnative.bootstrap.start()` binds
+//  the PythonNativeKit C exports, registers the Python callback, and
+//  verifies the protocol version. Everything else (screens, modules,
+//  deep links) flows over that bridge; nothing else here calls Python
+//  functions by name.
+//
 
 import Foundation
+import PythonNativeKit
 
 enum PythonRuntimeError: Error, CustomStringConvertible {
     case startup(String)
@@ -62,25 +69,51 @@ final class PythonRuntime {
 
     private(set) var started = false
     private(set) var startupError: String? = nil
-    private var pendingURLs: [String] = []
 
     private init() {}
 
     // MARK: - Startup
 
-    /// Initialize the embedded interpreter once. Throws with a full
-    /// description when the bundle is not packaged correctly; there is
+    /// Initialize the embedded interpreter once and complete the bridge
+    /// handshake. Throws with a full description when the bundle is not
+    /// packaged correctly or the protocol versions disagree; there is
     /// deliberately no fallback mode.
     func ensureStarted() throws {
-        if started { return }
         if let error = startupError { throw PythonRuntimeError.startup(error) }
+        if started { return }
         do {
             try start()
+            // The interpreter is live from here on; a failed handshake is
+            // recorded as a startup error but Python is never re-initialized.
             started = true
-            flushPendingURLs()
+            try connectBridge()
         } catch let error as PythonRuntimeError {
             startupError = error.description
             throw error
+        }
+    }
+
+    /// Run `pythonnative.bootstrap.start(dev, strict=True)`: it binds the
+    /// `pn_bridge_*` symbols, registers the native -> Python callback,
+    /// verifies the protocol version against `pn_bridge_protocol_version()`,
+    /// routes `print()` to the console, and warms the asyncio runtime.
+    private func connectBridge() throws {
+        #if DEBUG
+        let dev = true
+        #else
+        let dev = false
+        #endif
+        do {
+            try callList(module: "pythonnative.bootstrap", function: "start", [dev, true])
+        } catch let error as PythonRuntimeError {
+            throw PythonRuntimeError.startup(
+                "Bridge bootstrap failed (native protocol v\(pn_bridge_protocol_version())):\n\(error.description)"
+            )
+        }
+        guard PNBridge.shared.hasCallback else {
+            throw PythonRuntimeError.startup(
+                "pythonnative.bridge.handshake() returned without registering the native callback."
+            )
         }
     }
 
@@ -250,16 +283,6 @@ final class PythonRuntime {
         return try Self.invoke(fnObj, args: args, context: "\(module).\(function)")
     }
 
-    /// Like `call`, but logs failures instead of throwing. For host
-    /// notifications where the app must keep running.
-    func notify(module: String, function: String, _ args: Any...) {
-        do {
-            _ = try callList(module: module, function: function, args)
-        } catch {
-            NSLog("[PN] \(module).\(function) failed: \(error)")
-        }
-    }
-
     /// Shared invocation helper. The caller must hold the GIL.
     fileprivate static func invoke(
         _ callable: UnsafeMutablePointer<PyObject>,
@@ -297,26 +320,6 @@ final class PythonRuntime {
             return PyFloat_FromDouble(double)
         default:
             return nil
-        }
-    }
-
-    // MARK: - Deep links
-
-    /// Deliver a deep-link URL to the Python side, buffering it until
-    /// the interpreter is running.
-    func deliverURL(_ url: String) {
-        guard started else {
-            pendingURLs.append(url)
-            return
-        }
-        notify(module: "pythonnative.native_modules.linking", function: "dispatch_url", url)
-    }
-
-    private func flushPendingURLs() {
-        let urls = pendingURLs
-        pendingURLs = []
-        for url in urls {
-            notify(module: "pythonnative.native_modules.linking", function: "dispatch_url", url)
         }
     }
 
@@ -382,16 +385,5 @@ final class PythonRuntime {
             return String(cString: errMsg)
         }
         return "unknown error"
-    }
-}
-
-/// Exported for the Python side: `pythonnative.runtime` wakes the guest
-/// asyncio loop by resolving this symbol via `ctypes.CDLL(None)` and
-/// calling it whenever loop work is scheduled.
-@_cdecl("pn_schedule_render_drain")
-public func pn_schedule_render_drain() {
-    DispatchQueue.main.async {
-        guard PythonRuntime.shared.started else { return }
-        PythonRuntime.shared.notify(module: "pythonnative.hosts", function: "drain_ios_scheduled_renders")
     }
 }

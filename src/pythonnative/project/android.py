@@ -512,9 +512,6 @@ def collect_logcat_filters() -> List[str]:
     return [
         "python.stdout:V",
         "python.stderr:V",
-        "MainActivity:V",
-        "ScreenFragment:V",
-        "Navigator:V",
         "PythonNative:V",
         "AndroidRuntime:E",
         "System.err:W",

@@ -63,8 +63,12 @@ Unsolicited pull requests for issues that are already assigned or already have a
 
 - `src/pythonnative/`: installable library and CLI
   - `pythonnative/`: core cross‑platform UI components and utilities
+  - `bridge/`: JSON codec and per-platform transports into the native rendering core
   - `cli/`: `pn` command
+  - `project/`: config loading, template configuration, native plugin staging, and the builder behind `pn`
   - `templates/`: Android/iOS project templates (bundled with the package)
+    - `ios_template/PythonNativeKit/`: Swift package with the iOS rendering core (component managers, gestures, animations, native modules) and its XCTest target
+    - `android_template/pythonnative/`: Gradle library module with the Android rendering core and its JUnit target
 - `tests/`: unit tests for the library, plus the Maestro E2E suite
   - `e2e/`: the comprehensive E2E suite (see [E2E tests](#e2e-tests-maestro) below and `tests/e2e/AGENTS.md`)
 - `examples/`: runnable example apps
@@ -77,7 +81,8 @@ Unsolicited pull requests for issues that are already assigned or already have a
 
 - Style: Black; lint: Ruff; typing where useful. Keep APIs stable.
 - Prefer explicit, descriptive names; keep platform abstractions clean.
-- Add/extend tests under `tests/` for new behavior.
+- Python never imports platform code. Everything that touches `UIView` or `android.view.View` lives in Swift (`PythonNativeKit`) or Kotlin (the `pythonnative` Gradle module) and is reached through `pythonnative.bridge`; see `docs/concepts/bridge.md` for the protocol. Bump `PROTOCOL_VERSION` on both sides when the wire format changes.
+- Add/extend tests under `tests/` for new behavior. Native changes get XCTest / JUnit coverage next to the code they touch.
 - Don't commit generated artifacts or large binaries; templates live under `src/pythonnative/templates/`.
 - Docstrings: Google style throughout. Ruff is configured with the Google
   convention (`pydocstyle.convention = "google"`) and enforces the `D` rule
@@ -94,6 +99,10 @@ uv run pytest -q                # run tests
 uv run ruff check .             # lint
 uv run black src examples tests # format
 uv run --group docs mkdocs serve # preview the docs site locally
+
+# native rendering core (macOS with Xcode for the Swift package; JDK 17 for Gradle)
+(cd src/pythonnative/templates/ios_template/PythonNativeKit && xcodebuild test -scheme PythonNativeKit -destination 'platform=iOS Simulator,name=iPhone 15 Pro')
+(cd src/pythonnative/templates/android_template && ./gradlew :pythonnative:testDebugUnitTest)
 ```
 
 ## Conventional Commits
@@ -132,6 +141,8 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
 - Module/directory scopes:
   - `alerts`: imperative Alert/Picker helpers (`alerts.py`)
   - `animated`: Animated namespace and animation primitives (`animated.py`)
+  - `bootstrap`: on-device runtime start-up called by the templates (`bootstrap.py`)
+  - `bridge`: wire codec, transports, handshake, and native-to-Python callback (`bridge/`)
   - `cli`: CLI tool and `pn` command (`src/pythonnative/cli/`)
   - `component`: the `@component` decorator, `Component`, and `memo` (`component.py`)
   - `components`: declarative element-creating functions (`components/`)
@@ -139,17 +150,18 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `events`: tag-based event routing between native views and Python callbacks (`events.py`)
   - `gestures`: gesture descriptors and the pure-Python recognition arbiter (`gestures.py`)
   - `hooks`: hooks and contexts (`hooks.py`)
-  - `hosts`: screen hosts, native lifecycle bridge, and render scheduling (`hosts/`)
+  - `hosts`: screen hosts, lifecycle forwarding, and render scheduling (`hosts/`)
   - `hot_reload`: file watcher and module reloader (`hot_reload.py`)
   - `layout`: pure-Python flexbox engine (`layout.py`)
   - `mutations`: batched mutation ops between reconciler and native backends (`mutations.py`)
-  - `native_modules`: native API modules for device capabilities (`native_modules/`)
-  - `native_views`: platform-specific native view creation and updates (`native_views/`)
+  - `native_modules`: native module registry, Python facades, and desktop implementations (`native_modules/`)
+  - `native_views`: view registry protocol, bridge backend, and desktop handlers (`native_views/`)
   - `navigation`: navigation state, container, navigators, hooks, and linking (`navigation/`)
   - `net`: awaitable HTTP client (`net.py`)
   - `package`: `src/pythonnative/__init__.py` exports and package boundary
   - `platform`: `Platform.OS`/`Platform.select` and version detection (`platform.py`)
   - `platform_metrics`: platform-reported metrics like safe-area insets and bar heights (`platform_metrics.py`)
+  - `project`: `pythonnative.toml` config, template configurators, plugin staging, and the builder (`project/`)
   - `reconciler`: virtual view tree diffing, boundaries, and the layout pass (`reconciler/`)
   - `runtime`: framework-wide asyncio loop and thread-safe future helpers (`runtime.py`)
   - `sdk`: public extension SDK for custom native components (`sdk/`)
@@ -167,6 +179,8 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `repo`: repository metadata and top‑level files (`README.md`, `CONTRIBUTING.md`, `.gitignore`, licenses)
   - `scripts`: developer scripts under `scripts/` (e.g., `check.sh`)
   - `templates`: Android/iOS project templates under `src/pythonnative/templates/`
+  - `kit`: the Swift rendering core (`templates/ios_template/PythonNativeKit/`)
+  - `runtime-android`: the Kotlin rendering core (`templates/android_template/pythonnative/`)
   - `tests`: unit/integration/E2E tests under `tests/`
   - `workflows`: CI pipelines under `.github/workflows/`
 

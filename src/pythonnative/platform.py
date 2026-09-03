@@ -43,31 +43,35 @@ def _detect_os() -> str:
 def _detect_version() -> str:
     """Return a human-readable platform version string.
 
-    On iOS, reads the Simulator/device's reported OS version. On
-    Android, reads ``Build.VERSION.RELEASE``. Off-device (the test
+    On device this asks the native ``Device`` module (``UIDevice
+    .systemVersion`` / ``Build.VERSION.RELEASE``). Off-device (the test
     environment), returns the host Python's version so user code can
     still introspect *something*.
     """
-    if IS_IOS:
+    if IS_IOS or IS_ANDROID:
         try:
-            from rubicon.objc import ObjCClass
+            from .native_modules.registry import native_module
 
-            UIDevice = ObjCClass("UIDevice")
-            return str(UIDevice.currentDevice.systemVersion)
+            info = native_module("Device").call("info")
+            if isinstance(info, dict) and info.get("os_version"):
+                return str(info["os_version"])
         except Exception:
             pass
         sim_version = os.environ.get("SIMULATOR_RUNTIME_VERSION")
         if sim_version:
             return sim_version
-    if IS_ANDROID:
-        try:
-            from java import jclass
-
-            Build = jclass("android.os.Build$VERSION")
-            return str(Build.RELEASE)
-        except Exception:
-            pass
     return f"python-{sys.version_info.major}.{sys.version_info.minor}"
+
+
+class _LazyVersion:
+    """Resolve ``Platform.Version`` on first access (it needs the bridge on device)."""
+
+    _value: Optional[str] = None
+
+    def __get__(self, obj: object, owner: Optional[type] = None) -> str:
+        if _LazyVersion._value is None:
+            _LazyVersion._value = _detect_version()
+        return _LazyVersion._value
 
 
 class Platform:
@@ -82,7 +86,7 @@ class Platform:
     OS: str = _detect_os()
     """``"ios"``, ``"android"``, ``"desktop"``, or ``"test"``."""
 
-    Version: str = _detect_version()
+    Version: str = _LazyVersion()  # type: ignore[assignment]
     """Best-effort OS version string (``"17.4"``, ``"14"``, ``"python-3.11"``)."""
 
     is_ios: bool = IS_IOS

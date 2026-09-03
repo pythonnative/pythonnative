@@ -2,11 +2,9 @@
 
 PythonNative is a cross-platform toolkit for building native **Android**
 and **iOS** apps in plain Python. The component model is React-style
-(function components plus hooks plus a reconciler); the runtime calls
-into the platform's real widget libraries directly via
-[Chaquopy](https://chaquo.com/chaquopy/) on Android and
-[rubicon-objc](https://rubicon-objc.readthedocs.io/) on iOS. There is
-no JavaScript bridge.
+(function components plus hooks plus a reconciler); rendering and
+device APIs are native Swift and Kotlin, driven over a small bridge
+with one transaction per commit. There is no JavaScript anywhere.
 
 ## A taste
 

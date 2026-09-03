@@ -31,6 +31,9 @@ splash = "assets/splash.png"    # splash / launch image
 [requirements]
 packages = ["humanize", "httpx"]
 
+[plugins]
+# paths = ["native/my_plugin"]  # project-local Swift/Kotlin plugins
+
 [ios]
 deployment_target = "13.0"
 development_team = "ABCDE12345"
@@ -143,6 +146,28 @@ packages = ["humanize", "httpx>=0.27"]
 C-extension packages need wheels built for the target architectures
 (`arm64-v8a`/`armeabi-v7a` on Android; `arm64`/`x86_64` for the iOS
 Simulator). Many popular extensions have no upstream mobile wheels yet.
+
+---
+
+## `[plugins]`
+
+| Key | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `paths` | list of strings | `[]` | Project-relative directories containing a native plugin (`pn_plugin.json` plus `ios/` and `android/` sources). |
+
+```toml
+[plugins]
+paths = ["native/badge"]
+```
+
+Native plugins add Swift and Kotlin component managers and native
+modules to the app. Installed packages contribute theirs through the
+`pythonnative.plugins` entry point group automatically; `paths` is for
+native code that lives in the app repository itself. At build time each
+plugin's `ios/*.swift` is copied into `PythonNativeKit` and its
+`android/**/*.kt` into the `pythonnative` Gradle module, and the
+generated registration file calls every plugin's `register`. See
+[Custom native components](custom-native-components.md).
 
 ---
 

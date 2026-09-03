@@ -3,12 +3,13 @@
 Native modules are PythonNative's wrappers around device APIs that
 aren't part of the view tree: the camera, GPS, file I/O, clipboard,
 share sheet, deep links, permissions, connectivity, secure storage,
-battery, haptics, and biometrics. Each module is implemented twice
-(once per platform) and dispatches at runtime based on
-`utils.IS_ANDROID` / `utils.IS_IOS`, so app code stays single-source.
-Off-device (desktop), each module falls back to a safe default
-(in-memory buffers, `"unknown"` states, no-op feedback) so the same
-code runs in the desktop mock and in unit tests.
+battery, haptics, and biometrics. Each module is a Swift class in
+`PythonNativeKit` and a Kotlin class in the `pythonnative` Gradle
+module, registered by name; the Python class you call is a thin facade
+that routes through the [native bridge](../concepts/bridge.md). Off
+device (`pn preview`, `pytest`), the same facade resolves to a Python
+implementation with safe defaults (in-memory buffers, `"unknown"`
+states, no-op feedback), so app code stays single-source.
 
 Both synchronous and coroutine APIs exist, chosen to match the
 underlying platform call:
@@ -331,51 +332,160 @@ async def unlock():
 
 ## Writing your own native module
 
-A native module is just a class with two implementations behind a
-runtime dispatch. The built-in modules above all follow this shape.
-Coroutine wrappers should bridge native delegates through the
-[`pn.runtime`](../api/runtime.md) helpers:
+A native module has three parts: a Swift class, a Kotlin class, and a
+Python facade. The two native classes are registered under one name by
+a plugin entry (the same `pn_plugin.json` layout used for
+[custom components](custom-native-components.md)); the facade calls
+them by that name and never imports platform code.
+
+### Native side
+
+Each platform's base type is one method that settles a promise:
+
+```swift
+// native/ios/CompassModule.swift
+import CoreLocation
+import PythonNativeKit
+
+public final class CompassModule: NSObject, PNNativeModule, CLLocationManagerDelegate {
+    public static let name = "Compass"
+    private let manager = CLLocationManager()
+    private var pending: PNPromise?
+
+    public override required init() {
+        super.init()
+        manager.delegate = self
+    }
+
+    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
+        switch method {
+        case "is_available":
+            promise.resolve(CLLocationManager.headingAvailable())
+        case "heading":
+            pending = promise               // settled later from the delegate
+            manager.startUpdatingHeading()
+        default:
+            promise.reject("Compass has no method '\(method)'", code: "unknown_method")
+        }
+    }
+
+    public func locationManager(_ manager: CLLocationManager, didUpdateHeading heading: CLHeading) {
+        manager.stopUpdatingHeading()
+        pending?.resolve(heading.trueHeading)
+        pending = nil
+    }
+}
+```
+
+```kotlin
+// native/android/com/example/compass/CompassModule.kt
+package com.example.compass
+
+import com.pythonnative.runtime.modules.NativeModule
+import com.pythonnative.runtime.modules.Promise
+import org.json.JSONObject
+
+class CompassModule : NativeModule {
+    override val name = "Compass"
+
+    override fun call(method: String, args: JSONObject, promise: Promise) {
+        when (method) {
+            "is_available" -> promise.resolve(true)
+            "heading" -> readHeadingOnce { degrees -> promise.resolve(degrees) }
+            else -> promise.rejectUnknownMethod(method)
+        }
+    }
+}
+```
+
+Settling the promise before `call` returns answers Python inline (a
+plain synchronous return). Settling it later, from any thread, delivers
+the result through the bridge's event channel on the main thread. Push
+unsolicited events with `PNModuleEvents.emit(module:event:payload:)` /
+`ModuleEvents.emit(module, event, payload)`.
+
+Register both in the plugin entry next to any component managers:
+
+```swift
+registry.registerModule(CompassModule.self)
+```
+
+```kotlin
+registry.registerModule { CompassModule() }
+```
+
+### Python facade
 
 ```python
-import asyncio
+# compass/__init__.py
+from typing import Optional
 
-from pythonnative.runtime import resolve_future
-from pythonnative.utils import IS_ANDROID, IS_IOS
+from pythonnative.native_modules.registry import native_module
+
+_compass = native_module("Compass")
 
 
 class Compass:
     @staticmethod
+    def is_available() -> bool:
+        return bool(_compass.call("is_available"))
+
+    @staticmethod
     async def heading() -> float:
-        loop = asyncio.get_running_loop()
-        future: asyncio.Future[float] = loop.create_future()
+        return float(await _compass.call_async("heading"))
 
-        if IS_ANDROID:
-            from java import jclass  # noqa: F401
-
-            from pythonnative.utils import get_android_context
-
-            ctx = get_android_context()
-            # ... subscribe to the SensorManager and resolve_future(future, deg)
-            resolve_future(future, 0.0)
-        elif IS_IOS:
-            from rubicon.objc import ObjCClass  # noqa: F401
-
-            # ... start CLLocationManager heading updates, resolve on the first fix
-            resolve_future(future, 0.0)
-        else:
-            resolve_future(future, 0.0)  # desktop fallback
-
-        return await future
+    @staticmethod
+    def add_listener(callback) -> callable:
+        return _compass.add_listener("change", callback)
 ```
 
-Keep platform imports inside the platform branch so the desktop
-import path doesn't pull in Chaquopy or rubicon-objc. Prefer a safe
-desktop fallback (a default value / no-op) over raising, so the same
-code stays runnable in the desktop mock and in unit tests.
+`call` is for methods that answer inline; it raises
+[`NativeModuleError`][pythonnative.native_modules.registry.NativeModuleError]
+when native rejects. `call_async` awaits methods that settle later.
+`add_listener` subscribes to module events and returns an unsubscribe
+callable.
+
+### Desktop and test implementation
+
+`native_module("Compass")` returns a
+[`BridgeModule`][pythonnative.native_modules.registry.BridgeModule] on
+device. Off device it looks for a Python implementation registered
+under the same name, so register one for `pn preview` and unit tests:
+
+```python
+from pythonnative.native_modules.registry import register_python_module
+
+
+class DesktopCompass:
+    def is_available(self) -> bool:
+        return False
+
+    def heading(self) -> float:
+        return 0.0
+
+
+register_python_module("Compass", DesktopCompass())
+```
+
+Methods are looked up by name and called with the same keyword
+arguments the facade passed; a coroutine function is awaited by
+`call_async`. Packages register their desktop implementations through
+the `pythonnative.modules` entry point group so they are found without
+an explicit import:
+
+```toml
+[project.entry-points."pythonnative.modules"]
+compass = "compass.desktop"
+```
+
+Tests can push module events directly with
+[`emit`][pythonnative.native_modules.registry.emit] to exercise
+listeners without a device.
 
 ## Next steps
 
 - Reference: [Native modules API](../api/native_modules.md).
 - Async hooks and data fetching: [Async + data](async.md).
 - See how device APIs interact with focus: [Lifecycle](../concepts/lifecycle.md).
-- Wrap a custom widget instead of an API: [Native views](../concepts/native-views.md).
+- Wrap a custom widget instead of an API: [Custom native components](custom-native-components.md).
+- Wire protocol and plugin layout: [The native bridge](../concepts/bridge.md).

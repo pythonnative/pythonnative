@@ -26,7 +26,7 @@
 
 ## Overview
 
-PythonNative is a cross-platform toolkit for building native Android and iOS apps in Python. It provides a **declarative, React-like component model** with hooks and automatic reconciliation, powered by Chaquopy on Android and rubicon-objc on iOS. Write function components with `use_state`, `use_effect`, and friends, just like React, and let PythonNative handle creating and updating native views.
+PythonNative is a cross-platform toolkit for building native Android and iOS apps in Python. It provides a **declarative, React-like component model** with hooks and automatic reconciliation on top of a **native rendering core** written in Swift and Kotlin. Write function components with `use_state`, `use_effect`, and friends, just like React, and let PythonNative handle creating and updating native views.
 
 ## Features
 
@@ -42,7 +42,7 @@ PythonNative is a cross-platform toolkit for building native Android and iOS app
 - **Native-driven animations:** The `Animated` API (timing / spring / decay / loop / stagger, awaitable or fire-and-forget) hands animations to Core Animation and `ViewPropertyAnimator` whenever possible, so no Python code runs per frame; a pure-Python ticker covers the rest. `interpolate`, arithmetic operators on animated nodes, `Animated.event` scroll binding, and `diff_clamp` cover the scroll-driven patterns (collapsing headers, parallax) that define native feel.
 - **Native gesture system:** Attach `Tap`, `LongPress`, `Pan`, `Swipe`, `Fling`, `Pinch`, and `Rotation` recognizers to any view via the `gestures=` prop, backed by `UIGestureRecognizer` on iOS and a unit-testable pure-Python arbiter on Android and desktop. Compose them with `Race`, `Exclusive`, and `Simultaneous` for cross-gesture arbitration (single vs. double tap, drag vs. long press).
 - **Virtualized lists:** `FlatList` / `SectionList` window their rows in Python over the platform scroll view: uniform, exact, or measured variable heights, grids, headers/footers, infinite scroll, and an imperative scroll controller, identical on every platform.
-- **Direct native bindings:** Python calls platform APIs directly through Chaquopy and rubicon-objc, with no JavaScript bridge.
+- **Native rendering core:** each commit is one serialized transaction applied by Swift and Kotlin component managers, the same shape as React Native's Fabric. Device APIs are native modules registered by name (TurboModules-style), callable from thin Python facades.
 - **Custom-component SDK:** Wrap any platform widget as a first-class element with type-checked props via `pythonnative.sdk` (`Props`, `@native_component`, `element_factory`). Plugins distributed on PyPI auto-register through the `pythonnative.handlers` entry-point group.
 - **CLI scaffolding:** `pn init` creates a ready-to-run project; `pn run android` and `pn run ios` build and launch your app.
 - **Instant desktop preview:** `pn preview` renders your app in a native desktop window via Tkinter with Fast Refresh on every save: iterate on layout, state, and navigation in milliseconds without booting a simulator or device. The reconciler, hooks, layout engine, and navigation are the same code that ships to the phone.

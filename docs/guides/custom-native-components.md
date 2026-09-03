@@ -1,220 +1,270 @@
 # Custom native components
 
-PythonNative ships a public extension SDK,
-[`pythonnative.sdk`](../api/sdk.md), that lets you wrap a real
-platform widget (a `UIView` subclass on iOS, a `View` subclass on
-Android) and expose it to user code as a first-class element with
-type-checked props. Custom components participate in reconciliation,
-flex layout, and Fast Refresh exactly like the built-ins.
+PythonNative renders through native **component managers**: a Swift
+`PNComponentManager` in `PythonNativeKit` and a Kotlin `ComponentManager`
+in the `pythonnative` Gradle module own every `UIView` and
+`android.view.View`. Python owns the element tree, reconciliation, and
+layout, and ships each commit to native as one transaction (see
+[The native bridge](../concepts/bridge.md)).
 
-This guide walks through the four-file shape of a typical component
-(typed props, iOS handler, Android handler, registration) and shows
-how to ship one as an installable PyPI plugin.
+Adding your own component means writing one manager per platform,
+registering both under an element name, and giving Python a typed
+factory for it. Custom components then participate in reconciliation,
+flex layout, gestures, animations, and Fast Refresh exactly like the
+built-ins.
 
-## Why an SDK?
+This guide builds a small `Badge` widget end to end and shows how to
+ship it as an installable PyPI plugin.
 
-Before the SDK, custom widgets were a monkey-patching exercise:
-construct a `ViewHandler` subclass, reach into the global
-[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry],
-and define your own ad-hoc element factory by hand. There was no
-contract for prop validation, no entry point for third-party
-plugins, and `mypy` couldn't help you.
+## The pieces
 
-The SDK fixes that:
+| Piece | Where | Role |
+|---|---|---|
+| `Props` dataclass | Python | Declares the props your component accepts, with types and defaults. |
+| `PNComponentManager` subclass | Swift (`ios/`) | Creates the `UIView`, applies props, measures, handles commands. |
+| `ComponentManager` subclass | Kotlin (`android/`) | Same for `android.view.View`. |
+| `PNPlugin` entry | Swift and Kotlin | Registers the managers (and any native modules) by name. |
+| `pn_plugin.json` | Plugin root | Tells `pn build` which entry to call on each platform. |
+| `register_component` + `element_factory` | Python | Declares the element name and exposes the typed factory. |
+| Desktop `ViewHandler` (optional) | Python | Tkinter fallback so `pn preview` and tests can render the component. |
 
-- A frozen [`Props`][pythonnative.sdk._components.Props] dataclass
-  declares every prop your component accepts, with types, defaults,
-  and IDE autocomplete.
-- A [`@native_component`][pythonnative.sdk._components.native_component]
-  decorator registers your handlers under a unique element name.
-- An [`element_factory`][pythonnative.sdk._components.element_factory]
-  turns that registration into a callable users invoke like any
-  other built-in.
-- Discovery via the `pythonnative.handlers` entry-point group (see
-  [`ENTRY_POINT_GROUP`][pythonnative.sdk._components.ENTRY_POINT_GROUP])
-  lets your component appear automatically when users `pip install`
-  your package.
+Layout stays in Python: managers never read `flex`, `margin`, or
+`padding`. They receive absolute frames through `setFrame` and answer
+`measure` for content-sized leaves.
 
-## A worked example: `Badge`
+## Project layout
 
-We'll build a small widget that draws a coloured pill with a centred
-label, useful for unread counts, status chips, etc. The same
-project layout works for anything from a chart view to a camera
-preview.
+```text
+my_badge/
+    pyproject.toml
+    my_badge/
+        __init__.py          # Props, register_component, Badge factory
+        desktop.py           # optional ViewHandler for pn preview
+        native/
+            __init__.py      # empty; makes the directory importable
+            pn_plugin.json
+            ios/
+                BadgeManager.swift
+                MyBadgePlugin.swift
+            android/
+                com/example/badge/
+                    BadgeManager.kt
+                    MyBadgePlugin.kt
+```
 
-### 1. Define typed props
+## 1. Typed props
 
-Create `my_pkg/badge_props.py`:
+`my_badge/__init__.py`:
 
 ```python
 from dataclasses import dataclass
 from typing import Optional
 
 import pythonnative as pn
-from pythonnative.sdk import Props
+from pythonnative.sdk import Props, element_factory, register_component
 
 
 @dataclass(frozen=True)
 class BadgeProps(Props):
     """Visible state of a Badge.
 
-    All fields default so callers can pass only the props they care
-    about. ``style`` is the standard ``StyleProp`` accepted by every
-    built-in factory.
+    Every field defaults so callers pass only what they care about.
+    ``style`` is the standard ``StyleProp`` accepted by every built-in.
     """
 
     text: str = ""
     color: str = "#FF3B30"
     text_color: str = "#FFFFFF"
     style: Optional[pn.StyleProp] = None
-```
-
-`Props` is a frozen dataclass; instances are immutable so equality
-diffing in the reconciler stays cheap.
-
-### 2. Implement the iOS handler
-
-`my_pkg/badge_ios.py` runs only when `IS_IOS` is true. It uses
-[rubicon-objc](https://rubicon-objc.readthedocs.io/) to wrap a
-`UIView` containing a `UILabel`:
-
-```python
-from typing import Any, Dict
-
-from rubicon.objc import ObjCClass
-
-from pythonnative.sdk import ViewHandler, native_component
-from .badge_props import BadgeProps
-
-UIView = ObjCClass("UIView")
-UILabel = ObjCClass("UILabel")
-UIColor = ObjCClass("UIColor")
 
 
-def _hex_to_uicolor(hex_str: str) -> Any:
-    s = hex_str.lstrip("#")
-    if len(s) == 6:
-        a = 1.0
-        r, g, b = int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16)
-    else:  # 8-char AARRGGBB
-        a = int(s[0:2], 16) / 255.0
-        r, g, b = int(s[2:4], 16), int(s[4:6], 16), int(s[6:8], 16)
-    return UIColor.colorWithRed_green_blue_alpha_(r / 255, g / 255, b / 255, a)
-
-
-@native_component("Badge", props=BadgeProps, platforms=("ios",))
-class IOSBadgeHandler(ViewHandler):
-    def create(self, tag: int, props: Dict[str, Any]) -> Any:
-        view = UIView.alloc().init()
-        view.layer.cornerRadius = 12
-        label = UILabel.alloc().init()
-        label.textAlignment = 1  # NSTextAlignmentCenter
-        view.addSubview_(label)
-        view._pn_label = label
-        self.update(view, props)
-        return view
-
-    def update(self, view: Any, changed: Dict[str, Any]) -> None:
-        if "color" in changed:
-            view.backgroundColor = _hex_to_uicolor(changed["color"])
-        if "text" in changed:
-            view._pn_label.text = changed["text"]
-        if "text_color" in changed:
-            view._pn_label.textColor = _hex_to_uicolor(changed["text_color"])
-
-    def set_frame(self, view: Any, x: float, y: float, w: float, h: float) -> None:
-        view.frame = ((x, y), (w, h))
-        view._pn_label.frame = ((0, 0), (w, h))
-
-    def measure_intrinsic(self, view: Any, max_w: float, max_h: float) -> tuple[float, float]:
-        size = view._pn_label.sizeThatFits_((max_w - 24, max_h))
-        return (float(size.width) + 24.0, float(size.height) + 8.0)
-```
-
-### 3. Implement the Android handler
-
-`my_pkg/badge_android.py` runs only when `IS_ANDROID` is true. It
-uses [Chaquopy](https://chaquo.com/chaquopy/) to wrap a `TextView`
-inside a `FrameLayout`:
-
-```python
-from typing import Any, Dict
-
-from java import jclass
-
-from pythonnative.sdk import ViewHandler, native_component
-from pythonnative.utils import get_android_context
-from .badge_props import BadgeProps
-
-FrameLayout = jclass("android.widget.FrameLayout")
-TextView = jclass("android.widget.TextView")
-GradientDrawable = jclass("android.graphics.drawable.GradientDrawable")
-Color = jclass("android.graphics.Color")
-Gravity = jclass("android.view.Gravity")
-
-
-@native_component("Badge", props=BadgeProps, platforms=("android",))
-class AndroidBadgeHandler(ViewHandler):
-    def create(self, tag: int, props: Dict[str, Any]) -> Any:
-        ctx = get_android_context()
-        container = FrameLayout(ctx)
-        bg = GradientDrawable()
-        bg.setShape(GradientDrawable.RECTANGLE)
-        bg.setCornerRadius(24.0)
-        container.setBackground(bg)
-        label = TextView(ctx)
-        label.setGravity(Gravity.CENTER)
-        container.addView(label)
-        container._pn_label = label
-        container._pn_bg = bg
-        self.update(container, props)
-        return container
-
-    def update(self, view: Any, changed: Dict[str, Any]) -> None:
-        if "color" in changed:
-            view._pn_bg.setColor(Color.parseColor(changed["color"]))
-        if "text" in changed:
-            view._pn_label.setText(changed["text"])
-        if "text_color" in changed:
-            view._pn_label.setTextColor(Color.parseColor(changed["text_color"]))
-```
-
-The `set_frame` and `measure_intrinsic` shapes are identical to the
-built-in handlers; see
-[Native views](../concepts/native-views.md) for the full protocol.
-
-The `tag` argument is the view's stable identity in the mutation
-protocol. Handlers that fire events use it to dispatch back into
-Python: wire the platform listener once in `create` and call
-[`dispatch_event(tag, "on_change", value)`][pythonnative.events.dispatch_event];
-the reconciler keeps the `(tag, name) -> callback` registry up to date
-across re-renders without any further native calls.
-
-### 4. Wire it into your project
-
-`my_pkg/__init__.py` imports the right module based on the active
-runtime and exposes a typed factory:
-
-```python
-from pythonnative.sdk import element_factory
-from pythonnative.utils import IS_ANDROID, IS_IOS
-
-if IS_ANDROID:
-    from . import badge_android  # noqa: F401  # registers AndroidBadgeHandler
-elif IS_IOS:
-    from . import badge_ios  # noqa: F401  # registers IOSBadgeHandler
-
+register_component(name="Badge", props=BadgeProps)
 Badge = element_factory("Badge")
 ```
 
-Users now write:
+`Props` is a frozen dataclass, so the reconciler's equality diff stays
+cheap. `register_component` declares the element name; the factory
+validates kwargs against `BadgeProps`, resolves `style` through
+[`resolve_style`][pythonnative.style.resolve_style], and returns a
+regular [`Element`][pythonnative.Element].
+
+Props cross the bridge as JSON. Stick to strings, numbers, booleans,
+lists, and dicts; callables become events (see below) and anything else
+is dropped with a warning.
+
+## 2. The Swift manager
+
+`native/ios/BadgeManager.swift`:
+
+```swift
+import PythonNativeKit
+import UIKit
+
+final class BadgeView: UIView {
+    let label = UILabel()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        layer.cornerRadius = 12
+        clipsToBounds = true
+        label.textAlignment = .center
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        addSubview(label)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        label.frame = bounds
+    }
+}
+
+public final class BadgeManager: PNComponentManager {
+    public override func makeView(props: [String: Any]) -> UIView {
+        BadgeView(frame: .zero)
+    }
+
+    public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        super.apply(view: view, props: props, initial: initial)  // background, border, opacity, ...
+        guard let badge = view as? BadgeView else { return }
+        if let text = PNProps.string(props["text"]) { badge.label.text = text }
+        if let color = PNProps.string(props["color"]) { badge.backgroundColor = PNColor.parse(color) }
+        if let textColor = PNProps.string(props["text_color"]) { badge.label.textColor = PNColor.parse(textColor) }
+    }
+
+    public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize {
+        guard let badge = view as? BadgeView else { return .zero }
+        let fit = badge.label.sizeThatFits(CGSize(width: max(0, maxW - 24), height: maxH))
+        return CGSize(width: fit.width + 24, height: fit.height + 8)
+    }
+}
+```
+
+`apply` receives the full props on create (`initial == true`) and only
+the changed keys on update; a removed prop arrives as `NSNull`. Call
+`mergedProps(view)` when you need the complete current set.
+
+## 3. The Kotlin manager
+
+`native/android/com/example/badge/BadgeManager.kt`:
+
+```kotlin
+package com.example.badge
+
+import android.content.Context
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
+import android.view.View
+import android.widget.TextView
+import com.pythonnative.runtime.components.ComponentManager
+import com.pythonnative.runtime.components.PNColor
+import org.json.JSONObject
+
+class BadgeManager : ComponentManager() {
+    override fun createView(context: Context, tag: Long, props: JSONObject): View =
+        TextView(context).apply {
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply { cornerRadius = 12 * resources.displayMetrics.density }
+        }
+
+    override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        super.applyProps(view, props, initial)
+        val badge = view as TextView
+        if (props.has("text")) badge.text = props.optString("text")
+        if (props.has("color")) (badge.background as GradientDrawable).setColor(PNColor.parse(props.optString("color")))
+        if (props.has("text_color")) badge.setTextColor(PNColor.parse(props.optString("text_color")))
+    }
+
+    override fun measure(view: View, maxWidth: Double, maxHeight: Double): FloatArray {
+        val base = super.measure(view, maxWidth, maxHeight)
+        return floatArrayOf(base[0] + 24f, base[1] + 8f)
+    }
+}
+```
+
+Geometry on Android is in **dp** on both sides of the bridge; the base
+class converts to pixels in `setFrame` and back in `measure`.
+
+## 4. Register both in a plugin entry
+
+`native/ios/MyBadgePlugin.swift`:
+
+```swift
+import PythonNativeKit
+
+public enum MyBadgePlugin: PNPlugin {
+    public static func register(into registry: PNRegistry) {
+        registry.registerComponent("Badge") { BadgeManager() }
+    }
+}
+```
+
+`native/android/com/example/badge/MyBadgePlugin.kt`:
+
+```kotlin
+package com.example.badge
+
+import com.pythonnative.runtime.bridge.PNPlugin
+import com.pythonnative.runtime.bridge.PNRegistry
+
+object MyBadgePlugin : PNPlugin {
+    override fun register(registry: PNRegistry) {
+        registry.registerComponent("Badge") { BadgeManager() }
+    }
+}
+```
+
+`native/pn_plugin.json`:
+
+```json
+{
+  "ios": {"entry": "MyBadgePlugin"},
+  "android": {"entry": "com.example.badge.MyBadgePlugin"}
+}
+```
+
+A plugin may declare only one platform; the component then renders as a
+labelled placeholder on the other.
+
+## 5. Tell `pn build` about the plugin
+
+Point the `pythonnative.plugins` entry point at the directory holding
+`pn_plugin.json`, and the `pythonnative.handlers` entry point at the
+Python module that calls `register_component`:
+
+```toml
+[project.entry-points."pythonnative.plugins"]
+my_badge = "my_badge.native"
+
+[project.entry-points."pythonnative.handlers"]
+my_badge = "my_badge"
+```
+
+`pn build` (and `pn run`) copies `ios/*.swift` into
+`PythonNativeKit/Sources/PythonNativeKit/Plugins/my_badge/` and
+`android/**/*.kt` into the `pythonnative` Gradle module, then regenerates
+the registration file that calls `MyBadgePlugin.register` on each
+platform. SwiftPM and Gradle compile whatever lands there; no Xcode or
+Gradle project edits are involved.
+
+For native code that lives inside an app rather than a package, list
+the directory in `pythonnative.toml` instead of an entry point:
+
+```toml
+[plugins]
+paths = ["native/badge"]
+```
+
+## 6. Use it
 
 ```python
 import pythonnative as pn
-from my_pkg import Badge
+from my_badge import Badge
+
 
 @pn.component
-def NotificationsButton():
+def InboxRow():
     count, _ = pn.use_state(3)
     return pn.Row(
         pn.Text("Inbox"),
@@ -223,111 +273,125 @@ def NotificationsButton():
     )
 ```
 
-`Badge(...)` validates kwargs against `BadgeProps`, resolves the
-`style` argument through [`resolve_style`][pythonnative.style.resolve_style],
-and returns a regular [`Element`][pythonnative.Element].
+## Events
+
+Callable props never cross the bridge. When a `Badge(on_press=...)`
+element is created, Python strips the callback into the process-wide
+[`EventRegistry`][pythonnative.events.EventRegistry] and sends the prop
+`_pn_events: ["on_press"]` instead. The manager wires a listener once
+and fires by tag:
+
+```swift
+// Swift: inside createView / didCreate
+badge.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped(_:))))
+
+@objc private func tapped(_ recognizer: UITapGestureRecognizer) {
+    guard let view = recognizer.view else { return }
+    PNEvents.emitIfWired(view, "on_press")
+}
+```
+
+```kotlin
+// Kotlin
+view.setOnClickListener { PNEvents.fire(it, "on_press") }
+```
+
+The payload is a positional argument list, so `PNEvents.emit(view,
+"on_change", [newText])` calls `on_change(new_text)` in Python. A
+re-render that only swaps the lambda costs zero native calls.
+
+## Commands
+
+Imperative actions (`focus`, `scroll_to_offset`, ...) arrive through
+`command(view:name:args:)`. Return a JSON-encodable value or `nil`:
+
+```swift
+public override func command(view: UIView, name: String, args: [String: Any]) -> Any? {
+    switch name {
+    case "pulse": (view as? BadgeView)?.pulse(); return nil
+    default: return super.command(view: view, name: name, args: args)
+    }
+}
+```
+
+Python reaches it through the tag the reconciler publishes on a `ref`:
+
+```python
+from pythonnative.native_views import get_registry
+
+badge_ref = pn.use_ref(None)
+...
+get_registry().command(badge_ref._pn_tag, "pulse")
+```
+
+## Desktop preview and tests
+
+`pn preview` and `pythonnative.testing` never load Swift or Kotlin.
+Register a Python [`ViewHandler`][pythonnative.sdk.ViewHandler] so the
+component renders off device; the `@native_component` decorator does
+this and declares the element in one step:
+
+```python
+# my_badge/desktop.py
+import tkinter as tk
+
+from pythonnative.sdk import ViewHandler, native_component
+
+from . import BadgeProps
+
+
+@native_component("Badge", props=BadgeProps)
+class DesktopBadgeHandler(ViewHandler):
+    def create(self, tag, props):
+        label = tk.Label(text=props.get("text", ""), bg=props.get("color", "#FF3B30"))
+        return label
+
+    def update(self, view, changed):
+        if "text" in changed:
+            view.configure(text=changed["text"] or "")
+
+    def set_frame(self, view, x, y, width, height):
+        view.place(x=x, y=y, width=width, height=height)
+
+    def measure_intrinsic(self, view, max_w, max_h):
+        return (float(view.winfo_reqwidth()), float(view.winfo_reqheight()))
+```
+
+Without a desktop handler the component still validates props and
+takes part in layout; it just renders as an empty box in the preview.
+
+Unit tests use the recording backend from
+[`pythonnative.testing`](../api/testing.md):
+
+```python
+from pythonnative.testing import render
+from my_badge import Badge
+
+
+def test_badge_renders_text() -> None:
+    result = render(Badge(text="3"))
+    badge = result.get_by_type("Badge")
+    assert badge.props["text"] == "3"
+```
+
+Native managers get their own tests: `PythonNativeKit` ships an XCTest
+target and the Gradle module a JUnit target, both driving managers with
+decoded transactions. See [Testing](testing.md).
 
 ## Validation rules
-
-The factory enforces a strict contract on its arguments:
 
 | Call site | Result |
 |---|---|
 | `Badge(text="3")` | Validated against `BadgeProps`. Unknown fields raise `TypeError`. |
 | `Badge(props=BadgeProps(text="3"))` | Used directly. `style` is still resolved if present. |
 | `Badge(props=..., text="3")` | `TypeError`: pass either `props` *or* keyword arguments. |
-| `Badge(some_unknown_key=...)` | `TypeError("Invalid props for 'Badge': …")`. |
+| `Badge(unknown=...)` | `TypeError("Invalid props for 'Badge': ...")`. |
 
-For `register_component` callers without a `Props` class, kwargs
-flow straight to the `Element` and are not validated. We strongly
-recommend defining a `Props` dataclass for every public component.
-
-## Distributing as a plugin
-
-To ship `Badge` as a PyPI package and have it auto-register on
-install, declare an entry point in your project's `pyproject.toml`:
-
-```toml
-[project.entry-points."pythonnative.handlers"]
-badge = "my_pkg:register"
-```
-
-The function pointed at by the entry point runs once on first call
-to [`get_registry()`][pythonnative.native_views.get_registry]. A
-common pattern is to import the platform-specific module from inside
-that function so the heavy `rubicon-objc`/Chaquopy code path only
-runs on the target device:
-
-```python
-def register() -> None:
-    from pythonnative.utils import IS_ANDROID, IS_IOS
-    if IS_ANDROID:
-        from . import badge_android  # noqa: F401
-    elif IS_IOS:
-        from . import badge_ios  # noqa: F401
-```
-
-Plugins are loaded once per process, even if `get_registry()` is
-called many times. Errors raised from a misbehaving plugin are
-caught and logged but do not break PythonNative's startup.
-
-## Imperative registration
-
-If you don't want to use the decorator (e.g., for handlers that are
-constructed lazily), call
-[`register_component`][pythonnative.sdk._components.register_component]:
-
-```python
-from pythonnative.sdk import register_component
-
-register_component(
-    name="Badge",
-    props=BadgeProps,
-    handlers={"ios": IOSBadgeHandler(), "android": AndroidBadgeHandler()},
-)
-```
-
-You can call this at any time before the first `Badge(...)` call.
-Multiple calls merge by platform, so different files can register
-the iOS and Android handlers separately.
-
-## Testing custom components
-
-The SDK is platform-agnostic: it does not import Chaquopy or
-rubicon-objc, so you can unit-test your factory and registration
-logic from pytest on a developer laptop. A typical pattern is to
-swap in a stub handler that records calls:
-
-```python
-import pytest
-from pythonnative.sdk import register_component, element_factory, ViewHandler
-from pythonnative.native_views import NativeViewRegistry, set_registry
-from my_pkg.badge_props import BadgeProps
-
-
-class _StubHandler(ViewHandler):
-    def create(self, tag, props): return {"props": dict(props)}
-    def update(self, view, changed): view["props"].update(changed)
-
-
-def test_badge_validates_props() -> None:
-    register_component(name="Badge", props=BadgeProps, handlers={"ios": _StubHandler()})
-    Badge = element_factory("Badge")
-
-    with pytest.raises(TypeError):
-        Badge(unknown_field=42)
-
-    el = Badge(text="3", color="#000000")
-    assert el.props["text"] == "3"
-```
-
-See `tests/test_sdk.py` in the PythonNative repo for a fuller
-end-to-end example that runs the reconciler against a recording
-backend.
+For `register_component` calls without a `props` class, kwargs flow
+straight to the `Element` and aren't validated.
 
 ## Next steps
 
-- API reference: [`pythonnative.sdk`](../api/sdk.md).
-- Native view protocol: [Native views](../concepts/native-views.md).
-- Forward styles cleanly: [Styling](styling.md).
+- Protocol details: [The native bridge](../concepts/bridge.md).
+- SDK reference: [`pythonnative.sdk`](../api/sdk.md).
 - Wrap a device API instead of a widget: [Native modules](native-modules.md).

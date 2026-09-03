@@ -1,18 +1,13 @@
 """Screen hosts: the bridge between a native screen and the reconciler.
 
-Native templates create one host per screen:
-
-```python
-host = pythonnative.hosts.create_screen("app.main", native_instance, args_json)
-host.on_create()
-```
-
-and forward lifecycle events to it. The concrete class depends on the
-runtime ([`AndroidScreenHost`][pythonnative.hosts.android.AndroidScreenHost],
-[`IOSScreenHost`][pythonnative.hosts.ios.IOSScreenHost],
-[`DesktopScreenHost`][pythonnative.hosts.desktop.DesktopScreenHost]);
-the headless base [`ScreenHost`][pythonnative.hosts.ScreenHost] is used
-in unit tests with a fake backend.
+On device the native runtime creates screens through the bridge
+(``callback("host", screen_id, "create", {...})``), which lands in
+[`NativeScreenHost`][pythonnative.hosts.native.NativeScreenHost]. Off device,
+``pn preview`` creates a
+[`DesktopScreenHost`][pythonnative.hosts.desktop.DesktopScreenHost]
+through [`create_screen`][pythonnative.hosts.create_screen], and unit
+tests use the headless base [`ScreenHost`][pythonnative.hosts.ScreenHost]
+with a fake backend.
 """
 
 from __future__ import annotations
@@ -27,18 +22,14 @@ __all__ = ["ScreenHost", "create_screen", "host_class", "import_component"]
 
 def host_class() -> Type[ScreenHost]:
     """The host class for the current runtime."""
-    if IS_ANDROID:
-        from .android import AndroidScreenHost
+    if IS_ANDROID or IS_IOS:
+        from .native import NativeScreenHost
 
-        return AndroidScreenHost
+        return NativeScreenHost
     if IS_DESKTOP:
         from .desktop import DesktopScreenHost
 
         return DesktopScreenHost
-    if IS_IOS:
-        from .ios import IOSScreenHost
-
-        return IOSScreenHost
     return ScreenHost
 
 
@@ -49,8 +40,8 @@ def create_screen(component_path: str, native_instance: Any = None, args_json: O
         component_path: ``"app.main"`` (the module's ``App`` is used) or a
             dotted path like ``"app.main.RootScreen"``. Imported lazily
             so the dev server can reload it.
-        native_instance: The platform object owning the screen
-            (``Activity``, ``UIViewController`` pointer, ``DesktopApp``).
+        native_instance: The platform object owning the screen (the
+            integer screen id on device, ``DesktopApp`` in the preview).
         args_json: Optional JSON launch arguments (pushed screens
             receive their navigation history here).
 
@@ -62,20 +53,6 @@ def create_screen(component_path: str, native_instance: Any = None, args_json: O
     if args_json:
         host.set_args(args_json)
     return host
-
-
-def drain_ios_scheduled_renders() -> None:
-    """Drain deferred iOS renders (called by the Swift template on the main thread)."""
-    from .ios import drain_ios_scheduled_renders as drain
-
-    drain()
-
-
-def forward_lifecycle(native_addr: int, event: str) -> None:
-    """Forward a Swift view-controller lifecycle event to its host."""
-    from .ios import forward_lifecycle as forward
-
-    forward(native_addr, event)
 
 
 def drain_desktop_scheduled_renders() -> None:

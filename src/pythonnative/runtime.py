@@ -47,12 +47,10 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import ctypes
-import ctypes.util
 import inspect
 import threading
 import time as _time
-from typing import Any, Awaitable, Callable, Coroutine, Dict, Optional, TypeVar, Union
+from typing import Any, Awaitable, Callable, Coroutine, Optional, TypeVar, Union
 
 T = TypeVar("T")
 
@@ -463,28 +461,41 @@ def _has_pump_dispatcher() -> bool:
 
 
 def _dispatch_to_main_queue(fn: Callable[[], None]) -> None:
-    """Enqueue ``fn`` on the platform main queue (never runs inline)."""
+    """Enqueue ``fn`` on the platform main queue (never runs inline).
+
+    On device this is the bridge's
+    [`post_to_main`][pythonnative.bridge.post_to_main]: native schedules
+    a ``pump`` callback on the next main-queue turn and Python drains
+    its queue then. Off device the ``pn preview`` dispatcher takes it;
+    headless tests have no dispatcher and drive the loop with
+    [`drain`][pythonnative.runtime.drain] instead.
+    """
     from .platform import Platform
 
-    if Platform.is_ios:
-        _ios_dispatch_async(fn)
-    elif Platform.is_android:
-        _android_post_to_main(fn)
+    if Platform.is_ios or Platform.is_android:
+        from .bridge import post_to_main
+
+        post_to_main(fn)
     elif _desktop_main_dispatch is not None:
         _desktop_main_dispatch(fn)
-    # Headless: nothing to dispatch to; drain()/run_blocking() pump.
+
+
+def _is_main_thread() -> bool:
+    """Whether the calling thread is the platform main thread.
+
+    Python is initialized on the platform main thread by both app
+    templates, so ``threading.main_thread()`` is the UIKit / Android
+    main thread on device.
+    """
+    return threading.current_thread() is threading.main_thread()
 
 
 def call_on_main_thread(fn: Callable[[], None]) -> None:
     """Run ``fn()`` on the platform UI thread.
 
-    - **iOS**: dispatches ``fn`` onto the main dispatch queue via
-      ``libdispatch.dispatch_async_f`` (called through
-      :class:`ctypes.PyDLL` to keep the GIL held), or runs inline when
-      already on the main thread.
-    - **Android**: posts a ``Runnable`` to
-      ``Handler(Looper.getMainLooper())``, or runs inline on the main
-      looper thread.
+    - **iOS / Android**: runs inline when already on the main thread,
+      otherwise queues ``fn`` through the bridge (one native crossing
+      per batch of queued callables).
     - **Desktop**: enqueues ``fn`` for the ``pn preview`` poll loop
       (or runs inline if no preview is live).
     - **Tests**: runs ``fn()`` inline.
@@ -498,197 +509,18 @@ def call_on_main_thread(fn: Callable[[], None]) -> None:
     """
     from .platform import Platform
 
-    if Platform.is_ios:
-        _ios_call_on_main(fn)
-    elif Platform.is_android:
-        _android_call_on_main(fn)
+    if Platform.is_ios or Platform.is_android:
+        if _is_main_thread():
+            try:
+                fn()
+            except Exception as exc:
+                print(f"[pn.runtime] main-inline callback raised: {exc!r}")
+            return
+        _dispatch_to_main_queue(fn)
     elif Platform.is_desktop and _desktop_main_dispatch is not None:
         _desktop_main_dispatch(fn)
     else:
         fn()
-
-
-# ----------------------------------------------------------------------
-# iOS main-queue dispatch (PyDLL-based, no GIL release)
-# ----------------------------------------------------------------------
-#
-# rubicon-objc loads libobjc via ctypes.CDLL, which RELEASES THE GIL
-# around every ObjC method call. On the iOS simulator (and to a lesser
-# extent on-device), a thread is then parked by the kernel until the
-# next wakeup-coalescing tick (~500ms), making cross-thread ObjC calls
-# absurdly slow. To avoid this, we call libdispatch's
-# ``dispatch_async_f`` directly via ``ctypes.PyDLL`` (which keeps the
-# GIL held), and pass a ``CFUNCTYPE`` trampoline as the work function.
-# The trampoline runs on the main thread, looks up the pending Python
-# callable by an integer key, and invokes it.
-
-_dispatch_lib: Optional[Any] = None
-_dispatch_async_f_c: Optional[Any] = None
-_dispatch_main_q_ptr: int = 0
-_DISPATCH_FN_TYPE = ctypes.CFUNCTYPE(None, ctypes.c_void_p)
-_main_pending: Dict[int, Callable[[], None]] = {}
-_main_pending_lock = threading.Lock()
-_main_next_id: int = 0
-
-
-def _main_trampoline_py(ctx: int) -> None:
-    """Run on the main thread; pop the queued callable and call it."""
-    with _main_pending_lock:
-        fn = _main_pending.pop(ctx, None)
-    if fn is None:
-        return
-    try:
-        fn()
-    except Exception as exc:
-        print(f"[pn.runtime] main-thread trampoline raised: {exc!r}")
-
-
-# Keep a strong reference to the C-callable trampoline forever; if it
-# gets GC'd while libdispatch holds the function pointer, we crash.
-_main_trampoline_c = _DISPATCH_FN_TYPE(_main_trampoline_py)
-
-
-def _ensure_libdispatch_loaded() -> bool:
-    """Locate libdispatch + the main queue. Returns True on success."""
-    global _dispatch_lib, _dispatch_async_f_c, _dispatch_main_q_ptr
-    if _dispatch_lib is not None:
-        return True
-    try:
-        # PyDLL keeps the GIL held during C calls, preventing the
-        # calling thread from being parked after dispatch_async_f.
-        lib = ctypes.PyDLL("/usr/lib/system/libdispatch.dylib")
-    except OSError:
-        try:
-            lib = ctypes.PyDLL(None)  # main program (libdispatch is in libSystem)
-        except OSError as exc:
-            print(f"[pn.runtime] could not load libdispatch via PyDLL: {exc!r}")
-            return False
-    try:
-        fn = lib.dispatch_async_f
-        fn.restype = None
-        fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
-        # The main queue is a struct global named ``_dispatch_main_q``
-        # in libdispatch. dispatch_async_f wants a pointer to it.
-        sym = ctypes.c_void_p.in_dll(lib, "_dispatch_main_q")
-        main_q_ptr = ctypes.addressof(sym)
-    except (AttributeError, ValueError) as exc:
-        print(f"[pn.runtime] libdispatch missing expected symbol: {exc!r}")
-        return False
-    _dispatch_lib = lib
-    _dispatch_async_f_c = fn
-    _dispatch_main_q_ptr = main_q_ptr
-    return True
-
-
-_pthread_main_np_c: Optional[Any] = None
-
-
-def _ios_is_main_thread() -> bool:
-    """Cheap main-thread check using pthread_main_np (no GIL release)."""
-    try:
-        # pthread_main_np is in libc; calling via PyDLL keeps the GIL.
-        global _pthread_main_np_c
-        if _pthread_main_np_c is None:
-            libc = ctypes.PyDLL(ctypes.util.find_library("c") or "/usr/lib/libc.dylib")
-            f = libc.pthread_main_np
-            f.restype = ctypes.c_int
-            f.argtypes = []
-            _pthread_main_np_c = f
-        return bool(_pthread_main_np_c())
-    except Exception:
-        # Fall back to threading module (Python-side check).
-        return threading.current_thread().name == "MainThread"
-
-
-def _ios_dispatch_async(fn: Callable[[], None]) -> None:
-    """Enqueue ``fn`` on the iOS main dispatch queue (always queued)."""
-    global _main_next_id
-    if not _ensure_libdispatch_loaded():
-        print("[pn.runtime] libdispatch unavailable; running callback inline")
-        try:
-            fn()
-        except Exception as exc:
-            print(f"[pn.runtime] inline fallback raised: {exc!r}")
-        return
-    with _main_pending_lock:
-        _main_next_id += 1
-        key = _main_next_id
-        _main_pending[key] = fn
-    # dispatch_async_f(queue, context, work): non-blocking; just
-    # enqueues the work onto the main queue and returns.
-    assert _dispatch_async_f_c is not None
-    _dispatch_async_f_c(_dispatch_main_q_ptr, key, _main_trampoline_c)
-
-
-def _ios_call_on_main(fn: Callable[[], None]) -> None:
-    """Run ``fn`` on the iOS main thread (inline when already there)."""
-    if _ios_is_main_thread():
-        try:
-            fn()
-        except Exception as exc:
-            print(f"[pn.runtime] main-inline callback raised: {exc!r}")
-        return
-    _ios_dispatch_async(fn)
-
-
-# Cached Android main-queue plumbing. Posting a pump is a hot path (it
-# runs for every batch of scheduled loop work), so the Runnable proxy
-# class and the main-looper Handler are created once and reused;
-# defining a ``dynamic_proxy`` class per call would register a new JNI
-# class every time.
-_android_runnable_cls: Optional[Any] = None
-_android_main_handler: Optional[Any] = None
-
-
-def _ensure_android_main_handler() -> Any:
-    global _android_runnable_cls, _android_main_handler
-    if _android_main_handler is not None:
-        return _android_main_handler
-    from java import dynamic_proxy, jclass
-
-    Runnable = jclass("java.lang.Runnable")
-
-    class _PNMainRunnable(dynamic_proxy(Runnable)):  # type: ignore[misc]
-        def __init__(self, fn: Callable[[], None]) -> None:
-            super().__init__()
-            self._fn = fn
-
-        def run(self) -> None:
-            try:
-                self._fn()
-            except Exception as exc:  # pragma: no cover - last resort
-                print(f"[pn.runtime] main-thread runnable raised: {exc!r}")
-
-    Looper = jclass("android.os.Looper")
-    Handler = jclass("android.os.Handler")
-    _android_runnable_cls = _PNMainRunnable
-    _android_main_handler = Handler(Looper.getMainLooper())
-    return _android_main_handler
-
-
-def _android_post_to_main(fn: Callable[[], None]) -> None:
-    """Enqueue ``fn`` on the Android main looper (always queued)."""
-    try:
-        handler = _ensure_android_main_handler()
-        assert _android_runnable_cls is not None
-        handler.post(_android_runnable_cls(fn))
-    except Exception as exc:
-        print(f"[pn.runtime] _android_post_to_main failed, falling back inline: {exc!r}")
-        fn()
-
-
-def _android_call_on_main(fn: Callable[[], None]) -> None:
-    """Run ``fn`` on the Android main thread (inline when already there)."""
-    try:
-        from java import jclass
-
-        Looper = jclass("android.os.Looper")
-        if Looper.myLooper() == Looper.getMainLooper():
-            fn()
-            return
-    except Exception:
-        pass
-    _android_post_to_main(fn)
 
 
 __all__ = [

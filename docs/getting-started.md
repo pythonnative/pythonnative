@@ -200,7 +200,7 @@ def App():
 
 - On Android, logs are streamed via `adb logcat` filtered to the
   `python.stdout` / `python.stderr` tags (that Chaquopy redirects `print()` to)
-  plus the template's Kotlin tags.
+  plus the `PythonNative` tag the Kotlin runtime logs under.
 - On iOS Simulator, the app is launched via `xcrun simctl launch --console-pty`,
   which forwards the Python process's standard streams to your terminal.
 

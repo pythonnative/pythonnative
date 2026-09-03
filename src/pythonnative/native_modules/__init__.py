@@ -1,11 +1,21 @@
 """Native API modules for device capabilities.
 
-Provides cross-platform Python interfaces to common device APIs. Each
-module auto-detects the platform at import time and dispatches to the
-appropriate native APIs via Chaquopy (Android) or rubicon-objc (iOS).
-On a desktop machine without either runtime, modules fall back to safe
-defaults (in-memory buffers, ``"unknown"`` states, no-op feedback) so
-the same code stays runnable in the desktop mock and unit tests.
+Cross-platform Python interfaces to common device APIs. Every module
+here is a thin facade over a *native module*: a Swift class in
+``PythonNativeKit`` and a Kotlin class in the ``pythonnative`` Gradle
+module registered under the same name (``"Camera"``, ``"Haptics"``,
+...). Facades reach them through
+[`native_module`][pythonnative.native_modules.registry.native_module]
+and the bridge described in ``docs/concepts/bridge.md``; there is no
+Python-side Objective-C or JNI anywhere in this package.
+
+On a desktop machine (``pn preview``, unit tests) the same names
+resolve to plain Python implementations in
+[`pythonnative.native_modules.desktop`][pythonnative.native_modules.desktop]
+with safe defaults (in-memory buffers, ``"unknown"`` states, no-op
+feedback), so the same code stays runnable off device. Third-party
+packages ship their own native modules the same way; see
+``docs/guides/native-modules.md``.
 
 Hardware / media:
 
@@ -43,8 +53,6 @@ Reactive state (with hooks):
   [`use_net_info`][pythonnative.use_net_info]: connectivity.
 """
 
-from typing import Any, Sequence
-
 from .app_state import AppState, use_app_state
 from .battery import Battery
 from .biometrics import Biometrics
@@ -57,46 +65,39 @@ from .location import Location
 from .net_info import NetInfo, use_net_info
 from .notifications import Notifications
 from .permissions import Permissions
+from .registry import (
+    BridgeModule,
+    NativeModule,
+    NativeModuleError,
+    PythonModule,
+    native_module,
+    register_python_module,
+)
 from .secure_store import SecureStore
 from .share import Share
-
-
-def dispatch_activity_result(request_code: int, result_code: int, data: Any) -> bool:
-    """Route an Android ``onActivityResult`` to whichever module is waiting on it.
-
-    Called by the screen host. Returns ``True`` when a pending request
-    consumed the result.
-    """
-    from .camera import deliver_android_activity_result
-
-    return deliver_android_activity_result(request_code, result_code, data)
-
-
-def dispatch_permissions_result(request_code: int, permissions: Sequence[str], grant_results: Sequence[int]) -> bool:
-    """Route an Android ``onRequestPermissionsResult`` to the pending ``Permissions.request``."""
-    from .permissions import deliver_android_permission_result
-
-    return deliver_android_permission_result(request_code, permissions, grant_results)
-
 
 __all__ = [
     "AppState",
     "Battery",
     "Biometrics",
+    "BridgeModule",
     "Camera",
     "Clipboard",
     "FileSystem",
     "Haptics",
     "Linking",
     "Location",
+    "NativeModule",
+    "NativeModuleError",
     "NetInfo",
     "Notifications",
     "Permissions",
+    "PythonModule",
     "SecureStore",
     "Share",
     "Vibration",
-    "dispatch_activity_result",
-    "dispatch_permissions_result",
+    "native_module",
+    "register_python_module",
     "use_app_state",
     "use_net_info",
 ]

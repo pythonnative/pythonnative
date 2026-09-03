@@ -7,7 +7,7 @@ and re-renders when the value changes.
 
 from __future__ import annotations
 
-from typing import Dict, Generator, List
+from typing import Any, Dict, Generator, List
 
 import pytest
 
@@ -36,7 +36,7 @@ def _reset_metrics() -> Generator[None, None, None]:
 
 def test_use_window_dimensions_returns_current_value() -> None:
     pm.set_window_dimensions(390.0, 844.0)
-    rendered: List[Dict[str, float]] = []
+    rendered: List[Any] = []
 
     @component
     def comp() -> Element:
@@ -45,11 +45,12 @@ def test_use_window_dimensions_returns_current_value() -> None:
 
     backend = MockBackend()
     Reconciler(backend).mount(comp())
-    assert rendered[0] == {"width": 390.0, "height": 844.0}
+    assert rendered[0] == (390.0, 844.0)
+    assert rendered[0].width == 390.0 and rendered[0].height == 844.0
 
 
 def test_use_window_dimensions_re_renders_on_change() -> None:
-    rendered: List[Dict[str, float]] = []
+    rendered: List[Any] = []
 
     @component
     def comp() -> Element:
@@ -65,12 +66,12 @@ def test_use_window_dimensions_re_renders_on_change() -> None:
     pm.set_window_dimensions(800.0, 600.0)
 
     assert len(rendered) > initial_render_count
-    assert rendered[-1] == {"width": 800.0, "height": 600.0}
+    assert rendered[-1] == (800.0, 600.0)
 
 
 def test_use_safe_area_insets_returns_current_value() -> None:
     pm.set_safe_area_insets(top=44.0, left=0.0, bottom=34.0, right=0.0)
-    rendered: List[Dict[str, float]] = []
+    rendered: List[Any] = []
 
     @component
     def comp() -> Element:
@@ -79,11 +80,12 @@ def test_use_safe_area_insets_returns_current_value() -> None:
 
     backend = MockBackend()
     Reconciler(backend).mount(comp())
-    assert rendered[0] == {"top": 44.0, "left": 0.0, "bottom": 34.0, "right": 0.0}
+    assert rendered[0] == (44.0, 0.0, 34.0, 0.0)
+    assert rendered[0].bottom == 34.0
 
 
 def test_use_safe_area_insets_re_renders_on_change() -> None:
-    rendered: List[Dict[str, float]] = []
+    rendered: List[Any] = []
 
     @component
     def comp() -> Element:
@@ -98,7 +100,7 @@ def test_use_safe_area_insets_re_renders_on_change() -> None:
 
     pm.set_safe_area_insets(top=20.0, left=0.0, bottom=10.0, right=0.0)
     assert len(rendered) > before
-    assert rendered[-1]["top"] == 20.0
+    assert rendered[-1].top == 20.0
 
 
 def test_use_keyboard_height_returns_current_value() -> None:

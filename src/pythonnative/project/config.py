@@ -34,6 +34,9 @@ splash = "assets/splash.png"  # splash/launch image
 [requirements]
 packages = ["humanize", "httpx"]
 
+[plugins]
+paths = ["native/my_plugin"]  # local native plugins (pn_plugin.json + ios/ + android/)
+
 [ios]
 deployment_target = "13.0"
 development_team = "ABCDE12345"
@@ -235,6 +238,9 @@ class AppConfig:
         icon: Optional source icon path (``[assets].icon``).
         splash: Optional splash image path (``[assets].splash``).
         requirements: Third-party pip packages (``[requirements].packages``).
+        plugin_paths: Project-local native plugin directories
+            (``[plugins].paths``); installed packages contribute plugins
+            through the ``pythonnative.plugins`` entry point group instead.
         ios: Nested [`IOSConfig`][pythonnative.project.config.IOSConfig].
         android: Nested
             [`AndroidConfig`][pythonnative.project.config.AndroidConfig].
@@ -254,6 +260,7 @@ class AppConfig:
     icon: Optional[str] = None
     splash: Optional[str] = None
     requirements: List[str] = field(default_factory=list)
+    plugin_paths: List[str] = field(default_factory=list)
     ios: IOSConfig = field(default_factory=IOSConfig)
     android: AndroidConfig = field(default_factory=AndroidConfig)
     project_root: Path = field(default_factory=Path.cwd)
@@ -345,8 +352,8 @@ class AppConfig:
 
         Args:
             data: A parsed TOML mapping (top-level tables: ``app``,
-                ``permissions``, ``assets``, ``requirements``, ``ios``,
-                ``android``).
+                ``permissions``, ``assets``, ``requirements``, ``plugins``,
+                ``ios``, ``android``).
             project_root: Directory the config came from, used to resolve
                 relative paths.
 
@@ -381,6 +388,9 @@ class AppConfig:
 
         requirements = _expect_table(data, "requirements", optional=True)
         config.requirements = _opt_str_list(requirements, "packages")
+
+        plugins = _expect_table(data, "plugins", optional=True)
+        config.plugin_paths = _opt_str_list(plugins, "paths")
 
         config.validate()
         return config

@@ -7,9 +7,12 @@ pause, back press, destroy) to navigators and effects. It's also the
 [`Stack.Navigator`][pythonnative.create_stack_navigator] talks to when
 it pushes real native screens.
 
-The bundled Android (`ScreenFragment`) and iOS (`ViewController`)
-templates create a host via [`create_screen`][pythonnative.create_screen]
-and never need to be edited by app code. The desktop preview uses
+The bundled Android (`PNScreenFragment`) and iOS (`PNViewController`)
+templates create a host through the `Host` native module's `create`
+event and never need to be edited by app code; one
+[`NativeScreenHost`][pythonnative.hosts.native.NativeScreenHost] class
+serves both platforms because every platform-specific step goes over
+the [bridge](../concepts/bridge.md). The desktop preview uses
 [`DesktopScreenHost`][pythonnative.hosts.desktop.DesktopScreenHost].
 
 ::: pythonnative.hosts
@@ -30,18 +33,11 @@ and never need to be edited by app code. The desktop preview uses
 
 ## Platform hosts
 
-::: pythonnative.hosts.android
+::: pythonnative.hosts.native
     options:
       show_root_heading: false
       show_root_toc_entry: false
-      members: ["AndroidScreenHost"]
-      filters: ["!^_"]
-
-::: pythonnative.hosts.ios
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      members: ["IOSScreenHost"]
+      members_order: source
       filters: ["!^_"]
 
 ::: pythonnative.hosts.desktop

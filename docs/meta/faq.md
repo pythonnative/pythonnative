@@ -5,8 +5,8 @@ and their fixes, see [Troubleshooting](troubleshooting.md).
 
 ## Why "PythonNative" and not, say, Toga or Kivy?
 
-PythonNative renders **real** native widgets via Chaquopy on Android
-and rubicon-objc on iOS. A `pn.Text` becomes a `UILabel` /
+PythonNative renders **real** native widgets through Swift and Kotlin
+component managers. A `pn.Text` becomes a `UILabel` /
 `TextView`; a `pn.Button` becomes a `UIButton` / `Button`.
 Accessibility, theming, and platform behaviors come along for free.
 
@@ -177,7 +177,7 @@ synchronous event handler, kick off work with
 
 | Tool | Model | Widgets |
 |---|---|---|
-| **PythonNative** | Declarative components plus reconciler | Real native (`UILabel`, `TextView`) via Chaquopy / rubicon-objc |
+| **PythonNative** | Declarative components plus reconciler | Real native (`UILabel`, `TextView`) via Swift / Kotlin component managers |
 | Toga | Imperative widgets | Real native via per-platform backend |
 | Kivy | Imperative widgets | Custom OpenGL renderer |
 | Briefcase | Packaging only (no widgets) | n/a |

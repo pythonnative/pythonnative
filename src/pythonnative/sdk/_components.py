@@ -4,26 +4,28 @@ Implements the [`@native_component`][pythonnative.sdk.native_component]
 decorator and supporting helpers that let third-party packages contribute
 new element types to the reconciler.
 
-The registration model is intentionally small. A custom component is a
+On device a custom component is rendered by a Swift
+``PNComponentManager`` and a Kotlin ``ComponentManager`` registered
+under the same type name by the package's native plugin (see
+``docs/guides/custom-components.md``). The Python side only needs to
+know the element name and, optionally, its typed props and a
+[`ViewHandler`][pythonnative.sdk.ViewHandler] that renders a stand-in
+in ``pn preview`` and unit tests. Registration is therefore a
 three-part agreement:
 
-1. A typed, immutable
-   [`Props`][pythonnative.sdk.Props] dataclass declaring the
-   component's public surface.
-2. One or more
-   [`ViewHandler`][pythonnative.sdk.ViewHandler] subclasses
-   (one per platform) implementing the platform-side rendering.
-3. A name (string) used by the reconciler to look up the handler.
+1. A typed, immutable [`Props`][pythonnative.sdk.Props] dataclass
+   declaring the component's public surface.
+2. An element factory built with
+   [`element_factory`][pythonnative.sdk.element_factory].
+3. Optionally, a desktop [`ViewHandler`][pythonnative.sdk.ViewHandler]
+   so the component also renders off device.
 
-The decorator stores the (name, props_type, handler_instance) tuple
-in a process-wide registry. The
-[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
-calls
+The registry is process-wide. The view backend calls
 [`install_into_registry`][pythonnative.sdk.install_into_registry] on
 first use; that helper performs entry-point discovery (importing any
 modules registered under
 [`ENTRY_POINT_GROUP`][pythonnative.sdk.ENTRY_POINT_GROUP]) and copies
-every handler matching the active platform into the registry.
+every desktop handler into the registry.
 
 Example:
     ```python
@@ -39,10 +41,10 @@ Example:
         style: pn.StyleProp = None
 
 
-    @native_component("Badge", props=BadgeProps, platforms=("ios",))
-    class IOSBadgeHandler(ViewHandler):
+    @native_component("Badge", props=BadgeProps)
+    class BadgePreviewHandler(ViewHandler):
         def create(self, tag, props):
-            ...
+            ...  # Tkinter stand-in for pn preview
 
         def update(self, view, changed):
             ...
@@ -102,8 +104,8 @@ class Props:
 # Internal registry
 # ---------------------------------------------------------------------- #
 
-# name -> (props_type or None, {platform_name: handler_instance})
-_REGISTRY: Dict[str, Tuple[Optional[type], Dict[str, ViewHandler]]] = {}
+# name -> (props_type or None, desktop handler or None)
+_REGISTRY: Dict[str, Tuple[Optional[type], Optional[ViewHandler]]] = {}
 
 # Caches `_install_into_registry` runs to avoid repeated entry-point
 # discovery once the registry has been populated for a given platform.
@@ -117,27 +119,22 @@ def native_component(
     name: str,
     *,
     props: Optional[type] = None,
-    platforms: Optional[Tuple[str, ...]] = None,
 ) -> Callable[[Type[H]], Type[H]]:
-    """Decorator that registers a [`ViewHandler`][pythonnative.sdk.ViewHandler] under ``name``.
+    """Decorator that registers a desktop [`ViewHandler`][pythonnative.sdk.ViewHandler] under ``name``.
 
     The handler class is instantiated immediately and stored in the
-    process-wide registry. Decorate the same ``name`` once per platform
-    when shipping platform-specific implementations; the decorator
-    accumulates entries in a ``{platform: handler}`` mapping per name.
+    process-wide registry as the component's off-device renderer. The
+    on-device renderers are the Swift and Kotlin component managers the
+    package's native plugin registers under the same ``name``.
 
     Args:
-        name: Element type name (e.g., ``"Badge"``). Must be a valid
-            identifier-like string. Used by the reconciler at lookup time.
+        name: Element type name (e.g., ``"Badge"``). Used by the
+            reconciler and by native component managers at lookup time.
         props: Optional dataclass type describing the component's
             typed props. When supplied, the
             [`element_factory`][pythonnative.sdk.element_factory] helper
             uses this type to validate kwargs and produce frozen prop
             instances.
-        platforms: Tuple of platform identifiers
-            (``"ios"`` / ``"android"``) the handler implements. Defaults
-            to ``("android", "ios")`` so a single cross-platform handler
-            registers everywhere.
 
     Returns:
         A decorator that, when applied to a
@@ -147,31 +144,12 @@ def native_component(
     Raises:
         TypeError: If the decorated object is not a class subclassing
             ``ViewHandler``.
-
-    Example:
-        ```python
-        from dataclasses import dataclass
-        from pythonnative.sdk import Props, ViewHandler, native_component
-
-
-        @dataclass(frozen=True)
-        class BadgeProps(Props):
-            text: str = ""
-            color: str = "#FF3B30"
-
-
-        @native_component("Badge", props=BadgeProps, platforms=("ios",))
-        class IOSBadgeHandler(ViewHandler):
-            def create(self, tag, props):
-                ...
-        ```
     """
-    plats: Tuple[str, ...] = platforms if platforms is not None else ("android", "ios")
 
     def decorator(handler_cls: Type[H]) -> Type[H]:
         if not isinstance(handler_cls, type) or not issubclass(handler_cls, ViewHandler):
             raise TypeError(f"@native_component({name!r}) must decorate a ViewHandler subclass; got {handler_cls!r}")
-        register_component(name=name, props=props, handlers={plat: handler_cls() for plat in plats})
+        register_component(name=name, props=props, handler=handler_cls())
         return handler_cls
 
     return decorator
@@ -181,42 +159,41 @@ def register_component(
     *,
     name: str,
     props: Optional[type] = None,
-    handlers: Dict[str, ViewHandler],
+    handler: Optional[ViewHandler] = None,
 ) -> None:
     """Register a custom native component imperatively.
 
-    Equivalent to applying [`@native_component`][pythonnative.sdk.native_component]
-    one or more times, but useful when constructing handlers
-    programmatically (e.g., parameterized handler instances). Subsequent
-    calls for the same ``name`` merge their ``handlers`` into the
-    existing entry, replacing any previously-registered handler for the
-    same platform.
+    Declares ``name`` as an element type so
+    [`element_factory`][pythonnative.sdk.element_factory] can build it.
+    ``handler`` is the optional desktop / test renderer; native
+    rendering always comes from the platform component managers.
+    Subsequent calls for the same ``name`` merge: a later ``props`` or
+    ``handler`` replaces the earlier one, ``None`` leaves it alone.
 
     Args:
         name: Element type name.
         props: Optional dataclass type describing the typed props.
-        handlers: ``{platform_name: handler_instance}`` mapping. Common
-            keys are ``"ios"`` and ``"android"``.
+        handler: Optional [`ViewHandler`][pythonnative.sdk.ViewHandler]
+            instance used off device.
 
     Raises:
-        TypeError: If any handler is not a
-            [`ViewHandler`][pythonnative.sdk.ViewHandler] instance, or
+        TypeError: If ``handler`` is not a ``ViewHandler`` instance, or
             if ``props`` is not a dataclass type.
     """
     if props is not None and not (isinstance(props, type) and is_dataclass(props)):
         raise TypeError(f"register_component({name!r}): props must be a @dataclass type, got {props!r}")
-    for plat, handler in handlers.items():
-        if not isinstance(handler, ViewHandler):
-            raise TypeError(f"register_component({name!r}): handler for {plat!r} must be a ViewHandler instance")
+    if handler is not None and not isinstance(handler, ViewHandler):
+        raise TypeError(f"register_component({name!r}): handler must be a ViewHandler instance")
 
     existing = _REGISTRY.get(name)
     if existing is None:
-        _REGISTRY[name] = (props, dict(handlers))
+        _REGISTRY[name] = (props, handler)
         return
-    existing_props, plat_map = existing
-    new_props = props if props is not None else existing_props
-    plat_map.update(handlers)
-    _REGISTRY[name] = (new_props, plat_map)
+    existing_props, existing_handler = existing
+    _REGISTRY[name] = (
+        props if props is not None else existing_props,
+        handler if handler is not None else existing_handler,
+    )
 
 
 def unregister_component(name: str) -> None:
@@ -247,11 +224,17 @@ def get_props_type(name: str) -> Optional[type]:
     return entry[0] if entry is not None else None
 
 
-def install_into_registry(registry: Any, platform_name: str) -> None:
-    """Copy registered handlers into a [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry].
+def get_desktop_handler(name: str) -> Optional[ViewHandler]:
+    """Return the registered off-device handler for ``name`` (or ``None``)."""
+    entry = _REGISTRY.get(name)
+    return entry[1] if entry is not None else None
+
+
+def install_into_registry(registry: Any) -> None:
+    """Copy registered desktop handlers into a view registry.
 
     Called once by the registry on first use. Triggers entry-point
-    discovery on the first call so PyPI-installed handlers register
+    discovery on the first call so PyPI-installed components register
     themselves before the registry snapshot is taken.
 
     Args:
@@ -259,12 +242,9 @@ def install_into_registry(registry: Any, platform_name: str) -> None:
             [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
             (or duck-compatible object) with a ``register(name, handler)``
             method.
-        platform_name: The active platform identifier
-            (``"ios"`` or ``"android"``).
     """
     _discover_entry_points()
-    for name, (_props_type, plat_map) in _REGISTRY.items():
-        handler = plat_map.get(platform_name)
+    for name, (_props_type, handler) in _REGISTRY.items():
         if handler is not None:
             registry.register(name, handler)
 
@@ -418,6 +398,7 @@ __all__ = [
     "ENTRY_POINT_GROUP",
     "Props",
     "element_factory",
+    "get_desktop_handler",
     "get_props_type",
     "install_into_registry",
     "list_components",

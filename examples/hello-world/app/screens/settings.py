@@ -43,7 +43,7 @@ def SettingsScreen() -> pn.Element:
                 style=styles["subtitle"],
             ),
             pn.Text(
-                f"Window: {dims['width']:.0f} × {dims['height']:.0f}",
+                f"Window: {dims.width:.0f} × {dims.height:.0f}",
                 style=styles["subtitle"],
             ),
             pn.Button("Show alert", on_press=_show_alert),

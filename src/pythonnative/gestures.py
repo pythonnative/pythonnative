@@ -34,10 +34,13 @@ configuration into plain dicts for the native handler (so prop diffing
 never compares closures) and routes the callbacks through the
 tag-based event channel. Recognition itself is native:
 
-- **iOS** attaches real ``UIGestureRecognizer`` instances.
-- **Android** feeds raw ``MotionEvent`` streams into the pure-Python
-  [`GestureArbiter`][pythonnative.gestures.GestureArbiter] below.
-- **Desktop** feeds Tk pointer events into the same arbiter.
+- **iOS** attaches real ``UIGestureRecognizer`` instances
+  (``PythonNativeKit``).
+- **Android** runs an equivalent recognizer set in Kotlin (the
+  ``pythonnative`` Gradle module) on top of ``MotionEvent`` streams.
+- **Desktop** feeds Tk pointer events into the pure-Python
+  [`GestureArbiter`][pythonnative.gestures.GestureArbiter] below, which
+  doubles as the executable specification for the native ports.
 
 Composition
 -----------
@@ -518,14 +521,14 @@ def serialize_gestures(
 
 
 # ======================================================================
-# Pure-Python recognition engine (Android + desktop backends)
+# Pure-Python recognition engine (desktop backend + reference semantics)
 # ======================================================================
 #
-# iOS uses real UIGestureRecognizers. Android and the desktop preview
-# receive raw pointer streams instead, which this arbiter turns into
-# the same GestureEvent payloads. Keeping it in pure Python makes the
-# state machines unit-testable with scripted event sequences and
-# guarantees identical semantics on both backends.
+# iOS and Android recognize natively. The desktop preview receives raw
+# Tk pointer streams instead, which this arbiter turns into the same
+# GestureEvent payloads. Keeping it in pure Python makes the state
+# machines unit-testable with scripted event sequences; the Kotlin
+# arbiter mirrors this file so the two stay in lockstep.
 
 EmitFn = Callable[[int, Dict[str, Any]], None]
 """``emit(gesture_index, payload)``: the arbiter's output channel."""

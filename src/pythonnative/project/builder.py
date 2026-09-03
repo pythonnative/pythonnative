@@ -28,6 +28,7 @@ from __future__ import annotations
 import compileall
 import os
 import platform as platform_module
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -37,6 +38,7 @@ from typing import Callable, List, Optional, Sequence, Union
 
 from . import android as android_config
 from . import ios as ios_config
+from . import plugins as native_plugins
 from . import runtime_assets
 from .android import AndroidLayout
 from .config import AppConfig
@@ -177,6 +179,20 @@ class BuildArtifacts:
 
 _TEMPLATE_NAMES = {"android": "android_template", "ios": "ios_template"}
 
+# A source checkout accumulates Gradle, SwiftPM, and Xcode outputs next to
+# the native library sources; a staged project must start from a clean tree.
+_TEMPLATE_IGNORE = shutil.ignore_patterns(
+    "build",
+    ".build",
+    ".gradle",
+    ".swiftpm",
+    "xcuserdata",
+    "DerivedData",
+    "__pycache__",
+    "*.pyc",
+    ".DS_Store",
+)
+
 
 def stage_template(template_name: str, destination: Path) -> Path:
     """Copy a bundled native template into ``destination``.
@@ -196,22 +212,20 @@ def stage_template(template_name: str, destination: Path) -> Path:
     Raises:
         BuildError: If no bundled copy can be located.
     """
-    import shutil
-
     dest_path = destination / template_name
     destination.mkdir(parents=True, exist_ok=True)
 
     # Dev-first: local source package templates.
     local = Path(__file__).resolve().parents[1] / "templates" / template_name
     if local.is_dir():
-        shutil.copytree(local, dest_path, dirs_exist_ok=True)
+        shutil.copytree(local, dest_path, dirs_exist_ok=True, ignore=_TEMPLATE_IGNORE)
         return dest_path
 
     try:
         candidate = resources.files("pythonnative").joinpath("templates").joinpath(template_name)
         with resources.as_file(candidate) as resolved:
             if Path(resolved).is_dir():
-                shutil.copytree(resolved, dest_path, dirs_exist_ok=True)
+                shutil.copytree(resolved, dest_path, dirs_exist_ok=True, ignore=_TEMPLATE_IGNORE)
                 return dest_path
     except (ModuleNotFoundError, FileNotFoundError, OSError):
         pass
@@ -280,6 +294,7 @@ class Builder:
         build_dir = self.build_root / platform
         build_dir.mkdir(parents=True, exist_ok=True)
         project_dir = stage_template(_TEMPLATE_NAMES[platform], build_dir)
+        plugins = self._discover_plugins()
 
         if platform == "android":
             layout = android_config.configure(
@@ -288,6 +303,7 @@ class Builder:
                 dev_lib_root=self.dev_lib_root,
                 log=self.log,
             )
+            native_plugins.stage_android_plugins(project_dir, plugins, log=self.log)
             return PreparedProject(
                 platform=platform,
                 build_dir=build_dir,
@@ -297,6 +313,7 @@ class Builder:
             )
 
         ios_layout = ios_config.configure(project_dir, self.config, log=self.log)
+        native_plugins.stage_ios_plugins(project_dir, plugins, log=self.log)
         self._stage_ios_python(project_dir, release=release)
         self._link_ios_runtime(project_dir)
         return PreparedProject(
@@ -307,6 +324,20 @@ class Builder:
             ios=ios_layout,
         )
 
+    def _discover_plugins(self) -> List[native_plugins.NativePlugin]:
+        """Collect native plugins from entry points and ``[plugins].paths``.
+
+        Raises:
+            BuildError: If a project-local plugin directory is invalid.
+        """
+        try:
+            return native_plugins.discover_plugins(
+                extra_paths=[self.config.resolve_path(p) for p in self.config.plugin_paths],
+                log=self.log,
+            )
+        except native_plugins.PluginError as exc:
+            raise BuildError(f"Invalid native plugin: {exc}") from exc
+
     def _stage_ios_python(self, project_dir: Path, *, release: bool) -> None:
         """Stage ``app/`` and ``app_packages/`` at the Xcode project root.
 
@@ -314,8 +345,6 @@ class Builder:
         and the "Install Python runtime" build phase converts any
         binary modules inside them into signed frameworks.
         """
-        import shutil
-
         app_dir = project_dir / "app"
         packages_dir = project_dir / "app_packages"
         for directory in (app_dir, packages_dir):
@@ -336,14 +365,9 @@ class Builder:
                 ignore=android_config.LIB_IGNORE,
             )
 
-        # rubicon-objc supplies the iOS Objective-C bridge; user
-        # requirements ride along in the same site directory.
-        result = self.runner.run(
-            [sys.executable, "-m", "pip", "install", "--no-deps", "--upgrade", "rubicon-objc", "-t", str(packages_dir)],
-            capture=True,
-        )
-        if not result.ok:
-            raise BuildError(f"pip install rubicon-objc failed:\n{result.stderr}")
+        # The framework has no Python-side native dependencies (the
+        # bridge into PythonNativeKit is ctypes); only user requirements
+        # are installed into the site directory.
         if self.config.requirements:
             result = self.runner.run(
                 [sys.executable, "-m", "pip", "install", "-t", str(packages_dir), *self.config.requirements],
@@ -389,8 +413,6 @@ class Builder:
         framework is hundreds of megabytes); staging falls back to a
         copy when symlinks are unavailable.
         """
-        import shutil
-
         runtime = self._ios_runtime()
         link = project_dir / "Python.xcframework"
         if link.is_symlink() or link.is_file():

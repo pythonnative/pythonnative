@@ -2,15 +2,12 @@
 
 Off-device the host class is the headless ``ScreenHost``; these tests
 drive it against a ``FakeBackend`` installed as the process registry.
-The iOS-specific pointer and lifecycle-forwarding contracts run in a
-subprocess so the platform module is never imported into the test
-process.
+The on-device host is covered by ``test_bridge.py`` through a
+``FakeTransport``.
 """
 
 import os
-import subprocess
 import sys
-import textwrap
 import types
 from pathlib import Path
 from typing import Any, Iterator, List, Optional
@@ -31,7 +28,7 @@ from pythonnative.testing import FakeBackend, FakeView
 def backend() -> Iterator[FakeBackend]:
     """Install a ``FakeBackend`` as the registry the host mounts into."""
     fake = FakeBackend()
-    set_registry(fake)  # type: ignore[arg-type]
+    set_registry(fake)
     try:
         yield fake
     finally:
@@ -314,74 +311,6 @@ def test_mount_error_propagates_outside_dev_mode(monkeypatch: pytest.MonkeyPatch
         host.on_create()
     assert host._redbox_reconciler is None
     host.on_destroy()
-
-
-# ======================================================================
-# iOS host contracts (subprocess; the platform module stays out of process)
-# ======================================================================
-
-_IOS_SCRIPT = """
-    import sys
-    from pythonnative.hosts import ios
-
-    class StubObjC:
-        # Mimics rubicon-objc's ``ObjCInstance.ptr`` attribute.
-        def __init__(self, ptr):
-            self.ptr = ptr
-
-    addr = 4_317_709_568
-    bytes_ptr = addr.to_bytes(8, byteorder=sys.byteorder, signed=False)
-
-    # rubicon-objc 0.5.x exposes ``ptr`` as raw bytes; ``int(bytes)`` would
-    # raise, so the address must be decoded with ``int.from_bytes``.
-    assert ios._objc_addr(StubObjC(bytes_ptr)) == addr
-    assert ios._objc_addr(StubObjC(bytearray(bytes_ptr))) == addr
-    # Older releases (and direct callers) hand back an int or a
-    # ``c_void_p``-like object whose ``.value`` is the address.
-    assert ios._objc_addr(StubObjC(0xDEADBEEF)) == 0xDEADBEEF
-
-    class CVoidPLike:
-        value = 0xCAFEF00D
-
-    assert ios._objc_addr(StubObjC(CVoidPLike())) == 0xCAFEF00D
-    assert ios._objc_addr(object()) is None
-
-    # Swift hands ``forward_lifecycle`` a ``UInt`` of the view-controller
-    # address; the host registry must be keyed under that same number.
-    ios._REGISTRY.clear()
-    host = ios.IOSScreenHost(StubObjC(bytes_ptr), "dummy.App", None)
-    assert ios._REGISTRY.get(addr) is host, "host failed to register under its decoded pointer"
-    assert host.is_focused is True
-    ios.forward_lifecycle(addr, "on_pause")
-    assert host.is_focused is False, "forwarded lifecycle event did not reach the host"
-    ios.forward_lifecycle(addr, "on_resume")
-    assert host.is_focused is True
-    ios.forward_lifecycle(addr, "on_layout")
-    ios.forward_lifecycle(999, "on_resume")  # unknown addresses are ignored
-    host.on_destroy()
-    assert addr not in ios._REGISTRY
-    print("IOS_HOST_OK")
-"""
-
-
-def test_ios_host_pointer_decoding_and_lifecycle_forwarding(tmp_path: Path) -> None:
-    """``_objc_addr`` decodes bytes/int/c_void_p pointers; ``forward_lifecycle`` reaches the host.
-
-    Regression: with ``ptr`` as bytes the iOS host failed to register
-    itself and every ``forward_lifecycle`` call (``on_layout`` /
-    ``on_resume`` / ``on_pause``) silently dropped on the floor.
-    """
-    script = tmp_path / "ios_host_script.py"
-    script.write_text(textwrap.dedent(_IOS_SCRIPT), encoding="utf-8")
-    result = subprocess.run(
-        [sys.executable, os.fspath(script)],
-        env={k: v for k, v in os.environ.items() if k != "PN_PLATFORM"},
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    assert result.returncode == 0, f"stdout={result.stdout!r}\nstderr={result.stderr!r}"
-    assert "IOS_HOST_OK" in result.stdout, f"stdout={result.stdout!r} stderr={result.stderr!r}"
 
 
 # ======================================================================

@@ -22,6 +22,7 @@ from pythonnative.sdk import (
     Props,
     ViewHandler,
     element_factory,
+    get_desktop_handler,
     get_props_type,
     install_into_registry,
     list_components,
@@ -84,49 +85,34 @@ def _clean_registry() -> Any:
 
 
 def test_native_component_registers_handler() -> None:
-    @native_component("Badge", props=BadgeProps, platforms=("ios",))
-    class IOSBadge(StubBadgeHandler):
+    @native_component("Badge", props=BadgeProps)
+    class Badge(StubBadgeHandler):
         pass
 
     assert "Badge" in list_components()
     assert get_props_type("Badge") is BadgeProps
+    assert isinstance(get_desktop_handler("Badge"), Badge)
 
 
-def test_native_component_default_platforms() -> None:
+def test_native_component_without_props() -> None:
     @native_component("Spinner")
     class Spinner(StubBadgeHandler):
         pass
 
-    plat_map = nc_internals._REGISTRY["Spinner"][1]
-    assert set(plat_map.keys()) == {"android", "ios"}
+    assert get_props_type("Spinner") is None
+    assert isinstance(get_desktop_handler("Spinner"), Spinner)
 
 
-def test_native_component_two_platform_specific_classes() -> None:
-    @native_component("Badge", props=BadgeProps, platforms=("ios",))
-    class IOSBadge(StubBadgeHandler):
-        pass
-
-    @native_component("Badge", props=BadgeProps, platforms=("android",))
-    class AndroidBadge(StubBadgeHandler):
-        pass
-
-    plat_map = nc_internals._REGISTRY["Badge"][1]
-    assert set(plat_map.keys()) == {"ios", "android"}
-    assert isinstance(plat_map["ios"], IOSBadge)
-    assert isinstance(plat_map["android"], AndroidBadge)
-
-
-def test_native_component_replaces_handler_for_same_platform() -> None:
-    @native_component("Badge", props=BadgeProps, platforms=("ios",))
+def test_native_component_replaces_handler() -> None:
+    @native_component("Badge", props=BadgeProps)
     class FirstBadge(StubBadgeHandler):
         pass
 
-    @native_component("Badge", props=BadgeProps, platforms=("ios",))
+    @native_component("Badge", props=BadgeProps)
     class SecondBadge(StubBadgeHandler):
         pass
 
-    plat_map = nc_internals._REGISTRY["Badge"][1]
-    assert isinstance(plat_map["ios"], SecondBadge)
+    assert isinstance(get_desktop_handler("Badge"), SecondBadge)
 
 
 def test_native_component_rejects_non_view_handler() -> None:
@@ -144,18 +130,25 @@ def test_native_component_rejects_non_view_handler() -> None:
 
 def test_register_component_basic() -> None:
     handler = StubBadgeHandler()
-    register_component(name="Badge", props=BadgeProps, handlers={"ios": handler})
+    register_component(name="Badge", props=BadgeProps, handler=handler)
     assert get_props_type("Badge") is BadgeProps
-    assert nc_internals._REGISTRY["Badge"][1]["ios"] is handler
+    assert get_desktop_handler("Badge") is handler
 
 
-def test_register_component_merges_platforms() -> None:
+def test_register_component_declares_without_handler() -> None:
+    """A component rendered only natively needs no Python handler."""
+    register_component(name="Badge", props=BadgeProps)
+    assert "Badge" in list_components()
+    assert get_desktop_handler("Badge") is None
+    Badge = element_factory("Badge")
+    assert Badge(text="1").type == "Badge"
+
+
+def test_register_component_merges_later_calls() -> None:
     a = StubBadgeHandler()
-    b = StubBadgeHandler()
-    register_component(name="Badge", handlers={"ios": a})
-    register_component(name="Badge", props=BadgeProps, handlers={"android": b})
-    plat_map = nc_internals._REGISTRY["Badge"][1]
-    assert plat_map == {"ios": a, "android": b}
+    register_component(name="Badge", handler=a)
+    register_component(name="Badge", props=BadgeProps)
+    assert get_desktop_handler("Badge") is a
     # Late-arrived props get installed
     assert get_props_type("Badge") is BadgeProps
 
@@ -165,20 +158,16 @@ def test_register_component_invalid_props_raises() -> None:
         pass
 
     with pytest.raises(TypeError, match="must be a @dataclass type"):
-        register_component(
-            name="Badge",
-            props=NotADataclass,
-            handlers={"ios": StubBadgeHandler()},
-        )
+        register_component(name="Badge", props=NotADataclass, handler=StubBadgeHandler())
 
 
 def test_register_component_invalid_handler_raises() -> None:
     with pytest.raises(TypeError, match="ViewHandler instance"):
-        register_component(name="Badge", handlers={"ios": "not a handler"})  # type: ignore[dict-item]
+        register_component(name="Badge", handler="not a handler")  # type: ignore[arg-type]
 
 
 def test_unregister_component() -> None:
-    register_component(name="Badge", handlers={"ios": StubBadgeHandler()})
+    register_component(name="Badge", handler=StubBadgeHandler())
     assert "Badge" in list_components()
     unregister_component("Badge")
     assert "Badge" not in list_components()
@@ -190,7 +179,7 @@ def test_unregister_component() -> None:
 
 
 def test_element_factory_validates_kwargs_via_props() -> None:
-    register_component(name="Badge", props=BadgeProps, handlers={"ios": StubBadgeHandler()})
+    register_component(name="Badge", props=BadgeProps, handler=StubBadgeHandler())
     Badge = element_factory("Badge")
     el = Badge(text="3", color="#0A84FF")
     assert isinstance(el, Element)
@@ -201,7 +190,7 @@ def test_element_factory_validates_kwargs_via_props() -> None:
 
 
 def test_element_factory_accepts_props_instance() -> None:
-    register_component(name="Badge", props=BadgeProps, handlers={"ios": StubBadgeHandler()})
+    register_component(name="Badge", props=BadgeProps, handler=StubBadgeHandler())
     Badge = element_factory("Badge")
     el = Badge(props=BadgeProps(text="Hi", color="#FFFFFF"))
     assert el.props["text"] == "Hi"
@@ -209,7 +198,7 @@ def test_element_factory_accepts_props_instance() -> None:
 
 
 def test_element_factory_skips_none_default_fields() -> None:
-    register_component(name="Badge", props=BadgeProps, handlers={"ios": StubBadgeHandler()})
+    register_component(name="Badge", props=BadgeProps, handler=StubBadgeHandler())
     Badge = element_factory("Badge")
     el = Badge(props=BadgeProps())
     # ``style`` defaults to None and is dropped.
@@ -220,7 +209,7 @@ def test_element_factory_skips_none_default_fields() -> None:
 
 
 def test_element_factory_resolves_style_arg() -> None:
-    register_component(name="Badge", props=BadgeProps, handlers={"ios": StubBadgeHandler()})
+    register_component(name="Badge", props=BadgeProps, handler=StubBadgeHandler())
     Badge = element_factory("Badge")
     el = Badge(text="5", style=pn.style(padding=4, background_color="#000"))
     assert el.props["padding"] == 4
@@ -229,7 +218,7 @@ def test_element_factory_resolves_style_arg() -> None:
 
 
 def test_element_factory_passes_children() -> None:
-    register_component(name="Container", handlers={"ios": StubBadgeHandler()})
+    register_component(name="Container", handler=StubBadgeHandler())
     Container = element_factory("Container")
     inner = pn.Text("inner")
     el = Container(inner, key="root")
@@ -243,21 +232,21 @@ def test_element_factory_unknown_name_raises() -> None:
 
 
 def test_element_factory_kwargs_against_unknown_field_raises() -> None:
-    register_component(name="Badge", props=BadgeProps, handlers={"ios": StubBadgeHandler()})
+    register_component(name="Badge", props=BadgeProps, handler=StubBadgeHandler())
     Badge = element_factory("Badge")
     with pytest.raises(TypeError, match="Invalid props"):
         Badge(unknown_field=42)
 
 
 def test_element_factory_rejects_both_props_and_kwargs() -> None:
-    register_component(name="Badge", props=BadgeProps, handlers={"ios": StubBadgeHandler()})
+    register_component(name="Badge", props=BadgeProps, handler=StubBadgeHandler())
     Badge = element_factory("Badge")
     with pytest.raises(TypeError, match="Pass either props"):
         Badge(props=BadgeProps(text="a"), text="b")
 
 
 def test_element_factory_without_props_passes_kwargs_through() -> None:
-    register_component(name="Anything", handlers={"ios": StubBadgeHandler()})
+    register_component(name="Anything", handler=StubBadgeHandler())
     Anything = element_factory("Anything")
     el = Anything(arbitrary="value", number=42)
     assert el.props == {"arbitrary": "value", "number": 42}
@@ -268,35 +257,35 @@ def test_element_factory_without_props_passes_kwargs_through() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_install_copies_handlers_for_active_platform() -> None:
+def test_install_copies_desktop_handlers() -> None:
     handler = StubBadgeHandler()
-    register_component(name="Badge", props=BadgeProps, handlers={"ios": handler, "android": handler})
+    register_component(name="Badge", props=BadgeProps, handler=handler)
 
     reg = NativeViewRegistry()
-    install_into_registry(reg, "ios")
+    install_into_registry(reg)
 
     view = _create_view(reg, "Badge", {"text": "hi"})
     assert view["type"] == "badge"
     assert view["props"]["text"] == "hi"
 
 
-def test_install_skips_handlers_not_targeting_platform() -> None:
-    register_component(name="IOSOnly", props=BadgeProps, handlers={"ios": StubBadgeHandler()})
+def test_install_skips_components_without_desktop_handler() -> None:
+    register_component(name="NativeOnly", props=BadgeProps)
 
     reg = NativeViewRegistry()
-    install_into_registry(reg, "android")
+    install_into_registry(reg)
 
-    assert reg.handler_for("IOSOnly") is None
+    assert reg.handler_for("NativeOnly") is None
     # A CreateOp for the missing type is isolated; no view materializes.
-    assert _create_view(reg, "IOSOnly", {}) is None
+    assert _create_view(reg, "NativeOnly", {}) is None
 
 
 def test_install_supports_multiple_components() -> None:
-    register_component(name="A", handlers={"ios": StubBadgeHandler()})
-    register_component(name="B", handlers={"ios": StubBadgeHandler()})
+    register_component(name="A", handler=StubBadgeHandler())
+    register_component(name="B", handler=StubBadgeHandler())
 
     reg = NativeViewRegistry()
-    install_into_registry(reg, "ios")
+    install_into_registry(reg)
 
     assert _create_view(reg, "A", {}) is not None
     assert _create_view(reg, "B", {}) is not None
@@ -321,7 +310,7 @@ def test_entry_point_discovery_runs_once(monkeypatch: pytest.MonkeyPatch) -> Non
 
         def load(self) -> None:
             calls.append(self.name)
-            register_component(name=self.name, handlers={"ios": StubBadgeHandler()})
+            register_component(name=self.name, handler=StubBadgeHandler())
 
     class FakeEntryPoints:
         def select(self, group: str) -> Any:
@@ -356,7 +345,7 @@ def test_entry_point_failure_does_not_break_discovery(monkeypatch: pytest.Monkey
 
         def load(self) -> None:
             self.loaded = True
-            register_component(name="Good", handlers={"ios": StubBadgeHandler()})
+            register_component(name="Good", handler=StubBadgeHandler())
 
     good = GoodEP()
 
@@ -375,20 +364,14 @@ def test_entry_point_failure_does_not_break_discovery(monkeypatch: pytest.Monkey
     assert "Good" in list_components()
 
 
-def test_get_registry_runs_sdk_install(monkeypatch: pytest.MonkeyPatch) -> None:
-    """get_registry pulls SDK handlers in for the active platform."""
+def test_get_registry_runs_sdk_install() -> None:
+    """get_registry pulls SDK desktop handlers into the off-device registry."""
     handler = StubBadgeHandler()
-    register_component(name="Badge", props=BadgeProps, handlers={"ios": handler, "android": handler})
+    register_component(name="Badge", props=BadgeProps, handler=handler)
 
-    # Force the lazy registry to rebuild against a stub backend
+    # Force the lazy registry to rebuild.
     set_registry(None)
-
-    # Patch `_register_builtin_handlers` so we don't need the real
-    # platform-specific handler module.
     import pythonnative.native_views as nv
-
-    original_register_builtin = nv._register_builtin_handlers
-    monkeypatch.setattr(nv, "_register_builtin_handlers", lambda registry: None)
 
     try:
         reg = nv.get_registry()
@@ -396,7 +379,6 @@ def test_get_registry_runs_sdk_install(monkeypatch: pytest.MonkeyPatch) -> None:
         assert view["type"] == "badge"
     finally:
         set_registry(None)
-        monkeypatch.setattr(nv, "_register_builtin_handlers", original_register_builtin)
 
 
 # ---------------------------------------------------------------------------
@@ -426,12 +408,12 @@ def test_sdk_component_drives_reconciler_end_to_end() -> None:
         style: Optional[pn.StyleProp] = None
 
     handler = RecordingHandler()
-    register_component(name="Glass", props=Props2, handlers={"ios": handler, "android": handler})
+    register_component(name="Glass", props=Props2, handler=handler)
 
     Glass = element_factory("Glass")
 
     reg = NativeViewRegistry()
-    install_into_registry(reg, "ios")
+    install_into_registry(reg)
 
     el = Glass(text="hi", intensity=0.8, style=pn.style(padding=8))
 

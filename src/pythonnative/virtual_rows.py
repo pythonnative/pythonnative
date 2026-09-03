@@ -90,9 +90,9 @@ class RowSubtree:
 class RowHostPool:
     """Per-list bookkeeping of row subtrees keyed by native container.
 
-    Platform handlers create one pool per virtualized list view. Keys
-    are platform-stable container identities (Java identity hash on
-    Android, ``contentView`` pointer on iOS).
+    The view backend creates one pool per virtualized list view. Keys
+    are the container ids native sends with ``on_bind_row`` (stable for
+    the life of a recycled cell).
     """
 
     def __init__(self) -> None:

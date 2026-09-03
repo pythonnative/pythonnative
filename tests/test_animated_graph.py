@@ -161,7 +161,7 @@ def test_operator_divide_by_zero_is_safe() -> None:
 
 def test_derived_node_pushes_to_native_attachment() -> None:
     backend = FakeBackend()
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         v = AnimatedValue(0.0)
         iv = v.interpolate([0, 1], [0, 100])
@@ -175,7 +175,7 @@ def test_derived_node_pushes_to_native_attachment() -> None:
 
 def test_derived_chain_pushes_through_operators() -> None:
     backend = FakeBackend()
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         v = AnimatedValue(1.0)
         node = v * 10 + 5
@@ -270,7 +270,7 @@ class _AcceptingBackend(FakeBackend):
 
 def test_values_with_derived_dependents_stay_on_python_driver() -> None:
     backend = _AcceptingBackend()
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         v = AnimatedValue(0.0)
         v.attach(1, "translate_y")

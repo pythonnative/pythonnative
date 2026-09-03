@@ -17,8 +17,9 @@ Example:
 import os
 from typing import Any, Optional
 
-from .. import diagnostics
-from ..utils import IS_ANDROID
+from .registry import native_module
+
+_app_dir_cache: Optional[str] = None
 
 
 class FileSystem:
@@ -39,31 +40,24 @@ class FileSystem:
         On Android the result is `Context.getFilesDir()`. On iOS it is
         the user's Documents directory. On a desktop machine without
         either runtime, a `.pythonnative_data` directory is created
-        under the user's home folder.
+        under the user's home folder. The value comes from the native
+        ``Device`` module's ``info()`` and is cached after the first
+        call.
 
         Returns:
             Absolute path to the app's data directory.
         """
-        if IS_ANDROID:
+        global _app_dir_cache
+        if _app_dir_cache is None:
+            path: Optional[str] = None
             try:
-                from ..utils import get_android_context
-
-                return str(get_android_context().getFilesDir().getAbsolutePath())
+                info = native_module("Device").call("info")
+                if isinstance(info, dict):
+                    path = info.get("app_dir")
             except Exception:
-                diagnostics.swallowed("file_system.FileSystem.app_dir")
-        else:
-            try:
-                from rubicon.objc import ObjCClass
-
-                NSSearchPathForDirectoriesInDomains = ObjCClass(
-                    "NSFileManager"
-                ).defaultManager.URLsForDirectory_inDomains_
-                docs = NSSearchPathForDirectoriesInDomains(9, 1)  # NSDocumentDirectory, NSUserDomainMask
-                if docs and docs.count > 0:
-                    return str(docs.objectAtIndex_(0).path)
-            except Exception:
-                diagnostics.swallowed("file_system.FileSystem.app_dir")
-        return os.path.join(os.path.expanduser("~"), ".pythonnative_data")
+                path = None
+            _app_dir_cache = str(path) if path else os.path.join(os.path.expanduser("~"), ".pythonnative_data")
+        return _app_dir_cache
 
     @staticmethod
     def read_text(path: str, encoding: str = "utf-8") -> Optional[str]:

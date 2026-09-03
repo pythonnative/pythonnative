@@ -16,9 +16,10 @@ runtime, however, is meaningfully different.
   State updates are batched per render pass.
 - Re-rendering produces a new tree; the reconciler diffs it against
   the previous one and applies the smallest set of native mutations.
-- Native widgets are created and updated by direct platform calls
-  (Chaquopy on Android, rubicon-objc on iOS). There is no JavaScript
-  bridge and no V8 / Hermes runtime.
+- Native widgets are created and updated by Swift and Kotlin
+  component managers that receive one serialized transaction per
+  commit over the [native bridge](bridge.md). There is no JavaScript
+  and no V8 / Hermes runtime.
 
 ## The runtime in one diagram
 
@@ -52,11 +53,11 @@ that prevents render storms).
 | Concept | React Native | PythonNative |
 |---|---|---|
 | Component language | JavaScript / TypeScript | Python |
-| Bridge | Async JS bridge (or JSI in newer versions) | None; direct platform calls |
+| Bridge | Fabric: one C++ shadow tree commit per render; TurboModules for device APIs | One JSON transaction per commit applied by Swift / Kotlin component managers; named native modules for device APIs |
 | Threading | UI runs on the main thread; JS on a separate thread | UI and reconciler both on the platform's main thread |
 | Distribution | Metro bundler ships a JS bundle | The `pn` CLI bundles your `app/` and the `pythonnative` package into the native project |
 | Hot reload | Metro fast refresh of the JS bundle | `FileWatcher` plus `ModuleReloader` reloads `.py` modules in place |
-| Native widgets | Wrapped via React Native's bridge | Wrapped via `ViewHandler` classes calling Chaquopy / rubicon-objc directly |
+| Native widgets | Wrapped by Fabric component managers | Wrapped by `PNComponentManager` (Swift) / `ComponentManager` (Kotlin) classes |
 
 The single most important consequence: there is **no async boundary**
 between Python and the native widget. Reading a label's text in Python

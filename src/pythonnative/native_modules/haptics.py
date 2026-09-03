@@ -1,6 +1,6 @@
 """Haptic feedback and raw vibration.
 
-Two interfaces live here:
+Two interfaces live here, both backed by the native ``Haptics`` module:
 
 - [`Haptics`][pythonnative.Haptics]: semantic, iOS-style feedback
   (impact / notification / selection) backed by
@@ -17,20 +17,20 @@ than errors.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from .. import diagnostics
-from ..utils import IS_ANDROID, IS_IOS
+from .registry import native_module
 
 ImpactStyle = str  # "light" | "medium" | "heavy" | "soft" | "rigid"
 NotificationType = str  # "success" | "warning" | "error"
 
-_IOS_IMPACT_STYLE = {"light": 0, "medium": 1, "heavy": 2, "soft": 4, "rigid": 5}
-_IOS_NOTIFICATION_TYPE = {"success": 0, "warning": 1, "error": 2}
 
-# Approximate Android fallback durations (ms) per semantic feedback.
-_ANDROID_IMPACT_MS = {"light": 10, "medium": 20, "heavy": 40, "soft": 15, "rigid": 30}
-_ANDROID_NOTIFICATION_MS = {"success": 30, "warning": 50, "error": 70}
+def _call(method: str, **args: Any) -> None:
+    try:
+        native_module("Haptics").call(method, **args)
+    except Exception:
+        diagnostics.swallowed(f"haptics.{method}")
 
 
 class Haptics:
@@ -39,26 +39,17 @@ class Haptics:
     @staticmethod
     def impact(style: ImpactStyle = "medium") -> None:
         """Play a physical "impact" tap of the given ``style``."""
-        if IS_IOS:
-            _ios_impact(style)
-        elif IS_ANDROID:
-            _android_buzz(_ANDROID_IMPACT_MS.get(style, 20))
+        _call("impact", style=style)
 
     @staticmethod
     def notification(type_: NotificationType = "success") -> None:
         """Play a success / warning / error notification pattern."""
-        if IS_IOS:
-            _ios_notification(type_)
-        elif IS_ANDROID:
-            _android_buzz(_ANDROID_NOTIFICATION_MS.get(type_, 30))
+        _call("notification", type=type_)
 
     @staticmethod
     def selection() -> None:
         """Play the light "selection changed" tick."""
-        if IS_IOS:
-            _ios_selection()
-        elif IS_ANDROID:
-            _android_buzz(8)
+        _call("selection")
 
 
 class Vibration:
@@ -66,116 +57,15 @@ class Vibration:
 
     @staticmethod
     def vibrate(duration_ms: int = 400) -> None:
-        """Vibrate for ``duration_ms`` milliseconds."""
-        if IS_ANDROID:
-            _android_buzz(int(duration_ms))
-        elif IS_IOS:
-            # iOS has no arbitrary-duration API; approximate with a
-            # heavy impact for short buzzes and the legacy AudioServices
-            # vibration for longer ones.
-            if duration_ms >= 200:
-                _ios_legacy_vibrate()
-            else:
-                _ios_impact("heavy")
+        """Vibrate for ``duration_ms`` milliseconds.
+
+        iOS has no arbitrary-duration API; the native module
+        approximates short buzzes with a heavy impact and longer ones
+        with the legacy system vibration sound.
+        """
+        _call("vibrate", duration_ms=int(duration_ms))
 
     @staticmethod
     def cancel() -> None:
         """Cancel an in-progress vibration (Android only)."""
-        if IS_ANDROID:
-            vibrator = _android_vibrator()
-            if vibrator is not None:
-                try:
-                    vibrator.cancel()
-                except Exception:
-                    diagnostics.swallowed("haptics.Vibration.cancel")
-
-
-# ======================================================================
-# iOS
-# ======================================================================
-
-
-def _ios_impact(style: str) -> None:
-    try:
-        from rubicon.objc import ObjCClass
-
-        generator = ObjCClass("UIImpactFeedbackGenerator").alloc().initWithStyle_(_IOS_IMPACT_STYLE.get(style, 1))
-        generator.prepare()
-        generator.impactOccurred()
-    except Exception:
-        diagnostics.swallowed("haptics._ios_impact")
-
-
-def _ios_notification(type_: str) -> None:
-    try:
-        from rubicon.objc import ObjCClass
-
-        generator = ObjCClass("UINotificationFeedbackGenerator").alloc().init()
-        generator.prepare()
-        generator.notificationOccurred_(_IOS_NOTIFICATION_TYPE.get(type_, 0))
-    except Exception:
-        diagnostics.swallowed("haptics._ios_notification")
-
-
-def _ios_selection() -> None:
-    try:
-        from rubicon.objc import ObjCClass
-
-        generator = ObjCClass("UISelectionFeedbackGenerator").alloc().init()
-        generator.prepare()
-        generator.selectionChanged()
-    except Exception:
-        diagnostics.swallowed("haptics._ios_selection")
-
-
-def _ios_legacy_vibrate() -> None:
-    try:
-        from ctypes import CDLL, util
-
-        audio = CDLL(util.find_library("AudioToolbox"))
-        audio.AudioServicesPlaySystemSound(4095)  # kSystemSoundID_Vibrate
-    except Exception:
-        diagnostics.swallowed("haptics._ios_legacy_vibrate")
-
-
-# ======================================================================
-# Android
-# ======================================================================
-
-
-def _android_vibrator() -> Optional[Any]:
-    try:
-        from java import jclass
-
-        from ..utils import get_android_context
-
-        ctx = get_android_context()
-        Build = jclass("android.os.Build")
-        if Build.VERSION.SDK_INT >= 31:
-            VibratorManager = jclass("android.os.VibratorManager")
-            Context = jclass("android.content.Context")
-            manager = ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE)
-            VibratorManager  # referenced for clarity
-            return manager.getDefaultVibrator()
-        Context = jclass("android.content.Context")
-        return ctx.getSystemService(Context.VIBRATOR_SERVICE)
-    except Exception:
-        return None
-
-
-def _android_buzz(duration_ms: int) -> None:
-    vibrator = _android_vibrator()
-    if vibrator is None:
-        return
-    try:
-        from java import jclass
-
-        Build = jclass("android.os.Build")
-        if Build.VERSION.SDK_INT >= 26:
-            VibrationEffect = jclass("android.os.VibrationEffect")
-            effect = VibrationEffect.createOneShot(int(duration_ms), VibrationEffect.DEFAULT_AMPLITUDE)
-            vibrator.vibrate(effect)
-        else:
-            vibrator.vibrate(int(duration_ms))
-    except Exception:
-        diagnostics.swallowed("haptics._android_buzz")
+        _call("cancel")

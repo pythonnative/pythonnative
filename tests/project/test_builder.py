@@ -122,8 +122,11 @@ def test_prepare_ios_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     xcframework = prepared.project_dir / "Python.xcframework"
     assert xcframework.is_dir() or xcframework.is_symlink()
     assert (xcframework / "build" / "utils.sh").is_file()
-    # rubicon-objc is installed into app_packages via pip.
-    assert any("rubicon-objc" in cmd for cmd in runner.commands)
+    # No framework-level pip installs: the bridge into PythonNativeKit is
+    # ctypes, so only [requirements].packages would trigger pip.
+    assert not any("pip" in cmd for cmd in runner.commands)
+    # The Swift runtime package is staged with the Xcode project.
+    assert (prepared.project_dir / "PythonNativeKit" / "Package.swift").is_file()
 
 
 def test_prepare_ios_release_compiles_bytecode_when_versions_match(

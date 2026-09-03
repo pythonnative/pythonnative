@@ -59,7 +59,7 @@ The reference is split per module so each page stays scannable:
 | Hot reload | [Hot reload](hot_reload.md) | [`FileWatcher`][pythonnative.hot_reload.FileWatcher], [`ModuleReloader`][pythonnative.hot_reload.ModuleReloader] |
 | Diagnostics | [Diagnostics](diagnostics.md) | [`HookOrderError`][pythonnative.HookOrderError], [`warn`][pythonnative.diagnostics.warn], [`is_dev`][pythonnative.diagnostics.is_dev], [`report_error`][pythonnative.diagnostics.report_error] |
 | Custom components SDK | [SDK](sdk.md) | [`Props`][pythonnative.sdk._components.Props], [`ViewHandler`][pythonnative.native_views.base.ViewHandler], [`native_component`][pythonnative.sdk._components.native_component], [`register_component`][pythonnative.sdk._components.register_component], [`element_factory`][pythonnative.sdk._components.element_factory] |
-| Utilities | [Utilities](utils.md) | `IS_ANDROID`, `IS_IOS`, [`get_android_context`][pythonnative.utils.get_android_context] |
+| Utilities | [Utilities](utils.md) | `IS_ANDROID`, `IS_IOS`, `IS_DESKTOP` |
 | CLI | [CLI (`pn`)](cli.md) | `pn init`, `pn run`, `pn clean` |
 
 ## Property reference

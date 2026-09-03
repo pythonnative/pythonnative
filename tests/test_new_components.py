@@ -259,7 +259,7 @@ def test_flatlist_scroll_controller_attached_to_ref() -> None:
     assert controller is not None, "mount must publish a ListController on the ref"
 
     # Imperative scroll commands resolve through the process registry.
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         controller.scroll_to_index(2, animated=False)
     finally:

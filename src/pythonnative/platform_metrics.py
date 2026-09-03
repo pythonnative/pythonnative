@@ -245,8 +245,8 @@ def ios_tab_bar_height() -> float:
     deliberately extends the root view past the bottom safe area for
     this very reason; the tab bar absorbs the inset and UIKit
     renders the pill with internal padding for the home indicator.
-    Used by ``pythonnative.native_views.ios.TabBarHandler``; exposed
-    here so the formula is testable without importing the iOS
-    handler module (which requires ``rubicon-objc``).
+    The Swift ``TabBarManager`` applies the same formula natively;
+    this Python copy keeps the layout engine's expectations testable
+    off device.
     """
     return IOS_TAB_BAR_BASE_HEIGHT_PT + get_safe_area_insets().bottom

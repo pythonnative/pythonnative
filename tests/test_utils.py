@@ -10,7 +10,7 @@ from pythonnative.utils import IS_ANDROID, IS_IOS, _detect_ios
 
 class TestIosDetection:
     """``_detect_ios()`` should key off explicit signals only, not on the
-    presence of optional packages like ``rubicon-objc``.
+    presence of optional packages.
     """
 
     def test_detects_via_pn_platform_env(self, monkeypatch: pytest.MonkeyPatch) -> None:

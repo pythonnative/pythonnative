@@ -113,7 +113,16 @@ def View(
 def Column(
     *children: Element,
     style: StyleProp = None,
+    gestures: Optional[List[Any]] = None,
+    hit_slop: Optional[Union[float, Dict[str, float]]] = None,
     on_layout: Optional[Callable[[Dict[str, float]], None]] = None,
+    accessibility_label: Optional[str] = None,
+    accessibility_hint: Optional[str] = None,
+    accessibility_role: Optional[str] = None,
+    accessible: Optional[bool] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -123,12 +132,25 @@ def Column(
     ``flex_direction`` locked to ``"column"``. Use ``View`` directly if
     you need to switch between row and column at runtime.
 
+    Accepts every [`View`][pythonnative.View] prop (gestures, hit slop,
+    accessibility, ``test_id``); only ``flex_direction`` is fixed.
+
     Args:
         *children: Child elements stacked top to bottom.
         style: Style dict (or list of dicts).
+        gestures: Gesture descriptors recognized natively on this view.
+        hit_slop: Extra touch target beyond the bounds (see ``View``).
         on_layout: Callback invoked with
             ``{"x", "y", "width", "height"}`` after layout and on
             frame changes.
+        accessibility_label: Spoken description for screen readers.
+        accessibility_hint: Spoken extra detail (iOS only).
+        accessibility_role: Semantic role for assistive tech.
+        accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech.
+        accessibility_live_region: How AT announces dynamic changes
+            (Android only).
+        test_id: Stable identifier for UI tests.
         ref: Optional [`Ref`][pythonnative.Ref] for native-view access.
         key: Stable identity for keyed reconciliation.
 
@@ -139,9 +161,18 @@ def Column(
         "Column",
         *children,
         style=style,
-        on_layout=on_layout,
         ref=ref,
         key=key,
+        gestures=gestures,
+        hit_slop=hit_slop,
+        on_layout=on_layout,
+        accessibility_label=accessibility_label,
+        accessibility_hint=accessibility_hint,
+        accessibility_role=accessibility_role,
+        accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
         _forced={"flex_direction": "column"},
     )
 
@@ -149,7 +180,16 @@ def Column(
 def Row(
     *children: Element,
     style: StyleProp = None,
+    gestures: Optional[List[Any]] = None,
+    hit_slop: Optional[Union[float, Dict[str, float]]] = None,
     on_layout: Optional[Callable[[Dict[str, float]], None]] = None,
+    accessibility_label: Optional[str] = None,
+    accessibility_hint: Optional[str] = None,
+    accessibility_role: Optional[str] = None,
+    accessible: Optional[bool] = None,
+    accessibility_state: Optional[AccessibilityState] = None,
+    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -159,12 +199,25 @@ def Row(
     ``flex_direction`` locked to ``"row"``. Use ``View`` directly if you
     need to switch between row and column at runtime.
 
+    Accepts every [`View`][pythonnative.View] prop (gestures, hit slop,
+    accessibility, ``test_id``); only ``flex_direction`` is fixed.
+
     Args:
         *children: Child elements arranged left to right.
         style: Style dict (or list of dicts).
+        gestures: Gesture descriptors recognized natively on this view.
+        hit_slop: Extra touch target beyond the bounds (see ``View``).
         on_layout: Callback invoked with
             ``{"x", "y", "width", "height"}`` after layout and on
             frame changes.
+        accessibility_label: Spoken description for screen readers.
+        accessibility_hint: Spoken extra detail (iOS only).
+        accessibility_role: Semantic role for assistive tech.
+        accessible: Override whether the element is exposed to AT.
+        accessibility_state: Current widget state for assistive tech.
+        accessibility_live_region: How AT announces dynamic changes
+            (Android only).
+        test_id: Stable identifier for UI tests.
         ref: Optional [`Ref`][pythonnative.Ref] for native-view access.
         key: Stable identity for keyed reconciliation.
 
@@ -175,9 +228,18 @@ def Row(
         "Row",
         *children,
         style=style,
-        on_layout=on_layout,
         ref=ref,
         key=key,
+        gestures=gestures,
+        hit_slop=hit_slop,
+        on_layout=on_layout,
+        accessibility_label=accessibility_label,
+        accessibility_hint=accessibility_hint,
+        accessibility_role=accessibility_role,
+        accessible=accessible,
+        accessibility_state=accessibility_state,
+        accessibility_live_region=accessibility_live_region,
+        test_id=test_id,
         _forced={"flex_direction": "row"},
     )
 
@@ -326,7 +388,7 @@ def _SafeAreaContainer(
     for edge in _SAFE_AREA_EDGES:
         if edge not in selected:
             continue
-        inset = float(insets.get(edge, 0.0) or 0.0)
+        inset = float(getattr(insets, edge, 0.0) or 0.0)
         if inset > 0:
             resolved[f"padding_{edge}"] = _numeric_edge_padding(resolved, edge) + inset
     return Element("SafeAreaView", resolved, list(children))

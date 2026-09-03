@@ -30,77 +30,42 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Dict, List, Optional, Sequence
 
-from .platform import Platform
-from .runtime import resolve_future
+from .native_modules.registry import native_module
 
 # ======================================================================
 # Internal dispatch helpers
 # ======================================================================
 
 
-def _dispatch_alert(
+async def _present(
     *,
     title: str,
     message: Optional[str],
     buttons: List[Dict[str, Any]],
     style: str,
-    on_result: Any,
-) -> None:
-    """Route an alert request to the active platform presenter.
+) -> int:
+    """Ask the native ``Alert`` module to present and await the chosen index.
 
     ``buttons`` is a list of ``{"label": str, "style":
-    "default"|"cancel"|"destructive"}`` dicts. The presenter must
-    invoke ``on_result(index)`` exactly once when the user picks a
-    button, or ``on_result(-1)`` if the dialog is dismissed without a
-    selection. ``on_result`` may run on any thread.
+    "default"|"cancel"|"destructive"}`` dicts. The module resolves with
+    the index the user picked, or ``-1`` if the dialog was dismissed
+    without a selection. Off device the
+    [`DesktopAlert`][pythonnative.native_modules.desktop.DesktopAlert]
+    implementation records the call and answers from the queue set by
+    [`Alert.set_test_response`][pythonnative.alerts.Alert.set_test_response].
     """
-    if Platform.is_ios:
-        try:
-            from .native_views.ios import _present_alert as _ios_present_alert
-
-            _ios_present_alert(
-                title=title,
-                message=message,
-                buttons=buttons,
-                style=style,
-                on_result=on_result,
-            )
-            return
-        except Exception:
-            on_result(-1)
-            return
-
-    if Platform.is_android:
-        try:
-            from .native_views.android import _present_alert as _android_present_alert
-
-            _android_present_alert(
-                title=title,
-                message=message,
-                buttons=buttons,
-                style=style,
-                on_result=on_result,
-            )
-            return
-        except Exception:
-            on_result(-1)
-            return
-
-    # Test backend: record the call so unit tests can assert on it,
-    # then deliver the configured response.
-    Alert._test_log.append(
-        {
-            "title": title,
-            "message": message,
-            "buttons": list(buttons),
-            "style": style,
-        }
-    )
-    response = Alert._next_test_response()
-    on_result(response)
+    try:
+        result = await native_module("Alert").call_async(
+            "present", title=title, message=message, buttons=buttons, style=style
+        )
+    except Exception:
+        return -1
+    try:
+        return int(result)
+    except (TypeError, ValueError):
+        return -1
 
 
 # ======================================================================
@@ -170,13 +135,14 @@ class Alert:
         [`choose`][pythonnative.alerts.Alert.choose] and ``await``
         the result.
         """
-        _dispatch_alert(
-            title=title,
-            message=message,
-            buttons=[{"label": button, "style": "default"}],
-            style="alert",
-            on_result=lambda _idx: None,
-        )
+        try:
+            native_module("Alert").call(
+                "show", title=title, message=message, buttons=[{"label": button, "style": "default"}], style="alert"
+            )
+        except Exception:
+            from . import diagnostics
+
+            diagnostics.swallowed("alerts.Alert.show")
 
     @staticmethod
     async def confirm(
@@ -206,13 +172,7 @@ class Alert:
                 await save()
             ```
         """
-        loop = asyncio.get_running_loop()
-        future: asyncio.Future[bool] = loop.create_future()
-
-        def _on_result(index: int) -> None:
-            resolve_future(future, index == 1)
-
-        _dispatch_alert(
+        index = await _present(
             title=title,
             message=message,
             buttons=[
@@ -220,9 +180,8 @@ class Alert:
                 {"label": confirm_label, "style": "default"},
             ],
             style="alert",
-            on_result=_on_result,
         )
-        return await future
+        return index == 1
 
     @staticmethod
     async def choose(
@@ -265,9 +224,6 @@ class Alert:
         if not options:
             raise ValueError("Alert.choose requires at least one option")
 
-        loop = asyncio.get_running_loop()
-        future: asyncio.Future[Optional[str]] = loop.create_future()
-
         destructive = set(destructive_labels)
         buttons: List[Dict[str, Any]] = [
             {
@@ -279,20 +235,10 @@ class Alert:
         if cancel_label is not None:
             buttons.append({"label": cancel_label, "style": "cancel"})
 
-        def _on_result(index: int) -> None:
-            if 0 <= index < len(options):
-                resolve_future(future, options[index])
-            else:
-                resolve_future(future, None)
-
-        _dispatch_alert(
-            title=title,
-            message=message,
-            buttons=buttons,
-            style=style,
-            on_result=_on_result,
-        )
-        return await future
+        index = await _present(title=title, message=message, buttons=buttons, style=style)
+        if 0 <= index < len(options):
+            return options[index]
+        return None
 
 
 __all__ = ["Alert"]
