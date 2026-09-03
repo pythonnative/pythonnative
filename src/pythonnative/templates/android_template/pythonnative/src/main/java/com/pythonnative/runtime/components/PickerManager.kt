@@ -20,7 +20,7 @@ class PickerManager : ComponentManager() {
                 if (stateOf(parent)["suppress"] == true) return
                 val items = propsOf(parent).value("items") as? JSONArray ?: return
                 if (position < 0 || position >= items.length()) return
-                fire(parent, "on_change", itemValue(items.opt(position)), position)
+                fire(parent, "on_change", itemValue(items.opt(position)))
             }
 
             override fun onNothingSelected(parent: AdapterView<*>) {}

@@ -67,7 +67,9 @@ public final class PNTabBarManager: PNComponentManager {
             appearance.configureWithOpaqueBackground()
             appearance.backgroundColor = color
             bar.standardAppearance = appearance
-            bar.scrollEdgeAppearance = appearance
+            if #available(iOS 15.0, *) {
+                bar.scrollEdgeAppearance = appearance
+            }
         }
         if PNProps.has(props, "translucent") {
             bar.isTranslucent = PNProps.bool(PNProps.value(props, "translucent")) ?? true

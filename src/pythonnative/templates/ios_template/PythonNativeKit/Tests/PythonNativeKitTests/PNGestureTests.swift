@@ -60,7 +60,24 @@ final class PNGestureTests: XCTestCase {
         XCTAssertEqual(PNGestureCoordinator.stateName(.cancelled), "cancelled")
         XCTAssertEqual(PNGestureCoordinator.swipeDirection("up"), .up)
         XCTAssertEqual(PNGestureCoordinator.swipeDirection("any"), [.left, .right, .up, .down])
-        XCTAssertEqual(PNGestureCoordinator.directionName(.right, fallback: "any"), "right")
+    }
+
+    func testAnyDirectionSwipeInstallsOneRecognizerPerDirection() {
+        let manager = PNViewManager()
+        let view = manager.createView(tag: 3, props: [
+            "gestures": [
+                ["kind": "tap", "simultaneous": [], "wait_for": [1]],
+                ["kind": "swipe", "direction": "any", "simultaneous": [], "wait_for": []],
+            ],
+        ])
+        let recognizers = PNViewState.existing(for: view)?.gestureRecognizers ?? []
+        XCTAssertEqual(recognizers.count, 5, "one tap plus four single-direction swipes")
+        let coordinator = PNGestureCoordinator.shared
+        let swipes = recognizers.compactMap { $0 as? UISwipeGestureRecognizer }
+        XCTAssertEqual(swipes.map { coordinator.direction(of: $0) }, ["left", "right", "up", "down"])
+        XCTAssertEqual(swipes.map { $0.direction }, [.left, .right, .up, .down])
+        XCTAssertTrue(swipes.allSatisfy { coordinator.index(of: $0) == 1 }, "every recognizer reports the spec index")
+        XCTAssertNil(coordinator.direction(of: recognizers[0]))
     }
 
     func testAnimatorTimingParameters() {

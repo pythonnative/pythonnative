@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "PythonNativeKit",
-    platforms: [.iOS(.v16)],
+    platforms: [.iOS(.v13)],
     products: [
         .library(name: "PythonNativeKit", targets: ["PythonNativeKit"]),
     ],

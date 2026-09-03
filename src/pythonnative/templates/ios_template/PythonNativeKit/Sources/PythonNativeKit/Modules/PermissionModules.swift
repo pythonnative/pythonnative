@@ -36,11 +36,11 @@ public final class PermissionsModule: PNNativeModule {
         case "microphone":
             done(PermissionsModule.status(AVCaptureDevice.authorizationStatus(for: .audio)))
         case "photos":
-            done(PermissionsModule.status(PHPhotoLibrary.authorizationStatus(for: .readWrite)))
+            done(PermissionsModule.status(PHPhotoLibrary.pnReadWriteAuthorizationStatus()))
         case "contacts":
             done(PermissionsModule.status(CNContactStore.authorizationStatus(for: .contacts)))
         case "location":
-            done(PermissionsModule.status(CLLocationManager().authorizationStatus))
+            done(PermissionsModule.status(CLLocationManager().pnAuthorizationStatus))
         case "notifications":
             UNUserNotificationCenter.current().getNotificationSettings { settings in
                 let status: String
@@ -67,7 +67,7 @@ public final class PermissionsModule: PNNativeModule {
         case "microphone":
             AVCaptureDevice.requestAccess(for: .audio) { finish($0 ? "granted" : "blocked") }
         case "photos":
-            PHPhotoLibrary.requestAuthorization(for: .readWrite) { finish(PermissionsModule.status($0)) }
+            PHPhotoLibrary.pnRequestReadWriteAuthorization { finish(PermissionsModule.status($0)) }
         case "contacts":
             CNContactStore().requestAccess(for: .contacts) { granted, _ in finish(granted ? "granted" : "blocked") }
         case "notifications":
@@ -140,7 +140,7 @@ final class PNLocationPermissionRequester: NSObject, CLLocationManagerDelegate {
     }
 
     func start() {
-        let current = manager.authorizationStatus
+        let current = manager.pnAuthorizationStatus
         if current != .notDetermined {
             finish(PermissionsModule.status(current))
             return
@@ -149,7 +149,7 @@ final class PNLocationPermissionRequester: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        let status = manager.authorizationStatus
+        let status = manager.pnAuthorizationStatus
         if status != .notDetermined {
             finish(PermissionsModule.status(status))
         }
@@ -189,7 +189,7 @@ public final class NotificationsModule: PNNativeModule {
             center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)) { error in
                 DispatchQueue.main.async {
                     if let error = error {
-                        PNLog.modules.error("schedule failed: \(error.localizedDescription, privacy: .public)")
+                        PNLog.modules.error("schedule failed: \(error.localizedDescription)")
                     }
                     promise.resolve(error == nil)
                 }

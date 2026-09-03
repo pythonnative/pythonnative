@@ -110,7 +110,7 @@ public enum PNTransaction {
         do {
             ops = try decode(json)
         } catch {
-            PNLog.bridge.error("transaction rejected: \(String(describing: error), privacy: .public)")
+            PNLog.bridge.error("transaction rejected: \(String(describing: error))")
             return
         }
         apply(ops)

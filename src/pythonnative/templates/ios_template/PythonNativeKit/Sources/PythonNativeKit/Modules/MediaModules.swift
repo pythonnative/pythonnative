@@ -65,7 +65,7 @@ final class PNImagePickerSession: NSObject, UIImagePickerControllerDelegate, UIN
             try data.write(to: file, options: [.atomic])
             done(file.path)
         } catch {
-            PNLog.modules.error("could not save picked image: \(error.localizedDescription, privacy: .public)")
+            PNLog.modules.error("could not save picked image: \(error.localizedDescription)")
             done(nil)
         }
     }
@@ -127,7 +127,7 @@ final class PNLocationSession: NSObject, CLLocationManagerDelegate {
         timer = Timer.scheduledTimer(withTimeInterval: timeout, repeats: false) { [weak self] _ in
             self?.finish(nil)
         }
-        switch manager.authorizationStatus {
+        switch manager.pnAuthorizationStatus {
         case .notDetermined:
             manager.requestWhenInUseAuthorization()
         case .denied, .restricted:
@@ -138,7 +138,7 @@ final class PNLocationSession: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        switch manager.authorizationStatus {
+        switch manager.pnAuthorizationStatus {
         case .authorizedAlways, .authorizedWhenInUse:
             manager.requestLocation()
         case .denied, .restricted:
@@ -163,7 +163,7 @@ final class PNLocationSession: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        PNLog.modules.error("location failed: \(error.localizedDescription, privacy: .public)")
+        PNLog.modules.error("location failed: \(error.localizedDescription)")
         finish(nil)
     }
 

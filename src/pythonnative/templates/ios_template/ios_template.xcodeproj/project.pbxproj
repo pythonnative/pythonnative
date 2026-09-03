@@ -522,6 +522,7 @@
 					"-Wl,-exported_symbol,_pn_bridge_free",
 					"-Wl,-exported_symbol,_pn_bridge_set_callback",
 					"-Wl,-exported_symbol,_pn_bridge_protocol_version",
+					"-Wl,-exported_symbol,_main",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pythonnative.ios-template";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -571,6 +572,7 @@
 					"-Wl,-exported_symbol,_pn_bridge_free",
 					"-Wl,-exported_symbol,_pn_bridge_set_callback",
 					"-Wl,-exported_symbol,_pn_bridge_protocol_version",
+					"-Wl,-exported_symbol,_main",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pythonnative.ios-template";
 				PRODUCT_NAME = "$(TARGET_NAME)";

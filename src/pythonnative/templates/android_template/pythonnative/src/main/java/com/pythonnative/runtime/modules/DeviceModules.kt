@@ -60,13 +60,24 @@ class AlertModule : NativeModule {
 
     override fun call(method: String, args: JSONObject, promise: Promise) {
         when (method) {
-            "show" -> show(args, promise)
+            "present" -> present(args, promise, fireAndForget = false)
+            "show" -> present(args, promise, fireAndForget = true)
             else -> promise.rejectUnknownMethod(method)
         }
     }
 
-    private fun show(args: JSONObject, promise: Promise) {
-        val activity = PNBridge.activity() ?: return promise.reject("no activity", "no_activity")
+    /**
+     * Build and show the dialog. `present` resolves with the tapped button
+     * index (or -1 on dismiss); `show` resolves immediately so the Python
+     * side's synchronous `call("show")` returns before the dialog closes.
+     */
+    private fun present(args: JSONObject, promise: Promise, fireAndForget: Boolean) {
+        val activity = PNBridge.activity()
+        if (activity == null) {
+            if (fireAndForget) promise.resolve(null) else promise.reject("no activity", "no_activity")
+            return
+        }
+        if (fireAndForget) promise.resolve(null)
         val builder = AlertDialog.Builder(activity)
         builder.setTitle(args.str("title") ?: "")
         args.str("message")?.let { builder.setMessage(it) }
@@ -92,7 +103,7 @@ class AlertModule : NativeModule {
         fun deliver(index: Int) {
             if (delivered) return
             delivered = true
-            promise.resolve(index)
+            if (!fireAndForget) promise.resolve(index)
         }
         specs.forEachIndexed { i, spec ->
             val label = spec.str("label") ?: "OK"

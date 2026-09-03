@@ -237,7 +237,7 @@ open class PNViewController: UIViewController {
 
     /// Replace the screen with a full-bleed error report.
     public func showBootstrapError(_ message: String) {
-        PNLog.screens.error("\(message, privacy: .public)")
+        PNLog.screens.error("\(message)")
         let text = UITextView(frame: view.bounds)
         text.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         text.isEditable = false

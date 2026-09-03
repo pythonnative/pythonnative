@@ -42,6 +42,17 @@ public final class PNSwitchManager: PNComponentManager {
     public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize {
         CGSize(width: 51, height: 31)
     }
+
+    /// `UISwitch` ignores the size part of `frame`, but the base class sets
+    /// `bounds` directly, which would stretch its hit area (and accessibility
+    /// frame) across a stretched flex cross axis. Pin the box to the natural
+    /// size at the layout origin so taps land on the visible control.
+    public override func setFrame(view: UIView, x: Double, y: Double, w: Double, h: Double) {
+        let natural = view.intrinsicContentSize
+        let pw = natural.width > 0 ? min(w, Double(natural.width)) : w
+        let ph = natural.height > 0 ? min(h, Double(natural.height)) : h
+        super.setFrame(view: view, x: x, y: y, w: pw, h: ph)
+    }
 }
 
 /// `Slider`: `UISlider` emitting `on_change(float)`.
@@ -221,7 +232,7 @@ public final class PNDatePickerManager: PNComponentManager {
 
     public override func makeView(props: [String: Any]) -> UIView {
         let picker = UIDatePicker(frame: .zero)
-        picker.preferredDatePickerStyle = .compact
+        picker.pnApplyCompactStyle()
         return picker
     }
 

@@ -45,32 +45,41 @@ public final class PNGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         guard let state = PNViewState.existing(for: view) else { return }
         let list = ((specs as? [Any]) ?? []).map { ($0 as? [String: Any]) ?? [:] }
         guard !list.isEmpty else { return }
-        var built: [Int: UIGestureRecognizer] = [:]
+        // A spec may own several recognizers (an any-direction swipe is
+        // one `UISwipeGestureRecognizer` per direction), so relationships
+        // are wired spec-to-spec across every recognizer on each side.
+        var built: [Int: [UIGestureRecognizer]] = [:]
         for (index, spec) in list.enumerated() {
-            guard let recognizer = makeRecognizer(spec) else {
+            let recognizers = makeRecognizers(spec)
+            if recognizers.isEmpty {
                 PNLog.once(PNLog.gestures, key: "kind:\(PNProps.string(spec["kind"]) ?? "")", "unsupported gesture kind '\(PNProps.string(spec["kind"]) ?? "")'")
                 continue
             }
-            let entry = Entry(
-                index: index,
-                kind: PNProps.string(spec["kind"]) ?? "",
-                simultaneous: Set(((spec["simultaneous"] as? [Any]) ?? []).compactMap { PNProps.int($0) }),
-                minVelocity: CGFloat(PNProps.double(spec["min_velocity"]) ?? 300),
-                direction: PNProps.string(spec["direction"]) ?? "any"
-            )
-            entries[ObjectIdentifier(recognizer)] = entry
-            recognizer.delegate = self
-            recognizer.cancelsTouchesInView = false
-            recognizer.addTarget(self, action: #selector(handle(_:)))
-            view.addGestureRecognizer(recognizer)
-            state.gestureRecognizers.append(recognizer)
-            built[index] = recognizer
+            for (recognizer, direction) in recognizers {
+                let entry = Entry(
+                    index: index,
+                    kind: PNProps.string(spec["kind"]) ?? "",
+                    simultaneous: Set(((spec["simultaneous"] as? [Any]) ?? []).compactMap { PNProps.int($0) }),
+                    minVelocity: CGFloat(PNProps.double(spec["min_velocity"]) ?? 300),
+                    direction: direction ?? PNProps.string(spec["direction"]) ?? "any"
+                )
+                entries[ObjectIdentifier(recognizer)] = entry
+                recognizer.delegate = self
+                recognizer.cancelsTouchesInView = false
+                recognizer.addTarget(self, action: #selector(handle(_:)))
+                view.addGestureRecognizer(recognizer)
+                state.gestureRecognizers.append(recognizer)
+                built[index, default: []].append(recognizer)
+            }
         }
         for (index, spec) in list.enumerated() {
-            guard let recognizer = built[index] else { continue }
+            guard let recognizers = built[index] else { continue }
             for wait in ((spec["wait_for"] as? [Any]) ?? []).compactMap({ PNProps.int($0) }) {
-                if let other = built[wait], other !== recognizer {
-                    recognizer.require(toFail: other)
+                guard wait != index, let others = built[wait] else { continue }
+                for recognizer in recognizers {
+                    for other in others {
+                        recognizer.require(toFail: other)
+                    }
                 }
             }
         }
@@ -90,32 +99,47 @@ public final class PNGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
 
     // MARK: - Recognizer construction
 
-    func makeRecognizer(_ spec: [String: Any]) -> UIGestureRecognizer? {
+    /// Build the recognizer(s) for one spec as `(recognizer, direction)`
+    /// pairs. `direction` is set only for swipe / fling recognizers: a
+    /// `UISwipeGestureRecognizer` reports its configured mask rather than
+    /// the direction it resolved, so `direction = "any"` installs one
+    /// recognizer per direction and tags each with its own name.
+    func makeRecognizers(_ spec: [String: Any]) -> [(UIGestureRecognizer, String?)] {
         switch PNProps.string(spec["kind"]) ?? "" {
         case "tap":
             let tap = UITapGestureRecognizer()
             tap.numberOfTapsRequired = max(1, PNProps.int(spec["n_taps"]) ?? 1)
-            return tap
+            return [(tap, nil)]
         case "long_press":
             let press = UILongPressGestureRecognizer()
             press.minimumPressDuration = max(0.01, (PNProps.double(spec["min_duration_ms"]) ?? 500) / 1000)
             press.allowableMovement = CGFloat(PNProps.double(spec["max_distance"]) ?? 12)
-            return press
+            return [(press, nil)]
         case "pan":
-            return PNPanGestureRecognizer(minDistance: CGFloat(PNProps.double(spec["min_distance"]) ?? 10))
+            return [(PNPanGestureRecognizer(minDistance: CGFloat(PNProps.double(spec["min_distance"]) ?? 10)), nil)]
         case "swipe", "fling":
-            let swipe = UISwipeGestureRecognizer()
-            swipe.direction = PNGestureCoordinator.swipeDirection(PNProps.string(spec["direction"]) ?? "any")
-            swipe.numberOfTouchesRequired = max(1, PNProps.int(spec["n_pointers"]) ?? 1)
-            return swipe
+            let requested = PNProps.string(spec["direction"]) ?? "any"
+            let directions = PNGestureCoordinator.swipeDirectionNames.contains(requested)
+                ? [requested]
+                : PNGestureCoordinator.swipeDirectionNames
+            let touches = max(1, PNProps.int(spec["n_pointers"]) ?? 1)
+            return directions.map { name in
+                let swipe = UISwipeGestureRecognizer()
+                swipe.direction = PNGestureCoordinator.swipeDirection(name)
+                swipe.numberOfTouchesRequired = touches
+                return (swipe, name)
+            }
         case "pinch":
-            return UIPinchGestureRecognizer()
+            return [(UIPinchGestureRecognizer(), nil)]
         case "rotation":
-            return UIRotationGestureRecognizer()
+            return [(UIRotationGestureRecognizer(), nil)]
         default:
-            return nil
+            return []
         }
     }
+
+    /// The single-direction names a swipe spec may request.
+    public static let swipeDirectionNames = ["left", "right", "up", "down"]
 
     /// Map a Python direction name to `UISwipeGestureRecognizer.Direction`.
     public static func swipeDirection(_ name: String) -> UISwipeGestureRecognizer.Direction {
@@ -188,7 +212,7 @@ public final class PNGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
             // UIKit reports swipes as a single `.ended`; Python expects `ended`.
             guard swipe.state == .ended || swipe.state == .recognized else { return }
             state = "ended"
-            payload["direction"] = PNGestureCoordinator.directionName(swipe.direction, fallback: entry.direction)
+            payload["direction"] = entry.direction
             payload["pointer_count"] = max(1, swipe.numberOfTouchesRequired)
         case is UITapGestureRecognizer:
             guard recognizer.state == .ended || recognizer.state == .recognized else { return }
@@ -212,12 +236,12 @@ public final class PNGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         }
     }
 
-    static func directionName(_ direction: UISwipeGestureRecognizer.Direction, fallback: String) -> String {
-        if direction == .left { return "left" }
-        if direction == .right { return "right" }
-        if direction == .up { return "up" }
-        if direction == .down { return "down" }
-        return fallback
+    /// The direction name recorded for a swipe / fling recognizer (exposed for tests).
+    public func direction(of recognizer: UIGestureRecognizer) -> String? {
+        guard let entry = entries[ObjectIdentifier(recognizer)], entry.kind == "swipe" || entry.kind == "fling" else {
+            return nil
+        }
+        return entry.direction
     }
 }
 
