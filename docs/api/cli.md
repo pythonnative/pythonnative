@@ -15,7 +15,9 @@ the documented behavior never drifts from the code.
 - `pn doctor [android|ios]`: diagnose the local toolchain and validate
   `pythonnative.toml`, including that a `python3.X` matching
   `[app].python_version` is available for package resolution. Exits
-  non-zero when something will block a build.
+  non-zero when something will block a build. Flag: `--json` to print a
+  JSON array of check results to stdout for scripting; the verdict line
+  goes to stderr instead, and the exit status is unchanged.
 - `pn deps [android|ios]`: resolve `[requirements].packages` for every
   device target (iOS device, iOS Simulator, and each Android ABI)
   without installing anything, and report the wheel each package would

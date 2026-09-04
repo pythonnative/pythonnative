@@ -112,3 +112,16 @@ def test_check_result_format() -> None:
     line = doctor.CheckResult("Thing", doctor.OK, "all good").format()
     assert "Thing" in line
     assert "all good" in line
+
+
+def test_check_result_to_dict() -> None:
+    assert doctor.CheckResult("Thing", doctor.WARN, "heads up").to_dict() == {
+        "name": "Thing",
+        "level": doctor.WARN,
+        "message": "heads up",
+    }
+    assert doctor.CheckResult("Bare", doctor.OK).to_dict() == {
+        "name": "Bare",
+        "level": doctor.OK,
+        "message": "",
+    }

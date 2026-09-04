@@ -5,7 +5,8 @@ The console script `pn` (declared in `pyproject.toml`) dispatches to:
 - `pn init [name]`: scaffold a new project (``pythonnative.toml`` +
   ``app/``) into ``./name/``, or into the current directory when no name
   is given.
-- `pn doctor [platform]`: diagnose the local toolchain and config.
+- `pn doctor [platform]`: diagnose the local toolchain and config, as a
+  report or as JSON with `--json`.
 - `pn deps [platform]`: resolve ``[requirements].packages`` for every
   device target and report which wheels would be used (or why a package
   can't be installed), without building anything.
@@ -264,26 +265,48 @@ def init_project(args: argparse.Namespace) -> None:
 # ======================================================================
 
 
+def _print_doctor_summary(level: str, stream: TextIO) -> None:
+    """Print the one-line verdict for ``level`` to ``stream``.
+
+    Shared by both output modes so the wording can't drift between the
+    report (stdout) and ``--json`` (stderr).
+    """
+    if level == doctor_mod.ERROR:
+        print("Found problems that will block builds. Address the [x] items above.", file=stream)
+    elif level == doctor_mod.WARN:
+        print("Ready, with warnings. Review the [!] items above.", file=stream)
+    else:
+        print("Everything looks good.", file=stream)
+
+
 def doctor_command(args: argparse.Namespace) -> None:
     """Run toolchain/config diagnostics and exit non-zero on errors.
 
+    With ``--json``, stdout carries a JSON array and nothing else, one
+    object per check (see ``CheckResult.to_dict``), and the verdict line
+    goes to stderr. The exit status stays keyed to the worst check level
+    either way.
+
     Args:
-        args: Parsed namespace with optional ``platform``.
+        args: Parsed namespace with optional ``platform`` and ``json``.
     """
     platform: Optional[str] = getattr(args, "platform", None)
+    as_json: bool = getattr(args, "json", False)
     results = doctor_mod.run_doctor(Path.cwd(), platform=platform)
-    print("PythonNative doctor\n")
-    for result in results:
-        print(result.format())
     level = doctor_mod.worst_level(results)
-    print()
-    if level == doctor_mod.ERROR:
-        print("Found problems that will block builds. Address the [x] items above.")
-        sys.exit(1)
-    if level == doctor_mod.WARN:
-        print("Ready, with warnings. Review the [!] items above.")
+
+    if as_json:
+        print(json.dumps([result.to_dict() for result in results], indent=2))
+        _print_doctor_summary(level, sys.stderr)
     else:
-        print("Everything looks good.")
+        print("PythonNative doctor\n")
+        for result in results:
+            print(result.format())
+        print()
+        _print_doctor_summary(level, sys.stdout)
+
+    if level == doctor_mod.ERROR:
+        sys.exit(1)
 
 
 def app_id_command(args: argparse.Namespace) -> None:
@@ -1069,6 +1092,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser_doctor = subparsers.add_parser("doctor", help="Diagnose the local toolchain and config")
     parser_doctor.add_argument("platform", nargs="?", choices=["android", "ios"], help="Restrict checks to a platform")
+    parser_doctor.add_argument(
+        "--json", action="store_true", help="Print a JSON array to stdout for scripting (the verdict goes to stderr)"
+    )
     parser_doctor.set_defaults(func=doctor_command)
 
     parser_deps = subparsers.add_parser(
