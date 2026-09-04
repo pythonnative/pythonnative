@@ -80,16 +80,44 @@ def _sha256(path: Path) -> str:
 
 
 def _safe_extract(tar_path: Path, dest: Path) -> None:
-    """Extract a tarball, refusing entries that escape ``dest``."""
+    """Extract a tarball, refusing entries that escape ``dest``.
+
+    The manual checks below cover path escapes, link escapes, and special
+    files. They are not a ``data_filter`` equivalent: notably they do not
+    sanitize modes, so on the fallback path setuid/setgid bits and a
+    directory member's permissions are applied as the archive states them.
+    That is accepted here because the asset is pinned by SHA-256 and its
+    ``build/utils.sh`` has to stay executable.
+    """
     dest = dest.resolve()
     with tarfile.open(tar_path, "r:gz") as tar:
         members = tar.getmembers()
         for member in members:
             target = (dest / member.name).resolve()
-            if not str(target).startswith(str(dest)):
+            # ``is_relative_to`` compares path components. A string prefix
+            # test would accept a sibling whose name merely starts with
+            # ``dest``, such as ``../out-evil/x.txt`` beside ``out/``.
+            if not target.is_relative_to(dest):
                 raise RuntimeError(f"Refusing to extract unsafe path: {member.name}")
-        # ``filter='data'`` (3.12+) blocks unsafe members; older Pythons
-        # fall back to the manual check above.
+            if member.issym() or member.islnk():
+                # A link's name can be innocuous while its target escapes.
+                # Symlink targets resolve against the link's own directory;
+                # hardlink targets are relative to the archive root.
+                base = target.parent if member.issym() else dest
+                link_target = (base / member.linkname).resolve()
+                if not link_target.is_relative_to(dest):
+                    raise RuntimeError(f"Refusing to extract unsafe link: {member.name} -> {member.linkname}")
+            if member.isdev():
+                # FIFOs and device nodes. ``filter="data"`` rejects these;
+                # the fallback would otherwise mknod them. Every member of
+                # the pinned archives is a file, directory, or symlink.
+                raise RuntimeError(f"Refusing to extract special file: {member.name}")
+        # ``filter='data'`` is available on every supported interpreter, so
+        # it always runs and blocks unsafe members too. The manual checks
+        # above are the primary boundary check: they run first, and their
+        # refusals are what the tests pin. The ``except TypeError`` branch
+        # below is unreachable on >=3.13; it is kept rather than removed
+        # unilaterally.
         try:
             tar.extractall(dest, filter="data")
         except TypeError:
