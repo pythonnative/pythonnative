@@ -886,6 +886,8 @@
       
         
       
+        
+      
     
     
     
@@ -1228,6 +1230,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/pypi-packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Packages
   
 
     
@@ -4040,7 +4070,7 @@ positional parts; they flatten into a single native attributed string
 <li><code>content_container_style</code>: style for the inner content wrapper (padding,
   alignment, spacing), distinct from <code>style</code> (the scroll frame)</li>
 <li><code>keyboard_dismiss_mode</code>: <code>"none"</code>, <code>"on_drag"</code>, or <code>"interactive"</code></li>
-<li><code>refresh_control</code>: pull-to-refresh spec (see <a href="#refreshcontrol"><code>RefreshControl</code></a>)</li>
+<li><code>refresh_control</code>: pull-to-refresh element (see <a href="#refreshcontrol"><code>RefreshControl</code></a>)</li>
 </ul>
 <h2 id="textinput">TextInput<a class="headerlink" href="#textinput" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">TextInput</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">placeholder</span><span class="o">=</span><span class="s2">"Enter text"</span><span class="p">,</span> <span class="n">on_change</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">secure</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
@@ -4275,7 +4305,7 @@ absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">ScrollView</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">refresh_control</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">RefreshControl</span><span class="p">(</span>
 </span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>    <span class="n">refreshing</span><span class="o">=</span><span class="n">loading</span><span class="p">,</span> <span class="n">on_refresh</span><span class="o">=</span><span class="n">reload</span><span class="p">,</span> <span class="n">tint_color</span><span class="o">=</span><span class="s2">"#007AFF"</span><span class="p">))</span>
 </span></code></pre></div>
-<p>Pull-to-refresh spec (a plain dict) passed to a <code>ScrollView</code> or <code>FlatList</code>.</p>
+<p>Pull-to-refresh control, an element of type <code>"RefreshControl"</code>, passed as the <code>refresh_control=</code> prop of a <code>ScrollView</code>, <code>FlatList</code>, or <code>SectionList</code>. The scroll container attaches it to its native scroll view rather than rendering it as a child, and raises <code>TypeError</code> for anything that isn't a <code>RefreshControl</code>.</p>
 <ul>
 <li><code>refreshing</code>: drive the spinner from state</li>
 <li><code>on_refresh</code>: callback <code>() -&gt; None</code> when pulled past threshold</li>
@@ -4341,7 +4371,7 @@ absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
 <li><code>on_end_reached</code>: callback <code>() -&gt; None</code> near the end (virtualized)</li>
 <li><code>on_end_reached_threshold</code>: fraction-of-viewport trigger distance</li>
 <li><code>content_container_style</code>: style for the inner content wrapper</li>
-<li><code>refresh_control</code>: pull-to-refresh spec (see <a href="#refreshcontrol"><code>RefreshControl</code></a>)</li>
+<li><code>refresh_control</code>: pull-to-refresh element (see <a href="#refreshcontrol"><code>RefreshControl</code></a>)</li>
 </ul>
 
 

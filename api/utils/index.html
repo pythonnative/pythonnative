@@ -886,6 +886,8 @@
       
         
       
+        
+      
     
     
     
@@ -1228,6 +1230,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/pypi-packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Packages
   
 
     
@@ -3302,9 +3332,9 @@ results are cached the first time
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>True</code> when running inside an Android process (either
-because <code>ANDROID_*</code> env vars are present or because Chaquopy's
-<code>java</code> module imports successfully).</p>
+                <p><code>True</code> when running inside an Android process
+(<code>sys.platform == "android"</code> on the embedded CPython 3.13+, or
+Chaquopy's <code>java</code> module imports successfully).</p>
               </div>
             </td>
           </tr>
@@ -3320,9 +3350,9 @@ because <code>ANDROID_*</code> env vars are present or because Chaquopy's
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>True</code> when running inside an iOS app bundle (signaled by
-<code>PN_PLATFORM=ios</code>, <code>sys.platform == "ios"</code>, or a Simulator
-<code>HOME</code> path).</p>
+                <p><code>True</code> when running inside an iOS app bundle
+(<code>sys.platform == "ios"</code> on the embedded CPython 3.13+, or the
+explicit <code>PN_PLATFORM=ios</code> override).</p>
               </div>
             </td>
           </tr>
@@ -3389,8 +3419,8 @@ app can render in a real OS window for fast local iteration.</p>
     <div class="doc doc-contents ">
 
         <p><code>True</code> when running inside an Android process.</p>
-<p>The flag is computed once at import time, by checking for <code>ANDROID_*</code>
-environment variables and trying to import Chaquopy's <code>java</code> module.</p>
+<p>The flag is computed once at import time, from <code>sys.platform ==
+"android"</code> or a successful import of Chaquopy's <code>java</code> module.</p>
 
     </div>
 
@@ -3415,9 +3445,8 @@ environment variables and trying to import Chaquopy's <code>java</code> module.<
     <div class="doc doc-contents ">
 
         <p><code>True</code> when running inside an iOS app bundle.</p>
-<p>The flag is computed once at import time, by checking
-<code>PN_PLATFORM=ios</code>, <code>sys.platform == "ios"</code>, and the iOS Simulator
-<code>HOME</code> path.</p>
+<p>The flag is computed once at import time, from <code>sys.platform ==
+"ios"</code> or the explicit <code>PN_PLATFORM=ios</code> override.</p>
 
     </div>
 

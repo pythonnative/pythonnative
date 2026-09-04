@@ -886,6 +886,8 @@
       
         
       
+        
+      
     
     
     
@@ -1228,6 +1230,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/pypi-packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Packages
   
 
     
@@ -3578,21 +3608,25 @@ that's how the unit-test suite works.</p>
 normal Android Studio / Xcode project (sign, archive, upload via
 Play Console / App Store Connect).</p>
 <h2 id="can-i-use-any-python-package">Can I use any Python package?<a class="headerlink" href="#can-i-use-any-python-package" title="Permanent link">&para;</a></h2>
-<p>Pure-Python packages, mostly yes. List them in
-<code>[requirements].packages</code> in <code>pythonnative.toml</code> and the <code>pn</code> CLI
-bundles them into the app:</p>
+<p>Most of them. List packages in <code>[requirements].packages</code> in
+<code>pythonnative.toml</code> and the <code>pn</code> CLI resolves them <strong>for the phone,
+not for your laptop</strong>, then bundles them into the app:</p>
 <ul>
-<li><strong>Android</strong>: the packages are written to the staged template's
-  <code>requirements.txt</code> and Chaquopy installs them into the APK at build
-  time.</li>
-<li><strong>iOS</strong>: pure-Python packages are copied into the app bundle's
-  <code>platform-site/</code>.</li>
+<li><strong>Pure-Python packages</strong> (requests, httpx, pydantic-core-free
+  libraries, and so on) work everywhere.</li>
+<li><strong>Binary wheels</strong> work when the package publishes wheels for the
+  target: iOS wheels (PEP 730, <code>ios_13_0_arm64_iphoneos</code> and the
+  Simulator tags) from the BeeWare index, and Android wheels from the
+  Chaquopy index. numpy, Pillow, cryptography, cffi, lxml, and pandas
+  all resolve out of the box today.</li>
+<li><strong>No wheel for the target</strong> is a build-time error, reported by
+  <code>pn deps</code> with the package name and the target that failed, never a
+  silent import error on the device.</li>
 </ul>
-<p>C extensions are harder. You need a wheel that targets the right
-platform / architecture (<code>armeabi-v7a</code> and <code>arm64-v8a</code> on Android,
-<code>arm64</code>, <code>x86_64</code> for iOS Simulator on iOS). Many popular
-extensions (numpy, Pillow) have no upstream iOS wheels yet, so you'd
-need to build them locally.</p>
+<p>Run <code>pn deps</code> to see how every requirement resolves for each iOS and
+Android target before you build. The
+<a href="../../guides/pypi-packages/">PyPI packages guide</a> covers the details
+and the live compatibility matrix.</p>
 <p>Don't put <code>pythonnative</code> itself in <code>[requirements].packages</code>; the CLI
 bundles the installed copy directly.</p>
 <h2 id="where-do-flex-padding-and-position-absolute-actually-run">Where do <code>flex</code>, <code>padding</code>, and <code>position: "absolute"</code> actually run?<a class="headerlink" href="#where-do-flex-padding-and-position-absolute-actually-run" title="Permanent link">&para;</a></h2>

@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -1377,6 +1379,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pypi-packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Packages
   
 
     
@@ -3571,10 +3601,23 @@ release with the resolved <code>direction</code>).</p>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span><span class="n">min_distance</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">min_pointers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Swipe</span><span class="p">(</span><span class="n">direction</span><span class="o">=</span><span class="s2">"left"</span><span class="p">,</span> <span class="n">min_velocity</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
 </span></code></pre></div>
-<p><code>GestureEvent.state</code> is one of
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;GestureState&lt;/span&gt;" href="../../api/gestures/#pythonnative.gestures.GestureState"><code>GestureState</code></a> (<code>"began"</code>,
-<code>"changed"</code>, <code>"ended"</code>, <code>"cancelled"</code>), which matters mostly when you
-share one handler across slots.</p>
+<p><code>GestureEvent.state</code> is a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;GestureState&lt;/span&gt;" href="../../api/gestures/#pythonnative.gestures.GestureState"><code>GestureState</code></a> enum member
+(<code>BEGAN</code>, <code>CHANGED</code>, <code>ENDED</code>, <code>CANCELLED</code>), which matters mostly when
+you share one handler across slots:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.gestures</span><span class="w"> </span><span class="kn">import</span> <span class="n">GestureState</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">on_pan</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">match</span> <span class="n">event</span><span class="o">.</span><span class="n">state</span><span class="p">:</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">BEGAN</span><span class="p">:</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>            <span class="n">grab</span><span class="p">()</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">CHANGED</span><span class="p">:</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>            <span class="n">move</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">translation_x</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">translation_y</span><span class="p">)</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">ENDED</span> <span class="o">|</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">CANCELLED</span><span class="p">:</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>            <span class="n">release</span><span class="p">()</span>
+</span></code></pre></div>
+<p>It is a <code>str</code> enum, so <code>event.state == "ended"</code> also works.</p>
 <h2 id="gestures-vs-pressable">Gestures vs. <code>Pressable</code><a class="headerlink" href="#gestures-vs-pressable" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Pressable&lt;/span&gt;" href="../../api/components/#pythonnative.components.Pressable"><code>Pressable</code></a> (and <code>on_press</code>) remains the
 right tool for plain buttons: it adds pressed-state feedback and

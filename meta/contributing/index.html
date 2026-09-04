@@ -886,6 +886,8 @@
       
         
       
+        
+      
     
     
     
@@ -1228,6 +1230,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/pypi-packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Packages
   
 
     
@@ -3544,7 +3574,7 @@ The contents are included below so the docs site stays in sync.</p>
 <h3 id="contributing-to-pythonnative">Contributing to PythonNative<a class="headerlink" href="#contributing-to-pythonnative" title="Permanent link">&para;</a></h3>
 <p>Thanks for your interest in contributing. This repository contains the PythonNative library, the <code>pn</code> CLI, Android/iOS project templates, example apps, and the documentation site. Contributions should keep the code reliable, cross-platform, and easy to use.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
-<p>Development uses Python ≥ 3.10 and <a href="https://docs.astral.sh/uv/">uv</a> as the
+<p>Development uses Python ≥ 3.13 (the same versions the apps embed) and <a href="https://docs.astral.sh/uv/">uv</a> as the
 only prerequisite. <code>uv sync</code> creates and updates <code>.venv</code> itself, so there's no
 virtual environment to make and nothing to activate.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># install the project and its dev tooling into .venv, exactly as CI does</span>
@@ -3864,6 +3894,7 @@ way:</p>
 <ul>
 <li><strong>CI</strong> (<code>ci.yml</code>): runs formatter, linter, type checker, and tests on every push and PR.</li>
 <li><strong>E2E</strong> (<code>e2e.yml</code>): builds the hello-world example on Android (Linux emulator) and iOS (macOS simulator), then runs Maestro flows. Triggers on pushes to <code>main</code>, PRs, and manual dispatch.</li>
+<li><strong>Packages</strong> (<code>packages.yml</code>): resolves the PyPI compatibility matrix in <code>tests/packages/matrix.toml</code> against the live indexes with <code>scripts/package-matrix.py --check</code>, weekly and on changes to the resolver or manifest, and uploads the rendered Markdown table for <code>docs/guides/pypi-packages.md</code>.</li>
 <li><strong>PR Lint</strong> (<code>pr-lint.yml</code>): validates the PR title against Conventional Commits format (protects squash merges) and checks individual commit messages via commitlint (protects rebase merges). Recommended: add the <strong>PR title</strong> job as a required status check in branch-protection settings.</li>
 <li><strong>Release</strong> (<code>release.yml</code>): runs on merge to <code>main</code>; computes version, generates changelog, tags, creates GitHub Release, and (when <code>DRAFT_RELEASE</code> is <code>"false"</code>) publishes to PyPI.</li>
 <li><strong>Docs</strong> (<code>docs.yml</code>): builds the MkDocs site in strict mode on every push and pull request, and deploys to GitHub Pages on push to <code>main</code>.</li>

@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -1372,6 +1374,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pypi-packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Packages
   
 
     
@@ -3356,7 +3386,7 @@
 <ul>
 <li><code>Python.xcframework</code>: the embedded CPython runtime for your <code>app.python_version</code> (downloaded once, checksum-verified, and cached under <code>build/ios/ios_runtime/</code>).</li>
 <li><code>app/</code>: your project's Python sources.</li>
-<li><code>app_packages/</code>: the <code>pythonnative</code> package and any <code>[requirements].packages</code>.</li>
+<li><code>app_packages.iphoneos/</code> and <code>app_packages.iphonesimulator/</code>: the <code>pythonnative</code> package plus <code>[requirements].packages</code> resolved for that SDK (device or Simulator), so binary wheels such as numpy land in the right slice. <code>pn run ios</code> against a Simulator stages only the Simulator slice; <code>pn build ios</code> stages both. The "Install Python runtime" build phase copies the slice matching the SDK being built into the app bundle.</li>
 </ul>
 <p><code>PythonNativeKit/</code> holds the native rendering core (component managers, gesture recognizers, animations, native modules) and is linked as a local Swift package. Native plugins from <code>[plugins].paths</code> and installed packages are copied into <code>PythonNativeKit/Sources/PythonNativeKit/Plugins/</code> before <code>xcodebuild</code> runs.</p>
 <p>The Xcode project links the framework at build time and embeds CPython through its C API (<code>PythonRuntime.swift</code>); an "Install Python runtime" build phase installs the standard library and converts binary modules into signed frameworks. The built <code>.app</code> is therefore complete as soon as <code>xcodebuild</code> finishes, with no post-build patching. If Python fails to start or your root component fails to mount, the app shows a full-screen error report with the Python traceback instead of failing silently.</p>
@@ -3400,6 +3430,9 @@ example).</p>
 Simulators window; <code>simctl</code> console attach is Simulator-only.</p>
 <h3 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>iOS 13.0 or newer</strong> on the device or Simulator (<code>[ios].deployment_target</code>
+  can't go lower; it's the floor for BeeWare's CPython and for iOS
+  wheels on PyPI).</li>
 <li><strong>Xcode 14 or newer.</strong> <code>simctl launch --console-pty</code> was added in
   Xcode 14; on older toolchains either upgrade Xcode or pass
   <code>--no-logs</code>.</li>

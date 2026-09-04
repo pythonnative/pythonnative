@@ -1032,6 +1032,8 @@
       
         
       
+        
+      
     
     
     
@@ -1374,6 +1376,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/pypi-packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Packages
   
 
     
@@ -3357,6 +3387,9 @@
 
 
 <h1 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h1>
+<p>PythonNative requires Python 3.13 or newer on your development
+machine: the same interpreter version your app embeds, so packages
+resolve identically on both.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>pythonnative
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pn<span class="w"> </span>--help
 </span></code></pre></div>
@@ -3487,7 +3520,10 @@ approximated, and there's no desktop packaging. Ship to devices with
 </span></code></pre></div>
 <p>The first run still builds and launches the native app. After that,
 edits under <code>app/</code> are copied into the running app's writable source
-overlay and the active page refreshes without a full rebuild.</p>
+overlay and the active page refreshes without a full rebuild. This
+works on Android devices and emulators and on the iOS Simulator;
+physical iPhones don't support hot reload yet (see the
+<a href="../guides/hot-reload/">Hot reload guide</a>).</p>
 <p>PythonNative prefers a <strong>Fast Refresh</strong> path: each
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;component&lt;/span&gt;" href="../api/component/#pythonnative.component.component"><code>@pn.component</code></a> function is matched by
 qualified name across the reloaded module, the live VNode tree's

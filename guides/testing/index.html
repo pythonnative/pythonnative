@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -1231,6 +1233,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pypi-packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Packages
   
 
     
@@ -3659,6 +3689,12 @@ listeners registered through the facades or the <code>use_*</code> hooks fire th
 same way they would on device.</p>
 <p>Use <code>unregister_python_module(name)</code> in a fixture teardown to restore
 the built-in desktop implementation.</p>
+<p>Facades don't swallow errors: a fake that raises
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NativeModuleError&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.registry.NativeModuleError"><code>NativeModuleError</code></a>
+surfaces through the facade to the component, which is the right way
+to test your error handling. User cancellations and denials are
+ordinary return values (<code>None</code> from <code>Camera.launch_camera</code>, <code>False</code>
+from <code>Permissions.request</code>), so fake those by returning them.</p>
 <h2 id="testing-the-bridge">Testing the bridge<a class="headerlink" href="#testing-the-bridge" title="Permanent link">&para;</a></h2>
 <p>The reconciler's on-device backend serializes commits to JSON. To assert
 on what native would receive (or to test a custom component's props at
@@ -3711,6 +3747,16 @@ MyPy). Run them all locally before pushing:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>./scripts/check.sh
 </span></code></pre></div>
 <p>The same commands run in CI on every push and pull request.</p>
+<p>Two optional suites need the network and are skipped by default:</p>
+<ul>
+<li><code>uv run pytest tests/packages -m network</code> resolves every package in
+  <code>tests/packages/matrix.toml</code> against the live PyPI, BeeWare, and
+  Chaquopy indexes and asserts the outcome matches the manifest. The
+  <code>packages</code> workflow runs it weekly. See
+  <a href="../pypi-packages/#compatibility-matrix">PyPI packages</a>.</li>
+<li>The Maestro E2E suite under <code>tests/e2e/</code> drives the example apps on
+  an emulator and a Simulator; see <code>tests/e2e/AGENTS.md</code>.</li>
+</ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Wrap subtrees with <a href="../error-boundaries/">Error boundaries</a> so test

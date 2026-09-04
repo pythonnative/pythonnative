@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -1460,10 +1462,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pinning-a-theme-with-a-provider" class="md-nav__link">
+  <a href="#custom-themes-and-providers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pinning a theme with a provider
+        Custom themes and providers
       
     </span>
   </a>
@@ -1471,10 +1473,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#theme-properties" class="md-nav__link">
+  <a href="#theme-fields" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Theme properties
+        Theme fields
       
     </span>
   </a>
@@ -1672,6 +1674,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pypi-packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Packages
   
 
     
@@ -3868,10 +3898,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pinning-a-theme-with-a-provider" class="md-nav__link">
+  <a href="#custom-themes-and-providers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pinning a theme with a provider
+        Custom themes and providers
       
     </span>
   </a>
@@ -3879,10 +3909,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#theme-properties" class="md-nav__link">
+  <a href="#theme-fields" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Theme properties
+        Theme fields
       
     </span>
   </a>
@@ -4589,37 +4619,47 @@ any provider it resolves the built-in
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
   &lt;/span&gt;" href="../../api/style/#pythonnative.style.DEFAULT_DARK_THEME"><code>DEFAULT_DARK_THEME</code></a> from the
-current scheme, so themed components are dark-mode aware by default:</p>
+current scheme, so themed components are dark-mode aware by default.
+Themes are typed <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Theme&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/style/#pythonnative.style.Theme"><code>Theme</code></a> records, so
+<code>theme.text_color</code> autocompletes and a typo is a static error:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
 </span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">ThemedText</span><span class="p">(</span><span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">):</span>
 </span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>    <span class="n">theme</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_theme</span><span class="p">()</span>
-</span><span id="__span-31-4"><a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">theme</span><span class="p">[</span><span class="s2">"text_color"</span><span class="p">],</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="n">theme</span><span class="p">[</span><span class="s2">"font_size"</span><span class="p">]})</span>
+</span><span id="__span-31-4"><a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">theme</span><span class="o">.</span><span class="n">text_color</span><span class="p">,</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="n">theme</span><span class="o">.</span><span class="n">font_size</span><span class="p">})</span>
 </span></code></pre></div>
 <p>An in-app appearance toggle overrides the system setting through the
 <a href="../../api/appearance/"><code>appearance</code></a> module:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">appearance</span><span class="o">.</span><span class="n">set_color_scheme</span><span class="p">(</span><span class="s2">"dark"</span><span class="p">)</span>  <span class="c1"># force dark everywhere</span>
 </span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="n">pn</span><span class="o">.</span><span class="n">appearance</span><span class="o">.</span><span class="n">set_color_scheme</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>  <span class="c1"># follow the system again</span>
 </span></code></pre></div>
-<h3 id="pinning-a-theme-with-a-provider">Pinning a theme with a provider<a class="headerlink" href="#pinning-a-theme-with-a-provider" title="Permanent link">&para;</a></h3>
-<p>To pin an explicit theme for a subtree (ignoring the color scheme),
-mount a <code>ThemeContext</code> provider; <code>use_theme</code> returns the provided
-value as-is:</p>
+<h3 id="custom-themes-and-providers">Custom themes and providers<a class="headerlink" href="#custom-themes-and-providers" title="Permanent link">&para;</a></h3>
+<p>Derive a brand theme from a built-in one with
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;replace&lt;/span&gt;" href="../../api/style/#pythonnative.style.Theme.replace"><code>Theme.replace</code></a>, then pin it for a
+subtree (ignoring the color scheme) with a <code>ThemeContext</code> provider.
+<code>use_theme</code> returns the provided value as-is, and rejects anything
+that isn't a <code>Theme</code> with a <code>TypeError</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
-</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.style</span><span class="w"> </span><span class="kn">import</span> <span class="n">DEFAULT_DARK_THEME</span>
-</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>
+</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a><span class="n">BRAND</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">DEFAULT_DARK_THEME</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">primary_color</span><span class="o">=</span><span class="s2">"#FF2D55"</span><span class="p">,</span> <span class="n">border_radius</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
 </span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a>
-</span><span id="__span-33-5"><a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-33-6"><a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">DarkPage</span><span class="p">():</span>
-</span><span id="__span-33-7"><a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">ThemeContext</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span>
-</span><span id="__span-33-8"><a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a>        <span class="n">DEFAULT_DARK_THEME</span><span class="p">,</span>
-</span><span id="__span-33-9"><a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-33-10"><a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a>            <span class="n">ThemedText</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="s2">"Always dark!"</span><span class="p">),</span>
-</span><span id="__span-33-11"><a id="__codelineno-33-11" name="__codelineno-33-11" href="#__codelineno-33-11"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
-</span><span id="__span-33-12"><a id="__codelineno-33-12" name="__codelineno-33-12" href="#__codelineno-33-12"></a>        <span class="p">),</span>
-</span><span id="__span-33-13"><a id="__codelineno-33-13" name="__codelineno-33-13" href="#__codelineno-33-13"></a>    <span class="p">)</span>
+</span><span id="__span-33-5"><a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>
+</span><span id="__span-33-6"><a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-33-7"><a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">DarkPage</span><span class="p">():</span>
+</span><span id="__span-33-8"><a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">ThemeContext</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span>
+</span><span id="__span-33-9"><a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a>        <span class="n">BRAND</span><span class="p">,</span>
+</span><span id="__span-33-10"><a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-33-11"><a id="__codelineno-33-11" name="__codelineno-33-11" href="#__codelineno-33-11"></a>            <span class="n">ThemedText</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="s2">"Always dark!"</span><span class="p">),</span>
+</span><span id="__span-33-12"><a id="__codelineno-33-12" name="__codelineno-33-12" href="#__codelineno-33-12"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
+</span><span id="__span-33-13"><a id="__codelineno-33-13" name="__codelineno-33-13" href="#__codelineno-33-13"></a>        <span class="p">),</span>
+</span><span id="__span-33-14"><a id="__codelineno-33-14" name="__codelineno-33-14" href="#__codelineno-33-14"></a>    <span class="p">)</span>
 </span></code></pre></div>
-<h3 id="theme-properties">Theme properties<a class="headerlink" href="#theme-properties" title="Permanent link">&para;</a></h3>
-<p>Both light and dark themes include:</p>
+<h3 id="theme-fields">Theme fields<a class="headerlink" href="#theme-fields" title="Permanent link">&para;</a></h3>
+<p>Every <code>Theme</code> has these fields:</p>
 <ul>
 <li><code>primary_color</code>, <code>secondary_color</code>: accent colors.</li>
 <li><code>background_color</code>, <code>surface_color</code>: background colors.</li>

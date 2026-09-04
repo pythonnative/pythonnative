@@ -886,6 +886,8 @@
       
         
       
+        
+      
     
     
     
@@ -1228,6 +1230,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/pypi-packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Packages
   
 
     
@@ -2901,6 +2931,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.cli.pn.deps_command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;deps_command
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.cli.pn.preview_project" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3327,6 +3368,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.cli.pn.deps_command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;deps_command
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.cli.pn.preview_project" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3460,7 +3512,16 @@ the documented behavior never drifts from the code.</p>
   Flag: <code>--force</code> to overwrite existing files or scaffold into a
   non-empty directory. See <a href="../../guides/configuration/">Configuration</a>.</li>
 <li><code>pn doctor [android|ios]</code>: diagnose the local toolchain and validate
-  <code>pythonnative.toml</code>. Exits non-zero when something will block a build.</li>
+  <code>pythonnative.toml</code>, including that a <code>python3.X</code> matching
+  <code>[app].python_version</code> is available for package resolution. Exits
+  non-zero when something will block a build.</li>
+<li><code>pn deps [android|ios]</code>: resolve <code>[requirements].packages</code> for every
+  device target (iOS device, iOS Simulator, and each Android ABI)
+  without installing anything, and report the wheel each package would
+  use, flagging binary wheels, their index, and downgrades. Flags:
+  <code>--json</code> for a machine-readable report, <code>--python</code> to pick the
+  interpreter that runs pip. Exits non-zero when any target can't be
+  satisfied. See <a href="../../guides/pypi-packages/">PyPI packages</a>.</li>
 <li><code>pn preview [component]</code>: render the app in a desktop (Tkinter) window
   with Fast Refresh, the fastest way to iterate on UI. Flags:
   <code>--width</code>, <code>--height</code>, <code>--title</code>, <code>--no-hot-reload</code>. See the
@@ -3501,6 +3562,9 @@ the documented behavior never drifts from the code.</p>
   <code>app/</code>) into <code>./name/</code>, or into the current directory when no name
   is given.</li>
 <li><code>pn doctor [platform]</code>: diagnose the local toolchain and config.</li>
+<li><code>pn deps [platform]</code>: resolve <code>[requirements].packages</code> for every
+  device target and report which wheels would be used (or why a package
+  can't be installed), without building anything.</li>
 <li><code>pn preview [component]</code>: render the app in a desktop (Tkinter) window
   with Fast Refresh, the fast inner dev loop, no device required.</li>
 <li><code>pn devices [platform]</code>: list connected devices, emulators, and
@@ -3561,6 +3625,14 @@ reload) that can't be unit tested.</p>
               <td>
                 <div class="doc-md-description">
                   <p>Print the resolved application id (Android) or bundle id (iOS).</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;deps_command&lt;/span&gt; (&lt;code&gt;pythonnative.cli.pn.deps_command&lt;/code&gt;)" href="#pythonnative.cli.pn.deps_command">deps_command</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Report how <code>[requirements].packages</code> resolve for each device target.</p>
                 </div>
               </td>
             </tr>
@@ -3850,6 +3922,64 @@ directory, and <code>--force</code> lifts neither of the rules above.</p>
             <td>
               <div class="doc-md-description">
                 <p>Parsed namespace with <code>platform</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.cli.pn.deps_command" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">deps_command</span>
+
+
+<a href="#pythonnative.cli.pn.deps_command" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">deps_command</span><span class="p">(</span><span class="n">args</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;argparse.Namespace&lt;/code&gt;" href="https://docs.python.org/3/library/argparse.html#argparse.Namespace">Namespace</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Report how <code>[requirements].packages</code> resolve for each device target.</p>
+<p>Runs pip in its cross-platform dry-run mode once per target (iOS
+device, iOS Simulator, and one per Android ABI) and prints the
+wheel each package would use, flagging binary wheels and their
+source index. Exits non-zero when any target can't be satisfied,
+so it doubles as a CI gate. <code>--json</code> emits the same data as a
+machine-readable document.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>args</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;argparse.Namespace&lt;/code&gt;" href="https://docs.python.org/3/library/argparse.html#argparse.Namespace">Namespace</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Parsed namespace with optional <code>platform</code>, <code>json</code>, and
+<code>python</code> (the interpreter to run pip with).</p>
               </div>
             </td>
             <td>

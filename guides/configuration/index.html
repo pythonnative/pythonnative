@@ -886,6 +886,8 @@
       
         
       
+        
+      
     
     
     
@@ -1228,6 +1230,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pypi-packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Packages
   
 
     
@@ -3418,7 +3448,7 @@ other command (<code>pn run</code>, <code>pn build</code>, <code>pn doctor</code
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"My App"</span><span class="w">         </span><span class="c1"># home-screen label (defaults to name)</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.0.0"</span><span class="w">               </span><span class="c1"># marketing version</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">build</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w">                       </span><span class="c1"># integer build number</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">python_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3.11"</span><span class="w">         </span><span class="c1"># embedded CPython version</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">python_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3.13"</span><span class="w">         </span><span class="c1"># embedded CPython version (3.13 or 3.14)</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">orientation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"portrait"</span><span class="w">        </span><span class="c1"># portrait | landscape | all</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">entry_point</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app/main.py"</span><span class="w">     </span><span class="c1"># module whose `App` is mounted</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">url_schemes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"myapp"</span><span class="p">]</span><span class="w">         </span><span class="c1"># deep-link schemes the app handles</span>
@@ -3433,28 +3463,29 @@ other command (<code>pn run</code>, <code>pn build</code>, <code>pn doctor</code
 </span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="n">splash</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"assets/splash.png"</span><span class="w">    </span><span class="c1"># splash / launch image</span>
 </span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>
 </span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="k">[requirements]</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="n">packages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"humanize"</span><span class="p">,</span><span class="w"> </span><span class="s2">"httpx"</span><span class="p">]</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="k">[plugins]</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="c1"># paths = ["native/my_plugin"]  # project-local Swift/Kotlin plugins</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="k">[ios]</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="n">deployment_target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"13.0"</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="n">development_team</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ABCDE12345"</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="c1"># bundle_id = "com.example.myapp"</span>
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="k">[ios.signing]</span>
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="n">export_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"development"</span><span class="w">   </span><span class="c1"># development | ad-hoc | app-store | enterprise</span>
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="c1"># provisioning_profile = "My App Distribution"</span>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a><span class="k">[android]</span>
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="n">min_sdk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">24</span>
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="n">target_sdk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">34</span>
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="c1"># abi_filters = ["arm64-v8a", "x86_64"]   # the default; add 32-bit ABIs if needed</span>
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a><span class="k">[android.signing]</span>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a><span class="c1"># keystore = "release.keystore"</span>
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a><span class="c1"># key_alias = "myapp"</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="n">packages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"humanize"</span><span class="p">,</span><span class="w"> </span><span class="s2">"httpx"</span><span class="p">,</span><span class="w"> </span><span class="s2">"numpy"</span><span class="p">]</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="c1"># extra_index_urls = ["https://wheels.example.com/simple"]</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="k">[plugins]</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="c1"># paths = ["native/my_plugin"]  # project-local Swift/Kotlin plugins</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="k">[ios]</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="n">deployment_target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"13.0"</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="n">development_team</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ABCDE12345"</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="c1"># bundle_id = "com.example.myapp"</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="k">[ios.signing]</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="n">export_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"development"</span><span class="w">   </span><span class="c1"># development | ad-hoc | app-store | enterprise</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="c1"># provisioning_profile = "My App Distribution"</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="k">[android]</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="n">min_sdk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">24</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="n">target_sdk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">34</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="c1"># abi_filters = ["arm64-v8a", "x86_64"]   # the default; add 32-bit ABIs if needed</span>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a><span class="k">[android.signing]</span>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a><span class="c1"># keystore = "release.keystore"</span>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a><span class="c1"># key_alias = "myapp"</span>
 </span></code></pre></div>
 <p>Paths (icon, splash, keystore) are resolved relative to the project
 root. Invalid configuration fails fast with a specific, actionable
@@ -3505,8 +3536,8 @@ error; run <a href="../../api/cli/"><code>pn doctor</code></a> to validate at an
 <tr>
 <td><code>python_version</code></td>
 <td>string</td>
-<td><code>"3.11"</code></td>
-<td>Embedded CPython version. One of <code>3.10</code>, <code>3.11</code>, <code>3.12</code>; every listed version has a pinned, checksum-verified iOS runtime.</td>
+<td><code>"3.13"</code></td>
+<td>Embedded CPython version. One of <code>3.13</code>, <code>3.14</code>; every listed version has a pinned, checksum-verified iOS runtime and a matching Chaquopy build. Packages are resolved for this version, not your host's (see <a href="../pypi-packages/">PyPI packages</a>).</td>
 </tr>
 <tr>
 <td><code>orientation</code></td>
@@ -3596,19 +3627,31 @@ reports whether Pillow is available. See
 <td><code>packages</code></td>
 <td>list of strings</td>
 <td><code>[]</code></td>
-<td>Third-party pip requirements bundled into the app.</td>
+<td>Third-party pip requirements bundled into the app. Resolved per device target with <code>--only-binary</code>, so binary packages need a wheel for each target.</td>
+</tr>
+<tr>
+<td><code>extra_index_urls</code></td>
+<td>list of strings</td>
+<td><code>[]</code></td>
+<td>Additional package indexes searched after PyPI and the platform indexes (BeeWare for iOS, Chaquopy for Android). Must be <code>http(s)</code> URLs.</td>
 </tr>
 </tbody>
 </table>
 <div class="language-toml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[requirements]</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">packages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"humanize"</span><span class="p">,</span><span class="w"> </span><span class="s2">"httpx&gt;=0.27"</span><span class="p">]</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">packages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"humanize"</span><span class="p">,</span><span class="w"> </span><span class="s2">"httpx&gt;=0.27"</span><span class="p">,</span><span class="w"> </span><span class="s2">"numpy"</span><span class="p">]</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">extra_index_urls</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"https://wheels.mycompany.example/simple"</span><span class="p">]</span>
 </span></code></pre></div>
 <ul>
-<li><strong>Android</strong>: written into the staged template's <code>requirements.txt</code> and
-  installed by Chaquopy into the APK at build time.</li>
-<li><strong>iOS</strong>: pure-Python packages are copied into the app bundle's
-  Python site directory.</li>
+<li><strong>iOS</strong>: the CLI resolves and installs one <code>app_packages.&lt;sdk&gt;</code> slice
+  per SDK (device and Simulator); the Xcode run script bundles the
+  matching one.</li>
+<li><strong>Android</strong>: written into the staged template's <code>requirements.txt</code>
+  (with the index options) and installed by Chaquopy into the APK at
+  build time, once per ABI.</li>
 </ul>
+<p>Run <code>pn deps</code> to see how each requirement resolves for every target
+before building. See <a href="../pypi-packages/">PyPI packages</a> for what works
+and why.</p>
 <div class="admonition warning">
 <p class="admonition-title">Don't list <code>pythonnative</code></p>
 <p>The CLI bundles the installed <code>pythonnative</code> package directly, so
@@ -3665,7 +3708,7 @@ generated registration file calls every plugin's <code>register</code>. See
 <td><code>deployment_target</code></td>
 <td>string</td>
 <td><code>"13.0"</code></td>
-<td>Minimum iOS version.</td>
+<td>Minimum iOS version. Must be at least <code>13.0</code>, the floor of BeeWare's CPython builds and of every iOS wheel on PyPI.</td>
 </tr>
 <tr>
 <td><code>development_team</code></td>
@@ -3736,7 +3779,7 @@ generated registration file calls every plugin's <code>register</code>. See
 <td><code>min_sdk</code></td>
 <td>integer</td>
 <td><code>24</code></td>
-<td>Minimum API level. Must be ≥ 21 (Chaquopy requirement).</td>
+<td>Minimum API level. Must be at least 24 (Chaquopy 17 requirement).</td>
 </tr>
 <tr>
 <td><code>target_sdk</code></td>
@@ -3760,7 +3803,7 @@ generated registration file calls every plugin's <code>register</code>. See
 <td><code>abi_filters</code></td>
 <td>list of strings</td>
 <td><code>["arm64-v8a", "x86_64"]</code></td>
-<td>Native ABIs to include. The default covers 64-bit devices and emulators; add <code>armeabi-v7a</code> or <code>x86</code> only if you must support 32-bit hardware (each ABI adds roughly 30 MB).</td>
+<td>Native ABIs to include: <code>arm64-v8a</code> (devices) and <code>x86_64</code> (emulators). CPython 3.13+ on Chaquopy and PEP 738 wheels are 64-bit only, so 32-bit ABIs are rejected. Drop <code>x86_64</code> for a smaller release APK.</td>
 </tr>
 <tr>
 <td><code>permissions</code></td>

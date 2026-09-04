@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -1231,6 +1233,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pypi-packages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI Packages
   
 
     
@@ -3348,6 +3378,11 @@ the affected modules and asks the screen host to re-render.</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># or</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--hot-reload
 </span></code></pre></div>
+<p>Hot reload works on Android devices and emulators (over <code>adb</code>) and on
+the iOS Simulator. Physical iPhones aren't supported yet: the CLI has
+no way to write into a sandboxed app's container over USB, so
+<code>pn run ios --hot-reload</code> against a physical device prints a note and
+runs without the watcher.</p>
 <p><code>pn</code> will:</p>
 <ol>
 <li>Build and install the app once (the standard <code>run</code> flow).</li>
@@ -3469,7 +3504,7 @@ hot-reload and you want the smallest possible cycle.</p>
 reloaded modules. Pass <code>--no-logs</code> to suppress the stream:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--hot-reload<span class="w"> </span>--no-logs
 </span></code></pre></div>
-<p>On iOS hot reload currently targets the Simulator flow. Use Console.app
+<p>On iOS the CLI prints hot-reload notifications only. Use Console.app
 or Xcode for full live logs while the CLI keeps the watcher process in
 the foreground.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
