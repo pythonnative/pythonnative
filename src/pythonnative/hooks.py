@@ -123,7 +123,7 @@ class Ref(Generic[T]):
     When a ``Ref`` is passed to a built-in element via the ``ref=``
     prop, the reconciler populates ``current`` with the underlying
     native view (``UIView`` on iOS, ``android.view.View`` on Android,
-    a Tk widget on desktop) after commit, and clears it back to
+    a DOM element in the browser preview) after commit, and clears it back to
     ``None`` on unmount. Composite components (e.g.
     [`FlatList`][pythonnative.FlatList]) instead publish a typed
     controller object on ``current`` via
@@ -1507,7 +1507,7 @@ def use_back_handler(handler: Callable[[], bool]) -> None:
     """Intercept the system back action for this screen.
 
     On Android this handles the hardware back button and predictive
-    back gesture; in the desktop preview it handles the Escape key.
+    back gesture; in the browser preview it handles the Escape key.
     iOS has no system back button, so the handler never fires there
     (swipe-back is controlled by the navigation stack instead).
 

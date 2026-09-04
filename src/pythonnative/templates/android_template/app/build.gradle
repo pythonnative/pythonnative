@@ -22,6 +22,12 @@ android {
         python {
             // Rewritten from app.python_version by the pn CLI (project/android.py).
             version "3.13"
+            pyc {
+                // Rewritten by the pn CLI: debug builds keep the .py sources
+                // (tracebacks show code; the dev client can seed its overlay
+                // from them), release builds ship bytecode only.
+                src false
+            }
             pip {
                 // `options` lines for [requirements].extra_index_urls are
                 // injected above `install` by the pn CLI.

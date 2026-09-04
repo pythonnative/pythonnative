@@ -135,6 +135,12 @@ def configure_info_plist(info_plist: Path, config: AppConfig) -> None:
     resolved = config.resolved_permissions()
     for key, reason in resolved.ios_usage_descriptions.items():
         plist[key] = reason
+    # Debug builds connect to `pn start` over the LAN, which iOS gates
+    # behind the local-network prompt; the prompt needs this string.
+    plist.setdefault(
+        "NSLocalNetworkUsageDescription",
+        "Development builds connect to the PythonNative dev server on your computer.",
+    )
     if resolved.ios_background_modes:
         plist["UIBackgroundModes"] = list(resolved.ios_background_modes)
 

@@ -46,22 +46,8 @@ def test_common_checks_present(tmp_path: Path) -> None:
     names = [r.name for r in results]
     assert any("Python" in n for n in names)
     assert any("Pillow" in n for n in names)
-    assert "Tkinter (desktop preview)" in names
-
-
-def test_common_check_reports_available_tkinter(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setattr(doctor, "_tkinter_available", lambda: True)
-    result = next(r for r in doctor.check_common() if r.name == "Tkinter (desktop preview)")
-    assert result.level == doctor.OK
-    assert result.detail == ""
-
-
-def test_common_check_reports_missing_tkinter(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setattr(doctor, "_tkinter_available", lambda: False)
-    result = next(r for r in doctor.check_common() if r.name == "Tkinter (desktop preview)")
-    assert result.level == doctor.WARN
-    assert "python3-tk" in result.detail
-    assert "tcl/tk" in result.detail
+    # The browser preview needs nothing beyond the standard library.
+    assert not any("Tkinter" in n for n in names)
 
 
 def _config_with(tmp_path: Path, extra: str = "") -> AppConfig:

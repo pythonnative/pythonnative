@@ -20,8 +20,8 @@ from pythonnative.testing import FakeBackend as _StubBackend
 
 
 @pytest.fixture(autouse=True)
-def _reset_desktop_store(tmp_path: Path) -> Generator[None, None, None]:
-    """Isolate the desktop Storage module per test by pointing it at a temp dir."""
+def _reset_fallback_store(tmp_path: Path) -> Generator[None, None, None]:
+    """Isolate the fallback Storage module per test by pointing it at a temp dir."""
     os.environ["PN_STORAGE_DIR"] = str(tmp_path)
     native_module("Storage").impl._reset()  # type: ignore[attr-defined]
     yield
@@ -100,7 +100,7 @@ def test_clear_removes_everything() -> None:
     assert asyncio.run(run()) == []
 
 
-def test_desktop_backend_persists_to_disk(tmp_path: Path) -> None:
+def test_fallback_backend_persists_to_disk(tmp_path: Path) -> None:
     async def write() -> None:
         await AsyncStorage.set("name", "Alice")
 

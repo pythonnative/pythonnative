@@ -208,18 +208,39 @@ see the failure and keep the rest of the page alive. See
 You're either missing keys or using positional keys. See
 [Reconciliation: keyed children](../concepts/reconciliation.md#keyed-children).
 
-## Hot reload
+## Fast Refresh
 
 ### Edits don't appear
 
-- Make sure you actually launched with `--hot-reload` (the run command
-  prints `[hot-reload] Watching app/ for changes` when the watcher
-  starts).
-- The watcher only sees `.py` files under `app/`. Code outside `app/`
-  needs a manual rebuild.
+- Is `pn start` (or `pn preview`) running? Debug builds connect to it
+  on launch; the terminal prints `[pn] ios <device> connected` when
+  one arrives. If you launched `pn run` with no server up, the app is
+  running its bundled sources: start the server and relaunch.
+- Is the device on the same network? Simulators and emulators reach
+  the server through `localhost` (Android via `adb reverse`), but a
+  physical iPhone needs your Mac's LAN address and an open port. Pass
+  `--dev-server ws://<ip>:8765/ws?role=client` to `pn run` if the
+  auto-detected address is wrong.
+- The watcher only sees files under `app/`. Code outside `app/` needs
+  a rebuild.
 - Top-level side effects re-run on each reload; if your module
   registers something into a global on import, the *second* import
-  may raise. See [Hot reload guide](../guides/hot-reload.md#common-pitfalls).
+  may raise. See [Fast Refresh guide](../guides/hot-reload.md#common-pitfalls).
+
+### `pn run` rebuilt the whole native project after a Python edit
+
+It shouldn't: edits under `app/` sync through the dev server. A
+rebuild means a native input changed (`pythonnative.toml`, the
+`pythonnative` package version, native plugins) or no dev server was
+running when `pn run` started. See
+[When native rebuilds happen](../guides/dev-workflow.md#when-native-rebuilds-happen).
+
+### The browser preview shows a blank frame
+
+Open its console (`` ` ``) and check the `pn start` terminal. The usual
+cause is an import error in the entry module, often a package from
+`[requirements].packages` that isn't installed in the environment
+running `pn start`; the CLI warns about those on startup.
 
 ### "Stale closure" errors
 

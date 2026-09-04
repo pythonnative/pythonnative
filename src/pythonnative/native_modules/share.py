@@ -43,7 +43,7 @@ class Share:
 
         Returns:
             ``True`` if the user completed a share, ``False`` if they
-            dismissed the sheet or the platform has no share UI (desktop).
+            dismissed the sheet or the platform has no share UI (tests).
 
         Raises:
             NativeModuleError: If the sheet could not be presented.

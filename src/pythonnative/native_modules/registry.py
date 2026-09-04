@@ -21,7 +21,7 @@ in ``docs/concepts/bridge.md``. Off device (tests, ``pn preview``) the
 same name resolves to a
 [`PythonModule`][pythonnative.native_modules.registry.PythonModule]
 wrapping a plain Python object with the same method names; the
-built-in fallbacks live in ``pythonnative.native_modules.desktop`` and
+built-in fallbacks live in ``pythonnative.native_modules.fallback`` and
 third-party packages register theirs through the
 ``pythonnative.modules`` entry point group or
 [`register_python_module`][pythonnative.native_modules.registry.register_python_module].
@@ -60,7 +60,7 @@ __all__ = [
 ]
 
 ENTRY_POINT_GROUP = "pythonnative.modules"
-"""Entry-point group for Python (desktop / test) implementations of native modules."""
+"""Entry-point group for Python (fallback / test) implementations of native modules."""
 
 Listener = Callable[[Any], None]
 
@@ -232,7 +232,7 @@ def _settle(call_id: int, message: Dict[str, Any]) -> None:
 
 
 # ======================================================================
-# Python-backed modules (desktop / tests)
+# Python-backed modules (fallbacks / tests)
 # ======================================================================
 
 
@@ -256,7 +256,7 @@ class PythonModule(NativeModule):
 
         Facades call ``native_module()`` at import time, so resolution is
         deferred until the first method call; by then the package's
-        desktop implementation (or entry point) has had a chance to
+        fallback implementation (or entry point) has had a chance to
         register.
 
         Raises:
@@ -370,9 +370,9 @@ def _resolve_python_impl(name: str) -> Any:
     with _registry_lock:
         impl = _python_impls.get(name)
     if impl is None:
-        from . import desktop
+        from . import fallback
 
-        impl = desktop.default_implementation(name)
+        impl = fallback.default_implementation(name)
     if impl is None:
         raise KeyError(
             f"No native module named {name!r} is available off device; register one with register_python_module()"

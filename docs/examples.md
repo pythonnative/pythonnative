@@ -21,16 +21,16 @@ project scaffolded with `pn init`.
 pn init my-app
 cd my-app
 # Edit app/main.py and paste any of the snippets below.
-pn preview       # fast desktop preview with Fast Refresh
+pn preview       # dev server + browser preview with Fast Refresh
 pn run android   # or: pn run ios
 ```
 
 The `app/main.py` that `pn init` writes already returns a small
 counter; replace it with one of the snippets to try a different
 example. The quickest way to iterate is
-[`pn preview`](guides/desktop-preview.md), which renders the app in a
-desktop window and reloads on every save; use `pn run` when you want it
-on a real device or simulator.
+[`pn preview`](guides/browser-preview.md), which renders the app in a
+browser tab and Fast Refreshes on every save; `pn run` puts it on a
+device or simulator connected to the same dev server.
 
 ## Snippets
 

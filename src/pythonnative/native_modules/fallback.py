@@ -1,11 +1,13 @@
-"""Off-device implementations of the built-in native modules.
+"""Pure-Python fallbacks for the built-in native modules.
 
 On iOS and Android every module in this package is implemented in
 Swift and Kotlin (``PythonNativeKit`` and the ``pythonnative`` Gradle
-module). Off device (``pn preview``, unit tests) the same module names
-resolve to the plain Python classes below, which keep the API usable
-without a device: in-memory buffers, ``"unknown"`` states, and no-op
-feedback.
+module). Off device the same module names resolve to the plain Python
+classes below, which keep the API usable without a device: in-memory
+buffers, ``"unknown"`` states, and no-op feedback. Unit tests use them
+directly; the browser preview implements a handful of modules in the
+page (``Alert``, ``Clipboard``, ``Device``, ...) and routes the rest
+here.
 
 Each class has the same method names and argument shapes as its native
 counterpart, so a facade in this package never branches on platform.
@@ -30,14 +32,14 @@ __all__ = ["default_implementation"]
 # ======================================================================
 
 
-class DesktopDevice:
-    """Static device information for the desktop preview."""
+class FallbackDevice:
+    """Static device information for the host machine."""
 
     def info(self) -> Dict[str, Any]:
         home = os.path.expanduser("~")
         app_dir = os.path.join(home, ".pythonnative_data")
         return {
-            "platform": "desktop",
+            "platform": "test",
             "os": sys.platform,
             "os_version": _platform.release(),
             "model": _platform.machine(),
@@ -52,7 +54,7 @@ class DesktopDevice:
         }
 
 
-class DesktopAppState:
+class FallbackAppState:
     def current_state(self) -> str:
         return "active"
 
@@ -62,7 +64,7 @@ class DesktopAppState:
 # ======================================================================
 
 
-class DesktopStorage:
+class FallbackStorage:
     """Dict-backed ``AsyncStorage`` with optional JSON persistence.
 
     Set ``PN_STORAGE_DIR`` to persist between runs (``pn preview`` does
@@ -143,7 +145,7 @@ class DesktopStorage:
             self._loaded = False
 
 
-class DesktopSecureStore:
+class FallbackSecureStore:
     def __init__(self) -> None:
         self._store: Dict[str, str] = {}
 
@@ -161,7 +163,7 @@ class DesktopSecureStore:
         self._store.clear()
 
 
-class DesktopClipboard:
+class FallbackClipboard:
     def __init__(self) -> None:
         self._buffer = ""
 
@@ -177,7 +179,7 @@ class DesktopClipboard:
 # ======================================================================
 
 
-class DesktopAlert:
+class FallbackAlert:
     """Records alerts and answers with scripted responses.
 
     The log and response queue live on
@@ -199,13 +201,13 @@ class DesktopAlert:
         return int(self._record(title, message, buttons, style)._next_test_response())
 
 
-class DesktopShare:
+class FallbackShare:
     def share(self, message: Optional[str] = None, url: Optional[str] = None, title: Optional[str] = None) -> bool:
         del message, url, title
         return False
 
 
-class DesktopLinking:
+class FallbackLinking:
     def open_url(self, url: str) -> bool:
         del url
         return False
@@ -218,7 +220,7 @@ class DesktopLinking:
         return False
 
 
-class DesktopHaptics:
+class FallbackHaptics:
     def impact(self, style: str = "medium") -> None:
         del style
 
@@ -235,7 +237,7 @@ class DesktopHaptics:
         pass
 
 
-class DesktopBattery:
+class FallbackBattery:
     def get_level(self) -> float:
         return -1.0
 
@@ -243,14 +245,14 @@ class DesktopBattery:
         return "unknown"
 
 
-class DesktopNetInfo:
+class FallbackNetInfo:
     def fetch(self) -> Optional[Dict[str, Any]]:
         # ``None`` means "no fresh reading"; the facade keeps whatever
         # snapshot was last dispatched (tests push those directly).
         return None
 
 
-class DesktopPermissions:
+class FallbackPermissions:
     def check(self, permission: str) -> str:
         del permission
         return "undetermined"
@@ -260,7 +262,7 @@ class DesktopPermissions:
         return "undetermined"
 
 
-class DesktopNotifications:
+class FallbackNotifications:
     def request_permission(self) -> bool:
         return False
 
@@ -275,7 +277,7 @@ class DesktopNotifications:
         return None
 
 
-class DesktopCamera:
+class FallbackCamera:
     def take_photo(self) -> Optional[str]:
         return None
 
@@ -283,12 +285,12 @@ class DesktopCamera:
         return None
 
 
-class DesktopLocation:
+class FallbackLocation:
     def get_current(self) -> Optional[Dict[str, float]]:
         return None
 
 
-class DesktopBiometrics:
+class FallbackBiometrics:
     def is_available(self) -> bool:
         return False
 
@@ -298,25 +300,25 @@ class DesktopBiometrics:
 
 
 _DEFAULTS: Dict[str, Callable[[], Any]] = {
-    "Device": DesktopDevice,
-    "AppState": DesktopAppState,
-    "Storage": DesktopStorage,
-    "SecureStore": DesktopSecureStore,
-    "Clipboard": DesktopClipboard,
-    "Alert": DesktopAlert,
-    "Share": DesktopShare,
-    "Linking": DesktopLinking,
-    "Haptics": DesktopHaptics,
-    "Battery": DesktopBattery,
-    "NetInfo": DesktopNetInfo,
-    "Permissions": DesktopPermissions,
-    "Notifications": DesktopNotifications,
-    "Camera": DesktopCamera,
-    "Location": DesktopLocation,
-    "Biometrics": DesktopBiometrics,
+    "Device": FallbackDevice,
+    "AppState": FallbackAppState,
+    "Storage": FallbackStorage,
+    "SecureStore": FallbackSecureStore,
+    "Clipboard": FallbackClipboard,
+    "Alert": FallbackAlert,
+    "Share": FallbackShare,
+    "Linking": FallbackLinking,
+    "Haptics": FallbackHaptics,
+    "Battery": FallbackBattery,
+    "NetInfo": FallbackNetInfo,
+    "Permissions": FallbackPermissions,
+    "Notifications": FallbackNotifications,
+    "Camera": FallbackCamera,
+    "Location": FallbackLocation,
+    "Biometrics": FallbackBiometrics,
 }
 
 
 def default_implementation(name: str) -> Optional[Callable[[], Any]]:
-    """Return the factory for the built-in desktop implementation of ``name``."""
+    """Return the factory for the built-in Python fallback implementation of ``name``."""
     return _DEFAULTS.get(name)

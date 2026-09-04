@@ -104,39 +104,40 @@ The build system reads this file for every command, so `pn run`,
 [Configuration reference](guides/configuration.md) and the
 [Permissions guide](guides/permissions.md).
 
-## Preview on your desktop
+## Start the dev server
 
-The fastest way to iterate is `pn preview`, which renders your app in a
-desktop window and **Fast Refreshes on every save** (no simulator, no
-device build):
+Everything during development goes through one long-running process,
+the dev server. Start it in a terminal and leave it running:
 
 ```bash
 pn preview
 ```
 
-This opens a phone-sized window, mounts your project's `App`, and
-watches `app/` for changes. Edit a component, hit save, and the window
-updates in place while keeping component state (counters, form input,
-scroll position). Navigation, hooks, async, and the flex layout engine
-all run exactly as they do on device, because the desktop backend reuses
-the same reconciler and layout engine; only the leaf widgets differ
-(Tkinter instead of UIKit / Android views).
+`pn preview` starts the server, opens `http://localhost:8765/` in your
+browser, and mounts your project's `App` in a phone frame. It **Fast
+Refreshes on every save**: edit a component, save, and the page updates
+in place while keeping component state (counters, form input, scroll
+position, the navigation stack). Navigation, hooks, async, and the flex
+layout engine run exactly as they do on device, because the page is a
+bridge peer like the Swift and Kotlin runtimes and reuses the same
+reconciler and screen host; only the leaf widgets differ (DOM elements
+instead of UIKit / Android views).
 
 ```bash
-pn preview                 # preview the project's entry point (app/main.py → App)
-pn preview app.main.Detail # preview a specific component
-pn preview --width 768 --height 1024   # tablet-sized window
-pn preview --no-hot-reload # disable file watching
+pn preview                    # server + browser tab for app/main.py -> App
+pn preview app.screens.home   # mount a different module's App
+pn start                      # the server without opening a browser
 ```
 
-The preview needs Tkinter, which ships with most Python installs. If
-it's missing, install it (`brew install python-tk` on macOS,
-`sudo apt-get install python3-tk` on Debian/Ubuntu). The desktop backend
-is a **development** surface for layout and logic; some visual chrome is
-approximated, and there's no desktop packaging. Ship to devices with
-`pn run`. See the [Desktop preview guide](guides/desktop-preview.md).
+Use the toolbar to switch device frames, rotate, toggle dark mode, or
+send a back press. The preview is a **development** surface for layout
+and logic; platform chrome is approximated and device APIs are
+simulated. Ship to devices with `pn run`. See the
+[Browser preview guide](guides/browser-preview.md).
 
-## Run on a platform
+## Run on a device or simulator
+
+With the dev server still running, in a second terminal:
 
 ```bash
 pn run android
@@ -144,8 +145,18 @@ pn run android
 pn run ios
 ```
 
-- Uses bundled templates (no network required for scaffolding)
-- Copies your `app/` into the generated project
+`pn run` stages the bundled native template, copies your `app/` in,
+builds a debug app, installs it, and launches it. The CLI finds the
+dev server on `localhost:8765`, bakes its URL into the build, and the
+app connects on startup. From then on it's a **dev client**: every save
+under `app/` syncs to the device and Fast Refreshes the running screens,
+and the app's `print` output and tracebacks stream back into the
+`pn start` terminal.
+
+Rerunning `pn run` is cheap. The native toolchain only runs when a
+native input changed (`pythonnative.toml`, the template, the
+`pythonnative` package, native plugins); otherwise the previous build
+is reinstalled in seconds. Force a rebuild with `--rebuild`.
 
 If you just want to scaffold the platform project without building, use:
 
@@ -156,40 +167,22 @@ pn run ios --prepare-only
 
 This stages files under `build/` so you can open them in Android Studio or Xcode.
 
-## Hot reload while developing
+Physical iPhones on the same Wi-Fi work the same way (`pn run ios
+--device "My iPhone"`); the CLI bakes in your Mac's LAN address instead
+of `localhost`. See the [Development workflow](guides/dev-workflow.md)
+for the details, including the reusable `--dev-client` shell app.
 
-For day-to-day UI work, run with `--hot-reload`:
-
-```bash
-pn run android --hot-reload
-pn run ios --hot-reload
-```
-
-The first run still builds and launches the native app. After that,
-edits under `app/` are copied into the running app's writable source
-overlay and the active page refreshes without a full rebuild. This
-works on Android devices and emulators and on the iOS Simulator;
-physical iPhones don't support hot reload yet (see the
-[Hot reload guide](guides/hot-reload.md)).
-
-PythonNative prefers a **Fast Refresh** path: each
-[`@pn.component`][pythonnative.component.component] function is matched by
-qualified name across the reloaded module, the live VNode tree's
-function references are swapped in place, and the next render reuses
-the existing hook state. So edits to the body of a component preserve
-in-memory state (counters, scroll positions, etc.). When Fast Refresh
-can't find a clean swap (for example, after deeper structural
-edits), PythonNative falls back to a full remount of the active page
-so you never get stuck with a stale tree.
-
-This works best for Python UI changes; native template changes
-(Kotlin, Swift, manifests) still require a normal rebuild.
+Native template changes (Kotlin, Swift, manifests) and edits to
+`pythonnative.toml` still require a rebuild; `pn run` detects them and
+runs the toolchain automatically.
 
 ## Viewing logs
 
-After the app launches, `pn run` attaches to the app's stdout/stderr so Python
-`print()` output and tracebacks stream back into your terminal until you press
-Ctrl+C:
+A connected dev client mirrors its Python `print()` output, warnings,
+and tracebacks to the `pn start` terminal, so that one window shows
+every client. `pn run` also attaches to the app's native log stream
+after launch until you press Ctrl+C, which is where lower-level output
+(and anything printed before the client connects) shows up:
 
 ```python
 import pythonnative as pn

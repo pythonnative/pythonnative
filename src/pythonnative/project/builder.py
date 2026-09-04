@@ -198,6 +198,23 @@ _TEMPLATE_IGNORE = shutil.ignore_patterns(
 )
 
 
+def template_name(platform: str) -> str:
+    """The bundled template directory name for ``platform``.
+
+    Raises:
+        BuildError: For an unknown platform.
+    """
+    try:
+        return _TEMPLATE_NAMES[platform]
+    except KeyError:
+        raise BuildError(f"Unknown platform: {platform!r} (expected 'android' or 'ios').") from None
+
+
+def template_source(platform: str) -> Path:
+    """Where the bundled template for ``platform`` lives in this installation."""
+    return Path(__file__).resolve().parents[1] / "templates" / template_name(platform)
+
+
 def stage_template(template_name: str, destination: Path) -> Path:
     """Copy a bundled native template into ``destination``.
 
@@ -287,10 +304,11 @@ class Builder:
 
         Args:
             platform: ``"android"`` or ``"ios"``.
-            release: Prepare for a release/store build. On iOS this
-                byte-compiles the staged Python code and drops the
-                ``.py`` sources from the bundle. (Chaquopy does the
-                equivalent on Android automatically.)
+            release: Prepare for a release/store build: byte-compile
+                the staged Python code and drop the ``.py`` sources from
+                the bundle (on Android through Chaquopy's ``pyc.src``).
+                Debug builds keep the sources so tracebacks show code and
+                the on-device dev client can see what it already runs.
             ios_sdks: Which iOS SDKs to resolve third-party packages
                 for: ``"iphoneos"`` (devices, archives) and/or
                 ``"iphonesimulator"``. Each becomes an
@@ -319,6 +337,7 @@ class Builder:
                 project_dir,
                 self.config,
                 dev_lib_root=self.dev_lib_root,
+                release=release,
                 log=self.log,
             )
             native_plugins.stage_android_plugins(project_dir, plugins, log=self.log)
@@ -466,6 +485,12 @@ class Builder:
             BuildError: If the Gradle build fails.
         """
         self._gradlew(prepared, ["installDebug"])
+
+    def android_debug_apk(self, prepared: PreparedProject) -> Optional[Path]:
+        """The debug APK produced by the last Gradle build, if it exists."""
+        outputs = prepared.project_dir / "app" / "build" / "outputs"
+        candidates = _existing(outputs.rglob("*-debug.apk"))
+        return candidates[0] if candidates else None
 
     def build_android(self, prepared: PreparedProject, *, debug: bool = False) -> BuildArtifacts:
         """Assemble standalone Android artifacts (APK + AAB).

@@ -55,8 +55,9 @@ that prevents render storms).
 | Component language | JavaScript / TypeScript | Python |
 | Bridge | Fabric: one C++ shadow tree commit per render; TurboModules for device APIs | One JSON transaction per commit applied by Swift / Kotlin component managers; named native modules for device APIs |
 | Threading | UI runs on the main thread; JS on a separate thread | UI and reconciler both on the platform's main thread |
-| Distribution | Metro bundler ships a JS bundle | The `pn` CLI bundles your `app/` and the `pythonnative` package into the native project |
-| Hot reload | Metro fast refresh of the JS bundle | `FileWatcher` plus `ModuleReloader` reloads `.py` modules in place |
+| Distribution | Metro bundler ships a JS bundle | `pn build` bundles your `app/` and the `pythonnative` package into the native project |
+| Dev loop | Metro dev server; Expo Go / dev client on device; Fast Refresh | `pn start` dev server; debug builds and the `--dev-client` shell connect over WebSocket; Fast Refresh reloads `.py` modules in place |
+| Preview without a device | Expo web / Snack | `pn preview` renders in a browser tab through the same bridge protocol the native runtimes speak |
 | Native widgets | Wrapped by Fabric component managers | Wrapped by `PNComponentManager` (Swift) / `ComponentManager` (Kotlin) classes |
 
 The single most important consequence: there is **no async boundary**

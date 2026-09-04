@@ -2,7 +2,7 @@
 
 Off-device (neither Android nor iOS) every module falls back to a safe
 default path: in-memory buffers, ``"unknown"`` states, and no-op
-feedback. These tests exercise those desktop fallbacks plus the
+feedback. These tests exercise those Python fallbacks plus the
 listener/dispatch machinery and the ``use_app_state`` / ``use_net_info``
 hooks, none of which need a real device.
 """
@@ -59,7 +59,7 @@ def _reset_module_state() -> Generator[None, None, None]:
 # ======================================================================
 
 
-def test_clipboard_roundtrip_desktop() -> None:
+def test_clipboard_roundtrip_fallback() -> None:
     Clipboard.set_string("hello world")
     assert Clipboard.get_string() == "hello world"
     assert Clipboard.has_string() is True
@@ -123,7 +123,7 @@ def test_use_app_state_returns_current_and_rerenders() -> None:
 # ======================================================================
 
 
-def test_net_info_fetch_desktop_default() -> None:
+def test_net_info_fetch_fallback_default() -> None:
     state = NetInfo.fetch()
     assert state["is_connected"] is True
     assert state["type"] == "unknown"
@@ -161,7 +161,7 @@ def test_use_net_info_rerenders_on_change() -> None:
 # ======================================================================
 
 
-def test_battery_desktop_defaults() -> None:
+def test_battery_fallback_defaults() -> None:
     assert Battery.get_level() == -1.0
     assert Battery.get_state() == "unknown"
 
@@ -178,7 +178,7 @@ def test_battery_listener_dispatch() -> None:
 # ======================================================================
 
 
-def test_secure_store_roundtrip_desktop() -> None:
+def test_secure_store_roundtrip_fallback() -> None:
     assert SecureStore.set_item("token", "abc123") is None
     assert SecureStore.get_item("token") == "abc123"
     assert SecureStore.delete_item("token") is True
@@ -191,11 +191,11 @@ def test_secure_store_roundtrip_desktop() -> None:
 # ======================================================================
 
 
-def test_permissions_check_undetermined_desktop() -> None:
+def test_permissions_check_undetermined_fallback() -> None:
     assert Permissions.check("camera") == "undetermined"
 
 
-def test_permissions_request_undetermined_desktop() -> None:
+def test_permissions_request_undetermined_fallback() -> None:
     assert asyncio.run(Permissions.request("camera")) == "undetermined"
 
 
@@ -234,7 +234,7 @@ def test_permissions_surface_native_errors() -> None:
 # ======================================================================
 
 
-def test_linking_desktop_false() -> None:
+def test_linking_fallback_false() -> None:
     assert Linking.can_open_url("https://example.com") is False
     assert Linking.open_url("https://example.com") is False
     assert Linking.open_settings() is False
@@ -285,7 +285,7 @@ def test_linking_listener_errors_do_not_break_dispatch() -> None:
 # ======================================================================
 
 
-def test_get_device_token_none_on_desktop() -> None:
+def test_get_device_token_none_on_fallback() -> None:
     from pythonnative.native_modules.notifications import Notifications
 
     assert asyncio.run(Notifications.get_device_token()) is None
@@ -362,24 +362,24 @@ def test_native_module_events_reach_facade_listeners() -> None:
 
 
 # ======================================================================
-# Share / Biometrics / Haptics (desktop no-ops)
+# Share / Biometrics / Haptics (fallback no-ops)
 # ======================================================================
 
 
-def test_share_returns_false_desktop() -> None:
+def test_share_returns_false_fallback() -> None:
     assert asyncio.run(Share.share(message="hi", url="https://example.com")) is False
 
 
-def test_biometrics_unavailable_desktop() -> None:
+def test_biometrics_unavailable_fallback() -> None:
     assert Biometrics.is_available() is False
 
 
-def test_biometrics_authenticate_false_desktop() -> None:
+def test_biometrics_authenticate_false_fallback() -> None:
     assert asyncio.run(Biometrics.authenticate("Unlock")) is False
 
 
-def test_haptics_and_vibration_are_noops_desktop() -> None:
-    # Should not raise on desktop.
+def test_haptics_and_vibration_are_noops_fallback() -> None:
+    # Should not raise off device.
     Haptics.impact("light")
     Haptics.notification("success")
     Haptics.selection()

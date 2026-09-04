@@ -478,7 +478,7 @@ under the same name, so register one for `pn preview` and unit tests:
 from pythonnative.native_modules.registry import register_python_module
 
 
-class DesktopCompass:
+class FallbackCompass:
     def is_available(self) -> bool:
         return False
 
@@ -486,7 +486,7 @@ class DesktopCompass:
         return 0.0
 
 
-register_python_module("Compass", DesktopCompass())
+register_python_module("Compass", FallbackCompass())
 ```
 
 Methods are looked up by name and called with the same keyword

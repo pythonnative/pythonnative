@@ -88,9 +88,9 @@ def HomeScreen() -> pn.Element:
         pn.Column(
             pn.Text("Hello from PythonNative Demo!", style=styles["title"]),
             pn.Text(
-                "Try `pn run android --hot-reload`, edit this text, and save. "
-                "The running app should update without a rebuild, and the counter "
-                "below should preserve its value across the refresh.",
+                "Run `pn start`, edit this text, and save. Every connected target "
+                "(browser preview, simulators, devices) updates without a rebuild, "
+                "and the counter below keeps its value across the refresh.",
                 style=styles["hint"],
             ),
             counter_badge(),

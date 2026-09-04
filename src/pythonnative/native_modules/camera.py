@@ -39,7 +39,7 @@ class Camera:
 
         Returns:
             The saved image path, or ``None`` if the user cancelled (or
-            there is no camera to present, as on desktop).
+            there is no camera to present, as in the browser preview).
 
         Raises:
             NativeModuleError: If the picker can't be presented, for

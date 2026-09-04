@@ -166,7 +166,7 @@ class ViewHandler:
     def set_animated_property(self, native_view: Any, prop_name: str, value: Any) -> None:
         """Apply one frame of a Python-driven animation immediately.
 
-        This is the fallback path used by the desktop preview and by
+        This is the fallback path used by
         animations the platform cannot drive natively. ``prop_name``
         is one of ``opacity``, ``background_color``, ``translate_x``,
         ``translate_y``, ``scale``, ``scale_x``, ``scale_y``,

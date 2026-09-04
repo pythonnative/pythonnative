@@ -56,7 +56,7 @@ class Notifications:
 
         Returns:
             ``True`` if granted (or no prompt is needed), ``False`` if
-            the user declined (always ``False`` on desktop).
+            the user declined (always ``False`` off device).
 
         Raises:
             NativeModuleError: If the native module fails.
@@ -119,7 +119,7 @@ class Notifications:
 
         Returns:
             The APNs token, or ``None`` on platforms without built-in
-            remote push support (Android and desktop).
+            remote push support (Android and off device).
 
         Raises:
             NativeModuleError: If APNs registration fails; ``code`` is

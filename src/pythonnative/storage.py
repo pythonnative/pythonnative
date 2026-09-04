@@ -6,10 +6,10 @@ native ``Storage`` module:
 
 - **iOS**: ``NSUserDefaults`` (standard user defaults).
 - **Android**: ``SharedPreferences`` (file ``"pn_async_storage"``).
-- **Desktop / tests**: an in-memory dict optionally backed by a JSON
+- **Browser preview / tests**: an in-memory dict optionally backed by a JSON
   file under ``PN_STORAGE_DIR`` for inter-run persistence during local
   development (see
-  [`DesktopStorage`][pythonnative.native_modules.desktop.DesktopStorage]).
+  [`FallbackStorage`][pythonnative.native_modules.fallback.FallbackStorage]).
 
 Every operation is a coroutine. The platform stores answer in
 microseconds, so calls complete inline on the framework loop without

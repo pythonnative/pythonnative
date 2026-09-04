@@ -40,7 +40,7 @@ native view the value is attached to
   callback when the animation settles, updates the
   [`AnimatedValue`][pythonnative.animated.AnimatedValue], and resolves
   any awaiting tasks.
-- **Declined** (desktop preview, unattached values, callable easings,
+- **Declined** (unattached values, callable easings,
   values feeding Python-side listeners or derived nodes): a single
   background thread ticks the animation at ~60 Hz from Python, pushing
   each frame through ``set_animated_property``. Semantics are

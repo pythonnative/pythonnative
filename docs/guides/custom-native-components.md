@@ -26,7 +26,7 @@ ship it as an installable PyPI plugin.
 | `PNPlugin` entry | Swift and Kotlin | Registers the managers (and any native modules) by name. |
 | `pn_plugin.json` | Plugin root | Tells `pn build` which entry to call on each platform. |
 | `register_component` + `element_factory` | Python | Declares the element name and exposes the typed factory. |
-| Desktop `ViewHandler` (optional) | Python | Tkinter fallback so `pn preview` and tests can render the component. |
+| `ViewHandler` (optional) | Python | Off-device stand-in so unit tests can render the component without a device. |
 
 Layout stays in Python: managers never read `flex`, `margin`, or
 `padding`. They receive absolute frames through `setFrame` and answer
@@ -324,41 +324,38 @@ badge_ref = pn.use_ref(None)
 get_registry().command(badge_ref._pn_tag, "pulse")
 ```
 
-## Desktop preview and tests
+## Browser preview and tests
 
-`pn preview` and `pythonnative.testing` never load Swift or Kotlin.
-Register a Python [`ViewHandler`][pythonnative.sdk.ViewHandler] so the
-component renders off device; the `@native_component` decorator does
-this and declares the element in one step:
+Neither the [browser preview](browser-preview.md) nor
+`pythonnative.testing` loads Swift or Kotlin. In the preview, a
+component with no browser implementation validates its props, takes
+part in layout, and renders as a labeled placeholder box, so the
+layout around it stays truthful while you work on everything else.
+
+Off device (the `"test"` platform), register a Python
+[`ViewHandler`][pythonnative.sdk.ViewHandler] so the component has a
+stand-in; the `@native_component` decorator does this and declares the
+element in one step:
 
 ```python
-# my_badge/desktop.py
-import tkinter as tk
-
+# my_badge/fallback.py
 from pythonnative.sdk import ViewHandler, native_component
 
 from . import BadgeProps
 
 
 @native_component("Badge", props=BadgeProps)
-class DesktopBadgeHandler(ViewHandler):
+class FallbackBadgeHandler(ViewHandler):
     def create(self, tag, props):
-        label = tk.Label(text=props.get("text", ""), bg=props.get("color", "#FF3B30"))
-        return label
+        return {"tag": tag, "text": props.get("text", "")}
 
     def update(self, view, changed):
         if "text" in changed:
-            view.configure(text=changed["text"] or "")
-
-    def set_frame(self, view, x, y, width, height):
-        view.place(x=x, y=y, width=width, height=height)
+            view["text"] = changed["text"] or ""
 
     def measure_intrinsic(self, view, max_w, max_h):
-        return (float(view.winfo_reqwidth()), float(view.winfo_reqheight()))
+        return (8.0 * len(view["text"]) + 12.0, 20.0)
 ```
-
-Without a desktop handler the component still validates props and
-takes part in layout; it just renders as an empty box in the preview.
 
 Unit tests use the recording backend from
 [`pythonnative.testing`](../api/testing.md):

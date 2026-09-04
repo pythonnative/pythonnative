@@ -2,8 +2,8 @@
 
 A small, RN-style helper for branching app code on the host platform.
 The public surface is the [`Platform`][pythonnative.Platform] class
-exposing ``OS``, ``Version``, ``is_ios``, ``is_android``, and
-``select`` so user code can write ``Platform.select({"ios": ..., ...})``
+exposing ``OS``, ``Version``, ``is_ios``, ``is_android``, ``is_web``,
+and ``select`` so user code can write ``Platform.select({"ios": ..., ...})``
 without importing the ``IS_*`` flags directly.
 
 Example:
@@ -27,7 +27,7 @@ import os
 import sys
 from typing import Any, Dict, Optional
 
-from .utils import IS_ANDROID, IS_DESKTOP, IS_IOS
+from .utils import IS_ANDROID, IS_IOS, IS_WEB
 
 
 def _detect_os() -> str:
@@ -35,8 +35,8 @@ def _detect_os() -> str:
         return "android"
     if IS_IOS:
         return "ios"
-    if IS_DESKTOP:
-        return "desktop"
+    if IS_WEB:
+        return "web"
     return "test"
 
 
@@ -44,11 +44,12 @@ def _detect_version() -> str:
     """Return a human-readable platform version string.
 
     On device this asks the native ``Device`` module (``UIDevice
-    .systemVersion`` / ``Build.VERSION.RELEASE``). Off-device (the test
+    .systemVersion`` / ``Build.VERSION.RELEASE``); the browser preview
+    answers with the browser's user agent family. Off-device (the test
     environment), returns the host Python's version so user code can
     still introspect *something*.
     """
-    if IS_IOS or IS_ANDROID:
+    if IS_IOS or IS_ANDROID or IS_WEB:
         try:
             from .native_modules.registry import native_module
 
@@ -78,13 +79,12 @@ class Platform:
     """Platform-aware constants and the ``select`` dispatcher.
 
     All attributes are read at import time. ``OS`` is one of
-    ``"ios"``, ``"android"``, ``"desktop"`` (the Tkinter preview
-    backend), or ``"test"`` (when running off-device, e.g., in unit
-    tests).
+    ``"ios"``, ``"android"``, ``"web"`` (the browser preview), or
+    ``"test"`` (when running off-device, e.g., in unit tests).
     """
 
     OS: str = _detect_os()
-    """``"ios"``, ``"android"``, ``"desktop"``, or ``"test"``."""
+    """``"ios"``, ``"android"``, ``"web"``, or ``"test"``."""
 
     Version: str = _LazyVersion()  # type: ignore[assignment]
     """Best-effort OS version string (``"17.4"``, ``"14"``, ``"python-3.11"``)."""
@@ -95,8 +95,8 @@ class Platform:
     is_android: bool = IS_ANDROID
     """``True`` when running inside an Android process."""
 
-    is_desktop: bool = IS_DESKTOP
-    """``True`` when running the desktop (Tkinter) preview backend."""
+    is_web: bool = IS_WEB
+    """``True`` when running the browser preview (``pn preview``)."""
 
     is_test: bool = OS == "test"
     """``True`` when running off-device (no native runtime)."""
@@ -106,13 +106,13 @@ class Platform:
         """Pick the value matching the current platform.
 
         Looks up ``spec[Platform.OS]``, then falls back to
-        ``spec["native"]`` (matches iOS and Android, *not* desktop,
-        which is a development surface), then to ``spec["default"]``,
-        then to the explicit ``default`` argument.
+        ``spec["native"]`` (matches iOS and Android, *not* the browser
+        preview, which is a development surface), then to
+        ``spec["default"]``, then to the explicit ``default`` argument.
 
         Args:
             spec: Mapping from platform name to value. Recognized keys:
-                ``"ios"``, ``"android"``, ``"desktop"``, ``"test"``,
+                ``"ios"``, ``"android"``, ``"web"``, ``"test"``,
                 ``"native"``, ``"default"``.
             default: Value returned when ``spec`` has no matching key
                 and no ``"default"`` entry.
@@ -149,17 +149,18 @@ def _set_platform_for_test(name: Optional[str]) -> None:
     """Override ``Platform.OS`` for unit tests.
 
     Production code should not call this. Tests can pass ``"ios"``,
-    ``"android"``, ``"test"``, or ``None`` (to reset to autodetect).
+    ``"android"``, ``"web"``, ``"test"``, or ``None`` (to reset to
+    autodetect).
     """
     if name is None:
         Platform.OS = _detect_os()
         Platform.is_ios = IS_IOS
         Platform.is_android = IS_ANDROID
-        Platform.is_desktop = IS_DESKTOP
+        Platform.is_web = IS_WEB
         Platform.is_test = Platform.OS == "test"
         return
     Platform.OS = name
     Platform.is_ios = name == "ios"
     Platform.is_android = name == "android"
-    Platform.is_desktop = name == "desktop"
+    Platform.is_web = name == "web"
     Platform.is_test = name == "test"

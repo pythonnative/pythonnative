@@ -12,8 +12,8 @@ loop, the framework loop cannot call ``run_forever`` and block.
 Instead it runs as a **guest**: whenever work is scheduled
 (``call_soon`` / ``call_soon_threadsafe`` / timers), the runtime asks
 the platform to *pump* the loop on the next main-queue turn
-(``dispatch_async`` on iOS, ``Handler.post`` on Android, the Tk poll
-loop in ``pn preview``). One pump runs every ready callback and due
+(``dispatch_async`` on iOS, ``Handler.post`` on Android, the preview's
+main loop under ``pn preview``). One pump runs every ready callback and due
 timer, then returns control to the platform.
 
 Key entry points:
@@ -434,50 +434,32 @@ def create_future() -> "asyncio.Future[Any]":
 # middle of a reconciler commit) would re-enter the renderer.
 
 
-# Desktop (Tkinter) main-thread dispatcher, installed by
-# ``pythonnative.preview`` while a ``pn preview`` session is live; the
-# preview's poll loop drains whatever this dispatcher enqueues.
-_desktop_main_dispatch: Optional[Callable[[Callable[[], None]], None]] = None
+def _bridge_platform() -> bool:
+    """Whether a bridge transport provides the main queue (iOS, Android, or the browser preview)."""
+    from .platform import Platform
 
-
-def set_desktop_main_dispatch(dispatch: Optional[Callable[[Callable[[], None]], None]]) -> None:
-    """Install (or clear) the desktop main-thread dispatcher.
-
-    Called by ``pythonnative.preview`` with a function that marshals
-    work onto the Tk main thread, and with ``None`` when the preview
-    window closes.
-    """
-    global _desktop_main_dispatch
-    _desktop_main_dispatch = dispatch
+    return bool(Platform.is_ios or Platform.is_android or Platform.is_web)
 
 
 def _has_pump_dispatcher() -> bool:
     """Whether a queued main-thread dispatcher exists on this platform."""
-    from .platform import Platform
-
-    if Platform.is_ios or Platform.is_android:
-        return True
-    return _desktop_main_dispatch is not None
+    return _bridge_platform()
 
 
 def _dispatch_to_main_queue(fn: Callable[[], None]) -> None:
     """Enqueue ``fn`` on the platform main queue (never runs inline).
 
-    On device this is the bridge's
-    [`post_to_main`][pythonnative.bridge.post_to_main]: native schedules
-    a ``pump`` callback on the next main-queue turn and Python drains
-    its queue then. Off device the ``pn preview`` dispatcher takes it;
-    headless tests have no dispatcher and drive the loop with
-    [`drain`][pythonnative.runtime.drain] instead.
+    On every bridge platform this is
+    [`post_to_main`][pythonnative.bridge.post_to_main]: the native side
+    (UIKit, the Android looper, or the browser preview's main loop)
+    schedules a ``pump`` callback on its next turn and Python drains
+    its queue then. Headless tests have no dispatcher and drive the
+    loop with [`drain`][pythonnative.runtime.drain] instead.
     """
-    from .platform import Platform
-
-    if Platform.is_ios or Platform.is_android:
+    if _bridge_platform():
         from .bridge import post_to_main
 
         post_to_main(fn)
-    elif _desktop_main_dispatch is not None:
-        _desktop_main_dispatch(fn)
 
 
 def _is_main_thread() -> bool:
@@ -493,11 +475,9 @@ def _is_main_thread() -> bool:
 def call_on_main_thread(fn: Callable[[], None]) -> None:
     """Run ``fn()`` on the platform UI thread.
 
-    - **iOS / Android**: runs inline when already on the main thread,
-      otherwise queues ``fn`` through the bridge (one native crossing
-      per batch of queued callables).
-    - **Desktop**: enqueues ``fn`` for the ``pn preview`` poll loop
-      (or runs inline if no preview is live).
+    - **iOS / Android / browser preview**: runs inline when already on
+      the main thread, otherwise queues ``fn`` through the bridge (one
+      native crossing per batch of queued callables).
     - **Tests**: runs ``fn()`` inline.
 
     Exceptions raised by ``fn`` are caught and printed; they must not
@@ -507,9 +487,7 @@ def call_on_main_thread(fn: Callable[[], None]) -> None:
         fn: A zero-arg callable. Runs on the main thread when the
             platform's UI runtime is available, otherwise inline.
     """
-    from .platform import Platform
-
-    if Platform.is_ios or Platform.is_android:
+    if _bridge_platform():
         if _is_main_thread():
             try:
                 fn()
@@ -517,8 +495,6 @@ def call_on_main_thread(fn: Callable[[], None]) -> None:
                 print(f"[pn.runtime] main-inline callback raised: {exc!r}")
             return
         _dispatch_to_main_queue(fn)
-    elif Platform.is_desktop and _desktop_main_dispatch is not None:
-        _desktop_main_dispatch(fn)
     else:
         fn()
 

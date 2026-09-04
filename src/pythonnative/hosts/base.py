@@ -1,7 +1,7 @@
 """Platform-independent screen host.
 
 A host bridges one native screen (an Android fragment, an iOS view
-controller, a desktop preview page) to a [`Reconciler`][pythonnative.reconciler.Reconciler]
+controller, a browser preview screen) to a [`Reconciler`][pythonnative.reconciler.Reconciler]
 rendering the app's root component. It owns:
 
 - **Lifecycle**: ``on_create`` mounts the tree, ``on_resume`` /
@@ -116,7 +116,7 @@ class ScreenHost:
 
     Attributes:
         native_instance: The platform object owning this screen
-            (``Activity``, ``UIViewController``, ``DesktopApp``).
+            (an integer screen id on the bridge platforms).
         component_path: Import path of the root component.
         args: Launch arguments (``set_args``), including the serialized
             navigation state under ``"pn_nav"`` for pushed screens.
@@ -138,9 +138,6 @@ class ScreenHost:
         self._is_rendering = False
         self._render_queued = False
         self._render_scheduled = False
-        self._hot_reload_manifest_path: Optional[str] = None
-        self._hot_reload_last_version: Optional[str] = None
-        self._hot_reload_pending_version: Optional[str] = None
         self._redbox_reconciler: Any = None
         self._redbox_root: Any = None
 
@@ -529,64 +526,59 @@ class ScreenHost:
     # Hot reload
     # ------------------------------------------------------------------
 
-    def enable_hot_reload(self, manifest_path: str, source_root: Optional[str] = None) -> None:
-        """Start polling ``manifest_path`` for reloads (see ``hot_reload_tick``) and switch on dev mode.
+    def reload(self, changed_modules: Optional[Sequence[str]] = None) -> str:
+        """Reload ``changed_modules`` (and their dependents) and refresh this tree.
 
-        ``source_root`` is accepted for the native templates, which pass the
-        dev directory alongside the manifest; the reloader derives module
-        paths from the manifest itself, so it is currently unused.
+        A convenience for a single host (tests, scripts). The dev client
+        reloads modules once per process and then calls
+        [`refresh`][pythonnative.hosts.ScreenHost.refresh] on every live
+        host; see ``pythonnative.hot_reload.apply_reload``.
+
+        Returns:
+            ``"fast_refresh"``, ``"remount"``, ``"error"``, or ``"none"``
+            (nothing was reloaded).
         """
-        self._hot_reload_manifest_path = manifest_path
-        self._hot_reload_last_version = None
-        # Hot reload only runs on debug builds, so it doubles as the
-        # on-device dev-mode switch (validation warnings, RedBox).
-        diagnostics.set_dev_mode(True)
-        self._register_redbox_reporter()
-
-    def hot_reload_tick(self) -> bool:
-        """Poll the reload manifest; returns whether a reload was applied."""
-        manifest_path = self._hot_reload_manifest_path
-        if not manifest_path:
-            return False
-        from ..hot_reload import ModuleReloader
-
-        last = self._hot_reload_last_version
-        if not os.path.exists(manifest_path) and last is None:
-            return False
-        next_version = ModuleReloader.reload_from_manifest(self, manifest_path, last_version=last)
-        if next_version == last:
-            return False
-        self._hot_reload_last_version = next_version
-        return True
-
-    def reload(self, changed_modules: Optional[Sequence[str]] = None) -> None:
-        """Reload modules and refresh the tree (Fast Refresh, else full remount)."""
         from ..hot_reload import ModuleReloader
 
         requested = list(changed_modules or [])
         targets = ModuleReloader.expand_reload_targets(requested, self.component_path)
-        reloaded = ModuleReloader.reload_modules_for_version(targets, self._hot_reload_pending_version)
+        reloaded = ModuleReloader.reload_modules(targets)
         if not reloaded:
             log_pn(f"reload: no modules could be reloaded from {targets!r}")
-            return
+            return "none"
+        return self.refresh(reloaded)
+
+    def refresh(self, reloaded_modules: Sequence[str]) -> str:
+        """Refresh the mounted tree against already-reloaded modules.
+
+        Tries Fast Refresh first (swap component functions in place so
+        hook state survives) and falls back to a full remount.
+
+        Returns:
+            ``"fast_refresh"``, ``"remount"``, or ``"error"`` (the error
+            is shown in the RedBox in dev mode, re-raised otherwise).
+        """
+        reloaded = list(reloaded_modules)
         try:
             self.component = import_component(self.component_path)
         except Exception as exc:
-            if diagnostics.is_dev():
-                self.show_redbox(exc, phase="hot reload import")
-            return
+            if not diagnostics.is_dev():
+                raise
+            self.show_redbox(exc, phase="hot reload import")
+            return "error"
         if self.reconciler is None:
-            return
+            return "none"
         self.clear_redbox()
         if self._try_fast_refresh(reloaded):
-            print(f"[hot-reload] Fast Refresh: {', '.join(requested) or ', '.join(reloaded)}", file=sys.stderr)
-            return
+            return "fast_refresh"
         try:
             self._full_remount(reloaded)
         except Exception as exc:
             if not diagnostics.is_dev():
                 raise
             self.show_redbox(exc, phase="hot reload")
+            return "error"
+        return "remount"
 
     def _try_fast_refresh(self, reloaded_modules: Sequence[str]) -> bool:
         from ..hot_reload import ModuleReloader
@@ -630,7 +622,6 @@ class ScreenHost:
         self.root_native_view = new_root
         self._attach_root(new_root)
         self._drain_renders()
-        print(f"[hot-reload] Remounted: {', '.join(reloaded_modules)}", file=sys.stderr)
 
 
 def _redbox_element(exc: BaseException, phase: str, on_dismiss: Callable[[], None]) -> Element:

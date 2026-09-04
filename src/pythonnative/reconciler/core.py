@@ -69,7 +69,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     Args:
         backend: An object implementing the registry protocol
             (``apply_mutations``, ``resolve_view``, ``measure_intrinsic``,
-            ``command``). PythonNative ships Android, iOS, and desktop
+            ``command``). PythonNative ships Android, iOS, and browser
             registries; tests use
             [`FakeBackend`][pythonnative.testing.FakeBackend].
 

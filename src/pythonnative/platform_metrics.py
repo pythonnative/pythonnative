@@ -139,7 +139,7 @@ def get_safe_area_insets() -> SafeAreaInsets:
     """Return the current safe-area insets.
 
     The default value is ``(0, 0, 0, 0)``; handlers should still
-    function correctly on a desktop / unit-test environment where no
+    function correctly in a unit-test environment where no
     screen host has published insets.
     """
     return _safe_area_insets

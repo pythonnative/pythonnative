@@ -18,7 +18,7 @@ class TestIosDetection:
         assert _detect_ios() is True
 
     def test_other_pn_platform_values_ignored(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("PN_PLATFORM", "desktop")
+        monkeypatch.setenv("PN_PLATFORM", "web")
         monkeypatch.delenv("HOME", raising=False)
         monkeypatch.setattr(sys, "platform", "darwin")
         assert _detect_ios() is False

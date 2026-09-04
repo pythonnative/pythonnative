@@ -22,6 +22,7 @@ android {
         }
         python {
             version "3.13"
+            pyc { src false }
             pip { install "-r", "requirements.txt" }
         }
     }
@@ -128,6 +129,14 @@ def test_configure_gradle_writes_identity(template: Path, tmp_path: Path) -> Non
     assert "compileSdk 35" in text
     assert 'version "3.14"' in text
     assert 'abiFilters "arm64-v8a"' in text
+    # Debug builds keep .py sources in the APK (tracebacks, dev client seeding).
+    assert "src false" in text and "src true" not in text
+
+
+def test_configure_gradle_release_ships_bytecode_only(template: Path, tmp_path: Path) -> None:
+    android.configure_gradle(template, _config(tmp_path), release=True)
+    text = (template / "app" / "build.gradle").read_text()
+    assert "src true" in text and "src false" not in text
     assert "signingConfigs" not in text  # no signing configured
 
 

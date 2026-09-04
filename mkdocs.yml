@@ -78,7 +78,8 @@ nav:
   - Guides:
     - Android: guides/android.md
     - iOS: guides/ios.md
-    - Desktop Preview: guides/desktop-preview.md
+    - Development Workflow: guides/dev-workflow.md
+    - Browser Preview: guides/browser-preview.md
     - Navigation: guides/navigation.md
     - Styling: guides/styling.md
     - Animations: guides/animations.md
@@ -89,7 +90,7 @@ nav:
     - Native Modules: guides/native-modules.md
     - PyPI Packages: guides/pypi-packages.md
     - Custom Native Components: guides/custom-native-components.md
-    - Hot Reload: guides/hot-reload.md
+    - Fast Refresh: guides/hot-reload.md
     - Error Boundaries: guides/error-boundaries.md
     - Testing: guides/testing.md
   - Building:
@@ -133,6 +134,7 @@ nav:
     - Events: api/events.md
     - Platform metrics: api/platform_metrics.md
     - SDK: api/sdk.md
+    - Dev server: api/devserver.md
     - Hot reload: api/hot_reload.md
     - Diagnostics: api/diagnostics.md
     - Utilities: api/utils.md

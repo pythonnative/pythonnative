@@ -46,8 +46,8 @@ Recognition itself is native:
 - **iOS** attaches real `UIGestureRecognizer` instances.
 - **Android** feeds raw `MotionEvent` streams into a pure-Python
   [`GestureArbiter`][pythonnative.gestures.GestureArbiter].
-- **Desktop preview** feeds Tk pointer events into the same arbiter,
-  so gesture code is testable on a laptop.
+- **The browser preview** streams the page's pointer events into the
+  same arbiter, so gesture code is testable on a laptop.
 
 Gestures listed side by side in the `gestures=` list recognize
 *simultaneously*. Use the composition combinators below when you need

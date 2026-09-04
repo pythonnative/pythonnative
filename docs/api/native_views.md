@@ -9,9 +9,10 @@ call on a [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry].
 On device that registry is the
 [`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend],
 which forwards the transaction to Swift and Kotlin component managers
-over the [native bridge](bridge.md). Off device it dispatches to Python
-[`ViewHandler`][pythonnative.native_views.base.ViewHandler] objects
-(Tkinter for `pn preview`, a fake for tests).
+over the [native bridge](bridge.md). The browser preview uses the same
+backend with a WebSocket transport to the page. In tests it dispatches
+to Python [`ViewHandler`][pythonnative.native_views.base.ViewHandler]
+objects (an in-memory fake).
 
 ::: pythonnative.native_views
     options:

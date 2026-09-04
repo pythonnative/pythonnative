@@ -52,7 +52,7 @@ async def _present(
     "default"|"cancel"|"destructive"}`` dicts. The module resolves with
     the index the user picked, or ``-1`` if the dialog was dismissed
     without a selection. Off device the
-    [`DesktopAlert`][pythonnative.native_modules.desktop.DesktopAlert]
+    [`FallbackAlert`][pythonnative.native_modules.fallback.FallbackAlert]
     implementation records the call and answers from the queue set by
     [`Alert.set_test_response`][pythonnative.alerts.Alert.set_test_response].
     """

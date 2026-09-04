@@ -2,8 +2,8 @@
 
 PythonNative runs a single framework-wide ``asyncio`` event loop **on
 the platform's main thread**, pumped as a guest of the native run loop
-(``dispatch_async`` on iOS, ``Handler.post`` on Android, the Tk poll
-loop in ``pn preview``). Every awaitable surface in the framework
+(``dispatch_async`` on iOS, ``Handler.post`` on Android, the
+transport's main loop in ``pn preview``). Every awaitable surface in the framework
 schedules its work on this loop: ``async def`` components,
 coroutine [`use_effect`][pythonnative.use_effect] callbacks,
 [`use_resource`][pythonnative.use_resource],

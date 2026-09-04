@@ -3,7 +3,7 @@
 The smallest PythonNative app: a counter with navigation to a detail
 screen.
 
-## Preview it on your desktop (fastest)
+## Preview it in the browser (fastest)
 
 From this directory, install the example's dependencies (the preview
 imports your real app code), then launch it. This app declares `emoji`
@@ -14,12 +14,14 @@ pip install emoji
 pn preview
 ```
 
-A desktop window opens running `app/main.py`'s `App`. Edit any component
-under `app/`, save, and the window Fast Refreshes in place (no
-simulator or device needed). See the
-[Desktop preview guide](../../docs/guides/desktop-preview.md).
+A browser tab opens running `app/main.py`'s `App` in a phone frame.
+Edit any component under `app/`, save, and the page Fast Refreshes in
+place (no simulator or device needed). See the
+[Browser preview guide](../../docs/guides/browser-preview.md).
 
 ## Run on a device or simulator
+
+Leave `pn preview` running and, in another terminal:
 
 ```bash
 pn run ios
@@ -27,5 +29,6 @@ pn run ios
 pn run android
 ```
 
-Add `--hot-reload` to push edits to the running app without a full
-rebuild.
+The debug build connects to the same dev server, so saves under `app/`
+Fast Refresh it too and its logs show up in the `pn preview` terminal.
+See the [Development workflow](../../docs/guides/dev-workflow.md).

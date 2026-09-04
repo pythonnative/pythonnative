@@ -301,7 +301,7 @@ class Clipboard:
 `native_module` returns a `BridgeModule` on device and a registered
 Python implementation on desktop and in tests. Desktop implementations
 are plain classes with the same method names; built-ins register theirs
-in `pythonnative.native_modules.desktop`, and packages register theirs
+in `pythonnative.native_modules.fallback`, and packages register theirs
 through the `pythonnative.modules` entry point group.
 
 ## Plugins
@@ -338,8 +338,8 @@ public enum MyBlurPlugin: PNPlugin {
 ```
 
 Python-side element factories and typed props come from
-`pythonnative.sdk`, exactly as for built-ins; the desktop preview and
-tests use the `ViewHandler` protocol for their fallback rendering.
+`pythonnative.sdk`, exactly as for built-ins; tests use the
+`ViewHandler` protocol for their off-device stand-ins.
 
 ## Protocol summary
 

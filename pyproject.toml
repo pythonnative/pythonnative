@@ -88,11 +88,13 @@ where = ["src"]
 [tool.setuptools]
 license-files = ["LICENSE*"]
 
-# Include template directories inside the package so importlib.resources can find them
+# Include template directories and the browser preview's page assets inside
+# the package so importlib.resources can find them
 [tool.setuptools.package-data]
 pythonnative = [
   "py.typed",
   "templates/**",
+  "devserver/static/*",
 ]
 
 [tool.ruff]
@@ -127,7 +129,6 @@ ignore = ["D107", "D105", "D203", "D213"]
 # docstrings would only add boilerplate that repeats the ABC.
 "src/pythonnative/native_views/android.py" = ["D101", "D102"]
 "src/pythonnative/native_views/ios.py" = ["D101", "D102"]
-"src/pythonnative/native_views/desktop.py" = ["D101", "D102"]
 # ios.py embeds a LaunchScreen storyboard as an XML string literal whose
 # lines exceed the limit; the XML must stay on single lines for Xcode.
 "src/pythonnative/project/ios.py" = ["E501"]

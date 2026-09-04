@@ -107,7 +107,6 @@ public final class HostModule: PNNativeModule {
         if let screenArgs = args["args"], !(screenArgs is NSNull) {
             next.requestedScreenArgsJSON = (screenArgs as? String) ?? PNJSON.encode(screenArgs)
         }
-        next.devRoot = source.devRoot
         if let title = PNProps.string(args["title"]) {
             next.title = title
         }

@@ -9,11 +9,13 @@ module registered under the same name (``"Camera"``, ``"Haptics"``,
 and the bridge described in ``docs/concepts/bridge.md``; there is no
 Python-side Objective-C or JNI anywhere in this package.
 
-On a desktop machine (``pn preview``, unit tests) the same names
-resolve to plain Python implementations in
-[`pythonnative.native_modules.desktop`][pythonnative.native_modules.desktop]
+Off device the same names resolve to plain Python implementations in
+[`pythonnative.native_modules.fallback`][pythonnative.native_modules.fallback]
 with safe defaults (in-memory buffers, ``"unknown"`` states, no-op
-feedback), so the same code stays runnable off device. Third-party
+feedback), so the same code stays runnable in unit tests. The browser
+preview (``pn start``) implements the modules a browser can honor
+(``Alert``, ``Clipboard``, ``Device``, ``Linking``, ``Share``, ...) in
+the page and falls back to the Python classes for the rest. Third-party
 packages ship their own native modules the same way; see
 ``docs/guides/native-modules.md``.
 

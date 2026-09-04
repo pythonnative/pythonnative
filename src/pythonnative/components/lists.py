@@ -14,7 +14,7 @@ FlatList and SectionList pick between two engines:
    same architecture as React Native's VirtualizedList). Because
    every windowed row lives in the *main* layout tree, rows may be
    any height: estimates steer the spacer sizes and measured extents
-   correct them over time. This is the desktop path and the fallback
+   correct them over time. This is the browser preview path and the fallback
    for variable-height rows, grids, horizontal lists, ornaments, and
    pull-to-refresh.
 """
@@ -318,7 +318,7 @@ def _native_lists_supported() -> bool:
     """Whether the natively virtualized list path is available.
 
     Android (RecyclerView) and iOS (UITableView) have native handlers;
-    the desktop preview and off-device tests use the Python-windowed
+    the browser preview and off-device tests use the Python-windowed
     engine. Patchable in tests to exercise the native routing.
     """
     from ..utils import IS_ANDROID, IS_IOS

@@ -11,7 +11,6 @@ from typing import Callable, Dict, List, Optional
 import pytest
 
 import pythonnative.cli.pn as pn_cli
-import pythonnative.hot_reload as hot_reload_module
 from pythonnative.project.devices import Device
 
 
@@ -329,7 +328,7 @@ def test_cli_run_help_lists_flags() -> None:
         result = run_pn(["run", "--help"], tmpdir)
         assert result.returncode == 0, result.stderr
         assert "--no-logs" in result.stdout
-        assert "--hot-reload" in result.stdout
+        assert "--dev-server" in result.stdout
         assert "--prepare-only" in result.stdout
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
@@ -899,75 +898,119 @@ def test_logs_device_flag_is_wired_through_argparse(tmp_path: Path) -> None:
     assert "no android device matches 'nope'" in result.stdout
 
 
-def test_hot_reload_manifest_payload_maps_files_to_modules(tmp_path: Path) -> None:
-    app_dir = tmp_path / "app"
-    app_dir.mkdir()
-    changed = app_dir / "main.py"
-    changed.write_text("print('hi')\n", encoding="utf-8")
-
-    payload = pn_cli._hot_reload_manifest_payload([os.fspath(changed)], os.fspath(tmp_path), version="v1")
-
-    assert payload == {
-        "version": "v1",
-        "files": ["app/main.py"],
-        "modules": ["app.main"],
-    }
+# ======================================================================
+# run: dev server discovery and native fingerprints
+# ======================================================================
 
 
-def test_android_hot_reload_dest_points_to_overlay() -> None:
-    assert pn_cli._android_hot_reload_dest("app/main.py") == os.path.join(
-        "files",
-        "pythonnative_dev",
-        "app/main.py",
+def test_dev_server_url_for_targets(monkeypatch: pytest.MonkeyPatch) -> None:
+    import pythonnative.devserver as devserver
+
+    monkeypatch.setattr(devserver, "lan_addresses", lambda: ["192.168.1.20"])
+    sim = Device(platform="ios", identifier="SIM", name="iPhone", kind="simulator", state="Booted")
+    phone = Device(platform="ios", identifier="PHONE", name="iPhone", kind="device", state="connected")
+
+    assert pn_cli._dev_server_url_for("ios", None, 8765) == "ws://localhost:8765/ws?role=client"
+    assert pn_cli._dev_server_url_for("ios", sim, 8765) == "ws://localhost:8765/ws?role=client"
+    assert pn_cli._dev_server_url_for("android", None, 9000) == "ws://localhost:9000/ws?role=client"
+    assert pn_cli._dev_server_url_for("ios", phone, 8765) == "ws://192.168.1.20:8765/ws?role=client"
+
+
+def test_running_dev_server_returns_none_when_nothing_listens() -> None:
+    import socket
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        free_port = probe.getsockname()[1]
+    assert pn_cli._running_dev_server(free_port) is None
+
+
+def test_run_reuses_artifact_when_fingerprint_matches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An unchanged native fingerprint plus a live dev server skips the toolchain."""
+    from pythonnative.project import builder as builder_mod
+    from pythonnative.project import fingerprint as fingerprint_mod
+    from pythonnative.project.config import AppConfig, render_default_toml
+
+    (tmp_path / "pythonnative.toml").write_text(render_default_toml(name="demo", app_id="com.example.demo"))
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "main.py").write_text("App = None\n")
+    monkeypatch.chdir(tmp_path)
+    config = AppConfig.load(tmp_path)
+    builder = builder_mod.Builder(config, log=lambda *_: None)
+    fingerprint = pn_cli._native_fingerprint(
+        builder.config, "ios", builder, ios_sdks=("iphonesimulator",), dev_client=False
     )
+    artifact = tmp_path / "Demo.app"
+    artifact.mkdir()
+    fingerprint_mod.write_stamp(tmp_path / "build" / "ios", fingerprint, artifact=artifact)
+
+    prepared_calls: List[str] = []
+
+    def fake_prepare(self: object, platform: str, **kw: object) -> None:
+        prepared_calls.append(platform)
+
+    monkeypatch.setattr(builder_mod.Builder, "prepare", fake_prepare)
+    monkeypatch.setattr(pn_cli, "_running_dev_server", lambda port: {"port": port})
+    launched: Dict[str, object] = {}
+
+    def fake_sim(builder: object, prepared: object, *, artifact: object, **kw: object) -> object:
+        launched.update(prepared=prepared, artifact=artifact, server_url=kw["server_url"])
+        return artifact
+
+    monkeypatch.setattr(pn_cli, "_run_ios_simulator", fake_sim)
+
+    args = argparse.Namespace(platform="ios", device=None, no_logs=True, rebuild=False, dev_client=False)
+    pn_cli.run_project(args)
+
+    assert prepared_calls == [], "native toolchain must not run for an unchanged fingerprint"
+    assert launched["prepared"] is None
+    assert launched["artifact"] == artifact
+    assert launched["server_url"] == "ws://localhost:8765/ws?role=client"
 
 
-def test_clear_ios_hot_reload_overlay_removes_stale_files(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    overlay = tmp_path / "Documents" / "pythonnative_dev"
-    overlay.mkdir(parents=True)
-    (overlay / "reload.json").write_text("{}", encoding="utf-8")
+def test_run_rebuilds_without_a_dev_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without `pn start` the bundled sources are all the app has, so it must be rebuilt."""
+    from pythonnative.project import builder as builder_mod
+    from pythonnative.project import fingerprint as fingerprint_mod
+    from pythonnative.project.config import AppConfig, render_default_toml
 
-    monkeypatch.setattr(pn_cli, "_ios_data_container", lambda bundle_id: os.fspath(tmp_path))
-
-    assert pn_cli._clear_ios_hot_reload_overlay("com.example.app") is True
-    assert not overlay.exists()
-
-
-def test_run_hot_reload_imports_top_level_watcher(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app_dir = tmp_path / "app"
-    app_dir.mkdir()
-    build_dir = tmp_path / "build"
-    events: list[str] = []
-
-    class FakeWatcher:
-        def __init__(self, watch_dir: str, on_change: object, interval: float = 1.0) -> None:
-            assert watch_dir == os.fspath(app_dir)
-
-        def start(self) -> None:
-            events.append("start")
-
-        def stop(self) -> None:
-            events.append("stop")
-
-    def stop_loop(_seconds: float) -> None:
-        raise KeyboardInterrupt
-
-    monkeypatch.setattr(hot_reload_module, "FileWatcher", FakeWatcher)
-    monkeypatch.setattr("time.sleep", stop_loop)
-
-    pn_cli._run_hot_reload(
-        "ios",
-        os.fspath(tmp_path),
-        os.fspath(build_dir),
-        app_id="com.example.app",
-        bundle_id="com.example.app",
-        show_logs=False,
+    (tmp_path / "pythonnative.toml").write_text(render_default_toml(name="demo", app_id="com.example.demo"))
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "main.py").write_text("App = None\n")
+    monkeypatch.chdir(tmp_path)
+    config = AppConfig.load(tmp_path)
+    builder = builder_mod.Builder(config, log=lambda *_: None)
+    fingerprint = pn_cli._native_fingerprint(
+        builder.config, "ios", builder, ios_sdks=("iphonesimulator",), dev_client=False
     )
+    artifact = tmp_path / "Demo.app"
+    artifact.mkdir()
+    fingerprint_mod.write_stamp(tmp_path / "build" / "ios", fingerprint, artifact=artifact)
 
-    assert events == ["start", "stop"]
+    prepared = builder_mod.PreparedProject(
+        platform="ios", build_dir=tmp_path / "build" / "ios", project_dir=tmp_path, app_id="x"
+    )
+    monkeypatch.setattr(builder_mod.Builder, "prepare", lambda self, platform, **kw: prepared)
+    monkeypatch.setattr(pn_cli, "_running_dev_server", lambda port: None)
+    seen: Dict[str, object] = {}
+
+    def fake_sim(builder: object, prepared_arg: object, *, artifact: object, **kw: object) -> object:
+        seen.update(prepared=prepared_arg, server_url=kw["server_url"])
+        return artifact
+
+    monkeypatch.setattr(pn_cli, "_run_ios_simulator", fake_sim)
+    pn_cli.run_project(argparse.Namespace(platform="ios", device=None, no_logs=True, rebuild=False, dev_client=False))
+
+    assert seen["prepared"] is prepared
+    assert seen["server_url"] is None
+
+
+def test_start_help_lists_dev_server_flags(tmp_path: Path) -> None:
+    result = run_pn(["start", "--help"], str(tmp_path))
+    assert result.returncode == 0
+    assert "--port" in result.stdout
+    assert "--open" in result.stdout
+    result = run_pn(["run", "--help"], str(tmp_path))
+    assert "--dev-client" in result.stdout
+    assert "--rebuild" in result.stdout
+    assert "--hot-reload" not in result.stdout

@@ -56,10 +56,11 @@ The reference is split per module so each page stays scannable:
 | Mutation ops | [Mutation ops](mutations.md) | [`CreateOp`][pythonnative.mutations.CreateOp], [`UpdateOp`][pythonnative.mutations.UpdateOp], [`InsertOp`][pythonnative.mutations.InsertOp], [`DestroyOp`][pythonnative.mutations.DestroyOp], [`SetFrameOp`][pythonnative.mutations.SetFrameOp] |
 | Event routing | [Events](events.md) | [`EventRegistry`][pythonnative.events.EventRegistry], [`dispatch_event`][pythonnative.events.dispatch_event], [`extract_events`][pythonnative.events.extract_events] |
 | Platform metrics | [Platform metrics](platform_metrics.md) | [`SafeAreaInsets`][pythonnative.platform_metrics.SafeAreaInsets], [`WindowDimensions`][pythonnative.platform_metrics.WindowDimensions], [`subscribe`][pythonnative.platform_metrics.subscribe] |
-| Hot reload | [Hot reload](hot_reload.md) | [`FileWatcher`][pythonnative.hot_reload.FileWatcher], [`ModuleReloader`][pythonnative.hot_reload.ModuleReloader] |
+| Dev server | [Dev server](devserver.md) | [`DevServer`][pythonnative.devserver.DevServer], [`DevClient`][pythonnative.devclient.DevClient], [`WebTransport`][pythonnative.bridge.web.WebTransport] |
+| Hot reload | [Hot reload](hot_reload.md) | [`apply_reload`][pythonnative.hot_reload.apply_reload], [`ModuleReloader`][pythonnative.hot_reload.ModuleReloader] |
 | Diagnostics | [Diagnostics](diagnostics.md) | [`HookOrderError`][pythonnative.HookOrderError], [`warn`][pythonnative.diagnostics.warn], [`is_dev`][pythonnative.diagnostics.is_dev], [`report_error`][pythonnative.diagnostics.report_error] |
 | Custom components SDK | [SDK](sdk.md) | [`Props`][pythonnative.sdk._components.Props], [`ViewHandler`][pythonnative.native_views.base.ViewHandler], [`native_component`][pythonnative.sdk._components.native_component], [`register_component`][pythonnative.sdk._components.register_component], [`element_factory`][pythonnative.sdk._components.element_factory] |
-| Utilities | [Utilities](utils.md) | `IS_ANDROID`, `IS_IOS`, `IS_DESKTOP` |
+| Utilities | [Utilities](utils.md) | `IS_ANDROID`, `IS_IOS`, `IS_WEB` |
 | CLI | [CLI (`pn`)](cli.md) | `pn init`, `pn run`, `pn clean` |
 
 ## Property reference

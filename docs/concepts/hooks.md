@@ -281,7 +281,7 @@ def Screen():
 ### use_back_handler
 
 Intercept the system back action (the Android hardware back button and
-predictive back gesture; Escape in the desktop preview). Return `True`
+predictive back gesture; Escape in the browser preview). Return `True`
 to consume the event, `False` to pass it along:
 
 ```python

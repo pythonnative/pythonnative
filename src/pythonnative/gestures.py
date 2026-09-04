@@ -38,7 +38,7 @@ tag-based event channel. Recognition itself is native:
   (``PythonNativeKit``).
 - **Android** runs an equivalent recognizer set in Kotlin (the
   ``pythonnative`` Gradle module) on top of ``MotionEvent`` streams.
-- **Desktop** feeds Tk pointer events into the pure-Python
+- **The browser preview** feeds DOM pointer events into the pure-Python
   [`GestureArbiter`][pythonnative.gestures.GestureArbiter] below, which
   doubles as the executable specification for the native ports.
 
@@ -542,11 +542,11 @@ def serialize_gestures(
 
 
 # ======================================================================
-# Pure-Python recognition engine (desktop backend + reference semantics)
+# Pure-Python recognition engine (browser preview + reference semantics)
 # ======================================================================
 #
-# iOS and Android recognize natively. The desktop preview receives raw
-# Tk pointer streams instead, which this arbiter turns into the same
+# iOS and Android recognize natively. The browser preview receives raw
+# DOM pointer streams instead, which this arbiter turns into the same
 # GestureEvent payloads. Keeping it in pure Python makes the state
 # machines unit-testable with scripted event sequences; the Kotlin
 # arbiter mirrors this file so the two stay in lockstep.

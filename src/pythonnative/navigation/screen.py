@@ -40,7 +40,7 @@ class ScreenOptions(TypedDict, total=False):
             (default ``True``).
         header_left: Element (or factory) rendered at the leading edge
             of the navigation bar. Rendered by PythonNative into the bar
-            on iOS; ignored on Android and desktop today.
+            on iOS; ignored on Android and in the browser preview today.
         header_right: Element (or factory) rendered at the trailing edge
             of the navigation bar (same platform notes as
             ``header_left``).

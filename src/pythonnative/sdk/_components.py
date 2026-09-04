@@ -10,22 +10,22 @@ under the same type name by the package's native plugin (see
 ``docs/guides/custom-components.md``). The Python side only needs to
 know the element name and, optionally, its typed props and a
 [`ViewHandler`][pythonnative.sdk.ViewHandler] that renders a stand-in
-in ``pn preview`` and unit tests. Registration is therefore a
-three-part agreement:
+in unit tests (the browser preview draws unknown types as labeled
+placeholders). Registration is therefore a three-part agreement:
 
 1. A typed, immutable [`Props`][pythonnative.sdk.Props] dataclass
    declaring the component's public surface.
 2. An element factory built with
    [`element_factory`][pythonnative.sdk.element_factory].
-3. Optionally, a desktop [`ViewHandler`][pythonnative.sdk.ViewHandler]
-   so the component also renders off device.
+3. Optionally, a test [`ViewHandler`][pythonnative.sdk.ViewHandler]
+   so the component also renders under the Python test backend.
 
 The registry is process-wide. The view backend calls
 [`install_into_registry`][pythonnative.sdk.install_into_registry] on
 first use; that helper performs entry-point discovery (importing any
 modules registered under
 [`ENTRY_POINT_GROUP`][pythonnative.sdk.ENTRY_POINT_GROUP]) and copies
-every desktop handler into the registry.
+every test handler into the registry.
 
 Example:
     ```python
@@ -44,7 +44,7 @@ Example:
     @native_component("Badge", props=BadgeProps)
     class BadgePreviewHandler(ViewHandler):
         def create(self, tag, props):
-            ...  # Tkinter stand-in for pn preview
+            ...  # stand-in used by the Python test backend
 
         def update(self, view, changed):
             ...
@@ -104,7 +104,7 @@ class Props:
 # Internal registry
 # ---------------------------------------------------------------------- #
 
-# name -> (props_type or None, desktop handler or None)
+# name -> (props_type or None, test handler or None)
 _REGISTRY: Dict[str, Tuple[Optional[type], Optional[ViewHandler]]] = {}
 
 # Caches `_install_into_registry` runs to avoid repeated entry-point
@@ -120,7 +120,7 @@ def native_component(
     *,
     props: Optional[type] = None,
 ) -> Callable[[Type[H]], Type[H]]:
-    """Decorator that registers a desktop [`ViewHandler`][pythonnative.sdk.ViewHandler] under ``name``.
+    """Decorator that registers a test [`ViewHandler`][pythonnative.sdk.ViewHandler] under ``name``.
 
     The handler class is instantiated immediately and stored in the
     process-wide registry as the component's off-device renderer. The
@@ -165,7 +165,7 @@ def register_component(
 
     Declares ``name`` as an element type so
     [`element_factory`][pythonnative.sdk.element_factory] can build it.
-    ``handler`` is the optional desktop / test renderer; native
+    ``handler`` is the optional test renderer; native
     rendering always comes from the platform component managers.
     Subsequent calls for the same ``name`` merge: a later ``props`` or
     ``handler`` replaces the earlier one, ``None`` leaves it alone.
@@ -224,14 +224,14 @@ def get_props_type(name: str) -> Optional[type]:
     return entry[0] if entry is not None else None
 
 
-def get_desktop_handler(name: str) -> Optional[ViewHandler]:
+def get_test_handler(name: str) -> Optional[ViewHandler]:
     """Return the registered off-device handler for ``name`` (or ``None``)."""
     entry = _REGISTRY.get(name)
     return entry[1] if entry is not None else None
 
 
 def install_into_registry(registry: Any) -> None:
-    """Copy registered desktop handlers into a view registry.
+    """Copy registered test handlers into a view registry.
 
     Called once by the registry on first use. Triggers entry-point
     discovery on the first call so PyPI-installed components register
@@ -398,7 +398,7 @@ __all__ = [
     "ENTRY_POINT_GROUP",
     "Props",
     "element_factory",
-    "get_desktop_handler",
+    "get_test_handler",
     "get_props_type",
     "install_into_registry",
     "list_components",

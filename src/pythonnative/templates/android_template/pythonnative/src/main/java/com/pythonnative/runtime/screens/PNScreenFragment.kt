@@ -1,6 +1,5 @@
 package com.pythonnative.runtime.screens
 
-import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -11,7 +10,6 @@ import androidx.core.os.bundleOf
 import androidx.core.view.ViewCompat
 import androidx.fragment.app.Fragment
 import com.pythonnative.runtime.PNBridge
-import com.pythonnative.runtime.bridge.MainThread
 import com.pythonnative.runtime.bridge.PNLog
 import org.json.JSONObject
 
@@ -26,8 +24,9 @@ import org.json.JSONObject
  * `Host.attach_root` module call, which lands in [attachRoot].
  *
  * Apps subclass this (the nav graph names the subclass) and override
- * [defaultPath] / [defaultDevRoot] to supply the entry module and the
- * hot-reload root when the fragment arguments don't carry them.
+ * [defaultPath] to supply the entry module when the fragment arguments
+ * don't carry one. Fast Refresh needs nothing from the fragment: the
+ * Python dev client reloads modules and refreshes mounted screens.
  */
 open class PNScreenFragment : Fragment() {
     /** The screen id assigned by [ScreenRegistry]. */
@@ -41,37 +40,14 @@ open class PNScreenFragment : Fragment() {
     private var created = false
     private var pendingRestore: String? = null
     private var lastLayout: String? = null
-    private var hotReloadRunning = false
-
-    private val hotReloadRunnable = object : Runnable {
-        override fun run() {
-            if (!hotReloadRunning) return
-            host("hot_reload_tick", "{}")
-            MainThread.postDelayed(this, 500)
-        }
-    }
 
     /** Screen path when the arguments carry none (apps return the entry module). */
     protected open fun defaultPath(): String? = null
-
-    /** Hot-reload source root when the arguments carry none (debug builds only). */
-    protected open fun defaultDevRoot(): String? = null
 
     /** The path this fragment shows. */
     fun screenPath(): String? = arguments?.getString(ARG_PATH) ?: defaultPath()
 
     private fun argsJson(): String? = arguments?.getString(ARG_ARGS)
-
-    private fun devRoot(): String? {
-        val explicit = arguments?.getString(ARG_DEV_ROOT)
-        if (explicit != null) return explicit
-        return if (isDebuggable()) defaultDevRoot() else null
-    }
-
-    private fun isDebuggable(): Boolean {
-        val ctx = context ?: return false
-        return (ctx.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -105,7 +81,6 @@ open class PNScreenFragment : Fragment() {
         val payload = JSONObject()
             .put("path", screenPath() ?: JSONObject.NULL)
             .put("args", argsJson() ?: JSONObject.NULL)
-            .put("dev_root", devRoot() ?: JSONObject.NULL)
         host("create", payload.toString())
         created = true
         pendingRestore?.let {
@@ -118,11 +93,6 @@ open class PNScreenFragment : Fragment() {
             insets
         }
         publishLayout(view, force = true)
-        if (devRoot() != null) {
-            hotReloadRunning = true
-            MainThread.remove(hotReloadRunnable)
-            MainThread.postDelayed(hotReloadRunnable, 500)
-        }
     }
 
     private fun publishLayout(view: View, force: Boolean = false) {
@@ -182,15 +152,11 @@ open class PNScreenFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        hotReloadRunning = false
-        MainThread.remove(hotReloadRunnable)
         container = null
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        hotReloadRunning = false
-        MainThread.remove(hotReloadRunnable)
         if (created) host("destroy", "{}")
         created = false
         ScreenRegistry.unregister(screenId)
@@ -209,14 +175,13 @@ open class PNScreenFragment : Fragment() {
         const val ARG_PATH = "screen_path"
         const val ARG_ARGS = "args_json"
         const val ARG_TITLE = "title"
-        const val ARG_DEV_ROOT = "dev_root"
         private const val STATE_KEY = "pn_screen_state"
 
-        /** Build a fragment for `path` with optional JSON `args` and hot-reload `devRoot`. */
+        /** Build a fragment for `path` with optional JSON `args`. */
         @JvmStatic
-        fun newInstance(path: String, argsJson: String?, devRoot: String? = null): PNScreenFragment {
+        fun newInstance(path: String, argsJson: String?): PNScreenFragment {
             val f = PNScreenFragment()
-            f.arguments = bundleOf(ARG_PATH to path, ARG_ARGS to argsJson, ARG_DEV_ROOT to devRoot)
+            f.arguments = bundleOf(ARG_PATH to path, ARG_ARGS to argsJson)
             return f
         }
     }

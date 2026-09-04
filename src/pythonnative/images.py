@@ -35,7 +35,8 @@ def _default_cache_dir() -> str:
 
     Android: the app's ``Context.getCacheDir()`` (purged by the OS
     under storage pressure). iOS: ``~/Library/Caches`` (excluded from
-    backups). Desktop: a per-user directory under the system temp dir.
+    backups). Browser preview and tests: a per-user directory under the
+    system temp dir.
     """
     try:
         from .utils import IS_ANDROID, IS_IOS

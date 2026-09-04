@@ -15,7 +15,7 @@ Under the hood the list picks one of two engines:
   that is mounted on demand and reconciled in place when its cell is
   recycled. This is the fastest path and the one long feeds should
   aim for.
-- **Python windowing.** Everywhere else (the desktop preview,
+- **Python windowing.** Everywhere else (the browser preview,
   variable-height rows, grids, horizontal lists, headers/footers/empty
   states, and pull-to-refresh), rows render into a native scroll view
   with leading and trailing spacers standing in for off-screen

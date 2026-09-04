@@ -10,7 +10,4 @@ import com.pythonnative.runtime.screens.PNScreenFragment
  */
 class ScreenFragment : PNScreenFragment() {
     override fun defaultPath(): String = getString(R.string.pn_entry_module)
-
-    override fun defaultDevRoot(): String? =
-        if (BuildConfig.DEBUG) "${requireContext().filesDir.absolutePath}/pythonnative_dev" else null
 }

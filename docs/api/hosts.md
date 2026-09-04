@@ -12,8 +12,10 @@ templates create a host through the `Host` native module's `create`
 event and never need to be edited by app code; one
 [`NativeScreenHost`][pythonnative.hosts.native.NativeScreenHost] class
 serves both platforms because every platform-specific step goes over
-the [bridge](../concepts/bridge.md). The desktop preview uses
-[`DesktopScreenHost`][pythonnative.hosts.desktop.DesktopScreenHost].
+the [bridge](../concepts/bridge.md). The browser preview uses the same
+class: its page is a bridge peer that speaks the `Host` module protocol
+over a WebSocket (see
+[`WebTransport`][pythonnative.bridge.web.WebTransport]).
 
 ::: pythonnative.hosts
     options:
@@ -38,13 +40,6 @@ the [bridge](../concepts/bridge.md). The desktop preview uses
       show_root_heading: false
       show_root_toc_entry: false
       members_order: source
-      filters: ["!^_"]
-
-::: pythonnative.hosts.desktop
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      members: ["DesktopScreenHost"]
       filters: ["!^_"]
 
 ## Next steps

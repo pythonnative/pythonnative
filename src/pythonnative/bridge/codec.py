@@ -104,7 +104,7 @@ def encode_transaction(
 
     Args:
         ops: Ordered mutations from the reconciler.
-        prop_filter: Unused hook kept for symmetry with the desktop
+        prop_filter: Unused hook kept for symmetry with the test
             registry; reserved for per-type prop rewriting.
 
     Returns:

@@ -44,20 +44,21 @@ a small Python factory that returns
 `Element(<type>, props, children)`. Step-by-step instructions live in
 [Native views (concept)](../concepts/native-views.md#custom-widgets).
 
-## Does PythonNative work on the desktop?
+## Does PythonNative work on the desktop or the web?
 
-Yes, for **previewing**. `pn preview` renders your app in a native
-desktop window using a built-in Tkinter backend, with instant Fast
-Refresh on every save. It's the fastest inner-loop: see your real UI
-and iterate in seconds without booting a simulator or deploying to a
-device. The same flex layout engine and reconciler drive it, so what
-you see closely matches the device. See the
-[Desktop preview guide](../guides/desktop-preview.md).
+For **previewing**, yes. `pn preview` renders your app in a browser tab
+inside a phone frame, with Fast Refresh on every save. It's the fastest
+inner loop: see your real UI and iterate in seconds without booting a
+simulator or deploying to a device. The page speaks the same bridge
+protocol as the Swift and Kotlin runtimes, so the reconciler, layout
+engine, hooks, navigation, and screen host are the exact code that
+ships to the phone. See the
+[Browser preview guide](../guides/browser-preview.md).
 
-The desktop backend is a **development tool**, not a production target:
-chrome like rounded corners, shadows, and overflow clipping are
-approximated, and there's no app packaging for desktop. Ship to devices
-with `pn run android` / `pn run ios`.
+The browser preview is a **development tool**, not a production target:
+platform chrome and fonts are approximated, most device APIs are
+simulated, and there's no web or desktop packaging. Ship to devices
+with `pn run android` / `pn run ios` and `pn build`.
 
 The core (components, hooks, reconciler) is also platform-agnostic and
 runs headless with a [fake backend](../guides/testing.md#a-minimal-fake-backend);

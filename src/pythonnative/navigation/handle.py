@@ -46,7 +46,7 @@ Listener = Callable[["NavigationEvent"], None]
 class HostNavigator(Protocol):
     """What a root stack needs from the native screen host.
 
-    Hosts (iOS view controller, Android fragment, desktop preview) and
+    Hosts (iOS view controller, Android fragment, browser preview) and
     [`FakeHost`][pythonnative.testing.FakeHost] implement these. Each
     method receives the *serialized* next navigation state so the
     screen it creates can boot with the full history.

@@ -12,7 +12,7 @@ Two interfaces live here, both backed by the native ``Haptics`` module:
 
 Every method is synchronous (the OS queues the effect and returns).
 Missing hardware is not an error: on a device without a Taptic Engine
-or vibrator, and on desktop, the native module simply does nothing.
+or vibrator, and off device the native module simply does nothing.
 """
 
 from __future__ import annotations

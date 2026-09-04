@@ -8,9 +8,10 @@ import pythonnative.bootstrap; pythonnative.bootstrap.start()
 
 [`start`][pythonnative.bootstrap.start] connects the two halves of the
 bridge (installing the native -> Python callback on iOS), verifies the
-protocol version, routes ``print()`` to the console on iOS, and warms
-the asyncio runtime. From then on the native runtime drives everything
-through ``callback("host", ...)``; see ``docs/concepts/bridge.md``.
+protocol version, routes ``print()`` to the console on iOS, warms the
+asyncio runtime, and, in debug builds, starts the dev client that syncs
+sources from ``pn start``. From then on the native runtime drives
+everything through ``callback("host", ...)``; see ``docs/concepts/bridge.md``.
 """
 
 from __future__ import annotations
@@ -29,8 +30,8 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
     """Connect the bridge and prepare the runtime.
 
     Args:
-        dev: Enable dev mode (RedBox, validation warnings). Debug
-            templates pass ``True``; hot reload turns it on as well.
+        dev: Enable dev mode (RedBox, validation warnings, the dev
+            client). Debug templates pass ``True``.
         strict: Re-raise the failure after recording it. The templates
             pass ``True`` so a broken bridge surfaces as a bootstrap
             error screen with the full traceback.
@@ -59,7 +60,8 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
         from . import bridge
 
         status_["protocol"] = bridge.handshake()
-        if dev or os.environ.get("PN_DEV") in ("1", "true"):
+        dev_mode = bool(dev or os.environ.get("PN_DEV") in ("1", "true"))
+        if dev_mode:
             from . import diagnostics
 
             diagnostics.set_dev_mode(True)
@@ -73,6 +75,13 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
         from .native_views import get_registry
 
         get_registry()
+        if dev_mode:
+            # Debug builds are dev clients: connect to `pn start` when
+            # the build (or a remembered connection) names a server.
+            from . import devclient
+
+            client = devclient.start_if_configured()
+            status_["dev_server"] = client.url if client is not None else None
     except Exception as exc:
         status_["error"] = f"{type(exc).__name__}: {exc}"
         print(f"[pn.bootstrap] start failed: {exc!r}", file=sys.stderr)

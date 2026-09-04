@@ -241,10 +241,11 @@ class BridgeBackend:
         return {"root": int(root_tag) if root_tag is not None else None}
 
     # ------------------------------------------------------------------
-    # Test helpers
+    # Reset
     # ------------------------------------------------------------------
 
-    def _reset_for_tests(self) -> None:
+    def reset(self) -> None:
+        """Forget every view: the native side is gone (browser tab closed, tests)."""
         for pool in list(self._row_pools.values()):
             pool.release_all()
         self._row_pools.clear()

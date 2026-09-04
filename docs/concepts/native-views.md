@@ -14,9 +14,9 @@ On a device that registry is the
 it serializes the batch and sends it across the
 [native bridge](bridge.md) in one call, where a Swift or Kotlin
 **component manager** per element type creates and updates the real
-views. Off device the registry dispatches to Python
-[`ViewHandler`][pythonnative.native_views.base.ViewHandler] objects
-(Tkinter for `pn preview`, an in-memory fake for tests).
+views. The browser preview is the same path with a WebSocket
+transport: the page applies the transactions with DOM elements. In
+tests the registry dispatches to an in-memory fake.
 
 This page describes that boundary, walks through what a component
 manager does, and covers the fake backend used by `pytest`.
@@ -95,10 +95,11 @@ lazily by [`get_registry`][pythonnative.native_views.get_registry]:
   [`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]
   forwards every transaction, measurement, command, and animation
   request to native.
-- On the desktop (`pn preview`, with `PN_PLATFORM=desktop`), a
-  handler-based registry populated by
-  `pythonnative.native_views.desktop.register_handlers` renders with
-  Tkinter. See the [Desktop preview guide](../guides/desktop-preview.md).
+- In the browser preview (`pn preview`, with `PN_PLATFORM=web`), the
+  same `BridgeBackend` commits through a
+  [`WebTransport`][pythonnative.bridge.web.WebTransport] to the page,
+  which applies them with DOM elements. See the
+  [Browser preview guide](../guides/browser-preview.md).
 - Under `pytest`, the backend is replaced with a fake via
   [`set_registry`][pythonnative.native_views.set_registry] (or by
   constructing the `Reconciler` with the fake directly).

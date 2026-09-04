@@ -233,18 +233,15 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
     Events (payloads are what ``PNViewController`` and
     ``PNScreenFragment`` send):
 
-    - ``create`` ``{"path", "args", "dev_root", "restored_state",
-      ...metrics}``: import the component, create the host, and mount.
-      ``path`` is the dotted component path (``None`` means the app
-      entry module), ``args`` a JSON string, ``dev_root`` the hot-reload
-      overlay directory for debug builds. Returns ``{"root": tag}``.
+    - ``create`` ``{"path", "args", "restored_state", ...metrics}``:
+      import the component, create the host, and mount. ``path`` is the
+      dotted component path (``None`` means the app entry module) and
+      ``args`` a JSON string. Returns ``{"root": tag}``.
     - ``start`` / ``resume`` / ``pause`` / ``stop`` / ``destroy``:
       lifecycle. ``resume`` and ``layout`` carry metrics.
     - ``layout`` ``{width, height, insets, keyboard_height, color_scheme}``.
     - ``appearance`` ``{"color_scheme"}``.
     - ``back_pressed``: returns ``"true"`` when a handler consumed it.
-    - ``hot_reload_tick``: poll the reload manifest; returns ``"true"``
-      when a reload ran.
     - ``save_state`` / ``restore_state``: instance-state hooks.
     - ``flush``: run deferred renders now.
 
@@ -273,8 +270,6 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
         return None
     if event == "back_pressed":
         return "true" if host.on_back_pressed() else "false"
-    if event in ("hot_reload_tick", "tick"):
-        return "true" if host.hot_reload_tick() else "false"
     if event == "save_state":
         host.on_save_instance_state()
         return None
@@ -307,11 +302,6 @@ def _create(screen_id: int, payload: Dict[str, Any]) -> Optional[str]:
     args = payload.get("args")
     if args:
         host.set_args(args)
-    dev_root = payload.get("dev_root")
-    if dev_root:
-        from .. import hot_reload
-
-        host.enable_hot_reload(hot_reload.manifest_path_for(str(dev_root)), str(dev_root))
     if not (payload.get("width") and payload.get("height")):
         # ``create`` is sent before the first layout pass; ask native for
         # its best guess so the first commit lays out at the right size.

@@ -43,10 +43,13 @@ class MainActivity : AppCompatActivity() {
                         ?.toString()
             })
             if (BuildConfig.DEBUG) {
-                // Dev-only writable source overlay for hot reload.
+                // Dev-only: the writable source overlay the dev client syncs
+                // into, and the dev server `pn run` asked us to connect to
+                // (an intent extra; a remembered server is used otherwise).
                 py.getModule("pythonnative.hot_reload").callAttr(
                     "configure_dev_environment",
-                    filesDir.absolutePath
+                    filesDir.absolutePath,
+                    intent?.getStringExtra("pn_dev_server")
                 )
             }
             // Handshake with the runtime library (raises on a protocol

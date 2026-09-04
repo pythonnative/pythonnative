@@ -1,166 +1,128 @@
-# Hot reload
+# Fast Refresh
 
-Hot reload turns your edit-save-rebuild loop into edit-save-see. The
-`pn` CLI watches `app/` for changes and pushes the modified files
-straight to the running app, where a small device-side helper reloads
-the affected modules and asks the screen host to re-render.
+Fast Refresh turns the edit-save-rebuild loop into edit-save-see. The
+[dev server](dev-workflow.md) watches `app/`, pushes each changed file
+to every connected client (the browser preview, simulators, emulators,
+phones), and each client reloads the affected modules and refreshes its
+mounted screens in place, keeping component state.
 
-## Turn it on
-
-Add `--hot-reload` to your `pn run` invocation:
+There's nothing to turn on. `pn start` (or `pn preview`) is the server;
+any debug build launched with `pn run` while it's running is a client.
 
 ```bash
-pn run android --hot-reload
-# or
-pn run ios --hot-reload
+pn start            # terminal 1
+pn run ios          # terminal 2 (or android, or open the browser preview)
 ```
 
-Hot reload works on Android devices and emulators (over `adb`) and on
-the iOS Simulator. Physical iPhones aren't supported yet: the CLI has
-no way to write into a sandboxed app's container over USB, so
-`pn run ios --hot-reload` against a physical device prints a note and
-runs without the watcher.
+## What happens on save
 
-`pn` will:
-
-1. Build and install the app once (the standard `run` flow).
-2. Launch the app on a connected device or simulator.
-3. Start a [`FileWatcher`][pythonnative.hot_reload.FileWatcher] over
-   `app/`.
-4. Push changed Python files into a writable on-device overlay.
-5. Write a small reload manifest that the running app polls from the
+1. The server's watcher notices `app/screens/home.py` changed, updates
+   its manifest, and broadcasts an `update` with the new contents.
+2. Each client writes the file into its **overlay**, a writable
+   directory that sits ahead of the bundled sources on `sys.path`
+   (the browser preview has no overlay; the project directory is
+   already on its path).
+3. The client resolves the path to a module (`app.screens.home`) and
+   calls [`apply_reload`][pythonnative.hot_reload.apply_reload] on the
    main thread.
-6. Tail logs (Android) or print hot-reload notifications (iOS) until
-   you press `Ctrl+C`.
+4. `apply_reload` re-executes the changed module, then the other
+   imported modules under `app` that may hold bindings to it (the
+   entry module's `from app.screens.home import HomeScreen`, for
+   instance), leaves first.
+5. Every live screen host runs **Fast Refresh**: it walks its VNode
+   tree, finds each component function whose module was reloaded,
+   looks up the replacement by `__module__` + `__qualname__`, and
+   rewrites the `Element.type` references in place. The next
+   reconcile sees the new function with the same `HookState`, so state
+   survives.
+6. The host re-renders. Layout and native views update incrementally
+   through the normal reconciler path.
+7. The client reports back (`fast_refresh: app.screens.home 42ms`),
+   which prints in the `pn start` terminal and toasts in the preview.
 
-## How the device sees changes
+If Fast Refresh can't find a clean swap (a component's `__qualname__`
+changed, a render raised with the new function, or the swap itself
+failed), the host falls back to a **full remount** of its root, so you
+never get stuck with a stale tree. Hook state is reset in that case
+and the report says `remount`.
 
-The native templates call
-[`configure_dev_environment()`][pythonnative.hot_reload.configure_dev_environment]
-before importing your app. That creates a `pythonnative_dev/` directory
-in the app's writable sandbox and puts it before the bundled app code
-on `sys.path`.
+If the saved file fails to import (a syntax error mid-edit), the
+previous module stays in `sys.modules`, the traceback shows in the
+RedBox and the terminal, and the app keeps running. Fix the file and
+save again.
 
-When a source file changes, the CLI copies it to that overlay:
-
-- Android: app-private storage via `adb` + `run-as`
-- iOS Simulator: the installed app's `Documents/pythonnative_dev/`
-  directory
-
-After the files are in place, the CLI writes `reload.json`. The
-Android and iOS templates poll that manifest on the platform main
-thread and call the screen host's reload hook. The host re-imports the
-root component by dotted path, resets hook/navigation state for the
-page, and mounts the refreshed tree.
+Per-screen scope: each native screen (`UIViewController` on iOS,
+`ScreenFragment` on Android, a screen element in the preview) runs its
+own host, so Fast Refresh operates independently per host. Two pushed
+screens that both use a changed module each swap their own references.
 
 ## What gets reloaded
 
-PythonNative reloads any `.py` file under `app/`. The device-side
-[`ModuleReloader`][pythonnative.hot_reload.ModuleReloader] resolves
-the file to a dotted module name (e.g., `app/pages/home.py` becomes
-`app.pages.home`) and re-imports it from disk.
-
-After reloading, every active screen host runs **Fast Refresh** in
-place:
-
-1. Walk the live VNode tree and collect every component function
-   defined in a reloaded module.
-2. Look up each function's replacement by `__module__` +
-   `__qualname__` in the freshly reloaded module (unwrapping the
-   `@pn.component` decorator).
-3. Rewrite the `Element.type` references on every VNode in place;
-   the next reconcile sees the new function with the same
-   `HookState`, so state survives.
-
-The next render runs through
-[`Reconciler.reconcile`][pythonnative.reconciler.core.Reconciler.reconcile]
-just like a normal re-render, so layout and native views are
-updated incrementally. Component state (`use_state`, `use_reducer`,
-refs) is preserved across the swap.
-
-If Fast Refresh can't find a clean swap (for example, a
-component's `__qualname__` changed, a new module was added that the
-tree doesn't reference yet, or the swap raises), the host
-**falls back** to a full remount of its root component so you never
-get stuck with a stale tree. Hook state is reset in that case.
-
-Per-screen scope: each native screen (UIViewController on iOS,
-ScreenFragment on Android) runs its own host, so Fast Refresh
-operates independently per host. Two pushed screens both running
-Fast Refresh for the same changed module each swap their own
-references.
+Any `.py` file under `app/`. Assets under `app/` (images, JSON, fonts)
+are synced too, so an `Image` that points at a bundle-relative file
+picks up the new bytes the next time it renders.
 
 ## What doesn't reload
 
 - Native template files (anything under `android_template/` or
-  `ios_template/`). Changes there require a full rebuild because the
-  Java/Swift code is compiled into the app binary.
+  `ios_template/`) and native plugins. Changes there require a rebuild;
+  `pn run` detects them through the
+  [native fingerprint](dev-workflow.md#when-native-rebuilds-happen) and
+  runs the toolchain automatically.
+- `pythonnative.toml`. Permissions, requirements, and app metadata are
+  native inputs; `pn run` rebuilds when it changes.
 - Files outside `app/`. If you have a shared library next to your
   project, copy or symlink it under `app/` to pick up changes.
-- C extension modules. Hot reload only updates Python source files;
-  recompiled `.so` / `.dylib` libraries are not re-loaded mid-session.
+- C extension modules. Recompiled `.so` / `.dylib` libraries are not
+  reloaded mid-session.
+- The `pythonnative` package itself. Reinstall and rebuild.
 
 ## Common pitfalls
 
 !!! warning "Top-level side effects"
-    Code that runs at import time (e.g., a global registry that
-    registers itself when the module is imported) runs again on every
-    reload. Idempotent registration is fine; non-idempotent setup
-    (counters, network calls) needs guarding.
+    Code that runs at import time (a global registry that registers
+    itself when the module is imported) runs again on every reload.
+    Idempotent registration is fine; non-idempotent setup (counters,
+    network calls, opening files) needs guarding.
 
 !!! warning "References across modules"
     If module `a` does `from b import Foo` and only `b.py` changes,
-    module `a` may still hold the *old* `Foo`. The screen host always
-    reloads the root screen module after changed modules so common
-    component imports update, but long-lived references (e.g., stashed
-    in a global) can drift. When in doubt, restart the app.
+    `a` is re-executed too so its binding updates, but long-lived
+    references stashed elsewhere (a module-level cache, an object held
+    in `use_ref`) can drift. When in doubt, use **Reload app** in the
+    preview or relaunch the device build.
 
 !!! warning "Hook signature changes"
     Adding or removing a hook in a component changes the slot layout.
-    Fast Refresh will swap the function in place but the next render
-    can read the wrong slots, so the host falls back to a full
-    remount when it detects the swap raises. If you see suspicious
-    state after a hook-shape edit, close and reopen the affected
-    screen (or restart the app) to clear the slate.
+    Fast Refresh swaps the function in place, and the next render may
+    read the wrong slots; the host falls back to a remount when it
+    detects the swap raising. If you see suspicious state after a
+    hook-shape edit, close and reopen the affected screen (or reload
+    the app) to clear the slate.
 
 !!! info "Renaming a component"
     Fast Refresh keys on each function's `__qualname__`. Renaming a
     component changes the key, so the live VNode keeps its old
-    function until the parent re-renders with the new name. In
-    practice this means you may need to trigger one navigation or
-    state change for the renamed component to take effect; closing
-    and reopening the screen always works.
+    function until the parent re-renders with the new name. Trigger a
+    navigation or state change, or reload the app.
 
-## Working without `--hot-reload`
+## Without a dev server
 
-Hot reload is opt-in. If you'd rather rebuild on every change (more
-predictable, slower), use `pn run android` / `pn run ios` without the
-flag, or split the loop:
+Fast Refresh needs `pn start` running. If you `pn run` without one, the
+CLI says so and builds an app that runs its bundled sources; start the
+server and relaunch to connect it. For rebuild-on-every-change (more
+predictable, much slower), pass `--rebuild`.
 
-```bash
-pn run android --prepare-only   # stage files, skip the build
-# ...edit...
-pn run android                  # rebuild and re-install
-```
+## Reading logs
 
-`--prepare-only` is also useful for iterating on
-`AndroidManifest.xml` or `Info.plist` because those changes never
-hot-reload and you want the smallest possible cycle.
-
-## Reading device logs
-
-Hot reload streams logs by default so you can see exceptions from your
-reloaded modules. Pass `--no-logs` to suppress the stream:
-
-```bash
-pn run android --hot-reload --no-logs
-```
-
-On iOS the CLI prints hot-reload notifications only. Use Console.app
-or Xcode for full live logs while the CLI keeps the watcher process in
-the foreground.
+Every dev client mirrors its `print` output, warnings, and tracebacks
+to the `pn start` terminal, so you rarely need a device log viewer. For
+native-level output, `pn logs ios` / `pn logs android` attach to
+`os_log` and `logcat`; `pn run` does the same after launching unless
+you pass `--no-logs`.
 
 ## Next steps
 
-- Reference: [Hot reload API](../api/hot_reload.md).
-- See where hot reload sits in the run loop: [`pn run`](../api/cli.md).
+- The whole loop: [Development workflow](dev-workflow.md).
+- Reference: [Hot reload API](../api/hot_reload.md) and
+  [Dev server API](../api/devserver.md).

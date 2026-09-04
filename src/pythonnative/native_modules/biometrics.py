@@ -33,7 +33,7 @@ class Biometrics:
 
     @staticmethod
     def is_available() -> bool:
-        """Return ``True`` when biometric auth can be attempted (enrolled hardware; ``False`` on desktop)."""
+        """Return ``True`` when biometric auth can be attempted (enrolled hardware; ``False`` off device)."""
         return bool(native_module("Biometrics").call("is_available"))
 
     @staticmethod

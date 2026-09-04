@@ -92,8 +92,8 @@ Because UIKit and the Android view system own the main thread's run
 loop, the framework loop can't call `run_forever` and block. It runs
 as a *guest* instead: whenever async work is scheduled, the runtime
 asks the platform to pump the loop on the next main-queue turn
-(the bridge's `pump` callback on iOS and Android, the Tk poll loop in
-`pn preview`). One pump runs every ready callback and due timer,
+(the bridge's `pump` callback on iOS and Android, the transport's
+main loop in `pn preview`). One pump runs every ready callback and due timer,
 then hands control back to the platform.
 
 The payoff is that coroutines and rendering interleave on one thread:
@@ -307,11 +307,10 @@ current Python callback. Gestures
 ([`pythonnative.gestures`](../api/gestures.md)) are recognized natively
 and ride the same channel.
 
-Off device the registry dispatches to Python
-[`ViewHandler`][pythonnative.native_views.base.ViewHandler] objects
-instead: Tkinter handlers for `pn preview` and an in-memory fake for
-tests. The protocol is identical, so the reconciler never knows which
-backend it is driving.
+The browser preview drives the same backend through a WebSocket
+transport, with the page acting as the native runtime. In tests the
+registry dispatches to an in-memory fake instead. The protocol is
+identical, so the reconciler never knows which backend it is driving.
 
 See [Native views](native-views.md) for the manager hooks and
 [The native bridge](bridge.md) for the wire format.
@@ -359,15 +358,21 @@ See [Mental model](mental-model.md) for a wider comparison table.
   update Android views. The `pythonnative` Gradle module has no
   Chaquopy dependency, so it is unit-tested with plain JUnit.
 
-## Hot reload (Fast Refresh)
+## Development loop (dev server and Fast Refresh)
 
-During development, `pn run --hot-reload` watches `app/` for file
-changes and pushes updated Python files to the running app, enabling
-near-instant UI updates without full rebuilds.
+During development one dev server (`pn start`) watches `app/` and
+syncs every change over WebSocket to each connected client: the
+browser preview, and debug builds on simulators, emulators, and
+devices. Each client reloads the changed modules and refreshes its
+mounted screens without a native rebuild; its logs stream back to the
+server's terminal. `pn run` rebuilds the native project only when a
+native input (config, template, the `pythonnative` package, plugins)
+changed, as recorded by a content fingerprint. See the
+[Development workflow](../guides/dev-workflow.md).
 
-PythonNative uses a **Fast Refresh** strategy:
+Reloads use a **Fast Refresh** strategy:
 
-1. Reload the changed module(s) on the device.
+1. Reload the changed module(s) on the client.
 2. For every active screen host, walk the VNode tree and collect every
    component function defined in a reloaded module.
 3. Match each one to its replacement by `__module__` +
@@ -377,14 +382,14 @@ PythonNative uses a **Fast Refresh** strategy:
    preserved across the edit.
 
 If Fast Refresh can't produce a clean swap, the host falls back to a
-**full remount** of its root component. See
-[Hot reload guide](../guides/hot-reload.md).
+**full remount** of its root component. See the
+[Fast Refresh guide](../guides/hot-reload.md).
 
 ## Native API modules
 
 Device APIs are native modules: Swift and Kotlin classes registered by
 name, called from thin Python facades through the bridge, with Python
-fallbacks for the desktop and tests. Built-ins include:
+fallbacks for the browser preview and tests. Built-ins include:
 
 - [`Camera`][pythonnative.native_modules.camera.Camera]: photo
   capture and gallery picker.

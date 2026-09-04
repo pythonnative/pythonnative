@@ -24,8 +24,8 @@ A custom native component is three things:
 3. A registration call in Python
    ([`register_component`][pythonnative.sdk.register_component], or the
    [`@native_component`][pythonnative.sdk.native_component] decorator
-   when you also supply a desktop
-   [`ViewHandler`][pythonnative.sdk.ViewHandler] for ``pn preview``)
+   when you also supply a test
+   [`ViewHandler`][pythonnative.sdk.ViewHandler] for the Python backend)
    that declares the element name and binds its props type.
 
 Once registered, the component appears alongside the built-ins: the
@@ -34,8 +34,8 @@ reconciler, layout engine, and Fast Refresh treat it identically.
 A native module (device API without a view) follows the same split: a
 Swift / Kotlin class registered by name in the plugin, a Python facade
 that calls ``native_module(name).call(...)``, and optionally a Python
-implementation registered with ``register_python_module`` for desktop
-and tests.
+implementation registered with ``register_python_module`` for the
+browser preview and tests.
 
 PyPI packages can ship both without users importing them explicitly
 by declaring entry points in the ``pythonnative.handlers`` (Python
@@ -97,8 +97,8 @@ from ._components import (
     ENTRY_POINT_GROUP,
     Props,
     element_factory,
-    get_desktop_handler,
     get_props_type,
+    get_test_handler,
     install_into_registry,
     list_components,
     native_component,
@@ -129,7 +129,7 @@ __all__ = [
     "ENTRY_POINT_GROUP",
     "Props",
     "element_factory",
-    "get_desktop_handler",
+    "get_test_handler",
     "get_props_type",
     "install_into_registry",
     "list_components",

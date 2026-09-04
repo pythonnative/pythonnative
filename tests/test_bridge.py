@@ -421,7 +421,7 @@ def test_python_module_registration_and_entry_points_off_device() -> None:
     with pytest.raises(modules.NativeModuleError, match="unknown method"):
         module.call("missing")
     modules.unregister_python_module("Weather")
-    # Facades call native_module() at import time, so a missing desktop
+    # Facades call native_module() at import time, so a missing fallback
     # implementation only surfaces on the first method call.
     unresolved = modules.native_module("Weather")
     with pytest.raises(KeyError):
@@ -432,7 +432,7 @@ def test_python_module_registration_and_entry_points_off_device() -> None:
     modules._reset_for_tests()
 
 
-def test_desktop_defaults_resolve_for_every_builtin() -> None:
+def test_fallback_defaults_resolve_for_every_builtin() -> None:
     modules._reset_for_tests()
     bridge._reset_for_tests()
     for name in (
@@ -454,7 +454,7 @@ def test_desktop_defaults_resolve_for_every_builtin() -> None:
         "Biometrics",
     ):
         assert isinstance(modules.native_module(name), modules.PythonModule), name
-    assert modules.native_module("Device").call("info")["platform"] == "desktop"
+    assert modules.native_module("Device").call("info")["platform"] == "test"
     modules._reset_for_tests()
 
 
@@ -505,10 +505,8 @@ def test_native_host_lifecycle_and_navigation(transport: FakeTransport, monkeypa
 
     transport.host_event(1, "pause")
     assert host.is_focused is False
-    assert transport.host_event(1, "hot_reload_tick") is False
     transport.host_event(1, "save_state")
     transport.host_event(1, "restore_state", {"state": "{}"})
-    assert transport.host_event(1, "hot_reload_tick") is False
     transport.host_event(1, "save_state")
     transport.host_event(1, "restore_state", {"state": "{}"})
     transport.host_event(1, "resume", {"width": 390.0, "height": 844.0})

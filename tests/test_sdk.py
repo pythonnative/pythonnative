@@ -22,8 +22,8 @@ from pythonnative.sdk import (
     Props,
     ViewHandler,
     element_factory,
-    get_desktop_handler,
     get_props_type,
+    get_test_handler,
     install_into_registry,
     list_components,
     native_component,
@@ -91,7 +91,7 @@ def test_native_component_registers_handler() -> None:
 
     assert "Badge" in list_components()
     assert get_props_type("Badge") is BadgeProps
-    assert isinstance(get_desktop_handler("Badge"), Badge)
+    assert isinstance(get_test_handler("Badge"), Badge)
 
 
 def test_native_component_without_props() -> None:
@@ -100,7 +100,7 @@ def test_native_component_without_props() -> None:
         pass
 
     assert get_props_type("Spinner") is None
-    assert isinstance(get_desktop_handler("Spinner"), Spinner)
+    assert isinstance(get_test_handler("Spinner"), Spinner)
 
 
 def test_native_component_replaces_handler() -> None:
@@ -112,7 +112,7 @@ def test_native_component_replaces_handler() -> None:
     class SecondBadge(StubBadgeHandler):
         pass
 
-    assert isinstance(get_desktop_handler("Badge"), SecondBadge)
+    assert isinstance(get_test_handler("Badge"), SecondBadge)
 
 
 def test_native_component_rejects_non_view_handler() -> None:
@@ -132,14 +132,14 @@ def test_register_component_basic() -> None:
     handler = StubBadgeHandler()
     register_component(name="Badge", props=BadgeProps, handler=handler)
     assert get_props_type("Badge") is BadgeProps
-    assert get_desktop_handler("Badge") is handler
+    assert get_test_handler("Badge") is handler
 
 
 def test_register_component_declares_without_handler() -> None:
     """A component rendered only natively needs no Python handler."""
     register_component(name="Badge", props=BadgeProps)
     assert "Badge" in list_components()
-    assert get_desktop_handler("Badge") is None
+    assert get_test_handler("Badge") is None
     Badge = element_factory("Badge")
     assert Badge(text="1").type == "Badge"
 
@@ -148,7 +148,7 @@ def test_register_component_merges_later_calls() -> None:
     a = StubBadgeHandler()
     register_component(name="Badge", handler=a)
     register_component(name="Badge", props=BadgeProps)
-    assert get_desktop_handler("Badge") is a
+    assert get_test_handler("Badge") is a
     # Late-arrived props get installed
     assert get_props_type("Badge") is BadgeProps
 
@@ -257,7 +257,7 @@ def test_element_factory_without_props_passes_kwargs_through() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_install_copies_desktop_handlers() -> None:
+def test_install_copies_test_handlers() -> None:
     handler = StubBadgeHandler()
     register_component(name="Badge", props=BadgeProps, handler=handler)
 
@@ -269,7 +269,7 @@ def test_install_copies_desktop_handlers() -> None:
     assert view["props"]["text"] == "hi"
 
 
-def test_install_skips_components_without_desktop_handler() -> None:
+def test_install_skips_components_without_test_handler() -> None:
     register_component(name="NativeOnly", props=BadgeProps)
 
     reg = NativeViewRegistry()
@@ -365,7 +365,7 @@ def test_entry_point_failure_does_not_break_discovery(monkeypatch: pytest.Monkey
 
 
 def test_get_registry_runs_sdk_install() -> None:
-    """get_registry pulls SDK desktop handlers into the off-device registry."""
+    """get_registry pulls SDK test handlers into the off-device registry."""
     handler = StubBadgeHandler()
     register_component(name="Badge", props=BadgeProps, handler=handler)
 

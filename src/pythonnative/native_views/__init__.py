@@ -8,14 +8,14 @@ create/update/insert/destroy/frame ops per commit, see
 ``command``, and the animation hooks. Two implementations exist:
 
 - [`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]
-  (iOS and Android): serializes each commit and hands it to the native
-  runtime through the bridge; Swift and Kotlin component managers own
+  (iOS, Android, and the browser preview): serializes each commit and
+  hands it to the native runtime through the bridge; the Swift and
+  Kotlin component managers, or the preview page's DOM applier, own
   every platform view. Python holds no native objects.
 - [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
-  (desktop preview and tests): maps element type names to Python
-  [`ViewHandler`][pythonnative.native_views.base.ViewHandler]
-  implementations (`pythonnative.native_views.desktop` renders with
-  Tkinter) and owns the tag table itself.
+  (tests and SDK handler introspection): maps element type names to
+  Python [`ViewHandler`][pythonnative.native_views.base.ViewHandler]
+  implementations and owns the tag table itself.
 
 Platform selection happens lazily on first use, so this package
 imports on any platform. Tests install a mock with
@@ -103,7 +103,7 @@ class NativeViewRegistry:
     The reconciler depends only on this protocol: ``apply_mutations``,
     ``resolve_view``, ``measure_intrinsic``, and ``command``.
     Implementations may host real platform handlers (Android/iOS/
-    desktop) or mocks for tests.
+    browser) or mocks for tests.
     """
 
     def __init__(self) -> None:
@@ -291,7 +291,7 @@ def _install_sdk_handlers(registry: Any) -> None:
 
     Imported lazily so unit tests that never touch the SDK don't pay the
     entry-point discovery cost. Only meaningful for the Python-handler
-    registry (desktop / tests); on device the native runtime owns
+    registry (tests); on the bridge platforms the native runtime owns
     component managers and Python handlers are recorded but never run.
     """
     try:
@@ -308,25 +308,20 @@ def _install_sdk_handlers(registry: Any) -> None:
 def _create_backend() -> Any:
     """Build the backend for the active platform.
 
-    iOS and Android get the bridge backend. ``pn preview``
-    (``PN_PLATFORM=desktop``) gets the Tkinter handler registry.
-    Anywhere else (plain unit tests) there is no renderer at all, so
-    the registry is empty: tests inject a
+    iOS, Android, and the browser preview (``PN_PLATFORM=web``) get the
+    bridge backend. Anywhere else (plain unit tests) there is no
+    renderer at all, so the registry is empty: tests inject a
     ``pythonnative.testing.FakeBackend`` with ``set_registry`` and a
     stray commit raises a clear "unknown element type" rather than
     silently importing a platform module.
     """
-    from ..utils import IS_ANDROID, IS_DESKTOP, IS_IOS
+    from ..utils import IS_NATIVE
 
-    if IS_IOS or IS_ANDROID:
+    if IS_NATIVE:
         from .bridge_backend import BridgeBackend
 
         return BridgeBackend()
     registry = NativeViewRegistry()
-    if IS_DESKTOP:
-        from .desktop import register_handlers
-
-        register_handlers(registry)
     _install_sdk_handlers(registry)
     return registry
 
@@ -336,11 +331,11 @@ def get_registry() -> Any:
 
     Returns:
         A [`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]
-        on device, otherwise a `NativeViewRegistry` (Tkinter handlers
-        under ``pn preview``, plus every decorator-registered SDK
-        handler and any handlers exposed by third-party packages via
-        the [`pythonnative.handlers`][pythonnative.sdk.ENTRY_POINT_GROUP]
-        entry point group).
+        on every bridge platform, otherwise a `NativeViewRegistry`
+        holding every decorator-registered SDK handler and any handlers
+        exposed by third-party packages via the
+        [`pythonnative.handlers`][pythonnative.sdk.ENTRY_POINT_GROUP]
+        entry point group.
     """
     global _registry
     if _registry is not None:

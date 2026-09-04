@@ -19,7 +19,6 @@ from pythonnative.component import component
 from pythonnative.element import Element
 from pythonnative.hooks import use_back_handler, use_effect, use_state
 from pythonnative.hosts import ScreenHost, create_screen, import_component
-from pythonnative.hosts.desktop import DesktopScreenHost
 from pythonnative.native_views import set_registry
 from pythonnative.testing import FakeBackend, FakeView
 
@@ -191,16 +190,18 @@ def test_screen_host_on_back_pressed_routes_to_handlers(monkeypatch: pytest.Monk
     assert host.on_back_pressed() is False, "destroyed host must decline back events"
 
 
-@pytest.mark.parametrize("host_class", [ScreenHost, DesktopScreenHost])
-def test_every_host_class_exposes_on_layout(host_class: type) -> None:
+def test_every_host_class_exposes_on_layout() -> None:
     """Regression: every host class must accept an ``on_layout`` callback.
 
     The iOS template forwards ``viewDidLayoutSubviews`` as
     ``on_layout`` so the screen host can re-push the safe-area-aware
-    viewport size; missing the method on the desktop or base classes
+    viewport size; missing the method on the base or native classes
     would raise ``AttributeError`` at runtime.
     """
-    assert callable(getattr(host_class, "on_layout", None))
+    from pythonnative.hosts.native import NativeScreenHost
+
+    for host_class in (ScreenHost, NativeScreenHost):
+        assert callable(getattr(host_class, "on_layout", None))
 
 
 def test_screen_host_on_layout_is_idempotent(monkeypatch: pytest.MonkeyPatch, backend: FakeBackend) -> None:

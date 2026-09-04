@@ -4,17 +4,17 @@ import UIKit
 ///
 /// Lifecycle is forwarded to Python as `callback("host", screenId,
 /// event, payload)`: `create` (viewDidLoad), `start`, `layout`,
-/// `resume`, `pause`, `stop`, `destroy`, `save_state`, `restore_state`,
-/// and (DEBUG builds) `hot_reload_tick` every 0.5 s. Python attaches its
-/// root view with `Host.attach_root`; the controller keeps that view
-/// below the top safe-area inset and full-bleed at the bottom.
+/// `resume`, `pause`, `stop`, `destroy`, `save_state`, and
+/// `restore_state`. Python attaches its root view with
+/// `Host.attach_root`; the controller keeps that view below the top
+/// safe-area inset and full-bleed at the bottom. Fast Refresh needs no
+/// help from here: the Python dev client reloads modules and refreshes
+/// the mounted screens itself.
 open class PNViewController: UIViewController {
     /// Dotted path of the screen component (`nil` = the app entry module).
     public var requestedScreenPath: String?
     /// JSON-encoded screen args, or `nil`.
     public var requestedScreenArgsJSON: String?
-    /// Hot-reload overlay directory for dev builds, or `nil`.
-    public var devRoot: String?
     /// State JSON to hand to Python right after `create` (from a prior `saveState`).
     public var restoredStateJSON: String?
 
@@ -24,7 +24,6 @@ open class PNViewController: UIViewController {
     public private(set) var isScreenCreated = false
 
     private(set) var rootView: UIView?
-    private var hotReloadTimer: Timer?
     private var lastLayoutPayload: String?
 
     /// `required` so `Host.push` can instantiate the app's subclass dynamically.
@@ -39,7 +38,6 @@ open class PNViewController: UIViewController {
     }
 
     deinit {
-        hotReloadTimer?.invalidate()
         if isScreenCreated {
             PNBridge.shared.callPython(kind: "host", tag: screenId, name: "destroy", payload: "{}")
         }
@@ -73,7 +71,6 @@ open class PNViewController: UIViewController {
         var payload: [String: Any] = [
             "path": requestedScreenPath ?? defaultScreenPath,
             "args": requestedScreenArgsJSON ?? NSNull(),
-            "dev_root": devRoot ?? NSNull(),
         ]
         if let restored = restoredStateJSON {
             payload["restored_state"] = restored
@@ -82,9 +79,6 @@ open class PNViewController: UIViewController {
         if let restored = restoredStateJSON {
             PNBridge.shared.callPython(kind: "host", tag: screenId, name: "restore_state", payload: restored)
         }
-        #if DEBUG
-        startHotReloadPolling()
-        #endif
     }
 
     open override func viewWillAppear(_ animated: Bool) {
@@ -221,16 +215,6 @@ open class PNViewController: UIViewController {
 
     func viewportJSON() -> String {
         PNJSON.encode(viewport())
-    }
-
-    // MARK: - Hot reload
-
-    private func startHotReloadPolling() {
-        hotReloadTimer?.invalidate()
-        hotReloadTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            guard let self = self, self.isScreenCreated else { return }
-            PNBridge.shared.callPython(kind: "host", tag: self.screenId, name: "hot_reload_tick", payload: "{}")
-        }
     }
 
     // MARK: - Bootstrap error UI

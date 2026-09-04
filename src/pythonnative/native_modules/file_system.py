@@ -56,7 +56,7 @@ class FileSystem:
         """Return the app's writable data directory.
 
         On Android the result is ``Context.getFilesDir()``. On iOS it is
-        the app's Documents directory. On a desktop machine without
+        the app's Documents directory. Off device, without
         either runtime, a ``.pythonnative_data`` directory under the
         user's home folder is used. The value comes from the native
         ``Device`` module's ``info()`` and is cached after the first

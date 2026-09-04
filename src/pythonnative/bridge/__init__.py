@@ -7,11 +7,13 @@ Everything that crosses into native code goes through a
 [`native_callback`][pythonnative.bridge.native_callback]. The protocol
 is documented in ``docs/concepts/bridge.md``.
 
-Off-device (tests, ``pn preview``) there is no transport; the desktop
-registry renders with Tkinter and native modules fall back to their
-Python implementations. Tests that want to exercise the bridge itself
-install a [`FakeTransport`][pythonnative.bridge.fake.FakeTransport]
-with [`set_transport`][pythonnative.bridge.set_transport].
+Under ``pn preview`` the native side is a browser page, reached through
+[`WebTransport`][pythonnative.bridge.web.WebTransport]; the preview
+installs it with [`set_transport`][pythonnative.bridge.set_transport]
+before any screen mounts. In headless tests there is no transport at
+all: native modules fall back to their Python implementations, and
+tests that want to exercise the bridge itself install a
+[`FakeTransport`][pythonnative.bridge.fake.FakeTransport].
 """
 
 from __future__ import annotations
@@ -74,7 +76,7 @@ _explicit = False
 
 
 def _create_platform_transport() -> Optional[Transport]:
-    from ..utils import IS_ANDROID, IS_IOS
+    from ..utils import IS_ANDROID, IS_IOS, IS_WEB
 
     if IS_IOS:
         from .ios import IOSTransport
@@ -86,6 +88,11 @@ def _create_platform_transport() -> Optional[Transport]:
         from .android import AndroidTransport
 
         return AndroidTransport()
+    if IS_WEB:
+        raise RuntimeError(
+            "PN_PLATFORM=web is set but no browser preview transport is installed. "
+            "Start the app with `pn preview` (or `pn start`), which installs the WebTransport."
+        )
     return None
 
 
@@ -104,7 +111,7 @@ def get_transport() -> Transport:
             if created is None:
                 raise RuntimeError(
                     "No native bridge is available on this platform (running off-device). "
-                    "Use `pn preview` for the desktop renderer or install a FakeTransport in tests."
+                    "Use `pn preview` for the browser renderer or install a FakeTransport in tests."
                 )
             _transport = created
     return _transport
@@ -116,9 +123,9 @@ def has_transport() -> bool:
         return True
     if _explicit:
         return False
-    from ..utils import IS_ANDROID, IS_IOS
+    from ..utils import IS_ANDROID, IS_IOS, IS_WEB
 
-    return bool(IS_IOS or IS_ANDROID)
+    return bool(IS_IOS or IS_ANDROID or IS_WEB)
 
 
 def set_transport(transport: Optional[Transport]) -> None:

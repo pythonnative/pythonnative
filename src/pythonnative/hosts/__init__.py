@@ -1,35 +1,30 @@
 """Screen hosts: the bridge between a native screen and the reconciler.
 
-On device the native runtime creates screens through the bridge
+On every bridge platform (iOS, Android, and the browser preview) the
+native runtime creates screens through the bridge
 (``callback("host", screen_id, "create", {...})``), which lands in
-[`NativeScreenHost`][pythonnative.hosts.native.NativeScreenHost]. Off device,
-``pn preview`` creates a
-[`DesktopScreenHost`][pythonnative.hosts.desktop.DesktopScreenHost]
-through [`create_screen`][pythonnative.hosts.create_screen], and unit
+[`NativeScreenHost`][pythonnative.hosts.native.NativeScreenHost]. Unit
 tests use the headless base [`ScreenHost`][pythonnative.hosts.ScreenHost]
-with a fake backend.
+with a fake backend, created through
+[`create_screen`][pythonnative.hosts.create_screen].
 """
 
 from __future__ import annotations
 
-from typing import Any, Optional, Type
+from typing import Any, Optional, Sequence, Type
 
-from ..utils import IS_ANDROID, IS_DESKTOP, IS_IOS
+from ..utils import IS_NATIVE
 from .base import ScreenHost, import_component
 
-__all__ = ["ScreenHost", "create_screen", "host_class", "import_component"]
+__all__ = ["ScreenHost", "create_screen", "host_class", "import_component", "live_hosts"]
 
 
 def host_class() -> Type[ScreenHost]:
     """The host class for the current runtime."""
-    if IS_ANDROID or IS_IOS:
+    if IS_NATIVE:
         from .native import NativeScreenHost
 
         return NativeScreenHost
-    if IS_DESKTOP:
-        from .desktop import DesktopScreenHost
-
-        return DesktopScreenHost
     return ScreenHost
 
 
@@ -41,7 +36,7 @@ def create_screen(component_path: str, native_instance: Any = None, args_json: O
             dotted path like ``"app.main.RootScreen"``. Imported lazily
             so the dev server can reload it.
         native_instance: The platform object owning the screen (the
-            integer screen id on device, ``DesktopApp`` in the preview).
+            integer screen id on the bridge platforms).
         args_json: Optional JSON launch arguments (pushed screens
             receive their navigation history here).
 
@@ -55,8 +50,14 @@ def create_screen(component_path: str, native_instance: Any = None, args_json: O
     return host
 
 
-def drain_desktop_scheduled_renders() -> None:
-    """Drain deferred desktop renders (called by the preview's Tk loop)."""
-    from .desktop import drain_desktop_scheduled_renders as drain
+def live_hosts() -> Sequence[ScreenHost]:
+    """Every screen host currently mounted by the native runtime.
 
-    drain()
+    Returns an empty sequence off the bridge platforms; tests hold their
+    own host references.
+    """
+    if not IS_NATIVE:
+        return []
+    from .native import live_hosts as native_live_hosts
+
+    return list(native_live_hosts())

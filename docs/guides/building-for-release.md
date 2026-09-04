@@ -117,7 +117,9 @@ package to `.pyc` and drop the `.py` files, which shrinks the bundle
 and avoids shipping plain-text source. Because bytecode is
 version-specific, this requires the Python running `pn` to match
 `app.python_version`; otherwise `pn` prints a notice and ships `.py`
-sources instead.
+sources instead. Debug builds (`pn run`, `pn build --debug`) keep the
+`.py` files on both platforms so tracebacks show source lines and the
+dev client can tell which sources the app already has.
 
 ### Signing
 

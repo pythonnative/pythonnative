@@ -8,7 +8,7 @@ unencrypted) should never hold.
 
 Both backing stores complete on the calling thread, so every method is
 synchronous. Reads return ``Optional[str]``; writes return nothing and
-raise on failure. On desktop the module falls back to an in-process dict
+raise on failure. Off device the module falls back to an in-process dict
 so code paths stay exercisable without a device Keychain.
 
 Example:

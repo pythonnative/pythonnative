@@ -26,7 +26,7 @@ and the [Async + data guide](../guides/async.md).
 
 ## Desktop implementations
 
-::: pythonnative.native_modules.desktop
+::: pythonnative.native_modules.fallback
     options:
       show_root_heading: false
       show_root_toc_entry: false

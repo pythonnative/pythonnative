@@ -1,7 +1,6 @@
-"""Tests for hot-reload source overlays and manifest handling."""
+"""Tests for the device-side half of Fast Refresh: overlays, module reloading, apply_reload."""
 
 import importlib
-import json
 import os
 import sys
 from pathlib import Path
@@ -14,8 +13,8 @@ from pythonnative.element import Element
 from pythonnative.hot_reload import (
     DEV_ROOT_DIR,
     ModuleReloader,
+    apply_reload,
     configure_dev_environment,
-    manifest_path_for,
 )
 from pythonnative.reconciler import Reconciler
 from pythonnative.testing import FakeBackend as _MockBackend
@@ -38,35 +37,6 @@ def test_file_to_module_normalizes_relative_paths() -> None:
     assert ModuleReloader.file_to_module("app/main.py") == "app.main"
     assert ModuleReloader.file_to_module("app\\pages\\home.py") == "app.pages.home"
     assert ModuleReloader.file_to_module("app/__init__.py") == "app"
-
-
-def test_reload_from_manifest_calls_reload_once(tmp_path: Path) -> None:
-    writable_root = os.fspath(tmp_path)
-    dev_root = configure_dev_environment(writable_root)
-    manifest_path = manifest_path_for(dev_root)
-    calls: list[list[str]] = []
-
-    class Page:
-        def reload(self, module_names: list[str]) -> None:
-            calls.append(module_names)
-
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "version": "1",
-                "files": ["app/main.py"],
-                "modules": ["app.main"],
-            },
-            f,
-        )
-
-    version = ModuleReloader.reload_from_manifest(Page(), manifest_path)
-    assert version == "1"
-    assert calls == [["app.main"]]
-
-    version = ModuleReloader.reload_from_manifest(Page(), manifest_path, last_version=version)
-    assert version == "1"
-    assert calls == [["app.main"]]
 
 
 def test_reload_module_imports_from_prioritized_sys_path(
@@ -200,143 +170,6 @@ def test_expand_reload_targets_returns_only_changed_when_entry_point_missing(
     targets = ModuleReloader.expand_reload_targets(["totally_unrelated.module"], "app.main")
 
     assert targets == ["totally_unrelated.module"]
-
-
-# ======================================================================
-# reload_modules_for_version (cross-host dedup)
-# ======================================================================
-
-
-@pytest.fixture
-def _reset_reloaded_version(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Isolate `ModuleReloader._last_reloaded_version` per test."""
-    monkeypatch.setattr(ModuleReloader, "_last_reloaded_version", None, raising=False)
-
-
-def _make_reloadable_pkg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str) -> str:
-    """Create a package with one module that can be reloaded; returns the dotted name."""
-    pkg = tmp_path / "dedup_pkg"
-    pkg.mkdir()
-    (pkg / "__init__.py").write_text("", encoding="utf-8")
-    (pkg / "comp.py").write_text(f"VALUE = {value!r}\n", encoding="utf-8")
-    monkeypatch.syspath_prepend(os.fspath(tmp_path))
-    monkeypatch.setattr(sys, "dont_write_bytecode", True)
-    sys.modules.pop("dedup_pkg.comp", None)
-    sys.modules.pop("dedup_pkg", None)
-    importlib.import_module("dedup_pkg.comp")
-    return "dedup_pkg.comp"
-
-
-def test_reload_modules_for_version_reloads_first_call(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    _reset_reloaded_version: None,
-) -> None:
-    module_name = _make_reloadable_pkg(tmp_path, monkeypatch, "v1")
-    first_module = sys.modules[module_name]
-
-    # Edit the file and reload through the version-aware API.
-    (tmp_path / "dedup_pkg" / "comp.py").write_text("VALUE = 'v2'\n", encoding="utf-8")
-    os.utime(tmp_path / "dedup_pkg" / "comp.py")
-
-    reloaded = ModuleReloader.reload_modules_for_version([module_name], version="1")
-
-    assert reloaded == [module_name]
-    assert sys.modules[module_name] is not first_module
-    assert sys.modules[module_name].VALUE == "v2"
-    assert ModuleReloader._last_reloaded_version == "1"
-
-
-def test_reload_modules_for_version_skips_second_call_for_same_version(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    _reset_reloaded_version: None,
-) -> None:
-    """A second host on the same version must reuse already-loaded modules."""
-    module_name = _make_reloadable_pkg(tmp_path, monkeypatch, "v1")
-
-    # First host reloads against the new source.
-    (tmp_path / "dedup_pkg" / "comp.py").write_text("VALUE = 'v2'\n", encoding="utf-8")
-    os.utime(tmp_path / "dedup_pkg" / "comp.py")
-    ModuleReloader.reload_modules_for_version([module_name], version="1")
-    after_first = sys.modules[module_name]
-    assert after_first.VALUE == "v2"
-
-    # Simulate another host calling for the same version. The source on disk has
-    # advanced (would be a v3 if reloaded), but the dedup must keep the v2 object.
-    (tmp_path / "dedup_pkg" / "comp.py").write_text("VALUE = 'v3'\n", encoding="utf-8")
-    os.utime(tmp_path / "dedup_pkg" / "comp.py")
-    reloaded = ModuleReloader.reload_modules_for_version([module_name], version="1")
-
-    assert reloaded == [module_name]
-    assert sys.modules[module_name] is after_first
-    assert sys.modules[module_name].VALUE == "v2"
-
-
-def test_reload_modules_for_version_reloads_again_when_version_changes(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    _reset_reloaded_version: None,
-) -> None:
-    """A bumped manifest version must trigger a fresh reload."""
-    module_name = _make_reloadable_pkg(tmp_path, monkeypatch, "v1")
-
-    (tmp_path / "dedup_pkg" / "comp.py").write_text("VALUE = 'v2'\n", encoding="utf-8")
-    os.utime(tmp_path / "dedup_pkg" / "comp.py")
-    ModuleReloader.reload_modules_for_version([module_name], version="1")
-
-    (tmp_path / "dedup_pkg" / "comp.py").write_text("VALUE = 'v3'\n", encoding="utf-8")
-    os.utime(tmp_path / "dedup_pkg" / "comp.py")
-    ModuleReloader.reload_modules_for_version([module_name], version="2")
-
-    assert sys.modules[module_name].VALUE == "v3"
-    assert ModuleReloader._last_reloaded_version == "2"
-
-
-def test_reload_modules_for_version_without_version_always_reloads(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    _reset_reloaded_version: None,
-) -> None:
-    """``version=None`` falls back to unconditional ``reload_modules``."""
-    module_name = _make_reloadable_pkg(tmp_path, monkeypatch, "v1")
-
-    (tmp_path / "dedup_pkg" / "comp.py").write_text("VALUE = 'v2'\n", encoding="utf-8")
-    os.utime(tmp_path / "dedup_pkg" / "comp.py")
-    ModuleReloader.reload_modules_for_version([module_name], version=None)
-    assert sys.modules[module_name].VALUE == "v2"
-    assert ModuleReloader._last_reloaded_version is None
-
-    (tmp_path / "dedup_pkg" / "comp.py").write_text("VALUE = 'v3'\n", encoding="utf-8")
-    os.utime(tmp_path / "dedup_pkg" / "comp.py")
-    ModuleReloader.reload_modules_for_version([module_name], version=None)
-    assert sys.modules[module_name].VALUE == "v3"
-
-
-def test_reload_from_manifest_stashes_version_on_screen_instance(
-    tmp_path: Path,
-    _reset_reloaded_version: None,
-) -> None:
-    """``reload_from_manifest`` must surface the version to ``host.reload`` via
-    ``_hot_reload_pending_version`` so the host can dedupe ``reload_modules``."""
-    writable_root = os.fspath(tmp_path)
-    dev_root = configure_dev_environment(writable_root)
-    manifest_path = manifest_path_for(dev_root)
-    observed: list[str | None] = []
-
-    class _Host:
-        def reload(self, module_names: list[str]) -> None:
-            observed.append(getattr(self, "_hot_reload_pending_version", None))
-
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump({"version": "abc-123", "modules": ["app.main"]}, f)
-
-    host = _Host()
-    ModuleReloader.reload_from_manifest(host, manifest_path)
-
-    assert observed == ["abc-123"]
-    # The attribute is restored to its previous value (``None``) after the call.
-    assert getattr(host, "_hot_reload_pending_version", "missing") is None
 
 
 # ======================================================================
@@ -506,3 +339,127 @@ def test_build_replacement_map_skips_nested_functions() -> None:
 
     mapping = ModuleReloader.build_replacement_map(rec, [inner.__module__])
     assert mapping == {}
+
+
+# ======================================================================
+# apply_reload: the dev client's single entry point
+# ======================================================================
+
+
+def _write_screen(path: Path, text: str) -> None:
+    path.write_text(
+        "from pythonnative.component import component\n"
+        "from pythonnative.element import Element\n\n"
+        "@component\n"
+        "def App():\n"
+        f"    return Element('Text', {{'text': {text!r}}}, [])\n",
+        encoding="utf-8",
+    )
+
+
+def _texts(view: Any) -> list:
+    return [v.text for v in view.walk() if v.text is not None] if view is not None else []
+
+
+@pytest.fixture
+def _screen_backend(monkeypatch: pytest.MonkeyPatch) -> Any:
+    from pythonnative.native_views import set_registry
+
+    backend = _MockBackend()
+    set_registry(backend)
+    yield backend
+    set_registry(None)
+
+
+def _mount_screen(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pkg: str, text: str) -> Any:
+    from pythonnative.hosts import create_screen
+
+    package_dir = tmp_path / pkg
+    package_dir.mkdir()
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    _write_screen(package_dir / "main.py", text)
+    monkeypatch.syspath_prepend(os.fspath(tmp_path))
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    for name in (f"{pkg}.main", pkg):
+        sys.modules.pop(name, None)
+    host = create_screen(f"{pkg}.main")
+    host.on_create()
+    assert _texts(host.root_native_view) == [text]
+    return host
+
+
+def _rewrite(path: Path, text: str) -> None:
+    import time as _time
+
+    _time.sleep(0.01)
+    _write_screen(path, text)
+    os.utime(path)
+
+
+def test_apply_reload_reloads_once_and_refreshes_every_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _screen_backend: Any
+) -> None:
+    host = _mount_screen(tmp_path, monkeypatch, "ar_pkg", "before")
+    _rewrite(tmp_path / "ar_pkg" / "main.py", "after")
+
+    result = apply_reload(["ar_pkg.main"], [host])
+
+    assert result.mode in ("fast_refresh", "remount")
+    # The package's other modules re-execute too; the entry module goes last.
+    assert result.reloaded[-1] == "ar_pkg.main"
+    assert set(result.reloaded) == {"ar_pkg", "ar_pkg.main"}
+    assert result.hosts == 1
+    assert result.error is None
+    assert _texts(host.root_native_view) == ["after"]
+    host.on_destroy()
+
+
+def test_apply_reload_skips_modules_that_were_never_imported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _screen_backend: Any
+) -> None:
+    """A changed file nobody imported needs no re-execution."""
+    host = _mount_screen(tmp_path, monkeypatch, "ar_unused", "hello")
+    (tmp_path / "ar_unused" / "extra.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    result = apply_reload(["ar_unused.extra"], [host])
+
+    # Only the entry module (re-imported so it can pick the new file up) runs.
+    assert "ar_unused.extra" not in result.reloaded
+    assert result.mode in ("fast_refresh", "remount", "none")
+    host.on_destroy()
+
+
+def test_apply_reload_reports_import_errors_without_replacing_module(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _screen_backend: Any
+) -> None:
+    from pythonnative import diagnostics
+
+    host = _mount_screen(tmp_path, monkeypatch, "ar_broken", "ok")
+    good_module = sys.modules["ar_broken.main"]
+    broken = tmp_path / "ar_broken" / "main.py"
+    import time as _time
+
+    _time.sleep(0.01)
+    broken.write_text("def App(:\n    pass\n", encoding="utf-8")
+    os.utime(broken)
+
+    was_dev = diagnostics.is_dev()
+    diagnostics.set_dev_mode(True)
+    try:
+        result = apply_reload(["ar_broken.main"], [host])
+    finally:
+        diagnostics.set_dev_mode(was_dev)
+
+    assert result.mode == "error"
+    assert result.error is not None and "SyntaxError" in result.error
+    assert result.reloaded == []
+    # The previous module object stays importable for the next attempt.
+    assert sys.modules["ar_broken.main"] is good_module
+    host.on_destroy()
+
+
+def test_apply_reload_with_no_hosts_is_a_noop() -> None:
+    result = apply_reload(["anything.at.all"], [])
+    assert result.mode == "none"
+    assert result.reloaded == []
+    assert result.requested == ["anything.at.all"]

@@ -74,6 +74,7 @@ def configure(
     config: AppConfig,
     *,
     dev_lib_root: Optional[Path] = None,
+    release: bool = False,
     log: Optional[Logger] = None,
 ) -> AndroidLayout:
     """Fully configure a staged Android template for ``config``.
@@ -83,6 +84,9 @@ def configure(
         config: The validated app configuration.
         dev_lib_root: Path to an in-repo ``pythonnative`` package to
             bundle (dev checkout); ``None`` to rely on the PyPI install.
+        release: Ship bytecode only (Chaquopy ``pyc.src``). Debug builds
+            keep the ``.py`` sources in the APK so tracebacks show code
+            and the dev client can tell what the app already runs.
         log: Optional progress logger.
 
     Returns:
@@ -93,7 +97,7 @@ def configure(
     project_dir = Path(project_dir)
 
     relocate_package(project_dir, TEMPLATE_PACKAGE, config.application_id)
-    configure_gradle(project_dir, config)
+    configure_gradle(project_dir, config, release=release)
     configure_settings_gradle(project_dir, config)
     configure_strings(project_dir, config)
     configure_manifest(project_dir, config)
@@ -166,15 +170,21 @@ def _prune_empty_dirs(source_root: Path, relative: str) -> None:
 # ======================================================================
 
 
-def configure_gradle(project_dir: Path, config: AppConfig) -> None:
-    """Write identity, SDK levels, ABIs, Python version, and signing.
+def configure_gradle(project_dir: Path, config: AppConfig, *, release: bool = False) -> None:
+    """Write identity, SDK levels, ABIs, Python version, bytecode policy, and signing.
 
     Args:
         project_dir: The staged Android project root.
         config: The validated app configuration.
+        release: Compile app sources to bytecode and drop the ``.py``
+            files from the APK (Chaquopy's default). Debug builds keep
+            them, for tracebacks with source lines and for the dev
+            client's overlay seeding.
     """
     gradle_path = project_dir / "app" / "build.gradle"
     content = gradle_path.read_text(encoding="utf-8")
+
+    content = re.sub(r"src\s+(true|false)", f"src {'true' if release else 'false'}", content, count=1)
 
     content = re.sub(r"versionCode\s+\d+", f"versionCode {config.build}", content)
     content = re.sub(r'versionName\s+"[^"]*"', f'versionName "{config.version}"', content)

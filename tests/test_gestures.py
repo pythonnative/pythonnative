@@ -1,5 +1,5 @@
 """Tests for the gesture system: descriptors, serialization, and the
-pure-Python `GestureArbiter` used by the Android and desktop backends.
+pure-Python `GestureArbiter` used by the browser preview (and as the reference semantics).
 
 The arbiter tests drive scripted pointer streams (positions in points,
 times in seconds) and assert on the emitted payloads, which is exactly
@@ -349,7 +349,7 @@ def test_gesture_events_route_through_view_tag() -> None:
         {"kind": "tap", "n_taps": 1, "max_distance": 12.0, "simultaneous": [], "wait_for": []}
     ]
 
-    # A handler-side arbiter (as Android/desktop run) feeds dispatch_event.
+    # A handler-side arbiter (as the browser preview runs) feeds dispatch_event.
     def _emit(i: int, payload: Dict[str, Any]) -> None:
         dispatch_event(tag, f"gesture:{i}", payload)
 

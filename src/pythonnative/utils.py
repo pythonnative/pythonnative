@@ -3,8 +3,9 @@
 This module is imported early by most other modules, so it avoids
 importing platform-specific packages at module level. The detection
 results are cached the first time
-[`IS_ANDROID`][pythonnative.utils.IS_ANDROID] and
-[`IS_IOS`][pythonnative.utils.IS_IOS] are read.
+[`IS_ANDROID`][pythonnative.utils.IS_ANDROID],
+[`IS_IOS`][pythonnative.utils.IS_IOS], and
+[`IS_WEB`][pythonnative.utils.IS_WEB] are read.
 
 Attributes:
     IS_ANDROID: `True` when running inside an Android process
@@ -13,10 +14,10 @@ Attributes:
     IS_IOS: `True` when running inside an iOS app bundle
         (`sys.platform == "ios"` on the embedded CPython 3.13+, or the
         explicit `PN_PLATFORM=ios` override).
-    IS_DESKTOP: `True` when running the desktop preview backend
-        (signaled by `PN_PLATFORM=desktop`, set by ``pn preview``).
-        This drives the Tkinter native-view registry so a PythonNative
-        app can render in a real OS window for fast local iteration.
+    IS_WEB: `True` when running the browser preview (signaled by
+        `PN_PLATFORM=web`, set by ``pn preview`` / ``pn start``). The
+        reconciler then commits through the bridge to a browser page
+        instead of to Swift or Kotlin.
 """
 
 import os
@@ -29,7 +30,7 @@ from typing import Optional
 
 _is_android: Optional[bool] = None
 _is_ios: Optional[bool] = None
-_is_desktop: Optional[bool] = None
+_is_web: Optional[bool] = None
 
 
 def _detect_android() -> bool:
@@ -60,7 +61,7 @@ def _detect_ios() -> bool:
     - Explicit `PN_PLATFORM=ios` env var: set by the iOS template before
       Python starts as a belt-and-braces override, and by tests.
 
-    Running on macOS is never enough on its own: the desktop preview
+    Running on macOS is never enough on its own: the browser preview
     and unit tests run there and must not be mistaken for iOS.
     """
     if sys.platform == "ios":
@@ -68,29 +69,29 @@ def _detect_ios() -> bool:
     return os.environ.get("PN_PLATFORM") == "ios"
 
 
-def _detect_desktop() -> bool:
-    """Detect whether we're running the desktop (Tkinter) preview backend.
+def _detect_web() -> bool:
+    """Detect whether we're running the browser preview.
 
-    The only signal is the explicit ``PN_PLATFORM=desktop`` env var,
-    set by ``pn preview`` before importing PythonNative. Desktop is a
-    *development* target: it renders the app in a native OS window via
-    the pure-Python Tkinter registry so the inner dev loop doesn't
-    require a device build. Off-device unit tests deliberately leave
-    this flag ``False`` so they keep using an injected mock registry
-    and ``Platform.OS == "test"``.
+    The only signal is the explicit ``PN_PLATFORM=web`` env var, set by
+    ``pn preview`` / ``pn start`` before importing PythonNative. Web is
+    a *development* target: the app renders in a browser tab through
+    the bridge protocol so the inner dev loop doesn't require a device
+    build. Off-device unit tests deliberately leave this flag ``False``
+    so they keep using an injected fake backend and
+    ``Platform.OS == "test"``.
     """
-    return os.environ.get("PN_PLATFORM") == "desktop"
+    return os.environ.get("PN_PLATFORM") == "web"
 
 
 def _ensure_platform_detection() -> None:
-    """Populate `_is_android` / `_is_ios` / `_is_desktop` once, then reuse."""
-    global _is_android, _is_ios, _is_desktop
+    """Populate `_is_android` / `_is_ios` / `_is_web` once, then reuse."""
+    global _is_android, _is_ios, _is_web
     if _is_android is None:
         _is_android = _detect_android()
     if _is_ios is None:
         _is_ios = (not _is_android) and _detect_ios()
-    if _is_desktop is None:
-        _is_desktop = (not _is_android) and (not _is_ios) and _detect_desktop()
+    if _is_web is None:
+        _is_web = (not _is_android) and (not _is_ios) and _detect_web()
 
 
 def _get_is_android() -> bool:
@@ -107,11 +108,11 @@ def _get_is_ios() -> bool:
     return _is_ios
 
 
-def _get_is_desktop() -> bool:
-    """Return the cached desktop-detection result."""
+def _get_is_web() -> bool:
+    """Return the cached web-detection result."""
     _ensure_platform_detection()
-    assert _is_desktop is not None
-    return _is_desktop
+    assert _is_web is not None
+    return _is_web
 
 
 IS_ANDROID: bool = _get_is_android()
@@ -128,10 +129,17 @@ The flag is computed once at import time, from ``sys.platform ==
 "ios"`` or the explicit `PN_PLATFORM=ios` override.
 """
 
-IS_DESKTOP: bool = _get_is_desktop()
-"""``True`` when running the desktop (Tkinter) preview backend.
+IS_WEB: bool = _get_is_web()
+"""``True`` when running the browser preview.
 
-Set by ``pn preview`` via ``PN_PLATFORM=desktop``. Mutually exclusive
-with `IS_ANDROID` / `IS_IOS`. Off-device unit tests leave this
-``False`` and inject a mock registry instead.
+Set by ``pn preview`` / ``pn start`` via ``PN_PLATFORM=web``. Mutually
+exclusive with `IS_ANDROID` / `IS_IOS`. Off-device unit tests leave
+this ``False`` and inject a fake backend instead.
+"""
+
+IS_NATIVE: bool = IS_ANDROID or IS_IOS or IS_WEB
+"""``True`` whenever the reconciler commits through the bridge.
+
+All three of iOS, Android, and the browser preview render through a
+bridge transport; only headless tests have no native side at all.
 """

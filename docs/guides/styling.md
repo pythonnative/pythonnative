@@ -195,9 +195,9 @@ rich-text spans inherit the outer element's transform. `"capitalize"`
 upper-cases the first character of each word and leaves the rest as
 written (it doesn't lower-case like `str.title()`).
 
-Text shadows render through `NSShadow` on iOS and
-`TextView.setShadowLayer` on Android. The desktop preview accepts the
-keys but draws no shadow, since Tk has no text shadow primitive:
+Text shadows render through `NSShadow` on iOS,
+`TextView.setShadowLayer` on Android, and CSS `text-shadow` in the
+browser preview:
 
 ```python
 pn.Text(

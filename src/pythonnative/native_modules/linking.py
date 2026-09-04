@@ -7,7 +7,7 @@ scheme, ...) to the OS.
 
 Outbound methods hand the URL to the OS and return at once, so they
 are synchronous; the ``bool`` says whether the platform accepted the
-request. On desktop they return ``False``.
+request. Off device they return ``False``.
 
 Inbound deep links flow the other way: declare your schemes in
 ``pythonnative.toml`` (``app.url_schemes``) and the native module
