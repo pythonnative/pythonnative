@@ -10,9 +10,14 @@ what it finds, so the flow proves the whole pipeline end to end:
 - the wheels were staged into the app bundle (``app_packages`` on iOS,
   Chaquopy's pip step on Android),
 - and the embedded interpreter can import them, including loading a
-  compiled extension module (``numpy._core._multiarray_umath``), which
-  on iOS means the ``.so`` -> framework conversion plus the ``.fwork``
+  compiled extension module (numpy's ``_multiarray_umath``), which on
+  iOS means the ``.so`` -> framework conversion plus the ``.fwork``
   import hook worked.
+
+The two platforms resolve different numpy release lines (BeeWare
+publishes 2.x for iOS, Chaquopy ships 1.26 for Android), so the probe
+accepts either package layout: ``numpy._core`` (2.x) or ``numpy.core``
+(1.x).
 
 Imports are deferred into the component (not module level) so a broken
 package surfaces as a readable ``Error:`` line on this one screen
@@ -38,13 +43,18 @@ def _import_version(module_name: str) -> Tuple[str, str]:
     return str(getattr(module, "__version__", "unknown")), ""
 
 
+# numpy 2.x moved the C core from ``numpy.core`` to ``numpy._core``.
+_NUMPY_CORE_MODULES = ("numpy._core._multiarray_umath", "numpy.core._multiarray_umath")
+
+
 def _numpy_probe() -> Tuple[str, str]:
     """Run a small computation through numpy's C core; return ``(result, error)``."""
     try:
         import numpy as np
 
         total = float(np.arange(4, dtype=np.float64).sum())
-        binary = "yes" if "numpy._core._multiarray_umath" in sys.modules else "no"
+        loaded = any(name in sys.modules for name in _NUMPY_CORE_MODULES)
+        binary = "yes" if loaded else "no"
         return f"{total:g} (binary module loaded: {binary})", ""
     except Exception as exc:  # noqa: BLE001
         return "", f"{type(exc).__name__}: {exc}"
