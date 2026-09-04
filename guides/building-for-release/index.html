@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../desktop-preview/" class="md-nav__link">
+      <a href="../dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -2007,6 +2037,8 @@
   
     
     
+      
+        
       
         
       
@@ -2912,6 +2944,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/hot_reload/" class="md-nav__link">
         
   
@@ -3538,7 +3598,9 @@ package to <code>.pyc</code> and drop the <code>.py</code> files, which shrinks 
 and avoids shipping plain-text source. Because bytecode is
 version-specific, this requires the Python running <code>pn</code> to match
 <code>app.python_version</code>; otherwise <code>pn</code> prints a notice and ships <code>.py</code>
-sources instead.</p>
+sources instead. Debug builds (<code>pn run</code>, <code>pn build --debug</code>) keep the
+<code>.py</code> files on both platforms so tracebacks show source lines and the
+dev client can tell which sources the app already has.</p>
 <h3 id="signing_1">Signing<a class="headerlink" href="#signing_1" title="Permanent link">&para;</a></h3>
 <p>Set your Apple Developer Team ID and an export method:</p>
 <div class="language-toml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">[ios]</span>

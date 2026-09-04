@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1824,6 +1854,8 @@
   
     
     
+      
+        
       
         
       
@@ -2729,6 +2761,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/hot_reload/" class="md-nav__link">
         
   
@@ -3399,15 +3459,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#hot-reload" class="md-nav__link">
+  <a href="#fast-refresh" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Hot reload
+        Fast Refresh
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Hot reload">
+    <nav class="md-nav" aria-label="Fast Refresh">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3415,6 +3475,28 @@
     <span class="md-ellipsis">
       
         Edits don't appear
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pn-run-rebuilt-the-whole-native-project-after-a-python-edit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pn run rebuilt the whole native project after a Python edit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-browser-preview-shows-a-blank-frame" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The browser preview shows a blank frame
       
     </span>
   </a>
@@ -3868,15 +3950,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#hot-reload" class="md-nav__link">
+  <a href="#fast-refresh" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Hot reload
+        Fast Refresh
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Hot reload">
+    <nav class="md-nav" aria-label="Fast Refresh">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3884,6 +3966,28 @@
     <span class="md-ellipsis">
       
         Edits don't appear
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pn-run-rebuilt-the-whole-native-project-after-a-python-edit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pn run rebuilt the whole native project after a Python edit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-browser-preview-shows-a-blank-frame" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The browser preview shows a blank frame
       
     </span>
   </a>
@@ -4127,18 +4231,35 @@ see the failure and keep the rest of the page alive. See
 <h3 id="children-dont-update-when-the-underlying-list-changes">Children don't update when the underlying list changes<a class="headerlink" href="#children-dont-update-when-the-underlying-list-changes" title="Permanent link">&para;</a></h3>
 <p>You're either missing keys or using positional keys. See
 <a href="../../concepts/reconciliation/#keyed-children">Reconciliation: keyed children</a>.</p>
-<h2 id="hot-reload">Hot reload<a class="headerlink" href="#hot-reload" title="Permanent link">&para;</a></h2>
+<h2 id="fast-refresh">Fast Refresh<a class="headerlink" href="#fast-refresh" title="Permanent link">&para;</a></h2>
 <h3 id="edits-dont-appear">Edits don't appear<a class="headerlink" href="#edits-dont-appear" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Make sure you actually launched with <code>--hot-reload</code> (the run command
-  prints <code>[hot-reload] Watching app/ for changes</code> when the watcher
-  starts).</li>
-<li>The watcher only sees <code>.py</code> files under <code>app/</code>. Code outside <code>app/</code>
-  needs a manual rebuild.</li>
+<li>Is <code>pn start</code> (or <code>pn preview</code>) running? Debug builds connect to it
+  on launch; the terminal prints <code>[pn] ios &lt;device&gt; connected</code> when
+  one arrives. If you launched <code>pn run</code> with no server up, the app is
+  running its bundled sources: start the server and relaunch.</li>
+<li>Is the device on the same network? Simulators and emulators reach
+  the server through <code>localhost</code> (Android via <code>adb reverse</code>), but a
+  physical iPhone needs your Mac's LAN address and an open port. Pass
+  <code>--dev-server ws://&lt;ip&gt;:8765/ws?role=client</code> to <code>pn run</code> if the
+  auto-detected address is wrong.</li>
+<li>The watcher only sees files under <code>app/</code>. Code outside <code>app/</code> needs
+  a rebuild.</li>
 <li>Top-level side effects re-run on each reload; if your module
   registers something into a global on import, the <em>second</em> import
-  may raise. See <a href="../../guides/hot-reload/#common-pitfalls">Hot reload guide</a>.</li>
+  may raise. See <a href="../../guides/hot-reload/#common-pitfalls">Fast Refresh guide</a>.</li>
 </ul>
+<h3 id="pn-run-rebuilt-the-whole-native-project-after-a-python-edit"><code>pn run</code> rebuilt the whole native project after a Python edit<a class="headerlink" href="#pn-run-rebuilt-the-whole-native-project-after-a-python-edit" title="Permanent link">&para;</a></h3>
+<p>It shouldn't: edits under <code>app/</code> sync through the dev server. A
+rebuild means a native input changed (<code>pythonnative.toml</code>, the
+<code>pythonnative</code> package version, native plugins) or no dev server was
+running when <code>pn run</code> started. See
+<a href="../../guides/dev-workflow/#when-native-rebuilds-happen">When native rebuilds happen</a>.</p>
+<h3 id="the-browser-preview-shows-a-blank-frame">The browser preview shows a blank frame<a class="headerlink" href="#the-browser-preview-shows-a-blank-frame" title="Permanent link">&para;</a></h3>
+<p>Open its console (<code>`</code>) and check the <code>pn start</code> terminal. The usual
+cause is an import error in the entry module, often a package from
+<code>[requirements].packages</code> that isn't installed in the environment
+running <code>pn start</code>; the CLI warns about those on startup.</p>
 <h3 id="stale-closure-errors">"Stale closure" errors<a class="headerlink" href="#stale-closure-errors" title="Permanent link">&para;</a></h3>
 <p>A captured reference to the old version of a function survived the
 reload. Restart the app to clear <code>sys.modules</code>.</p>

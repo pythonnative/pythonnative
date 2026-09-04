@@ -890,6 +890,8 @@
       
         
       
+        
+      
     
     
     
@@ -1001,14 +1003,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../desktop-preview/" class="md-nav__link">
+      <a href="../dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1462,7 +1492,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1973,6 +2003,8 @@
   
     
     
+      
+        
       
         
       
@@ -2878,6 +2910,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/hot_reload/" class="md-nav__link">
         
   
@@ -3470,8 +3530,8 @@ and routes the callbacks through the same tag-based event channel as
 <li><strong>iOS</strong> attaches real <code>UIGestureRecognizer</code> instances.</li>
 <li><strong>Android</strong> feeds raw <code>MotionEvent</code> streams into a pure-Python
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;GestureArbiter&lt;/span&gt;" href="../../api/gestures/#pythonnative.gestures.GestureArbiter"><code>GestureArbiter</code></a>.</li>
-<li><strong>Desktop preview</strong> feeds Tk pointer events into the same arbiter,
-  so gesture code is testable on a laptop.</li>
+<li><strong>The browser preview</strong> streams the page's pointer events into the
+  same arbiter, so gesture code is testable on a laptop.</li>
 </ul>
 <p>Gestures listed side by side in the <code>gestures=</code> list recognize
 <em>simultaneously</em>. Use the composition combinators below when you need

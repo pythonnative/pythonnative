@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1826,6 +1856,8 @@
   
     
     
+      
+        
       
         
       
@@ -2732,6 +2764,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../hot_reload/" class="md-nav__link">
         
   
@@ -2887,10 +2947,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pythonnative.cli.pn.HOT_RELOAD_DEV_ROOT" class="md-nav__link">
+  <a href="#pythonnative.cli.pn.DEFAULT_DEV_PORT" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HOT_RELOAD_DEV_ROOT
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;DEFAULT_DEV_PORT
       
     </span>
   </a>
@@ -2942,10 +3002,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pythonnative.cli.pn.preview_project" class="md-nav__link">
+  <a href="#pythonnative.cli.pn.start_command" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;preview_project
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;start_command
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.cli.pn.preview_command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;preview_command
       
     </span>
   </a>
@@ -3324,10 +3395,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pythonnative.cli.pn.HOT_RELOAD_DEV_ROOT" class="md-nav__link">
+  <a href="#pythonnative.cli.pn.DEFAULT_DEV_PORT" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HOT_RELOAD_DEV_ROOT
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;DEFAULT_DEV_PORT
       
     </span>
   </a>
@@ -3379,10 +3450,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pythonnative.cli.pn.preview_project" class="md-nav__link">
+  <a href="#pythonnative.cli.pn.start_command" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;preview_project
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;start_command
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.cli.pn.preview_command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;preview_command
       
     </span>
   </a>
@@ -3522,17 +3604,29 @@ the documented behavior never drifts from the code.</p>
   <code>--json</code> for a machine-readable report, <code>--python</code> to pick the
   interpreter that runs pip. Exits non-zero when any target can't be
   satisfied. See <a href="../../guides/pypi-packages/">PyPI packages</a>.</li>
-<li><code>pn preview [component]</code>: render the app in a desktop (Tkinter) window
-  with Fast Refresh, the fastest way to iterate on UI. Flags:
-  <code>--width</code>, <code>--height</code>, <code>--title</code>, <code>--no-hot-reload</code>. See the
-  <a href="../../guides/desktop-preview/">Desktop preview guide</a>.</li>
+<li><code>pn start [entry]</code>: run the dev server. It watches <code>app/</code>, syncs
+  every save to each connected debug build with Fast Refresh, relays
+  their logs, and serves the browser preview page. Flags: <code>--port</code>
+  (default 8765), <code>--host</code> (default <code>0.0.0.0</code>), <code>--open</code> to also open
+  the browser preview. See the
+  <a href="../../guides/dev-workflow/">Development workflow</a>.</li>
+<li><code>pn preview [entry]</code>: <code>pn start</code> plus opening the browser preview in
+  your default browser. Flags: <code>--port</code>, <code>--host</code>, <code>--no-open</code>. See the
+  <a href="../../guides/browser-preview/">Browser preview guide</a>.</li>
 <li><code>pn devices [android|ios]</code>: list connected devices, emulators, and
   simulators with the identifiers <code>--device</code> accepts. Flag: <code>--json</code> to
   print a JSON array to stdout for scripting; the "no devices" hints go
   to stderr instead, and an empty list prints <code>[]</code> and exits 0.</li>
-<li><code>pn run android|ios</code>: build and run on a connected device or
-  simulator. Flags: <code>--device</code> (target a specific device by identifier
-  or name), <code>--prepare-only</code>, <code>--hot-reload</code>, <code>--no-logs</code>.</li>
+<li><code>pn run android|ios</code>: build, install, and launch a debug build that
+  connects to the running dev server. The native toolchain runs only
+  when a native input changed (config, template, <code>pythonnative</code>
+  itself, native plugins); otherwise the previous artifact is
+  reinstalled. Flags: <code>--device</code> (target a specific device by
+  identifier or name), <code>--prepare-only</code>, <code>--no-logs</code>, <code>--rebuild</code>
+  (force the toolchain), <code>--dev-server URL</code> (override the server URL
+  baked into the app), <code>--port</code> (where <code>pn start</code> listens),
+  <code>--dev-client</code> (build a shell app with a connect screen that loads
+  any project from a dev server).</li>
 <li><code>pn logs android|ios</code>: stream logs from the running app without
   rebuilding. Flag: <code>--device</code> (target a specific device by identifier
   or name, same as <code>pn run</code>). Physical iOS devices aren't supported for
@@ -3555,7 +3649,7 @@ the documented behavior never drifts from the code.</p>
 
     <div class="doc doc-contents first">
 
-        <p><code>pn</code> CLI: scaffold, diagnose, preview, run, and build PythonNative apps.</p>
+        <p><code>pn</code> CLI: scaffold, diagnose, start, run, and build PythonNative apps.</p>
 <p>The console script <code>pn</code> (declared in <code>pyproject.toml</code>) dispatches to:</p>
 <ul>
 <li><code>pn init [name]</code>: scaffold a new project (<code>pythonnative.toml</code> +
@@ -3565,12 +3659,16 @@ the documented behavior never drifts from the code.</p>
 <li><code>pn deps [platform]</code>: resolve <code>[requirements].packages</code> for every
   device target and report which wheels would be used (or why a package
   can't be installed), without building anything.</li>
-<li><code>pn preview [component]</code>: render the app in a desktop (Tkinter) window
-  with Fast Refresh, the fast inner dev loop, no device required.</li>
+<li><code>pn start</code>: run the dev server. It renders the app in a browser tab
+  and syncs every save to every connected debug build (simulators,
+  emulators, physical devices) with Fast Refresh; device logs stream
+  back into the same terminal.</li>
+<li><code>pn preview</code>: <code>pn start</code> plus opening the browser preview.</li>
 <li><code>pn devices [platform]</code>: list connected devices, emulators, and
   simulators, as a table or as JSON with <code>--json</code>.</li>
-<li><code>pn run android|ios [--device D]</code>: stage + build + install + launch on
-  a device, emulator, or simulator, with optional on-device hot reload.</li>
+<li><code>pn run android|ios [--device D]</code>: stage + build + install + launch a
+  debug build that connects to the dev server. The native project is
+  only rebuilt when something outside <code>app/</code> changed.</li>
 <li><code>pn logs android|ios [--device D]</code>: stream logs from the running app
   without rebuilding.</li>
 <li><code>pn build android|ios</code>: produce standalone artifacts (signed APK/AAB,
@@ -3579,10 +3677,11 @@ the documented behavior never drifts from the code.</p>
   (handy for scripts and CI).</li>
 <li><code>pn clean</code>: remove the local <code>build/</code> directory.</li>
 </ul>
-<p>The heavy lifting lives in the <code>pythonnative.project</code> package; this
-module is a thin, side-effect-y shell that wires arguments to it and
-handles the device-facing steps (simulator boot, log streaming, hot
-reload) that can't be unit tested.</p>
+<p>The heavy lifting lives in the <code>pythonnative.project</code> and
+<code>pythonnative.devserver</code> packages; this module is a thin,
+side-effect-y shell that wires arguments to them and handles the
+device-facing steps (simulator boot, launch, log streaming) that can't
+be unit tested.</p>
 
 
 
@@ -3637,10 +3736,18 @@ reload) that can't be unit tested.</p>
               </td>
             </tr>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;preview_project&lt;/span&gt; (&lt;code&gt;pythonnative.cli.pn.preview_project&lt;/code&gt;)" href="#pythonnative.cli.pn.preview_project">preview_project</a></code></td>
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;start_command&lt;/span&gt; (&lt;code&gt;pythonnative.cli.pn.start_command&lt;/code&gt;)" href="#pythonnative.cli.pn.start_command">start_command</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Render the project in a desktop preview window (Tkinter).</p>
+                  <p>Run the dev server (and the browser preview) for the current project.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;preview_command&lt;/span&gt; (&lt;code&gt;pythonnative.cli.pn.preview_command&lt;/code&gt;)" href="#pythonnative.cli.pn.preview_command">preview_command</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p><code>pn preview</code>: <code>pn start</code> that also opens the browser preview.</p>
                 </div>
               </td>
             </tr>
@@ -3656,7 +3763,7 @@ reload) that can't be unit tested.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;run_project&lt;/span&gt; (&lt;code&gt;pythonnative.cli.pn.run_project&lt;/code&gt;)" href="#pythonnative.cli.pn.run_project">run_project</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Stage, build, install, and launch the app on a device/simulator.</p>
+                  <p>Stage, build, install, and launch a debug build that talks to <code>pn start</code>.</p>
                 </div>
               </td>
             </tr>
@@ -3709,17 +3816,17 @@ reload) that can't be unit tested.</p>
       </thead>
       <tbody>
           <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;HOT_RELOAD_DEV_ROOT&lt;/span&gt;
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;DEFAULT_DEV_PORT&lt;/span&gt;
 
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt; (&lt;code&gt;pythonnative.cli.pn.HOT_RELOAD_DEV_ROOT&lt;/code&gt;)" href="#pythonnative.cli.pn.HOT_RELOAD_DEV_ROOT">HOT_RELOAD_DEV_ROOT</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;pythonnative.cli.pn.DEFAULT_DEV_PORT&lt;/code&gt;)" href="#pythonnative.cli.pn.DEFAULT_DEV_PORT">DEFAULT_DEV_PORT</a></code></td>
             <td>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Subdirectory (under the app's writable storage) for hot-reload overlays.</p>
+                <p>Port <code>pn start</code> listens on unless <code>--port</code> says otherwise.</p>
               </div>
             </td>
           </tr>
@@ -3740,21 +3847,21 @@ reload) that can't be unit tested.</p>
 
 
 
-<h2 id="pythonnative.cli.pn.HOT_RELOAD_DEV_ROOT" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">HOT_RELOAD_DEV_ROOT</span>
+<h2 id="pythonnative.cli.pn.DEFAULT_DEV_PORT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">DEFAULT_DEV_PORT</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
   </span>
 
-<a href="#pythonnative.cli.pn.HOT_RELOAD_DEV_ROOT" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">HOT_RELOAD_DEV_ROOT</span> <span class="o">=</span> <span class="s1">'pythonnative_dev'</span>
+<a href="#pythonnative.cli.pn.DEFAULT_DEV_PORT" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">DEFAULT_DEV_PORT</span> <span class="o">=</span> <span class="mi">8765</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Subdirectory (under the app's writable storage) for hot-reload overlays.</p>
+        <p>Port <code>pn start</code> listens on unless <code>--port</code> says otherwise.</p>
 
     </div>
 
@@ -3997,19 +4104,21 @@ machine-readable document.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="pythonnative.cli.pn.preview_project" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">preview_project</span>
+<h2 id="pythonnative.cli.pn.start_command" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">start_command</span>
 
 
-<a href="#pythonnative.cli.pn.preview_project" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">preview_project</span><span class="p">(</span><span class="n">args</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;argparse.Namespace&lt;/code&gt;" href="https://docs.python.org/3/library/argparse.html#argparse.Namespace">Namespace</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#pythonnative.cli.pn.start_command" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">start_command</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">args</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;argparse.Namespace&lt;/code&gt;" href="https://docs.python.org/3/library/argparse.html#argparse.Namespace">Namespace</a></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">open_browser</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Render the project in a desktop preview window (Tkinter).</p>
-<p>Re-execs under <code>PN_PLATFORM=desktop</code> so every module binds to the
-Tkinter backend, then hands off to <code>pythonnative.preview.run_preview</code>.</p>
+        <p>Run the dev server (and the browser preview) for the current project.</p>
+<p>Re-execs under <code>PN_PLATFORM=web</code> so every module binds to the
+browser backend, then hands off to <code>pythonnative.preview.serve</code>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4032,16 +4141,53 @@ Tkinter backend, then hands off to <code>pythonnative.preview.run_preview</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parsed namespace (<code>component</code>, <code>width</code>, <code>height</code>,
-<code>title</code>, <code>no_hot_reload</code>).</p>
+                <p>Parsed namespace (<code>entry</code>, <code>host</code>, <code>port</code>, <code>open</code>,
+<code>no_open</code>).</p>
               </div>
             </td>
             <td>
                 <em>required</em>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>open_browser</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Open the preview page once the server is up
+(<code>pn preview</code> sets this; <code>--open</code> does too).</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
       </tbody>
     </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.cli.pn.preview_command" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">preview_command</span>
+
+
+<a href="#pythonnative.cli.pn.preview_command" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">preview_command</span><span class="p">(</span><span class="n">args</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;argparse.Namespace&lt;/code&gt;" href="https://docs.python.org/3/library/argparse.html#argparse.Namespace">Namespace</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p><code>pn preview</code>: <code>pn start</code> that also opens the browser preview.</p>
 
 
     </div>
@@ -4118,7 +4264,12 @@ valid answer for a script rather than a failure.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Stage, build, install, and launch the app on a device/simulator.</p>
+        <p>Stage, build, install, and launch a debug build that talks to <code>pn start</code>.</p>
+<p>The native toolchain only runs when a native input changed (see
+<code>pythonnative.project.fingerprint</code>) or when no dev server is up
+to deliver the latest sources; otherwise the previous artifact is
+reinstalled, which turns the edit/relaunch loop from minutes into
+seconds.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4142,7 +4293,8 @@ valid answer for a script rather than a failure.</p>
             <td>
               <div class="doc-md-description">
                 <p>Parsed namespace (<code>platform</code>, <code>device</code>,
-<code>prepare_only</code>, <code>hot_reload</code>, <code>no_logs</code>).</p>
+<code>prepare_only</code>, <code>no_logs</code>, <code>rebuild</code>, <code>dev_server</code>,
+<code>port</code>, <code>dev_client</code>).</p>
               </div>
             </td>
             <td>
@@ -4339,8 +4491,8 @@ valid answer for a script rather than a failure.</p>
 </div><h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li>See the <a href="../../getting-started/">Getting started</a> walkthrough.</li>
-<li>Read about <a href="../../guides/hot-reload/">Hot reload</a> when you turn on
-  <code>--hot-reload</code>.</li>
+<li>Read the <a href="../../guides/dev-workflow/">Development workflow</a> for how
+  <code>pn start</code> and <code>pn run</code> work together.</li>
 </ul>
 
 

@@ -999,6 +999,8 @@
       
         
       
+        
+      
     
     
     
@@ -1109,14 +1111,42 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/desktop-preview/" class="md-nav__link">
+      <a href="guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1424,7 +1454,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1935,6 +1965,8 @@
   
     
     
+      
+        
       
         
       
@@ -2840,6 +2872,34 @@
   
   
     <li class="md-nav__item">
+      <a href="api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="api/hot_reload/" class="md-nav__link">
         
   
@@ -3367,17 +3427,20 @@ produce identical frames on both platforms.</p>
   Component fragments on Android, <code>UINavigationController</code> on iOS),
   so transitions, back gestures, and state preservation are exactly
   what users expect from a first-class native app.</li>
-<li><strong>Fast Refresh hot reload.</strong> <code>pn run --hot-reload</code> watches <code>app/</code>
-  and patches the running app in place, preserving component state
-  across most edits.</li>
+<li><strong>A Metro-style dev loop.</strong> <code>pn start</code> runs one dev server for the
+  browser preview and every connected debug build. Save a file and
+  each client Fast Refreshes in place, preserving component state;
+  their logs stream back into the same terminal. See the
+  <a href="guides/dev-workflow/">Development workflow</a>.</li>
 <li><strong>Dev-mode diagnostics.</strong> Uncaught errors show a full-screen RedBox
   with the traceback instead of crashing; typos in style keys and
   duplicate list keys print "did you mean" warnings; conditional
   hooks raise at the source. Every check is skipped in production.</li>
-<li><strong>Instant desktop preview.</strong> <code>pn preview</code> renders your app in a
-  desktop window with Fast Refresh, so you can iterate on UI, state,
-  and navigation in milliseconds (no simulator boot required). See the
-  <a href="guides/desktop-preview/">Desktop preview guide</a>.</li>
+<li><strong>Browser preview.</strong> <code>pn preview</code> renders your app in a browser tab
+  inside a phone frame, through the same bridge protocol the Swift and
+  Kotlin runtimes speak, so you can iterate on UI, state, and
+  navigation in milliseconds (no simulator boot required). See the
+  <a href="guides/browser-preview/">Browser preview guide</a>.</li>
 <li><strong>An extension SDK.</strong> <a href="api/sdk/"><code>pythonnative.sdk</code></a> lets you
   wrap any platform widget as a first-class element with
   type-checked props, and PyPI plugins auto-register through the
@@ -3389,7 +3452,7 @@ produce identical frames on both platforms.</p>
 <ul>
 <li>New here? Start with <a href="getting-started/">Getting started</a>.</li>
 <li>Want to see it run right now? Try the
-  <a href="guides/desktop-preview/">Desktop preview</a>.</li>
+  <a href="guides/browser-preview/">Browser preview</a>.</li>
 <li>Want the bigger picture? Read <a href="concepts/mental-model/">Mental model</a>.</li>
 <li>Looking up an API? <a href="api/pythonnative/">Package overview</a>.</li>
 <li>Wrapping a custom widget? Read

@@ -890,6 +890,8 @@
       
         
       
+        
+      
     
     
     
@@ -1001,14 +1003,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../desktop-preview/" class="md-nav__link">
+      <a href="../dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1757,7 +1787,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -2268,6 +2298,8 @@
   
     
     
+      
+        
       
         
       
@@ -3153,6 +3185,34 @@
     
   
     SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
   
 
     
@@ -4211,9 +4271,9 @@ native label, so the layout engine measures the transformed text and
 rich-text spans inherit the outer element's transform. <code>"capitalize"</code>
 upper-cases the first character of each word and leaves the rest as
 written (it doesn't lower-case like <code>str.title()</code>).</p>
-<p>Text shadows render through <code>NSShadow</code> on iOS and
-<code>TextView.setShadowLayer</code> on Android. The desktop preview accepts the
-keys but draws no shadow, since Tk has no text shadow primitive:</p>
+<p>Text shadows render through <code>NSShadow</code> on iOS,
+<code>TextView.setShadowLayer</code> on Android, and CSS <code>text-shadow</code> in the
+browser preview:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span>
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="s2">"Overlay caption"</span><span class="p">,</span>
 </span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span>

@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1826,6 +1856,8 @@
   
     
     
+      
+        
       
         
       
@@ -3471,6 +3503,34 @@
     
   
     SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
   
 
     
@@ -5184,7 +5244,7 @@ place for timers, last-seen values, and imperative handles.</p>
 <p>When a <code>Ref</code> is passed to a built-in element via the <code>ref=</code>
 prop, the reconciler populates <code>current</code> with the underlying
 native view (<code>UIView</code> on iOS, <code>android.view.View</code> on Android,
-a Tk widget on desktop) after commit, and clears it back to
+a DOM element in the browser preview) after commit, and clears it back to
 <code>None</code> on unmount. Composite components (e.g.
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;FlatList&lt;/span&gt;" href="../components/#pythonnative.components.FlatList"><code>FlatList</code></a>) instead publish a typed
 controller object on <code>current</code> via
@@ -8702,7 +8762,7 @@ memoized ancestor skipped.</p>
 
         <p>Intercept the system back action for this screen.</p>
 <p>On Android this handles the hardware back button and predictive
-back gesture; in the desktop preview it handles the Escape key.
+back gesture; in the browser preview it handles the Escape key.
 iOS has no system back button, so the handler never fires there
 (swipe-back is controlled by the navigation stack instead).</p>
 <p>Handlers registered later run first, so a component mounted on top

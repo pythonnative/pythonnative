@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/desktop-preview/" class="md-nav__link">
+      <a href="../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1968,6 +1998,8 @@
   
     
     
+      
+        
       
         
       
@@ -2873,6 +2905,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../api/hot_reload/" class="md-nav__link">
         
   
@@ -3422,15 +3482,15 @@ project scaffolded with <code>pn init</code>.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pn<span class="w"> </span>init<span class="w"> </span>my-app
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>my-app
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Edit app/main.py and paste any of the snippets below.</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>pn<span class="w"> </span>preview<span class="w">       </span><span class="c1"># fast desktop preview with Fast Refresh</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>pn<span class="w"> </span>preview<span class="w">       </span><span class="c1"># dev server + browser preview with Fast Refresh</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w">   </span><span class="c1"># or: pn run ios</span>
 </span></code></pre></div>
 <p>The <code>app/main.py</code> that <code>pn init</code> writes already returns a small
 counter; replace it with one of the snippets to try a different
 example. The quickest way to iterate is
-<a href="../guides/desktop-preview/"><code>pn preview</code></a>, which renders the app in a
-desktop window and reloads on every save; use <code>pn run</code> when you want it
-on a real device or simulator.</p>
+<a href="../guides/browser-preview/"><code>pn preview</code></a>, which renders the app in a
+browser tab and Fast Refreshes on every save; <code>pn run</code> puts it on a
+device or simulator connected to the same dev server.</p>
 <h2 id="snippets">Snippets<a class="headerlink" href="#snippets" title="Permanent link">&para;</a></h2>
 <h3 id="reusable-components">Reusable components<a class="headerlink" href="#reusable-components" title="Permanent link">&para;</a></h3>
 <p>Compose small components and pass them as children:</p>

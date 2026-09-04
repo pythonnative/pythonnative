@@ -576,10 +576,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#preview-on-your-desktop" class="md-nav__link">
+  <a href="#start-the-dev-server" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Preview on your desktop
+        Start the dev server
       
     </span>
   </a>
@@ -587,21 +587,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-on-a-platform" class="md-nav__link">
+  <a href="#run-on-a-device-or-simulator" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run on a platform
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#hot-reload-while-developing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Hot reload while developing
+        Run on a device or simulator
       
     </span>
   </a>
@@ -1034,6 +1023,8 @@
       
         
       
+        
+      
     
     
     
@@ -1144,14 +1135,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/desktop-preview/" class="md-nav__link">
+      <a href="../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1459,7 +1478,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1970,6 +1989,8 @@
   
     
     
+      
+        
       
         
       
@@ -2875,6 +2896,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../api/hot_reload/" class="md-nav__link">
         
   
@@ -3277,10 +3326,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#preview-on-your-desktop" class="md-nav__link">
+  <a href="#start-the-dev-server" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Preview on your desktop
+        Start the dev server
       
     </span>
   </a>
@@ -3288,21 +3337,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-on-a-platform" class="md-nav__link">
+  <a href="#run-on-a-device-or-simulator" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run on a platform
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#hot-reload-while-developing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Hot reload while developing
+        Run on a device or simulator
       
     </span>
   </a>
@@ -3475,81 +3513,75 @@ splash, third-party packages, and signing) lives in a single
 <code>pn build</code>, <code>pn doctor</code>, and <code>pn app-id</code> all stay in sync. See the full
 <a href="../guides/configuration/">Configuration reference</a> and the
 <a href="../guides/permissions/">Permissions guide</a>.</p>
-<h2 id="preview-on-your-desktop">Preview on your desktop<a class="headerlink" href="#preview-on-your-desktop" title="Permanent link">&para;</a></h2>
-<p>The fastest way to iterate is <code>pn preview</code>, which renders your app in a
-desktop window and <strong>Fast Refreshes on every save</strong> (no simulator, no
-device build):</p>
+<h2 id="start-the-dev-server">Start the dev server<a class="headerlink" href="#start-the-dev-server" title="Permanent link">&para;</a></h2>
+<p>Everything during development goes through one long-running process,
+the dev server. Start it in a terminal and leave it running:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pn<span class="w"> </span>preview
 </span></code></pre></div>
-<p>This opens a phone-sized window, mounts your project's <code>App</code>, and
-watches <code>app/</code> for changes. Edit a component, hit save, and the window
-updates in place while keeping component state (counters, form input,
-scroll position). Navigation, hooks, async, and the flex layout engine
-all run exactly as they do on device, because the desktop backend reuses
-the same reconciler and layout engine; only the leaf widgets differ
-(Tkinter instead of UIKit / Android views).</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pn<span class="w"> </span>preview<span class="w">                 </span><span class="c1"># preview the project's entry point (app/main.py → App)</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>pn<span class="w"> </span>preview<span class="w"> </span>app.main.Detail<span class="w"> </span><span class="c1"># preview a specific component</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>pn<span class="w"> </span>preview<span class="w"> </span>--width<span class="w"> </span><span class="m">768</span><span class="w"> </span>--height<span class="w"> </span><span class="m">1024</span><span class="w">   </span><span class="c1"># tablet-sized window</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>pn<span class="w"> </span>preview<span class="w"> </span>--no-hot-reload<span class="w"> </span><span class="c1"># disable file watching</span>
+<p><code>pn preview</code> starts the server, opens <code>http://localhost:8765/</code> in your
+browser, and mounts your project's <code>App</code> in a phone frame. It <strong>Fast
+Refreshes on every save</strong>: edit a component, save, and the page updates
+in place while keeping component state (counters, form input, scroll
+position, the navigation stack). Navigation, hooks, async, and the flex
+layout engine run exactly as they do on device, because the page is a
+bridge peer like the Swift and Kotlin runtimes and reuses the same
+reconciler and screen host; only the leaf widgets differ (DOM elements
+instead of UIKit / Android views).</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pn<span class="w"> </span>preview<span class="w">                    </span><span class="c1"># server + browser tab for app/main.py -&gt; App</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>pn<span class="w"> </span>preview<span class="w"> </span>app.screens.home<span class="w">   </span><span class="c1"># mount a different module's App</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>pn<span class="w"> </span>start<span class="w">                      </span><span class="c1"># the server without opening a browser</span>
 </span></code></pre></div>
-<p>The preview needs Tkinter, which ships with most Python installs. If
-it's missing, install it (<code>brew install python-tk</code> on macOS,
-<code>sudo apt-get install python3-tk</code> on Debian/Ubuntu). The desktop backend
-is a <strong>development</strong> surface for layout and logic; some visual chrome is
-approximated, and there's no desktop packaging. Ship to devices with
-<code>pn run</code>. See the <a href="../guides/desktop-preview/">Desktop preview guide</a>.</p>
-<h2 id="run-on-a-platform">Run on a platform<a class="headerlink" href="#run-on-a-platform" title="Permanent link">&para;</a></h2>
+<p>Use the toolbar to switch device frames, rotate, toggle dark mode, or
+send a back press. The preview is a <strong>development</strong> surface for layout
+and logic; platform chrome is approximated and device APIs are
+simulated. Ship to devices with <code>pn run</code>. See the
+<a href="../guides/browser-preview/">Browser preview guide</a>.</p>
+<h2 id="run-on-a-device-or-simulator">Run on a device or simulator<a class="headerlink" href="#run-on-a-device-or-simulator" title="Permanent link">&para;</a></h2>
+<p>With the dev server still running, in a second terminal:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1"># or</span>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>pn<span class="w"> </span>run<span class="w"> </span>ios
 </span></code></pre></div>
-<ul>
-<li>Uses bundled templates (no network required for scaffolding)</li>
-<li>Copies your <code>app/</code> into the generated project</li>
-</ul>
+<p><code>pn run</code> stages the bundled native template, copies your <code>app/</code> in,
+builds a debug app, installs it, and launches it. The CLI finds the
+dev server on <code>localhost:8765</code>, bakes its URL into the build, and the
+app connects on startup. From then on it's a <strong>dev client</strong>: every save
+under <code>app/</code> syncs to the device and Fast Refreshes the running screens,
+and the app's <code>print</code> output and tracebacks stream back into the
+<code>pn start</code> terminal.</p>
+<p>Rerunning <code>pn run</code> is cheap. The native toolchain only runs when a
+native input changed (<code>pythonnative.toml</code>, the template, the
+<code>pythonnative</code> package, native plugins); otherwise the previous build
+is reinstalled in seconds. Force a rebuild with <code>--rebuild</code>.</p>
 <p>If you just want to scaffold the platform project without building, use:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--prepare-only
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--prepare-only
 </span></code></pre></div>
 <p>This stages files under <code>build/</code> so you can open them in Android Studio or Xcode.</p>
-<h2 id="hot-reload-while-developing">Hot reload while developing<a class="headerlink" href="#hot-reload-while-developing" title="Permanent link">&para;</a></h2>
-<p>For day-to-day UI work, run with <code>--hot-reload</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--hot-reload
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--hot-reload
-</span></code></pre></div>
-<p>The first run still builds and launches the native app. After that,
-edits under <code>app/</code> are copied into the running app's writable source
-overlay and the active page refreshes without a full rebuild. This
-works on Android devices and emulators and on the iOS Simulator;
-physical iPhones don't support hot reload yet (see the
-<a href="../guides/hot-reload/">Hot reload guide</a>).</p>
-<p>PythonNative prefers a <strong>Fast Refresh</strong> path: each
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;component&lt;/span&gt;" href="../api/component/#pythonnative.component.component"><code>@pn.component</code></a> function is matched by
-qualified name across the reloaded module, the live VNode tree's
-function references are swapped in place, and the next render reuses
-the existing hook state. So edits to the body of a component preserve
-in-memory state (counters, scroll positions, etc.). When Fast Refresh
-can't find a clean swap (for example, after deeper structural
-edits), PythonNative falls back to a full remount of the active page
-so you never get stuck with a stale tree.</p>
-<p>This works best for Python UI changes; native template changes
-(Kotlin, Swift, manifests) still require a normal rebuild.</p>
+<p>Physical iPhones on the same Wi-Fi work the same way (<code>pn run ios
+--device "My iPhone"</code>); the CLI bakes in your Mac's LAN address instead
+of <code>localhost</code>. See the <a href="../guides/dev-workflow/">Development workflow</a>
+for the details, including the reusable <code>--dev-client</code> shell app.</p>
+<p>Native template changes (Kotlin, Swift, manifests) and edits to
+<code>pythonnative.toml</code> still require a rebuild; <code>pn run</code> detects them and
+runs the toolchain automatically.</p>
 <h2 id="viewing-logs">Viewing logs<a class="headerlink" href="#viewing-logs" title="Permanent link">&para;</a></h2>
-<p>After the app launches, <code>pn run</code> attaches to the app's stdout/stderr so Python
-<code>print()</code> output and tracebacks stream back into your terminal until you press
-Ctrl+C:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">count</span><span class="p">,</span> <span class="n">set_count</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"[App] render count=</span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Count: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Tap me"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_count</span><span class="p">(</span><span class="n">count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)),</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="p">)</span>
+<p>A connected dev client mirrors its Python <code>print()</code> output, warnings,
+and tracebacks to the <code>pn start</code> terminal, so that one window shows
+every client. <code>pn run</code> also attaches to the app's native log stream
+after launch until you press Ctrl+C, which is where lower-level output
+(and anything printed before the client connects) shows up:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">count</span><span class="p">,</span> <span class="n">set_count</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"[App] render count=</span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Count: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Tap me"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_count</span><span class="p">(</span><span class="n">count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)),</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <ul>
 <li>On Android, logs are streamed via <code>adb logcat</code> filtered to the
@@ -3559,24 +3591,24 @@ Ctrl+C:</p>
   which forwards the Python process's standard streams to your terminal.</li>
 </ul>
 <p>Pass <code>--no-logs</code> if you'd rather run fire-and-forget:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--no-logs
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--no-logs
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--no-logs
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--no-logs
 </span></code></pre></div>
 <h2 id="check-your-toolchain">Check your toolchain<a class="headerlink" href="#check-your-toolchain" title="Permanent link">&para;</a></h2>
 <p>Before your first build, run <code>pn doctor</code> to verify the local toolchain
 (Java/Android SDK for Android; Xcode/Simulator and a signing team for
 iOS) and validate your <code>pythonnative.toml</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>pn<span class="w"> </span>doctor<span class="w">            </span><span class="c1"># check everything</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>pn<span class="w"> </span>doctor<span class="w"> </span>android<span class="w">    </span><span class="c1"># only Android-relevant checks</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>pn<span class="w"> </span>doctor<span class="w"> </span>ios<span class="w">        </span><span class="c1"># only iOS-relevant checks</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>pn<span class="w"> </span>doctor<span class="w">            </span><span class="c1"># check everything</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>pn<span class="w"> </span>doctor<span class="w"> </span>android<span class="w">    </span><span class="c1"># only Android-relevant checks</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>pn<span class="w"> </span>doctor<span class="w"> </span>ios<span class="w">        </span><span class="c1"># only iOS-relevant checks</span>
 </span></code></pre></div>
 <p>It prints <code>[ok]</code> / <code>[!]</code> / <code>[x]</code> for each check and exits non-zero when
 something will block a build, so it's safe to run in CI.</p>
 <h2 id="build-for-release">Build for release<a class="headerlink" href="#build-for-release" title="Permanent link">&para;</a></h2>
 <p>When you're ready to ship, <code>pn build</code> produces signed, distributable
 artifacts:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>pn<span class="w"> </span>build<span class="w"> </span>android<span class="w">     </span><span class="c1"># release APK + AAB</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>pn<span class="w"> </span>build<span class="w"> </span>ios<span class="w">         </span><span class="c1"># signed .ipa via xcodebuild archive/export</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>pn<span class="w"> </span>build<span class="w"> </span>android<span class="w">     </span><span class="c1"># release APK + AAB</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>pn<span class="w"> </span>build<span class="w"> </span>ios<span class="w">         </span><span class="c1"># signed .ipa via xcodebuild archive/export</span>
 </span></code></pre></div>
 <p>Release builds need signing configured in <code>pythonnative.toml</code> (a
 keystore for Android, a development team for iOS). See
@@ -3584,7 +3616,7 @@ keystore for Android, a development team for iOS). See
 walkthrough.</p>
 <h2 id="clean">Clean<a class="headerlink" href="#clean" title="Permanent link">&para;</a></h2>
 <p>Remove the build artifacts safely:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>pn<span class="w"> </span>clean
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>pn<span class="w"> </span>clean
 </span></code></pre></div>
 
 

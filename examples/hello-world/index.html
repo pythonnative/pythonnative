@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1745,10 +1775,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#preview-on-desktop" class="md-nav__link">
+  <a href="#preview-in-the-browser" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Preview on desktop
+        Preview in the browser
       
     </span>
   </a>
@@ -1946,6 +1976,8 @@
   
     
     
+      
+        
       
         
       
@@ -2851,6 +2883,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/hot_reload/" class="md-nav__link">
         
   
@@ -3265,10 +3325,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#preview-on-desktop" class="md-nav__link">
+  <a href="#preview-in-the-browser" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Preview on desktop
+        Preview in the browser
       
     </span>
   </a>
@@ -3377,34 +3437,36 @@
   the same geometry on Android and iOS.</li>
 </ul>
 <h2 id="run-it">Run it<a class="headerlink" href="#run-it" title="Permanent link">&para;</a></h2>
-<h3 id="preview-on-desktop">Preview on desktop<a class="headerlink" href="#preview-on-desktop" title="Permanent link">&para;</a></h3>
-<p>For the fastest feedback loop, run the example in the desktop preview
-before opening an emulator or simulator. The preview imports your real
-app code, so if your project declares packages in
-<code>[requirements].packages</code>, <code>pip install</code> them first. From the project
-root:</p>
+<h3 id="preview-in-the-browser">Preview in the browser<a class="headerlink" href="#preview-in-the-browser" title="Permanent link">&para;</a></h3>
+<p>For the fastest feedback loop, start the dev server and open the
+browser preview before reaching for an emulator or simulator. The
+preview imports your real app code, so if your project declares
+packages in <code>[requirements].packages</code>, <code>pip install</code> them first (this
+example needs <code>emoji</code>). From the project root:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pn<span class="w"> </span>preview
 </span></code></pre></div>
-<p>A desktop window opens with <code>app/main.py</code>'s <code>App</code>. Edit a component,
-save, and the preview refreshes in place. See the
-<a href="../../guides/desktop-preview/">Desktop preview guide</a> for platform
-notes and more options.</p>
+<p>A browser tab opens with <code>app/main.py</code>'s <code>App</code> in a phone frame. Edit a
+component, save, and the preview refreshes in place. See the
+<a href="../../guides/browser-preview/">Browser preview guide</a> for the toolbar
+and more options.</p>
 <h3 id="run-on-a-device-or-simulator">Run on a device or simulator<a class="headerlink" href="#run-on-a-device-or-simulator" title="Permanent link">&para;</a></h3>
-<p>From the project root:</p>
+<p>Leave <code>pn preview</code> running and, from the project root in another
+terminal:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w">   </span><span class="c1"># or: pn run ios</span>
 </span></code></pre></div>
 <p><code>pn run</code> will:</p>
 <ol>
 <li>Stage your <code>app/</code> and the bundled <code>pythonnative</code> package into the
    appropriate native template under <code>build/</code>.</li>
-<li>Build it (<code>gradle installDebug</code> on Android, <code>xcodebuild</code> on iOS).</li>
-<li>Install and launch it on a connected device or simulator.</li>
+<li>Build it (<code>gradle installDebug</code> on Android, <code>xcodebuild</code> on iOS),
+   unless an identical native build already exists.</li>
+<li>Install and launch it on a connected device or simulator, pointed
+   at the running dev server.</li>
 <li>Stream logs back to the terminal.</li>
 </ol>
-<p>For an even tighter loop while iterating, add <code>--hot-reload</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--hot-reload
-</span></code></pre></div>
-<p>See <a href="../../guides/hot-reload/">Hot reload guide</a> for the details.</p>
+<p>The app is now a dev client: saves under <code>app/</code> Fast Refresh it, and
+its output shows up in the <code>pn preview</code> terminal. See the
+<a href="../../guides/dev-workflow/">Development workflow</a> for the details.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Build a slightly richer counter: <a href="../counter/">Counter</a>.</li>

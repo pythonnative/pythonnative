@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1826,6 +1856,8 @@
   
     
     
+      
+        
       
         
       
@@ -3219,6 +3251,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#pythonnative.native_views.bridge_backend.BridgeBackend.reset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;reset
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3371,6 +3414,34 @@
     
   
     SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
   
 
     
@@ -4366,6 +4437,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#pythonnative.native_views.bridge_backend.BridgeBackend.reset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;reset
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4425,9 +4507,10 @@ call on a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-
 On device that registry is the
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;BridgeBackend&lt;/span&gt;" href="#pythonnative.native_views.bridge_backend.BridgeBackend"><code>BridgeBackend</code></a>,
 which forwards the transaction to Swift and Kotlin component managers
-over the <a href="../bridge/">native bridge</a>. Off device it dispatches to Python
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a> objects
-(Tkinter for <code>pn preview</code>, a fake for tests).</p>
+over the <a href="../bridge/">native bridge</a>. The browser preview uses the same
+backend with a WebSocket transport to the page. In tests it dispatches
+to Python <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a>
+objects (an in-memory fake).</p>
 
 
 <div class="doc doc-object doc-module">
@@ -4446,14 +4529,14 @@ create/update/insert/destroy/frame ops per commit, see
 <code>command</code>, and the animation hooks. Two implementations exist:</p>
 <ul>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;BridgeBackend&lt;/span&gt;" href="#pythonnative.native_views.bridge_backend.BridgeBackend"><code>BridgeBackend</code></a>
-  (iOS and Android): serializes each commit and hands it to the native
-  runtime through the bridge; Swift and Kotlin component managers own
+  (iOS, Android, and the browser preview): serializes each commit and
+  hands it to the native runtime through the bridge; the Swift and
+  Kotlin component managers, or the preview page's DOM applier, own
   every platform view. Python holds no native objects.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NativeViewRegistry&lt;/span&gt;" href="#pythonnative.native_views.NativeViewRegistry"><code>NativeViewRegistry</code></a>
-  (desktop preview and tests): maps element type names to Python
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a>
-  implementations (<code>pythonnative.native_views.desktop</code> renders with
-  Tkinter) and owns the tag table itself.</li>
+  (tests and SDK handler introspection): maps element type names to
+  Python <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a>
+  implementations and owns the tag table itself.</li>
 </ul>
 <p>Platform selection happens lazily on first use, so this package
 imports on any platform. Tests install a mock with
@@ -4486,14 +4569,6 @@ imports on any platform. Tests install a mock with
             <td>
               <div class="doc-md-description">
                 <p>The on-device view backend: every mutation crosses the bridge as one transaction.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><span title="pythonnative.native_views.desktop">desktop</span></code></td>
-            <td>
-              <div class="doc-md-description">
-                <p>Desktop native-view handlers (Tkinter).</p>
               </div>
             </td>
           </tr>
@@ -4663,7 +4738,7 @@ imports on any platform. Tests install a mock with
 <p>The reconciler depends only on this protocol: <code>apply_mutations</code>,
 <code>resolve_view</code>, <code>measure_intrinsic</code>, and <code>command</code>.
 Implementations may host real platform handlers (Android/iOS/
-desktop) or mocks for tests.</p>
+browser) or mocks for tests.</p>
 
 
 
@@ -5299,7 +5374,7 @@ depends on their content (text, buttons, images).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>on device, otherwise a <code>NativeViewRegistry</code> (Tkinter handlers</p>
+                <p>on every bridge platform, otherwise a <code>NativeViewRegistry</code></p>
               </div>
             </td>
           </tr>
@@ -5309,7 +5384,7 @@ depends on their content (text, buttons, images).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>under <code>pn preview</code>, plus every decorator-registered SDK</p>
+                <p>holding every decorator-registered SDK handler and any handlers</p>
               </div>
             </td>
           </tr>
@@ -5319,7 +5394,7 @@ depends on their content (text, buttons, images).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>handler and any handlers exposed by third-party packages via</p>
+                <p>exposed by third-party packages via the</p>
               </div>
             </td>
           </tr>
@@ -5329,7 +5404,7 @@ depends on their content (text, buttons, images).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;ENTRY_POINT_GROUP&lt;/span&gt;
+                <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;ENTRY_POINT_GROUP&lt;/span&gt;
 
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
@@ -5344,7 +5419,7 @@ depends on their content (text, buttons, images).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>entry point group).</p>
+                <p>entry point group.</p>
               </div>
             </td>
           </tr>
@@ -6431,7 +6506,7 @@ flashing indicators. Unknown commands should be ignored.</p>
     <div class="doc doc-contents ">
 
         <p>Apply one frame of a Python-driven animation immediately.</p>
-<p>This is the fallback path used by the desktop preview and by
+<p>This is the fallback path used by
 animations the platform cannot drive natively. <code>prop_name</code>
 is one of <code>opacity</code>, <code>background_color</code>, <code>translate_x</code>,
 <code>translate_y</code>, <code>scale</code>, <code>scale_x</code>, <code>scale_y</code>,
@@ -7052,6 +7127,14 @@ the opaque handle refs receive.</p>
                 </div>
               </td>
             </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;reset&lt;/span&gt; (&lt;code&gt;pythonnative.native_views.bridge_backend.BridgeBackend.reset&lt;/code&gt;)" href="#pythonnative.native_views.bridge_backend.BridgeBackend.reset">reset</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Forget every view: the native side is gone (browser tab closed, tests).</p>
+                </div>
+              </td>
+            </tr>
       </tbody>
     </table>
 
@@ -7409,6 +7492,26 @@ SDK's install step doesn't fail, but it is never invoked.</p>
   mounts or rebinds the row subtree and returns <code>{"root": tag}</code>.</li>
 <li><code>on_unbind_row</code> <code>[{"container"}]</code> releases it.</li>
 </ul>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pythonnative.native_views.bridge_backend.BridgeBackend.reset" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">reset</span>
+
+
+<a href="#pythonnative.native_views.bridge_backend.BridgeBackend.reset" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">reset</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Forget every view: the native side is gone (browser tab closed, tests).</p>
 
 
     </div>

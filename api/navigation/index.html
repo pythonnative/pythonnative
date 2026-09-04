@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1826,6 +1856,8 @@
   
     
     
+      
+        
       
         
       
@@ -4091,6 +4123,34 @@
     
   
     SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
   
 
     
@@ -7715,7 +7775,7 @@ new screen's navigator boots from that state.</p>
 
 
         <p>What a root stack needs from the native screen host.</p>
-<p>Hosts (iOS view controller, Android fragment, desktop preview) and
+<p>Hosts (iOS view controller, Android fragment, browser preview) and
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeHost&lt;/span&gt;" href="../testing/#pythonnative.testing.FakeHost"><code>FakeHost</code></a> implement these. Each
 method receives the <em>serialized</em> next navigation state so the
 screen it creates can boot with the full history.</p>
@@ -9894,7 +9954,7 @@ elsewhere.</p>
               <div class="doc-md-description">
                 <p>Element (or factory) rendered at the leading edge
 of the navigation bar. Rendered by PythonNative into the bar
-on iOS; ignored on Android and desktop today.</p>
+on iOS; ignored on Android and in the browser preview today.</p>
               </div>
             </td>
           </tr>

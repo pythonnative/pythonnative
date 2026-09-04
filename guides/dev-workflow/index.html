@@ -12,13 +12,13 @@
         <meta name="author" content="Owen Carey">
       
       
-        <link rel="canonical" href="https://pythonnative.com/guides/pypi-packages/">
+        <link rel="canonical" href="https://pythonnative.com/guides/dev-workflow/">
       
       
-        <link rel="prev" href="../native-modules/">
+        <link rel="prev" href="../ios/">
       
       
-        <link rel="next" href="../custom-native-components/">
+        <link rel="next" href="../browser-preview/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>PyPI Packages - PythonNative</title>
+        <title>Development Workflow - PythonNative</title>
       
     
     
@@ -67,17 +67,17 @@
     
   
 <meta property="og:type" content="website" />
-<meta property="og:title" content="PyPI Packages - PythonNative" />
+<meta property="og:title" content="Development Workflow - PythonNative" />
 <meta property="og:description" content="Cross-platform native UI toolkit for Android and iOS" />
-<meta property="og:image" content="https://pythonnative.com/assets/images/social/guides/pypi-packages.png" />
+<meta property="og:image" content="https://pythonnative.com/assets/images/social/guides/dev-workflow.png" />
 <meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:url" content="https://pythonnative.com/guides/pypi-packages/" />
+<meta property="og:url" content="https://pythonnative.com/guides/dev-workflow/" />
 <meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:title" content="PyPI Packages - PythonNative" />
+<meta property="twitter:title" content="Development Workflow - PythonNative" />
 <meta property="twitter:description" content="Cross-platform native UI toolkit for Android and iOS" />
-<meta property="twitter:image" content="https://pythonnative.com/assets/images/social/guides/pypi-packages.png" />
+<meta property="twitter:image" content="https://pythonnative.com/assets/images/social/guides/dev-workflow.png" />
 </head>
   
   
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#pypi-packages" class="md-skip">
+        <a href="#development-workflow" class="md-skip">
           Skip to content
         </a>
       
@@ -132,7 +132,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              PyPI Packages
+              Development Workflow
             
           </span>
         </div>
@@ -1000,10 +1000,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../dev-workflow/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1019,6 +1046,170 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-two-terminal-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two-terminal setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-pn-start-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What pn start does
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What pn start does">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dev-clients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dev clients
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dev clients">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#simulators-and-emulators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simulators and emulators
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#physical-iphones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Physical iPhones
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-dev-client-shell-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The dev-client shell app
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-native-rebuilds-happen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When native rebuilds happen
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#which-client-for-which-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which client for which job
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logs-and-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logs and errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1280,37 +1471,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PyPI Packages
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../pypi-packages/" class="md-nav__link">
         
   
   
@@ -1326,131 +1490,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#declare-requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Declare requirements
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-works" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What works
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="What works">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#downgrades" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Downgrades
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#check-before-you-build-pn-deps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Check before you build: pn deps
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#extra-indexes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Extra indexes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-packages-are-bundled" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How packages are bundled
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility-matrix" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility matrix
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#python-version" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Python version
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3324,10 +3363,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#declare-requirements" class="md-nav__link">
+  <a href="#the-two-terminal-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Declare requirements
+        The two-terminal setup
       
     </span>
   </a>
@@ -3335,22 +3374,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-works" class="md-nav__link">
+  <a href="#what-pn-start-does" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What works
+        What pn start does
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="What works">
+    <nav class="md-nav" aria-label="What pn start does">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#downgrades" class="md-nav__link">
+  <a href="#flags" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Downgrades
+        Flags
       
     </span>
   </a>
@@ -3363,10 +3402,60 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#check-before-you-build-pn-deps" class="md-nav__link">
+  <a href="#dev-clients" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Check before you build: pn deps
+        Dev clients
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dev clients">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#simulators-and-emulators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simulators and emulators
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#physical-iphones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Physical iPhones
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-dev-client-shell-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The dev-client shell app
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-native-rebuilds-happen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When native rebuilds happen
       
     </span>
   </a>
@@ -3374,10 +3463,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#extra-indexes" class="md-nav__link">
+  <a href="#which-client-for-which-job" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Extra indexes
+        Which client for which job
       
     </span>
   </a>
@@ -3385,10 +3474,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-packages-are-bundled" class="md-nav__link">
+  <a href="#logs-and-errors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How packages are bundled
+        Logs and errors
       
     </span>
   </a>
@@ -3396,21 +3485,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compatibility-matrix" class="md-nav__link">
+  <a href="#dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compatibility matrix
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#python-version" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Python version
+        Dependencies
       
     </span>
   </a>
@@ -3445,7 +3523,7 @@
 
 
   
-    <a href="https://github.com/pythonnative/pythonnative/edit/main/docs/guides/pypi-packages.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/pythonnative/pythonnative/edit/main/docs/guides/dev-workflow.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -3454,314 +3532,259 @@
     
       
     
-    <a href="https://github.com/pythonnative/pythonnative/raw/main/docs/guides/pypi-packages.md" title="View source of this page" class="md-content__button md-icon">
+    <a href="https://github.com/pythonnative/pythonnative/raw/main/docs/guides/dev-workflow.md" title="View source of this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0 8a5 5 0 0 1-5-5 5 5 0 0 1 5-5 5 5 0 0 1 5 5 5 5 0 0 1-5 5m0-12.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5"/></svg>
     </a>
   
 
 
-<h1 id="pypi-packages">PyPI packages<a class="headerlink" href="#pypi-packages" title="Permanent link">&para;</a></h1>
-<p>A PythonNative app runs on an embedded CPython, so its third-party
-packages have to be resolved for the <strong>phone</strong>, not for the laptop
-running <code>pn</code>. This guide explains what works, how the CLI resolves and
-bundles packages for each device target, and how to check a package
-before you build.</p>
-<h2 id="declare-requirements">Declare requirements<a class="headerlink" href="#declare-requirements" title="Permanent link">&para;</a></h2>
-<p>List pip requirements in <code>[requirements].packages</code> in
-<code>pythonnative.toml</code>. Specifiers work the way they do in a
-<code>requirements.txt</code>:</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">[requirements]</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">packages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"httpx&gt;=0.27"</span><span class="p">,</span><span class="w"> </span><span class="s2">"numpy"</span><span class="p">,</span><span class="w"> </span><span class="s2">"pillow~=11.0"</span><span class="p">]</span>
+<h1 id="development-workflow">Development workflow<a class="headerlink" href="#development-workflow" title="Permanent link">&para;</a></h1>
+<p>PythonNative's inner loop is modeled on Metro and Expo: one long-running
+<strong>dev server</strong> in your terminal, and any number of <strong>dev clients</strong> (a
+browser tab, simulators, emulators, physical phones) that connect to it.
+You edit a file, you save, and every connected client Fast Refreshes in
+place. Native builds happen only when something native changes.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>  ┌────────────────────┐        ┌──────────────────────────────┐
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  │  pn start          │  ws    │  browser preview (tab)       │
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  │                    │◄──────►│  renders through the bridge  │
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  │  watches app/      │        └──────────────────────────────┘
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  │  syncs sources     │  ws    ┌──────────────────────────────┐
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  │  streams logs      │◄──────►│  iOS Simulator / Android     │
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  │                    │        │  emulator (pn run)           │
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  │                    │  ws    ┌──────────────────────────────┐
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  │                    │◄──────►│  phone on the same Wi-Fi     │
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  └────────────────────┘        └──────────────────────────────┘
 </span></code></pre></div>
-<p>Every <code>pn run</code> and <code>pn build</code> resolves that list for each target the
-build needs, installs the resolved wheels, and bundles them into the
-app. Nothing from your host environment leaks in: a package that's
-importable on your Mac but has no wheel for the device is a build
-error, not a runtime <code>ImportError</code>.</p>
-<div class="admonition warning">
-<p class="admonition-title">Don't list <code>pythonnative</code></p>
-<p>The CLI bundles the installed <code>pythonnative</code> package directly.
-Validation rejects it in <code>[requirements].packages</code>.</p>
-</div>
-<h2 id="what-works">What works<a class="headerlink" href="#what-works" title="Permanent link">&para;</a></h2>
-<p><strong>Pure-Python packages</strong> (<code>py3-none-any</code> wheels) work on every target.</p>
-<p><strong>Binary wheels</strong> (compiled extensions) work when the package publishes
-a wheel for the target:</p>
+<h2 id="the-two-terminal-setup">The two-terminal setup<a class="headerlink" href="#the-two-terminal-setup" title="Permanent link">&para;</a></h2>
+<p>Terminal one runs the dev server for the whole session:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pn<span class="w"> </span>start<span class="w">          </span><span class="c1"># dev server only</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pn<span class="w"> </span>preview<span class="w">        </span><span class="c1"># dev server and open the browser preview</span>
+</span></code></pre></div>
+<p>Terminal two builds and launches a debug app whenever you need one:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pn<span class="w"> </span>run<span class="w"> </span>ios
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>pn<span class="w"> </span>run<span class="w"> </span>android
+</span></code></pre></div>
+<p><code>pn run</code> finds the dev server on <code>localhost:8765</code> (<code>--port</code> to change
+it), bakes the server's URL into the debug build, installs it, and
+launches. The app connects on startup, pulls any sources newer than
+what it shipped with, and from then on Fast Refreshes on every save.
+Its <code>print()</code> output, tracebacks, and reload notices stream back to the
+<code>pn start</code> terminal, so you can leave <code>pn run</code> and keep working from one
+window.</p>
+<p>Rerunning <code>pn run</code> is cheap: when nothing native changed since the last
+build (see <a href="#when-native-rebuilds-happen">When native rebuilds happen</a>)
+it reinstalls the previous artifact and relaunches in a few seconds.</p>
+<h2 id="what-pn-start-does">What <code>pn start</code> does<a class="headerlink" href="#what-pn-start-does" title="Permanent link">&para;</a></h2>
+<p>The dev server is one Python process, standard library only, doing
+three jobs:</p>
+<ol>
+<li><strong>Serves sources.</strong> It computes a content-addressed manifest of
+   <code>app/</code> (<code>sha256</code> per file) and hands connected clients whatever
+   they're missing. Clients report what they already hold, so a fresh
+   build after <code>pn run</code> transfers nothing and a stale install catches
+   up in one round trip.</li>
+<li><strong>Watches for changes.</strong> Every save under <code>app/</code> broadcasts an
+   <code>update</code> to each client with the new file contents. Each client
+   reloads the affected modules and runs
+   <a href="../hot-reload/">Fast Refresh</a> on its mounted screens.</li>
+<li><strong>Hosts the browser preview.</strong> <code>GET /</code> is a preview page that
+   renders the app in a phone frame. The page is a bridge peer exactly
+   like the Swift and Kotlin runtimes; the reconciler for it runs
+   inside <code>pn start</code> itself. See the
+   <a href="../browser-preview/">Browser preview guide</a>.</li>
+</ol>
+<p>Logs from every peer are interleaved in the terminal and prefixed with
+the source: <code>[ios iPhone 15]</code>, <code>[android Pixel 8]</code>, <code>[browser]</code>, and
+<code>[pn]</code> for the server's own messages.</p>
+<p>Endpoints, for scripting and curiosity:</p>
 <table>
 <thead>
 <tr>
-<th>Target</th>
-<th>Platform tags</th>
-<th>Where wheels come from</th>
+<th>Path</th>
+<th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>iOS device</td>
-<td><code>ios_13_0_arm64_iphoneos</code></td>
-<td>PyPI (PEP 730) and <a href="https://pypi.anaconda.org/beeware/simple">BeeWare's index</a></td>
+<td><code>GET /</code></td>
+<td>Browser preview page</td>
 </tr>
 <tr>
-<td>iOS Simulator</td>
-<td><code>ios_13_0_arm64_iphonesimulator</code>, <code>ios_13_0_x86_64_iphonesimulator</code></td>
-<td>PyPI and BeeWare's index</td>
+<td><code>GET /status</code></td>
+<td>Server, project, and connected-peer info (JSON)</td>
 </tr>
 <tr>
-<td>Android arm64-v8a</td>
-<td><code>android_24_arm64_v8a</code></td>
-<td>PyPI (PEP 738) and <a href="https://chaquo.com/pypi-13.1/">Chaquopy's index</a></td>
+<td><code>GET /manifest</code></td>
+<td><code>{"version", "entry", "files": {path: sha256}}</code></td>
 </tr>
 <tr>
-<td>Android x86_64 (emulator)</td>
-<td><code>android_24_x86_64</code></td>
-<td>PyPI and Chaquopy's index</td>
+<td><code>GET /file/&lt;path&gt;</code></td>
+<td>Raw bytes of one synced source file</td>
+</tr>
+<tr>
+<td><code>WS /ws?role=client</code></td>
+<td>Dev-client protocol</td>
+</tr>
+<tr>
+<td><code>WS /ws?role=preview</code></td>
+<td>Browser preview bridge channel</td>
 </tr>
 </tbody>
 </table>
-<p><strong>No wheel for the target</strong> is a hard failure. pip runs with
-<code>--only-binary=:all:</code> because it can't cross-compile an sdist for a
-foreign platform, and pure-Python fallbacks that live inside an sdist
-(PyYAML, MarkupSafe) can't be used either.</p>
-<h3 id="downgrades">Downgrades<a class="headerlink" href="#downgrades" title="Permanent link">&para;</a></h3>
-<p>When the newest release of a package has no wheel for a target, pip
-walks back through older releases until it finds one that does.
-Chaquopy builds its Android wheels itself and typically lags PyPI by a
-release line, so most binary packages resolve to a slightly older
-version on Android than on iOS or your desktop. <code>pn deps</code> marks these
-with <code>[!!]</code> and prints the desktop version alongside. Pin a version in
-<code>[requirements].packages</code> if the API difference matters to you.</p>
-<p>pydantic is the notable case: pydantic 2 needs <code>pydantic-core</code>, which
-has no iOS or Android wheel, so an unpinned <code>pydantic</code> resolves to the
-1.x line everywhere. Pin <code>pydantic&lt;2</code> explicitly so the choice is
-visible in your config.</p>
-<h2 id="check-before-you-build-pn-deps">Check before you build: <code>pn deps</code><a class="headerlink" href="#check-before-you-build-pn-deps" title="Permanent link">&para;</a></h2>
-<p><code>pn deps</code> runs the same resolution the build does, for every target,
-without installing anything:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="gp">$ </span>pn<span class="w"> </span>deps
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="go">Resolving 3 requirement(s) for Python 3.13 across 4 target(s)...</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="go">iOS device (arm64, iOS 13.0+)</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="go">  [ok] httpx 0.28.1     pure Python</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="go">  [ok] numpy 2.5.2.post1  binary wheel  ios_13_0_arm64_iphoneos  (BeeWare)</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="go">  [ok] pillow 12.3.0      binary wheel  ios_13_0_arm64_iphoneos  (PyPI)</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="go">  ...</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="go">Android arm64-v8a (API 24+)   (preview; Chaquopy resolves again inside the Gradle build)</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="go">  [ok] httpx 0.28.1     pure Python</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="go">  [!!] numpy 1.26.2     binary wheel  android_24_arm64_v8a  (Chaquopy)</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="go">       older than the desktop resolution (2.5.2): newer releases have no wheel here</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="go">  ...</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="go">Older release selected for: numpy ([!!] above). Pin a version in [requirements].packages if the API difference matters.</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="go">All 4 targets resolved.</span>
+<h3 id="flags">Flags<a class="headerlink" href="#flags" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pn<span class="w"> </span>start<span class="w"> </span><span class="o">[</span>entry<span class="o">]</span><span class="w"> </span><span class="o">[</span>--port<span class="w"> </span><span class="m">8765</span><span class="o">]</span><span class="w"> </span><span class="o">[</span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="o">]</span><span class="w"> </span><span class="o">[</span>--open<span class="o">]</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>pn<span class="w"> </span>preview<span class="w"> </span><span class="o">[</span>entry<span class="o">]</span><span class="w"> </span><span class="o">[</span>--port<span class="w"> </span><span class="m">8765</span><span class="o">]</span><span class="w"> </span><span class="o">[</span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-open<span class="o">]</span>
 </span></code></pre></div>
+<p><code>entry</code> overrides the entry module from <code>pythonnative.toml</code> (for
+example <code>app.screens.settings</code> to mount one screen's <code>App</code>). The server
+binds to all interfaces by default so phones on your network can reach
+it; pass <code>--host 127.0.0.1</code> to keep it local.</p>
+<h2 id="dev-clients">Dev clients<a class="headerlink" href="#dev-clients" title="Permanent link">&para;</a></h2>
+<p>A <strong>dev client</strong> is a debug build of your app. On launch,
+<code>pythonnative.bootstrap.start(dev=True)</code> calls
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;start_if_configured&lt;/span&gt;" href="../../api/devserver/#pythonnative.devclient.start_if_configured"><code>devclient.start_if_configured</code></a>,
+which:</p>
 <ul>
-<li><code>pn deps ios</code> or <code>pn deps android</code> restricts the report to one
-  platform.</li>
-<li><code>pn deps --json</code> prints the same data as a document for scripting.</li>
-<li>The command exits non-zero when any target can't be satisfied, so it
-  works as a CI gate.</li>
+<li>reads the server URL the CLI baked in (<code>PN_DEV_SERVER</code>), or the one
+  saved from the last session;</li>
+<li>connects over WebSocket on a daemon thread and says <code>hello</code> with a
+  hash of every source it holds in its writable <strong>overlay</strong>. On the
+  first launch the overlay is seeded from the sources bundled in the
+  build, so a build made from the current tree reports everything
+  up to date;</li>
+<li>receives a <code>sync</code> with only the files that differ, writes them into
+  the overlay (which sits ahead of the bundled sources on <code>sys.path</code>),
+  and applies a Fast Refresh for the modules that changed. Nothing
+  changed, nothing reloads;</li>
+<li>mirrors <code>print</code>, warnings, and tracebacks to the server;</li>
+<li>reports every reload (<code>fast_refresh</code> or <code>remount</code>, and which modules).</li>
 </ul>
-<p>When a package can't be resolved, the report names the requirement,
-the target, and the platform tags that would have been needed:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="go">iOS device (arm64, iOS 13.0+)</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="go">  [x] Could not resolve pandas for iOS device (arm64, iOS 13.0+) (Python 3.13).</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="go">      No matching distribution found for pandas</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="go">      iOS needs a wheel tagged for the device (ios_*_arm64_iphoneos) and, for 'pn run ios', the</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="go">      Simulator (ios_*_iphonesimulator). Pure-Python packages always work; for a C extension, check</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="go">      https://pypi.anaconda.org/beeware/simple or ask upstream for iOS wheels (PEP 730).</span>
+<p>Release builds never include any of this: <code>pn build</code> produces a
+standalone app with your sources bundled and no dev client.</p>
+<h3 id="simulators-and-emulators">Simulators and emulators<a class="headerlink" href="#simulators-and-emulators" title="Permanent link">&para;</a></h3>
+<p><code>pn run ios</code> and <code>pn run android</code> handle the URL plumbing. The iOS
+Simulator shares the Mac's loopback interface, so <code>localhost</code> works.
+For Android the CLI runs <code>adb reverse</code> so <code>localhost:8765</code> inside the
+emulator (or a USB-attached phone) reaches the server.</p>
+<h3 id="physical-iphones">Physical iPhones<a class="headerlink" href="#physical-iphones" title="Permanent link">&para;</a></h3>
+<p>A physical iOS device is on your Wi-Fi rather than your loopback, so
+<code>pn run ios --device &lt;name&gt;</code> bakes in the Mac's first LAN address
+instead. Both machines must be on the same network and the port must
+not be firewalled. If auto-detection picks the wrong interface, pass
+the URL explicitly:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--device<span class="w"> </span><span class="s2">"Owen's iPhone"</span><span class="w"> </span>--dev-server<span class="w"> </span>ws://192.168.1.20:8765/ws?role<span class="o">=</span>client
 </span></code></pre></div>
-<h2 id="extra-indexes">Extra indexes<a class="headerlink" href="#extra-indexes" title="Permanent link">&para;</a></h2>
-<p>Private or self-hosted wheel indexes are searched after PyPI and the
-platform indexes when listed in <code>[requirements].extra_index_urls</code>:</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[requirements]</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">packages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"mycompany-sdk"</span><span class="p">]</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">extra_index_urls</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"https://wheels.mycompany.example/simple"</span><span class="p">]</span>
+<p>Fast Refresh works the same over Wi-Fi; there's no longer a USB-only
+path.</p>
+<h3 id="the-dev-client-shell-app">The dev-client shell app<a class="headerlink" href="#the-dev-client-shell-app" title="Permanent link">&para;</a></h3>
+<p>Sometimes you want one installed app that can load <em>any</em> project, the
+way Expo Go does. Build a shell with:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--dev-client
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--dev-client
 </span></code></pre></div>
-<p>The same URLs are passed to Chaquopy for the Android build.</p>
-<h2 id="how-packages-are-bundled">How packages are bundled<a class="headerlink" href="#how-packages-are-bundled" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>iOS</strong>: the CLI installs one <code>app_packages.&lt;sdk&gt;</code> directory per SDK
-  (<code>iphoneos</code> for devices, <code>iphonesimulator</code> for the Simulator) under
-  <code>build/ios/</code>, and the Xcode run script copies the slice that matches
-  the SDK being built into the app bundle. <code>pn run ios</code> against a
-  Simulator resolves only the Simulator slice; <code>pn build ios</code> resolves
-  both.</li>
-<li><strong>Android</strong>: the CLI writes <code>requirements.txt</code> and the pip index
-  options into the staged Gradle project, and Chaquopy performs the
-  authoritative install inside the Gradle build, once per ABI in
-  <code>[android].abi_filters</code>. The <code>pn deps</code> Android columns are a fast
-  preview of that step.</li>
-</ul>
-<h2 id="compatibility-matrix">Compatibility matrix<a class="headerlink" href="#compatibility-matrix" title="Permanent link">&para;</a></h2>
-<p>The table below is generated by <code>scripts/package-matrix.py</code> from
-<code>tests/packages/matrix.toml</code> against the live indexes. The <code>packages</code>
-CI workflow re-runs the check weekly and on any change to the resolver
-or manifest, so the table and the test suite can't disagree for long.
-"ok" means the package resolves to a wheel for that target; "older"
-means it resolves, but to an older release than a desktop gets; "no
-wheel" means resolution fails.</p>
-<!-- matrix:start -->
-<!-- Generated by scripts/package-matrix.py on 2026-09-03 for Python 3.13. Edit tests/packages/matrix.toml, not this table. -->
-<table>
-<thead>
-<tr>
-<th>Package</th>
-<th>Kind</th>
-<th>iOS device</th>
-<th>iOS Simulator</th>
-<th>Android arm64-v8a</th>
-<th>Android x86_64</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>httpx</code></td>
-<td>pure</td>
-<td>0.28.1</td>
-<td>0.28.1</td>
-<td>0.28.1</td>
-<td>0.28.1</td>
-<td>HTTP client; PythonNative's own <code>fetch</code> is a lighter alternative.</td>
-</tr>
-<tr>
-<td><code>attrs</code></td>
-<td>pure</td>
-<td>26.1.0</td>
-<td>26.1.0</td>
-<td>26.1.0</td>
-<td>26.1.0</td>
-<td></td>
-</tr>
-<tr>
-<td><code>python-dateutil</code></td>
-<td>pure</td>
-<td>2.9.0.post0</td>
-<td>2.9.0.post0</td>
-<td>2.9.0.post0</td>
-<td>2.9.0.post0</td>
-<td></td>
-</tr>
-<tr>
-<td><code>rich</code></td>
-<td>pure</td>
-<td>15.0.0</td>
-<td>15.0.0</td>
-<td>15.0.0</td>
-<td>15.0.0</td>
-<td></td>
-</tr>
-<tr>
-<td><code>emoji</code></td>
-<td>pure</td>
-<td>2.15.0</td>
-<td>2.15.0</td>
-<td>2.15.0</td>
-<td>2.15.0</td>
-<td>Used by examples/hello-world.</td>
-</tr>
-<tr>
-<td><code>numpy</code></td>
-<td>binary</td>
-<td>2.5.2.post1, binary</td>
-<td>2.5.2.post1, binary</td>
-<td>1.26.2 (latest 2.5.2), binary</td>
-<td>1.26.2 (latest 2.5.2), binary</td>
-<td>iOS wheel from BeeWare (current release); Android wheel from Chaquopy's index (1.26 line). Exercised on device by the E2E suite.</td>
-</tr>
-<tr>
-<td><code>pillow</code></td>
-<td>binary</td>
-<td>12.3.0, binary</td>
-<td>12.3.0, binary</td>
-<td>11.0.0 (latest 12.3.0), binary</td>
-<td>11.0.0 (latest 12.3.0), binary</td>
-<td>iOS wheel on PyPI itself (PEP 730); Android from Chaquopy's index.</td>
-</tr>
-<tr>
-<td><code>cryptography</code></td>
-<td>binary</td>
-<td>47.0.0 (latest 50.0.1), binary</td>
-<td>47.0.0 (latest 50.0.1), binary</td>
-<td>42.0.8 (latest 50.0.1), binary</td>
-<td>42.0.8 (latest 50.0.1), binary</td>
-<td>Pulls cffi, also binary.</td>
-</tr>
-<tr>
-<td><code>cffi</code></td>
-<td>binary</td>
-<td>2.1.1, binary</td>
-<td>2.1.1, binary</td>
-<td>1.17.1 (latest 2.1.1), binary</td>
-<td>1.17.1 (latest 2.1.1), binary</td>
-<td></td>
-</tr>
-<tr>
-<td><code>pandas</code></td>
-<td>binary</td>
-<td>no wheel</td>
-<td>no wheel</td>
-<td>2.1.3 (latest 3.0.5), binary</td>
-<td>2.1.3 (latest 3.0.5), binary</td>
-<td>No iOS wheel published yet.</td>
-</tr>
-<tr>
-<td><code>lxml</code></td>
-<td>binary</td>
-<td>no wheel</td>
-<td>no wheel</td>
-<td>5.3.0 (latest 6.1.3), binary</td>
-<td>5.3.0 (latest 6.1.3), binary</td>
-<td>No iOS wheel published yet.</td>
-</tr>
-<tr>
-<td><code>pyyaml</code></td>
-<td>binary</td>
-<td>no wheel</td>
-<td>no wheel</td>
-<td>6.0.3, binary</td>
-<td>6.0.3, binary</td>
-<td>No iOS wheel; <code>ruamel.yaml</code> is a pure-Python alternative.</td>
-</tr>
-<tr>
-<td><code>markupsafe</code></td>
-<td>binary</td>
-<td>no wheel</td>
-<td>no wheel</td>
-<td>3.0.3, binary</td>
-<td>3.0.3, binary</td>
-<td>Ships only sdist + binary wheels; the pure-Python fallback inside the sdist can't be used because pip won't build for a foreign platform.</td>
-</tr>
-<tr>
-<td><code>pydantic</code></td>
-<td>pure</td>
-<td>1.10.26 (latest 2.13.5)</td>
-<td>1.10.26 (latest 2.13.5)</td>
-<td>1.10.26 (latest 2.13.5)</td>
-<td>1.10.26 (latest 2.13.5)</td>
-<td>Resolves to the 1.x line: pydantic 2 needs pydantic-core, which has no iOS or Android wheel. Pin <code>pydantic&lt;2</code> explicitly or expect the older API.</td>
-</tr>
-</tbody>
-</table>
-<!-- matrix:end -->
+<p>The shell has no app of its own. It opens a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;ConnectScreen&lt;/span&gt;
 
-<p>To add a package to the matrix, append a <code>[[package]]</code> entry to
-<code>tests/packages/matrix.toml</code> with the expected outcome per platform and
-run <code>uv run pytest tests/packages -m network</code>.</p>
-<h2 id="python-version">Python version<a class="headerlink" href="#python-version" title="Permanent link">&para;</a></h2>
-<p><code>[app].python_version</code> selects the embedded interpreter (<code>3.13</code> or
-<code>3.14</code>). Wheels are matched against that version, not your host's, so
-<code>pn doctor</code> checks that a matching <code>python3.X</code> is on <code>PATH</code> for pip to
-run under. If a package has wheels for 3.13 but not 3.14 yet, set
-<code>python_version = "3.13"</code>.</p>
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/devserver/#pythonnative.devclient.ConnectScreen"><code>ConnectScreen</code></a> where you type
+a dev server URL (the last one used is prefilled). After the first sync the real
+<code>app.main</code> from the overlay shadows the placeholder and the screen
+remounts into your app. The URL is remembered for next launch, so a
+shell built once keeps working across projects as long as their native
+inputs (native plugins, <code>[requirements].packages</code>, permissions) are the
+same.</p>
+<h2 id="when-native-rebuilds-happen">When native rebuilds happen<a class="headerlink" href="#when-native-rebuilds-happen" title="Permanent link">&para;</a></h2>
+<p>A debug build has to go through Gradle or Xcode only when a <strong>native
+input</strong> changes:</p>
+<ul>
+<li><code>pythonnative.toml</code> (permissions, app id, requirements, versions)</li>
+<li>the bundled native template that ships with your <code>pythonnative</code>
+  version</li>
+<li>the <code>pythonnative</code> package itself (after <code>pip install -U</code>)</li>
+<li>project-local native plugins</li>
+<li>the build flavor: platform, iOS SDK (device vs. simulator), release</li>
+</ul>
+<p><code>pn run</code> hashes the <em>contents</em> of all of those into one fingerprint
+(see <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;compute&lt;/span&gt;" href="../../api/devserver/#pythonnative.project.fingerprint.compute"><code>fingerprint.compute</code></a>)
+and writes it next to the build after a successful toolchain run. On
+the next <code>pn run</code>, if the fingerprint matches and a dev server is up to
+deliver current sources, the previous artifact is reinstalled and
+launched. Edits under <code>app/</code> never trigger a rebuild; they're synced.</p>
+<p>Force the toolchain with <code>--rebuild</code>. Stage without building with
+<code>--prepare-only</code> (useful for opening the project in Xcode or Android
+Studio).</p>
+<p>If no dev server is running when you <code>pn run</code>, the CLI says so and
+builds an app that runs its bundled sources without Fast Refresh.
+Start <code>pn start</code> and relaunch to connect it.</p>
+<h2 id="which-client-for-which-job">Which client for which job<a class="headerlink" href="#which-client-for-which-job" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Layout, state, navigation, most component work</td>
+<td>Browser preview</td>
+</tr>
+<tr>
+<td>Anything touching device APIs (camera, location, haptics, biometrics)</td>
+<td>Simulator or device</td>
+</tr>
+<tr>
+<td>Text rendering, fonts, platform chrome, gesture feel</td>
+<td>Simulator or device</td>
+</tr>
+<tr>
+<td>Performance</td>
+<td>A physical device</td>
+</tr>
+<tr>
+<td>Demoing to someone at a desk</td>
+<td>Browser preview (<code>--host</code> and share the URL)</td>
+</tr>
+</tbody>
+</table>
+<p>The browser preview runs your real Python in the <code>pn start</code> process and
+uses the same reconciler, layout engine, hooks, and navigation as
+device builds. It approximates leaf widgets with DOM elements and
+implements a subset of native modules (<code>Alert</code>, <code>Clipboard</code>, <code>Linking</code>,
+<code>Share</code>, <code>Haptics</code>, <code>NetInfo</code>, <code>AppState</code>, <code>Device</code>); everything else
+uses the pure-Python fallbacks in
+<a href="../../api/native_modules/"><code>pythonnative.native_modules.fallback</code></a>,
+so a <code>Camera</code> call returns an "unavailable" result rather than a
+photo.</p>
+<h2 id="logs-and-errors">Logs and errors<a class="headerlink" href="#logs-and-errors" title="Permanent link">&para;</a></h2>
+<p>Every dev client mirrors its Python output to the server, so the
+<code>pn start</code> terminal is the one place to watch. Uncaught exceptions in
+renders, effects, and handlers show a RedBox on the affected screen
+(on device and in the preview) and print the traceback in the terminal.
+Errors before any screen mounts (an <code>ImportError</code> in <code>app/main.py</code>,
+say) print in the terminal and pop up in the preview's console; fix
+the file and save to recover, nothing needs restarting.</p>
+<p><code>pn logs ios</code> / <code>pn logs android</code> still attach a native log stream
+(<code>os_log</code>, <code>logcat</code>) when you need lower-level output than the dev
+client mirrors.</p>
+<h2 id="dependencies">Dependencies<a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h2>
+<p>The browser preview imports your app in the <code>pn start</code> process, so any
+package under <code>[requirements].packages</code> must be installed in the same
+Python environment (<code>pip install</code> it, or run <code>uv run --with &lt;pkg&gt; pn
+start</code>). <code>pn start</code> warns when one is missing. Device builds resolve
+their own wheels from the same list; see <a href="../pypi-packages/">PyPI packages</a>.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Configure requirements and indexes in
-  <a href="../configuration/#requirements">Configuration</a>.</li>
-<li>Platform build details: <a href="../ios/">iOS</a> and <a href="../android/">Android</a>.</li>
-<li>The <code>pn deps</code> reference in the <a href="../../api/cli/">CLI</a>.</li>
+<li><a href="../browser-preview/">Browser preview</a>: device frames, dark mode,
+  keyboard shortcuts, what's approximated.</li>
+<li><a href="../hot-reload/">Fast Refresh</a>: what survives a reload, what
+  doesn't, and why.</li>
+<li><a href="../../api/cli/">CLI reference</a> for every flag.</li>
+<li><a href="../../api/devserver/">Dev server API</a> if you want to script against
+  the server or embed a client.</li>
 </ul>
 
 

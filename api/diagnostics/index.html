@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1826,6 +1856,8 @@
   
     
     
+      
+        
       
         
       
@@ -2732,6 +2764,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../hot_reload/" class="md-nav__link">
         
   
@@ -3439,8 +3499,9 @@ feedback you get while developing: <code>[PN] WARN</code> messages for suspiciou
 props and styles, the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;HookOrderError&lt;/span&gt;" href="#pythonnative.diagnostics.HookOrderError"><code>HookOrderError</code></a>
 raised on conditional hooks, and the RedBox overlay that surfaces
 uncaught errors from renders, effects, and event handlers.</p>
-<p>Dev mode is enabled automatically by <code>pn preview</code> and by <code>pn run
---hot-reload</code>, or explicitly with the <code>PN_DEV=1</code> environment variable.
+<p>Dev mode is enabled automatically by <code>pn start</code> / <code>pn preview</code> and in
+the debug builds <code>pn run</code> produces, or explicitly with the <code>PN_DEV=1</code>
+environment variable.
 In production builds every check in this module is skipped, so
 shipping apps pay no overhead.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>

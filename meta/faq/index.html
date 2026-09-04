@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1824,6 +1854,8 @@
   
     
     
+      
+        
       
         
       
@@ -2729,6 +2761,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/hot_reload/" class="md-nav__link">
         
   
@@ -3094,10 +3154,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#does-pythonnative-work-on-the-desktop" class="md-nav__link">
+  <a href="#does-pythonnative-work-on-the-desktop-or-the-web" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Does PythonNative work on the desktop?
+        Does PythonNative work on the desktop or the web?
       
     </span>
   </a>
@@ -3368,10 +3428,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#does-pythonnative-work-on-the-desktop" class="md-nav__link">
+  <a href="#does-pythonnative-work-on-the-desktop-or-the-web" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Does PythonNative work on the desktop?
+        Does PythonNative work on the desktop or the web?
       
     </span>
   </a>
@@ -3582,18 +3642,19 @@ for each platform you support, register it on
 a small Python factory that returns
 <code>Element(&lt;type&gt;, props, children)</code>. Step-by-step instructions live in
 <a href="../../concepts/native-views/#custom-widgets">Native views (concept)</a>.</p>
-<h2 id="does-pythonnative-work-on-the-desktop">Does PythonNative work on the desktop?<a class="headerlink" href="#does-pythonnative-work-on-the-desktop" title="Permanent link">&para;</a></h2>
-<p>Yes, for <strong>previewing</strong>. <code>pn preview</code> renders your app in a native
-desktop window using a built-in Tkinter backend, with instant Fast
-Refresh on every save. It's the fastest inner-loop: see your real UI
-and iterate in seconds without booting a simulator or deploying to a
-device. The same flex layout engine and reconciler drive it, so what
-you see closely matches the device. See the
-<a href="../../guides/desktop-preview/">Desktop preview guide</a>.</p>
-<p>The desktop backend is a <strong>development tool</strong>, not a production target:
-chrome like rounded corners, shadows, and overflow clipping are
-approximated, and there's no app packaging for desktop. Ship to devices
-with <code>pn run android</code> / <code>pn run ios</code>.</p>
+<h2 id="does-pythonnative-work-on-the-desktop-or-the-web">Does PythonNative work on the desktop or the web?<a class="headerlink" href="#does-pythonnative-work-on-the-desktop-or-the-web" title="Permanent link">&para;</a></h2>
+<p>For <strong>previewing</strong>, yes. <code>pn preview</code> renders your app in a browser tab
+inside a phone frame, with Fast Refresh on every save. It's the fastest
+inner loop: see your real UI and iterate in seconds without booting a
+simulator or deploying to a device. The page speaks the same bridge
+protocol as the Swift and Kotlin runtimes, so the reconciler, layout
+engine, hooks, navigation, and screen host are the exact code that
+ships to the phone. See the
+<a href="../../guides/browser-preview/">Browser preview guide</a>.</p>
+<p>The browser preview is a <strong>development tool</strong>, not a production target:
+platform chrome and fonts are approximated, most device APIs are
+simulated, and there's no web or desktop packaging. Ship to devices
+with <code>pn run android</code> / <code>pn run ios</code> and <code>pn build</code>.</p>
 <p>The core (components, hooks, reconciler) is also platform-agnostic and
 runs headless with a <a href="../../guides/testing/#a-minimal-fake-backend">fake backend</a>;
 that's how the unit-test suite works.</p>

@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1826,6 +1856,8 @@
   
     
     
+      
+        
       
         
       
@@ -3319,6 +3351,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../hot_reload/" class="md-nav__link">
         
   
@@ -4295,11 +4355,13 @@ calls this module directly; the
 <code>call</code> a native module), and everything native sends back arrives at
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;native_callback&lt;/span&gt;" href="#pythonnative.bridge.native_callback"><code>native_callback</code></a>. The protocol
 is documented in <code>docs/concepts/bridge.md</code>.</p>
-<p>Off-device (tests, <code>pn preview</code>) there is no transport; the desktop
-registry renders with Tkinter and native modules fall back to their
-Python implementations. Tests that want to exercise the bridge itself
-install a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeTransport&lt;/span&gt;" href="#pythonnative.bridge.fake.FakeTransport"><code>FakeTransport</code></a>
-with <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_transport&lt;/span&gt;" href="#pythonnative.bridge.set_transport"><code>set_transport</code></a>.</p>
+<p>Under <code>pn preview</code> the native side is a browser page, reached through
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;WebTransport&lt;/span&gt;" href="../devserver/#pythonnative.bridge.web.WebTransport"><code>WebTransport</code></a>; the preview
+installs it with <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_transport&lt;/span&gt;" href="#pythonnative.bridge.set_transport"><code>set_transport</code></a>
+before any screen mounts. In headless tests there is no transport at
+all: native modules fall back to their Python implementations, and
+tests that want to exercise the bridge itself install a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeTransport&lt;/span&gt;" href="#pythonnative.bridge.fake.FakeTransport"><code>FakeTransport</code></a>.</p>
 
 
 
@@ -4344,6 +4406,14 @@ with <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbo
             <td>
               <div class="doc-md-description">
                 <p>iOS transport: C-ABI calls into <code>PythonNativeKit</code> through <code>ctypes</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="pythonnative.bridge.web">web</span></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>The browser preview's half of the bridge.</p>
               </div>
             </td>
           </tr>
@@ -5447,7 +5517,7 @@ list rows) can still reach them.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Unused hook kept for symmetry with the desktop
+                <p>Unused hook kept for symmetry with the test
 registry; reserved for per-type prop rewriting.</p>
               </div>
             </td>
@@ -6349,9 +6419,10 @@ events and module results back through
 </span></code></pre></div>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;start&lt;/span&gt;" href="#pythonnative.bootstrap.start"><code>start</code></a> connects the two halves of the
 bridge (installing the native -&gt; Python callback on iOS), verifies the
-protocol version, routes <code>print()</code> to the console on iOS, and warms
-the asyncio runtime. From then on the native runtime drives everything
-through <code>callback("host", ...)</code>; see <code>docs/concepts/bridge.md</code>.</p>
+protocol version, routes <code>print()</code> to the console on iOS, warms the
+asyncio runtime, and, in debug builds, starts the dev client that syncs
+sources from <code>pn start</code>. From then on the native runtime drives
+everything through <code>callback("host", ...)</code>; see <code>docs/concepts/bridge.md</code>.</p>
 
 
 
@@ -6445,8 +6516,8 @@ through <code>callback("host", ...)</code>; see <code>docs/concepts/bridge.md</c
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Enable dev mode (RedBox, validation warnings). Debug
-templates pass <code>True</code>; hot reload turns it on as well.</p>
+                <p>Enable dev mode (RedBox, validation warnings, the dev
+client). Debug templates pass <code>True</code>.</p>
               </div>
             </td>
             <td>

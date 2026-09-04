@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1824,6 +1854,8 @@
   
     
     
+      
+        
       
         
       
@@ -2709,6 +2741,34 @@
     
   
     SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
   
 
     
@@ -3704,16 +3764,19 @@ way:</p>
 <li><code>gestures</code>: gesture descriptors and the pure-Python recognition arbiter (<code>gestures.py</code>)</li>
 <li><code>hooks</code>: hooks and contexts (<code>hooks.py</code>)</li>
 <li><code>hosts</code>: screen hosts, lifecycle forwarding, and render scheduling (<code>hosts/</code>)</li>
-<li><code>hot_reload</code>: file watcher and module reloader (<code>hot_reload.py</code>)</li>
+<li><code>devserver</code>: dev server, file watcher, and WebSocket implementation (<code>devserver/</code>)</li>
+<li><code>devclient</code>: on-device dev client that syncs sources and Fast Refreshes (<code>devclient.py</code>)</li>
+<li><code>hot_reload</code>: module reloader and Fast Refresh (<code>hot_reload.py</code>)</li>
 <li><code>layout</code>: pure-Python flexbox engine (<code>layout.py</code>)</li>
 <li><code>mutations</code>: batched mutation ops between reconciler and native backends (<code>mutations.py</code>)</li>
-<li><code>native_modules</code>: native module registry, Python facades, and desktop implementations (<code>native_modules/</code>)</li>
-<li><code>native_views</code>: view registry protocol, bridge backend, and desktop handlers (<code>native_views/</code>)</li>
+<li><code>native_modules</code>: native module registry, Python facades, and Python fallbacks (<code>native_modules/</code>)</li>
+<li><code>native_views</code>: view registry protocol and bridge backend (<code>native_views/</code>)</li>
 <li><code>navigation</code>: navigation state, container, navigators, hooks, and linking (<code>navigation/</code>)</li>
 <li><code>net</code>: awaitable HTTP client (<code>net.py</code>)</li>
 <li><code>package</code>: <code>src/pythonnative/__init__.py</code> exports and package boundary</li>
 <li><code>platform</code>: <code>Platform.OS</code>/<code>Platform.select</code> and version detection (<code>platform.py</code>)</li>
 <li><code>platform_metrics</code>: platform-reported metrics like safe-area insets and bar heights (<code>platform_metrics.py</code>)</li>
+<li><code>preview</code>: <code>pn start</code> / <code>pn preview</code> session and the browser preview page (<code>preview.py</code>, <code>devserver/static/</code>)</li>
 <li><code>project</code>: <code>pythonnative.toml</code> config, template configurators, plugin staging, and the builder (<code>project/</code>)</li>
 <li><code>reconciler</code>: virtual view tree diffing, boundaries, and the layout pass (<code>reconciler/</code>)</li>
 <li><code>runtime</code>: framework-wide asyncio loop and thread-safe future helpers (<code>runtime.py</code>)</li>

@@ -1004,6 +1004,8 @@
       
         
       
+        
+      
     
     
     
@@ -1114,14 +1116,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1429,7 +1459,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1940,6 +1970,8 @@
   
     
     
+      
+        
       
         
       
@@ -2845,6 +2877,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/hot_reload/" class="md-nav__link">
         
   
@@ -3395,12 +3455,17 @@ that prevents render storms).</p>
 <tr>
 <td>Distribution</td>
 <td>Metro bundler ships a JS bundle</td>
-<td>The <code>pn</code> CLI bundles your <code>app/</code> and the <code>pythonnative</code> package into the native project</td>
+<td><code>pn build</code> bundles your <code>app/</code> and the <code>pythonnative</code> package into the native project</td>
 </tr>
 <tr>
-<td>Hot reload</td>
-<td>Metro fast refresh of the JS bundle</td>
-<td><code>FileWatcher</code> plus <code>ModuleReloader</code> reloads <code>.py</code> modules in place</td>
+<td>Dev loop</td>
+<td>Metro dev server; Expo Go / dev client on device; Fast Refresh</td>
+<td><code>pn start</code> dev server; debug builds and the <code>--dev-client</code> shell connect over WebSocket; Fast Refresh reloads <code>.py</code> modules in place</td>
+</tr>
+<tr>
+<td>Preview without a device</td>
+<td>Expo web / Snack</td>
+<td><code>pn preview</code> renders in a browser tab through the same bridge protocol the native runtimes speak</td>
 </tr>
 <tr>
 <td>Native widgets</td>

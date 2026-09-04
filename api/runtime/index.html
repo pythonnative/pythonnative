@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1893,6 +1923,8 @@
       
         
       
+        
+      
     
     
     
@@ -2285,17 +2317,6 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;create_future
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pythonnative.runtime.set_desktop_main_dispatch" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;set_desktop_main_dispatch
       
     </span>
   </a>
@@ -2911,6 +2932,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../hot_reload/" class="md-nav__link">
         
   
@@ -3379,17 +3428,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pythonnative.runtime.set_desktop_main_dispatch" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;set_desktop_main_dispatch
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#pythonnative.runtime.call_on_main_thread" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3458,8 +3496,8 @@
 <h1 id="async-runtime">Async runtime<a class="headerlink" href="#async-runtime" title="Permanent link">&para;</a></h1>
 <p>PythonNative runs a single framework-wide <code>asyncio</code> event loop <strong>on
 the platform's main thread</strong>, pumped as a guest of the native run loop
-(<code>dispatch_async</code> on iOS, <code>Handler.post</code> on Android, the Tk poll
-loop in <code>pn preview</code>). Every awaitable surface in the framework
+(<code>dispatch_async</code> on iOS, <code>Handler.post</code> on Android, the
+transport's main loop in <code>pn preview</code>). Every awaitable surface in the framework
 schedules its work on this loop: <code>async def</code> components,
 coroutine <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a> callbacks,
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_resource&lt;/span&gt;" href="../hooks/#pythonnative.hooks.use_resource"><code>use_resource</code></a>,
@@ -3502,8 +3540,8 @@ loop, the framework loop cannot call <code>run_forever</code> and block.
 Instead it runs as a <strong>guest</strong>: whenever work is scheduled
 (<code>call_soon</code> / <code>call_soon_threadsafe</code> / timers), the runtime asks
 the platform to <em>pump</em> the loop on the next main-queue turn
-(<code>dispatch_async</code> on iOS, <code>Handler.post</code> on Android, the Tk poll
-loop in <code>pn preview</code>). One pump runs every ready callback and due
+(<code>dispatch_async</code> on iOS, <code>Handler.post</code> on Android, the preview's
+main loop under <code>pn preview</code>). One pump runs every ready callback and due
 timer, then returns control to the platform.</p>
 <p>Key entry points:</p>
 <ul>
@@ -4145,33 +4183,6 @@ it's on, only that it must not race with cancellation.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="pythonnative.runtime.set_desktop_main_dispatch" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">set_desktop_main_dispatch</span>
-
-
-<a href="#pythonnative.runtime.set_desktop_main_dispatch" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_desktop_main_dispatch</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">dispatch</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Callable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Callable">Callable</a></span><span class="p">[[</span><span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Callable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Callable">Callable</a></span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="p">],</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Install (or clear) the desktop main-thread dispatcher.</p>
-<p>Called by <code>pythonnative.preview</code> with a function that marshals
-work onto the Tk main thread, and with <code>None</code> when the preview
-window closes.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h2 id="pythonnative.runtime.call_on_main_thread" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">call_on_main_thread</span>
 
@@ -4184,11 +4195,9 @@ window closes.</p>
 
         <p>Run <code>fn()</code> on the platform UI thread.</p>
 <ul>
-<li><strong>iOS / Android</strong>: runs inline when already on the main thread,
-  otherwise queues <code>fn</code> through the bridge (one native crossing
-  per batch of queued callables).</li>
-<li><strong>Desktop</strong>: enqueues <code>fn</code> for the <code>pn preview</code> poll loop
-  (or runs inline if no preview is live).</li>
+<li><strong>iOS / Android / browser preview</strong>: runs inline when already on
+  the main thread, otherwise queues <code>fn</code> through the bridge (one
+  native crossing per batch of queued callables).</li>
 <li><strong>Tests</strong>: runs <code>fn()</code> inline.</li>
 </ul>
 <p>Exceptions raised by <code>fn</code> are caught and printed; they must not

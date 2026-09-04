@@ -18,7 +18,7 @@
         <link rel="prev" href="../platform_metrics/">
       
       
-        <link rel="next" href="../hot_reload/">
+        <link rel="next" href="../devserver/">
       
       
         
@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1826,6 +1856,8 @@
   
     
     
+      
+        
       
         
       
@@ -2922,6 +2954,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../hot_reload/" class="md-nav__link">
         
   
@@ -3582,8 +3642,8 @@ stand-ins, and the native module registry
 <li>A registration call in Python
    (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;register_component&lt;/span&gt;" href="#pythonnative.sdk.register_component"><code>register_component</code></a>, or the
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;native_component&lt;/span&gt;" href="#pythonnative.sdk.native_component"><code>@native_component</code></a> decorator
-   when you also supply a desktop
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a> for <code>pn preview</code>)
+   when you also supply a test
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a> for the Python backend)
    that declares the element name and binds its props type.</li>
 </ol>
 <p>Once registered, the component appears alongside the built-ins: the
@@ -3591,8 +3651,8 @@ reconciler, layout engine, and Fast Refresh treat it identically.</p>
 <p>A native module (device API without a view) follows the same split: a
 Swift / Kotlin class registered by name in the plugin, a Python facade
 that calls <code>native_module(name).call(...)</code>, and optionally a Python
-implementation registered with <code>register_python_module</code> for desktop
-and tests.</p>
+implementation registered with <code>register_python_module</code> for the
+browser preview and tests.</p>
 <p>PyPI packages can ship both without users importing them explicitly
 by declaring entry points in the <code>pythonnative.handlers</code> (Python
 side) and <code>pythonnative.plugins</code> (native source) groups; <code>pn build</code>
@@ -3675,7 +3735,7 @@ compiles the native sources into the app.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;native_component&lt;/span&gt; (&lt;code&gt;pythonnative.sdk.native_component&lt;/code&gt;)" href="#pythonnative.sdk.native_component">native_component</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Decorator that registers a desktop <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a> under <code>name</code>.</p>
+                  <p>Decorator that registers a test <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a> under <code>name</code>.</p>
                 </div>
               </td>
             </tr>
@@ -3707,7 +3767,7 @@ compiles the native sources into the app.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;install_into_registry&lt;/span&gt; (&lt;code&gt;pythonnative.sdk.install_into_registry&lt;/code&gt;)" href="#pythonnative.sdk.install_into_registry">install_into_registry</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Copy registered desktop handlers into a view registry.</p>
+                  <p>Copy registered test handlers into a view registry.</p>
                 </div>
               </td>
             </tr>
@@ -3894,7 +3954,7 @@ behavior in the future.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Decorator that registers a desktop <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a> under <code>name</code>.</p>
+        <p>Decorator that registers a test <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a> under <code>name</code>.</p>
 <p>The handler class is instantiated immediately and stored in the
 process-wide registry as the component's off-device renderer. The
 on-device renderers are the Swift and Kotlin component managers the
@@ -4045,7 +4105,7 @@ instances.</p>
         <p>Register a custom native component imperatively.</p>
 <p>Declares <code>name</code> as an element type so
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;element_factory&lt;/span&gt;" href="#pythonnative.sdk.element_factory"><code>element_factory</code></a> can build it.
-<code>handler</code> is the optional desktop / test renderer; native
+<code>handler</code> is the optional test renderer; native
 rendering always comes from the platform component managers.
 Subsequent calls for the same <code>name</code> merge: a later <code>props</code> or
 <code>handler</code> replaces the earlier one, <code>None</code> leaves it alone.</p>
@@ -4334,7 +4394,7 @@ prop schema.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Copy registered desktop handlers into a view registry.</p>
+        <p>Copy registered test handlers into a view registry.</p>
 <p>Called once by the registry on first use. Triggers entry-point
 discovery on the first call so PyPI-installed components register
 themselves before the registry snapshot is taken.</p>

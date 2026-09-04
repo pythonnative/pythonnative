@@ -45,6 +45,10 @@
          <lastmod>2026-09-04</lastmod>
     </url>
     <url>
+         <loc>https://pythonnative.com/api/devserver/</loc>
+         <lastmod>2026-09-04</lastmod>
+    </url>
+    <url>
          <loc>https://pythonnative.com/api/diagnostics/</loc>
          <lastmod>2026-09-04</lastmod>
     </url>
@@ -217,6 +221,10 @@
          <lastmod>2026-09-04</lastmod>
     </url>
     <url>
+         <loc>https://pythonnative.com/guides/browser-preview/</loc>
+         <lastmod>2026-09-04</lastmod>
+    </url>
+    <url>
          <loc>https://pythonnative.com/guides/building-for-release/</loc>
          <lastmod>2026-09-04</lastmod>
     </url>
@@ -229,7 +237,7 @@
          <lastmod>2026-09-04</lastmod>
     </url>
     <url>
-         <loc>https://pythonnative.com/guides/desktop-preview/</loc>
+         <loc>https://pythonnative.com/guides/dev-workflow/</loc>
          <lastmod>2026-09-04</lastmod>
     </url>
     <url>

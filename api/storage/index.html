@@ -888,6 +888,8 @@
       
         
       
+        
+      
     
     
     
@@ -998,14 +1000,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1313,7 +1343,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1826,6 +1856,8 @@
   
     
     
+      
+        
       
         
       
@@ -2906,6 +2938,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../hot_reload/" class="md-nav__link">
         
   
@@ -3466,10 +3526,10 @@ native <code>Storage</code> module:</p>
 <ul>
 <li><strong>iOS</strong>: <code>NSUserDefaults</code> (standard user defaults).</li>
 <li><strong>Android</strong>: <code>SharedPreferences</code> (file <code>"pn_async_storage"</code>).</li>
-<li><strong>Desktop / tests</strong>: an in-memory dict optionally backed by a JSON
+<li><strong>Browser preview / tests</strong>: an in-memory dict optionally backed by a JSON
   file under <code>PN_STORAGE_DIR</code> for inter-run persistence during local
   development (see
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;DesktopStorage&lt;/span&gt;" href="../native_modules/#pythonnative.native_modules.desktop.DesktopStorage"><code>DesktopStorage</code></a>).</li>
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FallbackStorage&lt;/span&gt;" href="../native_modules/#pythonnative.native_modules.fallback.FallbackStorage"><code>FallbackStorage</code></a>).</li>
 </ul>
 <p>Every operation is a coroutine. The platform stores answer in
 microseconds, so calls complete inline on the framework loop without

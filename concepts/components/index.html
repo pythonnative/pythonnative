@@ -1132,6 +1132,8 @@
       
         
       
+        
+      
     
     
     
@@ -1242,14 +1244,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1557,7 +1587,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -2068,6 +2098,8 @@
   
     
     
+      
+        
       
         
       
@@ -2953,6 +2985,34 @@
     
   
     SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
   
 
     
@@ -3923,15 +3983,15 @@ fine way to render conditionally.</p>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="k">if</span> <span class="n">pn</span><span class="o">.</span><span class="n">Platform</span><span class="o">.</span><span class="n">is_ios</span><span class="p">:</span>
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">margin</span> <span class="o">=</span> <span class="mi">16</span>
 </span></code></pre></div>
-<p><code>pn.Platform.OS</code> is <code>"ios"</code>, <code>"android"</code>, <code>"desktop"</code> (the <code>pn preview</code>
-backend, see the <a href="../../guides/desktop-preview/">Desktop preview guide</a>),
+<p><code>pn.Platform.OS</code> is <code>"ios"</code>, <code>"android"</code>, <code>"web"</code> (the <code>pn preview</code>
+browser preview, see the <a href="../../guides/browser-preview/">Browser preview guide</a>),
 or <code>"test"</code> (off-device, e.g. in unit tests). The lower-level
-<code>utils.IS_ANDROID</code> / <code>utils.IS_IOS</code> / <code>utils.IS_DESKTOP</code> constants are
+<code>utils.IS_ANDROID</code> / <code>utils.IS_IOS</code> / <code>utils.IS_WEB</code> constants are
 still available.</p>
 <p><code>Platform.select</code> matches on the exact key; a <code>"native"</code> key is shared
-by iOS <strong>and</strong> Android (but not desktop), and a <code>"default"</code> key catches
-anything unmatched:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">pad</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">Platform</span><span class="o">.</span><span class="n">select</span><span class="p">({</span><span class="s2">"native"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"desktop"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"default"</span><span class="p">:</span> <span class="mi">8</span><span class="p">})</span>
+by iOS <strong>and</strong> Android (but not the browser preview), and a <code>"default"</code>
+key catches anything unmatched:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">pad</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">Platform</span><span class="o">.</span><span class="n">select</span><span class="p">({</span><span class="s2">"native"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"web"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"default"</span><span class="p">:</span> <span class="mi">8</span><span class="p">})</span>
 </span></code></pre></div>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>

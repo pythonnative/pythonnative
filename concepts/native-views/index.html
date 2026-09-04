@@ -1037,6 +1037,8 @@
       
         
       
+        
+      
     
     
     
@@ -1147,14 +1149,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1462,7 +1492,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -1973,6 +2003,8 @@
   
     
     
+      
+        
       
         
       
@@ -2878,6 +2910,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/hot_reload/" class="md-nav__link">
         
   
@@ -3403,9 +3463,9 @@ call per commit.</p>
 it serializes the batch and sends it across the
 <a href="../bridge/">native bridge</a> in one call, where a Swift or Kotlin
 <strong>component manager</strong> per element type creates and updates the real
-views. Off device the registry dispatches to Python
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a> objects
-(Tkinter for <code>pn preview</code>, an in-memory fake for tests).</p>
+views. The browser preview is the same path with a WebSocket
+transport: the page applies the transactions with DOM elements. In
+tests the registry dispatches to an in-memory fake.</p>
 <p>This page describes that boundary, walks through what a component
 manager does, and covers the fake backend used by <code>pytest</code>.</p>
 <h2 id="the-commit-protocol">The commit protocol<a class="headerlink" href="#the-commit-protocol" title="Permanent link">&para;</a></h2>
@@ -3527,10 +3587,11 @@ lazily by <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;BridgeBackend&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.bridge_backend.BridgeBackend"><code>BridgeBackend</code></a>
   forwards every transaction, measurement, command, and animation
   request to native.</li>
-<li>On the desktop (<code>pn preview</code>, with <code>PN_PLATFORM=desktop</code>), a
-  handler-based registry populated by
-  <code>pythonnative.native_views.desktop.register_handlers</code> renders with
-  Tkinter. See the <a href="../../guides/desktop-preview/">Desktop preview guide</a>.</li>
+<li>In the browser preview (<code>pn preview</code>, with <code>PN_PLATFORM=web</code>), the
+  same <code>BridgeBackend</code> commits through a
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;WebTransport&lt;/span&gt;" href="../../api/devserver/#pythonnative.bridge.web.WebTransport"><code>WebTransport</code></a> to the page,
+  which applies them with DOM elements. See the
+  <a href="../../guides/browser-preview/">Browser preview guide</a>.</li>
 <li>Under <code>pytest</code>, the backend is replaced with a fake via
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_registry&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.set_registry"><code>set_registry</code></a> (or by
   constructing the <code>Reconciler</code> with the fake directly).</li>

@@ -841,10 +841,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#hot-reload-fast-refresh" class="md-nav__link">
+  <a href="#development-loop-dev-server-and-fast-refresh" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Hot reload (Fast Refresh)
+        Development loop (dev server and Fast Refresh)
       
     </span>
   </a>
@@ -1137,6 +1137,8 @@
       
         
       
+        
+      
     
     
     
@@ -1247,14 +1249,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1562,7 +1592,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -2073,6 +2103,8 @@
   
     
     
+      
+        
       
         
       
@@ -2978,6 +3010,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/hot_reload/" class="md-nav__link">
         
   
@@ -3513,10 +3573,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#hot-reload-fast-refresh" class="md-nav__link">
+  <a href="#development-loop-dev-server-and-fast-refresh" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Hot reload (Fast Refresh)
+        Development loop (dev server and Fast Refresh)
       
     </span>
   </a>
@@ -3679,8 +3739,8 @@ resources, native modules, animations, timers), and that loop lives
 loop, the framework loop can't call <code>run_forever</code> and block. It runs
 as a <em>guest</em> instead: whenever async work is scheduled, the runtime
 asks the platform to pump the loop on the next main-queue turn
-(the bridge's <code>pump</code> callback on iOS and Android, the Tk poll loop in
-<code>pn preview</code>). One pump runs every ready callback and due timer,
+(the bridge's <code>pump</code> callback on iOS and Android, the transport's
+main loop in <code>pn preview</code>). One pump runs every ready callback and due timer,
 then hands control back to the platform.</p>
 <p>The payoff is that coroutines and rendering interleave on one thread:</p>
 <ul>
@@ -3887,11 +3947,10 @@ once at view creation and emit <code>(tag, name, args)</code>; the
 current Python callback. Gestures
 (<a href="../../api/gestures/"><code>pythonnative.gestures</code></a>) are recognized natively
 and ride the same channel.</p>
-<p>Off device the registry dispatches to Python
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a> objects
-instead: Tkinter handlers for <code>pn preview</code> and an in-memory fake for
-tests. The protocol is identical, so the reconciler never knows which
-backend it is driving.</p>
+<p>The browser preview drives the same backend through a WebSocket
+transport, with the page acting as the native runtime. In tests the
+registry dispatches to an in-memory fake instead. The protocol is
+identical, so the reconciler never knows which backend it is driving.</p>
 <p>See <a href="../native-views/">Native views</a> for the manager hooks and
 <a href="../bridge/">The native bridge</a> for the wire format.</p>
 <h2 id="comparisons">Comparisons<a class="headerlink" href="#comparisons" title="Permanent link">&para;</a></h2>
@@ -3937,13 +3996,19 @@ React-like hooks that NativeScript does not have by default.</p>
   update Android views. The <code>pythonnative</code> Gradle module has no
   Chaquopy dependency, so it is unit-tested with plain JUnit.</li>
 </ul>
-<h2 id="hot-reload-fast-refresh">Hot reload (Fast Refresh)<a class="headerlink" href="#hot-reload-fast-refresh" title="Permanent link">&para;</a></h2>
-<p>During development, <code>pn run --hot-reload</code> watches <code>app/</code> for file
-changes and pushes updated Python files to the running app, enabling
-near-instant UI updates without full rebuilds.</p>
-<p>PythonNative uses a <strong>Fast Refresh</strong> strategy:</p>
+<h2 id="development-loop-dev-server-and-fast-refresh">Development loop (dev server and Fast Refresh)<a class="headerlink" href="#development-loop-dev-server-and-fast-refresh" title="Permanent link">&para;</a></h2>
+<p>During development one dev server (<code>pn start</code>) watches <code>app/</code> and
+syncs every change over WebSocket to each connected client: the
+browser preview, and debug builds on simulators, emulators, and
+devices. Each client reloads the changed modules and refreshes its
+mounted screens without a native rebuild; its logs stream back to the
+server's terminal. <code>pn run</code> rebuilds the native project only when a
+native input (config, template, the <code>pythonnative</code> package, plugins)
+changed, as recorded by a content fingerprint. See the
+<a href="../../guides/dev-workflow/">Development workflow</a>.</p>
+<p>Reloads use a <strong>Fast Refresh</strong> strategy:</p>
 <ol>
-<li>Reload the changed module(s) on the device.</li>
+<li>Reload the changed module(s) on the client.</li>
 <li>For every active screen host, walk the VNode tree and collect every
    component function defined in a reloaded module.</li>
 <li>Match each one to its replacement by <code>__module__</code> +
@@ -3953,12 +4018,12 @@ near-instant UI updates without full rebuilds.</p>
    preserved across the edit.</li>
 </ol>
 <p>If Fast Refresh can't produce a clean swap, the host falls back to a
-<strong>full remount</strong> of its root component. See
-<a href="../../guides/hot-reload/">Hot reload guide</a>.</p>
+<strong>full remount</strong> of its root component. See the
+<a href="../../guides/hot-reload/">Fast Refresh guide</a>.</p>
 <h2 id="native-api-modules">Native API modules<a class="headerlink" href="#native-api-modules" title="Permanent link">&para;</a></h2>
 <p>Device APIs are native modules: Swift and Kotlin classes registered by
 name, called from thin Python facades through the bridge, with Python
-fallbacks for the desktop and tests. Built-ins include:</p>
+fallbacks for the browser preview and tests. Built-ins include:</p>
 <ul>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Camera&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.camera.Camera"><code>Camera</code></a>: photo
   capture and gallery picker.</li>

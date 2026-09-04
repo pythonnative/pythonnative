@@ -1154,6 +1154,8 @@
       
         
       
+        
+      
     
     
     
@@ -1264,14 +1266,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/desktop-preview/" class="md-nav__link">
+      <a href="../../guides/dev-workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Desktop Preview
+    Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/browser-preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser Preview
   
 
     
@@ -1579,7 +1609,7 @@
   <span class="md-ellipsis">
     
   
-    Hot Reload
+    Fast Refresh
   
 
     
@@ -2090,6 +2120,8 @@
   
     
     
+      
+        
       
         
       
@@ -2975,6 +3007,34 @@
     
   
     SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/devserver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev server
   
 
     
@@ -3910,7 +3970,7 @@ Python never has to query for them. <code>on_back_pressed</code> returns
 <p><code>native_module</code> returns a <code>BridgeModule</code> on device and a registered
 Python implementation on desktop and in tests. Desktop implementations
 are plain classes with the same method names; built-ins register theirs
-in <code>pythonnative.native_modules.desktop</code>, and packages register theirs
+in <code>pythonnative.native_modules.fallback</code>, and packages register theirs
 through the <code>pythonnative.modules</code> entry point group.</p>
 <h2 id="plugins">Plugins<a class="headerlink" href="#plugins" title="Permanent link">&para;</a></h2>
 <p>A PyPI package can ship native code alongside its Python facade. It
@@ -3937,8 +3997,8 @@ registers component managers and native modules:</p>
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>Python-side element factories and typed props come from
-<code>pythonnative.sdk</code>, exactly as for built-ins; the desktop preview and
-tests use the <code>ViewHandler</code> protocol for their fallback rendering.</p>
+<code>pythonnative.sdk</code>, exactly as for built-ins; tests use the
+<code>ViewHandler</code> protocol for their off-device stand-ins.</p>
 <h2 id="protocol-summary">Protocol summary<a class="headerlink" href="#protocol-summary" title="Permanent link">&para;</a></h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Python -&gt; native      apply(transaction)         one call per commit
 </span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>                      measure(tag, w, h)         synchronous intrinsic size
