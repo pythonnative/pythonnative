@@ -72,6 +72,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # Restores ~/.gradle (wrapper distribution and dependency caches)
+      # so the staged project's ./gradlew doesn't download Gradle from
+      # services.gradle.org on every shard; a reset connection there
+      # fails the build before Maestro even starts.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Install PythonNative
         run: uv sync --locked
 
