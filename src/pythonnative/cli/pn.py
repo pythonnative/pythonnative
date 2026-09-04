@@ -146,6 +146,37 @@ def _sanitize_name(name: str) -> str:
 
 
 def _app_id_from_name(name: str) -> str:
+    """Derive the default reverse-DNS app id from a project name.
+
+    The result is an identifier rather than a name, and it fills
+    ``app.id``, the default for both the Android application id and the
+    iOS bundle id. It therefore has to satisfy the stricter of the two
+    grammars, ``config._APP_ID_SEGMENT``, which admits no hyphen. An
+    explicit ``[ios].bundle_id`` may contain one, because
+    ``config._validate_app_id`` is called with ``allow_hyphen=True`` for
+    that field alone.
+
+    Deleting hyphens is lossy, so the derivation is not injective:
+    ``my-app`` and ``myapp`` both give ``com.example.myapp``. Mapping
+    ``-`` to ``_`` instead would not fix that, only move it, since
+    ``_NAME_RE`` permits both characters and ``my-app`` would then
+    collide with ``my_app``. Injectivity would need an escaping scheme;
+    deletion is the deliberate choice here.
+
+    The ``app`` prefix covers the name taken from the current directory
+    when ``pn init`` is given none. A typed name cannot reach it, because
+    ``_NAME_RE`` already guarantees a leading letter.
+
+    The result always satisfies ``_APP_ID_SEGMENT`` but is not guaranteed
+    to pass ``config._validate_app_id``, which also rejects reserved
+    words: ``class`` is a legal project name and passes through here.
+
+    Args:
+        name: A project name, either typed or taken from the directory.
+
+    Returns:
+        A reverse-DNS id under ``com.example``.
+    """
     slug = re.sub(r"[^a-z0-9_]", "", name.lower())
     if not slug or not slug[0].isalpha():
         slug = "app" + slug

@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -308,16 +309,103 @@ def test_cli_init_suggestion_is_stable_for_legal_names() -> None:
         assert pn_cli._sanitize_name(name) == name
 
 
-def test_cli_init_without_name_accepts_a_cwd_that_fails_the_pattern(tmp_path: Path) -> None:
-    # Validation covers the typed name only. A directory named MyProject is
-    # extremely ordinary, and `pn init` there must keep working.
-    project_dir = tmp_path / "MyProject"
+# _app_id_from_name maps a project name onto a reverse-DNS segment, whose
+# grammar (config._APP_ID_SEGMENT) differs from _NAME_RE's. These two groups
+# split by which entry path can actually produce the input.
+
+# Reachable from a typed `pn init <name>`: _NAME_RE admits only [a-z][a-z0-9_-]*,
+# so the sole character the substitution can remove is the hyphen.
+_APP_ID_TYPED_CASES = [
+    pytest.param("my_app", "com.example.my_app", id="underscore"),
+    pytest.param("myapp", "com.example.myapp", id="plain"),
+    pytest.param("my-app", "com.example.myapp", id="hyphen"),
+    pytest.param("my--app", "com.example.myapp", id="doubled-hyphen"),
+    pytest.param("my-app-", "com.example.myapp", id="trailing-hyphen"),
+    pytest.param("e2e-suite", "com.example.e2esuite", id="digits-and-hyphen"),
+]
+
+# Reachable only from the derived path, `pn init` with no name taking cwd.name,
+# which is never validated. A typed name cannot produce any of these: _NAME_RE
+# rejects uppercase, a leading digit, a leading underscore, the empty string,
+# and non-ASCII.
+_APP_ID_DERIVED_ONLY_CASES = [
+    pytest.param("MyApp", "com.example.myapp", id="uppercase"),
+    pytest.param("MyProject", "com.example.myproject", id="mixed-case"),
+    pytest.param("3d_viewer", "com.example.app3d_viewer", id="digit-leading"),
+    pytest.param("2048", "com.example.app2048", id="all-digits"),
+    pytest.param("_leading", "com.example.app_leading", id="underscore-leading"),
+    pytest.param("", "com.example.app", id="empty"),
+    pytest.param("\u5de5\u7a0b", "com.example.app", id="all-non-ascii"),
+    pytest.param("caf\u00e9", "com.example.caf", id="partly-stripped-non-ascii"),
+    pytest.param("app.v2", "com.example.appv2", id="dotted"),
+]
+
+_APP_ID_ALL_CASES = _APP_ID_TYPED_CASES + _APP_ID_DERIVED_ONLY_CASES
+
+# The pattern the issue suggests asserting. It cannot fail against the current
+# implementation for any input, because the substitution leaves only [a-z0-9_]
+# and the "app" prefix supplies a leading letter otherwise. It still earns its
+# place: it catches a change that admits a character outside the segment
+# grammar, such as keeping hyphens. It does not catch a changed prefix, which
+# is what the exact-value cases above are for.
+_REVERSE_DNS_RE = re.compile(r"^com\.example\.[a-z][a-z0-9_]*$")
+
+
+@pytest.mark.parametrize(("name", "expected"), _APP_ID_TYPED_CASES)
+def test_cli_app_id_from_name_typed_names(name: str, expected: str) -> None:
+    assert pn_cli._NAME_RE.fullmatch(name), f"{name!r} should be typeable"
+    assert pn_cli._app_id_from_name(name) == expected
+
+
+@pytest.mark.parametrize(("name", "expected"), _APP_ID_DERIVED_ONLY_CASES)
+def test_cli_app_id_from_name_derived_only_names(name: str, expected: str) -> None:
+    assert not pn_cli._NAME_RE.fullmatch(name), f"{name!r} should not be typeable"
+    assert pn_cli._app_id_from_name(name) == expected
+
+
+@pytest.mark.parametrize(("name", "expected"), _APP_ID_ALL_CASES)
+def test_cli_app_id_from_name_is_reverse_dns(name: str, expected: str) -> None:
+    assert _REVERSE_DNS_RE.fullmatch(pn_cli._app_id_from_name(name))
+
+
+def test_cli_app_id_from_name_collides_on_hyphens() -> None:
+    # Deleting hyphens is lossy, so distinct names share an id. Recorded so
+    # the collision is known rather than discovered when two projects install
+    # over each other.
+    assert pn_cli._app_id_from_name("my-app") == pn_cli._app_id_from_name("myapp")
+    assert pn_cli._app_id_from_name("a-b-c") == pn_cli._app_id_from_name("abc")
+    # Mapping "-" to "_" would not fix this, only move it: _NAME_RE permits
+    # both characters, so this pair, distinct today, would merge under that
+    # scheme. Across every typed-legal name up to length 4 the two schemes
+    # lose the same number of names to collision.
+    assert pn_cli._app_id_from_name("my-app") != pn_cli._app_id_from_name("my_app")
+
+
+def _init_in_directory_named(tmp_path: Path, dirname: str) -> str:
+    """`pn init` with no name inside a directory called ``dirname``."""
+    project_dir = tmp_path / dirname
     project_dir.mkdir()
 
     result = run_pn(["init"], str(project_dir))
 
     assert result.returncode == 0, result.stdout
-    toml_text = (project_dir / "pythonnative.toml").read_text(encoding="utf-8")
+    return (project_dir / "pythonnative.toml").read_text(encoding="utf-8")
+
+
+def test_cli_init_without_name_reaches_the_app_prefix(tmp_path: Path) -> None:
+    # The prefix branch is unreachable from a typed name, so this is the only
+    # end-to-end path to it: a directory whose name starts with a digit.
+    toml_text = _init_in_directory_named(tmp_path, "3d_viewer")
+
+    assert 'id = "com.example.app3d_viewer"' in toml_text
+    assert 'name = "3d_viewer"' in toml_text
+
+
+def test_cli_init_without_name_accepts_a_cwd_that_fails_the_pattern(tmp_path: Path) -> None:
+    # Validation covers the typed name only. A directory named MyProject is
+    # extremely ordinary, and `pn init` there must keep working.
+    toml_text = _init_in_directory_named(tmp_path, "MyProject")
+
     assert 'name = "MyProject"' in toml_text
     assert 'id = "com.example.myproject"' in toml_text
 
