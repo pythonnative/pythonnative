@@ -1113,7 +1113,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_devices.set_defaults(func=devices_command)
 
     parser_run = subparsers.add_parser("run", help="Build, install, and launch on a device/simulator")
-    parser_run.add_argument("platform", choices=["android", "ios"])
+    parser_run.add_argument("platform", choices=["android", "ios"], help="Target platform")
     parser_run.add_argument(
         "--device",
         "-d",
@@ -1140,7 +1140,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_run.set_defaults(func=run_project)
 
     parser_logs = subparsers.add_parser("logs", help="Stream logs from the running app")
-    parser_logs.add_argument("platform", choices=["android", "ios"])
+    parser_logs.add_argument("platform", choices=["android", "ios"], help="Target platform")
     parser_logs.add_argument(
         "--device",
         "-d",
@@ -1150,7 +1150,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_logs.set_defaults(func=logs_command)
 
     parser_build = subparsers.add_parser("build", help="Build distributable artifacts")
-    parser_build.add_argument("platform", choices=["android", "ios"])
+    parser_build.add_argument("platform", choices=["android", "ios"], help="Target platform")
     parser_build.add_argument("--debug", action="store_true", help="Build the debug variant instead of release")
     parser_build.add_argument(
         "--upload",
@@ -1160,7 +1160,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_build.set_defaults(func=build_project)
 
     parser_app_id = subparsers.add_parser("app-id", help="Print the resolved application/bundle id")
-    parser_app_id.add_argument("platform", choices=["android", "ios"])
+    parser_app_id.add_argument("platform", choices=["android", "ios"], help="Target platform")
     parser_app_id.set_defaults(func=app_id_command)
 
     parser_clean = subparsers.add_parser("clean", help="Remove the local build/ directory")
