@@ -244,6 +244,8 @@ See [Testing async code](async.md#testing-async-code).
 
 ## Going lower level
 
+### A minimal fake backend
+
 `render` is a thin layer over
 [`Reconciler`][pythonnative.reconciler.Reconciler] and
 [`FakeBackend`][pythonnative.testing.FakeBackend]. Tests that need to
