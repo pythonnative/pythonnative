@@ -541,6 +541,8 @@
       
         
       
+        
+      
     
     
     
@@ -631,6 +633,34 @@
     
   
     Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/runtime-overhaul/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Overhaul
   
 
     
@@ -857,6 +887,8 @@
   
     
     
+      
+        
       
         
       
@@ -1426,6 +1458,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../native-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Native Contracts
   
 
     
@@ -3556,12 +3616,12 @@ mounted fresh on reconnect.</p>
    the page and for dev clients.</li>
 <li>Installs a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;WebTransport&lt;/span&gt;" href="../../api/devserver/#pythonnative.bridge.web.WebTransport"><code>WebTransport</code></a> as
    the bridge transport. Transactions the reconciler commits become
-   <code>["apply", ops]</code> messages to the page; the page's events come back
-   as <code>["cb", ...]</code> callbacks; synchronous questions (<code>measure</code> above
-   all) block the main thread until the page answers.</li>
-<li>Runs the transport's main loop on the main thread. That loop is the
-   browser's stand-in for the UIKit / Android main queue: every
-   callback and every <code>asyncio</code> pump runs there.</li>
+   <code>["apply", request_id, commit]</code> messages to the page; the page's events come back
+   as <code>["cb", ...]</code> callbacks. Commits acknowledge exact revisions, and native
+   Yoga layout returns a batch of changed frames.</li>
+<li>Runs Python callbacks and tasks on the standard application asyncio loop.
+   The page owns DOM widgets and Yoga WebAssembly layout. Network I/O and Python
+   work execute independently of the browser's UI thread.</li>
 <li>When the page connects, tells it the entry module. The page asks
    the <code>Host</code> module to create a screen, exactly as
    <code>PNViewController</code> and <code>PNScreenFragment</code> do, and a

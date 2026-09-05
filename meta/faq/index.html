@@ -541,6 +541,8 @@
       
         
       
+        
+      
     
     
     
@@ -631,6 +633,34 @@
     
   
     Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/runtime-overhaul/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Overhaul
   
 
     
@@ -855,6 +885,8 @@
   
     
     
+      
+        
       
         
       
@@ -1260,6 +1292,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/native-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Native Contracts
   
 
     
@@ -3656,7 +3716,7 @@ platform chrome and fonts are approximated, most device APIs are
 simulated, and there's no web or desktop packaging. Ship to devices
 with <code>pn run android</code> / <code>pn run ios</code> and <code>pn build</code>.</p>
 <p>The core (components, hooks, reconciler) is also platform-agnostic and
-runs headless with a <a href="../../guides/testing/#a-minimal-fake-backend">fake backend</a>;
+runs headless with a <a href="../../guides/testing/">fake backend</a>;
 that's how the unit-test suite works.</p>
 <h2 id="how-do-i-package-and-distribute-my-app">How do I package and distribute my app?<a class="headerlink" href="#how-do-i-package-and-distribute-my-app" title="Permanent link">&para;</a></h2>
 <p><code>pn run android</code> and <code>pn run ios</code> produce installable artifacts in
@@ -3745,8 +3805,8 @@ identity for the function so it can keep state across re-renders.</p>
 </ul>
 <h2 id="is-there-asyncawait-support">Is there async/await support?<a class="headerlink" href="#is-there-asyncawait-support" title="Permanent link">&para;</a></h2>
 <p>Yes, and it's the core of the framework. PythonNative runs a single
-<code>asyncio</code> event loop on the platform's main thread, pumped as a guest
-of the native run loop. Components themselves can be <code>async def</code> (pair
+standard <code>asyncio</code> loop on a dedicated application thread. Native UI threads
+own widgets, scrolling, and animation frames. Components themselves can be <code>async def</code> (pair
 them with <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Suspense&lt;/span&gt;" href="../../api/components/#pythonnative.components.Suspense"><code>Suspense</code></a> for loading states),
 <code>use_effect</code> accepts coroutine callbacks and cancels them on unmount,
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_resource&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_resource"><code>use_resource</code></a> fetches during render, and

@@ -541,6 +541,8 @@
       
         
       
+        
+      
     
     
     
@@ -631,6 +633,34 @@
     
   
     Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/runtime-overhaul/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Overhaul
   
 
     
@@ -855,6 +885,8 @@
   
     
     
+      
+        
       
         
       
@@ -1260,6 +1292,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/native-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Native Contracts
   
 
     
@@ -3148,6 +3208,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#generated-source-and-vendored-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generated source and vendored dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#conventional-commits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3462,6 +3533,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#generated-source-and-vendored-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generated source and vendored dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#conventional-commits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3680,20 +3762,25 @@ way:</p>
 <h2 id="project-layout-highlevel">Project layout (high‑level)<a class="headerlink" href="#project-layout-highlevel" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>src/pythonnative/</code>: installable library and CLI</li>
-<li><code>pythonnative/</code>: core cross‑platform UI components and utilities</li>
+<li>Core Python modules, UI components, and utilities</li>
 <li><code>bridge/</code>: JSON codec and per-platform transports into the native rendering core</li>
 <li><code>cli/</code>: <code>pn</code> command</li>
 <li><code>project/</code>: config loading, template configuration, native plugin staging, and the builder behind <code>pn</code></li>
-<li><code>templates/</code>: Android/iOS project templates (bundled with the package)<ul>
-<li><code>ios_template/PythonNativeKit/</code>: Swift package with the iOS rendering core (component managers, gestures, animations, native modules) and its XCTest target</li>
-<li><code>android_template/pythonnative/</code>: Gradle library module with the Android rendering core and its JUnit target</li>
+<li><code>native/</code>: native libraries and their tests, bundled with the Python package<ul>
+<li><code>ios/</code>: <code>PythonNativeKit</code> Swift package and its XCTest target</li>
+<li><code>android/</code>: Android rendering library and its JUnit target</li>
+<li><code>yoga/</code>: vendored Yoga source, native build definitions, and the host Python binding</li>
 </ul>
 </li>
+<li><code>sdk/</code>: native contract definitions, code generation, and generator templates</li>
+<li><code>devserver/static/</code>: browser preview assets, including the vendored Yoga JavaScript/WebAssembly distribution</li>
+<li><code>templates/</code>: Android/iOS app shells; the builder stages native libraries into generated app projects</li>
 <li><code>tests/</code>: unit tests for the library, plus the Maestro E2E suite</li>
 <li><code>e2e/</code>: the comprehensive E2E suite (see <a href="#e2e-tests-maestro">E2E tests</a> below and <code>tests/e2e/AGENTS.md</code>)</li>
 <li><code>examples/</code>: runnable example apps</li>
 <li><code>hello-world/</code>: minimal marketing demo</li>
 <li><code>e2e-suite/</code>: comprehensive feature catalog that drives the Maestro E2E suite</li>
+<li><code>inbox/</code>: offline reference app with a custom native extension</li>
 <li><code>scripts/</code>: helper scripts (<code>check.sh</code>, <code>run-e2e.sh</code>, <code>check-e2e-coverage.py</code>)</li>
 <li><code>README.md</code>, <code>pyproject.toml</code>: repo docs and packaging</li>
 </ul>
@@ -3703,7 +3790,7 @@ way:</p>
 <li>Prefer explicit, descriptive names; keep platform abstractions clean.</li>
 <li>Python never imports platform code. Everything that touches <code>UIView</code> or <code>android.view.View</code> lives in Swift (<code>PythonNativeKit</code>) or Kotlin (the <code>pythonnative</code> Gradle module) and is reached through <code>pythonnative.bridge</code>; see <code>docs/concepts/bridge.md</code> for the protocol. Bump <code>PROTOCOL_VERSION</code> on both sides when the wire format changes.</li>
 <li>Add/extend tests under <code>tests/</code> for new behavior. Native changes get XCTest / JUnit coverage next to the code they touch.</li>
-<li>Don't commit generated artifacts or large binaries; templates live under <code>src/pythonnative/templates/</code>.</li>
+<li>Commit source, reviewed generated contracts, dependency locks, and vendored dependencies as described in <a href="#generated-source-and-vendored-dependencies">Generated source and vendored dependencies</a>. Don't commit local build outputs or caches.</li>
 <li>Docstrings: Google style throughout. Ruff is configured with the Google
   convention (<code>pydocstyle.convention = "google"</code>) and enforces the <code>D</code> rule
   set on <code>src/pythonnative/</code>. See the
@@ -3719,16 +3806,53 @@ way:</p>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>uv<span class="w"> </span>run<span class="w"> </span>--group<span class="w"> </span>docs<span class="w"> </span>mkdocs<span class="w"> </span>serve<span class="w"> </span><span class="c1"># preview the docs site locally</span>
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
 </span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># native rendering core (macOS with Xcode for the Swift package; JDK 17 for Gradle)</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="o">(</span><span class="nb">cd</span><span class="w"> </span>src/pythonnative/templates/ios_template/PythonNativeKit<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>xcodebuild<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-scheme<span class="w"> </span>PythonNativeKit<span class="w"> </span>-destination<span class="w"> </span><span class="s1">'platform=iOS Simulator,name=iPhone 15 Pro'</span><span class="o">)</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="o">(</span><span class="nb">cd</span><span class="w"> </span>src/pythonnative/templates/android_template<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>./gradlew<span class="w"> </span>:pythonnative:testDebugUnitTest<span class="o">)</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="o">(</span><span class="nb">cd</span><span class="w"> </span>src/pythonnative/native/ios<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>xcodebuild<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-scheme<span class="w"> </span>PythonNativeKit<span class="w"> </span>-destination<span class="w"> </span><span class="s1">'platform=iOS Simulator,name=iPhone 15 Pro'</span><span class="o">)</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="o">(</span><span class="nb">cd</span><span class="w"> </span>src/pythonnative/native/android<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>../../templates/android_template/gradlew<span class="w"> </span>testDebugUnitTest<span class="o">)</span>
 </span></code></pre></div>
+<h2 id="generated-source-and-vendored-dependencies">Generated source and vendored dependencies<a class="headerlink" href="#generated-source-and-vendored-dependencies" title="Permanent link">&para;</a></h2>
+<p>Some generated files and third-party distribution files are intentional parts
+of the source tree. Keep these in version control:</p>
+<ul>
+<li>Native contracts: <code>PNContracts</code>, <code>NativeProps</code>, and <code>NativeModules</code> in
+  <code>src/pythonnative/native/ios/Sources/PythonNativeKit/Generated/</code> and
+  <code>src/pythonnative/native/android/src/main/java/com/pythonnative/generated/</code>.
+  These support standalone native builds. Regenerate them from the Python
+  definitions and generator templates instead of editing them by hand.</li>
+<li>Example extension schemas, such as <code>examples/inbox/native/schema.json</code>.
+  Commit schema updates alongside their Python definitions and native
+  implementations.</li>
+<li>Dependency locks, including <code>uv.lock</code> and example apps' <code>pn.lock</code> files.</li>
+<li>Vendored Yoga source and browser distribution files under
+  <code>src/pythonnative/native/yoga/</code> and <code>src/pythonnative/devserver/static/yoga/</code>.
+  The browser distribution includes its JavaScript/WebAssembly runtime, type
+  declarations, and source maps. Preserve upstream licenses and document the
+  version, source, and any local modifications when updating vendored code.</li>
+</ul>
+<p>After changing built-in contracts or their generators, regenerate the checked-in
+native files from the repository root:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pn<span class="w"> </span>codegen<span class="w"> </span>--output<span class="w"> </span>build/contracts
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>cp<span class="w"> </span>build/contracts/<span class="o">{</span>PNContracts,NativeProps,NativeModules<span class="o">}</span>.swift<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>src/pythonnative/native/ios/Sources/PythonNativeKit/Generated/
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>cp<span class="w"> </span>build/contracts/<span class="o">{</span>PNContracts,NativeProps,NativeModules<span class="o">}</span>.kt<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>src/pythonnative/native/android/src/main/java/com/pythonnative/generated/
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/test_codegen.py
+</span></code></pre></div>
+<p>The test checks that the committed native contracts match generation in a clean
+Python interpreter. The other files under <code>build/contracts/</code> are local outputs;
+don't add the whole directory to the commit.</p>
+<p>Exclude staged app projects, compiled apps and libraries, package distributions,
+test reports, local storage, credentials, and tool caches. Examples include
+<code>build/</code>, <code>dist/</code>, <code>.build/</code>, <code>.gradle/</code>, <code>.cxx/</code>, <code>.swiftpm/</code>, and <code>__pycache__/</code>.
+The vendored browser runtime above is an explicit exception to excluding
+compiled dependencies; downloaded Python runtimes and locally compiled binaries
+aren't.</p>
 <h2 id="conventional-commits">Conventional Commits<a class="headerlink" href="#conventional-commits" title="Permanent link">&para;</a></h2>
 <p>This project uses Conventional Commits. Use the form:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>&lt;type&gt;(&lt;scope&gt;): &lt;subject&gt;
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>[optional body]
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>[optional footer(s)]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>&lt;type&gt;(&lt;scope&gt;): &lt;subject&gt;
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>[optional body]
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>[optional footer(s)]
 </span></code></pre></div>
 <h3 id="commit-message-character-set">Commit message character set<a class="headerlink" href="#commit-message-character-set" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3767,7 +3891,7 @@ way:</p>
 <li><code>devserver</code>: dev server, file watcher, and WebSocket implementation (<code>devserver/</code>)</li>
 <li><code>devclient</code>: on-device dev client that syncs sources and Fast Refreshes (<code>devclient.py</code>)</li>
 <li><code>hot_reload</code>: module reloader and Fast Refresh (<code>hot_reload.py</code>)</li>
-<li><code>layout</code>: pure-Python flexbox engine (<code>layout.py</code>)</li>
+<li><code>layout</code>: Yoga layout integration and the host binding (<code>layout.py</code>, <code>native/yoga/</code>)</li>
 <li><code>mutations</code>: batched mutation ops between reconciler and native backends (<code>mutations.py</code>)</li>
 <li><code>native_modules</code>: native module registry, Python facades, and Python fallbacks (<code>native_modules/</code>)</li>
 <li><code>native_views</code>: view registry protocol and bridge backend (<code>native_views/</code>)</li>
@@ -3798,35 +3922,35 @@ way:</p>
 <li><code>repo</code>: repository metadata and top‑level files (<code>README.md</code>, <code>CONTRIBUTING.md</code>, <code>.gitignore</code>, licenses)</li>
 <li><code>scripts</code>: developer scripts under <code>scripts/</code> (e.g., <code>check.sh</code>)</li>
 <li><code>templates</code>: Android/iOS project templates under <code>src/pythonnative/templates/</code></li>
-<li><code>kit</code>: the Swift rendering core (<code>templates/ios_template/PythonNativeKit/</code>)</li>
-<li><code>runtime-android</code>: the Kotlin rendering core (<code>templates/android_template/pythonnative/</code>)</li>
+<li><code>kit</code>: the Swift rendering core (<code>native/ios/</code>)</li>
+<li><code>runtime-android</code>: the Kotlin rendering core (<code>native/android/</code>)</li>
 <li><code>tests</code>: unit/integration/E2E tests under <code>tests/</code></li>
 <li><code>workflows</code>: CI pipelines under <code>.github/workflows/</code></li>
 </ul>
 <p>Note: Avoid redundant type==scope pairs (e.g., <code>docs(docs)</code>). Prefer a module scope (e.g., <code>docs(core)</code>) or <code>docs(repo)</code> for top‑level updates.</p>
 <p>Examples:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>build(deps): refresh pinned versions
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>chore(repo): add contributing guidelines
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>ci(workflows): add publish job
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>docs(reconciler): clarify diffing algorithm
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>feat(components): add Slider element
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>fix(cli): handle missing Android SDK gracefully
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>perf(reconciler): reduce allocations in list diffing
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>refactor(utils): extract path helpers
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>test: cover iOS template copy flow
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>build(deps): refresh pinned versions
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>chore(repo): add contributing guidelines
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>ci(workflows): add publish job
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>docs(reconciler): clarify diffing algorithm
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>feat(components): add Slider element
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>fix(cli): handle missing Android SDK gracefully
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>perf(reconciler): reduce allocations in list diffing
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>refactor(utils): extract path helpers
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>test: cover iOS template copy flow
 </span></code></pre></div>
 <p>Examples (no scope):</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>build: update packaging metadata
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>chore: update .gitignore patterns
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>docs: add project overview
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>build: update packaging metadata
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>chore: update .gitignore patterns
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>docs: add project overview
 </span></code></pre></div>
 <p>Breaking changes:</p>
 <ul>
 <li>Use <code>!</code> after the type/scope or a <code>BREAKING CHANGE:</code> footer.</li>
 </ul>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>feat(hosts)!: rename create_page to create_screen
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>BREAKING CHANGE: API renamed; update app code and templates.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>feat(hosts)!: rename create_page to create_screen
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>BREAKING CHANGE: API renamed; update app code and templates.
 </span></code></pre></div>
 <h3 id="multiple-scopes-optional">Multiple scopes (optional)<a class="headerlink" href="#multiple-scopes-optional" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3840,7 +3964,7 @@ way:</p>
 <li>Keep it to 1–3 scopes max.</li>
 </ul>
 <p>Example:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>feat(templates,cli): add ios template and wire pn init
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>feat(templates,cli): add ios template and wire pn init
 </span></code></pre></div>
 <h2 id="pull-requests-and-squash-merges">Pull requests and squash merges<a class="headerlink" href="#pull-requests-and-squash-merges" title="Permanent link">&para;</a></h2>
 <ul>
@@ -3853,27 +3977,27 @@ way:</p>
 <li>Keep PRs focused; avoid unrelated changes in the same PR.</li>
 </ul>
 <p>Recommended PR template:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>What
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>- Short summary of the change
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>Why
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>- Motivation/user value
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>How (brief)
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>- Key implementation notes or decisions
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>Testing
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>- Local/CI coverage; links to tests if relevant
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>Risks/Impact
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>- Compat, rollout, perf, security; mitigations
-</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>
-</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>Docs/Follow-ups
-</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>- Docs updated or TODO next steps
-</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>
-</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>Closes #123
-</span><span id="__span-9-20"><a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>BREAKING CHANGE: &lt;details if any&gt;
-</span><span id="__span-9-21"><a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>Co-authored-by: Name &lt;email&gt;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>What
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>- Short summary of the change
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>Why
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>- Motivation/user value
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>How (brief)
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>- Key implementation notes or decisions
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>Testing
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>- Local/CI coverage; links to tests if relevant
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>Risks/Impact
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>- Compat, rollout, perf, security; mitigations
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>
+</span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>Docs/Follow-ups
+</span><span id="__span-10-17"><a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a>- Docs updated or TODO next steps
+</span><span id="__span-10-18"><a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>
+</span><span id="__span-10-19"><a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a>Closes #123
+</span><span id="__span-10-20"><a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a>BREAKING CHANGE: &lt;details if any&gt;
+</span><span id="__span-10-21"><a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a>Co-authored-by: Name &lt;email&gt;
 </span></code></pre></div>
 <h2 id="pull-request-checklist">Pull request checklist<a class="headerlink" href="#pull-request-checklist" title="Permanent link">&para;</a></h2>
 <ul>
@@ -3882,7 +4006,8 @@ way:</p>
 <li>Lint/format: <code>uv run ruff check .</code> and <code>uv run black --check src examples tests</code> pass.</li>
 <li>Docs: update <code>README.md</code> if behavior changes.</li>
 <li>Templates: update <code>src/pythonnative/templates/</code> if generator output changes.</li>
-<li>No generated artifacts committed.</li>
+<li>Generated contracts and example schemas are regenerated and reviewed when changed; vendored dependencies retain their licenses and provenance.</li>
+<li>No local build outputs, caches, credentials, or machine-specific files are committed.</li>
 </ul>
 <h2 id="versioning-and-releases">Versioning and releases<a class="headerlink" href="#versioning-and-releases" title="Permanent link">&para;</a></h2>
 <ul>
@@ -3913,34 +4038,34 @@ way:</p>
 <li><code>build/&lt;short-desc&gt;</code></li>
 </ul>
 <p>Examples:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>feat/cli-init
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>fix/core-threading-deadlock-123
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>docs/contributing
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>ci/publish-pypi
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>build/lock-versions
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>refactor/utils-paths
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>test/templates-android
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>fix/cli-regression
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>feat/cli-init
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>fix/core-threading-deadlock-123
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>docs/contributing
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>ci/publish-pypi
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>build/lock-versions
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>refactor/utils-paths
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>test/templates-android
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>fix/cli-regression
 </span></code></pre></div>
 <h3 id="e2e-tests-maestro">E2E tests (Maestro)<a class="headerlink" href="#e2e-tests-maestro" title="Permanent link">&para;</a></h3>
 <p>End-to-end tests use <a href="https://maestro.dev/">Maestro</a> to drive the dedicated <code>examples/e2e-suite</code> app on real emulators and simulators. That app contains one screen per public symbol in <code>pythonnative.__all__</code>; every flow under <code>tests/e2e/flows/&lt;category&gt;/</code> exercises one symbol.</p>
 <p>The dedicated <code>examples/hello-world</code> app is left in place as a small marketing demo; it's <strong>not</strong> the E2E target.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Install Maestro (one-time)</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>curl<span class="w"> </span>-Ls<span class="w"> </span><span class="s2">"https://get.maestro.mobile.dev"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>bash
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># For iOS, also install idb-companion</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>brew<span class="w"> </span>tap<span class="w"> </span>facebook/fb<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>brew<span class="w"> </span>install<span class="w"> </span>idb-companion
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Install Maestro (one-time)</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>curl<span class="w"> </span>-Ls<span class="w"> </span><span class="s2">"https://get.maestro.mobile.dev"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>bash
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># For iOS, also install idb-companion</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>brew<span class="w"> </span>tap<span class="w"> </span>facebook/fb<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>brew<span class="w"> </span>install<span class="w"> </span>idb-companion
 </span></code></pre></div>
 <p>Build and run everything via the convenience script:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Android (emulator must be running)</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>android
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># iOS (simulator must be running)</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>ios
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Android (emulator must be running)</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>android
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># iOS (simulator must be running)</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>ios
 </span></code></pre></div>
 <p>For tight iteration, run a single category instead of the full pass:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>android<span class="w"> </span>hooks
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>ios<span class="w"> </span>components
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>android<span class="w"> </span>hooks
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>ios<span class="w"> </span>components
 </span></code></pre></div>
 <p>Available categories: <code>components</code>, <code>hooks</code>, <code>navigation</code>, <code>layout</code>, <code>styling</code>, <code>animations</code>, <code>misc</code>.</p>
 <p>A coverage checker, <code>scripts/check-e2e-coverage.py</code>, gates CI: every name in <code>pythonnative.__all__</code> must be covered by a demo + flow, or listed in <code>INTENTIONAL_EXEMPTIONS</code> with a justification.</p>
@@ -3956,7 +4081,7 @@ way:</p>
 <h3 id="ci">CI<a class="headerlink" href="#ci" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>CI</strong> (<code>ci.yml</code>): runs formatter, linter, type checker, and tests on every push and PR.</li>
-<li><strong>E2E</strong> (<code>e2e.yml</code>): builds the hello-world example on Android (Linux emulator) and iOS (macOS simulator), then runs Maestro flows. Triggers on pushes to <code>main</code>, PRs, and manual dispatch.</li>
+<li><strong>E2E</strong> (<code>e2e.yml</code>): builds the <code>e2e-suite</code> example on Android (Linux emulator) and iOS (macOS simulator), then runs Maestro flows. Triggers on pushes to <code>main</code>, PRs, and manual dispatch.</li>
 <li><strong>Packages</strong> (<code>packages.yml</code>): resolves the PyPI compatibility matrix in <code>tests/packages/matrix.toml</code> against the live indexes with <code>scripts/package-matrix.py --check</code>, weekly and on changes to the resolver or manifest, and uploads the rendered Markdown table for <code>docs/guides/pypi-packages.md</code>.</li>
 <li><strong>PR Lint</strong> (<code>pr-lint.yml</code>): validates the PR title against Conventional Commits format (protects squash merges) and checks individual commit messages via commitlint (protects rebase merges). Recommended: add the <strong>PR title</strong> job as a required status check in branch-protection settings.</li>
 <li><strong>Release</strong> (<code>release.yml</code>): runs on merge to <code>main</code>; computes version, generates changelog, tags, creates GitHub Release, and (when <code>DRAFT_RELEASE</code> is <code>"false"</code>) publishes to PyPI.</li>

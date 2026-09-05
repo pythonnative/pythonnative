@@ -541,6 +541,8 @@
       
         
       
+        
+      
     
     
     
@@ -631,6 +633,34 @@
     
   
     Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/runtime-overhaul/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Overhaul
   
 
     
@@ -857,6 +887,8 @@
   
     
     
+      
+        
       
         
       
@@ -1263,6 +1295,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../native-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Native Contracts
   
 
     
@@ -3541,8 +3601,8 @@
 <p>PythonNative renders through native <strong>component managers</strong>: a Swift
 <code>PNComponentManager</code> in <code>PythonNativeKit</code> and a Kotlin <code>ComponentManager</code>
 in the <code>pythonnative</code> Gradle module own every <code>UIView</code> and
-<code>android.view.View</code>. Python owns the element tree, reconciliation, and
-layout, and ships each commit to native as one transaction (see
+<code>android.view.View</code>. Python owns the element tree and reconciliation and ships styles in each
+validated commit (see
 <a href="../../concepts/bridge/">The native bridge</a>).</p>
 <p>Adding your own component means writing one manager per platform,
 registering both under an element name, and giving Python a typed
@@ -3598,9 +3658,10 @@ ship it as an installable PyPI plugin.</p>
 </tr>
 </tbody>
 </table>
-<p>Layout stays in Python: managers never read <code>flex</code>, <code>margin</code>, or
-<code>padding</code>. They receive absolute frames through <code>setFrame</code> and answer
-<code>measure</code> for content-sized leaves.</p>
+<p>The native runtime runs Yoga over the committed styles. Managers receive
+absolute frames through <code>setFrame</code> and implement <code>measure</code> for content-sized
+leaves. See <a href="../native-contracts/">Generated native contracts</a> for schema
+generation, typed adapters, and plugin contract registration.</p>
 <h2 id="project-layout">Project layout<a class="headerlink" href="#project-layout" title="Permanent link">&para;</a></h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>my_badge/
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    pyproject.toml
@@ -3760,12 +3821,14 @@ class converts to pixels in <code>setFrame</code> and back in <code>measure</cod
 </span></code></pre></div>
 <p><code>native/pn_plugin.json</code>:</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">"ios"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"entry"</span><span class="p">:</span><span class="w"> </span><span class="s2">"MyBadgePlugin"</span><span class="p">},</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">"android"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"entry"</span><span class="p">:</span><span class="w"> </span><span class="s2">"com.example.badge.MyBadgePlugin"</span><span class="p">}</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="p">}</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">"contracts"</span><span class="p">:</span><span class="w"> </span><span class="s2">"schema.json"</span><span class="p">,</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">"ios"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"entry"</span><span class="p">:</span><span class="w"> </span><span class="s2">"MyBadgePlugin"</span><span class="p">},</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">"android"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"entry"</span><span class="p">:</span><span class="w"> </span><span class="s2">"com.example.badge.MyBadgePlugin"</span><span class="p">}</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>A plugin may declare only one platform; the component then renders as a
-labelled placeholder on the other.</p>
+<p>A plugin may declare only one platform. Gate its use with <code>Platform.OS</code> or
+provide an application-level fallback on unsupported platforms. Native commits
+reject unregistered component types.</p>
 <h2 id="5-tell-pn-build-about-the-plugin">5. Tell <code>pn build</code> about the plugin<a class="headerlink" href="#5-tell-pn-build-about-the-plugin" title="Permanent link">&para;</a></h2>
 <p>Point the <code>pythonnative.plugins</code> entry point at the directory holding
 <code>pn_plugin.json</code>, and the <code>pythonnative.handlers</code> entry point at the

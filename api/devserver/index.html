@@ -541,6 +541,8 @@
       
         
       
+        
+      
     
     
     
@@ -631,6 +633,34 @@
     
   
     Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/runtime-overhaul/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Overhaul
   
 
     
@@ -855,6 +885,8 @@
   
     
     
+      
+        
       
         
       
@@ -1260,6 +1292,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/native-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Native Contracts
   
 
     
@@ -4275,10 +4335,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pythonnative.bridge.web.WebTransport.post_to_main" class="md-nav__link">
+  <a href="#pythonnative.bridge.web.WebTransport.post_to_application" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;post_to_main
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;post_to_application
       
     </span>
   </a>
@@ -6291,10 +6351,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pythonnative.bridge.web.WebTransport.post_to_main" class="md-nav__link">
+  <a href="#pythonnative.bridge.web.WebTransport.post_to_application" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;post_to_main
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;post_to_application
       
     </span>
   </a>
@@ -11256,7 +11316,7 @@ server, so the device log viewer is optional.</p>
 </ul>
 <p>All network I/O runs on a daemon thread; file writes happen there too,
 and only the reload itself hops to the main thread through
-<code>call_on_main_thread</code>.</p>
+<code>call_on_application_thread</code>.</p>
 
 
 
@@ -12028,27 +12088,13 @@ client, or <code>None</code> when nothing is configured.</p>
 
     <div class="doc doc-contents first">
 
-        <p><code>pn start</code> / <code>pn preview</code>: the dev server plus the browser preview.</p>
-<p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;serve&lt;/span&gt;" href="#pythonnative.preview.serve"><code>serve</code></a> runs one process that does three
-jobs:</p>
-<ol>
-<li><strong>Dev server</strong> (<code>pythonnative.devserver</code>): watches <code>app/</code>, syncs
-   sources to every connected dev client (simulators, emulators,
-   physical devices), and relays their logs to this terminal.</li>
-<li><strong>Browser preview</strong>: renders the app in a browser tab. The tab is a
-   bridge peer like any device; the reconciler runs in <em>this</em> process
-   on the main thread and commits through
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;WebTransport&lt;/span&gt;" href="#pythonnative.bridge.web.WebTransport"><code>WebTransport</code></a>.</li>
-<li><strong>Fast Refresh</strong> for the preview: every save reloads the changed
-   modules here and refreshes the mounted screens, exactly as the dev
-   client does on device.</li>
-</ol>
-<p>The main thread runs the transport's main loop; that is the browser's
-stand-in for the UIKit / Android main queue. Everything else (sockets,
-the file watcher) lives on daemon threads and marshals work onto it.</p>
-<p><code>PN_PLATFORM=web</code> must be set before <code>pythonnative</code> is imported so
-platform detection binds to the browser backend; the CLI re-execs
-itself to guarantee that.</p>
+        <p>Development server and browser preview.</p>
+<p>The browser is a protocol-2 renderer with Yoga WebAssembly layout. Python runs
+on the standard application asyncio loop; the transport's coordinator and
+network threads forward messages to their owners. The dev server watches app
+sources, synchronizes mobile clients, and applies compatible Fast Refresh.</p>
+<p>PN_PLATFORM=web must be set before importing pythonnative; the CLI launches a
+child process with that environment when needed.</p>
 
 
 
@@ -12543,50 +12589,12 @@ PythonNative was imported (the CLI sets it for you).</p>
 
     <div class="doc doc-contents first">
 
-        <p>The browser preview's half of the bridge.</p>
-<p><code>pn preview</code> renders an app in a browser tab. Rather than a second
-rendering backend, the page is treated as <em>the native runtime</em>: it
-receives the very same JSON transactions the Swift and Kotlin runtimes
-apply, answers the same synchronous <code>measure</code> / <code>command</code> /
-<code>animate</code> / <code>call</code> requests, and raises the same
-<code>callback(kind, tag, name, payload)</code> events. The reconciler therefore
-runs the on-device
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;BridgeBackend&lt;/span&gt;" href="../native_views/#pythonnative.native_views.bridge_backend.BridgeBackend"><code>BridgeBackend</code></a>
-and the on-device
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NativeScreenHost&lt;/span&gt;" href="../hosts/#pythonnative.hosts.native.NativeScreenHost"><code>NativeScreenHost</code></a>
-unchanged; only this transport differs, and it is about moving strings
-over a WebSocket.</p>
-<p>Threads:</p>
-<ul>
-<li>The <strong>main thread</strong> owns the framework: it drains
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;run_main_loop&lt;/span&gt;" href="#pythonnative.bridge.web.WebTransport.run_main_loop"><code>WebTransport.run_main_loop</code></a>,
-  which is the browser's stand-in for the UIKit / Android main queue.
-  Every callback from the page and every asyncio pump runs there.</li>
-<li>The <strong>dev server thread</strong> owns the socket. It delivers page messages
-  to the transport, which either settles a waiting request (<code>res</code>)
-  or queues work for the main thread.</li>
-</ul>
-<p>Synchronous requests (<code>measure</code> above all) block the main thread on a
-<code>threading.Event</code> until the page answers; the page is single-threaded
-but its message handling is asynchronous, so it can answer a
-<code>measure</code> while it is itself awaiting Python (a row bind, say).</p>
-<p>Wire format (JSON arrays):</p>
-<ul>
-<li>Python -&gt; page: <code>["apply", ops]</code>, <code>["measure", id, tag, w, h]</code>,
-  <code>["command", id, tag, name, args]</code>, <code>["animate", id, tag, request]</code>,
-  <code>["call", id, module, method, envelope]</code>, <code>["res", id, result]</code>,
-  <code>["dev", {...}]</code>.</li>
-<li>Page -&gt; Python: <code>["res", id, result]</code>, <code>["cb", kind, tag, name,
-  payload]</code> (fire and forget), <code>["req", id, kind, tag, name, payload]</code>
-  (Python answers with <code>res</code>), <code>["gesture", tag, phase, info]</code>
-  (pointer stream for the Python gesture arbiter), <code>["dev", {...}]</code>.</li>
-</ul>
-<p><code>payload</code> / <code>args</code> / <code>request</code> / <code>result</code> are JSON <em>strings</em>,
-exactly the text the native protocol carries, so both sides reuse their
-existing codecs. Modules the page implements (<code>Host</code>, <code>Alert</code>,
-<code>Clipboard</code>, ...) are called there; every other native module falls
-back to the Python implementations in
-<code>pythonnative.native_modules.fallback</code>.</p>
+        <p>WebSocket transport for the browser renderer.</p>
+<p>Network I/O and request settlement execute independently of the application
+asyncio loop. Python owns the component tree; the page owns DOM widgets and Yoga
+layout. Revisioned commits receive explicit acknowledgements, and callbacks
+are queued onto the Python application thread. No asyncio loop is pumped by
+the browser transport.</p>
 
 
 
@@ -12676,16 +12684,17 @@ back to the Python implementations in
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">BROWSER_MODULES</span> <span class="o">=</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#frozenset">frozenset</a></span><span class="p">(</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="p">{</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        <span class="s2">"Host"</span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>        <span class="s2">"Alert"</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        <span class="s2">"Clipboard"</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="s2">"Linking"</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="s2">"Share"</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="s2">"Haptics"</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="s2">"NetInfo"</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        <span class="s2">"AppState"</span><span class="p">,</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="s2">"Device"</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="p">}</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>        <span class="s2">"Layout"</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        <span class="s2">"Alert"</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="s2">"Clipboard"</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="s2">"Linking"</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="s2">"Share"</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="s2">"Haptics"</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        <span class="s2">"NetInfo"</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="s2">"AppState"</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        <span class="s2">"Device"</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="p">}</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -12815,7 +12824,7 @@ back to the Python implementations in
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply&lt;/span&gt; (&lt;code&gt;pythonnative.bridge.web.WebTransport.apply&lt;/code&gt;)" href="#pythonnative.bridge.web.WebTransport.apply">apply</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Forward one commit to the page (fire and forget).</p>
+                  <p>Wait for the page to acknowledge this exact commit revision.</p>
                 </div>
               </td>
             </tr>
@@ -12852,7 +12861,7 @@ back to the Python implementations in
               </td>
             </tr>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;post_to_main&lt;/span&gt; (&lt;code&gt;pythonnative.bridge.web.WebTransport.post_to_main&lt;/code&gt;)" href="#pythonnative.bridge.web.WebTransport.post_to_main">post_to_main</a></code></td>
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;post_to_application&lt;/span&gt; (&lt;code&gt;pythonnative.bridge.web.WebTransport.post_to_application&lt;/code&gt;)" href="#pythonnative.bridge.web.WebTransport.post_to_application">post_to_application</a></code></td>
               <td>
                 <div class="doc-md-description">
                   <p>Queue <code>fn</code> for the main loop (never runs inline).</p>
@@ -13118,12 +13127,12 @@ back to the Python implementations in
 
 
 <a href="#pythonnative.bridge.web.WebTransport.apply" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">apply</span><span class="p">(</span><span class="n">transaction_json</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">apply</span><span class="p">(</span><span class="n">transaction_json</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Forward one commit to the page (fire and forget).</p>
+        <p>Wait for the page to acknowledge this exact commit revision.</p>
 
 
     </div>
@@ -13219,12 +13228,12 @@ back to the Python implementations in
 <div class="doc doc-object doc-function">
 
 
-<h3 id="pythonnative.bridge.web.WebTransport.post_to_main" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">post_to_main</span>
+<h3 id="pythonnative.bridge.web.WebTransport.post_to_application" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">post_to_application</span>
 
 
-<a href="#pythonnative.bridge.web.WebTransport.post_to_main" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">post_to_main</span><span class="p">(</span><span class="n">fn</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Callable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Callable">Callable</a></span><span class="p">[[],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#pythonnative.bridge.web.WebTransport.post_to_application" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">post_to_application</span><span class="p">(</span><span class="n">fn</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Callable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Callable">Callable</a></span><span class="p">[[],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">

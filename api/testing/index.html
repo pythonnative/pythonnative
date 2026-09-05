@@ -541,6 +541,8 @@
       
         
       
+        
+      
     
     
     
@@ -631,6 +633,34 @@
     
   
     Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/runtime-overhaul/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Overhaul
   
 
     
@@ -855,6 +885,8 @@
   
     
     
+      
+        
       
         
       
@@ -1260,6 +1292,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/native-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Native Contracts
   
 
     
@@ -2877,50 +2937,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pythonnative.testing.FakeHost.push_screen" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;push_screen
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pythonnative.testing.FakeHost.pop_screens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;pop_screens
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pythonnative.testing.FakeHost.replace_screen" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;replace_screen
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pythonnative.testing.FakeHost.reset_screens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;reset_screens
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#pythonnative.testing.FakeHost.set_screen_options" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4252,50 +4268,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pythonnative.testing.FakeHost.push_screen" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;push_screen
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pythonnative.testing.FakeHost.pop_screens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;pop_screens
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pythonnative.testing.FakeHost.replace_screen" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;replace_screen
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pythonnative.testing.FakeHost.reset_screens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;reset_screens
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#pythonnative.testing.FakeHost.set_screen_options" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4884,7 +4856,7 @@ bare hook.</p>
             <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeHost&lt;/span&gt; (&lt;code&gt;pythonnative.testing.FakeHost&lt;/code&gt;)" href="#pythonnative.testing.FakeHost">FakeHost</a></code></td>
             <td>
               <div class="doc-md-description">
-                <p>A <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;HostNavigator&lt;/span&gt;" href="../navigation/#pythonnative.navigation.handle.HostNavigator"><code>HostNavigator</code></a> that records native screen operations.</p>
+                <p>Application lifecycle and restoration host for navigation tests.</p>
               </div>
             </td>
           </tr>
@@ -5790,11 +5762,10 @@ view are skipped (what a user can see).</p>
 
 
 
-        <p>A <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;HostNavigator&lt;/span&gt;" href="../navigation/#pythonnative.navigation.handle.HostNavigator"><code>HostNavigator</code></a> that records native screen operations.</p>
-<p>Pass as <code>render(..., host=FakeHost())</code> to render a root stack the
-way a device would: pushes are recorded in <code>pushed</code> instead of
-creating screens in-tree. <code>set_focused</code> simulates the platform
-covering / revealing the screen.</p>
+        <p>Application lifecycle and restoration host for navigation tests.</p>
+<p>Pass as <code>render(..., host=FakeHost())</code> to provide restoration state.
+Screens remain in the logical tree. <code>set_focused</code> simulates the
+application entering or leaving the foreground.</p>
 
 
 
@@ -5821,38 +5792,6 @@ covering / revealing the screen.</p>
               <td>
                 <div class="doc-md-description">
                   <p>Return the <code>initial_state</code> the host was constructed with (<code>None</code> for a fresh root).</p>
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;push_screen&lt;/span&gt; (&lt;code&gt;pythonnative.testing.FakeHost.push_screen&lt;/code&gt;)" href="#pythonnative.testing.FakeHost.push_screen">push_screen</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  <p>Record the push in <code>pushed</code> instead of creating a native screen.</p>
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;pop_screens&lt;/span&gt; (&lt;code&gt;pythonnative.testing.FakeHost.pop_screens&lt;/code&gt;)" href="#pythonnative.testing.FakeHost.pop_screens">pop_screens</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  <p>Record the requested pop <code>count</code> in <code>popped</code>.</p>
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;replace_screen&lt;/span&gt; (&lt;code&gt;pythonnative.testing.FakeHost.replace_screen&lt;/code&gt;)" href="#pythonnative.testing.FakeHost.replace_screen">replace_screen</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  <p>Record the replacement in <code>replaced</code> instead of swapping a native screen.</p>
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;reset_screens&lt;/span&gt; (&lt;code&gt;pythonnative.testing.FakeHost.reset_screens&lt;/code&gt;)" href="#pythonnative.testing.FakeHost.reset_screens">reset_screens</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  <p>Record the stack reset in <code>resets</code> instead of rebuilding native screens.</p>
                 </div>
               </td>
             </tr>
@@ -5967,92 +5906,6 @@ covering / revealing the screen.</p>
     <div class="doc doc-contents ">
 
         <p>Return the <code>initial_state</code> the host was constructed with (<code>None</code> for a fresh root).</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="pythonnative.testing.FakeHost.push_screen" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">push_screen</span>
-
-
-<a href="#pythonnative.testing.FakeHost.push_screen" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">push_screen</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">state</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">],</span> <span class="n">options</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">]</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Record the push in <code>pushed</code> instead of creating a native screen.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="pythonnative.testing.FakeHost.pop_screens" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">pop_screens</span>
-
-
-<a href="#pythonnative.testing.FakeHost.pop_screens" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">pop_screens</span><span class="p">(</span><span class="n">count</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Record the requested pop <code>count</code> in <code>popped</code>.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="pythonnative.testing.FakeHost.replace_screen" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">replace_screen</span>
-
-
-<a href="#pythonnative.testing.FakeHost.replace_screen" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">replace_screen</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">state</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">],</span> <span class="n">options</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">]</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Record the replacement in <code>replaced</code> instead of swapping a native screen.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="pythonnative.testing.FakeHost.reset_screens" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">reset_screens</span>
-
-
-<a href="#pythonnative.testing.FakeHost.reset_screens" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">reset_screens</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">state</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">],</span> <span class="n">options</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">]</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Record the stack reset in <code>resets</code> instead of rebuilding native screens.</p>
 
 
     </div>
@@ -6584,7 +6437,7 @@ are skipped unless <code>hidden=True</code> is passed.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;change_text&lt;/span&gt; (&lt;code&gt;pythonnative.testing.RenderResult.change_text&lt;/code&gt;)" href="#pythonnative.testing.RenderResult.change_text">change_text</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Fire <code>on_change_text</code> on a <code>TextInput</code>.</p>
+                  <p>Fire <code>on_change</code> on a <code>TextInput</code>.</p>
                 </div>
               </td>
             </tr>
@@ -7102,7 +6955,7 @@ are skipped unless <code>hidden=True</code> is passed.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Fire <code>on_change_text</code> on a <code>TextInput</code>.</p>
+        <p>Fire <code>on_change</code> on a <code>TextInput</code>.</p>
 
 
     </div>
@@ -7307,8 +7160,7 @@ are skipped unless <code>hidden=True</code> is passed.</p>
             <td>
               <div class="doc-md-description">
                 <p>Render under a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;HostRoot&lt;/span&gt;" href="../navigation/#pythonnative.navigation.host.HostRoot"><code>HostRoot</code></a>
-with this fake host, so root stacks push native screens
-into <code>host.pushed</code> instead of the tree.</p>
+with this fake host for focus and restoration state.</p>
               </div>
             </td>
             <td>

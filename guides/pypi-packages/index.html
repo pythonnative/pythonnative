@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://pythonnative.com/guides/pypi-packages/">
       
       
-        <link rel="prev" href="../native-modules/">
+        <link rel="prev" href="../native-contracts/">
       
       
         <link rel="next" href="../custom-native-components/">
@@ -541,6 +541,8 @@
       
         
       
+        
+      
     
     
     
@@ -631,6 +633,34 @@
     
   
     Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/runtime-overhaul/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Overhaul
   
 
     
@@ -857,6 +887,8 @@
   
     
     
+      
+        
       
         
       
@@ -1280,6 +1312,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../native-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Native Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1347,6 +1407,17 @@
     <span class="md-ellipsis">
       
         Declare requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lock-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lock dependencies
       
     </span>
   </a>
@@ -3335,6 +3406,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#lock-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lock dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-works" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3474,9 +3556,9 @@ before you build.</p>
 <div class="language-toml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">[requirements]</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">packages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"httpx&gt;=0.27"</span><span class="p">,</span><span class="w"> </span><span class="s2">"numpy"</span><span class="p">,</span><span class="w"> </span><span class="s2">"pillow~=11.0"</span><span class="p">]</span>
 </span></code></pre></div>
-<p>Every <code>pn run</code> and <code>pn build</code> resolves that list for each target the
-build needs, installs the resolved wheels, and bundles them into the
-app. Nothing from your host environment leaks in: a package that's
+<p>Without a lock, <code>pn run</code> and <code>pn build</code> resolve that list for each target
+the build needs. With a lock, they install the recorded wheels and verify
+their hashes. Both paths bundle the resulting packages into the app. Nothing from your host environment leaks in: a package that's
 importable on your Mac but has no wheel for the device is a build
 error, not a runtime <code>ImportError</code>.</p>
 <div class="admonition warning">
@@ -3484,8 +3566,25 @@ error, not a runtime <code>ImportError</code>.</p>
 <p>The CLI bundles the installed <code>pythonnative</code> package directly.
 Validation rejects it in <code>[requirements].packages</code>.</p>
 </div>
+<h2 id="lock-dependencies">Lock dependencies<a class="headerlink" href="#lock-dependencies" title="Permanent link">&para;</a></h2>
+<p>Run <code>pn deps --lock</code> and commit the generated <code>pn.lock</code>. The lock records Python
+version, requirements, indexes, each target's wheel URLs, and SHA-256 hashes.
+The iOS targets include both Apple Silicon (<code>arm64</code>) and Intel (<code>x86_64</code>)
+simulators, so the same committed lock works on developer Macs and CI runners.
+<code>pn deps ios --lock</code> or <code>pn deps android --lock</code> updates selected targets.
+Builds reject stale locks, missing target entries, differing package versions
+across Android ABIs, and changed wheel bytes.</p>
+<p>Plugin discovery inspects the selected target wheels as archives. It doesn't
+import target binary modules on the host. A plugin's manifest, contract, source,
+and resources must agree across the selected architectures.</p>
+<p>Wheel selection isn't a guarantee of runtime compatibility. The resolver uses
+pip's cross-platform wheel options; dependencies with platform environment
+markers still need validation on each embedded runtime.</p>
 <h2 id="what-works">What works<a class="headerlink" href="#what-works" title="Permanent link">&para;</a></h2>
-<p><strong>Pure-Python packages</strong> (<code>py3-none-any</code> wheels) work on every target.</p>
+<p><strong>Pure-Python packages</strong> (<code>py3-none-any</code> wheels) are installable on every
+target, but their runtime dependencies must also be available. Packages that
+require subprocesses, unsupported system services, or a desktop GUI still need
+an alternative on mobile.</p>
 <p><strong>Binary wheels</strong> (compiled extensions) work when the package publishes
 a wheel for the target:</p>
 <table>

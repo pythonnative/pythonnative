@@ -652,6 +652,8 @@
       
         
       
+        
+      
     
     
     
@@ -742,6 +744,34 @@
     
   
     Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="design/runtime-overhaul/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Overhaul
   
 
     
@@ -966,6 +996,8 @@
   
     
     
+      
+        
       
         
       
@@ -1371,6 +1403,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="guides/native-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Native Contracts
   
 
     
@@ -3408,11 +3468,10 @@ produce identical frames on both platforms.</p>
   theming, and platform behaviors come along for free.</li>
 <li><strong>A familiar component model</strong>. If you know React or React Native,
   you already know how PythonNative works.</li>
-<li><strong>No JS bridge, no transpiler.</strong> The reconciler runs synchronously
-  in Python on the platform's main thread; native API calls are
-  direct method calls.</li>
-<li><strong>Async-first.</strong> One <code>asyncio</code> loop runs the whole framework on the
-  main thread. Components can be <code>async def</code> and await data right in
+<li><strong>Python application code.</strong> Components run on a dedicated asyncio
+  application thread. Validated commits connect Python state to native widgets.</li>
+<li><strong>Ordinary asyncio.</strong> One standard application loop runs Python work
+  independently of the native UI thread. Components can be <code>async def</code> and await data right in
   the body, with <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Suspense&lt;/span&gt;" href="api/components/#pythonnative.components.Suspense"><code>Suspense</code></a> providing the
   loading state declaratively. See the
   <a href="guides/async/">Async + data guide</a>.</li>

@@ -541,6 +541,8 @@
       
         
       
+        
+      
     
     
     
@@ -631,6 +633,34 @@
     
   
     Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/runtime-overhaul/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Overhaul
   
 
     
@@ -855,6 +885,8 @@
   
     
     
+      
+        
       
         
       
@@ -1260,6 +1292,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/native-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Native Contracts
   
 
     
@@ -2538,6 +2598,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.layout.apply_style" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;apply_style
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.layout.calculate_layout" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3296,6 +3367,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.layout.apply_style" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;apply_style
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.layout.calculate_layout" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3378,86 +3460,10 @@ commit and forwards the resulting frames to the platform handlers via
 
     <div class="doc doc-contents first">
 
-        <p>Pure-Python flexbox layout engine.</p>
-<p>Computes positions and sizes for every node in a layout tree based on
-CSS flexbox-inspired style properties. Inspired by Facebook's Yoga and
-React Native's layout system, but implemented entirely in Python so
-PythonNative does not depend on a native layout library.</p>
-<p>The engine is invoked by the reconciler after each commit pass:</p>
-<ol>
-<li>The reconciler maintains a parallel
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LayoutNode&lt;/span&gt;" href="#pythonnative.layout.LayoutNode"><code>LayoutNode</code></a> tree (cached across
-   passes: clean subtrees keep their nodes, dirty ones are rebuilt).</li>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;calculate_layout&lt;/span&gt;" href="#pythonnative.layout.calculate_layout"><code>calculate_layout</code></a> is called
-   with the viewport size; it recursively determines each node's
-   <code>(x, y, width, height)</code> relative to its parent's coordinate space.
-   Nodes that are <strong>not dirty</strong> and are measured under the same
-   constraints as the previous pass return their memoized size without
-   recursing, which turns full-tree layout into dirty-subtree layout.</li>
-<li>The reconciler walks the tree again and emits a frame op for each
-   native view whose frame actually changed.</li>
-</ol>
-<p>The algorithm supports:</p>
-<ul>
-<li><strong>Flex containers</strong>: <code>flex_direction</code> (<code>row</code>/<code>column</code> and their
-  reverse variants), <code>justify_content</code> (<code>flex_start</code> / <code>center</code> /
-  <code>flex_end</code> / <code>space_between</code> / <code>space_around</code> / <code>space_evenly</code>),
-  <code>align_items</code> (<code>stretch</code> / <code>flex_start</code> / <code>center</code> /
-  <code>flex_end</code> / <code>baseline</code>), and <code>align_self</code> overrides per child.
-  Baseline alignment (rows only) uses each leaf's height as its
-  baseline, since native text handlers report a size but not the
-  first line's baseline; containers use the baseline of their first
-  in-flow child.</li>
-<li><strong>Visibility</strong>: <code>display: "none"</code> removes a node (and its subtree)
-  from layout entirely: it contributes no size, gap, or margin to its
-  parent and every node in the subtree gets a zero frame.</li>
-<li><strong>Wrapping</strong>: <code>flex_wrap</code> (<code>nowrap</code> / <code>wrap</code> / <code>wrap_reverse</code>)
-  with <code>align_content</code> controlling how lines share leftover
-  cross-axis space (<code>stretch</code> default, plus the justify palette).</li>
-<li><strong>Direction</strong>: <code>direction: "rtl"</code> flips row layouts, <code>start</code> /
-  <code>end</code> edge keys (<code>margin_start</code>, <code>padding_end</code>, absolute
-  <code>start</code> / <code>end</code> insets) resolve against the inherited direction.</li>
-<li><strong>Sizing</strong>: explicit <code>width</code> / <code>height</code> (numbers or percentages),
-  <code>min_width</code> / <code>max_width</code> / <code>min_height</code> / <code>max_height</code>
-  constraints, <code>aspect_ratio</code>, and content-based sizing via the
-  optional <code>measure</code> callback.</li>
-<li><strong>Flex distribution</strong>: <code>flex</code> (RN shorthand for grow factor with
-  <code>flex_basis: 0</code>), <code>flex_grow</code>, <code>flex_shrink</code>, <code>flex_basis</code>.</li>
-<li><strong>Absolute positioning</strong>: <code>position: "absolute"</code> with <code>top</code>,
-  <code>right</code>, <code>bottom</code>, <code>left</code> (and <code>start</code> / <code>end</code>) insets.
-  Absolute children are positioned relative to the parent's padding box
-  and do not participate in flex distribution.</li>
-<li><strong>Spacing</strong>: <code>padding</code> / <code>margin</code> (scalar, dict, or per-edge
-  keys), inter-child <code>spacing</code> (aliases: <code>gap</code>, <code>column_gap</code> /
-  <code>row_gap</code> per axis). <code>border_width</code> (and the per-edge
-  <code>border_*_width</code> keys) sit inside the frame like padding, so the
-  content box shrinks by the border as in Yoga.</li>
-<li><strong>Auto margins</strong>: <code>margin: "auto"</code> (or any per-edge margin key set
-  to <code>"auto"</code>) absorbs free space. On the main axis the free space is
-  split equally among every auto margin on the line and
-  <code>justify_content</code> is ignored; on the cross axis auto margins center
-  or push the item and override <code>align_items</code> / <code>align_self</code>.</li>
-</ul>
+        <p>Yoga 3.2.1 layout for headless tests and the Python preview host.</p>
+<p>Mobile hosts run this same pinned core beside their native widgets. This
+module contains style translation and ownership, not a second flex algorithm.</p>
 
-
-<details class="example" open>
-  <summary>Example</summary>
-  <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">LayoutNode</span><span class="p">,</span> <span class="n">calculate_layout</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">root</span> <span class="o">=</span> <span class="n">LayoutNode</span><span class="p">(</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex_direction"</span><span class="p">:</span> <span class="s2">"row"</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">4</span><span class="p">},</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">children</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="n">LayoutNode</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">80</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">40</span><span class="p">}),</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="n">LayoutNode</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">40</span><span class="p">}),</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="n">LayoutNode</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">60</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">40</span><span class="p">}),</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="p">],</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">calculate_layout</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="mi">320</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># root.children[0].x == 8, .width == 80</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># root.children[1].x == 92, .width == 156  (filled by flex: 1)</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="c1"># root.children[2].x == 252, .width == 60</span>
-</span></code></pre></div>
-</details>
 
 
 
@@ -3480,7 +3486,7 @@ PythonNative does not depend on a native layout library.</p>
             <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LayoutNode&lt;/span&gt; (&lt;code&gt;pythonnative.layout.LayoutNode&lt;/code&gt;)" href="#pythonnative.layout.LayoutNode">LayoutNode</a></code></td>
             <td>
               <div class="doc-md-description">
-                <p>A node in the layout tree.</p>
+                <p>An owned Yoga node, with Python measurement for headless backends.</p>
               </div>
             </td>
           </tr>
@@ -3500,10 +3506,18 @@ PythonNative does not depend on a native layout library.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply_style&lt;/span&gt; (&lt;code&gt;pythonnative.layout.apply_style&lt;/code&gt;)" href="#pythonnative.layout.apply_style">apply_style</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Translate Pythonic style keys to Yoga's native style API.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;calculate_layout&lt;/span&gt; (&lt;code&gt;pythonnative.layout.calculate_layout&lt;/code&gt;)" href="#pythonnative.layout.calculate_layout">calculate_layout</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Compute layout for <code>node</code> and all descendants, in place.</p>
+                  <p>Calculate a tree's layout with the pinned Yoga core.</p>
                 </div>
               </td>
             </tr>
@@ -3511,7 +3525,7 @@ PythonNative does not depend on a native layout library.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;extract_layout_style&lt;/span&gt; (&lt;code&gt;pythonnative.layout.extract_layout_style&lt;/code&gt;)" href="#pythonnative.layout.extract_layout_style">extract_layout_style</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Return a dict of the layout-relevant entries in <code>props</code>.</p>
+                  <p>Select properties owned by layout.</p>
                 </div>
               </td>
             </tr>
@@ -3651,146 +3665,20 @@ PythonNative does not depend on a native layout library.</p>
 
 <a href="#pythonnative.layout.LayoutNode" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">LayoutNode</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">style</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">children</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.List&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.List">List</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LayoutNode&lt;/span&gt; (&lt;code&gt;pythonnative.layout.LayoutNode&lt;/code&gt;)" href="#pythonnative.layout.LayoutNode">LayoutNode</a></span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">measure</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><span title="pythonnative.layout.MeasureFn">MeasureFn</span></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">user_data</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">style</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">children</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LayoutNode&lt;/span&gt; (&lt;code&gt;pythonnative.layout.LayoutNode&lt;/code&gt;)" href="#pythonnative.layout.LayoutNode">LayoutNode</a></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">measure</span><span class="p">:</span> <span class="p">(</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Callable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Callable">Callable</a></span><span class="p">[[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">],</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="p">)</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">user_data</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
 
 
-        <p>A node in the layout tree.</p>
-<p>Holds the layout-relevant style props, child layout nodes, and the
-computed output (<code>x</code>, <code>y</code>, <code>width</code>, <code>height</code> in points
-relative to the parent's coordinate space).</p>
-
-
-<p><span class="doc-section-title">Attributes:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td><code><span title="pythonnative.layout.LayoutNode.style">style</span></code></td>
-            <td>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Dict of layout-relevant style props (a subset of the
-element's full props; usually filtered through
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;LAYOUT_STYLE_KEYS&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="#pythonnative.layout.LAYOUT_STYLE_KEYS"><code>LAYOUT_STYLE_KEYS</code></a>).</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><span title="pythonnative.layout.LayoutNode.children">children</span></code></td>
-            <td>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Ordered list of child <code>LayoutNode</code>s.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><span title="pythonnative.layout.LayoutNode.measure">measure</span></code></td>
-            <td>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Optional measure callback for leaf nodes whose natural
-size depends on their content (e.g., text). Receives
-<code>(max_width, max_height)</code> and returns <code>(width, height)</code>.
-Either argument may be <code>math.inf</code>.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><span title="pythonnative.layout.LayoutNode.user_data">user_data</span></code></td>
-            <td>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Free-form attribute the caller may use to associate
-each layout node with the corresponding native view; the
-engine itself does not inspect it.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><span title="pythonnative.layout.LayoutNode.dirty">dirty</span></code></td>
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>When <code>False</code>, the node may serve repeat measurements
-from its memo (set by the reconciler's incremental-layout
-cache). Fresh nodes start dirty.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><span title="pythonnative.layout.LayoutNode.x">x</span></code></td>
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Computed x-coordinate relative to the parent's coordinate
-space.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><span title="pythonnative.layout.LayoutNode.y">y</span></code></td>
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Computed y-coordinate relative to the parent's coordinate
-space.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><span title="pythonnative.layout.LayoutNode.width">width</span></code></td>
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Computed width in points.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><span title="pythonnative.layout.LayoutNode.height">height</span></code></td>
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Computed height in points.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
+        <p>An owned Yoga node, with Python measurement for headless backends.</p>
 
 
 
@@ -3830,109 +3718,39 @@ space.</p>
 <div class="doc doc-object doc-function">
 
 
+<h2 id="pythonnative.layout.apply_style" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">apply_style</span>
+
+
+<a href="#pythonnative.layout.apply_style" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">apply_style</span><span class="p">(</span><span class="n">ptr</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span><span class="p">,</span> <span class="n">style</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Translate Pythonic style keys to Yoga's native style API.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h2 id="pythonnative.layout.calculate_layout" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">calculate_layout</span>
 
 
 <a href="#pythonnative.layout.calculate_layout" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">calculate_layout</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">node</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LayoutNode&lt;/span&gt; (&lt;code&gt;pythonnative.layout.LayoutNode&lt;/code&gt;)" href="#pythonnative.layout.LayoutNode">LayoutNode</a></span><span class="p">,</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">available_width</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">available_height</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">direction</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span> <span class="o">=</span> <span class="n"><span title="pythonnative.layout.DIRECTION_LTR">DIRECTION_LTR</span></span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">node</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LayoutNode&lt;/span&gt; (&lt;code&gt;pythonnative.layout.LayoutNode&lt;/code&gt;)" href="#pythonnative.layout.LayoutNode">LayoutNode</a></span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Compute layout for <code>node</code> and all descendants, in place.</p>
-<p>Sizes the root from its own style and content. Callers that want
-the root to fill its viewport should wrap it in a synthetic outer
-node with explicit <code>width</code> / <code>height</code> (the
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> does this when
-running the layout pass after a commit).</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>node</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LayoutNode&lt;/span&gt; (&lt;code&gt;pythonnative.layout.LayoutNode&lt;/code&gt;)" href="#pythonnative.layout.LayoutNode">LayoutNode</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Root of the layout tree.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>available_width</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Available width in points. Pass
-<code>math.inf</code> for unbounded (e.g., horizontal scroll).</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>available_height</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Available height in points. Pass
-<code>math.inf</code> for unbounded (e.g., vertical scroll).</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>direction</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Base writing direction (<code>"ltr"</code> or <code>"rtl"</code>)
-inherited by nodes that don't set their own.</p>
-              </div>
-            </td>
-            <td>
-                  <code><span title="pythonnative.layout.DIRECTION_LTR">DIRECTION_LTR</span></code>
-            </td>
-          </tr>
-      </tbody>
-    </table>
+        <p>Calculate a tree's layout with the pinned Yoga core.</p>
 
 
     </div>
@@ -3948,15 +3766,13 @@ inherited by nodes that don't set their own.</p>
 
 <a href="#pythonnative.layout.extract_layout_style" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">extract_layout_style</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">props</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">],</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">]</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">props</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">],</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Return a dict of the layout-relevant entries in <code>props</code>.</p>
-<p>Used by the reconciler when building a <code>LayoutNode</code> from an element
-so the layout engine doesn't have to scan unrelated visual props.</p>
+        <p>Select properties owned by layout.</p>
 
 
     </div>

@@ -541,6 +541,8 @@
       
         
       
+        
+      
     
     
     
@@ -631,6 +633,34 @@
     
   
     Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/runtime-overhaul/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Overhaul
   
 
     
@@ -857,6 +887,8 @@
   
     
     
+      
+        
       
         
       
@@ -1398,6 +1430,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../native-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Native Contracts
   
 
     
@@ -3432,26 +3492,16 @@
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;SectionList&lt;/span&gt;" href="../../api/components/#pythonnative.components.SectionList"><code>SectionList</code></a> are the two list components
 shipped with PythonNative. Both are <strong>virtualized</strong>: only the rows
 inside (and just beyond) the viewport are mounted as native views.
-Under the hood the list picks one of two engines:</p>
-<ul>
-<li><strong>Native virtualization.</strong> On Android and iOS, when every row's
-  extent is known up front (a fixed <code>item_height</code>, or exact
-  <code>get_item_height</code> / <code>section_header_height</code> values) and no
-  windowed-only feature is requested, the list is backed by a real
-  <code>RecyclerView</code> (Android) or <code>UITableView</code> (iOS). The platform owns
-  row recycling; each visible row hosts its own PythonNative subtree
-  that is mounted on demand and reconciled in place when its cell is
-  recycled. This is the fastest path and the one long feeds should
-  aim for.</li>
-<li><strong>Python windowing.</strong> Everywhere else (the browser preview,
-  variable-height rows, grids, horizontal lists, headers/footers/empty
-  states, and pull-to-refresh), rows render into a native scroll view
-  with leading and trailing spacers standing in for off-screen
-  content, and the window of mounted rows shifts from scroll events.</li>
-</ul>
-<p>The public surface is identical on both paths: <code>on_end_reached</code>,
-<code>on_viewable_items_changed</code>, <code>on_scroll</code>, and the imperative scroll
-controller behave the same regardless of which engine is active.</p>
+On mobile, <code>RecyclerView</code> (Android) and <code>UICollectionView</code> (iOS) own physical
+cell recycling. Rows remain ordinary keyed components in the application's
+logical tree. Providers, error boundaries, suspense boundaries, and cancellation
+therefore work across row and screen containers.</p>
+<p>Use stable keys and immutable data. A new data snapshot advances the list's
+revision; stale row requests are discarded. <code>estimated_item_height</code> provides an
+initial estimate for variable content, and native measurement refines row
+extents. Fixed heights, sections, grids, headers, footers, and pull-to-refresh
+use this native path too. The browser implements the same logical-row protocol;
+headless tests use a windowed scroll container.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">items</span> <span class="o">=</span> <span class="p">[{</span><span class="s2">"id"</span><span class="p">:</span> <span class="n">i</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Row </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10_000</span><span class="p">)]</span>
@@ -3472,9 +3522,9 @@ viewport ever exists.</p>
 <p>Three ways to tell the list how tall rows are, in order of preference:</p>
 <ul>
 <li><code>item_height=44</code>: uniform rows. Offsets are exact and cheap, and
-  the list qualifies for the native virtualization path.</li>
+  native containers can skip estimating that extent.</li>
 <li><code>get_item_height=lambda item, i: ...</code>: exact per-row extents
-  without measurement. Also qualifies for native virtualization.</li>
+  without measurement. Native containers use those extents directly.</li>
 <li>Nothing at all: rows start at <code>estimated_item_height</code> (default 44)
   and are corrected with their measured extent once they've been on
   screen. Scroll positions stay stable as estimates converge. This
@@ -3576,7 +3626,7 @@ estimated and measured).</p>
   the window refresh in place rather than tearing down and rebuilding
   their subtree as the window shifts.</li>
 <li>Provide real extents (<code>item_height</code> / <code>get_item_height</code>) when you
-  can. Exact extents unlock the native RecyclerView / UITableView
+  can. Exact extents reduce measurement work in the native RecyclerView / UICollectionView
   path on device; measured estimation works but stays on the
   Python-windowed engine and does more bookkeeping per scroll.</li>
 <li>Features that force the windowed engine (<code>list_header</code>,

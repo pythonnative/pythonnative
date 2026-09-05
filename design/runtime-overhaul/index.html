@@ -12,13 +12,13 @@
         <meta name="author" content="Owen Carey">
       
       
-        <link rel="canonical" href="https://pythonnative.com/concepts/mental-model/">
+        <link rel="canonical" href="https://pythonnative.com/design/runtime-overhaul/">
       
       
-        <link rel="prev" href="../../getting-started/">
+        <link rel="prev" href="../../concepts/architecture/">
       
       
-        <link rel="next" href="../architecture/">
+        <link rel="next" href="../../concepts/components/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Mental Model - PythonNative</title>
+        <title>Runtime Overhaul - PythonNative</title>
       
     
     
@@ -67,17 +67,17 @@
     
   
 <meta property="og:type" content="website" />
-<meta property="og:title" content="Mental Model - PythonNative" />
+<meta property="og:title" content="Runtime Overhaul - PythonNative" />
 <meta property="og:description" content="Cross-platform native UI toolkit for Android and iOS" />
-<meta property="og:image" content="https://pythonnative.com/assets/images/social/concepts/mental-model.png" />
+<meta property="og:image" content="https://pythonnative.com/assets/images/social/design/runtime-overhaul.png" />
 <meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:url" content="https://pythonnative.com/concepts/mental-model/" />
+<meta property="og:url" content="https://pythonnative.com/design/runtime-overhaul/" />
 <meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:title" content="Mental Model - PythonNative" />
+<meta property="twitter:title" content="Runtime Overhaul - PythonNative" />
 <meta property="twitter:description" content="Cross-platform native UI toolkit for Android and iOS" />
-<meta property="twitter:image" content="https://pythonnative.com/assets/images/social/concepts/mental-model.png" />
+<meta property="twitter:image" content="https://pythonnative.com/assets/images/social/design/runtime-overhaul.png" />
 </head>
   
   
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#mental-model" class="md-skip">
+        <a href="#runtime-overhaul" class="md-skip">
           Skip to content
         </a>
       
@@ -132,7 +132,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Mental Model
+              Runtime Overhaul
             
           </span>
         </div>
@@ -286,7 +286,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+        <a href="../../concepts/mental-model/" class="md-tabs__link">
           
   
   
@@ -597,6 +597,62 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/mental-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mental Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -616,7 +672,7 @@
   <span class="md-ellipsis">
     
   
-    Mental Model
+    Runtime Overhaul
   
 
     
@@ -634,7 +690,7 @@
   <span class="md-ellipsis">
     
   
-    Mental Model
+    Runtime Overhaul
   
 
     
@@ -660,10 +716,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#tldr" class="md-nav__link">
+  <a href="#implemented-architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TL;DR
+        Implemented architecture
       
     </span>
   </a>
@@ -671,10 +727,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-runtime-in-one-diagram" class="md-nav__link">
+  <a href="#working-with-the-new-runtime" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The runtime in one diagram
+        Working with the new runtime
       
     </span>
   </a>
@@ -682,10 +738,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-pythonnative-differs-from-react-native" class="md-nav__link">
+  <a href="#validation-and-practical-limits" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How PythonNative differs from React Native
+        Validation and practical limits
       
     </span>
   </a>
@@ -693,32 +749,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-pythonnative-differs-from-toga-beeware-kivy" class="md-nav__link">
+  <a href="#local-validation-results" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How PythonNative differs from Toga, BeeWare, Kivy
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#mental-shortcuts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mental shortcuts
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next steps
+        Local validation results
       
     </span>
   </a>
@@ -741,63 +775,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../architecture/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../components/" class="md-nav__link">
+      <a href="../../concepts/components/" class="md-nav__link">
         
   
   
@@ -825,7 +803,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../hooks/" class="md-nav__link">
+      <a href="../../concepts/hooks/" class="md-nav__link">
         
   
   
@@ -853,7 +831,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../lifecycle/" class="md-nav__link">
+      <a href="../../concepts/lifecycle/" class="md-nav__link">
         
   
   
@@ -881,7 +859,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reconciliation/" class="md-nav__link">
+      <a href="../../concepts/reconciliation/" class="md-nav__link">
         
   
   
@@ -909,7 +887,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../layout/" class="md-nav__link">
+      <a href="../../concepts/layout/" class="md-nav__link">
         
   
   
@@ -937,7 +915,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../native-views/" class="md-nav__link">
+      <a href="../../concepts/native-views/" class="md-nav__link">
         
   
   
@@ -965,7 +943,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../bridge/" class="md-nav__link">
+      <a href="../../concepts/bridge/" class="md-nav__link">
         
   
   
@@ -3345,10 +3323,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#tldr" class="md-nav__link">
+  <a href="#implemented-architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TL;DR
+        Implemented architecture
       
     </span>
   </a>
@@ -3356,10 +3334,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-runtime-in-one-diagram" class="md-nav__link">
+  <a href="#working-with-the-new-runtime" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The runtime in one diagram
+        Working with the new runtime
       
     </span>
   </a>
@@ -3367,10 +3345,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-pythonnative-differs-from-react-native" class="md-nav__link">
+  <a href="#validation-and-practical-limits" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How PythonNative differs from React Native
+        Validation and practical limits
       
     </span>
   </a>
@@ -3378,32 +3356,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-pythonnative-differs-from-toga-beeware-kivy" class="md-nav__link">
+  <a href="#local-validation-results" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How PythonNative differs from Toga, BeeWare, Kivy
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#mental-shortcuts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mental shortcuts
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next steps
+        Local validation results
       
     </span>
   </a>
@@ -3427,7 +3383,7 @@
 
 
   
-    <a href="https://github.com/pythonnative/pythonnative/edit/main/docs/concepts/mental-model.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/pythonnative/pythonnative/edit/main/docs/design/runtime-overhaul.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -3436,147 +3392,122 @@
     
       
     
-    <a href="https://github.com/pythonnative/pythonnative/raw/main/docs/concepts/mental-model.md" title="View source of this page" class="md-content__button md-icon">
+    <a href="https://github.com/pythonnative/pythonnative/raw/main/docs/design/runtime-overhaul.md" title="View source of this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0 8a5 5 0 0 1-5-5 5 5 0 0 1 5-5 5 5 0 0 1 5 5 5 5 0 0 1-5 5m0-12.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5"/></svg>
     </a>
   
 
 
-<h1 id="mental-model">Mental model<a class="headerlink" href="#mental-model" title="Permanent link">&para;</a></h1>
-<p>PythonNative is a <em>thin</em> layer over native UIKit and Android view
-hierarchies, with a React-style component model on top. If you have
-worked with React Native, the surface API will feel familiar; the
-runtime, however, is meaningfully different.</p>
-<h2 id="tldr">TL;DR<a class="headerlink" href="#tldr" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>@pn.component</code> functions return immutable
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> descriptors. Nothing is mounted
-  until the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> commits
-  the tree.</li>
-<li>Hooks (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_state&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_state"><code>use_state</code></a>,
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a>, etc.) drive re-renders.
-  State updates are batched per render pass.</li>
-<li>Re-rendering produces a new tree; the reconciler diffs it against
-  the previous one and applies the smallest set of native mutations.</li>
-<li>Native widgets are created and updated by Swift and Kotlin
-  component managers that receive one serialized transaction per
-  commit over the <a href="../bridge/">native bridge</a>. There is no JavaScript
-  and no V8 / Hermes runtime.</li>
-</ul>
-<h2 id="the-runtime-in-one-diagram">The runtime in one diagram<a class="headerlink" href="#the-runtime-in-one-diagram" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>@pn.component fn   ---&gt;   Element tree   ---&gt;   Reconciler   ---&gt;   Native views
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>        ^                                            |
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        |                                            v
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>   set_state()   &lt;---------   schedule re-render   batched   ---&gt;   diff + patch
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                                                                          |
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                                                                          v
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                                                                     flush effects
-</span></code></pre></div>
-<p>Each render pass has three phases:</p>
-<ol>
-<li><strong>Render</strong>: component functions run; hooks record state reads,
-   queue effects, register memos. No native widgets change yet.</li>
-<li><strong>Commit</strong>: the reconciler applies the diff to native views,
-   creating, updating, and removing widgets through the registered
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a>
-   implementations.</li>
-<li><strong>Effect</strong>: pending <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a>
-   callbacks fire in depth-first order; cleanups from the previous
-   render run before the new callbacks.</li>
-</ol>
-<p>If an effect sets state, the loop kicks off again (with a safety cap
-that prevents render storms).</p>
-<h2 id="how-pythonnative-differs-from-react-native">How PythonNative differs from React Native<a class="headerlink" href="#how-pythonnative-differs-from-react-native" title="Permanent link">&para;</a></h2>
+<h1 id="runtime-overhaul">Runtime overhaul<a class="headerlink" href="#runtime-overhaul" title="Permanent link">&para;</a></h1>
+<p>PythonNative now uses one logical application tree and a standard asyncio loop
+on a dedicated application thread. Native runtimes own widgets, measurement,
+input, scrolling, and animation frames. This is a breaking pre-1.0 change:
+rebuild application clients together with the Python package.</p>
+<h2 id="implemented-architecture">Implemented architecture<a class="headerlink" href="#implemented-architecture" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Concept</th>
-<th>React Native</th>
-<th>PythonNative</th>
+<th>Area</th>
+<th>Result</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Component language</td>
-<td>JavaScript / TypeScript</td>
-<td>Python</td>
+<td>Async runtime</td>
+<td>Standard asyncio tasks, sockets, task groups, timeouts, component task scopes, async event handlers, and native cancellation.</td>
+</tr>
+<tr>
+<td>State and data</td>
+<td>Immutable snapshot comparison, reliable resubscription, bounded shared query caching with explicit keys, and cancellation of abandoned requests. Implicit queries belong to their hook instance.</td>
+</tr>
+<tr>
+<td>Logical ownership</td>
+<td>Screens, overlays, and bounded keyed list rows share providers, boundaries, and component task ownership. Native containers own presentation.</td>
 </tr>
 <tr>
 <td>Bridge</td>
-<td>Fabric: one C++ shadow tree commit per render; TurboModules for device APIs</td>
-<td>One JSON transaction per commit applied by Swift / Kotlin component managers; named native modules for device APIs</td>
+<td>Protocol 2 validates a complete revisioned commit before mutation. Acknowledgements, event sequences, text edit revisions, and live refs prevent stale updates.</td>
 </tr>
 <tr>
-<td>Threading</td>
-<td>UI runs on the main thread; JS on a separate thread</td>
-<td>Native UI on its platform thread; Python on a dedicated asyncio application thread</td>
+<td>Layout</td>
+<td>Pinned Yoga 3.2.1 runs in the host binding and native libraries. Native leaf measurement produces batched changed frames. The browser uses Yoga WebAssembly.</td>
 </tr>
 <tr>
-<td>Distribution</td>
-<td>Metro bundler ships a JS bundle</td>
-<td><code>pn build</code> bundles your <code>app/</code> and the <code>pythonnative</code> package into the native project</td>
+<td>Native lists</td>
+<td>UIKit collection views and Android recycler views own keyed cells, variable row measurements, both scroll axes, and scrolling. Python mounts a bounded window of ordinary row components.</td>
 </tr>
 <tr>
-<td>Dev loop</td>
-<td>Metro dev server; Expo Go / dev client on device; Fast Refresh</td>
-<td><code>pn start</code> dev server; debug builds and the <code>--dev-client</code> shell connect over WebSocket; Fast Refresh reloads <code>.py</code> modules in place</td>
+<td>Animation</td>
+<td>Serialized expression graphs, timing, spring, decay, derived values, color interpolation, and native scroll and gesture bindings. Binding replacement preserves running graph ownership.</td>
 </tr>
 <tr>
-<td>Preview without a device</td>
-<td>Expo web / Snack</td>
-<td><code>pn preview</code> renders in a browser tab through the same bridge protocol the native runtimes speak</td>
+<td>SDK</td>
+<td>Dataclass and protocol contracts generate typed props, module adapters, validators, Python facades, and schema documentation. Builds merge plugin contracts and verify the startup fingerprint.</td>
 </tr>
 <tr>
-<td>Native widgets</td>
-<td>Wrapped by Fabric component managers</td>
-<td>Wrapped by <code>PNComponentManager</code> (Swift) / <code>ComponentManager</code> (Kotlin) classes</td>
+<td>Builds</td>
+<td>Extracted native libraries, target wheel locks with hashes, archive-based plugin discovery, managed native resources, and clean source and wheel distributions.</td>
+</tr>
+<tr>
+<td>Development</td>
+<td>Conservative hook-signature refresh, component remounts for incompatible changes, service-change remounts, phase tracing, and updated architecture documentation.</td>
+</tr>
+<tr>
+<td>Reference app</td>
+<td>An offline inbox with 2,000 variable-height records, deferred search, shared state, editing, optimistic persistence and rollback, native navigation, and a custom native extension.</td>
 </tr>
 </tbody>
 </table>
-<p>The single most important consequence: there is <strong>no async boundary</strong>
-between Python and the native widget. Reading a label's text in Python
-is a synchronous JNI / Objective-C method call. That keeps the model
-small (no message-passing protocol, no serialization) and lets native
-APIs that expect synchronous, on-thread access just work.</p>
-<h2 id="how-pythonnative-differs-from-toga-beeware-kivy">How PythonNative differs from Toga, BeeWare, Kivy<a class="headerlink" href="#how-pythonnative-differs-from-toga-beeware-kivy" title="Permanent link">&para;</a></h2>
+<p>The former guest event loop, coroutine stepper, hand-written Python flex layout,
+row-host pool, and imperative per-screen host navigation have been removed.
+There are no compatibility adapters for those paths.</p>
+<h2 id="working-with-the-new-runtime">Working with the new runtime<a class="headerlink" href="#working-with-the-new-runtime" title="Permanent link">&para;</a></h2>
+<p>Read <a href="../../concepts/architecture/">the architecture</a>,
+<a href="../../concepts/bridge/">bridge contract</a>, and
+<a href="../../guides/native-contracts/">generated native contracts guide</a>.
+<code>examples/inbox/README.md</code> describes running the reference app and its mobile
+acceptance flow.</p>
+<p>For application-thread timings, set <code>PN_PROFILE</code> to a writable trace path before
+starting the process. Collection is bounded to the latest 10,000 events and
+exports at normal process exit. For explicit capture, use
+<code>pythonnative.profiling.Profiler</code> as a context manager and call <code>export(path)</code>.
+Traces include component rendering, layout and commit phases, rendered-component
+counts, and bridge operation and byte counts. Native frame profiling still uses
+Instruments or Android's platform tools.</p>
+<h2 id="validation-and-practical-limits">Validation and practical limits<a class="headerlink" href="#validation-and-practical-limits" title="Permanent link">&para;</a></h2>
+<p>Validation covers the Python suite, generated-file drift, static typing,
+formatting, strict documentation builds, native unit tests and compilation,
+installed-wheel layout, and real simulator and emulator flows. The reference
+flow exercises search, native text editing, save, navigation, and process restart
+with persisted data. A separate embedded-runtime flow exercises sockets,
+<code>TaskGroup</code>, timeout, and cancellation on both platforms.</p>
+<p>The application host currently uses one surface. A failed commit requires a
+complete surface reset and remount. Reconciliation reduces work at dirty
+component roots but doesn't time-slice arbitrary Python render functions.
+Native frame drivers continue independently; CPU-heavy Python work should yield
+cooperatively or run outside the application thread.</p>
+<p>Wheel locks guarantee the selected artifacts and their hashes. Cross-platform
+dependency markers and unavailable mobile system APIs still require validation
+on each embedded runtime. Simulator builds don't validate device signing or
+store submission. Native transition polish, exhaustive accessibility audits,
+and performance budgets on physical devices remain release work.</p>
+<h2 id="local-validation-results">Local validation results<a class="headerlink" href="#local-validation-results" title="Permanent link">&para;</a></h2>
+<p>The implementation was checked with Python 3.13, an iOS 18.6 simulator, and an
+Android API 31 emulator:</p>
 <ul>
-<li>Toga and Kivy are imperative widget toolkits. PythonNative is
-  declarative: you describe the tree per render, and the reconciler
-  figures out the diff.</li>
-<li>Kivy renders its own widgets via OpenGL. PythonNative renders
-  <em>real</em> native widgets, so your buttons look like UIKit buttons on
-  iOS and Material buttons on Android, and accessibility just works.</li>
-<li>BeeWare's Briefcase is a packaging story; PythonNative ships its
-  own <code>pn</code> CLI for the same purpose, plus a UI runtime.</li>
+<li>Python: 1,222 tests passed; 14 opt-in package-matrix tests were skipped.</li>
+<li>Native libraries: 40 iOS tests and 34 Android tests passed.</li>
+<li>Mobile flows: standard asyncio, animations, stack and other navigation,
+  vertical and horizontal list recycling, and the inbox acceptance workflow.</li>
+<li>Browser: inbox search, navigation, text editing, save, and reload persistence.</li>
+<li>Builds: Android release library, APK, and app bundle; iOS simulator Release
+  configuration; source distribution and wheel, including isolated installation.</li>
+<li>Tooling: Ruff, Black, MyPy, strict MkDocs, generated-contract drift checks,
+  E2E export coverage, and installation of locked iOS Simulator wheels.</li>
 </ul>
-<h2 id="mental-shortcuts">Mental shortcuts<a class="headerlink" href="#mental-shortcuts" title="Permanent link">&para;</a></h2>
-<p>When something feels surprising, fall back on these rules:</p>
-<div class="admonition tip">
-<p class="admonition-title">It's just Python</p>
-<p>There is no compiler, no transpiler, and no JS runtime.
-<code>print(x)</code> reaches the device console; <code>import foo</code> runs the
-bundled module. If a stack trace mentions <code>pythonnative.*</code>, you
-can open that file in your editor and read the source.</p>
-</div>
-<div class="admonition tip">
-<p class="admonition-title">Components are functions</p>
-<p>Each call to a <code>@component</code> function should produce the same
-output for the same input plus current hook state. Side effects
-belong in <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a>.</p>
-</div>
-<div class="admonition tip">
-<p class="admonition-title">Native widgets are real</p>
-<p>A <code>pn.Text</code> becomes a <code>UILabel</code> or a <code>TextView</code>. Anything you can
-do to those in their respective SDKs, you can usually do via a
-custom <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a>.</p>
-</div>
-<h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<ul>
-<li>See the runtime in detail: <a href="../architecture/">Architecture</a>.</li>
-<li>Walk through a render: <a href="../lifecycle/">Lifecycle</a>.</li>
-<li>Learn how trees are diffed: <a href="../reconciliation/">Reconciliation</a>.</li>
-</ul>
+<p>The complete 85-flow mobile suite wasn't run in this local pass. The CI workflow
+retains the full suite; the local flows focus on the changed runtime boundaries.</p>
 
 
 

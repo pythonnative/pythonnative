@@ -541,6 +541,8 @@
       
         
       
+        
+      
     
     
     
@@ -631,6 +633,34 @@
     
   
     Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/runtime-overhaul/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Overhaul
   
 
     
@@ -857,6 +887,8 @@
   
     
     
+      
+        
       
         
       
@@ -1277,34 +1309,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Native screens">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#ios" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        iOS
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#android" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Android
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -1521,6 +1525,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../native-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Native Contracts
   
 
     
@@ -3588,34 +3620,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Native screens">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#ios" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        iOS
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#android" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Android
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -3960,62 +3964,26 @@ Python) takes precedence, then <code>initial_state</code>, then the launch URL.<
 and URLs that arrive while running dispatch as <code>navigate</code> calls.
 <code>linking.url_from_state(state)</code> goes the other way, for sharing.</p>
 <h2 id="native-screens">Native screens<a class="headerlink" href="#native-screens" title="Permanent link">&para;</a></h2>
-<p>At the root of a native host, <code>Stack.Navigator</code> never mutates its own
-state for pushes and pops. It hands the <em>serialized next state</em> to the
-host (<code>push_screen</code>, <code>pop_screens</code>, <code>replace_screen</code>,
-<code>reset_screens</code>), the platform creates a new view controller or
-fragment, and the new screen's navigator boots from that state. Each
-native screen owns a Python
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ScreenHost&lt;/span&gt;" href="../../api/hosts/#pythonnative.hosts.base.ScreenHost"><code>ScreenHost</code></a> and reconciler, so:</p>
-<ul>
-<li>The previous screen's hook state and native views are preserved by
-  the platform stack.</li>
-<li>The new screen renders the right route on its first frame.</li>
-<li>Hot reload runs per host: each active screen swaps its function
-  references in place ("Fast Refresh"), falling back to a remount only
-  for screens that can't be refreshed cleanly.</li>
-</ul>
-<p><code>title</code> and the other header options are pushed to the host through
-<code>set_screen_options</code>, so <code>nav.set_options(title=...)</code> updates the
-native bar.</p>
-<h3 id="ios">iOS<a class="headerlink" href="#ios" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Each pushed screen is a Swift <code>ViewController</code> on a root
-  <code>UINavigationController</code> set up by the template's <code>SceneDelegate</code>.</li>
-<li><code>presentation="modal"</code> presents the screen as a sheet.</li>
-<li><code>gesture_enabled=False</code> disables the interactive pop gesture.</li>
-</ul>
-<h3 id="android">Android<a class="headerlink" href="#android" title="Permanent link">&para;</a></h3>
-<ul>
-<li>The host <code>MainActivity</code> embeds a <code>NavHostFragment</code> with a single
-  generic <code>ScreenFragment</code> destination; each pushed screen is a fresh
-  fragment whose arguments carry the serialized navigation state, so
-  it restores across configuration changes.</li>
-<li>Push and pop delegate to <code>NavController</code> through a small <code>Navigator</code>
-  Kotlin helper.</li>
-<li>The hardware back button and predictive back gesture run
-  <code>before_remove</code> listeners and
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_back_handler&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_back_handler"><code>use_back_handler</code></a> callbacks
-  before the platform pops.</li>
-</ul>
+<p>A root stack renders keyed logical <code>Screen</code> children within one application
+reconciler. UIKit navigation controllers and Android fragments present those
+existing roots. Pushing a screen preserves providers, repositories, and state
+above the navigator. Covered screens remain mounted until they leave the stack.
+Native containers own the content rectangle below their navigation bars.</p>
+<p>Navigation changes are cached on the native host before lifecycle state-saving
+callbacks. Back requests return to Python asynchronously so <code>before_remove</code>
+listeners and back handlers can decide whether to remove a route.</p>
 <h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
-<p>Navigation is fully testable without a device with
-<a href="../../api/testing/"><code>pythonnative.testing</code></a>. Rendering under a
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeHost&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.FakeHost"><code>FakeHost</code></a> records what a root stack
-would ask the platform to do:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeHost</span><span class="p">,</span> <span class="n">render</span>
+<p>Use <code>render</code>, <code>press</code>, and <code>back</code> to exercise complete navigation flows in one
+tree. <code>FakeHost</code> supplies lifecycle focus and restoration state when needed.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render</span>
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
 </span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_home_opens_detail</span><span class="p">():</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">host</span> <span class="o">=</span> <span class="n">FakeHost</span><span class="p">()</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">App</span><span class="p">(),</span> <span class="n">host</span><span class="o">=</span><span class="n">host</span><span class="p">)</span>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">result</span><span class="o">.</span><span class="n">press</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Open item 42"</span><span class="p">))</span>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">state</span><span class="p">,</span> <span class="n">options</span> <span class="o">=</span> <span class="n">host</span><span class="o">.</span><span class="n">pushed</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="k">assert</span> <span class="n">state</span><span class="p">[</span><span class="s2">"routes"</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s2">"name"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"Detail"</span>
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    <span class="k">assert</span> <span class="n">options</span><span class="p">[</span><span class="s2">"title"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"Item 42"</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">App</span><span class="p">())</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">result</span><span class="o">.</span><span class="n">press</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Open item 42"</span><span class="p">))</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Item 42"</span><span class="p">)</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">back</span><span class="p">()</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Open item 42"</span><span class="p">)</span>
 </span></code></pre></div>
-<p>Without a host, the same stack renders in Python so <code>get_by_text</code>,
-<code>press</code>, and <code>back()</code> drive a whole flow in one test. See the
-<a href="../testing/">Testing guide</a>.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li>See worked navigation examples: <a href="../../examples/navigation/">Examples/Navigation</a>.</li>

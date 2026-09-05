@@ -541,6 +541,8 @@
       
         
       
+        
+      
     
     
     
@@ -631,6 +633,34 @@
     
   
     Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/runtime-overhaul/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Overhaul
   
 
     
@@ -857,6 +887,8 @@
   
     
     
+      
+        
       
         
       
@@ -1263,6 +1295,34 @@
     
   
     Native Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../native-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Native Contracts
   
 
     
@@ -3426,7 +3486,7 @@ any debug build launched with <code>pn run</code> while it's running is a client
    already on its path).</li>
 <li>The client resolves the path to a module (<code>app.screens.home</code>) and
    calls <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply_reload&lt;/span&gt;" href="../../api/hot_reload/#pythonnative.hot_reload.apply_reload"><code>apply_reload</code></a> on the
-   main thread.</li>
+   application thread.</li>
 <li><code>apply_reload</code> re-executes the changed module, then the other
    imported modules under <code>app</code> that may hold bindings to it (the
    entry module's <code>from app.screens.home import HomeScreen</code>, for
@@ -3436,7 +3496,9 @@ any debug build launched with <code>pn run</code> while it's running is a client
    looks up the replacement by <code>__module__</code> + <code>__qualname__</code>, and
    rewrites the <code>Element.type</code> references in place. The next
    reconcile sees the new function with the same <code>HookState</code>, so state
-   survives.</li>
+   survives when the captured hook signature is compatible. Hook-order or
+   custom-hook changes remount the affected component. Helper-class and service
+   changes trigger an application remount.</li>
 <li>The host re-renders. Layout and native views update incrementally
    through the normal reconciler path.</li>
 <li>The client reports back (<code>fast_refresh: app.screens.home 42ms</code>),
@@ -3451,10 +3513,8 @@ and the report says <code>remount</code>.</p>
 previous module stays in <code>sys.modules</code>, the traceback shows in the
 RedBox and the terminal, and the app keeps running. Fix the file and
 save again.</p>
-<p>Per-screen scope: each native screen (<code>UIViewController</code> on iOS,
-<code>ScreenFragment</code> on Android, a screen element in the preview) runs its
-own host, so Fast Refresh operates independently per host. Two pushed
-screens that both use a changed module each swap their own references.</p>
+<p>Refresh walks the application's shared logical tree, including covered screens
+and mounted list rows. Native containers don't create separate Python hosts.</p>
 <h2 id="what-gets-reloaded">What gets reloaded<a class="headerlink" href="#what-gets-reloaded" title="Permanent link">&para;</a></h2>
 <p>Any <code>.py</code> file under <code>app/</code>. Assets under <code>app/</code> (images, JSON, fonts)
 are synced too, so an <code>Image</code> that points at a bundle-relative file
