@@ -7,6 +7,7 @@ on:
 
 jobs:
   release:
+    if: github.repository == 'pythonnative/pythonnative'
     name: Semantic Release
     runs-on: ubuntu-latest
     concurrency:
