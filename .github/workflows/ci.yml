@@ -57,7 +57,7 @@ jobs:
       # a named destination is missing, so resolve an available iPhone
       # simulator by UDID instead of hardcoding a model name.
       - name: Run PythonNativeKit tests
-        working-directory: src/pythonnative/templates/ios_template/PythonNativeKit
+        working-directory: src/pythonnative/native/ios
         run: |
           set -o pipefail
           UDID="$(xcrun simctl list devices available -j | python3 -c '
@@ -95,5 +95,5 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Run pythonnative module tests
-        working-directory: src/pythonnative/templates/android_template
-        run: ./gradlew :pythonnative:testDebugUnitTest --no-daemon
+        working-directory: src/pythonnative/native/android
+        run: ../../templates/android_template/gradlew testDebugUnitTest --no-daemon

@@ -1,0 +1,6 @@
+{
+  "name": "InboxExtension",
+  "contracts": "schema.json",
+  "ios": {"entry": "InboxExtension"},
+  "android": {"entry": "dev.pythonnative.inbox.extension.InboxExtension"}
+}

@@ -28,8 +28,6 @@ this module holds the render/diff/commit pipeline,
 
 from __future__ import annotations
 
-import asyncio
-import inspect
 import os
 from contextlib import contextmanager
 from functools import partial
@@ -41,8 +39,10 @@ from ..element import ERROR_BOUNDARY, FRAGMENT, SUSPENSE, Element
 from ..events import extract_events, get_event_registry
 from ..hooks import Context, HookState, install_hook_state, restore_hook_state
 from ..mutations import CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
+from ..profiling import profiled
+from ..runtime import _scope
 from ..scheduler import TransitionQueue, schedule_trigger
-from ..suspense import CoroDriver, Suspend
+from ..suspense import Suspend
 from .boundaries import BoundaryMixin, HydrationMap
 from .children import plan_child_moves
 from .layout_pass import LayoutMixin, affects_layout
@@ -91,6 +91,11 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     def __init__(self, backend: Any) -> None:
         self.backend = backend
         self.root: Optional[VNode] = None
+        self._tag_nodes: Dict[int, VNode] = {}
+        self._effect_states: Dict[int, HookState] = {}
+        self._native_children: Dict[int, List[int]] = {}
+        if hasattr(backend, "on_layout"):
+            backend.on_layout = self._accept_native_layout
         self.on_render_requested: Optional[Callable[[], None]] = None
         self.on_back_registered: Optional[Callable[[], None]] = None
         self.transitions = TransitionQueue()
@@ -175,6 +180,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             self._warn_on_multiple_roots()
         return self.root_view()
 
+    @profiled("render")
     def flush_dirty(self) -> Any:
         """Re-render only the components whose state changed, then commit.
 
@@ -226,18 +232,6 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             if handler():
                 return True
         return False
-
-    def reset_hook_signatures(self) -> None:
-        """Forget recorded hook-order signatures across the whole tree (Fast Refresh)."""
-
-        def walk(node: VNode) -> None:
-            if node.hook_state is not None:
-                node.hook_state.reset_hook_signature()
-            for child in node.children:
-                walk(child)
-
-        if self.root is not None:
-            walk(self.root)
 
     def walk(self) -> Iterator[VNode]:
         """Yield every mounted node in depth-first, document order."""
@@ -366,7 +360,6 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     def _commit(self) -> None:
         """Apply the staged transaction and run the post-commit phases."""
         self._flush_ops()
-        self._fix_tree_links()
         self._run_layout()
         self._flush_ops()
         self._dispatch_layout_events()
@@ -375,6 +368,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         self._flush_passive_effects()
         self._flush_ops()
 
+    @profiled("commit")
     def _flush_ops(self) -> None:
         """Send pending ops to the backend and resolve created views."""
         ops = self._ops
@@ -390,38 +384,28 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 continue
             node.native_view = self.backend.resolve_view(node.tag)
             self._attach_ref(node.element, node.native_view, node.tag)
-
-    def _fix_tree_links(self) -> None:
-        """Refresh ``parent`` links and delegated wrapper identity across the tree."""
-        if self.root is None:
-            return
-        self.root.parent = None
-        self._fix_node_links(self.root)
-
-    def _fix_node_links(self, node: VNode) -> None:
-        for child in node.children:
-            child.parent = node
-            self._fix_node_links(child)
-        if not node.is_native:
-            self._refresh_identity(node)
+            ancestor = node.parent
+            scope = None
+            while ancestor is not None:
+                if scope is None and ancestor.hook_state is not None:
+                    scope = ancestor.hook_state.task_scope
+                if not ancestor.is_native:
+                    self._refresh_identity(ancestor)
+                ancestor = ancestor.parent
+            self._events.set_scope(node.tag, scope)
 
     def _flush_layout_effects(self) -> None:
-        if self.root is not None:
-            self._walk_effects(self.root, layout=True)
+        for state in sorted(
+            self._effect_states.values(), key=lambda hs: hs.vnode.depth() if hs.vnode else 0, reverse=True
+        ):
+            if state.vnode is not None and state.vnode.mounted:
+                state.flush_layout_effects()
 
     def _flush_passive_effects(self) -> None:
-        if self.root is not None:
-            self._walk_effects(self.root, layout=False)
-
-    def _walk_effects(self, node: VNode, layout: bool) -> None:
-        for child in node.children:
-            self._walk_effects(child, layout)
-        hs = node.hook_state
-        if hs is not None:
-            if layout:
-                hs.flush_layout_effects()
-            else:
-                hs.flush_pending_effects()
+        states, self._effect_states = self._effect_states, {}
+        for state in sorted(states.values(), key=lambda hs: hs.vnode.depth() if hs.vnode else 0, reverse=True):
+            if state.vnode is not None and state.vnode.mounted:
+                state.flush_pending_effects()
 
     # ------------------------------------------------------------------
     # Tree creation
@@ -450,6 +434,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         tag = next_tag()
         clean_props, events = self._split_props(element.props)
         node = VNode(element, [], tag=tag)
+        self._tag_nodes[tag] = node
         node.clean_props = clean_props
         if events:
             self._events.set_events(tag, events)
@@ -476,6 +461,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         except Exception:
             self._destroy_tree(node)
             raise
+        self._native_children[tag] = self._flattened_child_tags(node)
         return node
 
     def _create_component(self, element: Element) -> VNode:
@@ -553,24 +539,55 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     # Component bodies
     # ------------------------------------------------------------------
 
+    @profiled("component")
     def _render_component_body(self, hook_state: HookState, element: Element) -> List[Element]:
-        """Run a component's function with hook state installed and normalize its output.
+        """Render synchronously or suspend on a real, component-owned task."""
+        from ..profiling import count
 
-        ``async def`` bodies are driven synchronously as far as they can
-        go (see [`CoroDriver`][pythonnative.suspense.CoroDriver]); if
-        the body blocks on pending work, ``Suspend`` propagates,
-        annotated with the component's hook state so a Suspense
-        boundary can preserve it across retries.
-        """
+        count("components.rendered")
+        self._effect_states[id(hook_state)] = hook_state
         component: Component = element.type
         label = component.display_name
-        hook_state.begin_render(label)
         hook_state.owner = self
+        if component.is_async:
+            previous = hook_state._async_task
+            inputs = (element.props, element.children)
+            from ..equality import equal
+
+            if previous is not None and not equal(hook_state._async_inputs, inputs):
+                previous.cancel()
+                previous = hook_state._async_task = None
+            if previous is None:
+
+                async def render_body() -> Any:
+                    hook_state.begin_render(label)
+                    token = install_hook_state(hook_state)
+                    try:
+                        result = await component.render(element)
+                        hook_state.finish_render()
+                        return result
+                    except BaseException:
+                        hook_state.abort_render()
+                        raise
+                    finally:
+                        restore_hook_state(token)
+
+                previous = hook_state.task_scope.create_task(render_body())
+                hook_state._async_task = previous
+                hook_state._async_inputs = inputs
+            if not previous.done():
+                signal = Suspend(previous, hook_state=hook_state, label=label)
+                signal.key = (id(element.type), element.key)
+                raise signal
+            hook_state._async_task = None
+            hook_state._dirty = False
+            return normalize_children(previous.result(), owner=label)
+
+        hook_state.begin_render(label)
         token = install_hook_state(hook_state)
+        scope_token = _scope.set(hook_state.task_scope)
         try:
             rendered = component.render(element)
-            if inspect.iscoroutine(rendered):
-                rendered = self._drive_async_body(hook_state, label, rendered)
             hook_state.finish_render()
         except Suspend as signal:
             hook_state.abort_render()
@@ -582,44 +599,10 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 signal.label = label
             raise
         finally:
+            _scope.reset(scope_token)
             restore_hook_state(token)
             hook_state._dirty = False
         return normalize_children(rendered, owner=label)
-
-    @staticmethod
-    def _drive_async_body(hook_state: HookState, label: str, coro: Any) -> Any:
-        """Drive an ``async def`` component body, suspending when it blocks.
-
-        A previous in-flight body for the same component is cancelled
-        first: only the newest render's coroutine may deliver a tree.
-        When the previous attempt finished while the component was
-        suspended, its result is consumed instead of re-running the
-        body, so bodies awaiting one-shot work make progress.
-        """
-        prev = hook_state._async_driver
-        if prev is not None:
-            if prev.done and not prev.cancelled():
-                coro.close()
-                hook_state._async_driver = None
-                hook_state._hook_log = None
-                error = prev.exception()
-                if error is not None:
-                    raise error
-                return prev.result()
-            if not prev.done:
-                prev.cancel()
-        driver = CoroDriver(coro)
-        hook_state._async_driver = driver
-        driver.start()
-        if driver.done:
-            hook_state._async_driver = None
-            if driver.cancelled():
-                raise asyncio.CancelledError()
-            error = driver.exception()
-            if error is not None:
-                raise error
-            return driver.result()
-        raise Suspend(driver, hook_state=hook_state, label=label)
 
     def _register_component_retry(self, vnode: VNode, signal: Suspend) -> None:
         """Re-render ``vnode`` once the work it suspended on completes.
@@ -681,13 +664,17 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         and re-syncs that container's children afterwards, so only the
         moves the update actually caused reach the native side.
         """
+        before_roots = [root.tag for root in self._native_roots(node)]
         container = self._nearest_native_ancestor(node)
-        before = self._flattened_child_tags(container) if container is not None else []
+        before = self._native_children.get(container.tag, []) if container is not None else []
         work()
         current = node.parent
         while current is not None and current is not container:
             self._refresh_identity(current)
             current = current.parent
+        after_roots = [root.tag for root in self._native_roots(node)]
+        if before_roots == after_roots:
+            return
         if container is not None and container.tag is not None:
             if self._sync_native_children(container.tag, before, self._flattened_child_roots(container)):
                 self._mark_layout_dirty(container)
@@ -758,6 +745,17 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             self._destroy_tree(old)
             return new_node
         if old.is_native:
+            from ..equality import equal
+            from ..sdk.schema import COMPONENTS
+
+            schema = COMPONENTS.get(new_el.type)
+            if schema is not None and any(
+                field.get("native", {}).get("recreate") and not equal(old.element.props.get(key), new_el.props.get(key))
+                for key, field in schema.props.items()
+            ):
+                new_node = self._create_tree(new_el)
+                self._destroy_tree(old)
+                return new_node
             return self._reconcile_native(old, new_el)
         if old.is_component:
             return self._reconcile_component(old, new_el)
@@ -966,6 +964,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             node.suspense_hydration = None
         hs = node.hook_state
         if hs is not None:
+            self._effect_states.pop(id(hs), None)
             if salvage is not None and node.is_component:
                 salvage.setdefault((id(node.element.type), node.element.key), []).append(hs)
             else:
@@ -975,6 +974,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         for child in node.children:
             self._destroy_tree(child, salvage=salvage)
         if node.is_native and node.tag is not None:
+            self._native_children.pop(node.tag, None)
+            self._tag_nodes.pop(node.tag, None)
             self._events.clear(node.tag)
             self._ops.append(DestroyOp(node.tag))
             self._destroyed_tags.add(node.tag)
@@ -1041,6 +1042,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
 
         Returns whether the native child list changed at all.
         """
+        self._native_children[parent_tag] = [root.tag for root in after_roots if root.tag is not None]
         surviving = [t for t in before_tags if t not in self._destroyed_tags]
         after_tags = [r.tag for r in after_roots if r.tag is not None]
         if surviving == after_tags:
@@ -1071,7 +1073,17 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         if not props:
             return {}, {}
         stripped = {key: value for key, value in props.items() if key not in _RECONCILER_OWNED_PROPS}
-        return extract_events(stripped)
+        clean, events = extract_events(stripped)
+        from ..animated import AnimatedEvent
+
+        bindings = {
+            name: {field: id(value) for field, value in callback._bindings.items()}
+            for name, callback in events.items()
+            if isinstance(callback, AnimatedEvent)
+        }
+        if bindings:
+            clean["_pn_animated_events"] = bindings
+        return clean, events
 
     @staticmethod
     def _diff_props(old: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:

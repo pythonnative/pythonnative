@@ -105,8 +105,15 @@ from ._components import (
     register_component,
     unregister_component,
 )
+from .codegen import generate
+from .schema import ComponentSchema, ModuleSchema, NativeField, register_schema
 
 __all__ = [
+    "ComponentSchema",
+    "ModuleSchema",
+    "NativeField",
+    "register_schema",
+    "generate",
     # Core types
     "Element",
     "ViewHandler",

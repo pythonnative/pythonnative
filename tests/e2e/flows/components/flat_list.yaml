@@ -1,6 +1,6 @@
 # Tests FlatList virtualizes rows; scrolling reveals later rows.
 # With a fixed item_height the demo takes the native virtualization
-# path (RecyclerView / UITableView with nested-reconciler rows), so
+# path (RecyclerView / UICollectionView with keyed logical rows), so
 # this flow exercises native cell recycling end to end.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/flat_list.py
@@ -30,6 +30,19 @@ appId: ${APP_ID}
     element: "FlatRow 40"
     direction: DOWN
     timeout: 45000
+    waitToSettleTimeoutMs: 500
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible: "FlatRow 40"
+# Horizontal rows are wider than vertical row heights. Use a faster native
+# fling and allow the greater travel distance to the same final row.
+- tapOn: "Show horizontal list"
+- assertVisible: "FlatRow 1"
+- scrollUntilVisible:
+    element: "FlatRow 40"
+    direction: RIGHT
+    speed: 80
+    timeout: 90000
     waitToSettleTimeoutMs: 500
     visibilityPercentage: 100
     centerElement: false

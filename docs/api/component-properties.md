@@ -477,7 +477,7 @@ pn.FlatList(data=items, render_item=render_fn, key_extractor=key_fn,
 - `render_item`: `(item, index) -> Element` function
 - `key_extractor`: `(item, index) -> str` for stable keys
 - `item_height`: fixed row height; qualifies the list for the native
-  RecyclerView / UITableView virtualization path (see the
+  RecyclerView / UICollectionView virtualization path (see the
   [Lists guide](../guides/lists.md))
 - `separator_height`: spacing between items
 - `horizontal`: lay rows out left-to-right (Python-windowed engine)

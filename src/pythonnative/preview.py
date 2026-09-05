@@ -1,26 +1,12 @@
-"""``pn start`` / ``pn preview``: the dev server plus the browser preview.
+"""Development server and browser preview.
 
-[`serve`][pythonnative.preview.serve] runs one process that does three
-jobs:
+The browser is a protocol-2 renderer with Yoga WebAssembly layout. Python runs
+on the standard application asyncio loop; the transport's coordinator and
+network threads forward messages to their owners. The dev server watches app
+sources, synchronizes mobile clients, and applies compatible Fast Refresh.
 
-1. **Dev server** (``pythonnative.devserver``): watches ``app/``, syncs
-   sources to every connected dev client (simulators, emulators,
-   physical devices), and relays their logs to this terminal.
-2. **Browser preview**: renders the app in a browser tab. The tab is a
-   bridge peer like any device; the reconciler runs in *this* process
-   on the main thread and commits through
-   [`WebTransport`][pythonnative.bridge.web.WebTransport].
-3. **Fast Refresh** for the preview: every save reloads the changed
-   modules here and refreshes the mounted screens, exactly as the dev
-   client does on device.
-
-The main thread runs the transport's main loop; that is the browser's
-stand-in for the UIKit / Android main queue. Everything else (sockets,
-the file watcher) lives on daemon threads and marshals work onto it.
-
-``PN_PLATFORM=web`` must be set before ``pythonnative`` is imported so
-platform detection binds to the browser backend; the CLI re-execs
-itself to guarantee that.
+PN_PLATFORM=web must be set before importing pythonnative; the CLI launches a
+child process with that environment when needed.
 """
 
 from __future__ import annotations
@@ -88,10 +74,9 @@ class PreviewSession:
         # (a failing import of the entry module, say).
         diagnostics.set_error_reporter(self, self._report_error)
         bridge.set_transport(self.transport)
-        # Warm the guest loop on this thread so it is owned by the main thread.
-        from .runtime import get_loop
+        from .runtime import start as start_runtime
 
-        get_loop()
+        start_runtime()
         self.server.set_preview_channel(self.transport)
         self._unsubscribe = self.server.add_change_listener(self._on_sources_changed)
         self.server.start()
@@ -152,7 +137,7 @@ class PreviewSession:
                 {"type": "reload", "ok": True, "mode": result.mode, "modules": result.reloaded, "ms": elapsed_ms}
             )
 
-        self.transport.post_to_main(_apply)
+        self.transport.post_to_application(_apply)
 
     # -- peers -------------------------------------------------------------
 

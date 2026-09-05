@@ -1,0 +1,321 @@
+{
+  "indexes": [],
+  "python": "3.13",
+  "requirements": [
+    "httpx",
+    "numpy"
+  ],
+  "targets": {
+    "android:3.13:arm64_v8a::24": {
+      "packages": [
+        {
+          "filename": "anyio-4.15.0-py3-none-any.whl",
+          "name": "anyio",
+          "sha256": "7ecd9937369ffce8bba0b5ccb9b3a9507b101b0ed50256aecfbab27e6c2acb99",
+          "url": "https://files.pythonhosted.org/packages/21/a6/2b21ce5ebe4d8938a247c9b0dbb7271566ae559b01795c83ea4bb2660ed7/anyio-4.15.0-py3-none-any.whl",
+          "version": "4.15.0"
+        },
+        {
+          "filename": "certifi-2026.7.22-py3-none-any.whl",
+          "name": "certifi",
+          "sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775",
+          "url": "https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl",
+          "version": "2026.7.22"
+        },
+        {
+          "filename": "chaquopy_libcxx-180000-0-py3-none-android_24_arm64_v8a.whl",
+          "name": "chaquopy-libcxx",
+          "sha256": "811547210b01eefb0fb850fd35bd27b53a00a76b9466b8c03e049b7e8175004b",
+          "url": "https://chaquo.com/pypi-13.1/chaquopy-libcxx/chaquopy_libcxx-180000-0-py3-none-android_24_arm64_v8a.whl",
+          "version": "180000"
+        },
+        {
+          "filename": "chaquopy_libgfortran-4.9-0-py3-none-android_21_arm64_v8a.whl",
+          "name": "chaquopy-libgfortran",
+          "sha256": "0b4caed1147f2a19707d4ba730afea57f7b8f2d8c046d8a48cf49377741c4604",
+          "url": "https://chaquo.com/pypi-13.1/chaquopy-libgfortran/chaquopy_libgfortran-4.9-0-py3-none-android_21_arm64_v8a.whl",
+          "version": "4.9"
+        },
+        {
+          "filename": "chaquopy_openblas-0.2.20-5-py3-none-android_21_arm64_v8a.whl",
+          "name": "chaquopy-openblas",
+          "sha256": "1e8e67a4f9e2fcde384890678bafbf7ffefe7b2cb4887e5c2996ba7607f4324c",
+          "url": "https://chaquo.com/pypi-13.1/chaquopy-openblas/chaquopy_openblas-0.2.20-5-py3-none-android_21_arm64_v8a.whl",
+          "version": "0.2.20"
+        },
+        {
+          "filename": "h11-0.16.0-py3-none-any.whl",
+          "name": "h11",
+          "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+          "url": "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl",
+          "version": "0.16.0"
+        },
+        {
+          "filename": "httpcore-1.0.9-py3-none-any.whl",
+          "name": "httpcore",
+          "sha256": "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55",
+          "url": "https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl",
+          "version": "1.0.9"
+        },
+        {
+          "filename": "httpx-0.28.1-py3-none-any.whl",
+          "name": "httpx",
+          "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
+          "url": "https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl",
+          "version": "0.28.1"
+        },
+        {
+          "filename": "idna-3.19-py3-none-any.whl",
+          "name": "idna",
+          "sha256": "815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4",
+          "url": "https://files.pythonhosted.org/packages/57/b0/0e52c878c53f245edd3a11020f20979b3f490f245af532c7cae3027754b5/idna-3.19-py3-none-any.whl",
+          "version": "3.19"
+        },
+        {
+          "filename": "numpy-1.26.2-0-cp313-cp313-android_24_arm64_v8a.whl",
+          "name": "numpy",
+          "sha256": "05db9adc14aa49f075a5ea5c59559c361e54efd926f321eddd3b37e2fd05b721",
+          "url": "https://chaquo.com/pypi-13.1/numpy/numpy-1.26.2-0-cp313-cp313-android_24_arm64_v8a.whl",
+          "version": "1.26.2"
+        },
+        {
+          "filename": "typing_extensions-4.16.0-py3-none-any.whl",
+          "name": "typing_extensions",
+          "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+          "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+          "version": "4.16.0"
+        }
+      ],
+      "target": {
+        "arch": "arm64_v8a",
+        "os_version": "24",
+        "platform": "android",
+        "python_version": "3.13",
+        "sdk": ""
+      }
+    },
+    "android:3.13:x86_64::24": {
+      "packages": [
+        {
+          "filename": "anyio-4.15.0-py3-none-any.whl",
+          "name": "anyio",
+          "sha256": "7ecd9937369ffce8bba0b5ccb9b3a9507b101b0ed50256aecfbab27e6c2acb99",
+          "url": "https://files.pythonhosted.org/packages/21/a6/2b21ce5ebe4d8938a247c9b0dbb7271566ae559b01795c83ea4bb2660ed7/anyio-4.15.0-py3-none-any.whl",
+          "version": "4.15.0"
+        },
+        {
+          "filename": "certifi-2026.7.22-py3-none-any.whl",
+          "name": "certifi",
+          "sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775",
+          "url": "https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl",
+          "version": "2026.7.22"
+        },
+        {
+          "filename": "chaquopy_libcxx-180000-0-py3-none-android_24_x86_64.whl",
+          "name": "chaquopy-libcxx",
+          "sha256": "dd56e48a66d08e352a1aacb6e3e9ff50788ae1b140b30bbd33d8bbb6854390c4",
+          "url": "https://chaquo.com/pypi-13.1/chaquopy-libcxx/chaquopy_libcxx-180000-0-py3-none-android_24_x86_64.whl",
+          "version": "180000"
+        },
+        {
+          "filename": "chaquopy_libgfortran-4.9-0-py3-none-android_21_x86_64.whl",
+          "name": "chaquopy-libgfortran",
+          "sha256": "375b3f8949f1826a969586fa529178f469f5e86565896be201264cf7faa35ee8",
+          "url": "https://chaquo.com/pypi-13.1/chaquopy-libgfortran/chaquopy_libgfortran-4.9-0-py3-none-android_21_x86_64.whl",
+          "version": "4.9"
+        },
+        {
+          "filename": "chaquopy_openblas-0.2.20-5-py3-none-android_21_x86_64.whl",
+          "name": "chaquopy-openblas",
+          "sha256": "6b258351c0ce1229f71057808f51117ab96c291d3ef1887a92e1d5fb75d319be",
+          "url": "https://chaquo.com/pypi-13.1/chaquopy-openblas/chaquopy_openblas-0.2.20-5-py3-none-android_21_x86_64.whl",
+          "version": "0.2.20"
+        },
+        {
+          "filename": "h11-0.16.0-py3-none-any.whl",
+          "name": "h11",
+          "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+          "url": "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl",
+          "version": "0.16.0"
+        },
+        {
+          "filename": "httpcore-1.0.9-py3-none-any.whl",
+          "name": "httpcore",
+          "sha256": "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55",
+          "url": "https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl",
+          "version": "1.0.9"
+        },
+        {
+          "filename": "httpx-0.28.1-py3-none-any.whl",
+          "name": "httpx",
+          "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
+          "url": "https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl",
+          "version": "0.28.1"
+        },
+        {
+          "filename": "idna-3.19-py3-none-any.whl",
+          "name": "idna",
+          "sha256": "815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4",
+          "url": "https://files.pythonhosted.org/packages/57/b0/0e52c878c53f245edd3a11020f20979b3f490f245af532c7cae3027754b5/idna-3.19-py3-none-any.whl",
+          "version": "3.19"
+        },
+        {
+          "filename": "numpy-1.26.2-0-cp313-cp313-android_24_x86_64.whl",
+          "name": "numpy",
+          "sha256": "5b24863b756d2a0adc0405a7c1a74f9acfd7c3aa66b920c8760daafc12a26da7",
+          "url": "https://chaquo.com/pypi-13.1/numpy/numpy-1.26.2-0-cp313-cp313-android_24_x86_64.whl",
+          "version": "1.26.2"
+        },
+        {
+          "filename": "typing_extensions-4.16.0-py3-none-any.whl",
+          "name": "typing_extensions",
+          "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+          "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+          "version": "4.16.0"
+        }
+      ],
+      "target": {
+        "arch": "x86_64",
+        "os_version": "24",
+        "platform": "android",
+        "python_version": "3.13",
+        "sdk": ""
+      }
+    },
+    "ios:3.13:arm64:iphoneos:13.0": {
+      "packages": [
+        {
+          "filename": "anyio-4.15.0-py3-none-any.whl",
+          "name": "anyio",
+          "sha256": "7ecd9937369ffce8bba0b5ccb9b3a9507b101b0ed50256aecfbab27e6c2acb99",
+          "url": "https://files.pythonhosted.org/packages/21/a6/2b21ce5ebe4d8938a247c9b0dbb7271566ae559b01795c83ea4bb2660ed7/anyio-4.15.0-py3-none-any.whl",
+          "version": "4.15.0"
+        },
+        {
+          "filename": "certifi-2026.7.22-py3-none-any.whl",
+          "name": "certifi",
+          "sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775",
+          "url": "https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl",
+          "version": "2026.7.22"
+        },
+        {
+          "filename": "h11-0.16.0-py3-none-any.whl",
+          "name": "h11",
+          "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+          "url": "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl",
+          "version": "0.16.0"
+        },
+        {
+          "filename": "httpcore-1.0.9-py3-none-any.whl",
+          "name": "httpcore",
+          "sha256": "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55",
+          "url": "https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl",
+          "version": "1.0.9"
+        },
+        {
+          "filename": "httpx-0.28.1-py3-none-any.whl",
+          "name": "httpx",
+          "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
+          "url": "https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl",
+          "version": "0.28.1"
+        },
+        {
+          "filename": "idna-3.19-py3-none-any.whl",
+          "name": "idna",
+          "sha256": "815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4",
+          "url": "https://files.pythonhosted.org/packages/57/b0/0e52c878c53f245edd3a11020f20979b3f490f245af532c7cae3027754b5/idna-3.19-py3-none-any.whl",
+          "version": "3.19"
+        },
+        {
+          "filename": "numpy-2.5.2.post1-cp313-cp313-ios_13_0_arm64_iphoneos.whl",
+          "name": "numpy",
+          "sha256": "d451e3281b8e2709bb85c6857c83b3c1797f930971b6bbff7f57469d3958e16e",
+          "url": "https://pypi.anaconda.org/beeware/simple/numpy/2.5.2.post1/numpy-2.5.2.post1-cp313-cp313-ios_13_0_arm64_iphoneos.whl",
+          "version": "2.5.2.post1"
+        },
+        {
+          "filename": "typing_extensions-4.16.0-py3-none-any.whl",
+          "name": "typing_extensions",
+          "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+          "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+          "version": "4.16.0"
+        }
+      ],
+      "target": {
+        "arch": "arm64",
+        "os_version": "13.0",
+        "platform": "ios",
+        "python_version": "3.13",
+        "sdk": "iphoneos"
+      }
+    },
+    "ios:3.13:x86_64:iphonesimulator:13.0": {
+      "packages": [
+        {
+          "filename": "anyio-4.15.0-py3-none-any.whl",
+          "name": "anyio",
+          "sha256": "7ecd9937369ffce8bba0b5ccb9b3a9507b101b0ed50256aecfbab27e6c2acb99",
+          "url": "https://files.pythonhosted.org/packages/21/a6/2b21ce5ebe4d8938a247c9b0dbb7271566ae559b01795c83ea4bb2660ed7/anyio-4.15.0-py3-none-any.whl",
+          "version": "4.15.0"
+        },
+        {
+          "filename": "certifi-2026.7.22-py3-none-any.whl",
+          "name": "certifi",
+          "sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775",
+          "url": "https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl",
+          "version": "2026.7.22"
+        },
+        {
+          "filename": "h11-0.16.0-py3-none-any.whl",
+          "name": "h11",
+          "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+          "url": "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl",
+          "version": "0.16.0"
+        },
+        {
+          "filename": "httpcore-1.0.9-py3-none-any.whl",
+          "name": "httpcore",
+          "sha256": "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55",
+          "url": "https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl",
+          "version": "1.0.9"
+        },
+        {
+          "filename": "httpx-0.28.1-py3-none-any.whl",
+          "name": "httpx",
+          "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
+          "url": "https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl",
+          "version": "0.28.1"
+        },
+        {
+          "filename": "idna-3.19-py3-none-any.whl",
+          "name": "idna",
+          "sha256": "815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4",
+          "url": "https://files.pythonhosted.org/packages/57/b0/0e52c878c53f245edd3a11020f20979b3f490f245af532c7cae3027754b5/idna-3.19-py3-none-any.whl",
+          "version": "3.19"
+        },
+        {
+          "filename": "numpy-2.5.2.post1-cp313-cp313-ios_13_0_x86_64_iphonesimulator.whl",
+          "name": "numpy",
+          "sha256": "4348588dc2e8e736c308082453d37b083c461a66f9bdafc123472f899140cf7b",
+          "url": "https://pypi.anaconda.org/beeware/simple/numpy/2.5.2.post1/numpy-2.5.2.post1-cp313-cp313-ios_13_0_x86_64_iphonesimulator.whl",
+          "version": "2.5.2.post1"
+        },
+        {
+          "filename": "typing_extensions-4.16.0-py3-none-any.whl",
+          "name": "typing_extensions",
+          "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+          "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+          "version": "4.16.0"
+        }
+      ],
+      "target": {
+        "arch": "x86_64",
+        "os_version": "13.0",
+        "platform": "ios",
+        "python_version": "3.13",
+        "sdk": "iphonesimulator"
+      }
+    }
+  },
+  "version": 1
+}

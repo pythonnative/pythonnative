@@ -4,26 +4,17 @@
 [`SectionList`][pythonnative.SectionList] are the two list components
 shipped with PythonNative. Both are **virtualized**: only the rows
 inside (and just beyond) the viewport are mounted as native views.
-Under the hood the list picks one of two engines:
+On mobile, `RecyclerView` (Android) and `UICollectionView` (iOS) own physical
+cell recycling. Rows remain ordinary keyed components in the application's
+logical tree. Providers, error boundaries, suspense boundaries, and cancellation
+therefore work across row and screen containers.
 
-- **Native virtualization.** On Android and iOS, when every row's
-  extent is known up front (a fixed `item_height`, or exact
-  `get_item_height` / `section_header_height` values) and no
-  windowed-only feature is requested, the list is backed by a real
-  `RecyclerView` (Android) or `UITableView` (iOS). The platform owns
-  row recycling; each visible row hosts its own PythonNative subtree
-  that is mounted on demand and reconciled in place when its cell is
-  recycled. This is the fastest path and the one long feeds should
-  aim for.
-- **Python windowing.** Everywhere else (the browser preview,
-  variable-height rows, grids, horizontal lists, headers/footers/empty
-  states, and pull-to-refresh), rows render into a native scroll view
-  with leading and trailing spacers standing in for off-screen
-  content, and the window of mounted rows shifts from scroll events.
-
-The public surface is identical on both paths: `on_end_reached`,
-`on_viewable_items_changed`, `on_scroll`, and the imperative scroll
-controller behave the same regardless of which engine is active.
+Use stable keys and immutable data. A new data snapshot advances the list's
+revision; stale row requests are discarded. `estimated_item_height` provides an
+initial estimate for variable content, and native measurement refines row
+extents. Fixed heights, sections, grids, headers, footers, and pull-to-refresh
+use this native path too. The browser implements the same logical-row protocol;
+headless tests use a windowed scroll container.
 
 ```python
 import pythonnative as pn
@@ -49,9 +40,9 @@ viewport ever exists.
 Three ways to tell the list how tall rows are, in order of preference:
 
 - `item_height=44`: uniform rows. Offsets are exact and cheap, and
-  the list qualifies for the native virtualization path.
+  native containers can skip estimating that extent.
 - `get_item_height=lambda item, i: ...`: exact per-row extents
-  without measurement. Also qualifies for native virtualization.
+  without measurement. Native containers use those extents directly.
 - Nothing at all: rows start at `estimated_item_height` (default 44)
   and are corrected with their measured extent once they've been on
   screen. Scroll positions stay stable as estimates converge. This
@@ -177,7 +168,7 @@ estimated and measured).
   the window refresh in place rather than tearing down and rebuilding
   their subtree as the window shifts.
 - Provide real extents (`item_height` / `get_item_height`) when you
-  can. Exact extents unlock the native RecyclerView / UITableView
+  can. Exact extents reduce measurement work in the native RecyclerView / UICollectionView
   path on device; measured estimation works but stays on the
   Python-windowed engine and does more bookkeeping per scroll.
 - Features that force the windowed engine (`list_header`,

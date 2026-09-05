@@ -3,8 +3,8 @@
 PythonNative renders through native **component managers**: a Swift
 `PNComponentManager` in `PythonNativeKit` and a Kotlin `ComponentManager`
 in the `pythonnative` Gradle module own every `UIView` and
-`android.view.View`. Python owns the element tree, reconciliation, and
-layout, and ships each commit to native as one transaction (see
+`android.view.View`. Python owns the element tree and reconciliation and ships styles in each
+validated commit (see
 [The native bridge](../concepts/bridge.md)).
 
 Adding your own component means writing one manager per platform,
@@ -28,9 +28,10 @@ ship it as an installable PyPI plugin.
 | `register_component` + `element_factory` | Python | Declares the element name and exposes the typed factory. |
 | `ViewHandler` (optional) | Python | Off-device stand-in so unit tests can render the component without a device. |
 
-Layout stays in Python: managers never read `flex`, `margin`, or
-`padding`. They receive absolute frames through `setFrame` and answer
-`measure` for content-sized leaves.
+The native runtime runs Yoga over the committed styles. Managers receive
+absolute frames through `setFrame` and implement `measure` for content-sized
+leaves. See [Generated native contracts](native-contracts.md) for schema
+generation, typed adapters, and plugin contract registration.
 
 ## Project layout
 
@@ -219,13 +220,15 @@ object MyBadgePlugin : PNPlugin {
 
 ```json
 {
+  "contracts": "schema.json",
   "ios": {"entry": "MyBadgePlugin"},
   "android": {"entry": "com.example.badge.MyBadgePlugin"}
 }
 ```
 
-A plugin may declare only one platform; the component then renders as a
-labelled placeholder on the other.
+A plugin may declare only one platform. Gate its use with `Platform.OS` or
+provide an application-level fallback on unsupported platforms. Native commits
+reject unregistered component types.
 
 ## 5. Tell `pn build` about the plugin
 

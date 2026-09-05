@@ -1,71 +1,26 @@
 # Layout engine
 
-PythonNative ships its own pure-Python flexbox engine. It is a small,
-React-Native-compatible re-implementation of the subset of the
-[Yoga](https://www.yogalayout.com/) algorithm that real apps use.
-Every screen on every platform is sized and positioned by the same
-Python code; the native handlers only get told *what frame to apply*.
+PythonNative uses Yoga 3.2.1 for flexbox layout on every renderer. The vendored
+C++ source compiles into the Python host binding, Swift runtime, and Android
+runtime. The browser preview uses Yoga WebAssembly from the same release.
+Native leaf widgets supply intrinsic sizes and text baselines.
 
-This page covers what the engine does, where it sits in the render
-pipeline, what `style` keys it understands, and how to test layouts
-without a device.
+## Layout and commits
 
-## Why a Python engine?
+Rendering first commits view creation, relationships, and props. The native
+layout pass then computes geometry and returns changed frames as a batch.
+Layout effects run after those frames exist, followed by passive effects.
+Viewport changes, text edits, and image completion can invalidate geometry.
 
-The handlers used to delegate to `LinearLayout` (Android) and
-`UIStackView` (iOS), which made `View` / `Column` / `Row` look right
-"on average" but came with three problems:
+Native screens and recycled rows own their physical content rectangles. Yoga
+lays out each detached logical root within its native container's available
+space. Providers and component ownership continue through those containers.
 
-1. **Platform drift.** The two stacks have subtly different alignment
-   semantics, padding handling, and weight rules. A layout that looked
-   correct on iOS could be off by a few points on Android.
-2. **No `position: "absolute"`.** Neither container natively supports
-   removing a child from the flow and pinning it by edge offsets.
-3. **Limited expressiveness.** `flex_basis`, `aspect_ratio`,
-   percentage sizes, `min_*` / `max_*` constraints, and `align_self`
-   were either missing or partial.
+## Headless layout
 
-Centralising layout in Python fixes all three: the rules are written
-once, exercised by unit tests, and produce identical frames on Android
-and iOS.
-
-## Where it sits in the render loop
-
-```text
-render -> commit (create / update native views via handlers)
-      -> flush effects
-      -> build LayoutNode tree from VNodes
-      -> calculate_layout(viewport_w, viewport_h)
-      -> backend.set_frame(view, x, y, w, h) for every node
-```
-
-The layout pass runs after the commit and effect phases, so by the
-time it executes:
-
-- All native views exist.
-- All visual props are up to date.
-- All effects have run (including any that may set state and trigger
-  another render).
-
-A render that does not change the tree still triggers a layout pass
-when the viewport size changes (e.g., on rotation).
-
-## The `LayoutNode` tree
-
-The reconciler walks the [`VNode`][pythonnative.reconciler.VNode]
-tree and builds a parallel tree of
-[`LayoutNode`][pythonnative.layout.LayoutNode] objects. Each node
-carries:
-
-- The element `type` and the resolved `style` dict.
-- A reference back to the `VNode` (so frames can be applied to its
-  native handle).
-- An optional `measure` callback for leaf widgets that need to ask
-  their handler for an intrinsic content size.
-
-The reconciler always wraps the user's root in a synthetic
-*viewport node* sized to the current screen so that `flex: 1` / `100%`
-at the top level "just work".
+Headless tests use `LayoutNode` and `calculate_layout()` through the host Yoga
+binding. Stub intrinsic measurements make geometry tests deterministic. Real
+font metrics and platform control sizes must also be tested on devices.
 
 ## Style keys
 
@@ -98,7 +53,7 @@ Leaf widgets (`Text`, `Button`, `Image`, `TextInput`, `Switch`,
 an intrinsic size when neither dimension is fixed. The handler
 implements `measure_intrinsic(view, max_w, max_h)`:
 
-- iOS uses `UIView.sizeThatFits_(CGSize(max_w, max_h))`.
+- iOS uses the native manager and `UIView.sizeThatFits` with UIKit text metrics.
 - Android wraps `View.measure(...)` with `MeasureSpec.AT_MOST` /
   `UNSPECIFIED`.
 
@@ -183,8 +138,8 @@ Wrapping (`flex_wrap: "wrap"` / `"wrap_reverse"`) and RTL flipping
 (`direction: "rtl"`, with `start` / `end` edge insets resolving against
 the inherited direction) are both supported.
 
-Everything else from the React Native flexbox cheat-sheet is
-supported.
+Supported properties follow the public `Style` annotations and the pinned Yoga
+version. Platform font metrics can produce different intrinsic sizes.
 
 ## Next steps
 

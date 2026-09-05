@@ -308,6 +308,7 @@ class ResolvedPackage:
     version: str
     filename: str
     url: str = ""
+    sha256: str = ""
     latest: str = ""
     """The version an unconstrained desktop resolution picks, when it is newer than ``version``.
 
@@ -442,6 +443,7 @@ def parse_report(report_json: str, target: Target) -> Resolution:
                 version=str(metadata.get("version", "?")),
                 filename=filename,
                 url=url,
+                sha256=str(download.get("archive_info", {}).get("hashes", {}).get("sha256", "")),
             )
         )
     packages.sort(key=lambda pkg: pkg.name.lower())
@@ -631,7 +633,15 @@ def install(
     if not config.requirements:
         return
     dest.mkdir(parents=True, exist_ok=True)
-    result = runner.run(install_args(config, target, dest, python=python), capture=True)
+    from .lockfile import requirements
+
+    locked = requirements(config, [target], direct=True)
+    command = install_args(config, target, dest, python=python)
+    if locked is not None:
+        locked_path = dest.parent / f"requirements.{target.slice_name}.lock"
+        locked_path.write_text(locked, encoding="utf-8")
+        command = command[: -len(config.requirements)] + ["--no-deps", "-r", str(locked_path)]
+    result = runner.run(command, capture=True)
     if result.ok:
         return
     summary, missing = parse_failure(result.stderr)

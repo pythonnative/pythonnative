@@ -1,0 +1,11 @@
+global-exclude *.pyc *.pyo .DS_Store
+recursive-exclude src/pythonnative/native .build/* .gradle/* .cxx/* build/* .swiftpm/* .kotlin/*
+prune src/pythonnative/native/android/build
+prune src/pythonnative/native/android/.gradle
+prune src/pythonnative/native/android/.cxx
+prune src/pythonnative/native/ios/.build
+prune src/pythonnative/native/ios/.swiftpm
+prune src/pythonnative/native/yoga/.build
+prune src/pythonnative/templates/android_template/app/build
+prune src/pythonnative/templates/android_template/.gradle
+prune src/pythonnative/templates/ios_template/build

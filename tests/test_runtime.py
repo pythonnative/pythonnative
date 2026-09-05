@@ -1,4 +1,4 @@
-"""Unit tests for the pn.runtime main-thread guest loop."""
+"""Standard application and headless asyncio runtime tests."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import time
 import pytest
 
 from pythonnative.runtime import (
-    call_on_main_thread,
+    call_on_application_thread,
     call_threadsafe,
     create_future,
     drain,
@@ -222,11 +222,11 @@ def test_run_blocking_rejects_reentrant_use() -> None:
         finally:
             coro.close()
 
-    with pytest.raises(RuntimeError, match="event loop is running"):
+    with pytest.raises(RuntimeError, match="inside the event loop"):
         run_blocking(inner())
 
 
-def test_call_on_main_thread_runs_inline_off_device() -> None:
+def test_call_on_application_thread_runs_inline_off_device() -> None:
     """Off-device the helper has no platform main loop to marshal onto;
     it should just invoke ``fn`` synchronously on the caller's thread."""
     received: list = []
@@ -235,7 +235,7 @@ def test_call_on_main_thread_runs_inline_off_device() -> None:
     def fn() -> None:
         received.append(threading.current_thread())
 
-    call_on_main_thread(fn)
+    call_on_application_thread(fn)
     assert received == [caller_thread]
 
 

@@ -64,7 +64,7 @@ Example:
 
 __version__ = "0.39.0"
 
-from . import appearance, diagnostics, gestures, images, runtime, sdk
+from . import appearance, diagnostics, gestures, runtime, sdk
 from .alerts import Alert
 from .animated import Animated, AnimatedValue, use_animated_value
 from .component import Component, component, memo
@@ -348,7 +348,6 @@ __all__ = [
     # Appearance
     "appearance",
     # Image pipeline
-    "images",
     # Animation
     "Animated",
     "AnimatedValue",

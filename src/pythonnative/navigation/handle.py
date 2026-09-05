@@ -12,7 +12,7 @@ first screen) bubble to the parent navigator, so a stack nested in a
 tab still pops correctly and ``navigate("Settings")`` from deep inside
 one tab can switch to another.
 
-When the core belongs to the **root stack of a native host** it never
+When the core belongs to the **root stack of a native host** it
 mutates its own state for pushes and pops: it asks the host to push or
 pop a real native screen carrying the serialized next state, and the
 new screen's navigator boots from that state.
@@ -46,32 +46,14 @@ Listener = Callable[["NavigationEvent"], None]
 class HostNavigator(Protocol):
     """What a root stack needs from the native screen host.
 
-    Hosts (iOS view controller, Android fragment, browser preview) and
-    [`FakeHost`][pythonnative.testing.FakeHost] implement these. Each
-    method receives the *serialized* next navigation state so the
-    screen it creates can boot with the full history.
+    Hosts and FakeHost publish application focus and cached navigation state.
+    Screen presentation belongs to the logical tree and its native containers.
     """
 
     is_focused: bool
 
     def initial_navigation_state(self) -> Optional[Dict[str, Any]]:
         """The serialized state this screen was pushed with, if any."""
-        ...
-
-    def push_screen(self, state: Dict[str, Any], options: Dict[str, Any]) -> None:
-        """Push a native screen that boots from ``state``."""
-        ...
-
-    def pop_screens(self, count: int) -> None:
-        """Pop ``count`` native screens."""
-        ...
-
-    def replace_screen(self, state: Dict[str, Any], options: Dict[str, Any]) -> None:
-        """Replace the current native screen with one booting from ``state``."""
-        ...
-
-    def reset_screens(self, state: Dict[str, Any], options: Dict[str, Any]) -> None:
-        """Replace the whole native stack with one booting from ``state``."""
         ...
 
     def set_screen_options(self, options: Dict[str, Any]) -> None:
@@ -274,9 +256,6 @@ class NavigatorCore:
                     self._commit(new_state)
                 return
             new_state = self.state.pop_to(name, params, nested)
-            if self.is_native_root:
-                self.host.pop_screens(len(self.state) - len(new_state))
-                return
             self._commit(new_state)
             return
         self._commit(self.state.jump_to(name, params, nested))
@@ -295,9 +274,6 @@ class NavigatorCore:
                 return
             raise ValueError(f"Unknown route {name!r}. Known routes: {list(self.screens)}")
         new_state = self.state.push(name, self._with_initial_params(name, params), nested)
-        if self.is_native_root:
-            self.host.push_screen(new_state.to_dict(), self.options_for(new_state.current))
-            return
         self._commit(new_state)
 
     def replace(self, name: str, params: Mapping[str, Any], nested: Optional[NavigationState] = None) -> None:
@@ -311,9 +287,6 @@ class NavigatorCore:
             self.navigate(name, params, nested)
             return
         new_state = self.state.replace(name, self._with_initial_params(name, params), nested)
-        if self.is_native_root:
-            self.host.replace_screen(new_state.to_dict(), self.options_for(new_state.current))
-            return
         self._commit(new_state)
 
     def pop(self, count: int = 1, *, source: str = "pop") -> bool:
@@ -327,9 +300,6 @@ class NavigatorCore:
             evt = self.emit(route, "before_remove", {"action": source})
             if evt.default_prevented:
                 return True
-        if self.is_native_root:
-            self.host.pop_screens(count)
-            return True
         self._commit(self.state.pop(count))
         return True
 
@@ -347,9 +317,6 @@ class NavigatorCore:
             if not self._validate(route.name):
                 raise ValueError(f"Unknown route {route.name!r}. Known routes: {list(self.screens)}")
         new_state = NavigationState(routes, index)
-        if self.is_native_root:
-            self.host.reset_screens(new_state.to_dict(), self.options_for(new_state.current))
-            return
         self._commit(new_state)
 
     def set_params(self, route_key: str, params: Mapping[str, Any]) -> None:

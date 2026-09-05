@@ -1,30 +1,11 @@
-"""Virtualized lists: ``FlatList`` and ``SectionList``.
-
-FlatList and SectionList pick between two engines:
-
-1. **Native virtualization** (`_NativeList` -> the ``VirtualList``
-   element): on Android and iOS, when every row extent is known up
-   front and no windowed-only feature is requested, the list is
-   backed by a real ``RecyclerView`` / ``UITableView``. The platform
-   owns row recycling; each visible row hosts a nested-reconciler
-   subtree (see ``pythonnative.virtual_rows``).
-2. **Python windowing** (`_VirtualizedList`): a windowed slice of
-   rows rendered into a ScrollView (leading spacer, visible rows,
-   trailing spacer), the window shifting from scroll events (the
-   same architecture as React Native's VirtualizedList). Because
-   every windowed row lives in the *main* layout tree, rows may be
-   any height: estimates steer the spacer sizes and measured extents
-   correct them over time. This is the browser preview path and the fallback
-   for variable-height rows, grids, horizontal lists, ornaments, and
-   pull-to-refresh.
-"""
+"""Keyed virtualized lists with one logical component tree."""
 
 import bisect
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ..component import component
 from ..element import Element
-from ..hooks import Ref, use_imperative_handle, use_ref, use_state
+from ..hooks import Ref, use_imperative_handle, use_memo, use_ref, use_state
 from ..style import StyleProp, resolve_style
 from .layout import Column, Row, ScrollView, View
 from .text import Text
@@ -317,13 +298,14 @@ def _VirtualizedList(
 def _native_lists_supported() -> bool:
     """Whether the natively virtualized list path is available.
 
-    Android (RecyclerView) and iOS (UITableView) have native handlers;
+    Android (RecyclerView) and iOS (UICollectionView) have native handlers;
     the browser preview and off-device tests use the Python-windowed
     engine. Patchable in tests to exercise the native routing.
     """
+    from ..native_views import get_registry
     from ..utils import IS_ANDROID, IS_IOS
 
-    return IS_ANDROID or IS_IOS
+    return IS_ANDROID or IS_IOS or getattr(get_registry(), "native_layout", False)
 
 
 def _use_native_lists() -> bool:
@@ -349,110 +331,114 @@ def _NativeList(
     shows_scroll_indicator: Optional[bool] = None,
     list_style: Optional[Dict[str, Any]] = None,
     controller_ref: Optional[Ref] = None,
+    horizontal: bool = False,
+    estimated_row_extent: float = 44,
+    header: Optional[Element] = None,
+    footer: Optional[Element] = None,
+    empty: Optional[Element] = None,
+    refresh_control: Optional[Element] = None,
+    content_container_style: Optional[Dict[str, Any]] = None,
 ) -> Element:
-    """Platform-virtualized list: emits a ``VirtualList`` native element.
+    """Prepare a bounded set of logical rows for native recycled containers.
 
-    The native side (RecyclerView / UITableView) owns row windowing and
-    recycling; each visible row hosts a nested-reconciler subtree (see
-    ``pythonnative.virtual_rows``). This composite adapts the FlatList /
-    SectionList surface onto that element: it forwards ``render_row``,
-    derives ``on_end_reached`` and ``on_viewable_items_changed`` from
-    native scroll reports, and wires the imperative scroll controller.
-
-    Requires every row's extent to be known up front (the native
-    virtualizers need exact heights before rows are rendered); callers
-    fall back to the Python-windowed engine otherwise.
+    Keys own hooks. Native container identities never enter the component
+    tree. Every data snapshot has a revision, including same-length edits.
     """
-    rows = rows or []
-    n = len(rows)
-    heights: List[float] = [float(spec.extent or 0.0) for spec in rows]
-    uniform = len(set(heights)) <= 1
+    source = rows or []
+    rows = list(source)
+    if not rows and empty is not None:
+        rows.append(_RowSpec("__empty__", lambda: empty, None))
+    if header is not None:
+        rows.insert(0, _RowSpec("__header__", lambda: header, None))
+    if footer is not None:
+        rows.append(_RowSpec("__footer__", lambda: footer, None))
+    keys = [row.key for row in rows]
+    if len(set(keys)) != len(keys):
+        raise ValueError("List keys must be unique")
+    generation = use_ref(0)
 
-    internal_ref: Ref = use_ref(None)
-    end_latch = use_ref({"fired_for": -1})
-    viewable_ref: Ref[Dict[str, Tuple[str, ...]]] = use_ref({"keys": ()})
+    def next_revision() -> int:
+        generation.current += 1
+        return generation.current
 
-    starts: List[float] = [0.0] * (n + 1)
-    acc = 0.0
-    for i, extent in enumerate(heights):
-        starts[i] = acc
-        acc += max(0.0, extent)
-    starts[n] = acc
-    total_extent = acc
+    revision = use_memo(next_revision, [source, header, footer, empty])
+    center, set_center = use_state(0)
+    first, last = max(0, center - 16), min(len(rows), center + 40)
+    internal_ref: Ref = use_ref()
+    end_revision = use_ref(-1)
 
-    def _render_row(index: int) -> Element:
-        if 0 <= index < n:
-            return rows[index].make()
-        return View()
+    def bind(info: Dict[str, Any]) -> None:
+        if info.get("revision") != revision:
+            return
+        index = int(info.get("index", -1))
+        if not 0 <= index < len(rows) or info.get("key") != keys[index]:
+            return
+        if index < first + 8 or index >= last - 8:
+            set_center(index)
 
-    end_threshold = float(on_end_reached_threshold or 0.5)
-    on_viewable = on_viewable_items_changed
-    user_on_scroll = on_scroll
+    def scroll(info: Dict[str, Any]) -> Any:
+        if on_end_reached is not None:
+            remaining = info.get("range", 0) - info.get("x" if horizontal else "y", 0) - info.get("extent", 0)
+            if (
+                remaining <= (on_end_reached_threshold or 0.5) * info.get("extent", 0)
+                and end_revision.current != revision
+            ):
+                end_revision.current = revision
+                from ..runtime import invoke
 
-    def _handle_scroll(payload: Any) -> None:
-        offset = float(payload.get("y", 0.0) or 0.0) if isinstance(payload, dict) else float(payload or 0.0)
-        viewport = float(payload.get("extent", 0.0) or 0.0) if isinstance(payload, dict) else 0.0
-        if viewport <= 0:
-            viewport = 800.0
+                invoke(on_end_reached)
+        if on_viewable_items_changed is not None:
+            start, end = int(info.get("first", 0)), int(info.get("last", -1))
+            from ..runtime import invoke
 
-        if on_end_reached is not None and total_extent > 0:
-            remaining = total_extent - (offset + viewport)
-            if remaining <= end_threshold * viewport:
-                if end_latch.current["fired_for"] != n:
-                    end_latch.current["fired_for"] = n
-                    on_end_reached()
-            elif remaining > end_threshold * viewport + viewport:
-                end_latch.current["fired_for"] = -1
-
-        if on_viewable is not None and n > 0:
-            v_first = max(0, bisect.bisect_right(starts, offset, 0, n) - 1)
-            v_last = min(n - 1, bisect.bisect_left(starts, offset + viewport, 0, n))
-            keys = tuple(rows[i].key for i in range(v_first, v_last + 1))
-            if keys != viewable_ref.current["keys"]:
-                viewable_ref.current["keys"] = keys
-                on_viewable(
-                    [
-                        {"index": rows[i].index, "key": rows[i].key, "item": rows[i].item}
-                        for i in range(v_first, v_last + 1)
-                    ]
-                )
-
-        if user_on_scroll is not None:
-            user_on_scroll({"x": 0.0, "y": offset})
-
-    def _scroll_to_offset(offset: float, animated: bool = True) -> None:
-        _dispatch_scroll_command(internal_ref, "scroll_to_offset", {"y": float(offset), "animated": animated})
-
-    def _scroll_to_index(index: int, animated: bool = True) -> None:
-        _dispatch_scroll_command(internal_ref, "scroll_to_index", {"index": int(index), "animated": animated})
-
-    def _scroll_to_end(animated: bool = True) -> None:
-        _dispatch_scroll_command(internal_ref, "scroll_to_end", {"animated": animated})
+            invoke(
+                on_viewable_items_changed,
+                [
+                    {"key": rows[i].key, "index": rows[i].index, "item": rows[i].item}
+                    for i in range(max(0, start), min(len(rows), end + 1))
+                ],
+            )
+        return on_scroll(info) if on_scroll is not None else None
 
     use_imperative_handle(
         controller_ref,
-        lambda: ListController(_scroll_to_offset, _scroll_to_index, _scroll_to_end),
-        None,
+        lambda: ListController(
+            lambda offset, animated: _dispatch_scroll_command(
+                internal_ref, "scroll_to_offset", {"x" if horizontal else "y": offset, "animated": animated}
+            ),
+            lambda index, animated: _dispatch_scroll_command(
+                internal_ref, "scroll_to_index", {"index": index, "animated": animated}
+            ),
+            lambda animated: _dispatch_scroll_command(internal_ref, "scroll_to_end", {"animated": animated}),
+        ),
+        [horizontal],
     )
-
-    props: Dict[str, Any] = dict(list_style or {})
-    props["count"] = n
-    if uniform:
-        props["row_height"] = heights[0] if heights else _DEFAULT_ROW_EXTENT
-    else:
-        props["row_heights"] = heights
-    props["render_row"] = _render_row
-    props["ref"] = internal_ref
-    wants_scroll = on_end_reached is not None or on_viewable is not None or user_on_scroll is not None
-    if wants_scroll:
-        props["on_scroll"] = _handle_scroll
-    if shows_scroll_indicator is False:
-        props["shows_scroll_indicator"] = False
-    return Element("VirtualList", props, [])
-
-
-def _all_extents_known(rows: List[_RowSpec]) -> bool:
-    return all(spec.extent is not None for spec in rows)
+    props = {
+        "flex_grow": 1,
+        **(list_style or {}),
+        "keys": keys,
+        "revision": revision,
+        "count": len(rows),
+        "row_heights": [r.extent or estimated_row_extent for r in rows],
+        "horizontal": horizontal,
+        "on_bind_row": bind,
+        "on_scroll": scroll,
+        "shows_scroll_indicator": shows_scroll_indicator is not False,
+        "ref": internal_ref,
+    }
+    if refresh_control is not None:
+        props["refresh_control"] = dict(refresh_control.props)
+    children = []
+    for row in rows[first:last]:
+        style = dict(content_container_style or {})
+        if row.extent is not None:
+            style["width" if horizontal else "height"] = row.extent
+        if not horizontal:
+            style["width"] = "100%"
+        child = View(row.make(), style=style, key=row.key)
+        child.props["_pn_list_key"] = row.key
+        children.append(child)
+    return Element("VirtualList", props, children)
 
 
 def FlatList(
@@ -611,20 +597,7 @@ def FlatList(
 
     estimated = estimated_item_height if estimated_item_height is not None else (item_height or _DEFAULT_ROW_EXTENT)
 
-    # Route to the platform virtualizer (RecyclerView / UITableView)
-    # when it can represent this list exactly: vertical, single-column,
-    # every row extent known up front, and no features that only the
-    # Python-windowed engine implements (ornaments, pull-to-refresh).
-    if (
-        _use_native_lists()
-        and not horizontal
-        and num_columns == 1
-        and list_header is None
-        and list_footer is None
-        and list_empty is None
-        and refresh_control is None
-        and _all_extents_known(rows)
-    ):
+    if _use_native_lists():
         return _NativeList(
             rows=rows,
             on_end_reached=on_end_reached,
@@ -634,6 +607,13 @@ def FlatList(
             shows_scroll_indicator=shows_scroll_indicator,
             list_style=resolve_style(style) or None,
             controller_ref=ref,
+            horizontal=horizontal,
+            estimated_row_extent=float(estimated) + sep,
+            header=list_header,
+            footer=list_footer,
+            empty=list_empty,
+            refresh_control=refresh_control,
+            content_container_style=resolve_style(content_container_style) or None,
         ).with_key(key)
 
     return _VirtualizedList(
@@ -774,16 +754,7 @@ def SectionList(
 
     estimated = estimated_item_height if estimated_item_height is not None else (item_height or _DEFAULT_ROW_EXTENT)
 
-    # Same native routing as FlatList: headers and items become one
-    # flattened row sequence with per-row heights.
-    if (
-        _use_native_lists()
-        and list_header is None
-        and list_footer is None
-        and list_empty is None
-        and refresh_control is None
-        and _all_extents_known(rows)
-    ):
+    if _use_native_lists():
         return _NativeList(
             rows=rows,
             on_end_reached=on_end_reached,
@@ -791,6 +762,11 @@ def SectionList(
             on_scroll=on_scroll,
             list_style=resolve_style(style) or None,
             controller_ref=ref,
+            estimated_row_extent=float(estimated) + sep,
+            header=list_header,
+            footer=list_footer,
+            empty=list_empty,
+            refresh_control=refresh_control,
         ).with_key(key)
 
     return _VirtualizedList(

@@ -37,7 +37,7 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
             error screen with the full traceback.
 
     Returns:
-        A status dict (``{"protocol": 1, "platform": "ios"}``) that the
+        A status dict (``{"protocol": 2, "platform": "ios"}``) that the
         template logs. Unless ``strict`` is set this never raises:
         failures are printed and reported in the dict under
         ``"error"``.
@@ -57,6 +57,12 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
                 _ios_log.install()
             except Exception:
                 pass
+        from .runtime import start as start_runtime
+
+        start_runtime()
+        from .sdk.schema import load_bundled_contracts
+
+        load_bundled_contracts()
         from . import bridge
 
         status_["protocol"] = bridge.handshake()
@@ -65,11 +71,6 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
             from . import diagnostics
 
             diagnostics.set_dev_mode(True)
-        # Create the guest loop now so the first pump request has a
-        # loop to drive and effects can schedule work during mount.
-        from .runtime import get_loop
-
-        get_loop()
         # Import the view backend eagerly: on a slow device the first
         # commit shouldn't also pay for importing the reconciler.
         from .native_views import get_registry

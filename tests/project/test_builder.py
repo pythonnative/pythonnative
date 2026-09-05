@@ -168,7 +168,7 @@ def test_prepare_ios_installs_requirements_per_slice(tmp_path: Path, monkeypatch
     runner = RecordingRunner()
     Builder(cfg, runner=runner, log=lambda _m: None).prepare("ios")
 
-    pip_cmds = [cmd for cmd in runner.commands if "pip" in cmd]
+    pip_cmds = [cmd for cmd in runner.commands if "pip" in cmd and "--target" in cmd]
     assert len(pip_cmds) == 2
     targets = {cmd[cmd.index("--target") + 1].rsplit("/", 1)[-1] for cmd in pip_cmds}
     assert targets == {"app_packages.iphoneos", "app_packages.iphonesimulator"}

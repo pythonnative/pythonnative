@@ -24,7 +24,7 @@ How the pieces fit:
 
 All network I/O runs on a daemon thread; file writes happen there too,
 and only the reload itself hops to the main thread through
-``call_on_main_thread``.
+``call_on_application_thread``.
 """
 
 from __future__ import annotations
@@ -475,7 +475,7 @@ class DevClient:
             self._schedule_reload(modules, version)
 
     def _schedule_reload(self, modules: List[str], version: str) -> None:
-        from .runtime import call_on_main_thread
+        from .runtime import call_on_application_thread
 
         def _apply() -> None:
             from .hot_reload import apply_reload
@@ -488,7 +488,7 @@ class DevClient:
                     {"type": "reloaded", "version": version, "mode": result.mode, "modules": result.reloaded or modules}
                 )
 
-        call_on_main_thread(_apply)
+        call_on_application_thread(_apply)
 
     def _safe_relpath(self, rel: str) -> bool:
         parts = rel.split("/")
@@ -713,13 +713,13 @@ def _connect_screen() -> Any:
                 return None
 
             def _on_state(state: str, info: str) -> None:
-                from .runtime import call_on_main_thread
+                from .runtime import call_on_application_thread
 
                 def _update() -> None:
                     set_status(state)
                     set_detail(info)
 
-                call_on_main_thread(_update)
+                call_on_application_thread(_update)
 
             return live.add_listener(_on_state)
 

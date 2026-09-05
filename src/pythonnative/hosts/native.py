@@ -1,18 +1,9 @@
-"""On-device screen host, shared by iOS and Android.
+"""On-device application surface hosting, shared by iOS and Android.
 
-One [`NativeScreenHost`][pythonnative.hosts.native.NativeScreenHost]
-exists per native screen (``UIViewController`` / ``Fragment``). The
-native side never holds Python objects: screens are addressed by an
-integer id it assigns, lifecycle arrives through
-``callback("host", screen_id, event, payload)`` (routed here by
-[`dispatch_host_event`][pythonnative.hosts.native.dispatch_host_event]),
-and everything the host needs from the platform goes out through the
-``Host`` native module (``attach_root``, ``push``, ``pop``, ...). See
-``docs/concepts/bridge.md`` for the payloads.
-
-Because native reports viewport size, safe-area insets, keyboard
-height, and color scheme *with* each lifecycle event, this module
-never queries the platform; it only publishes what it is told.
+Native hosts send asynchronous lifecycle, viewport, and back events keyed by
+surface host ID. Python attaches the application root and publishes cached
+restoration state through the Host module. Navigation owns logical Screen
+children in that same application tree.
 """
 
 from __future__ import annotations
@@ -68,9 +59,9 @@ def _request_flush() -> None:
     if _flush_pending:
         return
     _flush_pending = True
-    from ..bridge import post_to_main
+    from ..runtime import call_threadsafe
 
-    post_to_main(_flush_scheduled)
+    call_threadsafe(_flush_scheduled)
 
 
 # ======================================================================
@@ -177,44 +168,10 @@ class NativeScreenHost(ScreenHost):
         except Exception:
             diagnostics.swallowed("hosts.native.detach_root")
 
-    def _native_push(self, component_path: str, args: Dict[str, Any], options: Dict[str, Any]) -> None:
-        _host_module().call(
-            "push",
-            screen=self.screen_id,
-            path=component_path,
-            args=json.dumps(args) if args else None,
-            options=codec.to_jsonable(options or {}),
-        )
-
-    def _native_pop(self, count: int) -> None:
-        _host_module().call("pop", screen=self.screen_id, count=int(count))
-
-    def _native_pop_to_root(self) -> None:
-        _host_module().call("pop_to_root", screen=self.screen_id)
-
-    def _native_replace(self, component_path: str, args: Dict[str, Any], options: Dict[str, Any]) -> None:
-        _host_module().call(
-            "replace",
-            screen=self.screen_id,
-            path=component_path,
-            args=json.dumps(args) if args else None,
-            options=codec.to_jsonable(options or {}),
-        )
-
-    def _native_reset(self, component_path: str, screens: Sequence[Tuple[Dict[str, Any], Dict[str, Any]]]) -> None:
-        _host_module().call(
-            "reset",
-            screen=self.screen_id,
-            path=component_path,
-            screens=[
-                {
-                    "path": component_path,
-                    "args": json.dumps(args) if args else None,
-                    "options": codec.to_jsonable(options or {}),
-                }
-                for args, options in screens
-            ],
-        )
+    def cache_navigation_state(self, state: Dict[str, Any]) -> None:
+        """Cache navigation before the platform's synchronous state-saving callback."""
+        super().cache_navigation_state(state)
+        _host_module().call("cache_state", screen=self.screen_id, state=json.dumps(self.args))
 
     def _native_set_options(self, options: Dict[str, Any]) -> None:
         _host_module().call("set_options", screen=self.screen_id, options=codec.to_jsonable(options or {}))
@@ -269,7 +226,9 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
         host.on_resume()
         return None
     if event == "back_pressed":
-        return "true" if host.on_back_pressed() else "false"
+        if not host.on_back_pressed():
+            _host_module().call("finish", screen=host.screen_id)
+        return None
     if event == "save_state":
         host.on_save_instance_state()
         return None
@@ -316,6 +275,11 @@ def _create(screen_id: int, payload: Dict[str, Any]) -> Optional[str]:
     height = float(payload.get("height") or 0.0)
     if width > 0 and height > 0:
         host._pending_viewport = (width, height)
+    restored = payload.get("restored_state")
+    if restored:
+        decoded = codec.loads(restored) if isinstance(restored, str) else restored
+        if isinstance(decoded, dict):
+            host.args = decoded
     host.on_create()
     return _root_json(host)
 

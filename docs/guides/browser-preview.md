@@ -88,12 +88,12 @@ mounted fresh on reconnect.
    the page and for dev clients.
 2. Installs a [`WebTransport`][pythonnative.bridge.web.WebTransport] as
    the bridge transport. Transactions the reconciler commits become
-   `["apply", ops]` messages to the page; the page's events come back
-   as `["cb", ...]` callbacks; synchronous questions (`measure` above
-   all) block the main thread until the page answers.
-3. Runs the transport's main loop on the main thread. That loop is the
-   browser's stand-in for the UIKit / Android main queue: every
-   callback and every `asyncio` pump runs there.
+   `["apply", request_id, commit]` messages to the page; the page's events come back
+   as `["cb", ...]` callbacks. Commits acknowledge exact revisions, and native
+   Yoga layout returns a batch of changed frames.
+3. Runs Python callbacks and tasks on the standard application asyncio loop.
+   The page owns DOM widgets and Yoga WebAssembly layout. Network I/O and Python
+   work execute independently of the browser's UI thread.
 4. When the page connects, tells it the entry module. The page asks
    the `Host` module to create a screen, exactly as
    `PNViewController` and `PNScreenFragment` do, and a

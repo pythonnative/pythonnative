@@ -1,8 +1,9 @@
 """Native plugin discovery and staging (``pn build`` side of the plugin system)."""
 
 import json
+import zipfile
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
 import pytest
 
@@ -44,6 +45,62 @@ def _write_plugin(root: Path, *, ios: bool = True, android: bool = True, name: s
         )
     (root / "pn_plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
     return root
+
+
+def test_removed_android_plugins_leave_no_sources_or_resources(tmp_path: Path) -> None:
+    root = _write_plugin(tmp_path / "plugin")
+    resources = root / "android/res/values/strings.xml"
+    resources.parent.mkdir(parents=True)
+    resources.write_text('<resources><string name="plugin_label">Ready</string></resources>')
+    manifest = json.loads((root / "pn_plugin.json").read_text())
+    manifest["android"]["resources"] = ["android/res/**/*.xml"]
+    (root / "pn_plugin.json").write_text(json.dumps(manifest))
+    project = tmp_path / "project"
+    stage_android_plugins(project, [load_plugin(root)])
+    assert (project / "pythonnative/src/main/res/values/strings.xml").is_file()
+    stage_android_plugins(project, [])
+    assert not (project / "pythonnative/src/main/res/values/strings.xml").exists()
+    assert not (project / "pythonnative/src/main/java/com/example/blur/BlurPlugin.kt").exists()
+
+
+def test_target_wheel_plugins_are_read_without_importing_target_code(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from pythonnative.project import deps
+    from pythonnative.project.lockfile import target_key
+
+    project = tmp_path / "app_project"
+    project.mkdir()
+    (project / "pythonnative.toml").write_text(
+        '[app]\nid="dev.example.wheel"\nname="wheel"\n[requirements]\npackages=["example"]\n'
+    )
+    config = AppConfig.load(project)
+    target = deps.android_targets(config)[0]
+    cache = project / "build/plugin_wheels" / target_key(target).replace(":", "_")
+    cache.mkdir(parents=True)
+    root = _write_plugin(tmp_path / "plugin")
+    wheel = cache / "example-1.0-py3-none-any.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("example/__init__.py", 'raise RuntimeError("Do not import a target wheel on the host")')
+        for file in root.rglob("*"):
+            if file.is_file():
+                archive.write(file, "example/native/" + file.relative_to(root).as_posix())
+    monkeypatch.setattr(
+        deps,
+        "resolve",
+        lambda *args, **kwargs: deps.Resolution(
+            target=target,
+            packages=[deps.ResolvedPackage("example", "1.0", wheel.name, "https://example.test/" + wheel.name)],
+        ),
+    )
+
+    class Runner:
+        def run(self, *args: Any, **kwargs: Any) -> builder_mod.CommandResult:
+            return builder_mod.CommandResult(0)
+
+    found = plugins_mod.discover_target_plugins(config, [target], runner=Runner())
+    assert len(found) == 1
+    assert found[0].has_ios and found[0].has_android
 
 
 # ----------------------------------------------------------------------

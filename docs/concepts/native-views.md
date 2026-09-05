@@ -40,7 +40,7 @@ view exists, so ops can't reference views directly. Tags also give the
 native side a stable identity for event routing and animation
 bookkeeping, and the flat op list is what makes a single crossing per
 commit possible. On the wire each op is a short JSON array
-(`["c", tag, "Text", {...}]`); see [Transactions](bridge.md#transactions).
+(`["c", tag, "Text", {...}]`); see [Transactions](bridge.md#commits).
 
 ## Component managers
 

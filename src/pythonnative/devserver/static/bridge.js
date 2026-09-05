@@ -129,14 +129,6 @@ export class Bridge {
       }
       return;
     }
-    if (kind === "apply") {
-      try {
-        handler(message);
-      } catch (err) {
-        this.reportError("apply failed", err);
-      }
-      return;
-    }
     const id = message[1];
     let result = null;
     try {

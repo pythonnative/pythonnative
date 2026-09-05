@@ -46,6 +46,7 @@ class EventRegistry:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
+        self._scopes: Dict[int, Any] = {}
         self._callbacks: Dict[int, Dict[str, Callable[..., Any]]] = {}
 
     def set_events(self, tag: int, events: Dict[str, Callable[..., Any]]) -> None:
@@ -56,10 +57,24 @@ class EventRegistry:
             else:
                 self._callbacks.pop(tag, None)
 
+    def set_scope(self, tag: int, scope: Any) -> None:
+        """Associate callbacks with the component that owns this view."""
+        self._scopes[tag] = scope
+
+    def invoke(self, tag: int, name: str, *args: Any) -> Any:
+        """Invoke a sync or async handler with component cancellation."""
+        from .runtime import invoke
+
+        callback = self.get(tag, name)
+        if callback is not None:
+            return invoke(callback, *args, scope=self._scopes.get(tag))
+        return None
+
     def clear(self, tag: int) -> None:
         """Drop every registration for ``tag`` (called on view destroy)."""
         with self._lock:
             self._callbacks.pop(tag, None)
+            self._scopes.pop(tag, None)
 
     def get(self, tag: int, name: str) -> Optional[Callable[..., Any]]:
         """Return the callback for ``(tag, name)``, or ``None``."""
@@ -88,7 +103,7 @@ class EventRegistry:
         if callback is None:
             return False
         try:
-            callback(*args)
+            self.invoke(tag, name, *args)
         except Exception as exc:
             from . import diagnostics
 
@@ -102,6 +117,7 @@ class EventRegistry:
         """Drop every registration (test helper)."""
         with self._lock:
             self._callbacks.clear()
+            self._scopes.clear()
 
 
 _registry = EventRegistry()
