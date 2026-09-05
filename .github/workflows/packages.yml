@@ -1,0 +1,65 @@
+name: Packages
+
+# PyPI package compatibility matrix. Resolves tests/packages/matrix.toml
+# for every device target against the live indexes (PyPI, BeeWare,
+# Chaquopy) and fails when a package's availability disagrees with the
+# manifest, so an index change that breaks or fixes a package shows up
+# here rather than in a user's build.
+#
+# Runs weekly (the indexes change without us), on manual dispatch, and
+# on any change to the resolver, the manifest, or the guide's table.
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/pythonnative/project/deps.py'
+      - 'tests/packages/**'
+      - 'scripts/package-matrix.py'
+      - '.github/workflows/packages.yml'
+  pull_request:
+    paths:
+      - 'src/pythonnative/project/deps.py'
+      - 'tests/packages/**'
+      - 'scripts/package-matrix.py'
+      - '.github/workflows/packages.yml'
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: uv sync --locked --group dev
+
+      - name: Resolve the matrix
+        env:
+          PN_PACKAGE_MATRIX: '1'
+        run: uv run pytest tests/packages -q -m network
+
+      # The Markdown table the guide embeds; download it from the run
+      # page and paste it into docs/guides/pypi-packages.md when it
+      # changes.
+      - name: Render the Markdown table
+        if: always()
+        run: uv run scripts/package-matrix.py > package-matrix.md
+
+      - name: Upload the table
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-matrix
+          path: package-matrix.md
+          retention-days: 30

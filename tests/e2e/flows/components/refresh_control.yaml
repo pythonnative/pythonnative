@@ -10,7 +10,7 @@
 # explicit long swipe instead of a plain directional flick.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/refresh_control.py
-# Source under test: src/pythonnative/components.py :: RefreshControl
+# Source under test: src/pythonnative/components/controls.py :: RefreshControl
 appId: ${APP_ID}
 ---
 - runFlow:

@@ -1,7 +1,7 @@
 # Tests Button taps increment a counter; disabled buttons don't fire.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/button.py
-# Source under test: src/pythonnative/components.py :: Button
+# Source under test: src/pythonnative/components/text.py :: Button
 appId: ${APP_ID}
 ---
 - runFlow:

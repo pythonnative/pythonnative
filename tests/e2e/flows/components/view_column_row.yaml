@@ -1,7 +1,7 @@
 # Tests View / Column / Row render their children in the right direction.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/view_column_row.py
-# Source under test: src/pythonnative/components.py :: View, Column, Row
+# Source under test: src/pythonnative/components/layout.py :: View, Column, Row
 appId: ${APP_ID}
 ---
 - runFlow:

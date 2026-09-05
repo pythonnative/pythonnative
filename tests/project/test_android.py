@@ -18,10 +18,11 @@ android {
         versionCode 1
         versionName "1.0"
         ndk {
-            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            abiFilters "arm64-v8a", "x86_64"
         }
         python {
-            version "3.11"
+            version "3.13"
+            pyc { src false }
             pip { install "-r", "requirements.txt" }
         }
     }
@@ -116,7 +117,7 @@ def test_relocate_noop_when_same(template: Path) -> None:
 def test_configure_gradle_writes_identity(template: Path, tmp_path: Path) -> None:
     cfg = _config(
         tmp_path,
-        app={"id": "com.acme.cool", "name": "cool", "version": "3.1.4", "build": 42, "python_version": "3.12"},
+        app={"id": "com.acme.cool", "name": "cool", "version": "3.1.4", "build": 42, "python_version": "3.14"},
         android={"min_sdk": 26, "target_sdk": 33, "compile_sdk": 35, "abi_filters": ["arm64-v8a"]},
     )
     android.configure_gradle(template, cfg)
@@ -126,8 +127,16 @@ def test_configure_gradle_writes_identity(template: Path, tmp_path: Path) -> Non
     assert "minSdk 26" in text
     assert "targetSdk 33" in text
     assert "compileSdk 35" in text
-    assert 'version "3.12"' in text
+    assert 'version "3.14"' in text
     assert 'abiFilters "arm64-v8a"' in text
+    # Debug builds keep .py sources in the APK (tracebacks, dev client seeding).
+    assert "src false" in text and "src true" not in text
+
+
+def test_configure_gradle_release_ships_bytecode_only(template: Path, tmp_path: Path) -> None:
+    android.configure_gradle(template, _config(tmp_path), release=True)
+    text = (template / "app" / "build.gradle").read_text()
+    assert "src true" in text and "src false" not in text
     assert "signingConfigs" not in text  # no signing configured
 
 

@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        python-version: ['3.13', '3.14']
 
     steps:
       - name: Checkout
@@ -43,3 +43,57 @@ jobs:
 
       - name: Run tests
         run: uv run pytest -q
+
+  # The Swift half of the rendering core: decoders, component managers,
+  # gestures, and module promises run under XCTest on a simulator.
+  native-ios:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Runner images ship different simulator sets, and xcodebuild
+      # silently falls back to "My Mac" (where UIKit doesn't exist) when
+      # a named destination is missing, so resolve an available iPhone
+      # simulator by UDID instead of hardcoding a model name.
+      - name: Run PythonNativeKit tests
+        working-directory: src/pythonnative/templates/ios_template/PythonNativeKit
+        run: |
+          set -o pipefail
+          UDID="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          phones = [
+              d for runtime, devices in sorted(data.items()) if "iOS" in runtime
+              for d in devices if d.get("isAvailable") and d["name"].startswith("iPhone")
+          ]
+          if not phones:
+              sys.exit("no available iPhone simulator on this runner")
+          print(phones[-1]["udid"])
+          ')"
+          echo "Using simulator $UDID"
+          xcodebuild test \
+            -scheme PythonNativeKit \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            -derivedDataPath "$RUNNER_TEMP/pnkit" \
+            -quiet
+
+  # The Kotlin half has no Chaquopy dependency, so plain JUnit covers it.
+  native-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run pythonnative module tests
+        working-directory: src/pythonnative/templates/android_template
+        run: ./gradlew :pythonnative:testDebugUnitTest --no-daemon

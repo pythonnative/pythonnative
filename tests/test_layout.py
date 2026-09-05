@@ -835,6 +835,301 @@ def test_scroll_axis_x_clamps_container_width_to_parent_avail() -> None:
 
 
 # ======================================================================
+# display: none
+# ======================================================================
+
+
+def test_display_none_child_is_skipped_in_row() -> None:
+    root = LayoutNode(
+        style={"flex_direction": "row", "width": 300, "height": 50, "spacing": 10},
+        children=[
+            LayoutNode(style={"width": 80, "height": 40}),
+            LayoutNode(style={"width": 100, "height": 40, "margin": 20, "display": "none"}),
+            LayoutNode(style={"width": 60, "height": 40}),
+        ],
+    )
+    calculate_layout(root, 320, 480)
+    a, hidden, c = root.children
+    assert a.x == 0
+    # No size, no gap, no margin from the hidden sibling.
+    assert c.x == 90
+    assert (hidden.x, hidden.y, hidden.width, hidden.height) == (0, 0, 0, 0)
+
+
+def test_display_none_zeroes_descendant_frames() -> None:
+    grandchild = LayoutNode(style={"width": 30, "height": 30})
+    hidden = LayoutNode(style={"display": "none", "padding": 10}, children=[grandchild])
+    root = LayoutNode(style={"width": 100, "height": 100}, children=[hidden])
+    calculate_layout(root, 320, 480)
+    assert (hidden.width, hidden.height) == (0, 0)
+    assert (grandchild.x, grandchild.y, grandchild.width, grandchild.height) == (0, 0, 0, 0)
+
+
+def test_display_none_does_not_contribute_to_content_size() -> None:
+    root = LayoutNode(
+        style={"width": 100},
+        children=[
+            LayoutNode(style={"height": 30}),
+            LayoutNode(style={"height": 500, "display": "none"}),
+        ],
+    )
+    calculate_layout(root, 320, math.inf)
+    assert root.height == 30
+
+
+def test_display_none_absolute_child_is_skipped() -> None:
+    root = LayoutNode(
+        style={"width": 100, "height": 100},
+        children=[
+            LayoutNode(
+                style={"position": "absolute", "top": 10, "left": 10, "width": 20, "height": 20, "display": "none"},
+            ),
+        ],
+    )
+    calculate_layout(root, 320, 480)
+    child = root.children[0]
+    assert (child.x, child.y, child.width, child.height) == (0, 0, 0, 0)
+
+
+def test_display_toggles_back_to_flex_after_relayout() -> None:
+    child = LayoutNode(style={"height": 40, "display": "none"})
+    root = LayoutNode(style={"width": 100, "height": 100}, children=[child])
+    calculate_layout(root, 320, 480)
+    assert (child.width, child.height) == (0, 0)
+    child.style["display"] = "flex"
+    child.dirty = True
+    calculate_layout(root, 320, 480)
+    assert (child.width, child.height) == (100, 40)
+
+
+def test_display_none_root_gets_zero_frame() -> None:
+    root = LayoutNode(
+        style={"width": 100, "height": 100, "display": "none"},
+        children=[LayoutNode(style={"height": 10})],
+    )
+    calculate_layout(root, 320, 480)
+    assert (root.width, root.height) == (0, 0)
+    assert (root.children[0].width, root.children[0].height) == (0, 0)
+
+
+# ======================================================================
+# Auto margins
+# ======================================================================
+
+
+def test_margin_left_auto_pushes_child_to_end() -> None:
+    root = LayoutNode(
+        style={"flex_direction": "row", "width": 300, "height": 50},
+        children=[
+            LayoutNode(style={"width": 50, "height": 40}),
+            LayoutNode(style={"width": 50, "height": 40, "margin_left": "auto"}),
+        ],
+    )
+    calculate_layout(root, 320, 480)
+    assert root.children[0].x == 0
+    assert root.children[1].x == 250
+
+
+def test_margin_auto_on_two_children_spaces_them_evenly() -> None:
+    root = LayoutNode(
+        style={"flex_direction": "row", "width": 300, "height": 50},
+        children=[
+            LayoutNode(style={"width": 50, "height": 40, "margin": "auto"}),
+            LayoutNode(style={"width": 50, "height": 40, "margin": "auto"}),
+        ],
+    )
+    calculate_layout(root, 320, 480)
+    # Free space 200 split across four auto margins: 50 each.
+    a, b = root.children
+    assert a.x == 50
+    assert b.x == 200
+    # Vertical auto margins center on the cross axis too.
+    assert a.y == 5
+    assert b.y == 5
+
+
+def test_main_axis_auto_margins_override_justify_content() -> None:
+    root = LayoutNode(
+        style={"flex_direction": "row", "width": 300, "height": 50, "justify_content": "flex_end"},
+        children=[
+            LayoutNode(style={"width": 50, "height": 40, "margin_right": "auto"}),
+            LayoutNode(style={"width": 50, "height": 40}),
+        ],
+    )
+    calculate_layout(root, 320, 480)
+    assert root.children[0].x == 0
+    assert root.children[1].x == 250
+
+
+def test_column_main_axis_auto_margin_pushes_to_bottom() -> None:
+    root = LayoutNode(
+        style={"width": 100, "height": 300},
+        children=[
+            LayoutNode(style={"height": 40}),
+            LayoutNode(style={"height": 40, "margin_top": "auto"}),
+        ],
+    )
+    calculate_layout(root, 320, 480)
+    assert root.children[1].y == 260
+
+
+def test_cross_axis_auto_margins_center_and_disable_stretch() -> None:
+    root = LayoutNode(
+        style={"width": 100, "height": 200, "align_items": "flex_start"},
+        children=[
+            LayoutNode(style={"width": 40, "height": 50, "margin_horizontal": "auto"}),
+            LayoutNode(style={"height": 50, "margin": {"horizontal": "auto"}}, measure=text_measure),
+        ],
+    )
+    calculate_layout(root, 320, 480)
+    centered, measured = root.children
+    assert centered.x == 30
+    # Auto margins override align_items: stretch is skipped and the leaf
+    # keeps its natural 80pt width, centered in the 100pt column.
+    assert measured.width == 80
+    assert measured.x == 10
+
+
+def test_single_cross_axis_auto_margin_pushes_to_opposite_edge() -> None:
+    root = LayoutNode(
+        style={"width": 100, "height": 200, "align_items": "flex_start"},
+        children=[LayoutNode(style={"width": 40, "height": 50, "margin_left": "auto"})],
+    )
+    calculate_layout(root, 320, 480)
+    assert root.children[0].x == 60
+
+    row = LayoutNode(
+        style={"flex_direction": "row", "width": 200, "height": 100, "align_items": "center"},
+        children=[LayoutNode(style={"width": 40, "height": 30, "margin_top": "auto"})],
+    )
+    calculate_layout(row, 320, 480)
+    assert row.children[0].y == 70
+
+
+def test_auto_margin_is_not_parsed_as_zero_when_explicit_edge_overrides() -> None:
+    root = LayoutNode(
+        style={"flex_direction": "row", "width": 300, "height": 50},
+        children=[LayoutNode(style={"width": 50, "height": 40, "margin": "auto", "margin_left": 10})],
+    )
+    calculate_layout(root, 320, 480)
+    # Only the right margin stays auto, so the child sits at its explicit left margin.
+    assert root.children[0].x == 10
+
+
+# ======================================================================
+# Baseline alignment
+# ======================================================================
+
+
+def test_align_items_baseline_aligns_leaf_bottoms() -> None:
+    def measure_short(w: float, h: float) -> Tuple[float, float]:
+        return (50.0, 20.0)
+
+    def measure_tall(w: float, h: float) -> Tuple[float, float]:
+        return (50.0, 40.0)
+
+    root = LayoutNode(
+        style={"flex_direction": "row", "width": 300, "align_items": "baseline"},
+        children=[
+            LayoutNode(measure=measure_short),
+            LayoutNode(measure=measure_tall),
+        ],
+    )
+    calculate_layout(root, 320, 480)
+    short, tall = root.children
+    # A leaf's baseline is its height, so baselines coincide at y == 40.
+    assert short.y == 20
+    assert tall.y == 0
+    assert root.height == 40
+
+
+def test_baseline_uses_first_child_of_container_and_grows_line() -> None:
+    def measure_tall(w: float, h: float) -> Tuple[float, float]:
+        return (50.0, 40.0)
+
+    container = LayoutNode(
+        style={"width": 60, "height": 60, "padding_top": 5},
+        children=[LayoutNode(style={"height": 10}), LayoutNode(style={"height": 30})],
+    )
+    root = LayoutNode(
+        style={"flex_direction": "row", "width": 300, "align_items": "baseline"},
+        children=[LayoutNode(measure=measure_tall), container],
+    )
+    calculate_layout(root, 320, 480)
+    leaf = root.children[0]
+    # Container baseline = padding_top (5) + first child's baseline (10) = 15,
+    # so it moves down to meet the leaf's baseline at y == 40.
+    assert leaf.y == 0
+    assert container.y == 25
+    # Line height covers the max ascent (40) plus the container's descent (60 - 15).
+    assert root.height == 85
+    assert container.children[0].y == 5
+
+
+def test_align_self_baseline_on_single_child_is_flex_start() -> None:
+    root = LayoutNode(
+        style={"flex_direction": "row", "width": 300, "height": 100, "align_items": "center"},
+        children=[
+            LayoutNode(style={"width": 50, "height": 20, "align_self": "baseline"}),
+            LayoutNode(style={"width": 50, "height": 40}),
+        ],
+    )
+    calculate_layout(root, 320, 480)
+    assert root.children[0].y == 0
+    assert root.children[1].y == 30
+
+
+# ======================================================================
+# Borders in the box model
+# ======================================================================
+
+
+def test_border_width_offsets_children_like_padding() -> None:
+    root = LayoutNode(
+        style={"width": 100, "height": 100, "border_width": 4},
+        children=[LayoutNode(style={"height": 30})],
+    )
+    calculate_layout(root, 320, 480)
+    child = root.children[0]
+    assert (child.x, child.y) == (4, 4)
+    assert child.width == 92
+
+
+def test_border_and_padding_add_to_content_size() -> None:
+    root = LayoutNode(
+        style={"padding": 10, "border_width": 2},
+        children=[LayoutNode(style={"width": 50, "height": 30})],
+    )
+    calculate_layout(root, 320, 480)
+    assert root.width == 74
+    assert root.height == 54
+    assert (root.children[0].x, root.children[0].y) == (12, 12)
+
+
+def test_per_edge_border_width_overrides_uniform() -> None:
+    root = LayoutNode(
+        style={"width": 100, "height": 100, "border_width": 2, "border_left_width": 10, "border_top_width": 0},
+        children=[LayoutNode(style={"width": 20, "height": 20})],
+    )
+    calculate_layout(root, 320, 480)
+    assert (root.children[0].x, root.children[0].y) == (10, 0)
+
+
+def test_absolute_children_position_inside_border() -> None:
+    root = LayoutNode(
+        style={"width": 100, "height": 100, "border_width": 4},
+        children=[
+            LayoutNode(style={"position": "absolute", "top": 0, "left": 0, "width": 10, "height": 10}),
+            LayoutNode(style={"position": "absolute", "bottom": 0, "right": 0, "width": 10, "height": 10}),
+        ],
+    )
+    calculate_layout(root, 320, 480)
+    top_left, bottom_right = root.children
+    assert (top_left.x, top_left.y) == (4, 4)
+    assert (bottom_right.x, bottom_right.y) == (86, 86)
+
+
+# ======================================================================
 # extract_layout_style helper
 # ======================================================================
 
@@ -851,3 +1146,8 @@ def test_extract_layout_style_keeps_only_layout_keys() -> None:
     }
     style = extract_layout_style(props)
     assert style == {"width": 100, "height": 50, "padding": 8, "flex": 1}
+
+
+def test_extract_layout_style_includes_display_and_border_widths() -> None:
+    props = {"display": "none", "border_width": 2, "border_left_width": 4, "border_color": "#000"}
+    assert extract_layout_style(props) == {"display": "none", "border_width": 2, "border_left_width": 4}

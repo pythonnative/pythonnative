@@ -64,6 +64,11 @@ class UpdateOp:
 
     Removed props are signaled with a value of ``None``, matching the
     pre-existing handler contract.
+
+    Attributes:
+        tag: Unique integer identity of the target view.
+        changed_props: Mapping of modified prop names to their new values.
+            Removed props appear with a value of ``None``.
     """
 
     tag: int
@@ -78,6 +83,12 @@ class InsertOp:
     attached to the parent at a different position, it is moved rather
     than duplicated. ``index`` is clamped by handlers to the current
     child count.
+
+    Attributes:
+        parent_tag: Integer tag of the container view.
+        child_tag: Integer tag of the child view to insert or move.
+        index: Zero-based insertion index, clamped by handlers to the
+            current child count.
     """
 
     parent_tag: int
@@ -92,6 +103,9 @@ class DestroyOp:
     The registry drops its tag record and calls the handler's
     ``destroy`` hook so platform resources (listeners, timers, image
     loads) can be released eagerly instead of waiting for GC.
+
+    Attributes:
+        tag: Unique integer identity of the view to destroy.
     """
 
     tag: int
@@ -103,6 +117,13 @@ class SetFrameOp:
 
     Coordinates are points relative to the parent's content origin,
     exactly as computed by the layout engine.
+
+    Attributes:
+        tag: Unique integer identity of the target view.
+        x: Horizontal origin offset in points relative to the parent.
+        y: Vertical origin offset in points relative to the parent.
+        width: View width in points.
+        height: View height in points.
     """
 
     tag: int

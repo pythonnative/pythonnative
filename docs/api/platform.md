@@ -16,10 +16,12 @@ branches throughout the codebase.
 
 | Attribute | Values |
 |---|---|
-| `Platform.OS` | `"ios"`, `"android"`, or `"test"` |
+| `Platform.OS` | `"ios"`, `"android"`, `"web"`, or `"test"` |
 | `Platform.Version` | Best-effort OS version string |
-| `Platform.is_ios` / `Platform.is_android` / `Platform.is_test` | Booleans |
+| `Platform.is_ios` / `Platform.is_android` / `Platform.is_web` / `Platform.is_test` | Booleans |
 | `Platform.select(spec, default=None)` | Pick a value matching the current platform |
+
+- `"web"` means the `pn preview` browser preview.
 
 ## See also
 

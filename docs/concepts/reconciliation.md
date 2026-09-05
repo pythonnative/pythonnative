@@ -118,8 +118,9 @@ the native views live elsewhere.
 
 ## Context providers
 
-[`Provider`][pythonnative.Provider] is itself an element type. When the
-reconciler mounts one, it pushes a value onto a per-context stack;
+[`Context.Provider`][pythonnative.hooks.Context.Provider] returns an element
+whose type is the context itself. When the reconciler mounts one, it
+pushes a value onto a per-context stack;
 descendants reading via [`use_context`][pythonnative.use_context]
 observe the topmost value. Context is reactive: when a re-render
 changes a Provider's value, the reconciler marks every recorded
@@ -131,11 +132,7 @@ ThemeContext = pn.create_context({"primary": "#000"})
 
 @pn.component
 def Screen():
-    return pn.Provider(
-        ThemeContext,
-        {"primary": "#222"},
-        Header(),
-    )
+    return ThemeContext.Provider({"primary": "#222"}, Header())
 
 @pn.component
 def Header():

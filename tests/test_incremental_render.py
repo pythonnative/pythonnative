@@ -10,12 +10,12 @@ the measurement cache that lets untouched leaves skip native
 
 from typing import Any, Dict, List, Tuple
 
-from fake_backend import FakeBackend as MockBackend
-
+from pythonnative.component import component
 from pythonnative.components import ErrorBoundary
 from pythonnative.element import Element
-from pythonnative.hooks import Provider, component, create_context, use_context, use_state
+from pythonnative.hooks import create_context, use_context, use_state
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend as MockBackend
 
 
 def _make_reconciler() -> Tuple[Reconciler, MockBackend]:
@@ -23,7 +23,7 @@ def _make_reconciler() -> Tuple[Reconciler, MockBackend]:
     rec = Reconciler(backend)
     # The screen host normally supplies this; tests drive flush_dirty by
     # hand so a no-op trigger is enough.
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     return rec, backend
 
 
@@ -49,7 +49,7 @@ def test_flush_dirty_rerenders_only_dirty_component() -> None:
         return Element(
             "Column",
             {},
-            [child(name="a", key="a"), child(name="b", key="b")],
+            [child(name="a").with_key("a"), child(name="b").with_key("b")],
         )
 
     rec, _backend = _make_reconciler()
@@ -76,7 +76,7 @@ def test_flush_dirty_updates_only_the_changed_native_view() -> None:
 
     @component
     def parent() -> Element:
-        return Element("Column", {}, [child(name="a", key="a"), child(name="b", key="b")])
+        return Element("Column", {}, [child(name="a").with_key("a"), child(name="b").with_key("b")])
 
     rec, backend = _make_reconciler()
     column = rec.mount(parent())
@@ -107,7 +107,7 @@ def test_flush_dirty_batches_multiple_dirty_components() -> None:
 
     @component
     def parent() -> Element:
-        return Element("Column", {}, [child(name="a", key="a"), child(name="b", key="b")])
+        return Element("Column", {}, [child(name="a").with_key("a"), child(name="b").with_key("b")])
 
     rec, _backend = _make_reconciler()
     rec.mount(parent())
@@ -166,7 +166,7 @@ def test_flush_dirty_preserves_provider_context() -> None:
 
     @component
     def app() -> Element:
-        return Provider(theme, "dark", consumer())
+        return theme.Provider("dark", consumer())
 
     rec, _backend = _make_reconciler()
     rec.mount(app())
@@ -237,7 +237,7 @@ def test_local_rerender_error_is_caught_by_ancestor_boundary() -> None:
     # ErrorBoundary must catch it and mount the fallback.
     setters["risky"](1)
     rec.flush_dirty()
-    assert rec._tree.native_view.props["text"].startswith("caught:")
+    assert rec.root.native_view.props["text"].startswith("caught:")
 
 
 def test_local_rerender_error_without_boundary_propagates() -> None:
@@ -300,14 +300,14 @@ def test_measurement_cache_invalidated_only_for_rerendered_leaf() -> None:
 
     @component
     def parent() -> Element:
-        return Element("Column", {}, [child(name="a", key="a"), child(name="b", key="b")])
+        return Element("Column", {}, [child(name="a").with_key("a"), child(name="b").with_key("b")])
 
     rec, backend = _make_reconciler()
     rec.mount(parent())
     rec.set_viewport_size(300.0, 600.0)
 
-    a_view = rec._tree.native_view.children[0]
-    b_view = rec._tree.native_view.children[1]
+    a_view = rec.root.native_view.children[0]
+    b_view = rec.root.native_view.children[1]
     assert sorted(backend.measure_calls) == sorted([a_view.id, b_view.id])
 
     backend.measure_calls.clear()

@@ -6,7 +6,7 @@
 # bypass entirely.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/segmented_control.py
-# Source under test: src/pythonnative/components.py :: SegmentedControl
+# Source under test: src/pythonnative/components/controls.py :: SegmentedControl
 appId: ${APP_ID}
 ---
 - runFlow:

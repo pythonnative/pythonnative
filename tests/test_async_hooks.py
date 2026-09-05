@@ -6,13 +6,12 @@ import asyncio
 from typing import Any
 
 import pytest
-from fake_backend import FakeBackend as _StubBackend
 
+from pythonnative.component import component
 from pythonnative.element import Element
 from pythonnative.hooks import (
     MutationCall,
     QueryResult,
-    component,
     use_effect,
     use_mutation,
     use_query,
@@ -20,6 +19,7 @@ from pythonnative.hooks import (
 )
 from pythonnative.reconciler import Reconciler
 from pythonnative.runtime import drain, run_blocking
+from pythonnative.testing import FakeBackend as _StubBackend
 
 
 def _settle(rec: Reconciler, predicate: Any, timeout: float = 2.0) -> bool:

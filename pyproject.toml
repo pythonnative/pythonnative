@@ -4,13 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pythonnative"
-version = "0.33.0"
+version = "0.39.0"
 description = "Cross-platform native UI toolkit for Android and iOS"
 authors = [
   { name = "Owen Carey" }
 ]
 readme = "README.md"
-requires-python = ">=3.10"
+# The host interpreter must match the embedded runtime (app.python_version)
+# for device builds, and the embedded runtimes are 3.13 and 3.14: CPython
+# gained official iOS support (PEP 730) and Android support (PEP 738) in
+# 3.13, which is what makes binary wheels from PyPI installable at all.
+requires-python = ">=3.13"
 license = { file = "LICENSE" }
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
@@ -18,20 +22,15 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Software Development :: User Interfaces",
 ]
 dependencies = [
   "requests>=2.31.0",
-  "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
-ios = [
-  "rubicon-objc>=0.4.6,<0.5.0",
-]
 build = [
   "Pillow>=10.0",
 ]
@@ -46,8 +45,9 @@ dev = [
   "pytest>=8.0",
   "pytest-asyncio>=0.23",
   "Pillow>=10.0",
-  # `pn run ios` shells out to `sys.executable -m pip` to vendor
-  # rubicon-objc (project/builder.py), and the test suite exercises that
+  # `pn deps` and `pn run ios` shell out to `sys.executable -m pip` to
+  # resolve and vendor the app's [requirements].packages for the device
+  # platform tags (project/deps.py), and the test suite exercises that
   # path. `uv sync` does not seed pip the way `uv venv --seed` did.
   "pip>=24.0",
 ]
@@ -88,14 +88,17 @@ where = ["src"]
 [tool.setuptools]
 license-files = ["LICENSE*"]
 
-# Include template directories inside the package so importlib.resources can find them
+# Include template directories and the browser preview's page assets inside
+# the package so importlib.resources can find them
 [tool.setuptools.package-data]
 pythonnative = [
+  "py.typed",
   "templates/**",
+  "devserver/static/*",
 ]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py313"
 line-length = 120
 extend-exclude = [
   "templates",
@@ -126,7 +129,6 @@ ignore = ["D107", "D105", "D203", "D213"]
 # docstrings would only add boilerplate that repeats the ABC.
 "src/pythonnative/native_views/android.py" = ["D101", "D102"]
 "src/pythonnative/native_views/ios.py" = ["D101", "D102"]
-"src/pythonnative/native_views/desktop.py" = ["D101", "D102"]
 # ios.py embeds a LaunchScreen storyboard as an XML string literal whose
 # lines exceed the limit; the XML must stay on single lines for Xcode.
 "src/pythonnative/project/ios.py" = ["E501"]
@@ -136,10 +138,7 @@ convention = "google"
 
 [tool.black]
 line-length = 120
-target-version = ['py39']
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
+target-version = ['py313']
 
 # ── Semantic Release ────────────────────────────────────────────────
 

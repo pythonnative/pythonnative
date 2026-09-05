@@ -1,4 +1,4 @@
-"""`pn` CLI: scaffold, diagnose, preview, run, and build PythonNative apps.
+"""`pn` CLI: scaffold, diagnose, start, run, and build PythonNative apps.
 
 The console script `pn` (declared in `pyproject.toml`) dispatches to:
 
@@ -6,70 +6,88 @@ The console script `pn` (declared in `pyproject.toml`) dispatches to:
   ``app/``) into ``./name/``, or into the current directory when no name
   is given.
 - `pn doctor [platform]`: diagnose the local toolchain and config.
-- `pn preview [component]`: render the app in a desktop (Tkinter) window
-  with Fast Refresh, the fast inner dev loop, no device required.
+- `pn deps [platform]`: resolve ``[requirements].packages`` for every
+  device target and report which wheels would be used (or why a package
+  can't be installed), without building anything.
+- `pn start`: run the dev server. It renders the app in a browser tab
+  and syncs every save to every connected debug build (simulators,
+  emulators, physical devices) with Fast Refresh; device logs stream
+  back into the same terminal.
+- `pn preview`: `pn start` plus opening the browser preview.
 - `pn devices [platform]`: list connected devices, emulators, and
   simulators, as a table or as JSON with `--json`.
-- `pn run android|ios [--device D]`: stage + build + install + launch on
-  a device, emulator, or simulator, with optional on-device hot reload.
-- `pn logs android|ios`: stream logs from the running app without
-  rebuilding.
+- `pn run android|ios [--device D]`: stage + build + install + launch a
+  debug build that connects to the dev server. The native project is
+  only rebuilt when something outside ``app/`` changed.
+- `pn logs android|ios [--device D]`: stream logs from the running app
+  without rebuilding.
 - `pn build android|ios`: produce standalone artifacts (signed APK/AAB,
   or an iOS archive/IPA, optionally uploaded to App Store Connect).
 - `pn app-id android|ios`: print the resolved application/bundle id
   (handy for scripts and CI).
 - `pn clean`: remove the local `build/` directory.
 
-The heavy lifting lives in the ``pythonnative.project`` package; this
-module is a thin, side-effect-y shell that wires arguments to it and
-handles the device-facing steps (simulator boot, log streaming, hot
-reload) that can't be unit tested.
+The heavy lifting lives in the ``pythonnative.project`` and
+``pythonnative.devserver`` packages; this module is a thin,
+side-effect-y shell that wires arguments to them and handles the
+device-facing steps (simulator boot, launch, log streaming) that can't
+be unit tested.
 """
 
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
-import time
 from importlib.metadata import version as pkg_version
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TextIO
+from typing import Any, Dict, List, Optional, Sequence, TextIO
+from urllib.request import urlopen
 
 from ..project import builder as builder_mod
+from ..project import deps as deps_mod
 from ..project import devices as devices_mod
 from ..project import doctor as doctor_mod
+from ..project import fingerprint as fingerprint_mod
 from ..project.android import collect_logcat_filters
 from ..project.config import CONFIG_FILENAME, AppConfig, ConfigError, render_default_toml
 
-HOT_RELOAD_DEV_ROOT = "pythonnative_dev"
-"""Subdirectory (under the app's writable storage) for hot-reload overlays."""
+DEFAULT_DEV_PORT = 8765
+"""Port `pn start` listens on unless `--port` says otherwise."""
 
 
 # ======================================================================
 # init
 # ======================================================================
 
-_MAIN_TEMPLATE = """import pythonnative as pn
+_MAIN_TEMPLATE = """from typing import TypedDict
+
+import pythonnative as pn
 
 Stack = pn.create_stack_navigator()
+
+
+class DetailParams(TypedDict):
+    count: int
 
 
 @pn.component
 def HomeScreen():
     count, set_count = pn.use_state(0)
     nav = pn.use_navigation()
+    theme = pn.use_theme()
     return pn.ScrollView(
         pn.Column(
-            pn.Text("Hello from PythonNative!", style={"font_size": 24, "bold": True}),
+            pn.Text("Hello from PythonNative!", style={"font_size": theme.font_size_title, "bold": True}),
             pn.Text(f"Tapped {count} times"),
             pn.Button("Tap me", on_press=lambda: set_count(count + 1)),
-            pn.Button("Open detail", on_press=lambda: nav.navigate("Detail", {"count": count})),
-            style={"spacing": 12, "padding": 16, "align_items": "stretch"},
+            pn.Button("Open detail", on_press=lambda: nav.navigate("Detail", count=count)),
+            style={"spacing": theme.spacing_large, "padding": 16, "align_items": "stretch"},
         )
     )
 
@@ -77,9 +95,9 @@ def HomeScreen():
 @pn.component
 def DetailScreen():
     nav = pn.use_navigation()
-    params = pn.use_route()
+    route = pn.use_route(DetailParams)
     return pn.Column(
-        pn.Text(f"Detail: count was {params.get('count', 0)}", style={"font_size": 20}),
+        pn.Text(f"Detail: count was {route.params['count']}", style={"font_size": 20}),
         pn.Button("Back", on_press=nav.go_back),
         style={"spacing": 12, "padding": 16},
     )
@@ -89,8 +107,8 @@ def DetailScreen():
 def App():
     return pn.NavigationContainer(
         Stack.Navigator(
-            Stack.Screen("Home", component=HomeScreen, options={"title": "Home"}),
-            Stack.Screen("Detail", component=DetailScreen, options={"title": "Detail"}),
+            Stack.Screen("Home", HomeScreen, title="Home"),
+            Stack.Screen("Detail", DetailScreen, title="Detail"),
         )
     )
 """
@@ -196,8 +214,7 @@ def init_project(args: argparse.Namespace) -> None:
     # ``is_symlink()`` so the whole class is closed, not one spelling of it.
     if name and (target.is_symlink() or target.resolve().parent != cwd.resolve()):
         print(
-            f"Refusing to scaffold through a link or outside the current directory: {name}. "
-            "Use a plain directory name."
+            f"Refusing to scaffold through a link or outside the current directory: {name}. Use a plain directory name."
         )
         sys.exit(1)
 
@@ -236,7 +253,7 @@ def init_project(args: argparse.Namespace) -> None:
         gitignore_path.write_text(_GITIGNORE, encoding="utf-8")
 
     print(f"Initialized PythonNative project in {target}.")
-    next_steps = "pn preview   (desktop)   |   pn run android   |   pn run ios"
+    next_steps = "pn start   (browser preview + dev server)   |   pn run android   |   pn run ios"
     if name:
         next_steps = f"cd {name}   |   {next_steps}"
     print(f"Next: {next_steps}")
@@ -280,67 +297,161 @@ def app_id_command(args: argparse.Namespace) -> None:
 
 
 # ======================================================================
-# preview
+# deps
 # ======================================================================
 
 
-def preview_project(args: argparse.Namespace) -> None:
-    """Render the project in a desktop preview window (Tkinter).
+def deps_command(args: argparse.Namespace) -> None:
+    """Report how ``[requirements].packages`` resolve for each device target.
 
-    Re-execs under ``PN_PLATFORM=desktop`` so every module binds to the
-    Tkinter backend, then hands off to ``pythonnative.preview.run_preview``.
+    Runs pip in its cross-platform dry-run mode once per target (iOS
+    device, iOS Simulator, and one per Android ABI) and prints the
+    wheel each package would use, flagging binary wheels and their
+    source index. Exits non-zero when any target can't be satisfied,
+    so it doubles as a CI gate. ``--json`` emits the same data as a
+    machine-readable document.
 
     Args:
-        args: Parsed namespace (``component``, ``width``, ``height``,
-            ``title``, ``no_hot_reload``).
+        args: Parsed namespace with optional ``platform``, ``json``, and
+            ``python`` (the interpreter to run pip with).
     """
-    if os.environ.get("PN_PLATFORM") != "desktop":
+    platform: Optional[str] = getattr(args, "platform", None)
+    as_json: bool = getattr(args, "json", False)
+    python: Optional[str] = getattr(args, "python", None)
+
+    config = _load_config_or_exit()
+    targets = deps_mod.targets_for(config, platform)
+    runner = builder_mod.SubprocessRunner()
+    if not as_json and config.requirements:
+        print(
+            f"Resolving {len(config.requirements)} requirement(s) for Python {config.python_version} "
+            f"across {len(targets)} target(s)...\n"
+        )
+    resolutions = deps_mod.resolve_all(config, targets, runner=runner, python=python)
+
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "python_version": config.python_version,
+                    "requirements": list(config.requirements),
+                    "targets": [res.to_dict() for res in resolutions],
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(deps_mod.format_report(resolutions, requirements=config.requirements))
+    if any(not res.ok for res in resolutions):
+        sys.exit(1)
+
+
+# ======================================================================
+# start / preview
+# ======================================================================
+
+
+def start_command(args: argparse.Namespace, *, open_browser: bool = False) -> None:
+    """Run the dev server (and the browser preview) for the current project.
+
+    Re-execs under ``PN_PLATFORM=web`` so every module binds to the
+    browser backend, then hands off to ``pythonnative.preview.serve``.
+
+    Args:
+        args: Parsed namespace (``entry``, ``host``, ``port``, ``open``,
+            ``no_open``).
+        open_browser: Open the preview page once the server is up
+            (``pn preview`` sets this; ``--open`` does too).
+    """
+    if os.environ.get("PN_PLATFORM") != "web":
         try:
             completed = subprocess.run(
                 [sys.executable, "-m", "pythonnative.cli.pn", *sys.argv[1:]],
-                env={**os.environ, "PN_PLATFORM": "desktop"},
+                env={**os.environ, "PN_PLATFORM": "web"},
             )
         except KeyboardInterrupt:
             sys.exit(130)
         sys.exit(completed.returncode)
 
     project_dir = Path.cwd()
-    component: Optional[str] = getattr(args, "component", None)
-    if not component:
-        component = _preview_entry(project_dir)
-
+    entry: Optional[str] = getattr(args, "entry", None)
+    project_name = ""
+    requirements: List[str] = []
     try:
-        from pythonnative.preview import run_preview
-    except Exception as exc:  # pragma: no cover - environment dependent
-        print(f"Error: could not start the desktop preview: {exc}")
+        config = AppConfig.load(project_dir)
+        entry = entry or config.entry_module
+        project_name = config.name
+        requirements = list(config.requirements)
+    except ConfigError:
+        entry = entry or "app.main"
+    missing = _missing_requirements(requirements)
+    if missing:
+        print(f"Warning: {', '.join(missing)} from [requirements] is not installed in this Python environment.")
         print(
-            "The desktop preview needs Tkinter (Python's standard GUI toolkit).\n"
-            "On macOS:        brew install python-tk\n"
-            "On Debian/Ubuntu: sudo apt-get install python3-tk\n"
-            "On Windows:      reinstall Python with the 'tcl/tk' option checked."
+            "         The browser preview imports your app here, so install it first (e.g. `pip install "
+            + " ".join(missing)
+            + "`)."
         )
+    if not (project_dir / "app").is_dir():
+        print(f"Error: no app/ directory in {project_dir}. Run 'pn init' first or cd into a PythonNative project.")
         sys.exit(1)
 
-    print(f"Starting PythonNative preview for {component} (Ctrl+C or close the window to stop).")
+    from pythonnative.preview import serve
+
+    open_browser = open_browser or bool(getattr(args, "open", False))
+    if getattr(args, "no_open", False):
+        open_browser = False
     try:
-        run_preview(
-            component,
+        serve(
+            entry,
             project_root=str(project_dir),
-            width=getattr(args, "width", 390),
-            height=getattr(args, "height", 844),
-            title=getattr(args, "title", "PythonNative Preview"),
-            hot_reload=not getattr(args, "no_hot_reload", False),
+            host=getattr(args, "host", "0.0.0.0") or "0.0.0.0",
+            port=int(getattr(args, "port", DEFAULT_DEV_PORT) or 0),
+            project_name=project_name,
+            open_browser=open_browser,
         )
+    except OSError as exc:
+        print(f"Error: could not start the dev server: {exc}")
+        print("Is another 'pn start' running? Pick a different port with --port.")
+        sys.exit(1)
     except RuntimeError as exc:
         print(f"Error: {exc}")
         sys.exit(1)
 
 
-def _preview_entry(project_dir: Path) -> str:
+def _missing_requirements(requirements: Sequence[str]) -> List[str]:
+    """Names from ``[requirements]`` that aren't installed in this interpreter.
+
+    Requirement strings may carry version specifiers or extras
+    (``"httpx[http2]>=0.27"``); only the distribution name is checked.
+    """
+    import importlib.metadata as metadata
+
+    missing: List[str] = []
+    for requirement in requirements:
+        name = re.split(r"[\s\[<>=!~;@]", requirement.strip(), maxsplit=1)[0]
+        if not name:
+            continue
+        try:
+            metadata.distribution(name)
+        except metadata.PackageNotFoundError:
+            missing.append(name)
+    return missing
+
+
+def preview_command(args: argparse.Namespace) -> None:
+    """``pn preview``: ``pn start`` that also opens the browser preview."""
+    start_command(args, open_browser=True)
+
+
+def _running_dev_server(port: int) -> Optional[Dict[str, Any]]:
+    """Return ``/status`` of a dev server on ``localhost:port``, or ``None``."""
     try:
-        return AppConfig.load(project_dir).entry_module
-    except ConfigError:
-        return "app.main"
+        with urlopen(f"http://127.0.0.1:{port}/status", timeout=0.5) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
 
 
 # ======================================================================
@@ -411,135 +522,242 @@ def _resolve_device(platform: str, query: Optional[str]) -> Optional[devices_mod
 # ======================================================================
 
 
+def _dev_server_url_for(platform: str, device: Optional[devices_mod.Device], port: int) -> str:
+    """The WebSocket URL a launched app should use to reach ``pn start``.
+
+    Simulators share the host's loopback. Android emulators and USB
+    devices reach it through ``adb reverse`` (set up by the caller), so
+    ``localhost`` works for every Android target. A physical iOS device
+    is on the LAN, so it gets the first LAN address.
+    """
+    if platform == "ios" and device is not None and device.kind == "device":
+        from ..devserver import lan_addresses
+
+        for address in lan_addresses():
+            return f"ws://{address}:{port}/ws?role=client"
+    return f"ws://localhost:{port}/ws?role=client"
+
+
 def run_project(args: argparse.Namespace) -> None:
-    """Stage, build, install, and launch the app on a device/simulator.
+    """Stage, build, install, and launch a debug build that talks to ``pn start``.
+
+    The native toolchain only runs when a native input changed (see
+    ``pythonnative.project.fingerprint``) or when no dev server is up
+    to deliver the latest sources; otherwise the previous artifact is
+    reinstalled, which turns the edit/relaunch loop from minutes into
+    seconds.
 
     Args:
         args: Parsed namespace (``platform``, ``device``,
-            ``prepare_only``, ``hot_reload``, ``no_logs``).
+            ``prepare_only``, ``no_logs``, ``rebuild``, ``dev_server``,
+            ``port``, ``dev_client``).
     """
     platform: str = args.platform
     prepare_only: bool = getattr(args, "prepare_only", False)
-    hot_reload: bool = getattr(args, "hot_reload", False)
     show_logs: bool = not getattr(args, "no_logs", False)
+    force_rebuild: bool = getattr(args, "rebuild", False)
+    dev_client: bool = getattr(args, "dev_client", False)
+    port: int = int(getattr(args, "port", DEFAULT_DEV_PORT) or DEFAULT_DEV_PORT)
     device = _resolve_device(platform, getattr(args, "device", None))
 
     config = _load_config_or_exit()
+    if dev_client:
+        # A dev client is the same native app whose entry module is the
+        # connect screen; the real app arrives from the dev server.
+        config = dataclasses.replace(config, entry_point="pythonnative/devclient.py")
     builder = builder_mod.Builder(config, log=print)
 
-    try:
-        prepared = builder.prepare(platform)
-    except builder_mod.BuildError as exc:
-        print(f"Error: {exc}")
-        sys.exit(1)
-
+    # Resolve third-party packages only for the destination being built
+    # (device wheels and Simulator wheels differ); prepare-only keeps both
+    # slices so the staged project builds for either in Xcode.
     if prepare_only:
-        print(f"Prepared {platform} project in {prepared.project_dir} (prepare-only).")
-        return
+        ios_sdks: tuple = deps_mod.IOS_SDKS
+    elif device is not None and device.kind == "device":
+        ios_sdks = ("iphoneos",)
+    else:
+        ios_sdks = ("iphonesimulator",)
 
+    explicit_server: Optional[str] = getattr(args, "dev_server", None)
+    status = _running_dev_server(port) if not explicit_server else None
+    if explicit_server:
+        server_url: Optional[str] = explicit_server
+    elif status is not None:
+        server_url = _dev_server_url_for(platform, device, int(status.get("port") or port))
+    else:
+        server_url = None
+        if not prepare_only:
+            print(
+                f"Note: no dev server on port {port}. Run 'pn start' in another terminal and relaunch, or the "
+                "app will run its bundled sources without Fast Refresh."
+            )
+
+    fingerprint = _native_fingerprint(config, platform, builder, ios_sdks=ios_sdks, dev_client=dev_client)
+    build_dir = builder.build_root / platform
+    stamp = fingerprint_mod.read_stamp(build_dir)
+    artifact = Path(stamp["artifact"]) if stamp and stamp.get("artifact") else None
+    reuse = (
+        not prepare_only
+        and not force_rebuild
+        and server_url is not None
+        and stamp is not None
+        and stamp.get("fingerprint") == fingerprint
+        and artifact is not None
+        and artifact.exists()
+    )
+
+    prepared: Optional[builder_mod.PreparedProject] = None
+    if reuse:
+        print(f"Native inputs unchanged; reinstalling {artifact} (use --rebuild to force a build).")
+    else:
+        try:
+            prepared = builder.prepare(platform, ios_sdks=ios_sdks)
+        except builder_mod.BuildError as exc:
+            print(f"Error: {exc}")
+            sys.exit(1)
+        if prepare_only:
+            print(f"Prepared {platform} project in {prepared.project_dir} (prepare-only).")
+            return
+
+    app_id = config.application_id if platform == "android" else config.bundle_id
+    if server_url:
+        print(f"Dev server: {server_url} (saves in app/ apply with Fast Refresh).")
     try:
         if platform == "android":
-            _run_android(builder, prepared, device=device, hot_reload=hot_reload, show_logs=show_logs)
+            artifact = _run_android(
+                builder, prepared, artifact=artifact, app_id=app_id, device=device, server_url=server_url, port=port
+            )
         elif device is not None and device.kind == "device":
-            _run_ios_device(builder, prepared, device=device)
-            if hot_reload:
-                print("Note: hot reload targets the iOS Simulator; skipping it for a physical device.")
-            return
+            artifact = _run_ios_device(
+                builder, prepared, artifact=artifact, app_id=app_id, device=device, server_url=server_url
+            )
         else:
-            _run_ios(builder, prepared, device=device, hot_reload=hot_reload, show_logs=show_logs)
+            artifact = _run_ios_simulator(
+                builder,
+                prepared,
+                artifact=artifact,
+                app_id=app_id,
+                device=device,
+                server_url=server_url,
+                show_logs=show_logs,
+            )
     except builder_mod.BuildError as exc:
         print(f"Error: {exc}")
         sys.exit(1)
+    if artifact is not None and not reuse:
+        fingerprint_mod.write_stamp(build_dir, fingerprint, artifact=artifact)
 
-    if hot_reload:
-        _run_hot_reload(
-            platform,
-            str(config.project_root),
-            str(prepared.build_dir),
-            app_id=config.application_id,
-            bundle_id=config.bundle_id,
-            show_logs=show_logs,
-        )
+    if show_logs and platform == "android":
+        _stream_logs_until_interrupt(platform, app_id, device)
+
+
+def _native_fingerprint(
+    config: AppConfig,
+    platform: str,
+    builder: builder_mod.Builder,
+    *,
+    ios_sdks: tuple,
+    dev_client: bool,
+) -> str:
+    return fingerprint_mod.compute(
+        config,
+        platform,
+        template_root=builder_mod.template_source(platform),
+        lib_root=builder.dev_lib_root,
+        ios_sdks=ios_sdks,
+        extra={"dev_client": "1" if dev_client else "0"},
+    )
 
 
 def _run_android(
     builder: builder_mod.Builder,
-    prepared: builder_mod.PreparedProject,
+    prepared: Optional[builder_mod.PreparedProject],
     *,
+    artifact: Optional[Path],
+    app_id: str,
     device: Optional[devices_mod.Device],
-    hot_reload: bool,
-    show_logs: bool,
-) -> None:
+    server_url: Optional[str],
+    port: int,
+) -> Optional[Path]:
     if device is not None:
         # Both Gradle's install task and every adb call below honor
         # ANDROID_SERIAL, so exporting it targets the whole run.
         os.environ["ANDROID_SERIAL"] = device.identifier
-    builder.install_android_debug(prepared)
-    _clear_android_hot_reload_overlay(prepared.app_id)
-    subprocess.run(
-        ["adb", "shell", "am", "start", "-n", f"{prepared.app_id}/.MainActivity"],
-        check=True,
-    )
-    if show_logs and not hot_reload:
-        proc = _start_android_log_stream()
-        if proc is not None:
-            try:
-                proc.wait()
-            except KeyboardInterrupt:
-                print()
-                _terminate_subprocess(proc)
-                print("Stopped log streaming.")
+    if prepared is not None:
+        builder.install_android_debug(prepared)
+        artifact = builder.android_debug_apk(prepared)
+    elif artifact is not None:
+        install = subprocess.run(["adb", "install", "-r", str(artifact)], check=False)
+        if install.returncode != 0:
+            raise builder_mod.BuildError("adb install failed; run again with --rebuild.")
+    if server_url and "localhost" in server_url:
+        # Emulators and USB devices reach the host through adb's reverse tunnel.
+        subprocess.run(["adb", "reverse", f"tcp:{port}", f"tcp:{port}"], check=False, capture_output=True)
+    command = ["adb", "shell", "am", "start", "-n", f"{app_id}/.MainActivity"]
+    if server_url:
+        command += ["--es", "pn_dev_server", server_url]
+    subprocess.run(command, check=True)
+    return artifact
 
 
-def _run_ios(
+def _run_ios_simulator(
     builder: builder_mod.Builder,
-    prepared: builder_mod.PreparedProject,
+    prepared: Optional[builder_mod.PreparedProject],
     *,
+    artifact: Optional[Path],
+    app_id: str,
     device: Optional[devices_mod.Device],
-    hot_reload: bool,
+    server_url: Optional[str],
     show_logs: bool,
-) -> None:
-    app_path = builder.build_ios_simulator(prepared)
+) -> Optional[Path]:
+    if prepared is not None:
+        artifact = builder.build_ios_simulator(prepared)
+    if artifact is None:
+        raise builder_mod.BuildError("No simulator build to install; run again with --rebuild.")
     udid = device.identifier if device is not None else _select_ios_simulator()
     if udid is None:
         print("No available iOS Simulators found; open the project in Xcode to run.")
-        return
+        return artifact
     subprocess.run(["xcrun", "simctl", "boot", udid], check=False, capture_output=True)
-    subprocess.run(["xcrun", "simctl", "install", udid, str(app_path)], check=False)
-    _clear_ios_hot_reload_overlay(prepared.app_id)
-
-    if hot_reload:
-        # The hot-reload loop launches the app with a console PTY itself.
-        return
+    subprocess.run(["xcrun", "simctl", "install", udid, str(artifact)], check=False)
+    env = {**os.environ, "SIMCTL_CHILD_PYTHONUNBUFFERED": "1"}
+    if server_url:
+        env["SIMCTL_CHILD_PN_DEV_SERVER"] = server_url
+    command = ["xcrun", "simctl", "launch", "--terminate-running-process"]
     if show_logs:
-        env = {**os.environ, "SIMCTL_CHILD_PYTHONUNBUFFERED": "1"}
-        print("Launched iOS app on Simulator. Streaming logs (Ctrl+C to stop)...")
-        try:
-            subprocess.run(
-                ["xcrun", "simctl", "launch", "--console-pty", "--terminate-running-process", udid, prepared.app_id],
-                env=env,
-                check=False,
-            )
-        except KeyboardInterrupt:
-            print()
-            subprocess.run(["xcrun", "simctl", "terminate", udid, prepared.app_id], check=False, capture_output=True)
-            print("Stopped log streaming.")
-    else:
-        subprocess.run(["xcrun", "simctl", "launch", udid, prepared.app_id], check=False)
+        # A console PTY streams Python's stdout here; the launch blocks.
+        command.append("--console-pty")
+    command += [udid, app_id]
+    if not show_logs:
+        subprocess.run(command, env=env, check=False)
         print("Launched iOS app on Simulator.")
+        return artifact
+    print("Launched iOS app on Simulator. Streaming logs (Ctrl+C to stop)...")
+    try:
+        subprocess.run(command, env=env, check=False)
+    except KeyboardInterrupt:
+        print()
+        subprocess.run(["xcrun", "simctl", "terminate", udid, app_id], check=False, capture_output=True)
+        print("Stopped log streaming.")
+    return artifact
 
 
 def _run_ios_device(
     builder: builder_mod.Builder,
-    prepared: builder_mod.PreparedProject,
+    prepared: Optional[builder_mod.PreparedProject],
     *,
+    artifact: Optional[Path],
+    app_id: str,
     device: devices_mod.Device,
-) -> None:
+    server_url: Optional[str],
+) -> Optional[Path]:
     """Build, install, and launch on a physical iOS device via devicectl."""
-    app_path = builder.build_ios_device(prepared)
+    if prepared is not None:
+        artifact = builder.build_ios_device(prepared)
+    if artifact is None:
+        raise builder_mod.BuildError("No device build to install; run again with --rebuild.")
     print(f"Installing on {device.name}...")
     install = subprocess.run(
-        ["xcrun", "devicectl", "device", "install", "app", "--device", device.identifier, str(app_path)],
+        ["xcrun", "devicectl", "device", "install", "app", "--device", device.identifier, str(artifact)],
         check=False,
     )
     if install.returncode != 0:
@@ -548,24 +766,33 @@ def _run_ios_device(
             "and has Developer Mode enabled (Settings > Privacy & Security > Developer Mode)."
         )
         sys.exit(1)
-    launch = subprocess.run(
-        [
-            "xcrun",
-            "devicectl",
-            "device",
-            "process",
-            "launch",
-            "--terminate-existing",
-            "--device",
-            device.identifier,
-            prepared.app_id,
-        ],
-        check=False,
-    )
+    command = ["xcrun", "devicectl", "device", "process", "launch", "--terminate-existing"]
+    if server_url:
+        command += ["--environment-variables", json.dumps({"PN_DEV_SERVER": server_url})]
+    command += ["--device", device.identifier, app_id]
+    launch = subprocess.run(command, check=False)
     if launch.returncode != 0:
         print("Error: launch failed. Launch the app from the home screen to see details.")
         sys.exit(1)
-    print(f"Launched on {device.name}. Use Console.app (or Xcode > Devices) for device logs.")
+    print(f"Launched on {device.name}. Logs stream to the 'pn start' terminal (or Console.app).")
+    return artifact
+
+
+def _stream_logs_until_interrupt(platform: str, app_id: str, device: Optional[devices_mod.Device]) -> None:
+    """Tail the app's stdout on a simulator/emulator until Ctrl+C."""
+    if platform == "android":
+        proc = _start_android_log_stream()
+    else:
+        udid = device.identifier if device is not None else None
+        proc = _start_ios_log_stream(app_id, udid=udid)
+    if proc is None:
+        return
+    try:
+        proc.wait()
+    except KeyboardInterrupt:
+        print()
+        _terminate_subprocess(proc)
+        print("Stopped log streaming.")
 
 
 # ======================================================================
@@ -594,7 +821,11 @@ def build_project(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     try:
-        prepared = builder.prepare(platform, release=not debug)
+        prepared = builder.prepare(
+            platform,
+            release=not debug,
+            ios_sdks=("iphonesimulator",) if debug else ("iphoneos",),
+        )
         if platform == "android":
             artifacts = builder.build_android(prepared, debug=debug)
         else:
@@ -627,10 +858,15 @@ def logs_command(args: argparse.Namespace) -> None:
     """Stream logs from the running app without rebuilding.
 
     Args:
-        args: Parsed namespace (``platform``).
+        args: Parsed namespace (``platform``, ``device``).
     """
     platform: str = args.platform
+    device = _resolve_device(platform, getattr(args, "device", None))
     if platform == "android":
+        if device is not None:
+            # Both adb and logcat below honor ANDROID_SERIAL, so exporting
+            # it targets the whole log stream at the chosen device.
+            os.environ["ANDROID_SERIAL"] = device.identifier
         proc = _start_android_log_stream()
         if proc is None:
             sys.exit(1)
@@ -644,8 +880,12 @@ def logs_command(args: argparse.Namespace) -> None:
 
     # iOS: relaunch the app on the booted simulator with a console PTY so
     # Python's stdout/stderr stream to this terminal.
+    if device is not None and device.kind == "device":
+        print("For a physical device, use Console.app or Xcode > Devices and Simulators.")
+        sys.exit(1)
     config = _load_config_or_exit()
-    proc = _start_ios_log_stream(config.bundle_id)
+    udid = device.identifier if device is not None else None
+    proc = _start_ios_log_stream(config.bundle_id, udid=udid)
     if proc is None:
         print("For a physical device, use Console.app or Xcode > Devices and Simulators.")
         sys.exit(1)
@@ -763,16 +1003,19 @@ def _select_ios_simulator() -> Optional[str]:
     return None
 
 
-def _start_ios_log_stream(bundle_id: str) -> Optional[subprocess.Popen]:
+def _start_ios_log_stream(bundle_id: str, *, udid: Optional[str] = None) -> Optional[subprocess.Popen]:
     """Re-launch the iOS app with a console PTY so its stdio streams here.
 
     Args:
         bundle_id: The app's bundle identifier.
+        udid: A specific simulator UDID to target. Falls back to the
+            booted simulator when not given.
 
     Returns:
         The launched process, or ``None`` when no simulator is booted.
     """
-    udid = _booted_ios_udid()
+    if udid is None:
+        udid = _booted_ios_udid()
     if udid is None:
         print("Note: no booted iOS Simulator found; skipping log streaming.")
         return None
@@ -798,187 +1041,6 @@ def _terminate_subprocess(proc: Optional[subprocess.Popen]) -> None:
         proc.wait(timeout=3)
     except subprocess.TimeoutExpired:
         proc.kill()
-
-
-# ======================================================================
-# Hot reload
-# ======================================================================
-
-
-def _hot_reload_manifest_payload(
-    changed_files: List[str],
-    project_dir: str,
-    *,
-    version: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Build the reload manifest consumed by the running app.
-
-    Args:
-        changed_files: Absolute paths to changed source files.
-        project_dir: The project root, used to relativize paths.
-        version: Optional explicit version stamp (defaults to a timestamp).
-
-    Returns:
-        The manifest dict (``version``, ``files``, ``modules``).
-    """
-    from pythonnative.hot_reload import ModuleReloader
-
-    rel_files = sorted(os.path.relpath(path, project_dir) for path in changed_files)
-    return {
-        "version": version or str(time.time_ns()),
-        "files": rel_files,
-        "modules": ModuleReloader.modules_from_files(rel_files),
-    }
-
-
-def _write_hot_reload_manifest(changed_files: List[str], project_dir: str, build_dir: str) -> str:
-    """Write a local hot-reload manifest and return its path."""
-    manifest_dir = os.path.join(build_dir, "hot_reload")
-    os.makedirs(manifest_dir, exist_ok=True)
-    manifest_path = os.path.join(manifest_dir, "reload.json")
-    with open(manifest_path, "w", encoding="utf-8") as handle:
-        json.dump(_hot_reload_manifest_payload(changed_files, project_dir), handle)
-    return manifest_path
-
-
-def _android_hot_reload_dest(rel_path: str) -> str:
-    """Return a ``run-as`` relative destination for an app source file."""
-    return os.path.join("files", HOT_RELOAD_DEV_ROOT, rel_path)
-
-
-def _push_android_hot_reload_file(local_path: str, rel_path: str, app_id: str) -> bool:
-    """Push one file into the Android app's writable hot-reload overlay."""
-    tmp_path = f"/data/local/tmp/pythonnative-hot-reload-{os.getpid()}-{os.path.basename(local_path)}"
-    dest_path = _android_hot_reload_dest(rel_path)
-    dest_dir = os.path.dirname(dest_path)
-    push = subprocess.run(["adb", "push", local_path, tmp_path], check=False, capture_output=True)
-    if push.returncode != 0:
-        return False
-    subprocess.run(["adb", "shell", "run-as", app_id, "mkdir", "-p", dest_dir], check=False, capture_output=True)
-    copy = subprocess.run(
-        ["adb", "shell", "run-as", app_id, "cp", tmp_path, dest_path], check=False, capture_output=True
-    )
-    subprocess.run(["adb", "shell", "rm", "-f", tmp_path], check=False, capture_output=True)
-    return copy.returncode == 0
-
-
-def _ios_data_container(bundle_id: str) -> Optional[str]:
-    """Return the booted simulator's app data container, if available."""
-    try:
-        result = subprocess.run(
-            ["xcrun", "simctl", "get_app_container", "booted", bundle_id, "data"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        return None
-    if result.returncode != 0:
-        return None
-    return result.stdout.strip() or None
-
-
-def _push_ios_hot_reload_file(local_path: str, rel_path: str, bundle_id: str) -> bool:
-    """Copy one file into the booted iOS Simulator's hot-reload overlay."""
-    container = _ios_data_container(bundle_id)
-    if container is None:
-        return False
-    dest_path = os.path.join(container, "Documents", HOT_RELOAD_DEV_ROOT, rel_path)
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-    shutil.copy2(local_path, dest_path)
-    return True
-
-
-def _clear_android_hot_reload_overlay(app_id: str) -> bool:
-    """Remove stale Android hot-reload files before launching."""
-    result = subprocess.run(
-        ["adb", "shell", "run-as", app_id, "rm", "-rf", f"files/{HOT_RELOAD_DEV_ROOT}"],
-        check=False,
-        capture_output=True,
-    )
-    return result.returncode == 0
-
-
-def _clear_ios_hot_reload_overlay(bundle_id: str) -> bool:
-    """Remove stale iOS Simulator hot-reload files before launching."""
-    container = _ios_data_container(bundle_id)
-    if container is None:
-        return False
-    shutil.rmtree(os.path.join(container, "Documents", HOT_RELOAD_DEV_ROOT), ignore_errors=True)
-    return True
-
-
-def _push_hot_reload_file(platform: str, local_path: str, rel_path: str, *, app_id: str, bundle_id: str) -> bool:
-    """Push a changed source file to the running app."""
-    if platform == "android":
-        return _push_android_hot_reload_file(local_path, rel_path, app_id)
-    if platform == "ios":
-        return _push_ios_hot_reload_file(local_path, rel_path, bundle_id)
-    return False
-
-
-def _run_hot_reload(
-    platform: str,
-    project_dir: str,
-    build_dir: str,
-    *,
-    app_id: str,
-    bundle_id: str,
-    show_logs: bool = True,
-) -> None:
-    """Watch ``app/`` for changes and push updated files to the device.
-
-    Args:
-        platform: ``"android"`` or ``"ios"``.
-        project_dir: Absolute path to the user's project root.
-        build_dir: Absolute path to the staged build directory.
-        app_id: The Android application id (for ``run-as``).
-        bundle_id: The iOS bundle id (for the data container / launch).
-        show_logs: Whether to stream device logs in parallel.
-    """
-    from ..hot_reload import FileWatcher
-
-    app_dir = os.path.join(project_dir, "app")
-
-    def on_change(changed_files: List[str]) -> None:
-        pushed: List[str] = []
-        for fpath in changed_files:
-            rel = os.path.relpath(fpath, project_dir)
-            print(f"[hot-reload] Changed: {rel}")
-            if _push_hot_reload_file(platform, fpath, rel, app_id=app_id, bundle_id=bundle_id):
-                pushed.append(fpath)
-            else:
-                print(f"[hot-reload] Failed to push {rel}")
-        if pushed:
-            manifest = _write_hot_reload_manifest(pushed, project_dir, build_dir)
-            if _push_hot_reload_file(platform, manifest, "reload.json", app_id=app_id, bundle_id=bundle_id):
-                print(f"[hot-reload] Signaled reload for {len(pushed)} file(s).")
-            else:
-                print("[hot-reload] Failed to signal reload; app will not refresh automatically.")
-
-    print("[hot-reload] Watching app/ for changes. Press Ctrl+C to stop.")
-    watcher = FileWatcher(app_dir, on_change, interval=1.0)
-    watcher.start()
-
-    log_proc: Optional[subprocess.Popen] = None
-    if show_logs:
-        if platform == "android":
-            log_proc = _start_android_log_stream()
-        elif platform == "ios":
-            log_proc = _start_ios_log_stream(bundle_id)
-
-    try:
-        if log_proc is not None:
-            log_proc.wait()
-        else:
-            while True:
-                time.sleep(1)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        _terminate_subprocess(log_proc)
-        watcher.stop()
-        print("\n[hot-reload] Stopped.")
 
 
 # ======================================================================
@@ -1009,19 +1071,39 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_doctor.add_argument("platform", nargs="?", choices=["android", "ios"], help="Restrict checks to a platform")
     parser_doctor.set_defaults(func=doctor_command)
 
-    parser_preview = subparsers.add_parser("preview", help="Render the app in a desktop window")
-    parser_preview.add_argument(
-        "component",
-        nargs="?",
-        help="Module path (e.g. app.main) or dotted component path; defaults to the project entry point",
+    parser_deps = subparsers.add_parser(
+        "deps", help="Check which wheels [requirements].packages resolve to on each device target"
     )
-    parser_preview.add_argument("--width", type=int, default=390, help="Initial window width in points (default: 390)")
-    parser_preview.add_argument(
-        "--height", type=int, default=844, help="Initial window height in points (default: 844)"
+    parser_deps.add_argument("platform", nargs="?", choices=["android", "ios"], help="Restrict to a platform")
+    parser_deps.add_argument("--json", action="store_true", help="Print a JSON report for scripting")
+    parser_deps.add_argument(
+        "--python",
+        help="Interpreter to run pip with (default: the one running pn; any version works, pip cross-resolves)",
     )
-    parser_preview.add_argument("--title", default="PythonNative Preview", help="Preview window title")
-    parser_preview.add_argument("--no-hot-reload", action="store_true", help="Disable file watching / Fast Refresh")
-    parser_preview.set_defaults(func=preview_project)
+    parser_deps.set_defaults(func=deps_command)
+
+    def _add_server_args(sub: argparse.ArgumentParser) -> None:
+        sub.add_argument(
+            "entry",
+            nargs="?",
+            help="Entry module (e.g. app.main); defaults to the project entry point",
+        )
+        sub.add_argument(
+            "--port", type=int, default=DEFAULT_DEV_PORT, help=f"Port to listen on (default: {DEFAULT_DEV_PORT})"
+        )
+        sub.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0 so devices can connect)")
+
+    parser_start = subparsers.add_parser(
+        "start", help="Run the dev server: browser preview + Fast Refresh for every connected debug build"
+    )
+    _add_server_args(parser_start)
+    parser_start.add_argument("--open", action="store_true", help="Also open the browser preview")
+    parser_start.set_defaults(func=start_command)
+
+    parser_preview = subparsers.add_parser("preview", help="Run the dev server and open the browser preview")
+    _add_server_args(parser_preview)
+    parser_preview.add_argument("--no-open", action="store_true", help="Don't open the browser automatically")
+    parser_preview.set_defaults(func=preview_command)
 
     parser_devices = subparsers.add_parser("devices", help="List devices, emulators, and simulators")
     parser_devices.add_argument("platform", nargs="?", choices=["android", "ios"], help="Restrict to a platform")
@@ -1039,12 +1121,32 @@ def _build_parser() -> argparse.ArgumentParser:
         "(physical iOS devices need [ios].development_team)",
     )
     parser_run.add_argument("--prepare-only", action="store_true", help="Stage + configure without building")
-    parser_run.add_argument("--hot-reload", action="store_true", help="Watch app/ and push updates to the running app")
     parser_run.add_argument("--no-logs", action="store_true", help="Don't stream device logs after launch")
+    parser_run.add_argument(
+        "--rebuild", action="store_true", help="Run the native toolchain even when no native input changed"
+    )
+    parser_run.add_argument(
+        "--dev-server",
+        help="Dev server WebSocket URL for the app (default: the 'pn start' found on --port, via localhost/LAN)",
+    )
+    parser_run.add_argument(
+        "--port", type=int, default=DEFAULT_DEV_PORT, help=f"Port 'pn start' listens on (default: {DEFAULT_DEV_PORT})"
+    )
+    parser_run.add_argument(
+        "--dev-client",
+        action="store_true",
+        help="Build a dev client: a shell app that shows a connect screen and loads the app from any dev server",
+    )
     parser_run.set_defaults(func=run_project)
 
     parser_logs = subparsers.add_parser("logs", help="Stream logs from the running app")
     parser_logs.add_argument("platform", choices=["android", "ios"])
+    parser_logs.add_argument(
+        "--device",
+        "-d",
+        help="Target device: an identifier or name from 'pn devices' "
+        "(physical iOS devices aren't supported for log streaming)",
+    )
     parser_logs.set_defaults(func=logs_command)
 
     parser_build = subparsers.add_parser("build", help="Build distributable artifacts")

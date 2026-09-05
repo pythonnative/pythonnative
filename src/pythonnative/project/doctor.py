@@ -61,20 +61,30 @@ def _which_version(tool: str, version_args: List[str]) -> Optional[str]:
     return text[0] if text else path
 
 
-def _tkinter_available() -> bool:
-    """Return whether the host Python can import Tkinter."""
-    try:
-        import tkinter  # noqa: F401
-    except ImportError:
-        return False
-    return True
+def build_python_for(python_version: str) -> Optional[str]:
+    """Locate an interpreter matching ``python_version`` (e.g. ``python3.13``) on ``PATH``.
 
-
-def check_common() -> List[CheckResult]:
-    """Run platform-agnostic checks (interpreter and optional dependencies).
+    Args:
+        python_version: CPython ``major.minor``.
 
     Returns:
-        Check results for the host Python and optional dependencies.
+        The interpreter path, or ``None`` when none is installed.
+    """
+    host = f"{sys.version_info.major}.{sys.version_info.minor}"
+    if host == python_version:
+        return sys.executable
+    return shutil.which(f"python{python_version}")
+
+
+def check_common(config: Optional[AppConfig] = None) -> List[CheckResult]:
+    """Run platform-agnostic checks (interpreters, requirements, optional dependencies).
+
+    Args:
+        config: The loaded app config, or ``None`` if unavailable.
+
+    Returns:
+        Check results for the host and build Pythons, the declared
+        requirements, and optional dependencies.
     """
     results: List[CheckResult] = []
     py_version = f"{sys.version_info.major}.{sys.version_info.minor}"
@@ -88,6 +98,36 @@ def check_common() -> List[CheckResult]:
                 f"{py_version} (PythonNative targets {', '.join(SUPPORTED_PYTHON_VERSIONS)})",
             )
         )
+
+    if config is not None:
+        # pip cross-resolves iOS wheels from any interpreter, but Chaquopy
+        # needs a matching python3.X on the build machine whenever there
+        # are requirements, and release bytecode is version-specific.
+        build_python = build_python_for(config.python_version)
+        label = f"Build Python {config.python_version} (matches app.python_version)"
+        if build_python:
+            results.append(CheckResult(label, OK, build_python))
+        else:
+            level = WARN if config.requirements else INFO
+            results.append(
+                CheckResult(
+                    label,
+                    level,
+                    f"python{config.python_version} not found on PATH; Android builds with [requirements] and "
+                    "release bytecode compilation need it (e.g. uv python install "
+                    f"{config.python_version})",
+                )
+            )
+        if config.requirements:
+            count = len(config.requirements)
+            results.append(
+                CheckResult(
+                    "Requirements",
+                    INFO,
+                    f"{count} package(s) declared; run 'pn deps' to check device wheel availability",
+                )
+            )
+
     if icons.pillow_available():
         results.append(CheckResult("Pillow (icon/splash generation)", OK))
     else:
@@ -96,17 +136,6 @@ def check_common() -> List[CheckResult]:
                 "Pillow (icon/splash generation)",
                 WARN,
                 "not installed; run: pip install 'pythonnative[build]'",
-            )
-        )
-    if _tkinter_available():
-        results.append(CheckResult("Tkinter (desktop preview)", OK))
-    else:
-        results.append(
-            CheckResult(
-                "Tkinter (desktop preview)",
-                WARN,
-                "not installed; macOS: brew install python-tk; Debian/Ubuntu: sudo apt-get install python3-tk; "
-                "Windows: reinstall Python with the 'tcl/tk' option checked",
             )
         )
     return results
@@ -181,7 +210,7 @@ def check_ios(config: Optional[AppConfig]) -> List[CheckResult]:
                 CheckResult(
                     "iOS embedded Python",
                     WARN,
-                    f"app.python_version={config.python_version}; pinned iOS builds " f"exist for {supported}",
+                    f"app.python_version={config.python_version}; pinned iOS builds exist for {supported}",
                 )
             )
         if config.ios.development_team:
@@ -228,7 +257,7 @@ def run_doctor(project_root: Path, *, platform: Optional[str] = None) -> List[Ch
         All check results in display order.
     """
     config, results = check_config(project_root)
-    results.extend(check_common())
+    results.extend(check_common(config))
     if platform in (None, "android"):
         results.extend(check_android(config))
     if platform in (None, "ios"):

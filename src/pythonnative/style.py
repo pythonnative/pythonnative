@@ -34,8 +34,10 @@ Example:
     ```
 """
 
+import dataclasses
 import difflib
-from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union
+from dataclasses import dataclass
+from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union, get_args
 
 from . import diagnostics
 from .hooks import Context, create_context, use_color_scheme, use_context
@@ -105,6 +107,11 @@ class ShadowOffset(TypedDict):
 
     width: float
     height: float
+
+
+ShadowOffsetValue = Union[ShadowOffset, Tuple[float, float], List[float]]
+"""``shadow_offset`` / ``text_shadow_offset`` value: an
+[`ShadowOffset`][pythonnative.ShadowOffset] dict or an ``(x, y)`` pair."""
 
 
 # ----------------------------------------------------------------------
@@ -192,6 +199,7 @@ AlignItems = Literal[
     "flex_start",
     "center",
     "flex_end",
+    "baseline",
     "auto",
     "start",
     "leading",
@@ -203,9 +211,18 @@ AlignItems = Literal[
 ]
 AlignSelf = AlignItems
 Position = Literal["relative", "absolute"]
+Display = Literal["flex", "none"]
+"""``display`` style value. ``"none"`` removes the node and its subtree
+from layout entirely (no size, gap, or margin contribution; every frame
+in the subtree is ``(0, 0, 0, 0)``)."""
 Overflow = Literal["visible", "hidden", "scroll"]
 TextAlign = Literal["left", "center", "right", "justify", "start", "end"]
 TextDecoration = Literal["none", "underline", "line_through"]
+TextTransform = Literal["none", "uppercase", "lowercase", "capitalize"]
+"""``text_transform`` style value. Applied in Python before the string
+reaches the native label, so measurement and rendering agree."""
+MarginValue = Union[Dimension, Literal["auto"]]
+"""A margin length: points, a ``"%"`` string, or ``"auto"`` to absorb free space."""
 FontWeight = Literal[
     "normal",
     "bold",
@@ -294,6 +311,7 @@ class Style(TypedDict, total=False):
     align_self: AlignSelf
     align_content: AlignContent
     direction: LayoutDirection
+    display: Display
 
     # --- Layout: position ---
     position: Position
@@ -314,15 +332,15 @@ class Style(TypedDict, total=False):
     padding_end: Dimension
     padding_horizontal: Dimension
     padding_vertical: Dimension
-    margin: EdgeValue
-    margin_top: Dimension
-    margin_bottom: Dimension
-    margin_left: Dimension
-    margin_right: Dimension
-    margin_start: Dimension
-    margin_end: Dimension
-    margin_horizontal: Dimension
-    margin_vertical: Dimension
+    margin: Union[MarginValue, EdgeInsets]
+    margin_top: MarginValue
+    margin_bottom: MarginValue
+    margin_left: MarginValue
+    margin_right: MarginValue
+    margin_start: MarginValue
+    margin_end: MarginValue
+    margin_horizontal: MarginValue
+    margin_vertical: MarginValue
     spacing: float
     gap: float
     row_gap: float
@@ -362,13 +380,17 @@ class Style(TypedDict, total=False):
     italic: bool
     text_align: TextAlign
     text_decoration: TextDecoration
+    text_transform: TextTransform
     line_height: float
     letter_spacing: float
     max_lines: int
+    text_shadow_color: Color
+    text_shadow_offset: ShadowOffsetValue
+    text_shadow_radius: float
 
     # --- Visual: shadows / effects ---
     shadow_color: Color
-    shadow_offset: Union[ShadowOffset, Tuple[float, float], List[float]]
+    shadow_offset: ShadowOffsetValue
     shadow_opacity: float
     shadow_radius: float
     elevation: float
@@ -447,6 +469,49 @@ def resolve_style(value: StyleProp) -> Dict[str, Any]:
 _KNOWN_STYLE_KEYS = frozenset(Style.__annotations__)
 """Every key declared on the [`Style`][pythonnative.Style] TypedDict."""
 
+_STYLE_VALUE_CHOICES: Dict[str, frozenset] = {
+    "display": frozenset(get_args(Display)),
+    "position": frozenset(get_args(Position)),
+    "direction": frozenset(get_args(LayoutDirection)),
+    "text_decoration": frozenset(get_args(TextDecoration)),
+    "text_transform": frozenset(get_args(TextTransform)),
+    "pointer_events": frozenset(get_args(PointerEvents)),
+}
+"""Keys whose string values are checked against their ``Literal`` choices
+in dev mode. Only keys whose handlers accept exactly the declared
+literals are listed, so friendly aliases (``align_items: "leading"``,
+``font_weight: "semibold"``) never trigger false positives."""
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _text_shadow_offset_ok(value: Any) -> bool:
+    if isinstance(value, dict):
+        return all(_is_number(value.get(k, 0)) for k in ("width", "height"))
+    if isinstance(value, (tuple, list)) and len(value) == 2:
+        return all(_is_number(v) for v in value)
+    return False
+
+
+def _bad_value_message(key: str, value: Any) -> Optional[str]:
+    """Return a description of why ``value`` is invalid for ``key``, or ``None``."""
+    choices = _STYLE_VALUE_CHOICES.get(key)
+    if choices is not None:
+        if not isinstance(value, str) or value not in choices:
+            allowed = ", ".join(repr(c) for c in sorted(choices))
+            return f"Invalid value {value!r} for style key {key!r}; expected one of {allowed}."
+        return None
+    if key == "text_shadow_offset" and not _text_shadow_offset_ok(value):
+        return (
+            f"Invalid value {value!r} for style key 'text_shadow_offset'; "
+            "expected {'width': x, 'height': y} or an (x, y) pair."
+        )
+    if key == "text_shadow_radius" and (not _is_number(value) or value < 0):
+        return f"Invalid value {value!r} for style key 'text_shadow_radius'; expected a non-negative number."
+    return None
+
 
 def validate_style_keys(style_dict: Dict[str, Any], owner: str = "") -> None:
     """Warn (once per key) about style keys no built-in handler reads.
@@ -457,6 +522,13 @@ def validate_style_keys(style_dict: Dict[str, Any], owner: str = "") -> None:
     to handlers untouched, so custom components that read extra keys
     keep working (at the cost of one dev warning).
 
+    A small set of enum-shaped keys (``display``, ``position``,
+    ``direction``, ``text_decoration``, ``text_transform``,
+    ``pointer_events``) and the ``text_shadow_*`` keys also have their
+    values checked; a bad value warns once per key/value pair and is
+    otherwise passed through (the engine and handlers ignore values
+    they don't recognize).
+
     Args:
         style_dict: The flattened style dict about to be merged into an
             element's props.
@@ -465,8 +537,16 @@ def validate_style_keys(style_dict: Dict[str, Any], owner: str = "") -> None:
     """
     if not diagnostics.is_dev() or not style_dict:
         return
-    for key in style_dict:
+    for key, value in style_dict.items():
         if key in _KNOWN_STYLE_KEYS:
+            if value is None:
+                continue
+            problem = _bad_value_message(key, value)
+            if problem is not None:
+                diagnostics.warn_once(
+                    problem + (f" (on {owner})" if owner else ""),
+                    key=f"style-value:{owner}:{key}:{value!r}",
+                )
             continue
         matches = difflib.get_close_matches(str(key), _KNOWN_STYLE_KEYS, n=1)
         hint = f" Did you mean {matches[0]!r}?" if matches else ""
@@ -571,44 +651,89 @@ class StyleSheet:
 # Theming
 # ======================================================================
 
-DEFAULT_LIGHT_THEME: Dict[str, Any] = {
-    "primary_color": "#007AFF",
-    "secondary_color": "#5856D6",
-    "background_color": "#FFFFFF",
-    "surface_color": "#F2F2F7",
-    "text_color": "#000000",
-    "text_secondary_color": "#8E8E93",
-    "error_color": "#FF3B30",
-    "success_color": "#34C759",
-    "warning_color": "#FF9500",
-    "font_size": 16,
-    "font_size_small": 13,
-    "font_size_large": 20,
-    "font_size_title": 28,
-    "spacing": 8,
-    "spacing_large": 16,
-    "border_radius": 8,
-}
+
+@dataclass(frozen=True)
+class Theme:
+    """Design tokens read through [`use_theme`][pythonnative.use_theme].
+
+    A ``Theme`` is an immutable, fully typed record, so
+    ``theme.text_color`` autocompletes and a typo is a static error
+    rather than a runtime ``KeyError``. Derive a custom theme from a
+    built-in one with [`replace`][pythonnative.style.Theme.replace]:
+
+    ```python
+    brand = pn.DEFAULT_LIGHT_THEME.replace(primary_color="#FF2D55")
+    ```
+
+    Attributes:
+        primary_color: Main accent color.
+        secondary_color: Secondary accent color.
+        background_color: Screen background.
+        surface_color: Raised surfaces such as cards and sheets.
+        text_color: Primary text.
+        text_secondary_color: De-emphasized text.
+        error_color: Destructive and error states.
+        success_color: Success states.
+        warning_color: Warning states.
+        font_size: Body text size, in points.
+        font_size_small: Caption size, in points.
+        font_size_large: Subtitle size, in points.
+        font_size_title: Title size, in points.
+        spacing: Base spacing unit, in points.
+        spacing_large: Large spacing unit, in points.
+        border_radius: Default corner radius, in points.
+    """
+
+    primary_color: Color
+    secondary_color: Color
+    background_color: Color
+    surface_color: Color
+    text_color: Color
+    text_secondary_color: Color
+    error_color: Color
+    success_color: Color
+    warning_color: Color
+    font_size: float = 16
+    font_size_small: float = 13
+    font_size_large: float = 20
+    font_size_title: float = 28
+    spacing: float = 8
+    spacing_large: float = 16
+    border_radius: float = 8
+
+    def replace(self, **changes: Any) -> "Theme":
+        """Return a copy of this theme with the given fields replaced.
+
+        Raises:
+            TypeError: If ``changes`` names a field that doesn't exist.
+        """
+        return dataclasses.replace(self, **changes)
+
+
+DEFAULT_LIGHT_THEME = Theme(
+    primary_color="#007AFF",
+    secondary_color="#5856D6",
+    background_color="#FFFFFF",
+    surface_color="#F2F2F7",
+    text_color="#000000",
+    text_secondary_color="#8E8E93",
+    error_color="#FF3B30",
+    success_color="#34C759",
+    warning_color="#FF9500",
+)
 """Built-in light theme selected by [`use_theme`][pythonnative.use_theme]."""
 
-DEFAULT_DARK_THEME: Dict[str, Any] = {
-    "primary_color": "#0A84FF",
-    "secondary_color": "#5E5CE6",
-    "background_color": "#000000",
-    "surface_color": "#1C1C1E",
-    "text_color": "#FFFFFF",
-    "text_secondary_color": "#8E8E93",
-    "error_color": "#FF453A",
-    "success_color": "#30D158",
-    "warning_color": "#FF9F0A",
-    "font_size": 16,
-    "font_size_small": 13,
-    "font_size_large": 20,
-    "font_size_title": 28,
-    "spacing": 8,
-    "spacing_large": 16,
-    "border_radius": 8,
-}
+DEFAULT_DARK_THEME = Theme(
+    primary_color="#0A84FF",
+    secondary_color="#5E5CE6",
+    background_color="#000000",
+    surface_color="#1C1C1E",
+    text_color="#FFFFFF",
+    text_secondary_color="#8E8E93",
+    error_color="#FF453A",
+    success_color="#30D158",
+    warning_color="#FF9F0A",
+)
 """Built-in dark theme selected by [`use_theme`][pythonnative.use_theme]."""
 
 _FOLLOW_SYSTEM_THEME = object()
@@ -621,29 +746,29 @@ Without a provider, [`use_theme`][pythonnative.use_theme] resolves to
 [`DEFAULT_LIGHT_THEME`][pythonnative.style.DEFAULT_LIGHT_THEME] or
 [`DEFAULT_DARK_THEME`][pythonnative.style.DEFAULT_DARK_THEME] based on
 the current appearance. Wrap a subtree in
-[`Provider(ThemeContext, my_theme, ...)`][pythonnative.Provider] to
+[`ThemeContext.Provider(my_theme, ...)`][pythonnative.hooks.Context.Provider] to
 pin an explicit theme for that subtree, then read it inside
 descendants via [`use_theme`][pythonnative.use_theme] (or
 [`use_context(ThemeContext)`][pythonnative.use_context]).
 """
 
 
-def default_theme(scheme: str) -> Dict[str, Any]:
-    """Return the built-in theme dict for ``scheme`` (``"light"`` / ``"dark"``)."""
+def default_theme(scheme: str) -> Theme:
+    """Return the built-in [`Theme`][pythonnative.Theme] for ``scheme`` (``"light"`` / ``"dark"``)."""
     return DEFAULT_DARK_THEME if scheme == "dark" else DEFAULT_LIGHT_THEME
 
 
-def use_theme() -> Dict[str, Any]:
-    """Return the active theme, following the system appearance by default.
+def use_theme() -> Theme:
+    """Return the active [`Theme`][pythonnative.Theme], following the system appearance by default.
 
-    If an ancestor mounted a ``Provider(ThemeContext, ...)``, that
+    If an ancestor mounted a ``ThemeContext.Provider(...)``, that
     theme is returned as-is. Otherwise the built-in light or dark
     theme is selected from the effective color scheme (via
     [`use_color_scheme`][pythonnative.use_color_scheme], so the
     component re-renders when the system appearance flips).
 
     Returns:
-        The active theme dict.
+        The active theme.
 
     Raises:
         RuntimeError: If called outside a `@component` function.
@@ -656,8 +781,8 @@ def use_theme() -> Dict[str, Any]:
         def Card():
             theme = pn.use_theme()
             return pn.View(
-                pn.Text("Hello", style=pn.style(color=theme["text_color"])),
-                style=pn.style(background_color=theme["surface_color"]),
+                pn.Text("Hello", style=pn.style(color=theme.text_color)),
+                style=pn.style(background_color=theme.surface_color),
             )
         ```
     """
@@ -665,6 +790,8 @@ def use_theme() -> Dict[str, Any]:
     theme = use_context(ThemeContext)
     if theme is _FOLLOW_SYSTEM_THEME:
         return default_theme(scheme)
+    if not isinstance(theme, Theme):
+        raise TypeError(f"ThemeContext.Provider expects a pn.Theme, got {type(theme).__name__}: {theme!r}")
     return theme
 
 
@@ -676,23 +803,28 @@ __all__ = [
     "DEFAULT_DARK_THEME",
     "DEFAULT_LIGHT_THEME",
     "Dimension",
+    "Display",
     "EdgeInsets",
     "EdgeValue",
     "FlexDirection",
     "FontWeight",
     "JustifyContent",
     "KeyboardType",
+    "MarginValue",
     "Overflow",
     "PointerEvents",
     "Position",
     "ReturnKeyType",
     "ScaleType",
     "ShadowOffset",
+    "ShadowOffsetValue",
     "Style",
     "StyleProp",
     "StyleSheet",
     "TextAlign",
     "TextDecoration",
+    "TextTransform",
+    "Theme",
     "ThemeContext",
     "TransformEntry",
     "TransformRotate",

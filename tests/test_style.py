@@ -1,14 +1,36 @@
 """Unit tests for StyleSheet, resolve_style, theming, and typed Style."""
 
+import dataclasses
+from typing import Any, List
+
+import pytest
+
+from pythonnative import diagnostics
 from pythonnative.style import (
     DEFAULT_DARK_THEME,
     DEFAULT_LIGHT_THEME,
     Style,
     StyleSheet,
+    Theme,
     ThemeContext,
     resolve_style,
     style,
+    validate_style_keys,
 )
+
+
+@pytest.fixture()
+def dev_mode() -> Any:
+    """Enable dev diagnostics for one test and reset state afterwards."""
+    diagnostics.set_dev_mode(True)
+    diagnostics.clear_warnings()
+    yield None
+    diagnostics.clear_warnings()
+    diagnostics.set_dev_mode(False)
+
+
+def _warnings() -> List[str]:
+    return diagnostics.get_warnings()
 
 
 def test_resolve_style_none() -> None:
@@ -76,12 +98,25 @@ def test_theme_context_defaults_to_follow_system_sentinel() -> None:
     # sentinel; `use_theme` resolves it against the color scheme.
     from pythonnative.style import _FOLLOW_SYSTEM_THEME
 
-    assert ThemeContext._current() is _FOLLOW_SYSTEM_THEME
+    assert ThemeContext.current() is _FOLLOW_SYSTEM_THEME
 
 
 def test_light_and_dark_themes_differ() -> None:
-    assert DEFAULT_LIGHT_THEME["background_color"] != DEFAULT_DARK_THEME["background_color"]
-    assert DEFAULT_LIGHT_THEME["text_color"] != DEFAULT_DARK_THEME["text_color"]
+    assert DEFAULT_LIGHT_THEME.background_color != DEFAULT_DARK_THEME.background_color
+    assert DEFAULT_LIGHT_THEME.text_color != DEFAULT_DARK_THEME.text_color
+
+
+def test_theme_is_immutable_and_replaceable() -> None:
+    brand = DEFAULT_LIGHT_THEME.replace(primary_color="#FF2D55", spacing=12)
+    assert isinstance(brand, Theme)
+    assert brand.primary_color == "#FF2D55"
+    assert brand.spacing == 12
+    assert brand.text_color == DEFAULT_LIGHT_THEME.text_color
+    assert DEFAULT_LIGHT_THEME.primary_color == "#007AFF"
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        brand.primary_color = "#000000"  # type: ignore[misc]
+    with pytest.raises(TypeError):
+        DEFAULT_LIGHT_THEME.replace(primary_colour="#000000")
 
 
 # ---------------------------------------------------------------------------
@@ -170,3 +205,85 @@ def test_resolve_style_returns_fresh_dict() -> None:
     out = resolve_style(src)
     out["font_size"] = 99
     assert src["font_size"] == 16
+
+
+# ---------------------------------------------------------------------------
+# validate_style_keys: new layout / text keys
+# ---------------------------------------------------------------------------
+
+
+def test_validate_accepts_new_layout_and_text_keys(dev_mode: Any) -> None:
+    validate_style_keys(
+        {
+            "display": "none",
+            "margin": "auto",
+            "margin_left": "auto",
+            "align_items": "baseline",
+            "align_self": "baseline",
+            "border_width": 2,
+            "text_transform": "uppercase",
+            "text_shadow_color": "#00000080",
+            "text_shadow_offset": {"width": 0, "height": 2},
+            "text_shadow_radius": 4,
+        },
+        owner="Text",
+    )
+    assert _warnings() == []
+
+
+def test_validate_accepts_tuple_text_shadow_offset(dev_mode: Any) -> None:
+    validate_style_keys({"text_shadow_offset": (1, 2)}, owner="Text")
+    validate_style_keys({"text_shadow_offset": [0.5, 1.5]}, owner="Text")
+    assert _warnings() == []
+
+
+def test_validate_warns_on_bad_display_value(dev_mode: Any) -> None:
+    validate_style_keys({"display": "block"}, owner="View")
+    assert len(_warnings()) == 1
+    assert "display" in _warnings()[0]
+    assert "'flex'" in _warnings()[0] and "'none'" in _warnings()[0]
+
+
+def test_validate_warns_on_bad_text_transform_value(dev_mode: Any) -> None:
+    validate_style_keys({"text_transform": "title"}, owner="Text")
+    assert len(_warnings()) == 1
+    assert "text_transform" in _warnings()[0]
+
+
+@pytest.mark.parametrize("value", ["none", "uppercase", "lowercase", "capitalize"])
+def test_validate_accepts_every_text_transform(dev_mode: Any, value: str) -> None:
+    validate_style_keys({"text_transform": value}, owner="Text")
+    assert _warnings() == []
+
+
+def test_validate_warns_on_bad_text_shadow_values(dev_mode: Any) -> None:
+    validate_style_keys({"text_shadow_offset": "2px", "text_shadow_radius": -1}, owner="Text")
+    messages = _warnings()
+    assert len(messages) == 2
+    assert any("text_shadow_offset" in m for m in messages)
+    assert any("text_shadow_radius" in m for m in messages)
+
+
+def test_validate_bad_value_warns_once_per_value(dev_mode: Any) -> None:
+    validate_style_keys({"display": "block"}, owner="View")
+    validate_style_keys({"display": "block"}, owner="View")
+    validate_style_keys({"display": "inline"}, owner="View")
+    assert len(_warnings()) == 2
+
+
+def test_validate_ignores_none_values(dev_mode: Any) -> None:
+    validate_style_keys({"display": None, "text_transform": None, "text_decoration": None}, owner="Text")
+    assert _warnings() == []
+
+
+def test_validate_still_warns_on_unknown_keys(dev_mode: Any) -> None:
+    validate_style_keys({"text_transfrom": "uppercase"}, owner="Text")
+    assert len(_warnings()) == 1
+    assert "Did you mean 'text_transform'" in _warnings()[0]
+
+
+def test_validate_is_noop_outside_dev_mode() -> None:
+    diagnostics.set_dev_mode(False)
+    diagnostics.clear_warnings()
+    validate_style_keys({"display": "block", "bogus": 1}, owner="View")
+    assert _warnings() == []

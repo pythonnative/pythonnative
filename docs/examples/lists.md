@@ -4,6 +4,9 @@ Render a dynamic list with [`FlatList`][pythonnative.FlatList], use
 keys for stable reconciliation, and hook in delete and toggle actions.
 This example builds a simple to-do list.
 
+Paste it into `app/main.py` of a project scaffolded with `pn init`,
+then run `pn preview app.main.TodoList`.
+
 ## The code
 
 ```python

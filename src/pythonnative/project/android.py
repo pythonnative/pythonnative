@@ -74,6 +74,7 @@ def configure(
     config: AppConfig,
     *,
     dev_lib_root: Optional[Path] = None,
+    release: bool = False,
     log: Optional[Logger] = None,
 ) -> AndroidLayout:
     """Fully configure a staged Android template for ``config``.
@@ -83,6 +84,9 @@ def configure(
         config: The validated app configuration.
         dev_lib_root: Path to an in-repo ``pythonnative`` package to
             bundle (dev checkout); ``None`` to rely on the PyPI install.
+        release: Ship bytecode only (Chaquopy ``pyc.src``). Debug builds
+            keep the ``.py`` sources in the APK so tracebacks show code
+            and the dev client can tell what the app already runs.
         log: Optional progress logger.
 
     Returns:
@@ -93,7 +97,7 @@ def configure(
     project_dir = Path(project_dir)
 
     relocate_package(project_dir, TEMPLATE_PACKAGE, config.application_id)
-    configure_gradle(project_dir, config)
+    configure_gradle(project_dir, config, release=release)
     configure_settings_gradle(project_dir, config)
     configure_strings(project_dir, config)
     configure_manifest(project_dir, config)
@@ -166,15 +170,21 @@ def _prune_empty_dirs(source_root: Path, relative: str) -> None:
 # ======================================================================
 
 
-def configure_gradle(project_dir: Path, config: AppConfig) -> None:
-    """Write identity, SDK levels, ABIs, Python version, and signing.
+def configure_gradle(project_dir: Path, config: AppConfig, *, release: bool = False) -> None:
+    """Write identity, SDK levels, ABIs, Python version, bytecode policy, and signing.
 
     Args:
         project_dir: The staged Android project root.
         config: The validated app configuration.
+        release: Compile app sources to bytecode and drop the ``.py``
+            files from the APK (Chaquopy's default). Debug builds keep
+            them, for tracebacks with source lines and for the dev
+            client's overlay seeding.
     """
     gradle_path = project_dir / "app" / "build.gradle"
     content = gradle_path.read_text(encoding="utf-8")
+
+    content = re.sub(r"src\s+(true|false)", f"src {'true' if release else 'false'}", content, count=1)
 
     content = re.sub(r"versionCode\s+\d+", f"versionCode {config.build}", content)
     content = re.sub(r'versionName\s+"[^"]*"', f'versionName "{config.version}"', content)
@@ -186,10 +196,33 @@ def configure_gradle(project_dir: Path, config: AppConfig) -> None:
     abi_csv = ", ".join(f'"{abi}"' for abi in config.android.abi_filters)
     content = re.sub(r"abiFilters[^\n]*", f"abiFilters {abi_csv}", content)
 
+    if config.extra_index_urls:
+        content = _inject_pip_options(content, config)
+
     if config.android.signing.is_configured:
         content = _inject_signing(content, config)
 
     gradle_path.write_text(content, encoding="utf-8")
+
+
+def _inject_pip_options(content: str, config: AppConfig) -> str:
+    """Add ``--extra-index-url`` pip options for ``[requirements].extra_index_urls``.
+
+    Chaquopy runs pip at Gradle build time; ``options`` lines inside the
+    ``pip { }`` block are passed straight through, so a private index
+    declared once in ``pythonnative.toml`` applies to Android too.
+    """
+    marker = '                install "-r", "requirements.txt"'
+    if marker not in content:
+        return content
+    lines = "".join(
+        f'                options "--extra-index-url", "{_gradle_escape(url)}"\n' for url in config.extra_index_urls
+    )
+    return content.replace(marker, lines + marker, 1)
+
+
+def _gradle_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _inject_signing(content: str, config: AppConfig) -> str:
@@ -234,7 +267,7 @@ def configure_settings_gradle(project_dir: Path, config: AppConfig) -> None:
 
 
 def configure_strings(project_dir: Path, config: AppConfig) -> None:
-    """Set the ``app_name`` string resource to the display name.
+    """Set the ``app_name`` and ``pn_entry_module`` string resources.
 
     Args:
         project_dir: The staged Android project root.
@@ -248,6 +281,12 @@ def configure_strings(project_dir: Path, config: AppConfig) -> None:
     content = re.sub(
         r'(<string name="app_name">)(.*?)(</string>)',
         rf"\g<1>{escaped}\g<3>",
+        content,
+        flags=re.DOTALL,
+    )
+    content = re.sub(
+        r'(<string name="pn_entry_module"[^>]*>)(.*?)(</string>)',
+        rf"\g<1>{_xml_escape(config.entry_module)}\g<3>",
         content,
         flags=re.DOTALL,
     )
@@ -506,9 +545,6 @@ def collect_logcat_filters() -> List[str]:
     return [
         "python.stdout:V",
         "python.stderr:V",
-        "MainActivity:V",
-        "ScreenFragment:V",
-        "Navigator:V",
         "PythonNative:V",
         "AndroidRuntime:E",
         "System.err:W",

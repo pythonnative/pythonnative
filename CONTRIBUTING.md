@@ -4,7 +4,7 @@ Thanks for your interest in contributing. This repository contains the PythonNat
 
 ## Quick start
 
-Development uses Python ≥ 3.10 and [uv](https://docs.astral.sh/uv/) as the
+Development uses Python ≥ 3.13 (the same versions the apps embed) and [uv](https://docs.astral.sh/uv/) as the
 only prerequisite. `uv sync` creates and updates `.venv` itself, so there's no
 virtual environment to make and nothing to activate.
 
@@ -63,8 +63,12 @@ Unsolicited pull requests for issues that are already assigned or already have a
 
 - `src/pythonnative/`: installable library and CLI
   - `pythonnative/`: core cross‑platform UI components and utilities
+  - `bridge/`: JSON codec and per-platform transports into the native rendering core
   - `cli/`: `pn` command
+  - `project/`: config loading, template configuration, native plugin staging, and the builder behind `pn`
   - `templates/`: Android/iOS project templates (bundled with the package)
+    - `ios_template/PythonNativeKit/`: Swift package with the iOS rendering core (component managers, gestures, animations, native modules) and its XCTest target
+    - `android_template/pythonnative/`: Gradle library module with the Android rendering core and its JUnit target
 - `tests/`: unit tests for the library, plus the Maestro E2E suite
   - `e2e/`: the comprehensive E2E suite (see [E2E tests](#e2e-tests-maestro) below and `tests/e2e/AGENTS.md`)
 - `examples/`: runnable example apps
@@ -77,7 +81,8 @@ Unsolicited pull requests for issues that are already assigned or already have a
 
 - Style: Black; lint: Ruff; typing where useful. Keep APIs stable.
 - Prefer explicit, descriptive names; keep platform abstractions clean.
-- Add/extend tests under `tests/` for new behavior.
+- Python never imports platform code. Everything that touches `UIView` or `android.view.View` lives in Swift (`PythonNativeKit`) or Kotlin (the `pythonnative` Gradle module) and is reached through `pythonnative.bridge`; see `docs/concepts/bridge.md` for the protocol. Bump `PROTOCOL_VERSION` on both sides when the wire format changes.
+- Add/extend tests under `tests/` for new behavior. Native changes get XCTest / JUnit coverage next to the code they touch.
 - Don't commit generated artifacts or large binaries; templates live under `src/pythonnative/templates/`.
 - Docstrings: Google style throughout. Ruff is configured with the Google
   convention (`pydocstyle.convention = "google"`) and enforces the `D` rule
@@ -94,6 +99,10 @@ uv run pytest -q                # run tests
 uv run ruff check .             # lint
 uv run black src examples tests # format
 uv run --group docs mkdocs serve # preview the docs site locally
+
+# native rendering core (macOS with Xcode for the Swift package; JDK 17 for Gradle)
+(cd src/pythonnative/templates/ios_template/PythonNativeKit && xcodebuild test -scheme PythonNativeKit -destination 'platform=iOS Simulator,name=iPhone 15 Pro')
+(cd src/pythonnative/templates/android_template && ./gradlew :pythonnative:testDebugUnitTest)
 ```
 
 ## Conventional Commits
@@ -132,28 +141,37 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
 - Module/directory scopes:
   - `alerts`: imperative Alert/Picker helpers (`alerts.py`)
   - `animated`: Animated namespace and animation primitives (`animated.py`)
+  - `bootstrap`: on-device runtime start-up called by the templates (`bootstrap.py`)
+  - `bridge`: wire codec, transports, handshake, and native-to-Python callback (`bridge/`)
   - `cli`: CLI tool and `pn` command (`src/pythonnative/cli/`)
-  - `components`: declarative element-creating functions (`components.py`)
+  - `component`: the `@component` decorator, `Component`, and `memo` (`component.py`)
+  - `components`: declarative element-creating functions (`components/`)
   - `element`: Element descriptor class (`element.py`)
   - `events`: tag-based event routing between native views and Python callbacks (`events.py`)
   - `gestures`: gesture descriptors and the pure-Python recognition arbiter (`gestures.py`)
-  - `hooks`: function components and hooks (`hooks.py`)
-  - `hot_reload`: file watcher and module reloader (`hot_reload.py`)
+  - `hooks`: hooks and contexts (`hooks.py`)
+  - `hosts`: screen hosts, lifecycle forwarding, and render scheduling (`hosts/`)
+  - `devserver`: dev server, file watcher, and WebSocket implementation (`devserver/`)
+  - `devclient`: on-device dev client that syncs sources and Fast Refreshes (`devclient.py`)
+  - `hot_reload`: module reloader and Fast Refresh (`hot_reload.py`)
   - `layout`: pure-Python flexbox engine (`layout.py`)
   - `mutations`: batched mutation ops between reconciler and native backends (`mutations.py`)
-  - `native_modules`: native API modules for device capabilities (`native_modules/`)
-  - `native_views`: platform-specific native view creation and updates (`native_views/`)
-  - `navigation`: navigation containers and stack/tab/drawer navigators (`navigation.py`)
+  - `native_modules`: native module registry, Python facades, and Python fallbacks (`native_modules/`)
+  - `native_views`: view registry protocol and bridge backend (`native_views/`)
+  - `navigation`: navigation state, container, navigators, hooks, and linking (`navigation/`)
   - `net`: awaitable HTTP client (`net.py`)
   - `package`: `src/pythonnative/__init__.py` exports and package boundary
   - `platform`: `Platform.OS`/`Platform.select` and version detection (`platform.py`)
   - `platform_metrics`: platform-reported metrics like safe-area insets and bar heights (`platform_metrics.py`)
-  - `reconciler`: virtual view tree diffing and reconciliation (`reconciler.py`)
+  - `preview`: `pn start` / `pn preview` session and the browser preview page (`preview.py`, `devserver/static/`)
+  - `project`: `pythonnative.toml` config, template configurators, plugin staging, and the builder (`project/`)
+  - `reconciler`: virtual view tree diffing, boundaries, and the layout pass (`reconciler/`)
   - `runtime`: framework-wide asyncio loop and thread-safe future helpers (`runtime.py`)
-  - `screen`: screen host, native lifecycle bridge, and render scheduling (`screen.py`)
   - `sdk`: public extension SDK for custom native components (`sdk/`)
   - `storage`: AsyncStorage key/value persistence and `use_persisted_state` (`storage.py`)
+  - `scheduler`: render batching and transition queues (`scheduler.py`)
   - `style`: StyleSheet and theming (`style.py`)
+  - `testing`: public test utilities (`testing/`)
   - `utils`: shared utilities (`utils.py`)
 
 - Other scopes:
@@ -164,6 +182,8 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `repo`: repository metadata and top‑level files (`README.md`, `CONTRIBUTING.md`, `.gitignore`, licenses)
   - `scripts`: developer scripts under `scripts/` (e.g., `check.sh`)
   - `templates`: Android/iOS project templates under `src/pythonnative/templates/`
+  - `kit`: the Swift rendering core (`templates/ios_template/PythonNativeKit/`)
+  - `runtime-android`: the Kotlin rendering core (`templates/android_template/pythonnative/`)
   - `tests`: unit/integration/E2E tests under `tests/`
   - `workflows`: CI pipelines under `.github/workflows/`
 
@@ -196,7 +216,7 @@ Breaking changes:
 - Use `!` after the type/scope or a `BREAKING CHANGE:` footer.
 
 ```text
-feat(screen)!: rename create_page to create_screen
+feat(hosts)!: rename create_page to create_screen
 
 BREAKING CHANGE: API renamed; update app code and templates.
 ```
@@ -353,6 +373,7 @@ When you add a new public symbol you must also:
 
 - **CI** (`ci.yml`): runs formatter, linter, type checker, and tests on every push and PR.
 - **E2E** (`e2e.yml`): builds the hello-world example on Android (Linux emulator) and iOS (macOS simulator), then runs Maestro flows. Triggers on pushes to `main`, PRs, and manual dispatch.
+- **Packages** (`packages.yml`): resolves the PyPI compatibility matrix in `tests/packages/matrix.toml` against the live indexes with `scripts/package-matrix.py --check`, weekly and on changes to the resolver or manifest, and uploads the rendered Markdown table for `docs/guides/pypi-packages.md`.
 - **PR Lint** (`pr-lint.yml`): validates the PR title against Conventional Commits format (protects squash merges) and checks individual commit messages via commitlint (protects rebase merges). Recommended: add the **PR title** job as a required status check in branch-protection settings.
 - **Release** (`release.yml`): runs on merge to `main`; computes version, generates changelog, tags, creates GitHub Release, and (when `DRAFT_RELEASE` is `"false"`) publishes to PyPI.
 - **Docs** (`docs.yml`): builds the MkDocs site in strict mode on every push and pull request, and deploys to GitHub Pages on push to `main`.

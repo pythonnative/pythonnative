@@ -25,7 +25,14 @@ The algorithm supports:
   reverse variants), ``justify_content`` (``flex_start`` / ``center`` /
   ``flex_end`` / ``space_between`` / ``space_around`` / ``space_evenly``),
   ``align_items`` (``stretch`` / ``flex_start`` / ``center`` /
-  ``flex_end``), and ``align_self`` overrides per child.
+  ``flex_end`` / ``baseline``), and ``align_self`` overrides per child.
+  Baseline alignment (rows only) uses each leaf's height as its
+  baseline, since native text handlers report a size but not the
+  first line's baseline; containers use the baseline of their first
+  in-flow child.
+- **Visibility**: ``display: "none"`` removes a node (and its subtree)
+  from layout entirely: it contributes no size, gap, or margin to its
+  parent and every node in the subtree gets a zero frame.
 - **Wrapping**: ``flex_wrap`` (``nowrap`` / ``wrap`` / ``wrap_reverse``)
   with ``align_content`` controlling how lines share leftover
   cross-axis space (``stretch`` default, plus the justify palette).
@@ -44,7 +51,14 @@ The algorithm supports:
   and do not participate in flex distribution.
 - **Spacing**: ``padding`` / ``margin`` (scalar, dict, or per-edge
   keys), inter-child ``spacing`` (aliases: ``gap``, ``column_gap`` /
-  ``row_gap`` per axis).
+  ``row_gap`` per axis). ``border_width`` (and the per-edge
+  ``border_*_width`` keys) sit inside the frame like padding, so the
+  content box shrinks by the border as in Yoga.
+- **Auto margins**: ``margin: "auto"`` (or any per-edge margin key set
+  to ``"auto"``) absorbs free space. On the main axis the free space is
+  split equally among every auto margin on the line and
+  ``justify_content`` is ignored; on the cross axis auto margins center
+  or push the item and override ``align_items`` / ``align_self``.
 
 Example:
     ```python
@@ -66,7 +80,7 @@ Example:
 """
 
 import math
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 # ======================================================================
 # Public constants
@@ -112,6 +126,11 @@ LAYOUT_STYLE_KEYS = frozenset(
         "padding_end",
         "padding_horizontal",
         "padding_vertical",
+        "border_width",
+        "border_top_width",
+        "border_right_width",
+        "border_bottom_width",
+        "border_left_width",
         "flex_direction",
         "justify_content",
         "align_items",
@@ -121,6 +140,7 @@ LAYOUT_STYLE_KEYS = frozenset(
         "column_gap",
         "aspect_ratio",
         "direction",
+        "display",
     }
 )
 """Style keys that affect layout (and are consumed by the layout engine)."""
@@ -150,6 +170,11 @@ ALIGN_FLEX_START = "flex_start"
 ALIGN_CENTER = "center"
 ALIGN_FLEX_END = "flex_end"
 ALIGN_STRETCH = "stretch"
+ALIGN_BASELINE = "baseline"
+
+# display values
+DISPLAY_FLEX = "flex"
+DISPLAY_NONE = "none"
 
 # position values
 POSITION_RELATIVE = "relative"
@@ -168,6 +193,7 @@ _ALIGN_ALIASES = {
     "trailing": ALIGN_FLEX_END,
     "bottom": ALIGN_FLEX_END,
     "fill": ALIGN_STRETCH,
+    "baseline": ALIGN_BASELINE,
 }
 
 _JUSTIFY_ALIASES = {
@@ -245,54 +271,88 @@ def _resolve_value(value: Any, parent_size: float) -> Optional[float]:
     return None
 
 
-def _padding_edges(value: Any, parent_w: float, parent_h: float) -> Tuple[float, float, float, float]:
-    """Resolve a padding/margin value to ``(left, top, right, bottom)``."""
+class _Auto:
+    """Sentinel for an edge value of ``"auto"`` (only meaningful for margins)."""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "auto"
+
+
+_AUTO = _Auto()
+
+# A resolved edge: points, the auto sentinel, or ``None`` when unset.
+_EdgeValue = Union[float, _Auto, None]
+
+
+def _is_auto(value: Any) -> bool:
+    return isinstance(value, str) and value.strip().lower() == "auto"
+
+
+def _resolve_edge_value(value: Any, parent_size: float) -> _EdgeValue:
+    """Like `_resolve_value` but preserves ``"auto"`` as `_AUTO`.
+
+    Without this, ``margin: "auto"`` would fall through ``float("auto")``
+    and silently resolve to ``0``.
+    """
+    if _is_auto(value):
+        return _AUTO
+    return _resolve_value(value, parent_size)
+
+
+def _edges_from_value(value: Any, parent_w: float, parent_h: float) -> Tuple[_EdgeValue, ...]:
+    """Resolve a padding/margin shorthand to ``(left, top, right, bottom)``.
+
+    Entries are ``None`` when the shorthand doesn't set that edge, so
+    callers can layer per-edge keys on top.
+    """
     if value is None:
-        return (0.0, 0.0, 0.0, 0.0)
+        return (None, None, None, None)
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         v = float(value)
         return (v, v, v, v)
     if isinstance(value, dict):
-        all_v = _resolve_value(value.get("all"), max(parent_w, parent_h)) or 0.0
-        h_v = _resolve_value(value.get("horizontal"), parent_w)
-        v_v = _resolve_value(value.get("vertical"), parent_h)
-        h = h_v if h_v is not None else all_v
-        v = v_v if v_v is not None else all_v
-        left = _resolve_value(value.get("left"), parent_w)
-        right = _resolve_value(value.get("right"), parent_w)
-        top = _resolve_value(value.get("top"), parent_h)
-        bottom = _resolve_value(value.get("bottom"), parent_h)
+        all_v = _resolve_edge_value(value.get("all"), max(parent_w, parent_h))
+        h_v = _resolve_edge_value(value.get("horizontal"), parent_w)
+        v_v = _resolve_edge_value(value.get("vertical"), parent_h)
+        h_axis: _EdgeValue = h_v if h_v is not None else all_v
+        v_axis: _EdgeValue = v_v if v_v is not None else all_v
+        left = _resolve_edge_value(value.get("left"), parent_w)
+        right = _resolve_edge_value(value.get("right"), parent_w)
+        top = _resolve_edge_value(value.get("top"), parent_h)
+        bottom = _resolve_edge_value(value.get("bottom"), parent_h)
         return (
-            left if left is not None else h,
-            top if top is not None else v,
-            right if right is not None else h,
-            bottom if bottom is not None else v,
+            left if left is not None else h_axis,
+            top if top is not None else v_axis,
+            right if right is not None else h_axis,
+            bottom if bottom is not None else v_axis,
         )
     if isinstance(value, str):
-        v = _resolve_value(value, max(parent_w, parent_h))
-        if v is None:
-            return (0.0, 0.0, 0.0, 0.0)
-        return (v, v, v, v)
-    return (0.0, 0.0, 0.0, 0.0)
+        edge = _resolve_edge_value(value, max(parent_w, parent_h))
+        return (edge, edge, edge, edge)
+    return (None, None, None, None)
 
 
-def _resolve_padding_for(
+def _resolve_edges(
     style: Dict[str, Any],
     parent_w: float,
     parent_h: float,
     prefix: str,
     direction: str = DIRECTION_LTR,
-) -> Tuple[float, float, float, float]:
-    """Resolve padding/margin from `style`, honoring per-edge overrides.
+) -> Tuple[_EdgeValue, _EdgeValue, _EdgeValue, _EdgeValue]:
+    """Resolve padding/margin edges from `style`, honoring per-edge overrides.
 
-    ``{prefix}_start`` / ``{prefix}_end`` resolve to the left/right
-    edge according to ``direction`` and take precedence over the
-    physical ``left`` / ``right`` keys (matching React Native).
+    Returns ``(left, top, right, bottom)`` where each entry is a float,
+    `_AUTO`, or ``None`` (unset). ``{prefix}_start`` / ``{prefix}_end``
+    resolve to the left/right edge according to ``direction`` and take
+    precedence over the physical ``left`` / ``right`` keys (matching
+    React Native).
     """
-    base_l, base_t, base_r, base_b = _padding_edges(style.get(prefix), parent_w, parent_h)
+    base_l, base_t, base_r, base_b = _edges_from_value(style.get(prefix), parent_w, parent_h)
 
-    h_override = _resolve_value(style.get(f"{prefix}_horizontal"), parent_w)
-    v_override = _resolve_value(style.get(f"{prefix}_vertical"), parent_h)
+    h_override = _resolve_edge_value(style.get(f"{prefix}_horizontal"), parent_w)
+    v_override = _resolve_edge_value(style.get(f"{prefix}_vertical"), parent_h)
     if h_override is not None:
         base_l = h_override
         base_r = h_override
@@ -300,10 +360,10 @@ def _resolve_padding_for(
         base_t = v_override
         base_b = v_override
 
-    left = _resolve_value(style.get(f"{prefix}_left"), parent_w)
-    right = _resolve_value(style.get(f"{prefix}_right"), parent_w)
-    top = _resolve_value(style.get(f"{prefix}_top"), parent_h)
-    bottom = _resolve_value(style.get(f"{prefix}_bottom"), parent_h)
+    left = _resolve_edge_value(style.get(f"{prefix}_left"), parent_w)
+    right = _resolve_edge_value(style.get(f"{prefix}_right"), parent_w)
+    top = _resolve_edge_value(style.get(f"{prefix}_top"), parent_h)
+    bottom = _resolve_edge_value(style.get(f"{prefix}_bottom"), parent_h)
     if left is not None:
         base_l = left
     if right is not None:
@@ -313,8 +373,8 @@ def _resolve_padding_for(
     if bottom is not None:
         base_b = bottom
 
-    start = _resolve_value(style.get(f"{prefix}_start"), parent_w)
-    end = _resolve_value(style.get(f"{prefix}_end"), parent_w)
+    start = _resolve_edge_value(style.get(f"{prefix}_start"), parent_w)
+    end = _resolve_edge_value(style.get(f"{prefix}_end"), parent_w)
     if start is not None:
         if direction == DIRECTION_RTL:
             base_r = start
@@ -326,6 +386,74 @@ def _resolve_padding_for(
         else:
             base_r = end
     return (base_l, base_t, base_r, base_b)
+
+
+def _edge_points(value: _EdgeValue) -> float:
+    """Collapse a resolved edge to points (``auto`` and unset count as ``0``)."""
+    if value is None or isinstance(value, _Auto):
+        return 0.0
+    return value
+
+
+def _resolve_padding_for(
+    style: Dict[str, Any],
+    parent_w: float,
+    parent_h: float,
+    prefix: str,
+    direction: str = DIRECTION_LTR,
+) -> Tuple[float, float, float, float]:
+    """Resolve padding/margin from `style` to points, honoring per-edge overrides.
+
+    ``"auto"`` edges resolve to ``0`` here; the flex algorithm queries
+    them separately via `_auto_margins` to distribute free space.
+    """
+    left, top, right, bottom = _resolve_edges(style, parent_w, parent_h, prefix, direction)
+    return (_edge_points(left), _edge_points(top), _edge_points(right), _edge_points(bottom))
+
+
+def _border_edges(style: Dict[str, Any]) -> Tuple[float, float, float, float]:
+    """Resolve ``border_width`` and the per-edge ``border_*_width`` keys to points."""
+    base = _to_float(style.get("border_width"))
+    base = max(base, 0.0) if base is not None else 0.0
+    out = []
+    for key in ("border_left_width", "border_top_width", "border_right_width", "border_bottom_width"):
+        v = _to_float(style.get(key))
+        out.append(max(v, 0.0) if v is not None else base)
+    return (out[0], out[1], out[2], out[3])
+
+
+def _resolve_box_insets(
+    style: Dict[str, Any],
+    parent_w: float,
+    parent_h: float,
+    direction: str = DIRECTION_LTR,
+) -> Tuple[float, float, float, float]:
+    """Return ``(left, top, right, bottom)`` padding plus border.
+
+    Borders occupy space inside the node's frame exactly like padding
+    (Yoga's box model), so both shrink the content box that children
+    are laid out in and both are added back when a container sizes
+    itself to its content.
+    """
+    pad_l, pad_t, pad_r, pad_b = _resolve_padding_for(style, parent_w, parent_h, "padding", direction)
+    bor_l, bor_t, bor_r, bor_b = _border_edges(style)
+    return (pad_l + bor_l, pad_t + bor_t, pad_r + bor_r, pad_b + bor_b)
+
+
+def _is_hidden(node: "LayoutNode") -> bool:
+    """Return whether ``node`` is removed from layout via ``display: "none"``."""
+    return node.style.get("display") == DISPLAY_NONE
+
+
+def _zero_subtree(node: "LayoutNode") -> None:
+    """Assign a ``(0, 0, 0, 0)`` frame to ``node`` and every descendant."""
+    node.x = 0.0
+    node.y = 0.0
+    node.width = 0.0
+    node.height = 0.0
+    node._lines = None
+    for child in node.children:
+        _zero_subtree(child)
 
 
 def _clamp(
@@ -403,6 +531,14 @@ def _resolve_align(value: Any, default: str = ALIGN_STRETCH) -> str:
         return default
     s = str(value)
     return _ALIGN_ALIASES.get(s, s)
+
+
+def _child_align(child: "LayoutNode", parent_align: str) -> str:
+    """Return the effective cross-axis alignment for ``child``."""
+    align = _resolve_align(child.style.get("align_self"), default=parent_align)
+    if align == ALIGN_AUTO:
+        align = parent_align
+    return align
 
 
 def _resolve_justify(value: Any) -> str:
@@ -586,6 +722,8 @@ def calculate_layout(
     _measure_node(node, available_width, available_height, direction=direction)
     node.x = 0.0
     node.y = 0.0
+    if _is_hidden(node):
+        return
     _position_children(node)
 
 
@@ -616,6 +754,15 @@ def _measure_node(
     """
     style = node.style
     resolved_direction = _resolve_direction(style, direction)
+
+    if _is_hidden(node):
+        # ``display: "none"`` removes the whole subtree from layout.
+        # Zero every frame so descendants never carry a stale size from
+        # a pass in which they were visible; the memo is left untouched
+        # so toggling back to ``flex`` re-measures from scratch.
+        _zero_subtree(node)
+        node._direction = resolved_direction
+        return
 
     # Incremental-layout memo: a clean node measured under identical
     # inputs reuses its previous result without recursing; its whole
@@ -709,7 +856,7 @@ def _measure_container(
     direction = node._direction
     base_w = explicit_w if explicit_w is not None else avail_w
     base_h = explicit_h if explicit_h is not None else avail_h
-    pad_l, pad_t, pad_r, pad_b = _resolve_padding_for(style, base_w, base_h, "padding", direction)
+    pad_l, pad_t, pad_r, pad_b = _resolve_box_insets(style, base_w, base_h, direction)
     pad_x = pad_l + pad_r
     pad_y = pad_t + pad_b
 
@@ -776,6 +923,44 @@ def _child_margins(
     return _resolve_padding_for(child.style, parent_w, parent_h, "margin", direction)
 
 
+def _auto_margins(child: LayoutNode, direction: str) -> Tuple[bool, bool, bool, bool]:
+    """Return ``(left, top, right, bottom)`` flags for ``"auto"`` margins on ``child``."""
+    edges = _resolve_edges(child.style, 0.0, 0.0, "margin", direction)
+    return tuple(isinstance(e, _Auto) for e in edges)  # type: ignore[return-value]
+
+
+def _auto_margin_count_main(child: LayoutNode, is_row: bool, direction: str) -> int:
+    """Number of main-axis ``"auto"`` margins (0, 1, or 2) on ``child``."""
+    auto_l, auto_t, auto_r, auto_b = _auto_margins(child, direction)
+    if is_row:
+        return int(auto_l) + int(auto_r)
+    return int(auto_t) + int(auto_b)
+
+
+def _has_auto_cross_margin(child: LayoutNode, is_row: bool, direction: str) -> bool:
+    auto_l, auto_t, auto_r, auto_b = _auto_margins(child, direction)
+    return (auto_t or auto_b) if is_row else (auto_l or auto_r)
+
+
+def _partition_children(children: List[LayoutNode]) -> Tuple[List[LayoutNode], List[LayoutNode]]:
+    """Split ``children`` into ``(in_flow, absolute)``, zeroing hidden ones.
+
+    Children with ``display: "none"`` are excluded from both lists and
+    receive a zero frame (with their subtree) so every node always has
+    a well-defined frame after a layout pass.
+    """
+    in_flow: List[LayoutNode] = []
+    absolute: List[LayoutNode] = []
+    for child in children:
+        if _is_hidden(child):
+            _zero_subtree(child)
+        elif child.style.get("position") == POSITION_ABSOLUTE:
+            absolute.append(child)
+        else:
+            in_flow.append(child)
+    return in_flow, absolute
+
+
 def _child_outer_main(
     child: LayoutNode,
     is_row: bool,
@@ -835,14 +1020,18 @@ def _resolve_cross_force(
     1. The child's effective alignment is ``stretch``.
     2. The parent's cross axis is bounded (so we have a target size).
     3. The child does not have its own explicit cross-axis dimension.
+    4. The child has no ``"auto"`` margin on the cross axis (auto
+       margins take the free space instead, as in CSS).
     """
     if not cross_bounded or not math.isfinite(cross_avail):
         return None
-    align = _resolve_align(child.style.get("align_self"), default=parent_align)
+    align = _child_align(child, parent_align)
     if align != ALIGN_STRETCH:
         return None
     cross_key = "height" if is_row else "width"
     if cross_key in child.style and child.style.get(cross_key) is not None:
+        return None
+    if _has_auto_cross_margin(child, is_row, direction):
         return None
     margins = _child_margins(child, cross_avail, cross_avail, direction)
     margin_cross = (margins[1] + margins[3]) if is_row else (margins[0] + margins[2])
@@ -879,13 +1068,7 @@ def _layout_flex_children(
     wrap = _wrap_mode(style)
     wrapping = wrap != WRAP_NOWRAP and main_bounded and math.isfinite(main_avail)
 
-    in_flow: List[LayoutNode] = []
-    absolute: List[LayoutNode] = []
-    for child in parent.children:
-        if child.style.get("position") == POSITION_ABSOLUTE:
-            absolute.append(child)
-        else:
-            in_flow.append(child)
+    in_flow, absolute = _partition_children(parent.children)
 
     align_items = _resolve_align(style.get("align_items"), default=ALIGN_STRETCH)
 
@@ -1008,6 +1191,11 @@ def _layout_flex_children(
             (_child_outer_cross(c, is_row, content_w, content_h, direction) for c in line.children),
             default=0.0,
         )
+        metrics = _line_baseline_metrics(line, is_row, align_items, content_w, content_h, direction)
+        if metrics is not None:
+            # Baseline-aligned items may overhang above and below the
+            # tallest one, so the line must fit the combined extent.
+            line.cross_size = max(line.cross_size, metrics[0] + metrics[1])
 
     if wrapping and lines:
         align_content = _resolve_justify(style.get("align_content", "stretch"))
@@ -1113,19 +1301,13 @@ def _position_children(parent: LayoutNode) -> None:
     rtl = direction == DIRECTION_RTL
     # In RTL, rows flip their visual order; ``row_reverse`` flips back.
     reverse = _is_reverse(flex_direction) != (rtl and is_row)
-    pad_l, pad_t, pad_r, pad_b = _resolve_padding_for(style, parent.width, parent.height, "padding", direction)
+    pad_l, pad_t, pad_r, pad_b = _resolve_box_insets(style, parent.width, parent.height, direction)
     main_gap, cross_gap = _resolve_gaps(style, is_row)
     wrap = _wrap_mode(style)
     align_items = _resolve_align(style.get("align_items"), default=ALIGN_STRETCH)
     justify = _resolve_justify(style.get("justify_content"))
 
-    in_flow: List[LayoutNode] = []
-    absolute: List[LayoutNode] = []
-    for child in parent.children:
-        if child.style.get("position") == POSITION_ABSOLUTE:
-            absolute.append(child)
-        else:
-            in_flow.append(child)
+    in_flow, absolute = _partition_children(parent.children)
 
     content_w = max(0.0, parent.width - pad_l - pad_r)
     content_h = max(0.0, parent.height - pad_t - pad_b)
@@ -1162,15 +1344,45 @@ def _position_children(parent: LayoutNode) -> None:
     for line_index, line in enumerate(ordered_lines):
         line_cross = line.cross_size if multi_line else cross_size
         free_main = max(0.0, main_size - line.main_used)
-        main_offset, between = _justify_offsets(justify, free_main, len(line.children))
+
+        # Auto margins on the main axis soak up the free space before
+        # ``justify_content`` gets a say (CSS Flexbox 8.1 / Yoga): the
+        # free space is split equally among every auto margin on the
+        # line, and justification is skipped entirely.
+        auto_count = sum(_auto_margin_count_main(c, is_row, direction) for c in line.children)
+        if auto_count > 0:
+            auto_share = free_main / auto_count
+            main_offset, between = 0.0, 0.0
+        else:
+            auto_share = 0.0
+            main_offset, between = _justify_offsets(justify, free_main, len(line.children))
+
+        # Baseline alignment needs each child's subtree positioned to
+        # locate its baseline, so those children are positioned up
+        # front and skipped in the loop below.
+        baseline_metrics = _line_baseline_metrics(line, is_row, align_items, content_w, content_h, direction)
+        pre_positioned: Set[int] = set()
+        if baseline_metrics is not None:
+            for c in line.children:
+                if _child_align(c, align_items) == ALIGN_BASELINE:
+                    pre_positioned.add(id(c))
 
         cursor = main_offset
         ordered = list(reversed(line.children)) if reverse else list(line.children)
         for i, child in enumerate(ordered):
             cm_l, cm_t, cm_r, cm_b = _child_margins(child, content_w, content_h, direction)
+            auto_l, auto_t, auto_r, auto_b = _auto_margins(child, direction)
             margin_main_start = (cm_r if rtl else cm_l) if is_row else cm_t
             margin_cross_start = cm_t if is_row else (cm_r if rtl else cm_l)
             margin_cross_end = cm_b if is_row else (cm_l if rtl else cm_r)
+            auto_main_start = (auto_r if rtl else auto_l) if is_row else auto_t
+            auto_main_end = (auto_l if rtl else auto_r) if is_row else auto_b
+            auto_cross_start = auto_t if is_row else (auto_r if rtl else auto_l)
+            auto_cross_end = auto_b if is_row else (auto_l if rtl else auto_r)
+
+            baseline_pos: Optional[float] = None
+            if baseline_metrics is not None and id(child) in pre_positioned:
+                baseline_pos = baseline_metrics[0] - _node_baseline(child, position=False)
 
             cross_pos = _align_offset(
                 child,
@@ -1180,8 +1392,13 @@ def _position_children(parent: LayoutNode) -> None:
                 margin_cross_start,
                 margin_cross_end,
                 rtl,
+                auto_start=auto_cross_start,
+                auto_end=auto_cross_end,
+                baseline_pos=baseline_pos,
             )
 
+            if auto_main_start:
+                cursor += auto_share
             if is_row:
                 child.x = pad_l + cursor + margin_main_start
                 child.y = pad_t + cross_cursor + cross_pos
@@ -1190,10 +1407,13 @@ def _position_children(parent: LayoutNode) -> None:
                 child.y = pad_t + cursor + margin_main_start
 
             cursor += _child_outer_main(child, is_row, content_w, content_h, direction)
+            if auto_main_end:
+                cursor += auto_share
             if i < len(ordered) - 1:
                 cursor += main_gap + between
 
-            _position_children(child)
+            if id(child) not in pre_positioned:
+                _position_children(child)
 
         cross_cursor += line_cross
         if line_index < len(ordered_lines) - 1:
@@ -1233,11 +1453,34 @@ def _align_offset(
     margin_start: float,
     margin_end: float,
     rtl: bool = False,
+    auto_start: bool = False,
+    auto_end: bool = False,
+    baseline_pos: Optional[float] = None,
 ) -> float:
-    """Return the cross-axis offset for ``child`` inside its line."""
-    align = _resolve_align(child.style.get("align_self"), default=parent_align)
-    if align == ALIGN_AUTO:
-        align = parent_align
+    """Return the cross-axis offset for ``child`` inside its line.
+
+    ``auto_start`` / ``auto_end`` flag ``"auto"`` margins on the cross
+    axis; they take precedence over alignment (both auto centers the
+    child, one auto pushes it to the opposite edge). ``baseline_pos``
+    is the precomputed offset for baseline-aligned children in a row.
+    """
+    child_cross = _child_cross_size(child, is_row)
+    margin_cross = margin_start + margin_end
+    free = max(0.0, cross_size - child_cross - margin_cross)
+    if auto_start and auto_end:
+        return margin_start + free / 2.0
+    if auto_start:
+        return margin_start + free
+    if auto_end:
+        return margin_start
+
+    align = _child_align(child, parent_align)
+    if align == ALIGN_BASELINE:
+        if baseline_pos is not None:
+            return baseline_pos
+        # Baseline in a column (or with no measurable baseline) behaves
+        # like ``flex_start``, matching Yoga.
+        align = ALIGN_FLEX_START
     # A column's cross axis is horizontal, so RTL flips start/end.
     if rtl and not is_row:
         if align == ALIGN_FLEX_START:
@@ -1245,13 +1488,76 @@ def _align_offset(
         elif align == ALIGN_FLEX_END:
             align = ALIGN_FLEX_START
 
-    child_cross = _child_cross_size(child, is_row)
-    margin_cross = margin_start + margin_end
     if align == ALIGN_CENTER:
-        return margin_start + max(0.0, (cross_size - child_cross - margin_cross) / 2.0)
+        return margin_start + free / 2.0
     if align == ALIGN_FLEX_END:
         return max(0.0, cross_size - child_cross - margin_end)
     return margin_start
+
+
+def _node_baseline(node: LayoutNode, position: bool = True) -> float:
+    """Return the distance from ``node``'s top edge to its baseline.
+
+    Native text handlers only report an overall size, not the position
+    of the first line's baseline, so a measured leaf (text, button,
+    image) uses its height as the baseline: items line up along their
+    bottom edges. Sizeless leaves do the same. A container's baseline is
+    that of its first in-flow child (preferring a ``baseline``-aligned
+    child in a row), offset by that child's position; if it has no
+    in-flow children the container's height is used.
+
+    ``position`` requests a positioning pass over ``node``'s subtree
+    first, which the measurement pass needs because children have sizes
+    but no coordinates yet. Pass ``False`` when the subtree is already
+    positioned.
+    """
+    candidates = [c for c in node.children if not _is_hidden(c) and c.style.get("position") != POSITION_ABSOLUTE]
+    if not candidates:
+        return node.height
+    if position:
+        _position_children(node)
+    chosen = candidates[0]
+    if _is_row(node.style.get("flex_direction", FLEX_DIRECTION_COLUMN)):
+        parent_align = _resolve_align(node.style.get("align_items"), default=ALIGN_STRETCH)
+        for c in candidates:
+            if _child_align(c, parent_align) == ALIGN_BASELINE:
+                chosen = c
+                break
+    return chosen.y + _node_baseline(chosen, position=False)
+
+
+def _line_baseline_metrics(
+    line: "_FlexLine",
+    is_row: bool,
+    align_items: str,
+    content_w: float,
+    content_h: float,
+    direction: str,
+) -> Optional[Tuple[float, float]]:
+    """Return ``(max_ascent, max_descent)`` for a row line's baseline items.
+
+    ``max_ascent`` is measured from the line's top edge to the shared
+    baseline (including each item's top margin), ``max_descent`` from
+    the baseline to the bottom of the tallest overhang. ``None`` when the
+    line is not a row or no child is baseline-aligned.
+    """
+    if not is_row:
+        return None
+    max_ascent = 0.0
+    max_descent = 0.0
+    found = False
+    for child in line.children:
+        if _child_align(child, align_items) != ALIGN_BASELINE:
+            continue
+        found = True
+        _, m_top, _, m_bottom = _child_margins(child, content_w, content_h, direction)
+        ascent = _node_baseline(child) + m_top
+        descent = child.height + m_top + m_bottom - ascent
+        max_ascent = max(max_ascent, ascent)
+        max_descent = max(max_descent, descent)
+    if not found:
+        return None
+    return (max_ascent, max_descent)
 
 
 def _position_absolute(

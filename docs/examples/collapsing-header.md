@@ -77,7 +77,7 @@ def CollapsingHeaderPage():
 
 
 @pn.component
-def BottomSheet(children=None, open: bool = False, on_close=None):
+def BottomSheet(*children, open: bool = False, on_close=None):
     # 0.0 = fully open, SHEET_HEIGHT = fully hidden.
     slide = pn.use_animated_value(0.0 if open else SHEET_HEIGHT)
     drag_origin = pn.use_ref(0.0)
@@ -127,7 +127,7 @@ def BottomSheet(children=None, open: bool = False, on_close=None):
                     "margin": {"top": 8, "bottom": 12},
                 },
             ),
-            *(children or []),
+            *children,
             gestures=[gestures.Pan(
                 on_begin=on_pan_begin,
                 on_change=on_pan_change,
@@ -160,10 +160,8 @@ def App():
             style={"position": "absolute", "bottom": 24, "right": 16, "z_index": 2},
         ),
         BottomSheet(
-            children=[
-                pn.Text("Sheet content", style={"font_size": 17, "font_weight": "600"}),
-                pn.Text("Drag down to dismiss, or flick it away."),
-            ],
+            pn.Text("Sheet content", style={"font_size": 17, "font_weight": "600"}),
+            pn.Text("Drag down to dismiss, or flick it away."),
             open=sheet_open,
             on_close=lambda: set_sheet_open(False),
         ),

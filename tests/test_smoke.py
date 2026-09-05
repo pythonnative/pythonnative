@@ -50,7 +50,6 @@ def test_public_api_names() -> None:
         "use_ref",
         "use_route",
         "use_state",
-        "Provider",
         # Navigation
         "NavigationContainer",
         "create_drawer_navigator",

@@ -2,12 +2,13 @@
 //  AppDelegate.swift
 //  ios_template
 //
-//  Application-level callbacks. Remote-notification registration
-//  results are forwarded to pythonnative.native_modules.notifications,
-//  which resolves the awaitable returned by
-//  Notifications.get_device_token().
+//  Application-level callbacks. Battery monitoring and APNs
+//  registration results are forwarded to the Swift native modules in
+//  PythonNativeKit (BatteryModule, NotificationsModule), which relay
+//  them to Python over the bridge.
 //
 
+import PythonNativeKit
 import UIKit
 
 @main
@@ -16,6 +17,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        BatteryModule.startMonitoring()
         return true
     }
 
@@ -25,25 +27,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
-        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
-        guard PythonRuntime.shared.started else { return }
-        PythonRuntime.shared.notify(
-            module: "pythonnative.native_modules.notifications",
-            function: "dispatch_device_token",
-            token
-        )
+        NotificationsModule.deliverToken(deviceToken)
     }
 
     func application(
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
-        guard PythonRuntime.shared.started else { return }
-        PythonRuntime.shared.notify(
-            module: "pythonnative.native_modules.notifications",
-            function: "dispatch_device_token_error",
-            String(describing: error)
-        )
+        NotificationsModule.deliverError(error)
     }
 
     // MARK: - UISceneSession lifecycle

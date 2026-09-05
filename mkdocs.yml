@@ -74,10 +74,12 @@ nav:
     - Reconciliation: concepts/reconciliation.md
     - Layout Engine: concepts/layout.md
     - Native Views: concepts/native-views.md
+    - The Native Bridge: concepts/bridge.md
   - Guides:
     - Android: guides/android.md
     - iOS: guides/ios.md
-    - Desktop Preview: guides/desktop-preview.md
+    - Development Workflow: guides/dev-workflow.md
+    - Browser Preview: guides/browser-preview.md
     - Navigation: guides/navigation.md
     - Styling: guides/styling.md
     - Animations: guides/animations.md
@@ -86,8 +88,9 @@ nav:
     - Async + Data: guides/async.md
     - Platform & Accessibility: guides/platform-accessibility.md
     - Native Modules: guides/native-modules.md
+    - PyPI Packages: guides/pypi-packages.md
     - Custom Native Components: guides/custom-native-components.md
-    - Hot Reload: guides/hot-reload.md
+    - Fast Refresh: guides/hot-reload.md
     - Error Boundaries: guides/error-boundaries.md
     - Testing: guides/testing.md
   - Building:
@@ -104,6 +107,7 @@ nav:
     - Collapsing Header & Bottom Sheet: examples/collapsing-header.md
   - API Reference:
     - Package: api/pythonnative.md
+    - Component: api/component.md
     - Components: api/components.md
     - Hooks: api/hooks.md
     - Animated: api/animated.md
@@ -117,17 +121,20 @@ nav:
     - Storage: api/storage.md
     - Platform: api/platform.md
     - Element: api/element.md
-    - Screen: api/screen.md
+    - Hosts: api/hosts.md
     - Reconciler: api/reconciler.md
     - Layout: api/layout.md
     - Style: api/style.md
     - Navigation: api/navigation.md
+    - Testing: api/testing.md
     - Native modules: api/native_modules.md
     - Native views: api/native_views.md
+    - Bridge: api/bridge.md
     - Mutation ops: api/mutations.md
     - Events: api/events.md
     - Platform metrics: api/platform_metrics.md
     - SDK: api/sdk.md
+    - Dev server: api/devserver.md
     - Hot reload: api/hot_reload.md
     - Diagnostics: api/diagnostics.md
     - Utilities: api/utils.md

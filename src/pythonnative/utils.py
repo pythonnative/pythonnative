@@ -3,31 +3,26 @@
 This module is imported early by most other modules, so it avoids
 importing platform-specific packages at module level. The detection
 results are cached the first time
-[`IS_ANDROID`][pythonnative.utils.IS_ANDROID] and
-[`IS_IOS`][pythonnative.utils.IS_IOS] are read.
-
-The Android variants also expose a small global registry for the
-current `Activity` / `Context` and the screen's fragment container view;
-both are populated by the bundled Android template before any
-PythonNative code runs.
+[`IS_ANDROID`][pythonnative.utils.IS_ANDROID],
+[`IS_IOS`][pythonnative.utils.IS_IOS], and
+[`IS_WEB`][pythonnative.utils.IS_WEB] are read.
 
 Attributes:
-    IS_ANDROID: `True` when running inside an Android process (either
-        because `ANDROID_*` env vars are present or because Chaquopy's
-        `java` module imports successfully).
-    IS_IOS: `True` when running inside an iOS app bundle (signaled by
-        `PN_PLATFORM=ios`, `sys.platform == "ios"`, or a Simulator
-        `HOME` path). Importing `rubicon-objc` alone is intentionally
-        not enough to trigger this flag.
-    IS_DESKTOP: `True` when running the desktop preview backend
-        (signaled by `PN_PLATFORM=desktop`, set by ``pn preview``).
-        This drives the Tkinter native-view registry so a PythonNative
-        app can render in a real OS window for fast local iteration.
+    IS_ANDROID: `True` when running inside an Android process
+        (`sys.platform == "android"` on the embedded CPython 3.13+, or
+        Chaquopy's `java` module imports successfully).
+    IS_IOS: `True` when running inside an iOS app bundle
+        (`sys.platform == "ios"` on the embedded CPython 3.13+, or the
+        explicit `PN_PLATFORM=ios` override).
+    IS_WEB: `True` when running the browser preview (signaled by
+        `PN_PLATFORM=web`, set by ``pn preview`` / ``pn start``). The
+        reconciler then commits through the bridge to a browser page
+        instead of to Swift or Kotlin.
 """
 
 import os
 import sys
-from typing import Any, Optional
+from typing import Optional
 
 # ======================================================================
 # Platform detection
@@ -35,13 +30,16 @@ from typing import Any, Optional
 
 _is_android: Optional[bool] = None
 _is_ios: Optional[bool] = None
-_is_desktop: Optional[bool] = None
+_is_web: Optional[bool] = None
 
 
 def _detect_android() -> bool:
-    """Return whether we're running inside an Android process."""
-    env = os.environ
-    if "ANDROID_BOOTLOGO" in env or "ANDROID_ROOT" in env or "ANDROID_DATA" in env or "ANDROID_ARGUMENT" in env:
+    """Return whether we're running inside an Android process.
+
+    CPython 3.13+ reports ``sys.platform == "android"`` (PEP 738); the
+    Chaquopy ``java`` module import is kept as a secondary signal.
+    """
+    if sys.platform == "android":
         return True
     try:
         from java import jclass  # noqa: F401
@@ -57,52 +55,43 @@ def _detect_ios() -> bool:
 
     Signals, in priority order:
 
-    - Explicit `PN_PLATFORM=ios` env var (set by the iOS template's
-      `ViewController.swift` before Python starts). This is the
-      canonical signal and survives even on hosts where `sys.platform`
-      is generic `darwin`.
-    - `sys.platform == "ios"` (CPython 3.13+ native iOS builds).
-    - `/CoreSimulator/Devices/` in `$HOME` (iOS Simulator fallback if
-      the template signal is missing for some reason).
+    - `sys.platform == "ios"`: CPython 3.13+ reports this on both
+      devices and the Simulator (PEP 730), so it is the canonical
+      signal for the embedded runtime.
+    - Explicit `PN_PLATFORM=ios` env var: set by the iOS template before
+      Python starts as a belt-and-braces override, and by tests.
 
-    Crucially, having `rubicon-objc` importable is *not* enough:
-    developers frequently install it on macOS via the `[ios]` extra,
-    and treating that as iOS would cause subtle side effects
-    (e.g., stdout redirection) on desktop machines.
+    Running on macOS is never enough on its own: the browser preview
+    and unit tests run there and must not be mistaken for iOS.
     """
-    if os.environ.get("PN_PLATFORM") == "ios":
-        return True
     if sys.platform == "ios":
         return True
-    home = os.environ.get("HOME", "")
-    if "/CoreSimulator/Devices/" in home:
-        return True
-    return False
+    return os.environ.get("PN_PLATFORM") == "ios"
 
 
-def _detect_desktop() -> bool:
-    """Detect whether we're running the desktop (Tkinter) preview backend.
+def _detect_web() -> bool:
+    """Detect whether we're running the browser preview.
 
-    The only signal is the explicit ``PN_PLATFORM=desktop`` env var,
-    set by ``pn preview`` before importing PythonNative. Desktop is a
-    *development* target: it renders the app in a native OS window via
-    the pure-Python Tkinter registry so the inner dev loop doesn't
-    require a device build. Off-device unit tests deliberately leave
-    this flag ``False`` so they keep using an injected mock registry
-    and ``Platform.OS == "test"``.
+    The only signal is the explicit ``PN_PLATFORM=web`` env var, set by
+    ``pn preview`` / ``pn start`` before importing PythonNative. Web is
+    a *development* target: the app renders in a browser tab through
+    the bridge protocol so the inner dev loop doesn't require a device
+    build. Off-device unit tests deliberately leave this flag ``False``
+    so they keep using an injected fake backend and
+    ``Platform.OS == "test"``.
     """
-    return os.environ.get("PN_PLATFORM") == "desktop"
+    return os.environ.get("PN_PLATFORM") == "web"
 
 
 def _ensure_platform_detection() -> None:
-    """Populate `_is_android` / `_is_ios` / `_is_desktop` once, then reuse."""
-    global _is_android, _is_ios, _is_desktop
+    """Populate `_is_android` / `_is_ios` / `_is_web` once, then reuse."""
+    global _is_android, _is_ios, _is_web
     if _is_android is None:
         _is_android = _detect_android()
     if _is_ios is None:
         _is_ios = (not _is_android) and _detect_ios()
-    if _is_desktop is None:
-        _is_desktop = (not _is_android) and (not _is_ios) and _detect_desktop()
+    if _is_web is None:
+        _is_web = (not _is_android) and (not _is_ios) and _detect_web()
 
 
 def _get_is_android() -> bool:
@@ -119,102 +108,38 @@ def _get_is_ios() -> bool:
     return _is_ios
 
 
-def _get_is_desktop() -> bool:
-    """Return the cached desktop-detection result."""
+def _get_is_web() -> bool:
+    """Return the cached web-detection result."""
     _ensure_platform_detection()
-    assert _is_desktop is not None
-    return _is_desktop
+    assert _is_web is not None
+    return _is_web
 
 
 IS_ANDROID: bool = _get_is_android()
 """``True`` when running inside an Android process.
 
-The flag is computed once at import time, by checking for `ANDROID_*`
-environment variables and trying to import Chaquopy's `java` module.
+The flag is computed once at import time, from ``sys.platform ==
+"android"`` or a successful import of Chaquopy's `java` module.
 """
 
 IS_IOS: bool = _get_is_ios()
 """``True`` when running inside an iOS app bundle.
 
-The flag is computed once at import time, by checking
-`PN_PLATFORM=ios`, `sys.platform == "ios"`, and the iOS Simulator
-`HOME` path.
+The flag is computed once at import time, from ``sys.platform ==
+"ios"`` or the explicit `PN_PLATFORM=ios` override.
 """
 
-IS_DESKTOP: bool = _get_is_desktop()
-"""``True`` when running the desktop (Tkinter) preview backend.
+IS_WEB: bool = _get_is_web()
+"""``True`` when running the browser preview.
 
-Set by ``pn preview`` via ``PN_PLATFORM=desktop``. Mutually exclusive
-with `IS_ANDROID` / `IS_IOS`. Off-device unit tests leave this
-``False`` and inject a mock registry instead.
+Set by ``pn preview`` / ``pn start`` via ``PN_PLATFORM=web``. Mutually
+exclusive with `IS_ANDROID` / `IS_IOS`. Off-device unit tests leave
+this ``False`` and inject a fake backend instead.
 """
 
-# ======================================================================
-# Android context management
-# ======================================================================
+IS_NATIVE: bool = IS_ANDROID or IS_IOS or IS_WEB
+"""``True`` whenever the reconciler commits through the bridge.
 
-_android_context: Any = None
-_android_fragment_container: Any = None
-
-
-def set_android_context(context: Any) -> None:
-    """Record the current Android `Activity`/`Context`.
-
-    Called by the bundled Android template before any view is created;
-    most app code should not call this directly.
-
-    Args:
-        context: A Java `android.content.Context` (typically the
-            current `Activity`).
-    """
-    global _android_context
-    _android_context = context
-
-
-def set_android_fragment_container(container_view: Any) -> None:
-    """Record the current `Fragment` root container `ViewGroup`.
-
-    Args:
-        container_view: A Java `android.view.ViewGroup` that holds the
-            screen's view tree.
-    """
-    global _android_fragment_container
-    _android_fragment_container = container_view
-
-
-def get_android_context() -> Any:
-    """Return the current Android `Activity`/`Context`.
-
-    Returns:
-        The most recently recorded Android context.
-
-    Raises:
-        RuntimeError: If called on a non-Android platform, or before
-            the template has registered a context.
-    """
-    if not IS_ANDROID:
-        raise RuntimeError("get_android_context() called on non-Android platform")
-    if _android_context is None:
-        raise RuntimeError(
-            "Android context not set. Ensure the screen host is initialized from an Activity before constructing views."
-        )
-    return _android_context
-
-
-def get_android_fragment_container() -> Any:
-    """Return the current `Fragment` container `ViewGroup`.
-
-    Returns:
-        The most recently recorded fragment container view.
-
-    Raises:
-        RuntimeError: If called on a non-Android platform, or before
-            `ScreenFragment` has registered its container.
-    """
-    if not IS_ANDROID:
-        raise RuntimeError("get_android_fragment_container() called on non-Android platform")
-    if _android_fragment_container is None:
-        raise RuntimeError(
-            "Android fragment container not set. Ensure ScreenFragment has been created before set_root_view."
-        )
-    return _android_fragment_container
+All three of iOS, Android, and the browser preview render through a
+bridge transport; only headless tests have no native side at all.
+"""

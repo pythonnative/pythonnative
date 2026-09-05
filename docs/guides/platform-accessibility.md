@@ -36,8 +36,8 @@ def Responsive():
     keyboard = pn.use_keyboard_height()
 
     return pn.Column(
-        pn.Text(f"{dims['width']:.0f} × {dims['height']:.0f}"),
-        pn.Text(f"Bottom inset: {insets['bottom']:.0f}"),
+        pn.Text(f"{dims.width:.0f} × {dims.height:.0f}"),
+        pn.Text(f"Bottom inset: {insets.bottom:.0f}"),
         pn.Text(f"Keyboard: {keyboard:.0f}"),
         style={"padding": 16, "spacing": 8},
     )

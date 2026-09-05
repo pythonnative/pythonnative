@@ -6,6 +6,7 @@ from typing import Generator
 
 import pytest
 
+import pythonnative as pn
 from pythonnative.platform import Platform, _set_platform_for_test, get_platform
 
 
@@ -25,6 +26,10 @@ def test_default_platform_is_test() -> None:
 
 def test_get_platform_matches_os() -> None:
     assert get_platform() == Platform.OS
+
+
+def test_get_platform_exported_from_package() -> None:
+    assert pn.get_platform() == pn.Platform.OS
 
 
 def test_version_string_present() -> None:

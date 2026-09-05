@@ -1,7 +1,5 @@
 """Unit tests for the built-in element-creating functions."""
 
-from fake_backend import FakeBackend
-
 from pythonnative.components import (
     ActivityIndicator,
     Button,
@@ -24,7 +22,9 @@ from pythonnative.components import (
     View,
     WebView,
 )
+from pythonnative.element import ERROR_BOUNDARY, FRAGMENT
 from pythonnative.style import AccessibilityState
+from pythonnative.testing import FakeBackend
 
 # ---------------------------------------------------------------------------
 # Text
@@ -350,7 +350,7 @@ def test_view_flex_grow_shrink() -> None:
 def test_safe_area_view() -> None:
     el = SafeAreaView(Text("safe"), style={"background_color": "#000"})
     assert callable(el.type)  # hook-driven composite
-    assert len(el.props["children"]) == 1
+    assert len(el.children) == 1
     assert el.props["style"]["background_color"] == "#000"
 
 
@@ -388,7 +388,7 @@ def _mount(el):  # type: ignore[no-untyped-def]
 
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     root = rec.mount(el)
     return root, rec, backend
 
@@ -437,8 +437,8 @@ def test_error_boundary_creates_element() -> None:
     child = Text("risky")
     fallback = Text("error")
     el = ErrorBoundary(child, fallback=fallback)
-    assert el.type == "__ErrorBoundary__"
-    assert el.props["__fallback__"] is fallback
+    assert el.type == ERROR_BOUNDARY
+    assert el.props["fallback"] is fallback
     assert len(el.children) == 1
     assert el.children[0] is child
 
@@ -446,7 +446,7 @@ def test_error_boundary_creates_element() -> None:
 def test_error_boundary_callable_fallback() -> None:
     fn = lambda exc: Text(str(exc))  # noqa: E731
     el = ErrorBoundary(Text("risky"), fallback=fn)
-    assert callable(el.props["__fallback__"])
+    assert callable(el.props["fallback"])
 
 
 def test_error_boundary_no_child() -> None:
@@ -466,7 +466,7 @@ def test_error_boundary_with_key() -> None:
 
 def test_fragment_no_children() -> None:
     el = Fragment()
-    assert el.type == "__Fragment__"
+    assert el.type == FRAGMENT
     assert el.children == []
     assert el.props == {}
 
@@ -475,7 +475,7 @@ def test_fragment_with_children() -> None:
     a = Text("a")
     b = Text("b")
     el = Fragment(a, b)
-    assert el.type == "__Fragment__"
+    assert el.type == FRAGMENT
     assert el.children == [a, b]
 
 
@@ -540,7 +540,7 @@ def test_pressable_callable_style_tracks_pressed_state() -> None:
 
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     rec.mount(el)
 
     tag, view = next((t, v) for t, v in backend.views.items() if v.type_name == "Pressable")
@@ -570,7 +570,7 @@ def test_pressable_callable_style_forwards_user_press_callbacks() -> None:
     )
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     rec.mount(el)
 
     tag = next(t for t, v in backend.views.items() if v.type_name == "Pressable")

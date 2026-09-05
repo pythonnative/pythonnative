@@ -11,14 +11,14 @@ from __future__ import annotations
 from typing import Any, List, Tuple
 
 import pytest
-from fake_backend import FakeBackend
 
 import pythonnative.components as components
-from pythonnative.components import FlatList, SectionList, Text
+from pythonnative.components import FlatList, RefreshControl, SectionList, Text
 from pythonnative.element import Element
 from pythonnative.events import dispatch_event
 from pythonnative.native_views import set_registry
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend
 from pythonnative.virtual_rows import RowHostPool, RowSubtree
 
 
@@ -31,7 +31,7 @@ def native_lists(monkeypatch: Any) -> None:
 def _mount(el: Element) -> Tuple[Any, Reconciler, FakeBackend]:
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     root = rec.mount(el)
     return root, rec, backend
 
@@ -79,7 +79,7 @@ def test_flatlist_stays_windowed_with_refresh_control(native_lists: None) -> Non
     el = FlatList(
         data=list(range(10)),
         item_height=44,
-        refresh_control={"refreshing": False, "on_refresh": lambda: None},
+        refresh_control=RefreshControl(refreshing=False, on_refresh=lambda: None),
     )
     root, _rec, _backend = _mount(el)
     assert root.type_name == "ScrollView"
@@ -159,7 +159,7 @@ def test_unstyled_native_list_fills_available_space(native_lists: None) -> None:
     )
     backend = _FillBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     root = rec.mount(el)
     rec.set_viewport_size(390, 800)
     vlist = root.find_first("VirtualList")
@@ -177,7 +177,7 @@ def test_render_row_produces_mountable_row_elements(native_lists: None) -> None:
     render_row = root.props["render_row"]
 
     row_backend = FakeBackend()
-    set_registry(row_backend)  # type: ignore[arg-type]
+    set_registry(row_backend)
     try:
         subtree = RowSubtree()
         row_root = subtree.mount(render_row(5), 320.0, 44.0)
@@ -192,7 +192,7 @@ def test_render_row_produces_mountable_row_elements(native_lists: None) -> None:
 
 def test_row_host_pool_bind_rebind_release() -> None:
     backend = FakeBackend()
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         pool = RowHostPool()
         root_a = pool.bind(1, lambda: Text("a"), 320.0, 44.0)
@@ -219,7 +219,8 @@ def test_row_host_pool_bind_rebind_release() -> None:
 
 
 def test_row_subtree_state_re_renders_row() -> None:
-    from pythonnative.hooks import component, use_state
+    from pythonnative.component import component
+    from pythonnative.hooks import use_state
 
     setters: List[Any] = []
 
@@ -230,7 +231,7 @@ def test_row_subtree_state_re_renders_row() -> None:
         return Text(f"count-{count}")
 
     backend = FakeBackend()
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         subtree = RowSubtree()
         row_root = subtree.mount(Counter(), 320.0, 44.0)
@@ -256,7 +257,7 @@ def test_native_list_end_reached_fires_once(native_lists: None) -> None:
         on_end_reached=lambda: calls.append(1),
     )
     _root, rec, _backend = _mount(el)
-    tag = rec.root_tag()
+    tag = rec.root_tag
 
     # Far from the end: no callback.
     assert dispatch_event(tag, "on_scroll", {"y": 0.0, "extent": 800.0, "range": 4400.0}) is True
@@ -278,7 +279,7 @@ def test_native_list_viewable_items_changed(native_lists: None) -> None:
         on_viewable_items_changed=lambda infos: seen.append([i["index"] for i in infos]),
     )
     _root, rec, _backend = _mount(el)
-    tag = rec.root_tag()
+    tag = rec.root_tag
 
     dispatch_event(tag, "on_scroll", {"y": 0.0, "extent": 440.0, "range": 4400.0})
     assert seen, "initial scroll must report the visible rows"
@@ -296,7 +297,7 @@ def test_native_list_forwards_user_on_scroll(native_lists: None) -> None:
         on_scroll=lambda payload: payloads.append(payload),
     )
     _root, rec, _backend = _mount(el)
-    dispatch_event(rec.root_tag(), "on_scroll", {"y": 123.0, "extent": 800.0, "range": 4400.0})
+    dispatch_event(rec.root_tag, "on_scroll", {"y": 123.0, "extent": 800.0, "range": 4400.0})
     assert payloads == [{"x": 0.0, "y": 123.0}]
 
 
@@ -315,7 +316,7 @@ def test_native_list_controller_dispatches_commands(native_lists: None) -> None:
     controller = ref.current
     assert controller is not None
 
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         controller.scroll_to_index(3, animated=False)
         controller.scroll_to_offset(120.0)

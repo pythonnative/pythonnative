@@ -34,10 +34,13 @@ configuration into plain dicts for the native handler (so prop diffing
 never compares closures) and routes the callbacks through the
 tag-based event channel. Recognition itself is native:
 
-- **iOS** attaches real ``UIGestureRecognizer`` instances.
-- **Android** feeds raw ``MotionEvent`` streams into the pure-Python
-  [`GestureArbiter`][pythonnative.gestures.GestureArbiter] below.
-- **Desktop** feeds Tk pointer events into the same arbiter.
+- **iOS** attaches real ``UIGestureRecognizer`` instances
+  (``PythonNativeKit``).
+- **Android** runs an equivalent recognizer set in Kotlin (the
+  ``pythonnative`` Gradle module) on top of ``MotionEvent`` streams.
+- **The browser preview** feeds DOM pointer events into the pure-Python
+  [`GestureArbiter`][pythonnative.gestures.GestureArbiter] below, which
+  doubles as the executable specification for the native ports.
 
 Composition
 -----------
@@ -75,6 +78,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, Tuple
 
 __all__ = [
@@ -96,18 +100,32 @@ __all__ = [
 ]
 
 
-class GestureState:
-    """States reported on [`GestureEvent.state`][pythonnative.gestures.GestureEvent]."""
+class GestureState(str, Enum):
+    """Lifecycle states reported on [`GestureEvent.state`][pythonnative.gestures.GestureEvent].
+
+    A ``str`` enum, so members compare equal to their wire value
+    (``GestureState.ENDED == "ended"``) and serialize as plain strings
+    across the native bridge, while callers get exhaustive
+    ``match`` support and autocomplete.
+
+    Attributes:
+        BEGAN: The gesture activated (first callback).
+        CHANGED: A continuous gesture updated (pan, pinch, rotation).
+        ENDED: The gesture completed successfully.
+        CANCELLED: The gesture was interrupted (lost arbitration, view
+            unmounted, pointer left the window).
+    """
 
     BEGAN = "began"
     CHANGED = "changed"
     ENDED = "ended"
     CANCELLED = "cancelled"
 
+    def __str__(self) -> str:
+        return self.value
 
-GestureStateName = Literal["began", "changed", "ended", "cancelled"]
 
-GestureCallback = Callable[["GestureEvent"], None]
+GestureCallback = Callable[["GestureEvent"], Any]
 
 SwipeDirection = Literal["any", "left", "right", "up", "down"]
 
@@ -138,7 +156,7 @@ class GestureEvent:
     """
 
     kind: str
-    state: GestureStateName
+    state: GestureState
     x: float = 0.0
     y: float = 0.0
     translation_x: float = 0.0
@@ -149,6 +167,12 @@ class GestureEvent:
     rotation: float = 0.0
     pointer_count: int = 1
     direction: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        # Payloads from the native bridge carry plain strings; coerce
+        # so ``event.state`` is always a ``GestureState`` member.
+        if not isinstance(self.state, GestureState):
+            object.__setattr__(self, "state", GestureState(self.state))
 
 
 _EVENT_FIELDS = frozenset(
@@ -518,14 +542,14 @@ def serialize_gestures(
 
 
 # ======================================================================
-# Pure-Python recognition engine (Android + desktop backends)
+# Pure-Python recognition engine (browser preview + reference semantics)
 # ======================================================================
 #
-# iOS uses real UIGestureRecognizers. Android and the desktop preview
-# receive raw pointer streams instead, which this arbiter turns into
-# the same GestureEvent payloads. Keeping it in pure Python makes the
-# state machines unit-testable with scripted event sequences and
-# guarantees identical semantics on both backends.
+# iOS and Android recognize natively. The browser preview receives raw
+# DOM pointer streams instead, which this arbiter turns into the same
+# GestureEvent payloads. Keeping it in pure Python makes the state
+# machines unit-testable with scripted event sequences; the Kotlin
+# arbiter mirrors this file so the two stay in lockstep.
 
 EmitFn = Callable[[int, Dict[str, Any]], None]
 """``emit(gesture_index, payload)``: the arbiter's output channel."""
@@ -573,8 +597,8 @@ class _Recognizer:
         self.config = config
         self._emit_fn = emit
 
-    def emit(self, state: str, **fields: Any) -> None:
-        payload: Dict[str, Any] = {"kind": self.kind(), "state": state}
+    def emit(self, state: GestureState, **fields: Any) -> None:
+        payload: Dict[str, Any] = {"kind": self.kind(), "state": state.value}
         payload.update(fields)
         self._emit_fn(self.index, payload)
 

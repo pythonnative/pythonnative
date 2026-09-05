@@ -4,25 +4,27 @@ from __future__ import annotations
 
 from typing import Any, Tuple
 
-from fake_backend import FakeBackend
+import pytest
 
 from pythonnative.components import (
     FlatList,
     KeyboardAvoidingView,
     Picker,
     RefreshControl,
+    ScrollView,
     SectionList,
     StatusBar,
     Text,
 )
 from pythonnative.element import Element
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend
 
 
 def _mount(el: Element) -> Tuple[Any, Reconciler, FakeBackend]:
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     root = rec.mount(el)
     return root, rec, backend
 
@@ -55,7 +57,7 @@ def test_keyboard_avoiding_default_behavior() -> None:
     el = KeyboardAvoidingView(Text("hi"))
     assert callable(el.type)  # hook-driven composite
     assert el.props["behavior"] == "padding"
-    assert len(el.props["children"]) == 1
+    assert len(el.children) == 1
 
     _, _, backend = _mount(el)
     inner = [v for v in backend.views.values() if v.type_name == "KeyboardAvoidingView"]
@@ -108,18 +110,31 @@ def test_keyboard_avoiding_position_translates_upward() -> None:
 # ======================================================================
 
 
-def test_refresh_control_dict_shape() -> None:
+def test_refresh_control_is_an_element() -> None:
     cb = lambda: None  # noqa: E731
-    spec = RefreshControl(refreshing=True, on_refresh=cb, tint_color="#FF0000")
-    assert isinstance(spec, dict)
-    assert spec["refreshing"] is True
-    assert spec["on_refresh"] is cb
-    assert spec["tint_color"] == "#FF0000"
+    control = RefreshControl(refreshing=True, on_refresh=cb, tint_color="#FF0000")
+    assert isinstance(control, Element)
+    assert control.type == "RefreshControl"
+    assert control.props == {"refreshing": True, "on_refresh": cb, "tint_color": "#FF0000"}
+    assert control.children == []
 
 
 def test_refresh_control_minimal() -> None:
-    spec = RefreshControl()
-    assert spec == {"refreshing": False}
+    assert RefreshControl().props == {"refreshing": False}
+
+
+def test_scroll_view_unwraps_refresh_control_into_the_wire_prop() -> None:
+    cb = lambda: None  # noqa: E731
+    el = ScrollView(Text("x"), refresh_control=RefreshControl(refreshing=True, on_refresh=cb))
+    # The scroll container holds the control as a prop, not a child.
+    assert el.props["refresh_control"] == {"refreshing": True, "on_refresh": cb}
+    assert len(el.children) == 1
+
+
+@pytest.mark.parametrize("bad", [{"refreshing": True}, Text("nope"), "RefreshControl"])
+def test_scroll_view_rejects_non_refresh_control(bad: object) -> None:
+    with pytest.raises(TypeError, match="expects pn.RefreshControl"):
+        ScrollView(Text("x"), refresh_control=bad)  # type: ignore[arg-type]
 
 
 # ======================================================================
@@ -214,7 +229,7 @@ def test_flatlist_window_shifts_on_scroll() -> None:
 
     # Simulate the native scroll event landing deep in the list, then
     # flush the dirty component to re-render the shifted window.
-    scroll_tag = rec.root_tag()
+    scroll_tag = rec.root_tag
     assert dispatch_event(scroll_tag, "on_scroll", {"x": 0.0, "y": 44.0 * 300}) is True
     rec.flush_dirty()
 
@@ -234,12 +249,9 @@ def test_flatlist_separator_adds_to_row_extent() -> None:
 
 
 def test_flatlist_with_refresh_control() -> None:
-    el = FlatList(
-        data=[1, 2],
-        item_height=20,
-        refresh_control={"refreshing": True, "on_refresh": lambda: None},
-    )
-    assert el.props["refresh_control"]["refreshing"] is True
+    control = RefreshControl(refreshing=True, on_refresh=lambda: None)
+    el = FlatList(data=[1, 2], item_height=20, refresh_control=control)
+    assert el.props["refresh_control"] is control
 
     # The spec flows through to the mounted ScrollView (callback hoisted
     # to the event registry, data props kept).
@@ -260,7 +272,7 @@ def test_flatlist_scroll_controller_attached_to_ref() -> None:
     assert controller is not None, "mount must publish a ListController on the ref"
 
     # Imperative scroll commands resolve through the process registry.
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         controller.scroll_to_index(2, animated=False)
     finally:

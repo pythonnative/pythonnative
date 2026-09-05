@@ -241,13 +241,12 @@ def test_modal_new_props() -> None:
 
 
 def _mount(el):  # type: ignore[no-untyped-def]
-    from fake_backend import FakeBackend
-
     from pythonnative.reconciler import Reconciler
+    from pythonnative.testing import FakeBackend
 
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     root = rec.mount(el)
     return root, rec, backend
 
@@ -319,7 +318,7 @@ def test_flatlist_on_end_reached_fires_near_the_end() -> None:
     assert el.props["on_end_reached_threshold"] == 0.5
 
     _root, rec, _backend = _mount(el)
-    tag = rec.root_tag()
+    tag = rec.root_tag
 
     # Far from the end: no callback.
     dispatch_event(tag, "on_scroll", {"x": 0.0, "y": 0.0})

@@ -94,4 +94,5 @@ env:
 - runFlow: flows/storage/async_storage.yaml
 - runFlow: flows/runtime/run_async.yaml
 - runFlow: flows/platform/platform_info.yaml
+- runFlow: flows/packages/pypi_packages.yaml
 - runFlow: flows/sdk/custom_component.yaml

@@ -1,7 +1,7 @@
 # Tests ScrollView reveals rows that started off-screen after scrolling.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/scroll_view.py
-# Source under test: src/pythonnative/components.py :: ScrollView
+# Source under test: src/pythonnative/components/layout.py :: ScrollView
 #
 # The demo sizes the inner ScrollView (~400 dp) so it overlaps the
 # vertical center of the screen on both the iOS and Android CI

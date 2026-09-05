@@ -1,7 +1,7 @@
 # Tests SectionList renders section headers and items together.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/section_list.py
-# Source under test: src/pythonnative/components.py :: SectionList
+# Source under test: src/pythonnative/components/lists.py :: SectionList
 appId: ${APP_ID}
 ---
 - runFlow:

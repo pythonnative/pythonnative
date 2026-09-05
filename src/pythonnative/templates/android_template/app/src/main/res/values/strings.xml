@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">android_template</string>
+    <!-- Dotted module whose top-level `App` is mounted; set from app.entry_point by `pn build`. -->
+    <string name="pn_entry_module" translatable="false">app.main</string>
 </resources>

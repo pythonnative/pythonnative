@@ -14,7 +14,7 @@ straight to fd 2 is a small, reliable fix: fd 2 *is* visible to
 `simctl` (that is exactly how `NSLog` reaches the terminal), so
 Python output lands next to the Swift logs with correct ordering.
 
-This module is intentionally self-contained (no rubicon-objc or
+This module is intentionally self-contained (no bridge or
 platform-specific C bindings required), so it is safe to import
 early during `pythonnative` package initialization.
 """

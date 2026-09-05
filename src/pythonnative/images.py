@@ -35,16 +35,18 @@ def _default_cache_dir() -> str:
 
     Android: the app's ``Context.getCacheDir()`` (purged by the OS
     under storage pressure). iOS: ``~/Library/Caches`` (excluded from
-    backups). Desktop: a per-user directory under the system temp dir.
+    backups). Browser preview and tests: a per-user directory under the
+    system temp dir.
     """
     try:
-        from .utils import IS_ANDROID
+        from .utils import IS_ANDROID, IS_IOS
 
-        if IS_ANDROID:
-            from .utils import get_android_context
+        if IS_ANDROID or IS_IOS:
+            from .native_modules.registry import native_module
 
-            base = str(get_android_context().getCacheDir().getAbsolutePath())
-            return os.path.join(base, "pn_images")
+            info = native_module("Device").call("info")
+            if isinstance(info, dict) and info.get("cache_dir"):
+                return os.path.join(str(info["cache_dir"]), "pn_images")
     except Exception:
         pass
     home = os.path.expanduser("~")

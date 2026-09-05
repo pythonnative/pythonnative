@@ -1,6 +1,6 @@
 """Platform-level metrics shared between screen hosts and view handlers.
 
-The screen host (`pythonnative.screen`) is the only place that knows
+The screen host (`pythonnative.hosts`) is the only place that knows
 about native window/safe-area state because it is the only piece of
 code that holds a reference to the native ``UIViewController``
 (iOS) or ``Activity`` (Android). Native view handlers, however, need
@@ -139,7 +139,7 @@ def get_safe_area_insets() -> SafeAreaInsets:
     """Return the current safe-area insets.
 
     The default value is ``(0, 0, 0, 0)``; handlers should still
-    function correctly on a desktop / unit-test environment where no
+    function correctly in a unit-test environment where no
     screen host has published insets.
     """
     return _safe_area_insets
@@ -245,8 +245,8 @@ def ios_tab_bar_height() -> float:
     deliberately extends the root view past the bottom safe area for
     this very reason; the tab bar absorbs the inset and UIKit
     renders the pill with internal padding for the home indicator.
-    Used by ``pythonnative.native_views.ios.TabBarHandler``; exposed
-    here so the formula is testable without importing the iOS
-    handler module (which requires ``rubicon-objc``).
+    The Swift ``TabBarManager`` applies the same formula natively;
+    this Python copy keeps the layout engine's expectations testable
+    off device.
     """
     return IOS_TAB_BAR_BASE_HEIGHT_PT + get_safe_area_insets().bottom

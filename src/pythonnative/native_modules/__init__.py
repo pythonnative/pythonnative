@@ -1,11 +1,42 @@
 """Native API modules for device capabilities.
 
-Provides cross-platform Python interfaces to common device APIs. Each
-module auto-detects the platform at import time and dispatches to the
-appropriate native APIs via Chaquopy (Android) or rubicon-objc (iOS).
-On a desktop machine without either runtime, modules fall back to safe
-defaults (in-memory buffers, ``"unknown"`` states, no-op feedback) so
-the same code stays runnable in the desktop mock and unit tests.
+Cross-platform Python interfaces to common device APIs. Every module
+here is a thin facade over a *native module*: a Swift class in
+``PythonNativeKit`` and a Kotlin class in the ``pythonnative`` Gradle
+module registered under the same name (``"Camera"``, ``"Haptics"``,
+...). Facades reach them through
+[`native_module`][pythonnative.native_modules.registry.native_module]
+and the bridge described in ``docs/concepts/bridge.md``; there is no
+Python-side Objective-C or JNI anywhere in this package.
+
+Off device the same names resolve to plain Python implementations in
+[`pythonnative.native_modules.fallback`][pythonnative.native_modules.fallback]
+with safe defaults (in-memory buffers, ``"unknown"`` states, no-op
+feedback), so the same code stays runnable in unit tests. The browser
+preview (``pn start``) implements the modules a browser can honor
+(``Alert``, ``Clipboard``, ``Device``, ``Linking``, ``Share``, ...) in
+the page and falls back to the Python classes for the rest. Third-party
+packages ship their own native modules the same way; see
+``docs/guides/native-modules.md``.
+
+Two rules hold across every facade, so you never have to look one up:
+
+1. **Sync or async is decided by what the OS has to do.** A method is
+   a plain function when the answer is already on the device and
+   returns on the calling thread (read the pasteboard, check a
+   permission, read the battery level, Keychain get/set, file I/O).
+   It is a coroutine when the OS has to prompt the user, drive
+   hardware, or hand off to another process (camera and gallery
+   pickers, biometric prompts, permission requests, the share sheet,
+   GPS fixes, notification scheduling, remote push registration).
+2. **Failures raise; "nothing happened" returns a value.** A native
+   error (a rejected promise, a missing module, a bad argument) is a
+   [`NativeModuleError`][pythonnative.native_modules.NativeModuleError]
+   and propagates to the caller like any other Python exception. Outcomes
+   that are not errors, such as the user cancelling a picker, denying a
+   permission, or dismissing the share sheet, come back as ``None``,
+   ``False``, or a status string, and are documented per method. No
+   facade converts an exception into a default value.
 
 Hardware / media:
 
@@ -55,6 +86,14 @@ from .location import Location
 from .net_info import NetInfo, use_net_info
 from .notifications import Notifications
 from .permissions import Permissions
+from .registry import (
+    BridgeModule,
+    NativeModule,
+    NativeModuleError,
+    PythonModule,
+    native_module,
+    register_python_module,
+)
 from .secure_store import SecureStore
 from .share import Share
 
@@ -62,18 +101,24 @@ __all__ = [
     "AppState",
     "Battery",
     "Biometrics",
+    "BridgeModule",
     "Camera",
     "Clipboard",
     "FileSystem",
     "Haptics",
     "Linking",
     "Location",
+    "NativeModule",
+    "NativeModuleError",
     "NetInfo",
     "Notifications",
     "Permissions",
+    "PythonModule",
     "SecureStore",
     "Share",
     "Vibration",
+    "native_module",
+    "register_python_module",
     "use_app_state",
     "use_net_info",
 ]
