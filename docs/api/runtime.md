@@ -1,44 +1,21 @@
 # Async runtime
 
-PythonNative runs a single framework-wide ``asyncio`` event loop **on
-the platform's main thread**, pumped as a guest of the native run loop
-(``dispatch_async`` on iOS, ``Handler.post`` on Android, the
-transport's main loop in ``pn preview``). Every awaitable surface in the framework
-schedules its work on this loop: ``async def`` components,
-coroutine [`use_effect`][pythonnative.use_effect] callbacks,
-[`use_resource`][pythonnative.use_resource],
-[`use_query`][pythonnative.hooks.use_query],
-[`use_mutation`][pythonnative.hooks.use_mutation],
-[`fetch`][pythonnative.net.fetch],
-[`AsyncStorage`][pythonnative.storage.AsyncStorage], the awaitable native
-modules ([`Camera`][pythonnative.native_modules.camera.Camera] /
-[`Location`][pythonnative.native_modules.location.Location] /
-[`Notifications`][pythonnative.native_modules.notifications.Notifications]),
-and [`Animated`][pythonnative.animated.Animated] composites.
+PythonNative starts one standard `asyncio` event loop on a dedicated application
+thread. Component rendering, effects, event handlers, and async tasks run on
+that thread. UIKit and Android retain their own UI threads; native bridge calls
+marshal view operations there and queue events back to Python.
+
+Ordinary asyncio networking, `TaskGroup`, timeouts, synchronization primitives,
+and third-party async libraries work without a guest-loop adapter. A synchronous
+Python callback can still delay other Python work, so use `asyncio.to_thread`
+for blocking I/O and cooperative async work for long operations.
+
+Component effects and async event handlers have component lifetimes. Unmounting
+cancels their tasks. Use `runtime.run_application_task()` when work must survive
+the initiating component, and `TaskScope` for explicitly owned services.
+Native promises can register cancellation handlers; late results are ignored.
+
+Headless tests can use `run_blocking()` and `drain()`. Don't call `run_blocking()`
+from the running application loop; await the operation instead.
 
 ::: pythonnative.runtime
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      members_order: source
-      filters: ["!^_"]
-
-## Pattern: bridge a sync handler into async code
-
-```python
-import pythonnative as pn
-
-
-@pn.component
-def Toolbar():
-    async def export():
-        report = await build_report()
-        await save_to_disk(report)
-
-    return pn.Button("Export", on_press=lambda: pn.run_async(export()))
-```
-
-## Next steps
-
-- Walk through the async surface end-to-end:
-  [Async + data guide](../guides/async.md).

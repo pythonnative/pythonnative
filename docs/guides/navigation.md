@@ -349,65 +349,31 @@ and URLs that arrive while running dispatch as `navigate` calls.
 
 ## Native screens
 
-At the root of a native host, `Stack.Navigator` never mutates its own
-state for pushes and pops. It hands the *serialized next state* to the
-host (`push_screen`, `pop_screens`, `replace_screen`,
-`reset_screens`), the platform creates a new view controller or
-fragment, and the new screen's navigator boots from that state. Each
-native screen owns a Python
-[`ScreenHost`][pythonnative.hosts.base.ScreenHost] and reconciler, so:
+A root stack renders keyed logical `Screen` children within one application
+reconciler. UIKit navigation controllers and Android fragments present those
+existing roots. Pushing a screen preserves providers, repositories, and state
+above the navigator. Covered screens remain mounted until they leave the stack.
+Native containers own the content rectangle below their navigation bars.
 
-- The previous screen's hook state and native views are preserved by
-  the platform stack.
-- The new screen renders the right route on its first frame.
-- Hot reload runs per host: each active screen swaps its function
-  references in place ("Fast Refresh"), falling back to a remount only
-  for screens that can't be refreshed cleanly.
-
-`title` and the other header options are pushed to the host through
-`set_screen_options`, so `nav.set_options(title=...)` updates the
-native bar.
-
-### iOS
-- Each pushed screen is a Swift `ViewController` on a root
-  `UINavigationController` set up by the template's `SceneDelegate`.
-- `presentation="modal"` presents the screen as a sheet.
-- `gesture_enabled=False` disables the interactive pop gesture.
-
-### Android
-- The host `MainActivity` embeds a `NavHostFragment` with a single
-  generic `ScreenFragment` destination; each pushed screen is a fresh
-  fragment whose arguments carry the serialized navigation state, so
-  it restores across configuration changes.
-- Push and pop delegate to `NavController` through a small `Navigator`
-  Kotlin helper.
-- The hardware back button and predictive back gesture run
-  `before_remove` listeners and
-  [`use_back_handler`][pythonnative.use_back_handler] callbacks
-  before the platform pops.
+Navigation changes are cached on the native host before lifecycle state-saving
+callbacks. Back requests return to Python asynchronously so `before_remove`
+listeners and back handlers can decide whether to remove a route.
 
 ## Testing
 
-Navigation is fully testable without a device with
-[`pythonnative.testing`](../api/testing.md). Rendering under a
-[`FakeHost`][pythonnative.testing.FakeHost] records what a root stack
-would ask the platform to do:
+Use `render`, `press`, and `back` to exercise complete navigation flows in one
+tree. `FakeHost` supplies lifecycle focus and restoration state when needed.
 
 ```python
-from pythonnative.testing import FakeHost, render
+from pythonnative.testing import render
 
 def test_home_opens_detail():
-    host = FakeHost()
-    result = render(App(), host=host)
+    result = render(App())
     result.press(result.get_by_text("Open item 42"))
-    state, options = host.pushed[0]
-    assert state["routes"][-1]["name"] == "Detail"
-    assert options["title"] == "Item 42"
+    assert result.get_by_text("Item 42")
+    assert result.back()
+    assert result.get_by_text("Open item 42")
 ```
-
-Without a host, the same stack renders in Python so `get_by_text`,
-`press`, and `back()` drive a whole flow in one test. See the
-[Testing guide](testing.md).
 
 ## Next steps
 

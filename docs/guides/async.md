@@ -1,23 +1,21 @@
-# Async + data fetching
+# Async and data fetching
 
-PythonNative is **async-first**. The whole framework (rendering,
-effects, native modules, animations, timers) shares a single `asyncio`
-event loop that runs on the platform's main thread, components
-themselves can be `async def`, and [`Suspense`][pythonnative.Suspense]
-turns "waiting for data" into a declarative UI state instead of
-hand-rolled loading flags.
+PythonNative runs component work on a standard asyncio loop on a dedicated
+application thread. Native UI threads own widgets, scrolling, and animations.
+Async components can suspend into a `Suspense` fallback, and async effects and
+event handlers are cancelled when their component unmounts.
 
-This guide walks through the moving parts and the patterns that come
-out of them.
+## The application runtime
 
-## The framework runtime: one loop, on the main thread
+Use ordinary asyncio networking, `TaskGroup`, timeouts, and synchronization
+primitives. Async handlers can be passed directly: `Button("Save", on_press=save)`.
+Use `asyncio.to_thread` for blocking I/O. CPU work should yield cooperatively or
+run outside the application interpreter when it needs parallel execution.
 
-The framework loop lives on the platform's main thread, interleaved
-with UIKit / the Android Looper as a guest: whenever async work is
-scheduled, PythonNative asks the platform to pump the loop on the next
-main-queue turn. There is no background runtime thread, so coroutines
-can read component state and (through the commit) native views without
-any cross-thread marshaling or locks.
+`run_async()` inherits the current component's task scope. Use
+`runtime.run_application_task()` for work that should survive its initiating
+component, such as an application-owned service. A native module promise can
+release underlying work when its Python waiter is cancelled.
 
 The entry points you'll use directly:
 
@@ -233,6 +231,14 @@ state is all you need (the boundary owns it), and `use_query` when
 the component wants to keep stale data on screen with a refresh
 affordance.
 
+Pass an explicit `key=("user", user_id)` to share a request and its cached result
+between components. Include every input that identifies that result in the key.
+Without an explicit key, the query belongs to its hook instance and refetches
+when its dependency list changes; unrelated closures never share results just
+because they were defined on the same source line. An optional `client` argument
+accepts a `pythonnative.query.QueryClient` with configurable capacity and stale
+time. The last subscriber leaving cancels pending work.
+
 ## Side-effecting actions: `use_mutation`
 
 Use `use_mutation` for "do something then maybe refresh" patterns
@@ -352,15 +358,14 @@ pn.Alert.show("Saved!")
 
 ## Testing async code
 
-Because the loop is a guest on the calling thread, synchronous tests
-drive it explicitly:
+Synchronous headless tests can drive a local standard event loop explicitly:
 
 ```python
 from pythonnative.runtime import drain, run_blocking
 
 def test_load():
     rec.mount(pn.Suspense(Profile(user_id="42"), fallback=pn.Text("…")))
-    drain()            # pump the loop until it goes idle
+    drain()            # settle pending tasks
     rec.flush_dirty()  # commit renders queued by async completions
 
 def test_storage():

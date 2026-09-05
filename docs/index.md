@@ -34,11 +34,10 @@ produce identical frames on both platforms.
   theming, and platform behaviors come along for free.
 - **A familiar component model**. If you know React or React Native,
   you already know how PythonNative works.
-- **No JS bridge, no transpiler.** The reconciler runs synchronously
-  in Python on the platform's main thread; native API calls are
-  direct method calls.
-- **Async-first.** One `asyncio` loop runs the whole framework on the
-  main thread. Components can be `async def` and await data right in
+- **Python application code.** Components run on a dedicated asyncio
+  application thread. Validated commits connect Python state to native widgets.
+- **Ordinary asyncio.** One standard application loop runs Python work
+  independently of the native UI thread. Components can be `async def` and await data right in
   the body, with [`Suspense`][pythonnative.Suspense] providing the
   loading state declaratively. See the
   [Async + data guide](guides/async.md).

@@ -24,7 +24,7 @@ pn run ios          # terminal 2 (or android, or open the browser preview)
    already on its path).
 3. The client resolves the path to a module (`app.screens.home`) and
    calls [`apply_reload`][pythonnative.hot_reload.apply_reload] on the
-   main thread.
+   application thread.
 4. `apply_reload` re-executes the changed module, then the other
    imported modules under `app` that may hold bindings to it (the
    entry module's `from app.screens.home import HomeScreen`, for
@@ -34,7 +34,9 @@ pn run ios          # terminal 2 (or android, or open the browser preview)
    looks up the replacement by `__module__` + `__qualname__`, and
    rewrites the `Element.type` references in place. The next
    reconcile sees the new function with the same `HookState`, so state
-   survives.
+   survives when the captured hook signature is compatible. Hook-order or
+   custom-hook changes remount the affected component. Helper-class and service
+   changes trigger an application remount.
 6. The host re-renders. Layout and native views update incrementally
    through the normal reconciler path.
 7. The client reports back (`fast_refresh: app.screens.home 42ms`),
@@ -51,10 +53,8 @@ previous module stays in `sys.modules`, the traceback shows in the
 RedBox and the terminal, and the app keeps running. Fix the file and
 save again.
 
-Per-screen scope: each native screen (`UIViewController` on iOS,
-`ScreenFragment` on Android, a screen element in the preview) runs its
-own host, so Fast Refresh operates independently per host. Two pushed
-screens that both use a changed module each swap their own references.
+Refresh walks the application's shared logical tree, including covered screens
+and mounted list rows. Native containers don't create separate Python hosts.
 
 ## What gets reloaded
 

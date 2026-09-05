@@ -60,6 +60,9 @@ def _make_element(
     Returns:
         A fresh [`Element`][pythonnative.Element].
     """
+    from ..sdk.builtins import validate_props
+
+    validate_props(name, props)
     out: Dict[str, Any] = dict(resolve_style(style))
     if out:
         validate_style_keys(out, owner=name)

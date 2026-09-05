@@ -133,8 +133,8 @@ def test_button_with_callback() -> None:
 
 
 def test_button_disabled() -> None:
-    el = Button("Off", enabled=False)
-    assert el.props["enabled"] is False
+    el = Button("Off", disabled=True)
+    assert el.props["disabled"] is True
 
 
 # ---------------------------------------------------------------------------

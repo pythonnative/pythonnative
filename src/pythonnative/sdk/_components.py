@@ -185,6 +185,10 @@ def register_component(
     if handler is not None and not isinstance(handler, ViewHandler):
         raise TypeError(f"register_component({name!r}): handler must be a ViewHandler instance")
 
+    if props is not None:
+        from .schema import ComponentSchema, register_schema
+
+        register_schema(ComponentSchema.from_dataclass(name, props))
     existing = _REGISTRY.get(name)
     if existing is None:
         _REGISTRY[name] = (props, handler)
@@ -203,6 +207,9 @@ def unregister_component(name: str) -> None:
         name: The element type name to unregister.
     """
     _REGISTRY.pop(name, None)
+    from .schema import COMPONENTS
+
+    COMPONENTS.pop(name, None)
 
 
 def list_components() -> List[str]:
@@ -380,6 +387,10 @@ def element_factory(name: str) -> Callable[..., Element]:
             props_dict = _props_to_dict(instance)
         else:
             props_dict = dict(kwargs)
+        if props_type is not None:
+            from .schema import ComponentSchema
+
+            ComponentSchema.from_dataclass(name, props_type).validate(props_dict)
         # Style props pass through resolve_style at the boundary so list
         # forms / None get flattened identically to built-in factories.
         from ..style import resolve_style as _resolve
@@ -389,6 +400,14 @@ def element_factory(name: str) -> Callable[..., Element]:
         merged: Dict[str, Any] = {**style_dict, **props_dict}
         return Element(name, merged, list(children), key=key)
 
+    import inspect
+
+    props_type = get_props_type(name)
+    if props_type is not None:
+        factory.__signature__ = inspect.signature(props_type)
+        from .schema import ComponentSchema, register_schema
+
+        register_schema(ComponentSchema.from_dataclass(name, props_type))
     factory.__name__ = name
     factory.__doc__ = f"Construct an Element of type {name!r}."
     return factory

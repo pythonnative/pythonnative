@@ -68,6 +68,7 @@ nav:
   - Concepts:
     - Mental Model: concepts/mental-model.md
     - Architecture: concepts/architecture.md
+    - Runtime Overhaul: design/runtime-overhaul.md
     - Components: concepts/components.md
     - Hooks: concepts/hooks.md
     - Lifecycle: concepts/lifecycle.md
@@ -88,6 +89,7 @@ nav:
     - Async + Data: guides/async.md
     - Platform & Accessibility: guides/platform-accessibility.md
     - Native Modules: guides/native-modules.md
+    - Generated Native Contracts: guides/native-contracts.md
     - PyPI Packages: guides/pypi-packages.md
     - Custom Native Components: guides/custom-native-components.md
     - Fast Refresh: guides/hot-reload.md

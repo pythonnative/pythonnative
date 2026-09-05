@@ -2,7 +2,7 @@
 
 The framework runs one asyncio loop for the whole process. Tests
 create tasks, resources, and timers on it; without cleanup those leak
-into the next test. This autouse fixture closes the guest loop after
+into the next test. This autouse fixture closes the application loop after
 every test (cancelling pending work) so each test starts with a fresh
 loop.
 """

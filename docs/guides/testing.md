@@ -218,7 +218,7 @@ style.
 The Swift and Kotlin halves have their own suites next to the code:
 
 ```bash
-cd src/pythonnative/templates/ios_template/PythonNativeKit
+cd src/pythonnative/native/ios
 xcodebuild test -scheme PythonNativeKit -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
 
 cd src/pythonnative/templates/android_template

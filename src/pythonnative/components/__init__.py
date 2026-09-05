@@ -56,7 +56,6 @@ from .lists import (  # noqa: F401
     FlatList,
     ListController,
     SectionList,
-    _all_extents_known,
     _dispatch_scroll_command,
     _native_lists_supported,
     _NativeList,
@@ -104,3 +103,9 @@ __all__ = [
     "View",
     "WebView",
 ]
+
+# Factories are the single source for Python signatures and native contracts.
+from ..sdk.builtins import install as _install_native_contracts
+
+_install_native_contracts(globals())
+del _install_native_contracts

@@ -320,7 +320,7 @@ def deps_command(args: argparse.Namespace) -> None:
     python: Optional[str] = getattr(args, "python", None)
 
     config = _load_config_or_exit()
-    targets = deps_mod.targets_for(config, platform)
+    targets = deps_mod.targets_for(config, platform, all_simulator_archs=getattr(args, "lock", False))
     runner = builder_mod.SubprocessRunner()
     if not as_json and config.requirements:
         print(
@@ -328,6 +328,12 @@ def deps_command(args: argparse.Namespace) -> None:
             f"across {len(targets)} target(s)...\n"
         )
     resolutions = deps_mod.resolve_all(config, targets, runner=runner, python=python)
+    if getattr(args, "lock", False):
+        from ..project.lockfile import write
+
+        path = write(config, resolutions)
+        if not as_json:
+            print(f"Wrote {path}")
 
     if as_json:
         print(
@@ -1048,6 +1054,18 @@ def _terminate_subprocess(proc: Optional[subprocess.Popen]) -> None:
 # ======================================================================
 
 
+def codegen_command(args: argparse.Namespace) -> None:
+    """Generate native contracts after importing extension schema modules."""
+    import importlib
+
+    from ..sdk.codegen import generate
+
+    for name in args.module:
+        importlib.import_module(name)
+    for path in generate(args.output):
+        print(path)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pn", description="PythonNative CLI")
     parser.add_argument(
@@ -1057,6 +1075,13 @@ def _build_parser() -> argparse.ArgumentParser:
         version=f"pn {pkg_version('pythonnative')}",
     )
     subparsers = parser.add_subparsers()
+
+    parser_codegen = subparsers.add_parser("codegen", help="Generate typed native contracts")
+    parser_codegen.add_argument("--output", type=Path, default=Path("generated"))
+    parser_codegen.add_argument(
+        "--module", action="append", default=[], help="Import a module declaring extension schemas"
+    )
+    parser_codegen.set_defaults(func=codegen_command)
 
     parser_init = subparsers.add_parser("init", help="Scaffold a new project")
     parser_init.add_argument(
@@ -1079,6 +1104,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_deps.add_argument(
         "--python",
         help="Interpreter to run pip with (default: the one running pn; any version works, pip cross-resolves)",
+    )
+    parser_deps.add_argument(
+        "--lock",
+        action="store_true",
+        help="Lock exact wheel versions and hashes, including both iOS Simulator architectures",
     )
     parser_deps.set_defaults(func=deps_command)
 

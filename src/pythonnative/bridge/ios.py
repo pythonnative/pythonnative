@@ -2,7 +2,7 @@
 
 The Swift package exports ``@_cdecl`` symbols (see
 ``docs/concepts/bridge.md``). They're resolved from the running process
-with ``ctypes.PyDLL(None)``: ``PyDLL`` keeps the GIL held across the
+with ``ctypes.CDLL(None)``: ``PyDLL`` keeps the GIL held across the
 call, so the main thread is never parked while native applies a
 transaction, and the Python callback registered with
 ``pn_bridge_set_callback`` can re-enter Python safely.
@@ -28,8 +28,8 @@ class IOSTransport:
     name = "ios"
 
     def __init__(self, lib: Any = None) -> None:
-        self._lib = lib if lib is not None else ctypes.PyDLL(None)
-        self._apply = self._sym("pn_bridge_apply", None, [ctypes.c_char_p])
+        self._lib = lib if lib is not None else ctypes.CDLL(None)
+        self._apply = self._sym("pn_bridge_apply", ctypes.c_void_p, [ctypes.c_char_p])
         self._measure = self._sym(
             "pn_bridge_measure",
             None,
@@ -74,9 +74,9 @@ class IOSTransport:
         """Return the protocol version compiled into the native library."""
         return int(self._version())
 
-    def apply(self, transaction_json: str) -> None:
+    def apply(self, transaction_json: str) -> str:
         """Apply one serialized transaction (a JSON array of ops)."""
-        self._apply(transaction_json.encode("utf-8"))
+        return self._take(self._apply(transaction_json.encode("utf-8"))) or ""
 
     def measure(self, tag: int, max_width: float, max_height: float) -> Tuple[float, float]:
         """Return the intrinsic ``(width, height)`` of the view ``tag`` under the constraints."""

@@ -1,50 +1,10 @@
-"""The browser preview's half of the bridge.
+"""WebSocket transport for the browser renderer.
 
-``pn preview`` renders an app in a browser tab. Rather than a second
-rendering backend, the page is treated as *the native runtime*: it
-receives the very same JSON transactions the Swift and Kotlin runtimes
-apply, answers the same synchronous ``measure`` / ``command`` /
-``animate`` / ``call`` requests, and raises the same
-``callback(kind, tag, name, payload)`` events. The reconciler therefore
-runs the on-device
-[`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]
-and the on-device
-[`NativeScreenHost`][pythonnative.hosts.native.NativeScreenHost]
-unchanged; only this transport differs, and it is about moving strings
-over a WebSocket.
-
-Threads:
-
-- The **main thread** owns the framework: it drains
-  [`WebTransport.run_main_loop`][pythonnative.bridge.web.WebTransport.run_main_loop],
-  which is the browser's stand-in for the UIKit / Android main queue.
-  Every callback from the page and every asyncio pump runs there.
-- The **dev server thread** owns the socket. It delivers page messages
-  to the transport, which either settles a waiting request (``res``)
-  or queues work for the main thread.
-
-Synchronous requests (``measure`` above all) block the main thread on a
-``threading.Event`` until the page answers; the page is single-threaded
-but its message handling is asynchronous, so it can answer a
-``measure`` while it is itself awaiting Python (a row bind, say).
-
-Wire format (JSON arrays):
-
-- Python -> page: ``["apply", ops]``, ``["measure", id, tag, w, h]``,
-  ``["command", id, tag, name, args]``, ``["animate", id, tag, request]``,
-  ``["call", id, module, method, envelope]``, ``["res", id, result]``,
-  ``["dev", {...}]``.
-- Page -> Python: ``["res", id, result]``, ``["cb", kind, tag, name,
-  payload]`` (fire and forget), ``["req", id, kind, tag, name, payload]``
-  (Python answers with ``res``), ``["gesture", tag, phase, info]``
-  (pointer stream for the Python gesture arbiter), ``["dev", {...}]``.
-
-``payload`` / ``args`` / ``request`` / ``result`` are JSON *strings*,
-exactly the text the native protocol carries, so both sides reuse their
-existing codecs. Modules the page implements (``Host``, ``Alert``,
-``Clipboard``, ...) are called there; every other native module falls
-back to the Python implementations in
-``pythonnative.native_modules.fallback``.
+Network I/O and request settlement execute independently of the application
+asyncio loop. Python owns the component tree; the page owns DOM widgets and Yoga
+layout. Revisioned commits receive explicit acknowledgements, and callbacks
+are queued onto the Python application thread. No asyncio loop is pumped by
+the browser transport.
 """
 
 from __future__ import annotations
@@ -63,7 +23,7 @@ from . import PROTOCOL_VERSION, codec
 __all__ = ["BROWSER_MODULES", "WebTransport"]
 
 BROWSER_MODULES = frozenset(
-    {"Host", "Alert", "Clipboard", "Linking", "Share", "Haptics", "NetInfo", "AppState", "Device"}
+    {"Host", "Layout", "Alert", "Clipboard", "Linking", "Share", "Haptics", "NetInfo", "AppState", "Device"}
 )
 """Native modules the preview page implements; the rest use Python fallbacks."""
 
@@ -126,9 +86,9 @@ class WebTransport:
         """Install the native -> Python entry point (``bridge.native_callback``)."""
         self._callback = callback
 
-    def apply(self, transaction_json: str) -> None:
-        """Forward one commit to the page (fire and forget)."""
-        self._send('["apply",' + transaction_json + "]")
+    def apply(self, transaction_json: str) -> str:
+        """Wait for the page to acknowledge this exact commit revision."""
+        return codec.dumps(self._request(["apply", None, codec.loads(transaction_json)]))
 
     def measure(self, tag: int, max_width: float, max_height: float) -> Tuple[float, float]:
         """Ask the page for the intrinsic size of ``tag``."""
@@ -152,9 +112,6 @@ class WebTransport:
 
     def call(self, module: str, method: str, args_json: str) -> Optional[str]:
         """Call a native module: ``Host.post`` locally, page modules over the wire, others in Python."""
-        if module == "Host" and method == "post":
-            self.post_to_main(self._pump)
-            return codec.dumps({"ok": True, "value": None})
         if module in BROWSER_MODULES:
             result = self._request(["call", None, module, method, args_json])
             return _as_json_text(result)
@@ -164,9 +121,15 @@ class WebTransport:
     # Main thread
     # ------------------------------------------------------------------
 
-    def post_to_main(self, fn: Callable[[], None]) -> None:
+    def post_to_application(self, fn: Callable[[], None]) -> None:
         """Queue ``fn`` for the main loop (never runs inline)."""
-        self._main.put(fn)
+        from ..runtime import get_loop
+
+        loop = get_loop()
+        if loop.is_running():
+            loop.call_soon_threadsafe(self._run_job, fn)
+        else:
+            self._main.put(fn)
 
     def run_main_loop(self, *, until: Optional[Callable[[], bool]] = None) -> None:
         """Drain main-thread work until ``stop`` is called (or ``until`` holds).
@@ -213,10 +176,6 @@ class WebTransport:
             self._log("[pn preview] main-thread job raised:")
             self._log(traceback.format_exc())
 
-    def _pump(self) -> None:
-        if self._callback is not None:
-            self._callback("pump", 0, "", "")
-
     # ------------------------------------------------------------------
     # PreviewChannel (called on the dev server thread)
     # ------------------------------------------------------------------
@@ -227,7 +186,7 @@ class WebTransport:
         with self._peer_lock:
             self._peer = peer
         self._warned_no_peer = False
-        self.post_to_main(lambda: self._peer_changed(True))
+        self.post_to_application(lambda: self._peer_changed(True))
 
     def on_preview_disconnected(self, peer: Any) -> None:
         """The page went away: fail waiting requests and tear down its screens."""
@@ -236,7 +195,7 @@ class WebTransport:
                 return
             self._peer = None
         self._fail_all_waiters()
-        self.post_to_main(lambda: self._peer_changed(False))
+        self.post_to_application(lambda: self._peer_changed(False))
 
     def on_preview_message(self, peer: Any, text: str) -> None:
         """Route one frame from the page."""
@@ -255,17 +214,17 @@ class WebTransport:
             self._settle(message)
             return
         if kind == "cb":
-            self.post_to_main(lambda: self._deliver_fire_and_forget(message))
+            self.post_to_application(lambda: self._deliver_fire_and_forget(message))
             return
         if kind == "req":
-            self.post_to_main(lambda: self._deliver_request(peer, message))
+            self.post_to_application(lambda: self._deliver_request(peer, message))
             return
         if kind == "gesture":
-            self.post_to_main(lambda: self._deliver_gesture(message))
+            self.post_to_application(lambda: self._deliver_gesture(message))
             return
         if kind == "dev":
             payload = message[1] if len(message) > 1 and isinstance(message[1], dict) else {}
-            self.post_to_main(lambda: self._deliver_dev(payload))
+            self.post_to_application(lambda: self._deliver_dev(payload))
             return
         self._log(f"[pn preview] unknown message kind {kind!r}")
 

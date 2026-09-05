@@ -1,4 +1,5 @@
-# Tests TextInput: typing into a single-line input mirrors into the echo line.
+# Tests TextInput: native focus and typing mirror into the echo line,
+# dismissing the keyboard before checking the echo on smaller viewports.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/text_input.py
 # Source under test: src/pythonnative/components/text.py :: TextInput
@@ -15,13 +16,18 @@ appId: ${APP_ID}
 # on_focus fires when the field becomes first responder / gains focus.
 - assertVisible: "Focused: ON"
 - inputText: "Maestro"
-- assertVisible: "Echo: Maestro"
 # Maestro's ``hideKeyboard`` is unreliable on iOS 26+ (it looks for a
 # UI dismiss button that doesn't exist for a standard text keyboard).
 # ``pressKey: Enter`` works because the iOS handler installs a
 # ``UITextFieldDelegate.textFieldShouldReturn:`` that resigns first
 # responder, which is also the behavior most users expect.
 - pressKey: Enter
+- scrollUntilVisible:
+    element:
+      text: "Echo: Maestro"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "Echo: Maestro"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

@@ -454,6 +454,8 @@ class _FakePipRunner:
                 {"metadata": {"name": "numpy", "version": "2.2.1"}, "download_info": {"url": _NUMPY_IOS_WHEEL}},
             ]
         }
+        for package in report["install"]:
+            package["download_info"]["archive_info"] = {"hashes": {"sha256": "a" * 64}}
         return CommandResult(0, json.dumps(report), "")
 
 
@@ -482,6 +484,30 @@ def test_deps_command_reports_every_target(
         assert cmd[cmd.index("--python-version") + 1] == "3.13"
     android_cmds = [c for c in target_cmds if any(a.startswith("android_") for a in c)]
     assert len(android_cmds) == 2
+
+
+@pytest.mark.parametrize("host_arch", ["arm64", "x86_64"])
+@pytest.mark.parametrize("platform", [None, "ios", "android"])
+def test_deps_lock_is_usable_on_both_mac_architectures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, host_arch: str, platform: str | None
+) -> None:
+    from pythonnative.project import deps, lockfile
+    from pythonnative.project.config import AppConfig
+
+    monkeypatch.chdir(_deps_project(tmp_path))
+    monkeypatch.setattr(pn_cli.builder_mod, "SubprocessRunner", _FakePipRunner)
+    monkeypatch.setattr(deps, "host_simulator_arch", lambda: host_arch)
+    pn_cli.deps_command(argparse.Namespace(platform=platform, json=False, python=None, lock=True))
+
+    config = AppConfig.load(tmp_path)
+    document = lockfile.read(config)
+    assert document is not None
+    assert len(document["targets"]) == {None: 5, "ios": 3, "android": 2}[platform]
+    for arch in ("arm64", "x86_64"):
+        monkeypatch.setattr(deps, "host_simulator_arch", lambda: arch)
+        pinned = lockfile.requirements(config, deps.targets_for(config, platform))
+        assert "numpy==2.2.1" in pinned
+        assert "--hash=sha256:" + "a" * 64 in pinned
 
 
 def test_deps_command_platform_filter_and_json(

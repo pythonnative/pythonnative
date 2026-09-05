@@ -15,6 +15,7 @@ import json
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from . import codec
+from .commits import PROTOCOL_VERSION, CommitState
 
 __all__ = ["FakeNativeView", "FakeTransport"]
 
@@ -59,8 +60,11 @@ class FakeTransport:
 
     name = "fake"
 
-    def __init__(self, *, version: int = 1, measure: Optional[Dict[str, Tuple[float, float]]] = None) -> None:
+    def __init__(
+        self, *, version: int = PROTOCOL_VERSION, measure: Optional[Dict[str, Tuple[float, float]]] = None
+    ) -> None:
         self._version = version
+        self.commit_state = CommitState()
         self.measure_table = dict(DEFAULT_MEASURE if measure is None else measure)
         self.views: Dict[int, FakeNativeView] = {}
         self.transactions: List[List[Any]] = []
@@ -72,7 +76,6 @@ class FakeTransport:
         self.module_handlers: Dict[str, ModuleHandler] = {}
         self.pending_calls: List[Tuple[str, int, str, Dict[str, Any]]] = []
         self.callback: Optional[Callable[[str, int, str, str], Optional[str]]] = None
-        self.posted = 0
 
     # -- Transport protocol ----------------------------------------------
 
@@ -84,12 +87,19 @@ class FakeTransport:
         """Install ``callback`` as the native -> Python entry point."""
         self.callback = callback
 
-    def apply(self, transaction_json: str) -> None:
-        """Apply one serialized transaction (a JSON array of ops)."""
-        ops = json.loads(transaction_json)
+    def apply(self, transaction_json: str) -> str:
+        """Validate a full revision before applying any native mutations."""
+        envelope = json.loads(transaction_json)
+        if self.commit_state.application and envelope.get("application") != self.commit_state.application:
+            self.commit_state = CommitState()
+            self.views.clear()
+        candidate = self.commit_state.prepare(envelope)
+        ops = envelope["ops"]
         self.transactions.append(ops)
         for op in ops:
             self._apply_one(op)
+        self.commit_state = candidate
+        return codec.dumps(candidate.acknowledgement())
 
     def _apply_one(self, op: List[Any]) -> None:
         code = op[0]
@@ -162,9 +172,6 @@ class FakeTransport:
         args = envelope.get("args") or {}
         call_id = int(envelope.get("call_id", 0) or 0)
         self.calls.append((module, method, args))
-        if module == "Host" and method == "post":
-            self.posted += 1
-            return codec.dumps({"ok": True, "value": None})
         handler = self.module_handlers.get(module)
         if handler is None:
             return codec.dumps({"ok": True, "value": None})
@@ -181,7 +188,11 @@ class FakeTransport:
 
     def fire(self, tag: int, name: str, *args: Any) -> Any:
         """Emit a view event as native would; returns the decoded handler result."""
-        return self._callback("event", tag, name, codec.dumps([codec.to_jsonable(a) for a in args]))
+        self._event_sequence = getattr(self, "_event_sequence", 0) + 1
+        envelope = self.commit_state.acknowledgement()
+        envelope.pop("ok")
+        envelope.update(sequence=self._event_sequence, args=[codec.to_jsonable(a) for a in args])
+        return self._callback("event", tag, name, codec.dumps(envelope))
 
     def emit_module_event(self, module: str, event: str, payload: Any = None) -> None:
         """Push an unsolicited module event (``AppState`` ``change``, ...) into Python."""
@@ -203,10 +214,6 @@ class FakeTransport:
     def host_event(self, screen: int, event: str, payload: Any = None) -> Any:
         """Deliver a screen lifecycle event as the native host would; returns the decoded result."""
         return self._callback("host", screen, event, codec.dumps(codec.to_jsonable(payload)))
-
-    def pump(self) -> None:
-        """Deliver the ``pump`` callback (what ``Host.post`` would trigger)."""
-        self._callback("pump", 0, "", "")
 
     def complete_animation(self, anim_id: int, finished: bool = True) -> None:
         """Report a native animation as finished (or interrupted) to Python."""

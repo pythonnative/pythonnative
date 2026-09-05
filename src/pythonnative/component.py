@@ -46,7 +46,7 @@ from __future__ import annotations
 
 import functools
 import inspect
-from typing import Any, Awaitable, Callable, Dict, Generic, List, Optional, ParamSpec, Tuple, Union
+from typing import Any, Awaitable, Callable, Dict, Generic, List, Optional, ParamSpec, Tuple, Union, overload
 
 from .element import Element, Node
 
@@ -85,6 +85,7 @@ class Component(Generic[P]):
         "_positional",
         "_declares_key",
         "_is_async",
+        "refresh_signature",
         "__wrapped__",
         "__dict__",
     )
@@ -103,6 +104,9 @@ class Component(Generic[P]):
                 accepts_children = True
             if name == "key":
                 declares_key = True
+        from .refresh import hook_signature
+
+        self.refresh_signature = hook_signature(fn)
         self.fn = fn
         self.display_name = display_name or getattr(fn, "__name__", "Component")
         self.memoized = False
@@ -196,6 +200,18 @@ def component(fn: RenderFn[P]) -> Component[P]:
         ```
     """
     return Component(fn)
+
+
+@overload
+def memo(
+    target: Component[P], *, equal: Optional[Callable[[Dict[str, Any], Dict[str, Any]], bool]] = None
+) -> Component[P]: ...
+
+
+@overload
+def memo(
+    target: None = None, *, equal: Optional[Callable[[Dict[str, Any], Dict[str, Any]], bool]] = None
+) -> Callable[[Component[P]], Component[P]]: ...
 
 
 def memo(

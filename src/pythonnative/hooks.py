@@ -68,8 +68,9 @@ from typing import (
 from . import diagnostics
 from .element import Element, Node
 from .platform_metrics import SafeAreaInsets, WindowDimensions
+from .runtime import TaskScope, _scope, call_on_application_thread
 from .scheduler import TransitionQueue, in_transition, run_in_transition, schedule_trigger
-from .suspense import CoroDriver, Resource
+from .suspense import Resource
 
 T = TypeVar("T")
 
@@ -200,7 +201,9 @@ class HookState:
         "_hook_log",
         "_hook_signature",
         "_component_name",
-        "_async_driver",
+        "_async_task",
+        "_async_inputs",
+        "task_scope",
     )
 
     def __init__(self) -> None:
@@ -237,9 +240,11 @@ class HookState:
         self._hook_log: Optional[List[str]] = None
         self._hook_signature: Optional[List[str]] = None
         self._component_name: str = ""
-        # For ``async def`` components: the CoroDriver running the
+        # For ``async def`` components: the asyncio task running the
         # in-flight body, cancelled when a newer render supersedes it.
-        self._async_driver: Optional[CoroDriver] = None
+        self._async_task: Any = None
+        self._async_inputs: Any = None
+        self.task_scope = TaskScope("component")
         # Effect-queue lengths at ``begin_render``, so a suspended
         # render can be rolled back without double-queueing effects.
         self._pending_effects_mark: int = 0
@@ -340,7 +345,11 @@ class HookState:
         for idx, effect_fn, deps in pending:
             _, prev_cleanup = self.layout_effects[idx]
             _run_cleanup(prev_cleanup)
-            cleanup = _activate_effect(effect_fn)
+            token = _scope.set(self.task_scope)
+            try:
+                cleanup = _activate_effect(effect_fn)
+            finally:
+                _scope.reset(token)
             self.layout_effects[idx] = (list(deps) if deps is not None else None, cleanup)
 
     def flush_pending_effects(self) -> None:
@@ -359,7 +368,11 @@ class HookState:
         for idx, effect_fn, deps in pending:
             _, prev_cleanup = self.effects[idx]
             _run_cleanup(prev_cleanup)
-            cleanup = _activate_effect(effect_fn)
+            token = _scope.set(self.task_scope)
+            try:
+                cleanup = _activate_effect(effect_fn)
+            finally:
+                _scope.reset(token)
             self.effects[idx] = (list(deps) if deps is not None else None, cleanup)
 
     def cleanup_all_effects(self) -> None:
@@ -386,8 +399,9 @@ class HookState:
             except Exception:
                 pass
         self.resources = []
-        driver = self._async_driver
-        self._async_driver = None
+        self.task_scope.close()
+        driver = self._async_task
+        self._async_task = None
         if driver is not None:
             driver.cancel()
 
@@ -437,7 +451,9 @@ def _deps_changed(prev: Any, current: Any) -> bool:
         return True
     if len(prev) != len(current):
         return True
-    return any(p is not c and p != c for p, c in zip(prev, current))
+    from .equality import equal
+
+    return any(not equal(p, c) for p, c in zip(prev, current))
 
 
 def _run_cleanup(cleanup: Any) -> None:
@@ -585,11 +601,17 @@ def use_state(initial: Any = None) -> Tuple[Any, StateSetter[Any]]:
     current = ctx.states[idx]
 
     def setter(new_value: Any) -> None:
-        if callable(new_value):
-            new_value = new_value(ctx.states[idx])
-        if ctx.states[idx] is not new_value and ctx.states[idx] != new_value:
-            ctx.states[idx] = new_value
-            _notify_state_changed(ctx)
+        def apply() -> None:
+            if ctx.task_scope.closed:
+                return
+            value = new_value(ctx.states[idx]) if callable(new_value) else new_value
+            from .equality import equal
+
+            if not equal(ctx.states[idx], value):
+                ctx.states[idx] = value
+                _notify_state_changed(ctx)
+
+        call_on_application_thread(apply)
 
     return current, setter
 
@@ -1073,6 +1095,8 @@ def use_query(
     deps: Optional[list] = None,
     *,
     initial: Optional[T] = None,
+    key: Any = None,
+    client: Any = None,
 ) -> QueryResult[T]:
     """Subscribe to an async fetcher and re-render when its result changes.
 
@@ -1085,6 +1109,11 @@ def use_query(
         deps: Dependency list. Refetches whenever any entry changes.
         initial: Optional starting value for ``data`` before the
             first fetch completes.
+        key: Explicit hashable key for sharing results across subscribers.
+            Include every input that identifies the shared result. Without a
+            key, the query belongs to this hook and changes with ``deps``.
+        client: QueryClient owning the shared cache. Defaults to the
+            application's client.
 
     Returns:
         A frozen [`QueryResult`][pythonnative.QueryResult] with
@@ -1105,41 +1134,18 @@ def use_query(
             return pn.Text(q.data["name"])
         ```
     """
-    from .runtime import run_async
+    from .query import default_client
 
-    state, set_state = use_state(lambda: QueryResult[T](data=initial, loading=True))
-    nonce, set_nonce = use_state(0)
-
-    refetch = use_callback(lambda: set_nonce(lambda n: n + 1), [])
-
-    # Surface the stable refetch callable on every returned result.
-    if state.refetch is not refetch:
-        state = replace(state, refetch=refetch)
-
-    def _start_fetch() -> Callable[[], None]:
-        set_state(lambda s: replace(s, loading=True, error=None))
-
-        async def _runner() -> None:
-            try:
-                data = await fetcher()
-                set_state(lambda s: replace(s, data=data, loading=False, error=None))
-            except asyncio.CancelledError:
-                raise
-            except BaseException as exc:  # pragma: no cover - surfaced to user
-                failure = exc
-                set_state(lambda s: replace(s, loading=False, error=failure))
-
-        future = run_async(_runner())
-
-        def _cancel() -> None:
-            future.cancel()
-
-        return _cancel
-
-    effect_deps: List[Any] = list(deps or []) + [nonce]
-    use_effect(_start_fetch, effect_deps)
-
-    return state
+    cache = client or default_client()
+    local_key = use_memo(object, deps or [])
+    if key is None:
+        key = local_key
+    snapshot = use_subscription(
+        use_callback(lambda notify: cache.subscribe(key, fetcher, notify), [cache, key]),
+        use_callback(lambda: cache.snapshot(key, initial), [cache, key]),
+    )
+    refetch = use_callback(lambda: cache.invalidate(key), [cache, key])
+    return QueryResult(data=snapshot.data, loading=snapshot.loading, error=snapshot.error, refetch=refetch)
 
 
 @dataclass(frozen=True)
@@ -1297,14 +1303,30 @@ def use_subscription(subscribe: Callable[[Callable[[], None]], Callable[[], None
     Raises:
         RuntimeError: If called outside a ``@component`` function.
     """
+    from .equality import equal
+
     _require_hook_state("use_subscription")
     _, set_tick = use_state(0)
+    snapshot = get_snapshot()
+    observed = use_ref(snapshot)
+    getter = use_ref(get_snapshot)
+    observed.current = snapshot
+    getter.current = get_snapshot
 
     def _subscribe() -> Callable[[], None]:
-        return subscribe(lambda: set_tick(lambda n: n + 1))
+        def changed() -> None:
+            current = getter.current()
+            if not equal(observed.current, current):
+                observed.current = current
+                set_tick(lambda n: n + 1)
 
-    use_effect(_subscribe, [])
-    return get_snapshot()
+        remove = subscribe(changed)
+        # Account for a store change between rendering and subscribing.
+        changed()
+        return remove
+
+    use_effect(_subscribe, [subscribe])
+    return snapshot
 
 
 def use_window_dimensions() -> WindowDimensions:

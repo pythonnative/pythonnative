@@ -2,8 +2,7 @@
 
 Primitives behind PythonNative's async rendering model: the
 [`Suspend`][pythonnative.suspense.Suspend] signal, the
-[`CoroDriver`][pythonnative.suspense.CoroDriver] that steps `async def`
-component bodies synchronously, cached async values
+standard asyncio tasks that run `async def` component bodies, cached async values
 ([`Resource`][pythonnative.Resource] /
 [`start_resource`][pythonnative.start_resource]), and code splitting
 with [`lazy`][pythonnative.lazy].

@@ -61,7 +61,7 @@ simulated, and there's no web or desktop packaging. Ship to devices
 with `pn run android` / `pn run ios` and `pn build`.
 
 The core (components, hooks, reconciler) is also platform-agnostic and
-runs headless with a [fake backend](../guides/testing.md#a-minimal-fake-backend);
+runs headless with a [fake backend](../guides/testing.md);
 that's how the unit-test suite works.
 
 ## How do I package and distribute my app?
@@ -168,8 +168,8 @@ Two strategies, depending on the cadence:
 ## Is there async/await support?
 
 Yes, and it's the core of the framework. PythonNative runs a single
-`asyncio` event loop on the platform's main thread, pumped as a guest
-of the native run loop. Components themselves can be `async def` (pair
+standard `asyncio` loop on a dedicated application thread. Native UI threads
+own widgets, scrolling, and animation frames. Components themselves can be `async def` (pair
 them with [`Suspense`][pythonnative.Suspense] for loading states),
 `use_effect` accepts coroutine callbacks and cancels them on unmount,
 [`use_resource`][pythonnative.use_resource] fetches during render, and

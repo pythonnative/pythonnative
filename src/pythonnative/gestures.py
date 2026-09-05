@@ -233,7 +233,9 @@ class _BaseGesture:
         else:
             callback = self.on_end
         if callback is not None:
-            callback(event)
+            from .runtime import invoke
+
+            invoke(callback, event)
 
 
 @dataclass(frozen=True)
@@ -258,7 +260,9 @@ class Tap(_BaseGesture):
 
     def _dispatch(self, event: GestureEvent) -> None:
         if event.state == GestureState.ENDED and self.on_tap is not None:
-            self.on_tap(event)
+            from .runtime import invoke
+
+            invoke(self.on_tap, event)
         else:
             super()._dispatch(event)
 
@@ -290,7 +294,9 @@ class LongPress(_BaseGesture):
 
     def _dispatch(self, event: GestureEvent) -> None:
         if event.state == GestureState.BEGAN and self.on_long_press is not None:
-            self.on_long_press(event)
+            from .runtime import invoke
+
+            invoke(self.on_long_press, event)
         else:
             super()._dispatch(event)
 
@@ -340,7 +346,9 @@ class Swipe(_BaseGesture):
 
     def _dispatch(self, event: GestureEvent) -> None:
         if event.state == GestureState.ENDED and self.on_swipe is not None:
-            self.on_swipe(event)
+            from .runtime import invoke
+
+            invoke(self.on_swipe, event)
         else:
             super()._dispatch(event)
 
@@ -382,7 +390,9 @@ class Fling(_BaseGesture):
 
     def _dispatch(self, event: GestureEvent) -> None:
         if event.state == GestureState.ENDED and self.on_fling is not None:
-            self.on_fling(event)
+            from .runtime import invoke
+
+            invoke(self.on_fling, event)
         else:
             super()._dispatch(event)
 
@@ -526,6 +536,18 @@ def serialize_gestures(
     for i, leaf in enumerate(leaves):
         if isinstance(leaf, _BaseGesture):
             spec = leaf._to_spec()
+            from .animated import AnimatedEvent
+
+            animated = {}
+            for state, callback in (
+                ("began", leaf.on_begin),
+                ("changed", leaf.on_change),
+                ("ended", leaf.on_end),
+            ):
+                if isinstance(callback, AnimatedEvent):
+                    animated[state] = {field: id(node) for field, node in callback._bindings.items()}
+            if animated:
+                spec["animated_events"] = animated
 
             def _router(payload: Dict[str, Any], _spec: _BaseGesture = leaf) -> None:
                 _spec._dispatch(event_from_payload(payload))

@@ -35,7 +35,7 @@ def ButtonDemo() -> pn.Element:
             pn.Button(
                 "Should not fire",
                 on_press=lambda: set_disabled_count(disabled_count + 1),
-                enabled=False,
+                disabled=True,
             ),
             hint("Tapping this button must keep 'Disabled taps' at 0."),
         ),

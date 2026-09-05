@@ -93,8 +93,15 @@ license-files = ["LICENSE*"]
 [tool.setuptools.package-data]
 pythonnative = [
   "py.typed",
-  "templates/**",
-  "devserver/static/*",
+  "templates/**", "native/**", "sdk/templates/**",
+  "devserver/static/**",
+]
+
+[tool.setuptools.exclude-package-data]
+pythonnative = [
+  "**/build/**", "**/.build/**", "**/.gradle/**",
+  "**/.cxx/**", "**/.swiftpm/**", "**/.kotlin/**",
+  "**/__pycache__/**", "**/.DS_Store",
 ]
 
 [tool.ruff]

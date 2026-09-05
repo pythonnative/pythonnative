@@ -159,7 +159,6 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "start_resource",  # non-hook Resource constructor; driven by the lazy demo and unit tests
     "sdk",  # module re-export; custom_component demo covers it
     "appearance",  # module re-export; use_color_scheme demo drives set_color_scheme
-    "images",  # module re-export; Image demo exercises the fetch/cache pipeline
     "ViewHandler",  # ABC; subclassed by built-in handlers
     "element_factory",  # tested via unit tests; needs registered handlers
     "register_component",  # tested via unit tests; needs handler implementations

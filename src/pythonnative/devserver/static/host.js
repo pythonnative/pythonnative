@@ -303,11 +303,10 @@ export class PreviewHost {
     const host = this;
     this._modules = {
       Host: {
-        post() {
+        cache_state({ screen, state }) {
+          const s = host.screenById(screen);
+          if (s) s.cachedState = state;
           return null;
-        },
-        is_main_thread() {
-          return true;
         },
         attach_root({ screen, tag }) {
           const s = host.screenById(screen);
@@ -331,31 +330,7 @@ export class PreviewHost {
           if (s) s.applyOptions(options || {});
           return null;
         },
-        push({ path, args, options }) {
-          host.pushScreen(path, args ?? null, options || {});
-          return true;
-        },
-        pop({ count }) {
-          return host.popScreens(Math.max(1, Number(count) || 1));
-        },
-        pop_to_root() {
-          return host.popScreens(host.stack.length - 1);
-        },
-        replace({ screen, path, args, options }) {
-          const s = host.screenById(screen);
-          if (!s) return false;
-          host.replaceScreen(s, path, args ?? null, options || {});
-          return true;
-        },
-        reset({ screens }) {
-          (async () => {
-            while (host.stack.length > 1) host.popScreens(1);
-            for (const spec of Array.isArray(screens) ? screens : []) {
-              await host.pushScreen(spec.path, spec.args ?? null, spec.options || {}, { animated: false });
-            }
-          })();
-          return true;
-        },
+        finish() { return null; },
       },
       Alert: {
         show(args) {

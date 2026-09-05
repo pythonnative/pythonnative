@@ -1,5 +1,6 @@
 # Tests Text element renders multiple variants, including rich text
-# built from nested spans (SpannableString / NSAttributedString).
+# built from nested spans (SpannableString / NSAttributedString), scrolling
+# to the rich-text section on smaller viewports.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/text.py
 # Source under test: src/pythonnative/components/text.py :: Text
@@ -15,6 +16,11 @@ appId: ${APP_ID}
 - assertVisible: "Sized and colored line"
 # Rich text: three nested spans flatten into one native label whose
 # plain text is the concatenation of the parts.
+- scrollUntilVisible:
+    element:
+      text: "Rich start bold middle red end"
+    direction: DOWN
+    timeout: 20000
 - assertVisible: "Rich start bold middle red end"
 # The rich-text section pushes "Back to list" below the fold on the
 # shorter emulator viewports; close_demo taps it without scrolling,

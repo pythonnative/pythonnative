@@ -39,9 +39,9 @@ class AndroidTransport:
         """Return the protocol version compiled into the native library."""
         return int(self._bridge.protocolVersion())
 
-    def apply(self, transaction_json: str) -> None:
+    def apply(self, transaction_json: str) -> str:
         """Apply one serialized transaction (a JSON array of ops)."""
-        self._bridge.apply(transaction_json)
+        return str(self._bridge.apply(transaction_json))
 
     def measure(self, tag: int, max_width: float, max_height: float) -> Tuple[float, float]:
         """Return the intrinsic ``(width, height)`` of the view ``tag`` under the constraints."""

@@ -83,7 +83,7 @@ class FakeView:
     @property
     def hidden(self) -> bool:
         """Whether this view is removed from layout (``display: "none"``)."""
-        return self.props.get("display") == "none"
+        return self.props.get("display") == "none" or self.type_name == "Screen" and self.props.get("active") is False
 
     @property
     def test_id(self) -> Optional[str]:
