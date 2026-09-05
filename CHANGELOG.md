@@ -1,6 +1,38 @@
 # CHANGELOG
 
 
+## v0.40.0 (2026-09-05)
+
+### Continuous Integration
+
+- **workflows**: Restrict releases to the upstream repository
+  ([`01838d9`](https://github.com/pythonnative/pythonnative/commit/01838d992c39d63710c3fbe1d681b55f9fc513a7))
+
+### Documentation
+
+- **mkdocs**: Add run instructions to the navigation example
+  ([#63](https://github.com/pythonnative/pythonnative/pull/63),
+  [`d3e7a96`](https://github.com/pythonnative/pythonnative/commit/d3e7a966752d730ca156c310cd1306fe31aa0e4c))
+
+Refs: #60
+
+Co-authored-by: Owen Carey <37121709+owenthcarey@users.noreply.github.com>
+
+- **mkdocs**: Refresh package overview internals and CLI lists
+  ([#46](https://github.com/pythonnative/pythonnative/pull/46),
+  [`c934fca`](https://github.com/pythonnative/pythonnative/commit/c934fca5c5a48277b63ce6329afa7638af6261f7))
+
+Refs: #45
+
+Co-authored-by: Owen Carey <37121709+owenthcarey@users.noreply.github.com>
+
+### Features
+
+- **runtime**: Overhaul native rendering and app architecture
+  ([#80](https://github.com/pythonnative/pythonnative/pull/80),
+  [`065b40a`](https://github.com/pythonnative/pythonnative/commit/065b40a5c5c8bbae318664894b9fc1f7d9ea6b38))
+
+
 ## v0.39.0 (2026-09-04)
 
 ### Features
