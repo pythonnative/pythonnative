@@ -330,6 +330,7 @@ def test_cli_run_help_lists_flags() -> None:
         assert "--no-logs" in result.stdout
         assert "--dev-server" in result.stdout
         assert "--prepare-only" in result.stdout
+        assert "Target platform" in result.stdout
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -340,6 +341,7 @@ def test_cli_build_help_lists_debug() -> None:
         result = run_pn(["build", "--help"], tmpdir)
         assert result.returncode == 0, result.stderr
         assert "--debug" in result.stdout
+        assert "Target platform" in result.stdout
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
