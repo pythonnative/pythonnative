@@ -31,6 +31,8 @@ error, not a runtime `ImportError`.
 
 Run `pn deps --lock` and commit the generated `pn.lock`. The lock records Python
 version, requirements, indexes, each target's wheel URLs, and SHA-256 hashes.
+The iOS targets include both Apple Silicon (`arm64`) and Intel (`x86_64`)
+simulators, so the same committed lock works on developer Macs and CI runners.
 `pn deps ios --lock` or `pn deps android --lock` updates selected targets.
 Builds reject stale locks, missing target entries, differing package versions
 across Android ABIs, and changed wheel bytes.

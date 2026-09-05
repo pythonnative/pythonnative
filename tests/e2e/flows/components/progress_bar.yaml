@@ -1,4 +1,5 @@
-# Tests ProgressBar advances by 25% per tap and clamps to 100%.
+# Tests ProgressBar advances by 25% and resets, scrolling to the controls
+# when the static examples put them below the viewport.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/progress_bar.py
 # Source under test: src/pythonnative/components/controls.py :: ProgressBar
@@ -10,6 +11,11 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: ProgressBar
 - assertVisible: "Progress: 25%"
+- scrollUntilVisible:
+    element:
+      text: "Advance"
+    direction: DOWN
+    timeout: 20000
 - tapOn: "Advance"
 - assertVisible: "Progress: 50%"
 - tapOn: "Reset"

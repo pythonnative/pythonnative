@@ -16,8 +16,8 @@ object NativeLayout {
     }
     private val nodes = HashMap<Long, Entry>()
     private var viewport = JSONObject()
-    private val detached = setOf("VirtualList", "Modal", "Portal", "ScreenStack")
-    private val containers = detached + setOf("View", "Row", "Column", "ScrollView", "Screen")
+    private val detached = setOf("VirtualList", "Modal", "ScreenStack")
+    private val containers = detached + setOf("View", "Row", "Column", "ScrollView", "Screen", "Portal")
     private var scheduled = false
 
     fun containerDidLayout() {
@@ -93,9 +93,23 @@ object NativeLayout {
         viewport = request
         val width = request.optDouble("width").toFloat()
         val height = request.optDouble("height").toFloat()
+        if (!width.isFinite() || !height.isFinite() || width <= 0 || height <= 0) return JSONArray()
         val roots = request.optJSONArray("roots") ?: JSONArray()
         val rootTags = (0 until roots.length()).map { roots.getLong(it) }.toSet()
         for (tag in rootTags) nodes[tag]?.yoga?.let { it.calculate(it.ptr, width, height) }
+        // Portals have no on-screen parent. Their own Yoga node supplies the
+        // viewport for all children, including absolute insets and sibling layout.
+        for ((tag, entry) in nodes) {
+            val record = PNBridge.registry.get(tag) ?: continue
+            if (record.typeName != "Portal") continue
+            val containerWidth = record.view.width / PNBridge.density()
+            val containerHeight = record.view.height / PNBridge.density()
+            val portalWidth = if (containerWidth > 0) containerWidth else width
+            val portalHeight = if (containerHeight > 0) containerHeight else height
+            entry.yoga.style(entry.yoga.ptr, "width", portalWidth.toString())
+            entry.yoga.style(entry.yoga.ptr, "height", portalHeight.toString())
+            entry.yoga.calculate(entry.yoga.ptr, portalWidth, portalHeight)
+        }
         for (entry in nodes.values) if (entry.parent != null && !entry.attached) {
             val parent = PNBridge.registry.get(entry.parent!!)
             val record = PNBridge.registry.get(entry.yoga.tag)

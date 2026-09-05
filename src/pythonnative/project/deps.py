@@ -209,11 +209,17 @@ def android_targets(config: AppConfig) -> List[Target]:
     ]
 
 
-def targets_for(config: AppConfig, platform: Optional[str] = None) -> List[Target]:
-    """All targets for ``platform`` (``"ios"``, ``"android"``, or ``None`` for both)."""
+def targets_for(
+    config: AppConfig, platform: Optional[str] = None, *, all_simulator_archs: bool = False
+) -> List[Target]:
+    """Targets for a platform, optionally including both Mac architectures for portable locks."""
     targets: List[Target] = []
     if platform in (None, "ios"):
-        targets.extend(ios_targets(config))
+        if all_simulator_archs:
+            targets.extend(ios_targets(config, simulator_arch="arm64"))
+            targets.extend(ios_targets(config, sdks=("iphonesimulator",), simulator_arch="x86_64"))
+        else:
+            targets.extend(ios_targets(config))
     if platform in (None, "android"):
         targets.extend(android_targets(config))
     return targets

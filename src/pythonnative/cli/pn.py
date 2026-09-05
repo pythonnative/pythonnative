@@ -320,7 +320,7 @@ def deps_command(args: argparse.Namespace) -> None:
     python: Optional[str] = getattr(args, "python", None)
 
     config = _load_config_or_exit()
-    targets = deps_mod.targets_for(config, platform)
+    targets = deps_mod.targets_for(config, platform, all_simulator_archs=getattr(args, "lock", False))
     runner = builder_mod.SubprocessRunner()
     if not as_json and config.requirements:
         print(
@@ -1105,7 +1105,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--python",
         help="Interpreter to run pip with (default: the one running pn; any version works, pip cross-resolves)",
     )
-    parser_deps.add_argument("--lock", action="store_true", help="Write exact wheel versions and hashes to pn.lock")
+    parser_deps.add_argument(
+        "--lock",
+        action="store_true",
+        help="Lock exact wheel versions and hashes, including both iOS Simulator architectures",
+    )
     parser_deps.set_defaults(func=deps_command)
 
     def _add_server_args(sub: argparse.ArgumentParser) -> None:

@@ -76,7 +76,7 @@ enum PNLayout {
                 c.parent = parent
                 // Detached surfaces keep logical ownership but supply their own viewport.
                 let type = PNViewRegistry.shared.resolve(parent)?.typeName ?? ""
-                if !["VirtualList", "Modal", "Portal", "ScreenStack"].contains(type) {
+                if !["VirtualList", "Modal", "ScreenStack"].contains(type) {
                     YGNodeSetMeasureFunc(p.node, nil)
                     YGNodeInsertChild(p.node, c.node, min(index, Int(YGNodeGetChildCount(p.node))))
                 }
@@ -126,6 +126,17 @@ enum PNLayout {
         let roots = request["roots"] as? [Int64] ?? []
         for tag in roots {
             if let entry = nodes[tag] { YGNodeCalculateLayout(entry.node, width, height, YGDirection(rawValue: 1)!) }
+        }
+        // A portal is absent from the screen tree, but remains a Yoga parent
+        // so absolute insets and sibling layout resolve against its viewport.
+        for entry in nodes.values {
+            guard let record = PNViewRegistry.shared.resolve(entry.tag), record.typeName == "Portal" else { continue }
+            let size = record.view.bounds.size
+            let portalWidth = size.width > 0 ? Float(size.width) : width
+            let portalHeight = size.height > 0 ? Float(size.height) : height
+            YGNodeStyleSetWidth(entry.node, portalWidth)
+            YGNodeStyleSetHeight(entry.node, portalHeight)
+            YGNodeCalculateLayout(entry.node, portalWidth, portalHeight, YGDirection(rawValue: 1)!)
         }
         // Every detached root is laid out in its native container's available space.
         for entry in nodes.values where entry.parent != nil && YGNodeGetOwner(entry.node) == nil {
