@@ -1,0 +1,27 @@
+# Kept outside pyproject.toml so the current workflow can also build an
+# existing release's unmodified sdist, including tags predating cibuildwheel.
+[tool.cibuildwheel]
+build = ["cp313-*", "cp314-*"]
+skip = ["*-musllinux*", "*-win32", "*-manylinux_i686"]
+archs = ["native"]
+test-requires = ["pytest>=8"]
+# Install the repaired wheel into a fresh environment and copy just this
+# test file to a temporary directory, outside the source checkout.
+test-sources = ["tests/test_layout.py"]
+test-command = [
+  "python -c \"import pythonnative; from importlib.metadata import version; from pathlib import Path; assert 'site-packages' in Path(pythonnative.__file__).parts; assert pythonnative.__version__ == version('pythonnative')\"",
+  "python -m pytest -q tests/test_layout.py",
+  "pn --help",
+]
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+
+[tool.cibuildwheel.macos]
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
+
+[tool.cibuildwheel.windows]
+# These flags also make v0.40.0's C API available to ctypes without patching
+# the tagged source. setup.py supplies them for future source builds.
+environment = { CL = "/D_WINDLL", LINK = "/EXPORT:pn_yoga_callback /EXPORT:pn_yoga_measure" }

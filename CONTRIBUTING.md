@@ -336,15 +336,47 @@ Co-authored-by: Name <email>
 
 - The version is tracked in `pyproject.toml` (`project.version`) and mirrored in `src/pythonnative/__init__.py` as `__version__`. Both files are updated automatically by [python-semantic-release](https://python-semantic-release.readthedocs.io/).
 - **Automated release pipeline** (on every merge to `main`):
-  1. `python-semantic-release` scans Conventional Commit messages since the last tag.
-  2. It determines the next SemVer bump: `feat` → **minor**, `fix`/`perf` → **patch**, `BREAKING CHANGE` → **major** (minor while version < 1.0).
-  3. Version files are updated, `CHANGELOG.md` is generated, and a tagged release commit (`chore(release): vX.Y.Z`) is pushed.
-  4. A GitHub Release is created with auto-generated release notes and the built sdist/wheel attached.
-  5. When drafts are disabled, the package is also published to PyPI via Trusted Publishing.
-- **Draft / published toggle**: the `DRAFT_RELEASE` variable at the top of `.github/workflows/release.yml` controls release mode. Set to `"true"` (the default) for draft GitHub Releases with PyPI publishing skipped; flip to `"false"` to publish releases and upload to PyPI immediately.
-- Commit types that trigger a release: `feat` (minor), `fix` and `perf` (patch), `BREAKING CHANGE` (major). All other types (`build`, `chore`, `ci`, `docs`, `refactor`, `revert`, `style`, `test`) are recorded in the changelog but do **not** trigger a release on their own.
-- Tag format: `v`-prefixed (e.g., `v0.4.0`).
-- Manual version bumps are no longer needed: just merge PRs with valid Conventional Commit titles. For ad-hoc runs, use the workflow's **Run workflow** button (`workflow_dispatch`).
+  1. `python-semantic-release` scans Conventional Commits, updates the version files and `uv.lock`, generates `CHANGELOG.md`, and pushes the release commit and tag.
+  2. A published GitHub release is created with generated release notes.
+  3. The shared `Distributions` workflow builds a source archive from that exact commit, then uses [cibuildwheel](https://cibuildwheel.pypa.io/) to build all wheels from the archive.
+  4. Each wheel is repaired where needed, installed in an isolated environment, and tested with the Yoga layout suite and CLI. The complete artifact set must also pass platform, version, resource, and metadata checks.
+  5. Validated distributions are attached to the GitHub release before PyPI uploads begin. PyPI uses Trusted Publishing; no API token is needed.
+- The same distribution builds and checks run on PRs. The wheel matrix covers CPython 3.13 and 3.14 on Linux x86-64 and ARM64 (glibc 2.28 or newer), macOS Intel and Apple Silicon (macOS 11 or newer), and Windows x64. These are development-host wheels; mobile apps compile the bundled Yoga source in their native builds.
+- Build policy lives in `scripts/cibuildwheel.toml`, separately from the tagged package source, so fixed tooling can rebuild an older release without changing its code or version. Windows compiler/linker flags also support the original `v0.40.0` source; newer source distributions include the export settings in `setup.py`.
+- Commit types that trigger a release: `feat` (minor), `fix` and `perf` (patch), and `BREAKING CHANGE` (major, or minor before 1.0). Other types, including `build` and `ci`, don't trigger a release on their own. Use a `build` or `ci` title for a publishing-only repair that should recover the existing version.
+- Tag format: `v`-prefixed (for example, `v0.40.0`). Manual version bumps aren't needed.
+
+### Recovering a failed publication
+
+Version creation and package publication are separate jobs. A GitHub release can
+exist even when its PyPI upload failed. Rerunning version creation won't create
+another release for the same commits.
+
+Once the workflow repair is merged, select **Actions → Release → Run workflow**,
+choose `main`, and enter the existing tag in the recovery field. With the GitHub
+CLI, the equivalent is:
+
+```bash
+gh workflow run release.yml --ref main -f tag=v0.40.0
+```
+
+Recovery verifies that the tag belongs to `main` and matches the package version,
+then runs the same build and validation jobs. It doesn't bump the version,
+rewrite the tag, or change the tagged source. Existing distribution assets are
+reused byte for byte; missing assets are uploaded before publishing to PyPI.
+Files already uploaded to PyPI are skipped, so a partial upload can resume.
+Release runs are serialized to prevent competing uploads.
+
+For a build-only rehearsal, run **Distributions** with a `source-ref` of the tag
+or commit to check. This runs the full matrix without publishing anything:
+
+```bash
+gh workflow run wheels.yml --ref main -f source-ref=v0.40.0
+```
+
+A source-only install of `v0.40.0` on Windows still needs the export flags from
+`scripts/cibuildwheel.toml`; its tagged `setup.py` predates that fix. The recovered
+Windows wheels include those exports and install without a compiler.
 
 ### Branch naming (suggested)
 

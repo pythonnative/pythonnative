@@ -14,6 +14,10 @@ setup(
             include_dirs=[str(root)],
             language="c++",
             extra_compile_args=["/std:c++20"] if os.name == "nt" else ["-std=c++20"],
+            # ctypes loads Yoga's C API and our measurement callbacks from
+            # the extension DLL, not just Python's module initializer.
+            define_macros=[("_WINDLL", "1")] if os.name == "nt" else [],
+            export_symbols=["pn_yoga_callback", "pn_yoga_measure"] if os.name == "nt" else [],
         )
     ]
 )
