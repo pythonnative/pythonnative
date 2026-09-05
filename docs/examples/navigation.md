@@ -9,12 +9,20 @@ For the conceptual model and the full API, see the
 [Navigation guide](../guides/navigation.md) and the
 [Navigation API reference](../api/navigation.md).
 
-Paste any of the snippets below into `app/main.py` of a project
-scaffolded with `pn init`, then run `pn preview` (or `pn run android`
-/ `pn run ios`). The Stack, Tab, and Drawer examples define `App`
-directly and run as they are. The Nesting and Focus-aware effects
-snippets show a piece of a larger app; see the note at the end of
-each of those sections for what to run instead.
+## Run it
+
+Create a project with `pn init navigation-demo`, then `cd navigation-demo`.
+Replace `app/main.py` with the Stack, Tab, or Drawer snippet below.
+Each includes its imports and defines `App`, the project's root component.
+
+From the project root, run `pn preview` to open the app in your browser.
+To run on a device or simulator, leave the preview running and use
+`pn run android` or `pn run ios` in another terminal from the same
+directory. See the [Browser preview guide](../guides/browser-preview.md)
+and [Development workflow](../guides/dev-workflow.md) for more options.
+
+The Nesting and Focus-aware effects snippets need additional definitions;
+follow the note at the end of each section to try them.
 
 ## Stack navigator
 
@@ -72,6 +80,8 @@ A persistent tab bar at the bottom (iOS) or top (Android), with one
 screen per tab. Each tab keeps its own state across switches.
 
 ```python
+import pythonnative as pn
+
 Tabs = pn.create_tab_navigator()
 
 
@@ -115,6 +125,8 @@ is configured otherwise.
 A side drawer for primary navigation in larger apps.
 
 ```python
+import pythonnative as pn
+
 Drawer = pn.create_drawer_navigator()
 
 
@@ -168,11 +180,13 @@ def HomeStack():
 Pushing onto the inner stack leaves the tab bar visible; switching
 tabs preserves each stack's own history.
 
-This snippet sketches the composition rather than a complete app:
-`Feed` is defined in the Tab navigator example above, and `Post`
-isn't shown. To try it, add a `Post` screen and use this `App` in
-place of the Tab navigator's `App`, then follow the same `pn init`
-and `pn preview` steps as the other examples on this page.
+This snippet sketches the composition rather than a complete app.
+To try it, start from the Tab navigator example, keeping its import,
+`Tabs`, and `Feed`. Add `Stack = pn.create_stack_navigator()`, a `Post`
+screen, and a `ProfileStack` component that returns a `Stack.Navigator`
+with its own screens. Add `HomeStack` and replace the Tab example's
+`App` with the one above, which wraps the navigators in
+`pn.NavigationContainer`. Then follow the same run instructions.
 
 ## Focus-aware effects
 
@@ -193,11 +207,12 @@ def CameraScreen():
 The cleanup runs as soon as the user navigates away, even if the
 screen stays mounted.
 
-`CameraScreen` isn't wrapped in a navigator here. Define stand-ins
-for `start_camera` and `stop_camera`, then preview it on its own
-with `pn preview app.main.CameraScreen` instead of mounting it as
-`App`. See the Stack navigator example above for the full shape of
-an `App` that wraps a screen in a `NavigationContainer`.
+To try this with the Tab navigator example, keep its import and `App`,
+add `CameraScreen` and stand-ins for `start_camera` and `stop_camera`,
+and replace `Tabs.Screen(name="Settings", component=Settings)` with
+`Tabs.Screen(name="Camera", component=CameraScreen)`. Run `pn preview`,
+then switch between the Camera and Feed tabs to trigger the effect
+and its cleanup.
 
 ## Next steps
 
