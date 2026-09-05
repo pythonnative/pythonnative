@@ -55,7 +55,10 @@ the documented behavior never drifts from the code.
   an iOS release build to App Store Connect. See
   [Building for release](../guides/building-for-release.md).
 - `pn app-id android|ios`: print the resolved application id (Android)
-  or bundle id (iOS), handy for scripts and CI.
+  or bundle id (iOS), handy for scripts and CI. Flag: `--json` to print
+  a `{"platform": "...", "app_id": "..."}` object to stdout for
+  scripting; the config
+  error goes to stderr instead, and a missing config still exits 1.
 - `pn clean`: remove the local `build/` directory.
 - `pn --version` (`-V`): print the installed PythonNative version.
 

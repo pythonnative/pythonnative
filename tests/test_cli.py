@@ -363,13 +363,111 @@ def test_cli_run_without_config_errors() -> None:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-def test_cli_app_id_resolves(tmp_path: Path) -> None:
-    assert run_pn(["init", "my_app"], str(tmp_path)).returncode == 0
-    project_dir = str(tmp_path / "my_app")
-    result = run_pn(["app-id", "android"], project_dir)
+# A default `pn init` scaffold sets only `app.id`, so both platforms resolve to
+# the same string and a test built on it passes with the platform branch
+# inverted. These per-platform overrides make the two diverge.
+_APP_ID_TOML = """\
+[app]
+id = "com.example.base"
+name = "over"
+
+[ios]
+bundle_id = "com.example.ios_override"
+
+[android]
+application_id = "com.example.android_override"
+"""
+
+_EXPECTED_APP_IDS = {
+    "android": "com.example.android_override",
+    "ios": "com.example.ios_override",
+}
+
+
+def _app_id_project(tmp_path: Path) -> str:
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    (project_dir / "pythonnative.toml").write_text(_APP_ID_TOML, encoding="utf-8")
+    return str(project_dir)
+
+
+@pytest.mark.parametrize("platform", ["android", "ios"])
+def test_cli_app_id_resolves(tmp_path: Path, platform: str) -> None:
+    project_dir = _app_id_project(tmp_path)
+
+    result = run_pn(["app-id", platform], project_dir)
+
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "com.example.my_app"
-    assert run_pn(["app-id", "ios"], project_dir).stdout.strip() == "com.example.my_app"
+    # Unstripped, because scripts/run-e2e.sh captures this into a shell
+    # variable: any extra line would corrupt APP_ID and only surface later
+    # as a Maestro failure against a bundle id that doesn't exist.
+    assert result.stdout == f"{_EXPECTED_APP_IDS[platform]}\n"
+    assert result.stderr == ""
+
+
+@pytest.mark.parametrize("platform", ["android", "ios"])
+def test_cli_app_id_json(tmp_path: Path, platform: str) -> None:
+    project_dir = _app_id_project(tmp_path)
+
+    result = run_pn(["app-id", platform, "--json"], project_dir)
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload == {"platform": platform, "app_id": _EXPECTED_APP_IDS[platform]}
+    assert result.stderr == ""
+
+
+def test_cli_app_id_json_is_indented(tmp_path: Path) -> None:
+    # json.loads is blind to formatting, so nothing else here would notice
+    # indent=2 being dropped. Scripts consume the bytes, and the docstring
+    # promises an additive-only contract, so pin the exact shape once.
+    project_dir = _app_id_project(tmp_path)
+
+    result = run_pn(["app-id", "android", "--json"], project_dir)
+
+    assert result.stdout == ("{\n" '  "platform": "android",\n' '  "app_id": "com.example.android_override"\n' "}\n")
+
+
+def test_cli_app_id_json_differs_per_platform(tmp_path: Path) -> None:
+    # The pair, so a branch that ignored `platform` would fail even if each
+    # single-platform assertion above were somehow satisfied.
+    project_dir = _app_id_project(tmp_path)
+
+    android = json.loads(run_pn(["app-id", "android", "--json"], project_dir).stdout)
+    ios = json.loads(run_pn(["app-id", "ios", "--json"], project_dir).stdout)
+
+    assert android["app_id"] != ios["app_id"]
+
+
+def test_cli_app_id_json_keeps_errors_off_stdout(tmp_path: Path) -> None:
+    # Without --json this same error goes to stdout, which is why the stream
+    # is scoped rather than global.
+    result = run_pn(["app-id", "android", "--json"], str(tmp_path))
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    # Match the noun, not the sentence. A malformed config also exits 1 with
+    # an error on stderr, so without this phrase the test passes for either.
+    assert "No pythonnative.toml" in result.stderr
+
+
+def test_cli_app_id_plain_error_stays_on_stdout(tmp_path: Path) -> None:
+    # Pins the scoping: the default path is untouched by the stream change.
+    result = run_pn(["app-id", "android"], str(tmp_path))
+
+    assert result.returncode == 1
+    assert "No pythonnative.toml" in result.stdout
+    assert result.stderr == ""
+
+
+def test_cli_app_id_json_flag_is_wired_through_argparse(tmp_path: Path) -> None:
+    # Everything here goes through run_pn, so argparse is always exercised.
+    # Confirmed rather than assumed: #22 shipped six in-process tests that
+    # all passed with the add_argument deleted.
+    result = run_pn(["app-id", "android", "--json"], str(tmp_path))
+
+    assert result.returncode == 1, "expected the config error, not argparse exit 2"
+    assert "unrecognized arguments" not in result.stderr
 
 
 def test_cli_doctor_runs(tmp_path: Path) -> None:

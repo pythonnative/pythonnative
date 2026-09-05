@@ -24,7 +24,7 @@ The console script `pn` (declared in `pyproject.toml`) dispatches to:
 - `pn build android|ios`: produce standalone artifacts (signed APK/AAB,
   or an iOS archive/IPA, optionally uploaded to App Store Connect).
 - `pn app-id android|ios`: print the resolved application/bundle id
-  (handy for scripts and CI).
+  (handy for scripts and CI), as plain text or as JSON with `--json`.
 - `pn clean`: remove the local `build/` directory.
 
 The heavy lifting lives in the ``pythonnative.project`` and
@@ -289,11 +289,27 @@ def doctor_command(args: argparse.Namespace) -> None:
 def app_id_command(args: argparse.Namespace) -> None:
     """Print the resolved application id (Android) or bundle id (iOS).
 
+    With ``--json``, stdout carries one object,
+    ``{"platform": "...", "app_id": "..."}``, and nothing else; the config
+    error goes to stderr instead so stdout stays parseable. Keys may be
+    added to that object later, but none will be removed or renamed, so
+    a caller reading ``app_id`` keeps working.
+
+    A missing or invalid config still exits 1, with or without the flag.
+    That differs from ``pn devices --json``, which exits 0 on an empty
+    result, because "no devices" is a valid answer to a query whereas
+    an unreadable config means there is no id to report at all.
+
     Args:
-        args: Parsed namespace with ``platform``.
+        args: Parsed namespace with ``platform`` and optional ``json``.
     """
-    config = _load_config_or_exit()
-    print(config.application_id if args.platform == "android" else config.bundle_id)
+    as_json: bool = getattr(args, "json", False)
+    config = _load_config_or_exit(stream=sys.stderr if as_json else None)
+    app_id = config.application_id if args.platform == "android" else config.bundle_id
+    if as_json:
+        print(json.dumps({"platform": args.platform, "app_id": app_id}, indent=2))
+        return
+    print(app_id)
 
 
 # ======================================================================
@@ -921,11 +937,22 @@ def clean_project(args: argparse.Namespace) -> None:
 # ======================================================================
 
 
-def _load_config_or_exit(project_dir: Optional[Path] = None) -> AppConfig:
+def _load_config_or_exit(project_dir: Optional[Path] = None, *, stream: Optional[TextIO] = None) -> AppConfig:
+    """Load the project config or exit 1, reporting the error on ``stream``.
+
+    Args:
+        project_dir: Project root; defaults to the current directory.
+        stream: Where to report a failure. Defaults to stdout, which is
+            what every caller wants except a machine-readable mode, where
+            an error on stdout would corrupt the document.
+
+    Returns:
+        The loaded config.
+    """
     try:
         return AppConfig.load(project_dir or Path.cwd())
     except ConfigError as exc:
-        print(f"Error: {exc}")
+        print(f"Error: {exc}", file=stream or sys.stdout)
         sys.exit(1)
 
 
@@ -1161,6 +1188,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser_app_id = subparsers.add_parser("app-id", help="Print the resolved application/bundle id")
     parser_app_id.add_argument("platform", choices=["android", "ios"])
+    parser_app_id.add_argument(
+        "--json", action="store_true", help="Print a JSON object to stdout for scripting (errors go to stderr)"
+    )
     parser_app_id.set_defaults(func=app_id_command)
 
     parser_clean = subparsers.add_parser("clean", help="Remove the local build/ directory")
