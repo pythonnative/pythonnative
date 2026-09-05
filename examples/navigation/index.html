@@ -1853,6 +1853,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#run-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#stack-navigator" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3285,6 +3296,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#run-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#stack-navigator" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3391,6 +3413,17 @@ route with <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc
 <p>For the conceptual model and the full API, see the
 <a href="../../guides/navigation/">Navigation guide</a> and the
 <a href="../../api/navigation/">Navigation API reference</a>.</p>
+<h2 id="run-it">Run it<a class="headerlink" href="#run-it" title="Permanent link">&para;</a></h2>
+<p>Create a project with <code>pn init navigation-demo</code>, then <code>cd navigation-demo</code>.
+Replace <code>app/main.py</code> with the Stack, Tab, or Drawer snippet below.
+Each includes its imports and defines <code>App</code>, the project's root component.</p>
+<p>From the project root, run <code>pn preview</code> to open the app in your browser.
+To run on a device or simulator, leave the preview running and use
+<code>pn run android</code> or <code>pn run ios</code> in another terminal from the same
+directory. See the <a href="../../guides/browser-preview/">Browser preview guide</a>
+and <a href="../../guides/dev-workflow/">Development workflow</a> for more options.</p>
+<p>The Nesting and Focus-aware effects snippets need additional definitions;
+follow the note at the end of each section to try them.</p>
 <h2 id="stack-navigator">Stack navigator<a class="headerlink" href="#stack-navigator" title="Permanent link">&para;</a></h2>
 <p>A pushable, poppable stack. The default for "go from screen A to
 screen B with a back button".</p>
@@ -3439,65 +3472,69 @@ new one; <code>nav.go_back()</code> pops one frame. To replace the entire stack
 <h2 id="tab-navigator">Tab navigator<a class="headerlink" href="#tab-navigator" title="Permanent link">&para;</a></h2>
 <p>A persistent tab bar at the bottom (iOS) or top (Android), with one
 screen per tab. Each tab keeps its own state across switches.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">Tabs</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">create_tab_navigator</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">Feed</span><span class="p">():</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Feed"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">24</span><span class="p">})</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="k">def</span><span class="w"> </span><span class="nf">Search</span><span class="p">():</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="n">q</span><span class="p">,</span> <span class="n">set_q</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">TextInput</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">q</span><span class="p">,</span> <span class="n">on_change</span><span class="o">=</span><span class="n">set_q</span><span class="p">,</span> <span class="n">placeholder</span><span class="o">=</span><span class="s2">"Search..."</span><span class="p">),</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Results for: </span><span class="si">{</span><span class="n">q</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="p">)</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="k">def</span><span class="w"> </span><span class="nf">Settings</span><span class="p">():</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Settings"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">24</span><span class="p">})</span>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">NavigationContainer</span><span class="p">(</span>
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>        <span class="n">Tabs</span><span class="o">.</span><span class="n">Navigator</span><span class="p">(</span>
-</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>            <span class="n">Tabs</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Feed"</span><span class="p">,</span> <span class="n">component</span><span class="o">=</span><span class="n">Feed</span><span class="p">),</span>
-</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>            <span class="n">Tabs</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Search"</span><span class="p">,</span> <span class="n">component</span><span class="o">=</span><span class="n">Search</span><span class="p">),</span>
-</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>            <span class="n">Tabs</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Settings"</span><span class="p">,</span> <span class="n">component</span><span class="o">=</span><span class="n">Settings</span><span class="p">),</span>
-</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>        <span class="p">)</span>
-</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>    <span class="p">)</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">Tabs</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">create_tab_navigator</span><span class="p">()</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">Feed</span><span class="p">():</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Feed"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">24</span><span class="p">})</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="k">def</span><span class="w"> </span><span class="nf">Search</span><span class="p">():</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">q</span><span class="p">,</span> <span class="n">set_q</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">TextInput</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">q</span><span class="p">,</span> <span class="n">on_change</span><span class="o">=</span><span class="n">set_q</span><span class="p">,</span> <span class="n">placeholder</span><span class="o">=</span><span class="s2">"Search..."</span><span class="p">),</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Results for: </span><span class="si">{</span><span class="n">q</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="p">)</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="k">def</span><span class="w"> </span><span class="nf">Settings</span><span class="p">():</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Settings"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">24</span><span class="p">})</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">NavigationContainer</span><span class="p">(</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>        <span class="n">Tabs</span><span class="o">.</span><span class="n">Navigator</span><span class="p">(</span>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>            <span class="n">Tabs</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Feed"</span><span class="p">,</span> <span class="n">component</span><span class="o">=</span><span class="n">Feed</span><span class="p">),</span>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>            <span class="n">Tabs</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Search"</span><span class="p">,</span> <span class="n">component</span><span class="o">=</span><span class="n">Search</span><span class="p">),</span>
+</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>            <span class="n">Tabs</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Settings"</span><span class="p">,</span> <span class="n">component</span><span class="o">=</span><span class="n">Settings</span><span class="p">),</span>
+</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>        <span class="p">)</span>
+</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p>The search box keeps its query when the user switches to <strong>Settings</strong>
 and back; tab screens are not unmounted on blur unless the navigator
 is configured otherwise.</p>
 <h2 id="drawer-navigator">Drawer navigator<a class="headerlink" href="#drawer-navigator" title="Permanent link">&para;</a></h2>
 <p>A side drawer for primary navigation in larger apps.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">Drawer</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">create_drawer_navigator</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">Inbox</span><span class="p">():</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Inbox"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">24</span><span class="p">})</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="k">def</span><span class="w"> </span><span class="nf">Sent</span><span class="p">():</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Sent"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">24</span><span class="p">})</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">NavigationContainer</span><span class="p">(</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        <span class="n">Drawer</span><span class="o">.</span><span class="n">Navigator</span><span class="p">(</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>            <span class="n">Drawer</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Inbox"</span><span class="p">,</span> <span class="n">component</span><span class="o">=</span><span class="n">Inbox</span><span class="p">),</span>
-</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>            <span class="n">Drawer</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Sent"</span><span class="p">,</span> <span class="n">component</span><span class="o">=</span><span class="n">Sent</span><span class="p">),</span>
-</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>        <span class="p">)</span>
-</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>    <span class="p">)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">Drawer</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">create_drawer_navigator</span><span class="p">()</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">Inbox</span><span class="p">():</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Inbox"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">24</span><span class="p">})</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="k">def</span><span class="w"> </span><span class="nf">Sent</span><span class="p">():</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Sent"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">24</span><span class="p">})</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">NavigationContainer</span><span class="p">(</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>        <span class="n">Drawer</span><span class="o">.</span><span class="n">Navigator</span><span class="p">(</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>            <span class="n">Drawer</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Inbox"</span><span class="p">,</span> <span class="n">component</span><span class="o">=</span><span class="n">Inbox</span><span class="p">),</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>            <span class="n">Drawer</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Sent"</span><span class="p">,</span> <span class="n">component</span><span class="o">=</span><span class="n">Sent</span><span class="p">),</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>        <span class="p">)</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p>The drawer opens via a swipe from the leading edge or
 <code>nav.toggle_drawer()</code> from inside any screen.</p>
@@ -3523,6 +3560,13 @@ with a stack navigator inside each tab:</p>
 </span></code></pre></div>
 <p>Pushing onto the inner stack leaves the tab bar visible; switching
 tabs preserves each stack's own history.</p>
+<p>This snippet sketches the composition rather than a complete app.
+To try it, start from the Tab navigator example, keeping its import,
+<code>Tabs</code>, and <code>Feed</code>. Add <code>Stack = pn.create_stack_navigator()</code>, a <code>Post</code>
+screen, and a <code>ProfileStack</code> component that returns a <code>Stack.Navigator</code>
+with its own screens. Add <code>HomeStack</code> and replace the Tab example's
+<code>App</code> with the one above, which wraps the navigators in
+<code>pn.NavigationContainer</code>. Then follow the same run instructions.</p>
 <h2 id="focus-aware-effects">Focus-aware effects<a class="headerlink" href="#focus-aware-effects" title="Permanent link">&para;</a></h2>
 <p>When you need to start something only while a screen is on screen
 (camera, GPS, animation), use
@@ -3537,6 +3581,12 @@ tabs preserves each stack's own history.</p>
 </span></code></pre></div>
 <p>The cleanup runs as soon as the user navigates away, even if the
 screen stays mounted.</p>
+<p>To try this with the Tab navigator example, keep its import and <code>App</code>,
+add <code>CameraScreen</code> and stand-ins for <code>start_camera</code> and <code>stop_camera</code>,
+and replace <code>Tabs.Screen(name="Settings", component=Settings)</code> with
+<code>Tabs.Screen(name="Camera", component=CameraScreen)</code>. Run <code>pn preview</code>,
+then switch between the Camera and Feed tabs to trigger the effect
+and its cleanup.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Reference: <a href="../../api/navigation/">Navigation API</a>.</li>
