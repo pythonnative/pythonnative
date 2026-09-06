@@ -4,62 +4,110 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to recover (leave empty for a new release)
+        type: string
+        required: false
+
+# Serialize the entire release, including manual recoveries and uploads.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   release:
-    if: github.repository == 'pythonnative/pythonnative'
-    name: Semantic Release
-    runs-on: ubuntu-latest
-    concurrency:
-      group: release
-      cancel-in-progress: false
+    if: github.repository == 'pythonnative/pythonnative' && github.ref == 'refs/heads/main'
+    name: Select release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.select.outputs.tag }}
+      commit: ${{ steps.select.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: '3.13'
+      - name: Create a version or select an existing release
+        id: select
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RECOVERY_TAG: ${{ inputs.tag }}
+        run: |
+          if [ -n "$RECOVERY_TAG" ]; then
+            # Only published release tags from main can be recovered.
+            [[ "$RECOVERY_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+            commit=$(git rev-parse --verify "refs/tags/$RECOVERY_TAG^{commit}")
+            git merge-base --is-ancestor "$commit" origin/main
+            gh release view "$RECOVERY_TAG" --json isDraft --jq '.isDraft' | grep -qx false
+            tag="$RECOVERY_TAG"
+          else
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            # GitPython 3.1.60 removed Actor.name_email_regex, which PSR
+            # 9.21.2 still uses. Keep this constraint until PSR is upgraded.
+            uv tool install "python-semantic-release==9.21.2" --with "gitpython<3.1.60"
+            tags_before=$(git tag | wc -l)
+            semantic-release -v version
+            tags_after=$(git tag | wc -l)
+            if [ "$tags_after" -eq "$tags_before" ]; then
+              echo "No new release. To resume an upload, run this workflow with its existing tag."
+              exit 0
+            fi
+            tag=$(git describe --tags --exact-match HEAD)
+            commit=$(git rev-parse HEAD)
+          fi
+          # Check the tag against package metadata without importing/building it.
+          git show "$commit:pyproject.toml" > "$RUNNER_TEMP/release-project.toml"
+          RELEASE_TAG="$tag" python -c 'import os, pathlib, tomllib; data = tomllib.loads((pathlib.Path(os.environ["RUNNER_TEMP"]) / "release-project.toml").read_text()); assert os.environ["RELEASE_TAG"] == "v" + data["project"]["version"]'
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+  distributions:
+    name: Build release distributions
+    needs: release
+    if: needs.release.outputs.tag != ''
+    uses: ./.github/workflows/wheels.yml
+    with:
+      source-ref: ${{ needs.release.outputs.commit }}
+
+  publish:
+    name: Publish distributions
+    needs: [release, distributions]
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       id-token: write
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.0.1
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
         with:
-          enable-cache: true
+          name: release-distributions
+          path: dist
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
           python-version: '3.13'
-
-      # TEMPORARY: inlined replacement for the
-      # python-semantic-release/python-semantic-release@v9 action. That
-      # action builds its Docker image at job time with GitPython
-      # unpinned, and GitPython 3.1.60 (2026-08-25) removed
-      # Actor.name_email_regex, which crashes every semantic-release
-      # config load (python-semantic-release issue #1475). This step
-      # mirrors the action: same git identity, same `version` command,
-      # and a `released` output for the steps below. Restore the action
-      # once the fix (python-semantic-release PR #1477) is released.
-      - name: Python Semantic Release
-        id: release
+      - name: Preserve release assets for resumable publishing
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+        run: uv run --no-project python scripts/release-assets.py "$RELEASE_TAG" dist
+      - name: Validate the exact files to publish
+        env:
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          uv tool install "python-semantic-release==9.21.2" --with "gitpython<3.1.60"
-          tags_before=$(git tag | wc -l)
-          semantic-release -v version
-          tags_after=$(git tag | wc -l)
-          if [ "$tags_after" -gt "$tags_before" ]; then
-            echo "released=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "released=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # The distributions come from `build_command` in
-      # [tool.semantic_release], which runs `uv build` after PSR stamps the
-      # new version, so there is no separate build step here.
+          uv run --no-project --with packaging python scripts/check-distributions.py dist --version "${RELEASE_TAG#v}"
+          uvx twine check --strict dist/*
       - name: Publish to PyPI
-        if: steps.release.outputs.released == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true

@@ -153,11 +153,11 @@ target-version = ['py313']
 # PSR stamps the new version into pyproject.toml before running this, so
 # `--upgrade-package` re-syncs only this project's own version in the lock
 # (never dependency upgrades), and the staged uv.lock lands in the release
-# commit. This also replaces the workflow's separate `python -m build`.
+# commit. The release workflow builds distributions from that tagged commit
+# using the same cibuildwheel matrix as PR CI.
 build_command = """
 uv lock --upgrade-package pythonnative
 git add uv.lock
-uv build
 """
 version_toml = ["pyproject.toml:project.version"]
 version_variables = ["src/pythonnative/__init__.py:__version__"]
