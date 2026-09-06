@@ -3292,6 +3292,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#recovering-a-failed-publication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovering a failed publication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#branch-naming-suggested" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3615,6 +3626,17 @@
   
     <nav class="md-nav" aria-label="Versioning and releases">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recovering-a-failed-publication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovering a failed publication
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#branch-naming-suggested" class="md-nav__link">
@@ -4013,16 +4035,38 @@ aren't.</p>
 <ul>
 <li>The version is tracked in <code>pyproject.toml</code> (<code>project.version</code>) and mirrored in <code>src/pythonnative/__init__.py</code> as <code>__version__</code>. Both files are updated automatically by <a href="https://python-semantic-release.readthedocs.io/">python-semantic-release</a>.</li>
 <li><strong>Automated release pipeline</strong> (on every merge to <code>main</code>):</li>
-<li><code>python-semantic-release</code> scans Conventional Commit messages since the last tag.</li>
-<li>It determines the next SemVer bump: <code>feat</code> → <strong>minor</strong>, <code>fix</code>/<code>perf</code> → <strong>patch</strong>, <code>BREAKING CHANGE</code> → <strong>major</strong> (minor while version &lt; 1.0).</li>
-<li>Version files are updated, <code>CHANGELOG.md</code> is generated, and a tagged release commit (<code>chore(release): vX.Y.Z</code>) is pushed.</li>
-<li>A GitHub Release is created with auto-generated release notes and the built sdist/wheel attached.</li>
-<li>When drafts are disabled, the package is also published to PyPI via Trusted Publishing.</li>
-<li><strong>Draft / published toggle</strong>: the <code>DRAFT_RELEASE</code> variable at the top of <code>.github/workflows/release.yml</code> controls release mode. Set to <code>"true"</code> (the default) for draft GitHub Releases with PyPI publishing skipped; flip to <code>"false"</code> to publish releases and upload to PyPI immediately.</li>
-<li>Commit types that trigger a release: <code>feat</code> (minor), <code>fix</code> and <code>perf</code> (patch), <code>BREAKING CHANGE</code> (major). All other types (<code>build</code>, <code>chore</code>, <code>ci</code>, <code>docs</code>, <code>refactor</code>, <code>revert</code>, <code>style</code>, <code>test</code>) are recorded in the changelog but do <strong>not</strong> trigger a release on their own.</li>
-<li>Tag format: <code>v</code>-prefixed (e.g., <code>v0.4.0</code>).</li>
-<li>Manual version bumps are no longer needed: just merge PRs with valid Conventional Commit titles. For ad-hoc runs, use the workflow's <strong>Run workflow</strong> button (<code>workflow_dispatch</code>).</li>
+<li><code>python-semantic-release</code> scans Conventional Commits, updates the version files and <code>uv.lock</code>, generates <code>CHANGELOG.md</code>, and pushes the release commit and tag.</li>
+<li>A published GitHub release is created with generated release notes.</li>
+<li>The shared <code>Distributions</code> workflow builds a source archive from that exact commit, then uses <a href="https://cibuildwheel.pypa.io/">cibuildwheel</a> to build all wheels from the archive.</li>
+<li>Each wheel is repaired where needed, installed in an isolated environment, and tested with the Yoga layout suite and CLI. The complete artifact set must also pass platform, version, resource, and metadata checks.</li>
+<li>Validated distributions are attached to the GitHub release before PyPI uploads begin. PyPI uses Trusted Publishing; no API token is needed.</li>
+<li>The same distribution builds and checks run on PRs. The wheel matrix covers CPython 3.13 and 3.14 on Linux x86-64 and ARM64 (glibc 2.28 or newer), macOS Intel and Apple Silicon (macOS 11 or newer), and Windows x64. These are development-host wheels; mobile apps compile the bundled Yoga source in their native builds.</li>
+<li>Build policy lives in <code>scripts/cibuildwheel.toml</code>, separately from the tagged package source, so fixed tooling can rebuild an older release without changing its code or version. Windows compiler/linker flags also support the original <code>v0.40.0</code> source; newer source distributions include the export settings in <code>setup.py</code>.</li>
+<li>Commit types that trigger a release: <code>feat</code> (minor), <code>fix</code> and <code>perf</code> (patch), and <code>BREAKING CHANGE</code> (major, or minor before 1.0). Other types, including <code>build</code> and <code>ci</code>, don't trigger a release on their own. Use a <code>build</code> or <code>ci</code> title for a publishing-only repair that should recover the existing version.</li>
+<li>Tag format: <code>v</code>-prefixed (for example, <code>v0.40.0</code>). Manual version bumps aren't needed.</li>
 </ul>
+<h3 id="recovering-a-failed-publication">Recovering a failed publication<a class="headerlink" href="#recovering-a-failed-publication" title="Permanent link">&para;</a></h3>
+<p>Version creation and package publication are separate jobs. A GitHub release can
+exist even when its PyPI upload failed. Rerunning version creation won't create
+another release for the same commits.</p>
+<p>Once the workflow repair is merged, select <strong>Actions → Release → Run workflow</strong>,
+choose <code>main</code>, and enter the existing tag in the recovery field. With the GitHub
+CLI, the equivalent is:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>release.yml<span class="w"> </span>--ref<span class="w"> </span>main<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.40.0
+</span></code></pre></div>
+<p>Recovery verifies that the tag belongs to <code>main</code> and matches the package version,
+then runs the same build and validation jobs. It doesn't bump the version,
+rewrite the tag, or change the tagged source. Existing distribution assets are
+reused byte for byte; missing assets are uploaded before publishing to PyPI.
+Files already uploaded to PyPI are skipped, so a partial upload can resume.
+Release runs are serialized to prevent competing uploads.</p>
+<p>For a build-only rehearsal, run <strong>Distributions</strong> with a <code>source-ref</code> of the tag
+or commit to check. This runs the full matrix without publishing anything:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>wheels.yml<span class="w"> </span>--ref<span class="w"> </span>main<span class="w"> </span>-f<span class="w"> </span>source-ref<span class="o">=</span>v0.40.0
+</span></code></pre></div>
+<p>A source-only install of <code>v0.40.0</code> on Windows still needs the export flags from
+<code>scripts/cibuildwheel.toml</code>; its tagged <code>setup.py</code> predates that fix. The recovered
+Windows wheels include those exports and install without a compiler.</p>
 <h3 id="branch-naming-suggested">Branch naming (suggested)<a class="headerlink" href="#branch-naming-suggested" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Use lowercase kebab‑case; concise (≤ 40 chars).</li>
@@ -4038,34 +4082,34 @@ aren't.</p>
 <li><code>build/&lt;short-desc&gt;</code></li>
 </ul>
 <p>Examples:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>feat/cli-init
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>fix/core-threading-deadlock-123
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>docs/contributing
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>ci/publish-pypi
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>build/lock-versions
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>refactor/utils-paths
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>test/templates-android
-</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>fix/cli-regression
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>feat/cli-init
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>fix/core-threading-deadlock-123
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>docs/contributing
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>ci/publish-pypi
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>build/lock-versions
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>refactor/utils-paths
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>test/templates-android
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>fix/cli-regression
 </span></code></pre></div>
 <h3 id="e2e-tests-maestro">E2E tests (Maestro)<a class="headerlink" href="#e2e-tests-maestro" title="Permanent link">&para;</a></h3>
 <p>End-to-end tests use <a href="https://maestro.dev/">Maestro</a> to drive the dedicated <code>examples/e2e-suite</code> app on real emulators and simulators. That app contains one screen per public symbol in <code>pythonnative.__all__</code>; every flow under <code>tests/e2e/flows/&lt;category&gt;/</code> exercises one symbol.</p>
 <p>The dedicated <code>examples/hello-world</code> app is left in place as a small marketing demo; it's <strong>not</strong> the E2E target.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Install Maestro (one-time)</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>curl<span class="w"> </span>-Ls<span class="w"> </span><span class="s2">"https://get.maestro.mobile.dev"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>bash
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># For iOS, also install idb-companion</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>brew<span class="w"> </span>tap<span class="w"> </span>facebook/fb<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>brew<span class="w"> </span>install<span class="w"> </span>idb-companion
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Install Maestro (one-time)</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>curl<span class="w"> </span>-Ls<span class="w"> </span><span class="s2">"https://get.maestro.mobile.dev"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>bash
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># For iOS, also install idb-companion</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>brew<span class="w"> </span>tap<span class="w"> </span>facebook/fb<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>brew<span class="w"> </span>install<span class="w"> </span>idb-companion
 </span></code></pre></div>
 <p>Build and run everything via the convenience script:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Android (emulator must be running)</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>android
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># iOS (simulator must be running)</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>ios
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Android (emulator must be running)</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>android
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># iOS (simulator must be running)</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>ios
 </span></code></pre></div>
 <p>For tight iteration, run a single category instead of the full pass:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>android<span class="w"> </span>hooks
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>ios<span class="w"> </span>components
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>android<span class="w"> </span>hooks
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>ios<span class="w"> </span>components
 </span></code></pre></div>
 <p>Available categories: <code>components</code>, <code>hooks</code>, <code>navigation</code>, <code>layout</code>, <code>styling</code>, <code>animations</code>, <code>misc</code>.</p>
 <p>A coverage checker, <code>scripts/check-e2e-coverage.py</code>, gates CI: every name in <code>pythonnative.__all__</code> must be covered by a demo + flow, or listed in <code>INTENTIONAL_EXEMPTIONS</code> with a justification.</p>
