@@ -1,5 +1,6 @@
 global-exclude *.pyc *.pyo .DS_Store
 include scripts/cibuildwheel.toml scripts/check-distributions.py scripts/release-assets.py
+include .github/workflows/release.yml
 recursive-exclude src/pythonnative/native .build/* .gradle/* .cxx/* build/* .swiftpm/* .kotlin/*
 prune src/pythonnative/native/android/build
 prune src/pythonnative/native/android/.gradle

@@ -26,8 +26,10 @@ jobs:
     permissions:
       contents: write
     outputs:
-      tag: ${{ steps.select.outputs.tag }}
-      commit: ${{ steps.select.outputs.commit }}
+      # PSR writes its own `tag` output even when released=false. Forward
+      # only outputs we explicitly set after selecting a source commit.
+      tag: ${{ steps.select.outputs.release_tag }}
+      commit: ${{ steps.select.outputs.release_commit }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,13 +69,13 @@ jobs:
           # Check the tag against package metadata without importing/building it.
           git show "$commit:pyproject.toml" > "$RUNNER_TEMP/release-project.toml"
           RELEASE_TAG="$tag" python -c 'import os, pathlib, tomllib; data = tomllib.loads((pathlib.Path(os.environ["RUNNER_TEMP"]) / "release-project.toml").read_text()); assert os.environ["RELEASE_TAG"] == "v" + data["project"]["version"]'
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release_commit=$commit" >> "$GITHUB_OUTPUT"
 
   distributions:
     name: Build release distributions
     needs: release
-    if: needs.release.outputs.tag != ''
+    if: needs.release.outputs.tag != '' && needs.release.outputs.commit != ''
     uses: ./.github/workflows/wheels.yml
     with:
       source-ref: ${{ needs.release.outputs.commit }}
