@@ -2,11 +2,12 @@
 
 PythonNative is a cross-platform toolkit that turns Python ``@component``
 functions into real, native Android and iOS views. The component model
-is React-like (function components plus hooks). Python owns the
-component tree, reconciliation, and layout; each commit crosses once
-into a native rendering core (Swift ``PythonNativeKit`` on iOS, the
-Kotlin ``pythonnative`` module on Android) that owns every platform
-view, gesture, animation, and device API. There is no JavaScript.
+is React-like (function components plus hooks). Python owns the logical
+component tree and reconciliation on a dedicated asyncio application thread.
+Versioned commits cross into Swift ``PythonNativeKit`` on iOS and the Kotlin
+``pythonnative`` module on Android. Those renderers own widgets, Yoga layout,
+measurement, gestures, and animation frames on the platform UI thread.
+The browser preview uses DOM widgets and Yoga WebAssembly.
 
 Key building blocks:
 
@@ -27,9 +28,10 @@ Key building blocks:
   dicts), composable via [`StyleSheet`][pythonnative.StyleSheet].
   PythonNative ships a fully-typed [`Style`][pythonnative.style.Style]
   TypedDict so editors and ``mypy`` validate every key as you type.
-- **Animations** use the ``Animated`` namespace, modeled on React
-  Native's animation API. Animations are driven natively (Core
-  Animation / ``ViewPropertyAnimator``) whenever possible.
+- **Animations** use the ``Animated`` namespace. Serialized graphs
+  connect values, arithmetic, interpolation, and style bindings.
+  Native timing, spring, decay, scroll, and gesture drivers update
+  supported bindings without Python work on every frame.
 - **Gestures** attach to any view via the ``gestures=`` prop using
   descriptors from ``pythonnative.gestures``
   ([`Tap`][pythonnative.gestures.Tap],

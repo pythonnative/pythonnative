@@ -5,9 +5,9 @@ protocol implemented by Android and iOS handlers, plus the
 [`parse_color_int`][pythonnative.native_views.base.parse_color_int]
 helper shared across platforms.
 
-Layout itself is *not* a handler responsibility. The pure-Python flex
-engine in ``pythonnative.layout`` owns sizing and positioning;
-handlers receive computed frames via
+Yoga owns sizing and positioning. Mobile renderers run its C++ core beside
+their widgets; headless backends use the host binding in
+``pythonnative.layout``. Handlers receive computed frames via
 [`set_frame`][pythonnative.native_views.base.ViewHandler.set_frame] and
 optionally expose an intrinsic-size hook via
 [`measure_intrinsic`][pythonnative.native_views.base.ViewHandler.measure_intrinsic]

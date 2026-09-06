@@ -6,7 +6,7 @@ that thread. UIKit and Android retain their own UI threads; native bridge calls
 marshal view operations there and queue events back to Python.
 
 Ordinary asyncio networking, `TaskGroup`, timeouts, synchronization primitives,
-and third-party async libraries work without a guest-loop adapter. A synchronous
+and third-party async libraries run on this loop. A synchronous
 Python callback can still delay other Python work, so use `asyncio.to_thread`
 for blocking I/O and cooperative async work for long operations.
 

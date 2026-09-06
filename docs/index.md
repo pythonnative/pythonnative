@@ -4,7 +4,7 @@ PythonNative is a cross-platform toolkit for building native **Android**
 and **iOS** apps in plain Python. The component model is React-style
 (function components plus hooks plus a reconciler); rendering and
 device APIs are native Swift and Kotlin, driven over a small bridge
-with one transaction per commit. There is no JavaScript anywhere.
+with one transaction per commit. Application components run in Python.
 
 ## A taste
 
@@ -24,14 +24,15 @@ def Counter(initial: int = 0):
 
 That same `Counter` mounts as a `UILabel` plus a `UIButton` inside a
 `UIView` on iOS, and as a `TextView` plus a `Button` inside a
-`FrameLayout` on Android. PythonNative ships its own pure-Python
-flexbox engine, so the same `flex` / `padding` / `position` rules
-produce identical frames on both platforms.
+`FrameLayout` on Android. The shared Yoga layout engine interprets
+`flex`, `padding`, and `position` beside the native widgets.
+Platform controls and fonts supply their own intrinsic sizes.
 
 ## Why PythonNative?
 
-- **Real native widgets**, not a custom renderer. Accessibility,
-  theming, and platform behaviors come along for free.
+- **Real native widgets.** UIKit and Android controls provide platform
+  behavior. Configure accessibility labels and roles, and test navigation
+  and interaction on each platform.
 - **A familiar component model**. If you know React or React Native,
   you already know how PythonNative works.
 - **Python application code.** Components run on a dedicated asyncio

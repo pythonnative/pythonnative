@@ -342,7 +342,7 @@ Co-authored-by: Name <email>
   4. Each wheel is repaired where needed, installed in an isolated environment, and tested with the Yoga layout suite and CLI. The complete artifact set must also pass platform, version, resource, and metadata checks.
   5. Validated distributions are attached to the GitHub release before PyPI uploads begin. PyPI uses Trusted Publishing; no API token is needed.
 - The same distribution builds and checks run on PRs. The wheel matrix covers CPython 3.13 and 3.14 on Linux x86-64 and ARM64 (glibc 2.28 or newer), macOS Intel and Apple Silicon (macOS 11 or newer), and Windows x64. These are development-host wheels; mobile apps compile the bundled Yoga source in their native builds.
-- Build policy lives in `scripts/cibuildwheel.toml`, separately from the tagged package source, so fixed tooling can rebuild an older release without changing its code or version. Windows compiler/linker flags also support the original `v0.40.0` source; newer source distributions include the export settings in `setup.py`.
+- Build policy lives in `scripts/cibuildwheel.toml`, separately from the tagged package source, so fixed tooling can rebuild an existing release without changing its code or version.
 - Commit types that trigger a release: `feat` (minor), `fix` and `perf` (patch), and `BREAKING CHANGE` (major, or minor before 1.0). Other types, including `build` and `ci`, don't trigger a release on their own. Use a `build` or `ci` title for a publishing-only repair that should recover the existing version.
 - Tag format: `v`-prefixed (for example, `v0.40.0`). Manual version bumps aren't needed.
 
@@ -352,9 +352,10 @@ Version creation and package publication are separate jobs. A GitHub release can
 exist even when its PyPI upload failed. Rerunning version creation won't create
 another release for the same commits.
 
-Once the workflow repair is merged, select **Actions → Release → Run workflow**,
-choose `main`, and enter the existing tag in the recovery field. With the GitHub
-CLI, the equivalent is:
+To resume publication, select **Actions → Release → Run workflow**, choose
+`main`, and enter the existing tag in the recovery field. If the failure
+requires a workflow repair, merge that repair first. For example, with the
+GitHub CLI:
 
 ```bash
 gh workflow run release.yml --ref main -f tag=v0.40.0
@@ -373,10 +374,6 @@ or commit to check. This runs the full matrix without publishing anything:
 ```bash
 gh workflow run wheels.yml --ref main -f source-ref=v0.40.0
 ```
-
-A source-only install of `v0.40.0` on Windows still needs the export flags from
-`scripts/cibuildwheel.toml`; its tagged `setup.py` predates that fix. The recovered
-Windows wheels include those exports and install without a compiler.
 
 ### Branch naming (suggested)
 

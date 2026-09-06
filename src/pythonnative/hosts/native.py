@@ -54,7 +54,7 @@ def _flush_scheduled() -> None:
 
 
 def _request_flush() -> None:
-    """Queue one main-thread flush of every scheduled host."""
+    """Queue one application-thread flush of every scheduled host."""
     global _flush_pending
     if _flush_pending:
         return

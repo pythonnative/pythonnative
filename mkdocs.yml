@@ -68,7 +68,6 @@ nav:
   - Concepts:
     - Mental Model: concepts/mental-model.md
     - Architecture: concepts/architecture.md
-    - Runtime Overhaul: design/runtime-overhaul.md
     - Components: concepts/components.md
     - Hooks: concepts/hooks.md
     - Lifecycle: concepts/lifecycle.md

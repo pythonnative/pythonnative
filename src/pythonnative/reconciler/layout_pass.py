@@ -1,11 +1,12 @@
 """The layout phase of a reconciler pass.
 
-After native mutations commit, the reconciler builds a
-[`LayoutNode`][pythonnative.layout.LayoutNode] tree mirroring the
-native nodes of the mounted tree, runs the flexbox engine against the
-viewport, and emits a ``SetFrameOp`` for every frame that changed.
+After mutations commit, bridge backends request Yoga layout from the
+renderer and receive changed frames. Native widgets supply their own
+measurements; screen and row containers define their content rectangles.
 
-Two details keep this cheap on every state update:
+Headless backends build a [`LayoutNode`][pythonnative.layout.LayoutNode]
+tree, run the host Yoga binding, and emit ``SetFrameOp`` mutations.
+That path uses two optimizations:
 
 - **Incremental rebuild.** Each native ``VNode`` caches its
   ``LayoutNode``; subtrees whose props and child list are unchanged

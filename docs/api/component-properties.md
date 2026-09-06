@@ -1,11 +1,12 @@
-# Component Property Reference
+# Component property reference
 
 All visual and layout properties are passed via the `style` dict (or list of dicts) to element functions. Behavioural properties (callbacks, data, content) remain as keyword arguments.
 
-> Layout is computed by PythonNative's pure-Python flexbox engine (see
-> [Layout engine](../concepts/layout.md)). The same `style` keys produce the
-> same frames on Android and iOS; every property listed below is honoured by
-> the engine and applied via `set_frame` on the underlying native view.
+Layout properties are interpreted by Yoga beside the native widgets, with
+platform measurements for text and controls. Visual properties are applied by
+component managers. The browser preview uses Yoga WebAssembly and DOM widgets.
+See [Layout engine](../concepts/layout.md) for the shared rules and platform
+differences.
 
 ## Common layout properties (inside `style`)
 
@@ -476,12 +477,12 @@ pn.FlatList(data=items, render_item=render_fn, key_extractor=key_fn,
 - `data`: list of items
 - `render_item`: `(item, index) -> Element` function
 - `key_extractor`: `(item, index) -> str` for stable keys
-- `item_height`: fixed row height; qualifies the list for the native
-  RecyclerView / UICollectionView virtualization path (see the
+- `item_height`: fixed row extent; reduces measurement work in the native
+  RecyclerView / UICollectionView containers (see the
   [Lists guide](../guides/lists.md))
 - `separator_height`: spacing between items
-- `horizontal`: lay rows out left-to-right (Python-windowed engine)
-- `num_columns`: render as a grid of N columns (Python-windowed engine)
+- `horizontal`: scroll horizontally; row extents become widths
+- `num_columns`: render as a grid of N columns
 - `list_header` / `list_footer`: elements rendered once above / below rows
 - `list_empty`: element rendered when `data` is empty
 - `on_end_reached`: callback `() -> None` near the end (virtualized)

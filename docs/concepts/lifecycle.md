@@ -17,9 +17,10 @@ A render pass is triggered by:
 
 A `use_state` / `use_reducer` setter re-renders **locally**: only the
 component that owns the changed state (and the subtree it returns) is
-re-run, not the whole app. The full tree is rebuilt from the root only
-on initial mount, navigation, and hot reload. Sibling and ancestor
-components keep their existing native views and hook state untouched.
+re-run. Sibling and ancestor components retain their native views and hook
+state unless their own inputs or context change. Screens and mounted list
+rows belong to the same logical tree. Navigation updates that tree, and
+Fast Refresh preserves compatible component instances.
 
 The phases:
 
@@ -35,9 +36,9 @@ The phases:
    runs the layout pass.
 3. **Layout effects**.
    [`use_layout_effect`][pythonnative.use_layout_effect] callbacks run
-   synchronously inside the commit, after frames are set, so they can
-   measure committed geometry or issue view commands before the frame
-   is presented.
+   on the application thread after committed geometry is available,
+   before passive effects. They can inspect frames or issue view commands;
+   the platform UI thread owns presentation.
 4. **Passive effects**. Cleanup callbacks from the *previous* render
    run first; new [`use_effect`][pythonnative.use_effect] callbacks
    run after, in depth-first order so children run before parents.
@@ -79,7 +80,7 @@ For a class-component-style mental model:
 | `componentDidUpdate` | `use_effect(fn, deps=[a, b])` |
 | `componentWillUnmount` | the cleanup function returned from `use_effect` |
 | `getDerivedStateFromProps` | a plain expression at the top of the component |
-| `getSnapshotBeforeUpdate` | `use_layout_effect` (runs inside the commit, before paint-visible effects) |
+| `getSnapshotBeforeUpdate` | `use_layout_effect` (inspect committed geometry before passive effects) |
 
 ## Navigation lifecycle
 

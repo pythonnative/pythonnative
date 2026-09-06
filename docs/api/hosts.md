@@ -1,11 +1,15 @@
 # Hosts
 
-A screen host owns a [`Reconciler`][pythonnative.reconciler.Reconciler],
-schedules re-renders, and forwards platform lifecycle events (resume,
-pause, back press, destroy) to navigators and effects. It's also the
-[`HostNavigator`][pythonnative.navigation.HostNavigator] a root
-[`Stack.Navigator`][pythonnative.create_stack_navigator] talks to when
-it pushes real native screens.
+An application surface host owns a
+[`Reconciler`][pythonnative.reconciler.Reconciler], schedules Python work,
+and forwards lifecycle, viewport, and back events. Its logical tree includes
+screens, overlays, and mounted list rows. Native containers present those
+children without creating a separate Python host for every screen or row.
+
+The host also publishes cached navigation restoration state through the
+`Host` module. It implements the
+[`HostNavigator`][pythonnative.navigation.HostNavigator] interface used by
+navigation and headless tests.
 
 The bundled Android (`PNScreenFragment`) and iOS (`PNViewController`)
 templates create a host through the `Host` native module's `create`

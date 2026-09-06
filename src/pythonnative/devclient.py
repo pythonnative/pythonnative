@@ -23,7 +23,7 @@ How the pieces fit:
   for the next launch.
 
 All network I/O runs on a daemon thread; file writes happen there too,
-and only the reload itself hops to the main thread through
+and the reload itself runs on the application thread through
 ``call_on_application_thread``.
 """
 
@@ -258,8 +258,7 @@ class DevClient:
         if self._thread is not None:
             return
         self._stop.clear()
-        # Native modules expect the main thread; ``start`` runs there (the
-        # bootstrap or a tap handler), the client thread never does.
+        # Resolve device metadata before starting the network worker.
         self._device = _device_name()
         self._install_tee()
         self._thread = threading.Thread(target=self._run, name="pn-dev-client", daemon=True)

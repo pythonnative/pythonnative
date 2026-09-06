@@ -349,8 +349,9 @@ Supported keys: `rotate` (degrees), `scale`, `scale_x`, `scale_y`,
 
 ## Flex layout
 
-PythonNative uses a Yoga-style flexbox layout model implemented in
-pure Python (see [Layout engine](../concepts/layout.md)). `View` is
+PythonNative uses the shared Yoga flexbox engine, compiled into each mobile
+runtime and provided as WebAssembly in the browser preview (see
+[Layout engine](../concepts/layout.md)). `View` is
 the universal flex container, and `Column`/`Row` are convenience
 wrappers that fix the direction.
 

@@ -8,12 +8,13 @@ and their fixes, see [Troubleshooting](troubleshooting.md).
 PythonNative renders **real** native widgets through Swift and Kotlin
 component managers. A `pn.Text` becomes a `UILabel` /
 `TextView`; a `pn.Button` becomes a `UIButton` / `Button`.
-Accessibility, theming, and platform behaviors come along for free.
+Platform controls provide native behavior. Applications still need appropriate
+accessibility labels, roles, and testing on each deployment target.
 
 The component model is React-style (functions plus hooks plus a
 reconciler) so you get a familiar declarative API on top of those
-native widgets, instead of an imperative widget toolkit. There is no
-JavaScript bridge: native APIs are direct method calls from Python.
+native widgets. Python runs on its own application thread and communicates
+with the native UI through a versioned bridge.
 
 ## Can I write Android-only or iOS-only code?
 
@@ -50,9 +51,9 @@ For **previewing**, yes. `pn preview` renders your app in a browser tab
 inside a phone frame, with Fast Refresh on every save. It's the fastest
 inner loop: see your real UI and iterate in seconds without booting a
 simulator or deploying to a device. The page speaks the same bridge
-protocol as the Swift and Kotlin runtimes, so the reconciler, layout
-engine, hooks, navigation, and screen host are the exact code that
-ships to the phone. See the
+protocol as the Swift and Kotlin runtimes. It shares Python components,
+hooks, reconciliation, and logical navigation with mobile apps; the page
+implements widgets in the DOM and layout with Yoga WebAssembly. See the
 [Browser preview guide](../guides/browser-preview.md).
 
 The browser preview is a **development tool**, not a production target:
@@ -103,14 +104,13 @@ bundles the installed copy directly.
 
 ## Where do `flex`, `padding`, and `position: "absolute"` actually run?
 
-In Python. PythonNative ships its own pure-Python flexbox engine
-(`pythonnative.layout`) and runs it after every commit. The engine produces an absolute frame for every element, and
-the reconciler hands those frames to the platform handlers via
-`set_frame`. Containers on both platforms are simple
-`UIView` / `FrameLayout` instances; there's no `UIStackView` or
-`LinearLayout` in the picture, so there's no platform drift between
-the two backends. See [Layout engine](../concepts/layout.md) for
-details.
+In the Yoga C++ engine compiled into each mobile runtime. Python sends
+styles through the bridge; native widgets supply intrinsic measurements,
+and the renderer returns changed frames to Python. The browser uses Yoga
+WebAssembly, while headless tests use the Python host binding in
+`pythonnative.layout`. The layout rules are shared, but platform fonts
+and controls can have different intrinsic sizes. See
+[Layout engine](../concepts/layout.md).
 
 ## How is state shared across screens?
 
@@ -159,11 +159,12 @@ Two strategies, depending on the cadence:
 - **State-driven** (e.g., a fade triggered by a button press): keep
   the value in [`use_state`][pythonnative.use_state] and let the
   reconciler push updates. Fine up to a few updates per second.
-- **Frame-driven** (e.g., a spring animation at 60Hz): hold a
-  reference to the native view via
-  [`use_ref`][pythonnative.use_ref] and mutate it directly from a
-  display-link or `Choreographer` callback. Going through
-  `set_state` for every frame is wasteful.
+- **Frame-driven** (e.g., a spring animation): bind an
+  [`AnimatedValue`][pythonnative.AnimatedValue] into an
+  `Animated.View` style and drive it with `Animated.spring` or
+  `Animated.timing`. Native animation graphs update supported bindings
+  without running Python on every frame. See the
+  [Animations guide](../guides/animations.md) for examples and fallback cases.
 
 ## Is there async/await support?
 

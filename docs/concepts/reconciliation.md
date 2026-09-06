@@ -3,8 +3,7 @@
 Reconciliation is the process that turns a freshly produced
 [`Element`][pythonnative.Element] tree into the smallest set of native
 view mutations that bring the on-screen tree into agreement with it.
-PythonNative's reconciler is small (a few hundred lines) and intentional;
-this page covers how to think about it and the rules that govern keyed
+This page covers the rules that govern keyed
 diffing, function components, providers, and error boundaries.
 
 ## Why we need a reconciler
@@ -35,20 +34,23 @@ tree:
   as needed using [`InsertOp`][pythonnative.mutations.InsertOp] /
   [`DestroyOp`][pythonnative.mutations.DestroyOp].
 
-That's it. There's no "fiber tree", no time slicing, and no priority
-lanes. The reconciler runs synchronously to completion; if a render is
-heavy, you'll feel it as a frame drop, not a deferred update.
+The reconciler runs each render function synchronously to completion on the
+application thread. Expensive Python work delays callbacks and commits.
+Native scrolling and supported animation drivers run independently; see
+[Runtime limits](architecture.md#runtime-limits).
 
 ## Commits are transactions
 
 The diff phase is pure: it only accumulates ops. At the end of the
-pass the whole list (including the `SetFrameOp`s produced by the
-layout pass) is applied through a single
+pass the staged mutations are applied through a single
 [`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]
-call. The native side sees one coherent transaction per commit
-(mirroring React Native's Fabric mounting layer), which is also what
-makes `flush_dirty` batches cheap: several dirty components re-render,
-and their combined mutations land as one batch.
+call. The renderer validates the versioned transaction before applying it
+and acknowledges the committed revision. Layout then runs beside the native
+widgets and returns changed frames. Headless backends instead use the host
+Yoga binding and receive `SetFrameOp` mutations.
+
+`flush_dirty` combines work from several dirty components into a batch.
+See [Commits](bridge.md#commits) for validation and failure handling.
 
 Callable props never enter the transaction at all. They're registered
 in the [`EventRegistry`][pythonnative.events.EventRegistry] keyed by

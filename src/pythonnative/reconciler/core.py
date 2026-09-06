@@ -1,7 +1,8 @@
 """The [`Reconciler`][pythonnative.reconciler.core.Reconciler]: element trees in, native mutations out.
 
-One reconciler owns one mounted tree (a screen, a list row, a test
-render). Each pass runs the same phases in order:
+One reconciler owns a mounted application tree or headless test render.
+Logical screens, overlays, and mounted list rows share that tree.
+Each pass runs the same phases in order:
 
 1. **Render**: component bodies run for the subtrees that need it,
    producing [`Element`][pythonnative.Element] descriptions. Hook state

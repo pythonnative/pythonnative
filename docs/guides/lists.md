@@ -45,9 +45,8 @@ Three ways to tell the list how tall rows are, in order of preference:
   without measurement. Native containers use those extents directly.
 - Nothing at all: rows start at `estimated_item_height` (default 44)
   and are corrected with their measured extent once they've been on
-  screen. Scroll positions stay stable as estimates converge. This
-  always uses the Python-windowed engine (native recyclers need exact
-  heights before rows are rendered).
+  screen. Native containers refine their layout as measurements arrive;
+  variable-height rows use the same recycling path as fixed-height rows.
 
 `separator_height=` adds a fixed gap below every row.
 
@@ -168,13 +167,11 @@ estimated and measured).
   the window refresh in place rather than tearing down and rebuilding
   their subtree as the window shifts.
 - Provide real extents (`item_height` / `get_item_height`) when you
-  can. Exact extents reduce measurement work in the native RecyclerView / UICollectionView
-  path on device; measured estimation works but stays on the
-  Python-windowed engine and does more bookkeeping per scroll.
-- Features that force the windowed engine (`list_header`,
-  `list_footer`, `list_empty`, `refresh_control`, `num_columns`,
-  `horizontal`) are fine for short lists, but a very long feed is
-  smoothest with none of them and a fixed `item_height`.
+  can. Exact extents reduce native measurement work. For variable content,
+  choose an `estimated_item_height` close to typical row sizes.
+- Headers, footers, empty states, pull-to-refresh, grids, and horizontal
+  scrolling all use native recycling on mobile. Test representative content
+  and scrolling on your deployment targets.
 - Keep row subtrees shallow. The reconciler is fast, but mounting a
   hundred `Text`/`Image`/`Button` nodes per row is wasteful work
   every time a row enters the window.

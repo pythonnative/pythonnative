@@ -298,9 +298,9 @@ def _VirtualizedList(
 def _native_lists_supported() -> bool:
     """Whether the natively virtualized list path is available.
 
-    Android (RecyclerView) and iOS (UICollectionView) have native handlers;
-    the browser preview and off-device tests use the Python-windowed
-    engine. Patchable in tests to exercise the native routing.
+    Android (RecyclerView), iOS (UICollectionView), and the browser renderer
+    support logical row requests. Headless backends use the Python-windowed
+    engine. Patchable in tests to exercise renderer routing.
     """
     from ..native_views import get_registry
     from ..utils import IS_ANDROID, IS_IOS
@@ -468,10 +468,11 @@ def FlatList(
 ) -> Element:
     """Virtualized scrollable list that renders items from ``data`` lazily.
 
-    Only the rows inside (and just beyond) the viewport are mounted;
-    leading and trailing spacers stand in for everything else, and the
-    window shifts as the user scrolls. Rows may have **variable
-    heights**: pass ``item_height`` when rows are uniform,
+    A bounded window of keyed row components supplies content to the
+    renderer. UIKit collection views and Android recycler views own native
+    cells; the browser implements the same row-request protocol.
+    Headless backends use a scroll container with spacers.
+    Rows may have **variable heights**: pass ``item_height`` when rows are uniform,
     ``get_item_height`` for exact per-item extents, or nothing at all;
     unknown rows start at ``estimated_item_height`` and are corrected
     with their measured extent once they've been on screen.
