@@ -44,6 +44,7 @@ dev = [
   "mypy>=1.10",
   "pytest>=8.0",
   "pytest-asyncio>=0.23",
+  "PyYAML>=6.0",
   "Pillow>=10.0",
   # `pn deps` and `pn run ios` shell out to `sys.executable -m pip` to
   # resolve and vendor the app's [requirements].packages for the device
