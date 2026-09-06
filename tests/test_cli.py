@@ -12,6 +12,7 @@ import pytest
 
 import pythonnative.cli.pn as pn_cli
 from pythonnative.project.devices import Device
+from pythonnative.project.doctor import CheckResult
 
 
 def run_pn(args: List[str], cwd: str, env: Optional[Dict[str, str]] = None) -> "subprocess.CompletedProcess[str]":
@@ -796,6 +797,87 @@ def test_devices_json_serializes_awkward_field_values(
         "state": "",
         "is_ready": False,
     }
+
+
+# `pn doctor` tests mirror the `pn devices --json` ones: run doctor_command()
+# in-process with run_doctor stubbed, so the result doesn't depend on whatever
+# toolchain the test machine has. The one run_pn test drives a real project.
+_FAKE_CHECKS = [
+    CheckResult("pythonnative.toml", "ok", "com.example.demo (v0.1.0)"),
+    CheckResult("Host Python", "ok", "3.13.0"),
+    CheckResult("adb (Android platform-tools)", "warn", "not found on PATH"),
+]
+
+_FAKE_CHECKS_WITH_ERROR = _FAKE_CHECKS + [CheckResult("Xcode (xcodebuild)", "error", "not found on PATH")]
+
+
+def _fake_run_doctor(
+    results: List[CheckResult], calls: Optional[List[Optional[str]]] = None
+) -> Callable[..., List[CheckResult]]:
+    def _run(project_root: Path, *, platform: Optional[str] = None) -> List[CheckResult]:
+        if calls is not None:
+            calls.append(platform)
+        return list(results)
+
+    return _run
+
+
+def test_doctor_json_emits_parseable_array(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setattr(pn_cli.doctor_mod, "run_doctor", _fake_run_doctor(_FAKE_CHECKS))
+
+    pn_cli.doctor_command(argparse.Namespace(platform=None, json=True))
+
+    payload = json.loads(capsys.readouterr().out)
+    assert [entry["name"] for entry in payload] == [
+        "pythonnative.toml",
+        "Host Python",
+        "adb (Android platform-tools)",
+    ]
+    for entry in payload:
+        assert set(entry) == {"name", "level", "message"}
+    assert payload[2] == {"name": "adb (Android platform-tools)", "level": "warn", "message": "not found on PATH"}
+
+
+def test_doctor_json_keeps_human_text_off_stdout(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls: List[Optional[str]] = []
+    monkeypatch.setattr(pn_cli.doctor_mod, "run_doctor", _fake_run_doctor(_FAKE_CHECKS, calls))
+
+    pn_cli.doctor_command(argparse.Namespace(platform="android", json=True))
+
+    captured = capsys.readouterr()
+    json.loads(captured.out)
+    assert calls == ["android"]
+    assert "PythonNative doctor" not in captured.out
+    for check in _FAKE_CHECKS:
+        assert check.format() not in captured.out
+    assert "Ready, with warnings" not in captured.out
+    assert "Ready, with warnings" in captured.err
+
+
+def test_doctor_json_exit_code_and_summary_track_worst_level(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(pn_cli.doctor_mod, "run_doctor", _fake_run_doctor(_FAKE_CHECKS_WITH_ERROR))
+
+    with pytest.raises(SystemExit) as info:
+        pn_cli.doctor_command(argparse.Namespace(platform=None, json=True))
+
+    assert info.value.code == 1
+    captured = capsys.readouterr()
+    assert [entry["level"] for entry in json.loads(captured.out)][-1] == "error"
+    assert "Found problems that will block builds" in captured.err
+    assert "Found problems" not in captured.out
+
+
+def test_doctor_json_flag_is_wired_through_argparse(tmp_path: Path) -> None:
+    assert run_pn(["init", "my_app"], str(tmp_path)).returncode == 0
+    result = run_pn(["doctor", "android", "--json"], str(tmp_path / "my_app"))
+
+    assert result.returncode in (0, 1)
+    payload = json.loads(result.stdout)
+    assert {entry["level"] for entry in payload} <= {"ok", "warn", "error", "info"}
 
 
 class _FakeCompletedProc:
