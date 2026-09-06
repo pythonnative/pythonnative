@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3136,6 +3106,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#document-current-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Document current behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#grammar-and-punctuation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3439,6 +3420,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#document-current-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Document current behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#grammar-and-punctuation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3624,6 +3616,21 @@ cleanly inside a Python REPL on a developer machine or device.</p>
   <code>[`use_state`][pythonnative.use_state]</code>.</li>
 <li>Comments explain <strong>why</strong>, not <strong>what</strong> (the code already says what).</li>
 </ul>
+<h2 id="document-current-behavior">Document current behavior<a class="headerlink" href="#document-current-behavior" title="Permanent link">&para;</a></h2>
+<p>Concepts, guides, examples, and API references describe PythonNative as it
+currently works. When behavior changes, update the existing explanation and
+examples. Check related pages, the README (also displayed on PyPI), and source
+docstrings that feed the API reference for contradictory descriptions.</p>
+<p>Keep implementation progress, deleted-code inventories, one-time test counts,
+and local validation reports in the pull request. Release history belongs in the
+changelog and GitHub releases. Add a migration guide only when users need
+specific steps to update an existing application.</p>
+<p>Document current limitations and platform differences where they affect a
+reader's decisions. Put reusable development and release procedures in the
+contributing guide. A new page should teach a lasting concept or workflow;
+introducing a feature doesn't by itself call for a separate announcement page.</p>
+<p>A strict documentation build checks rendering and references. Review examples
+and behavioral claims against the implementation as well.</p>
 <h2 id="grammar-and-punctuation">Grammar and punctuation<a class="headerlink" href="#grammar-and-punctuation" title="Permanent link">&para;</a></h2>
 <p>We follow the <em>Chicago Manual of Style</em> (17<sup>th</sup> edition) for prose. Highlights:</p>
 <ul>

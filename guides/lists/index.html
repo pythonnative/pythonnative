@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3527,9 +3497,8 @@ viewport ever exists.</p>
   without measurement. Native containers use those extents directly.</li>
 <li>Nothing at all: rows start at <code>estimated_item_height</code> (default 44)
   and are corrected with their measured extent once they've been on
-  screen. Scroll positions stay stable as estimates converge. This
-  always uses the Python-windowed engine (native recyclers need exact
-  heights before rows are rendered).</li>
+  screen. Native containers refine their layout as measurements arrive;
+  variable-height rows use the same recycling path as fixed-height rows.</li>
 </ul>
 <p><code>separator_height=</code> adds a fixed gap below every row.</p>
 <h2 id="pull-to-refresh">Pull-to-refresh<a class="headerlink" href="#pull-to-refresh" title="Permanent link">&para;</a></h2>
@@ -3626,13 +3595,11 @@ estimated and measured).</p>
   the window refresh in place rather than tearing down and rebuilding
   their subtree as the window shifts.</li>
 <li>Provide real extents (<code>item_height</code> / <code>get_item_height</code>) when you
-  can. Exact extents reduce measurement work in the native RecyclerView / UICollectionView
-  path on device; measured estimation works but stays on the
-  Python-windowed engine and does more bookkeeping per scroll.</li>
-<li>Features that force the windowed engine (<code>list_header</code>,
-  <code>list_footer</code>, <code>list_empty</code>, <code>refresh_control</code>, <code>num_columns</code>,
-  <code>horizontal</code>) are fine for short lists, but a very long feed is
-  smoothest with none of them and a fixed <code>item_height</code>.</li>
+  can. Exact extents reduce native measurement work. For variable content,
+  choose an <code>estimated_item_height</code> close to typical row sizes.</li>
+<li>Headers, footers, empty states, pull-to-refresh, grids, and horizontal
+  scrolling all use native recycling on mobile. Test representative content
+  and scrolling on your deployment targets.</li>
 <li>Keep row subtrees shallow. The reconciler is fast, but mounting a
   hundred <code>Text</code>/<code>Image</code>/<code>Button</code> nodes per row is wasteful work
   every time a row enters the window.</li>

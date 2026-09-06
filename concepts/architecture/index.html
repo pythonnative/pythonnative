@@ -18,7 +18,7 @@
         <link rel="prev" href="../mental-model/">
       
       
-        <link rel="next" href="../../design/runtime-overhaul/">
+        <link rel="next" href="../components/">
       
       
         
@@ -543,8 +543,6 @@
       
         
       
-        
-      
     
     
     
@@ -721,6 +719,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#runtime-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-map" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -735,34 +744,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -3356,6 +3337,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#runtime-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-map" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3457,9 +3449,21 @@ run on a device. Test every supported deployment target.</p>
 custom-hook signatures remount affected instances. Changes to helper classes or
 services remount the application to avoid retaining instances of old definitions.
 Native contract changes require rebuilding the dev client.</p>
-<p><code>PN_PROFILE=/path/to/trace.json</code> records bounded Python phase timings and bridge
-work counters in Chrome trace format. Tests can use <code>profiling.Profiler</code> directly.
-The profiler doesn't retain component trees or application snapshots.</p>
+<p>Python phase timings and bridge work counters can be captured in Chrome trace
+format. See <a href="../../guides/dev-workflow/#profiling">Profiling</a> for collection and
+export instructions.</p>
+<h2 id="runtime-limits">Runtime limits<a class="headerlink" href="#runtime-limits" title="Permanent link">&para;</a></h2>
+<p>The application host uses one surface. A failed bridge commit requires a
+complete surface reset and remount; see <a href="../bridge/#commits">Commits</a>.
+Reconciliation reduces work at dirty component roots but doesn't time-slice
+arbitrary Python render functions. Long computations delay Python callbacks
+and commits even while native scrolling and animation drivers continue.
+Use cooperative async work, move blocking I/O off the application thread,
+and keep expensive computation out of render functions.</p>
+<p>Shared layout rules don't imply identical fonts or control sizes. Test
+intrinsic measurement, accessibility, and performance on your deployment
+targets. Simulator and emulator tests exercise app behavior; they don't
+validate device signing, store submission, or performance on physical devices.</p>
 <h2 id="source-map">Source map<a class="headerlink" href="#source-map" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3511,10 +3515,9 @@ The profiler doesn't retain component trees or application snapshots.</p>
 </tr>
 </tbody>
 </table>
-<p>The offline inbox in <code>examples/inbox</code> exercises shared providers, 2,000
-variable-height rows, cancellable search, forms, optimistic persistence, native
-navigation, and a generated native extension. Its Maestro flow lives in
-<code>tests/e2e/reference/inbox.yaml</code>.</p>
+<p>The <a href="../../examples/#complete-apps">Inbox example</a> combines shared providers,
+variable-height rows, cancellable search, forms, persistence, native navigation,
+and a generated native extension.</p>
 
 
 

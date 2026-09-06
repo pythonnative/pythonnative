@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3550,13 +3520,12 @@ PythonNative: edit a component, save, and see the result in well under a
 second, with no simulator boot, no device deploy, and no native build.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pn<span class="w"> </span>preview
 </span></code></pre></div>
-<p>The preview isn't a second rendering backend. The page is treated as a
-<strong>native runtime</strong>: it receives the same JSON transactions the Swift and
-Kotlin runtimes apply, answers the same <code>measure</code> / <code>command</code> /
-<code>animate</code> requests, and raises the same events. Your Python runs in the
-<code>pn preview</code> process with the on-device reconciler, screen host, hooks,
-navigation, async runtime, and flex layout engine unchanged. Only the
-leaf widgets differ: DOM elements instead of UIKit and Android views.</p>
+<p>The browser renderer speaks the same bridge protocol as the Swift and
+Kotlin renderers. Your components, hooks, reconciliation, logical navigation,
+and async work run in the <code>pn preview</code> Python process. The page implements
+widgets with DOM elements, layout with Yoga WebAssembly, and animation
+graphs with JavaScript. Platform controls, fonts, and device APIs differ
+from those in a mobile app.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
 <p>From a project directory (one created by <code>pn init</code>, with an
 <code>app/main.py</code> that defines <code>App</code>):</p>
@@ -3618,7 +3587,7 @@ mounted fresh on reconnect.</p>
    the bridge transport. Transactions the reconciler commits become
    <code>["apply", request_id, commit]</code> messages to the page; the page's events come back
    as <code>["cb", ...]</code> callbacks. Commits acknowledge exact revisions, and native
-   Yoga layout returns a batch of changed frames.</li>
+   Yoga WebAssembly layout returns a batch of changed frames.</li>
 <li>Runs Python callbacks and tasks on the standard application asyncio loop.
    The page owns DOM widgets and Yoga WebAssembly layout. Network I/O and Python
    work execute independently of the browser's UI thread.</li>
@@ -3640,8 +3609,9 @@ and intrinsic sizes match what you see.</p>
 <p>Root navigators (<code>create_stack_navigator</code>, tabs, drawer) drive a real
 stack of screens in the page, the same way they drive
 <code>UINavigationController</code> / AndroidX Navigation on device. Each pushed
-screen gets its own host and reconciler; <code>navigate(...)</code> pushes,
-<code>go_back()</code> pops, and the previous screen's state survives underneath.
+screen remains a logical child of the application's shared tree;
+<code>navigate(...)</code> selects or adds a route, <code>go_back()</code> pops, and covered
+screens keep their state.
 Pushes and pops animate with a slide.</p>
 <h3 id="dev-mode-and-errors">Dev mode and errors<a class="headerlink" href="#dev-mode-and-errors" title="Permanent link">&para;</a></h3>
 <p>The preview always runs with dev diagnostics on: unknown style keys and
@@ -3690,9 +3660,10 @@ and logic rather than pixel-perfect platform chrome.</p>
   borders, opacity, shadows, and overflow clipping.</li>
 <li><code>Animated</code> timing, spring, and decay, run through the same
   <code>animate</code> protocol the native animators implement; transforms,
-  opacity, and colors animate on the compositor.</li>
+  opacity, and colors update through the page's animation graph.</li>
 <li>Gestures: the page streams raw pointer events to the Python
-  <a href="../gestures/">gesture arbiter</a>, the same one Android uses.</li>
+  <a href="../gestures/">gesture arbiter</a>. Mobile renderers recognize gestures
+  in Swift and Kotlin.</li>
 <li>Scrolling, <code>FlatList</code> / <code>SectionList</code> windowing, pull to refresh,
   and scroll-driven <code>Animated.event</code> bindings.</li>
 </ul>

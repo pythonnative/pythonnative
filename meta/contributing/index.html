@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -4041,7 +4011,7 @@ aren't.</p>
 <li>Each wheel is repaired where needed, installed in an isolated environment, and tested with the Yoga layout suite and CLI. The complete artifact set must also pass platform, version, resource, and metadata checks.</li>
 <li>Validated distributions are attached to the GitHub release before PyPI uploads begin. PyPI uses Trusted Publishing; no API token is needed.</li>
 <li>The same distribution builds and checks run on PRs. The wheel matrix covers CPython 3.13 and 3.14 on Linux x86-64 and ARM64 (glibc 2.28 or newer), macOS Intel and Apple Silicon (macOS 11 or newer), and Windows x64. These are development-host wheels; mobile apps compile the bundled Yoga source in their native builds.</li>
-<li>Build policy lives in <code>scripts/cibuildwheel.toml</code>, separately from the tagged package source, so fixed tooling can rebuild an older release without changing its code or version. Windows compiler/linker flags also support the original <code>v0.40.0</code> source; newer source distributions include the export settings in <code>setup.py</code>.</li>
+<li>Build policy lives in <code>scripts/cibuildwheel.toml</code>, separately from the tagged package source, so fixed tooling can rebuild an existing release without changing its code or version.</li>
 <li>Commit types that trigger a release: <code>feat</code> (minor), <code>fix</code> and <code>perf</code> (patch), and <code>BREAKING CHANGE</code> (major, or minor before 1.0). Other types, including <code>build</code> and <code>ci</code>, don't trigger a release on their own. Use a <code>build</code> or <code>ci</code> title for a publishing-only repair that should recover the existing version.</li>
 <li>Tag format: <code>v</code>-prefixed (for example, <code>v0.40.0</code>). Manual version bumps aren't needed.</li>
 </ul>
@@ -4049,9 +4019,10 @@ aren't.</p>
 <p>Version creation and package publication are separate jobs. A GitHub release can
 exist even when its PyPI upload failed. Rerunning version creation won't create
 another release for the same commits.</p>
-<p>Once the workflow repair is merged, select <strong>Actions → Release → Run workflow</strong>,
-choose <code>main</code>, and enter the existing tag in the recovery field. With the GitHub
-CLI, the equivalent is:</p>
+<p>To resume publication, select <strong>Actions → Release → Run workflow</strong>, choose
+<code>main</code>, and enter the existing tag in the recovery field. If the failure
+requires a workflow repair, merge that repair first. For example, with the
+GitHub CLI:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>release.yml<span class="w"> </span>--ref<span class="w"> </span>main<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.40.0
 </span></code></pre></div>
 <p>Recovery verifies that the tag belongs to <code>main</code> and matches the package version,
@@ -4064,9 +4035,6 @@ Release runs are serialized to prevent competing uploads.</p>
 or commit to check. This runs the full matrix without publishing anything:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>wheels.yml<span class="w"> </span>--ref<span class="w"> </span>main<span class="w"> </span>-f<span class="w"> </span>source-ref<span class="o">=</span>v0.40.0
 </span></code></pre></div>
-<p>A source-only install of <code>v0.40.0</code> on Windows still needs the export flags from
-<code>scripts/cibuildwheel.toml</code>; its tagged <code>setup.py</code> predates that fix. The recovered
-Windows wheels include those exports and install without a compiler.</p>
 <h3 id="branch-naming-suggested">Branch naming (suggested)<a class="headerlink" href="#branch-naming-suggested" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Use lowercase kebab‑case; concise (≤ 40 chars).</li>

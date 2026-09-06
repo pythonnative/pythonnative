@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -4844,12 +4814,15 @@
 
 
 <h1 id="hosts">Hosts<a class="headerlink" href="#hosts" title="Permanent link">&para;</a></h1>
-<p>A screen host owns a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a>,
-schedules re-renders, and forwards platform lifecycle events (resume,
-pause, back press, destroy) to navigators and effects. It's also the
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;HostNavigator&lt;/span&gt;" href="../navigation/#pythonnative.navigation.handle.HostNavigator"><code>HostNavigator</code></a> a root
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_stack_navigator&lt;/span&gt;" href="../navigation/#pythonnative.navigation.navigators.create_stack_navigator"><code>Stack.Navigator</code></a> talks to when
-it pushes real native screens.</p>
+<p>An application surface host owns a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a>, schedules Python work,
+and forwards lifecycle, viewport, and back events. Its logical tree includes
+screens, overlays, and mounted list rows. Native containers present those
+children without creating a separate Python host for every screen or row.</p>
+<p>The host also publishes cached navigation restoration state through the
+<code>Host</code> module. It implements the
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;HostNavigator&lt;/span&gt;" href="../navigation/#pythonnative.navigation.handle.HostNavigator"><code>HostNavigator</code></a> interface used by
+navigation and headless tests.</p>
 <p>The bundled Android (<code>PNScreenFragment</code>) and iOS (<code>PNViewController</code>)
 templates create a host through the <code>Host</code> native module's <code>create</code>
 event and never need to be edited by app code; one
@@ -4868,12 +4841,13 @@ over a WebSocket (see
 
     <div class="doc doc-contents first">
 
-        <p>Screen hosts: the bridge between a native screen and the reconciler.</p>
+        <p>Application surface hosts connecting renderers to the reconciler.</p>
 <p>On every bridge platform (iOS, Android, and the browser preview) the
-native runtime creates screens through the bridge
+renderer creates an application host through the bridge
 (<code>callback("host", screen_id, "create", {...})</code>), which lands in
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NativeScreenHost&lt;/span&gt;" href="#pythonnative.hosts.native.NativeScreenHost"><code>NativeScreenHost</code></a>. Unit
-tests use the headless base <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ScreenHost&lt;/span&gt;" href="#pythonnative.hosts.ScreenHost"><code>ScreenHost</code></a>
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NativeScreenHost&lt;/span&gt;" href="#pythonnative.hosts.native.NativeScreenHost"><code>NativeScreenHost</code></a>.
+Screens, overlays, and mounted list rows remain in that host's logical tree.
+Tests use the headless base <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ScreenHost&lt;/span&gt;" href="#pythonnative.hosts.ScreenHost"><code>ScreenHost</code></a>
 with a fake backend, created through
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt;" href="#pythonnative.hosts.create_screen"><code>create_screen</code></a>.</p>
 
@@ -4967,7 +4941,7 @@ with a fake backend, created through
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_screen&lt;/span&gt; (&lt;code&gt;pythonnative.hosts.create_screen&lt;/code&gt;)" href="#pythonnative.hosts.create_screen">create_screen</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Create the screen host for a root component.</p>
+                  <p>Create an application surface host for a root component.</p>
                 </div>
               </td>
             </tr>
@@ -5979,7 +5953,7 @@ syntax error) propagate unchanged so the real cause stays visible.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Create the screen host for a root component.</p>
+        <p>Create an application surface host for a root component.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -6020,8 +5994,8 @@ so the dev server can reload it.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The platform object owning the screen (the
-integer screen id on the bridge platforms).</p>
+                <p>The platform object owning the surface (the
+integer host id on the bridge platforms).</p>
               </div>
             </td>
             <td>
@@ -6037,8 +6011,8 @@ integer screen id on the bridge platforms).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Optional JSON launch arguments (pushed screens
-receive their navigation history here).</p>
+                <p>Optional JSON launch arguments, including cached
+navigation restoration state.</p>
               </div>
             </td>
             <td>

@@ -543,8 +543,6 @@
       
         
       
-        
-      
     
     
     
@@ -749,34 +747,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3461,8 +3431,8 @@ runtime, however, is meaningfully different.</p>
   the previous one and applies the smallest set of native mutations.</li>
 <li>Native widgets are created and updated by Swift and Kotlin
   component managers that receive one serialized transaction per
-  commit over the <a href="../bridge/">native bridge</a>. There is no JavaScript
-  and no V8 / Hermes runtime.</li>
+  commit over the <a href="../bridge/">native bridge</a>. Mobile applications embed
+  CPython; the browser preview has its own JavaScript renderer.</li>
 </ul>
 <h2 id="the-runtime-in-one-diagram">The runtime in one diagram<a class="headerlink" href="#the-runtime-in-one-diagram" title="Permanent link">&para;</a></h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>@pn.component fn   ---&gt;   Element tree   ---&gt;   Reconciler   ---&gt;   Native views
@@ -3534,11 +3504,11 @@ that prevents render storms).</p>
 </tr>
 </tbody>
 </table>
-<p>The single most important consequence: there is <strong>no async boundary</strong>
-between Python and the native widget. Reading a label's text in Python
-is a synchronous JNI / Objective-C method call. That keeps the model
-small (no message-passing protocol, no serialization) and lets native
-APIs that expect synchronous, on-thread access just work.</p>
+<p>Python components run on a dedicated application thread. Native calls cross
+a versioned, serialized bridge and marshal widget operations to the platform
+UI thread. Native events are queued back to Python. Some module calls can
+return synchronously; asynchronous results and cancellation use the bridge's
+promise protocol. See <a href="../bridge/">The native bridge</a> for the contract.</p>
 <h2 id="how-pythonnative-differs-from-toga-beeware-kivy">How PythonNative differs from Toga, BeeWare, Kivy<a class="headerlink" href="#how-pythonnative-differs-from-toga-beeware-kivy" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Toga and Kivy are imperative widget toolkits. PythonNative is
@@ -3546,7 +3516,8 @@ APIs that expect synchronous, on-thread access just work.</p>
   figures out the diff.</li>
 <li>Kivy renders its own widgets via OpenGL. PythonNative renders
   <em>real</em> native widgets, so your buttons look like UIKit buttons on
-  iOS and Material buttons on Android, and accessibility just works.</li>
+  iOS and Material buttons on Android. Applications configure accessibility
+  labels and roles and test interaction on each platform.</li>
 <li>BeeWare's Briefcase is a packaging story; PythonNative ships its
   own <code>pn</code> CLI for the same purpose, plus a UI runtime.</li>
 </ul>
@@ -3554,7 +3525,8 @@ APIs that expect synchronous, on-thread access just work.</p>
 <p>When something feels surprising, fall back on these rules:</p>
 <div class="admonition tip">
 <p class="admonition-title">It's just Python</p>
-<p>There is no compiler, no transpiler, and no JS runtime.
+<p>Application functions run in CPython. Native Swift, Kotlin, and C++
+libraries are compiled when building the app.
 <code>print(x)</code> reaches the device console; <code>import foo</code> runs the
 bundled module. If a stack trace mentions <code>pythonnative.*</code>, you
 can open that file in your editor and read the source.</p>

@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -4501,8 +4471,9 @@ shorthand mapping:</p>
 <code>translate_x</code>, <code>translate_y</code>. For animated transforms, see
 <a href="../animations/">Animations</a>.</p>
 <h2 id="flex-layout">Flex layout<a class="headerlink" href="#flex-layout" title="Permanent link">&para;</a></h2>
-<p>PythonNative uses a Yoga-style flexbox layout model implemented in
-pure Python (see <a href="../../concepts/layout/">Layout engine</a>). <code>View</code> is
+<p>PythonNative uses the shared Yoga flexbox engine, compiled into each mobile
+runtime and provided as WebAssembly in the browser preview (see
+<a href="../../concepts/layout/">Layout engine</a>). <code>View</code> is
 the universal flex container, and <code>Column</code>/<code>Row</code> are convenience
 wrappers that fix the direction.</p>
 <h3 id="flex-container-properties">Flex container properties<a class="headerlink" href="#flex-container-properties" title="Permanent link">&para;</a></h3>

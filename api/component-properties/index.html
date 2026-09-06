@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -4027,14 +3997,13 @@
   
 
 
-<h1 id="component-property-reference">Component Property Reference<a class="headerlink" href="#component-property-reference" title="Permanent link">&para;</a></h1>
+<h1 id="component-property-reference">Component property reference<a class="headerlink" href="#component-property-reference" title="Permanent link">&para;</a></h1>
 <p>All visual and layout properties are passed via the <code>style</code> dict (or list of dicts) to element functions. Behavioural properties (callbacks, data, content) remain as keyword arguments.</p>
-<blockquote>
-<p>Layout is computed by PythonNative's pure-Python flexbox engine (see
-<a href="../../concepts/layout/">Layout engine</a>). The same <code>style</code> keys produce the
-same frames on Android and iOS; every property listed below is honoured by
-the engine and applied via <code>set_frame</code> on the underlying native view.</p>
-</blockquote>
+<p>Layout properties are interpreted by Yoga beside the native widgets, with
+platform measurements for text and controls. Visual properties are applied by
+component managers. The browser preview uses Yoga WebAssembly and DOM widgets.
+See <a href="../../concepts/layout/">Layout engine</a> for the shared rules and platform
+differences.</p>
 <h2 id="common-layout-properties-inside-style">Common layout properties (inside <code>style</code>)<a class="headerlink" href="#common-layout-properties-inside-style" title="Permanent link">&para;</a></h2>
 <p>All components accept these layout properties in their <code>style</code> dict:</p>
 <h3 id="sizing">Sizing<a class="headerlink" href="#sizing" title="Permanent link">&para;</a></h3>
@@ -4480,12 +4449,12 @@ absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
 <li><code>data</code>: list of items</li>
 <li><code>render_item</code>: <code>(item, index) -&gt; Element</code> function</li>
 <li><code>key_extractor</code>: <code>(item, index) -&gt; str</code> for stable keys</li>
-<li><code>item_height</code>: fixed row height; qualifies the list for the native
-  RecyclerView / UICollectionView virtualization path (see the
+<li><code>item_height</code>: fixed row extent; reduces measurement work in the native
+  RecyclerView / UICollectionView containers (see the
   <a href="../../guides/lists/">Lists guide</a>)</li>
 <li><code>separator_height</code>: spacing between items</li>
-<li><code>horizontal</code>: lay rows out left-to-right (Python-windowed engine)</li>
-<li><code>num_columns</code>: render as a grid of N columns (Python-windowed engine)</li>
+<li><code>horizontal</code>: scroll horizontally; row extents become widths</li>
+<li><code>num_columns</code>: render as a grid of N columns</li>
 <li><code>list_header</code> / <code>list_footer</code>: elements rendered once above / below rows</li>
 <li><code>list_empty</code>: element rendered when <code>data</code> is empty</li>
 <li><code>on_end_reached</code>: callback <code>() -&gt; None</code> near the end (virtualized)</li>

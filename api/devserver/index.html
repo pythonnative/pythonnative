@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -8213,8 +8183,8 @@ unchanged reuse their digest instead of being re-read.</p>
         <p>The dev server: HTTP for static assets, WebSocket for live peers.</p>
 <p>One <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;DevServer&lt;/span&gt;" href="#pythonnative.devserver.server.DevServer"><code>DevServer</code></a> runs on its
 own thread with a private <code>asyncio</code> loop, so it works both inside
-<code>pn start</code> (whose main thread runs the browser preview's app) and in
-tests. It exposes:</p>
+<code>pn start</code> and in tests independently of the Python application
+loop. It exposes:</p>
 <ul>
 <li><code>GET /</code>: the browser preview page.</li>
 <li><code>GET /static/&lt;name&gt;</code>: preview assets (JS, CSS).</li>
@@ -11315,7 +11285,7 @@ server, so the device log viewer is optional.</p>
   for the next launch.</li>
 </ul>
 <p>All network I/O runs on a daemon thread; file writes happen there too,
-and only the reload itself hops to the main thread through
+and the reload itself runs on the application thread through
 <code>call_on_application_thread</code>.</p>
 
 
@@ -12864,7 +12834,7 @@ the browser transport.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;post_to_application&lt;/span&gt; (&lt;code&gt;pythonnative.bridge.web.WebTransport.post_to_application&lt;/code&gt;)" href="#pythonnative.bridge.web.WebTransport.post_to_application">post_to_application</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Queue <code>fn</code> for the main loop (never runs inline).</p>
+                  <p>Queue <code>fn</code> on the application loop, or the fallback queue if it isn't running.</p>
                 </div>
               </td>
             </tr>
@@ -12872,7 +12842,7 @@ the browser transport.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;run_main_loop&lt;/span&gt; (&lt;code&gt;pythonnative.bridge.web.WebTransport.run_main_loop&lt;/code&gt;)" href="#pythonnative.bridge.web.WebTransport.run_main_loop">run_main_loop</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Drain main-thread work until <code>stop</code> is called (or <code>until</code> holds).</p>
+                  <p>Drain fallback work until <code>stop</code> is called or <code>until</code> holds.</p>
                 </div>
               </td>
             </tr>
@@ -12880,7 +12850,7 @@ the browser transport.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;drain_main&lt;/span&gt; (&lt;code&gt;pythonnative.bridge.web.WebTransport.drain_main&lt;/code&gt;)" href="#pythonnative.bridge.web.WebTransport.drain_main">drain_main</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Run queued main-thread work inline (tests); returns how many jobs ran.</p>
+                  <p>Run fallback-queue work inline for tests and return how many jobs ran.</p>
                 </div>
               </td>
             </tr>
@@ -12952,7 +12922,7 @@ the browser transport.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Hook for <code>["dev", {...}]</code> messages from the page (runs on the main thread).</p>
+                <p>Hook for <code>["dev", {...}]</code> messages on the Python application thread.</p>
               </div>
             </td>
           </tr>
@@ -12968,7 +12938,7 @@ the browser transport.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Called on the main thread with <code>True</code> on connect and <code>False</code> on disconnect.</p>
+                <p>Called on the application thread with <code>True</code> on connect and <code>False</code> on disconnect.</p>
               </div>
             </td>
           </tr>
@@ -13022,7 +12992,7 @@ the browser transport.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Hook for <code>["dev", {...}]</code> messages from the page (runs on the main thread).</p>
+        <p>Hook for <code>["dev", {...}]</code> messages on the Python application thread.</p>
 
     </div>
 
@@ -13046,7 +13016,7 @@ the browser transport.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Called on the main thread with <code>True</code> on connect and <code>False</code> on disconnect.</p>
+        <p>Called on the application thread with <code>True</code> on connect and <code>False</code> on disconnect.</p>
 
     </div>
 
@@ -13238,7 +13208,7 @@ the browser transport.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Queue <code>fn</code> for the main loop (never runs inline).</p>
+        <p>Queue <code>fn</code> on the application loop, or the fallback queue if it isn't running.</p>
 
 
     </div>
@@ -13260,10 +13230,10 @@ the browser transport.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Drain main-thread work until <code>stop</code> is called (or <code>until</code> holds).</p>
-<p>This is the preview's event loop: the browser's stand-in for the
-platform main queue. Call it from the thread that should own the
-framework (the process main thread under <code>pn preview</code>).</p>
+        <p>Drain fallback work until <code>stop</code> is called or <code>until</code> holds.</p>
+<p>The preview uses this as a coordinator while application callbacks
+run on the standard asyncio loop. When that loop isn't running,
+queued jobs execute on the thread calling this method.</p>
 
 
     </div>
@@ -13283,7 +13253,7 @@ framework (the process main thread under <code>pn preview</code>).</p>
 
     <div class="doc doc-contents ">
 
-        <p>Run queued main-thread work inline (tests); returns how many jobs ran.</p>
+        <p>Run fallback-queue work inline for tests and return how many jobs ran.</p>
 
 
     </div>

@@ -543,8 +543,6 @@
       
         
       
-        
-      
     
     
     
@@ -636,34 +634,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3557,8 +3527,7 @@
 <p>Reconciliation is the process that turns a freshly produced
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> tree into the smallest set of native
 view mutations that bring the on-screen tree into agreement with it.
-PythonNative's reconciler is small (a few hundred lines) and intentional;
-this page covers how to think about it and the rules that govern keyed
+This page covers the rules that govern keyed
 diffing, function components, providers, and error boundaries.</p>
 <h2 id="why-we-need-a-reconciler">Why we need a reconciler<a class="headerlink" href="#why-we-need-a-reconciler" title="Permanent link">&para;</a></h2>
 <p>Re-running a <code>@component</code> function returns a brand-new
@@ -3599,18 +3568,20 @@ tree:</p>
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
   &lt;/span&gt;" href="../../api/mutations/#pythonnative.mutations.DestroyOp"><code>DestroyOp</code></a>.</li>
 </ul>
-<p>That's it. There's no "fiber tree", no time slicing, and no priority
-lanes. The reconciler runs synchronously to completion; if a render is
-heavy, you'll feel it as a frame drop, not a deferred update.</p>
+<p>The reconciler runs each render function synchronously to completion on the
+application thread. Expensive Python work delays callbacks and commits.
+Native scrolling and supported animation drivers run independently; see
+<a href="../architecture/#runtime-limits">Runtime limits</a>.</p>
 <h2 id="commits-are-transactions">Commits are transactions<a class="headerlink" href="#commits-are-transactions" title="Permanent link">&para;</a></h2>
 <p>The diff phase is pure: it only accumulates ops. At the end of the
-pass the whole list (including the <code>SetFrameOp</code>s produced by the
-layout pass) is applied through a single
+pass the staged mutations are applied through a single
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply_mutations&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.NativeViewRegistry.apply_mutations"><code>apply_mutations</code></a>
-call. The native side sees one coherent transaction per commit
-(mirroring React Native's Fabric mounting layer), which is also what
-makes <code>flush_dirty</code> batches cheap: several dirty components re-render,
-and their combined mutations land as one batch.</p>
+call. The renderer validates the versioned transaction before applying it
+and acknowledges the committed revision. Layout then runs beside the native
+widgets and returns changed frames. Headless backends instead use the host
+Yoga binding and receive <code>SetFrameOp</code> mutations.</p>
+<p><code>flush_dirty</code> combines work from several dirty components into a batch.
+See <a href="../bridge/#commits">Commits</a> for validation and failure handling.</p>
 <p>Callable props never enter the transaction at all. They're registered
 in the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../../api/events/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a> keyed by
 <code>(tag, event name)</code>, so a render that only changes callback identities

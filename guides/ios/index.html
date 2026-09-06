@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3511,6 +3481,10 @@
 <p><code>PythonNativeKit/</code> holds the native rendering core (component managers, gesture recognizers, animations, native modules) and is linked as a local Swift package. Native plugins from <code>[plugins].paths</code> and installed packages are copied into <code>PythonNativeKit/Sources/PythonNativeKit/Plugins/</code> before <code>xcodebuild</code> runs.</p>
 <p>The Xcode project links the framework at build time and embeds CPython through its C API (<code>PythonRuntime.swift</code>); an "Install Python runtime" build phase installs the standard library and converts binary modules into signed frameworks. The built <code>.app</code> is therefore complete as soon as <code>xcodebuild</code> finishes, with no post-build patching. If Python fails to start or your root component fails to mount, the app shows a full-screen error report with the Python traceback instead of failing silently.</p>
 <h2 id="component-model">Component model<a class="headerlink" href="#component-model" title="Permanent link">&para;</a></h2>
+<p>The staged <code>yoga/</code> directory supplies the <code>YogaCore</code> Swift package,
+which <code>PythonNativeKit</code> depends on. Xcode compiles its C++ source for
+the selected device or simulator architecture during the app build.
+The desktop PythonNative wheel's host extension isn't used by the app.</p>
 <p>Your <code>app/</code> directory contains <code>@pn.component</code> function components.
 The native iOS template boots Python with
 <code>pythonnative.bootstrap.start()</code> and asks the <code>Host</code> native module to

@@ -543,8 +543,6 @@
       
         
       
-        
-      
     
     
     
@@ -636,34 +634,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3558,7 +3528,7 @@ the render loop.</p>
 </tr>
 <tr>
 <td><code>SetFrameOp(tag, x, y, w, h)</code></td>
-<td>Apply a layout frame. Only emitted for frames that actually changed.</td>
+<td>Apply a frame from headless layout or an explicit frame operation. Bridge renderers compute ordinary layout beside their widgets.</td>
 </tr>
 </tbody>
 </table>
@@ -3620,9 +3590,8 @@ view. The hooks mirror the op list:</p>
 </tr>
 </tbody>
 </table>
-<p>Managers do <strong>not</strong> read flex, margin, or padding props; those are
-interpreted by <code>pythonnative.layout</code> and turned into <code>f</code> ops. A
-manager only applies the frame it is given.</p>
+<p>Yoga interprets flex, margin, and padding props in the native renderer.
+Managers provide intrinsic measurements and apply computed frames.</p>
 <p>Managers fire events by tag through <code>PNEvents.emit(view, "on_change",
 [value])</code> (Swift) or <code>PNEvents.fire(view, "on_change", value)</code>
 (Kotlin). The bridge routes them to
@@ -3656,20 +3625,19 @@ lazily by <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_registry&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.set_registry"><code>set_registry</code></a> (or by
   constructing the <code>Reconciler</code> with the fake directly).</li>
 </ul>
-<p>Per-op failures are isolated on both sides: a bad prop on one view
-logs a tripwire (Python) or a rate-limited native log instead of
-desyncing the whole transaction.</p>
+<p>The renderer validates an entire commit before applying it. A rejected
+commit fails the surface, and further incremental updates require a reset
+and remount. See <a href="../bridge/#commits">Commits</a> for the failure contract.</p>
 <h2 id="layout-and-styling">Layout and styling<a class="headerlink" href="#layout-and-styling" title="Permanent link">&para;</a></h2>
-<p>Layout-related style keys are interpreted by the central
-<code>pythonnative.layout</code> engine, <em>not</em> by the platform managers. The full
+<p>Layout-related style keys are interpreted by the renderer's Yoga engine. The full
 list (sizing, flex, position, margin, padding, spacing, ...) is
 documented in <a href="../../api/component-properties/">Component properties</a>.
 The set of keys the layout engine consumes is exposed as
 <code>pythonnative.layout.LAYOUT_STYLE_KEYS</code>.</p>
 <p>Managers only deal with <strong>visual</strong> properties: colors, fonts, borders,
-corner radii, image scaling, text content. After each commit the
-reconciler runs the layout pass and emits <code>SetFrameOp</code>s for every node
-whose frame changed.</p>
+corner radii, image scaling, and text content. After each commit the
+renderer computes layout and returns changed frames to Python.
+Headless backends use <code>pythonnative.layout</code> and <code>SetFrameOp</code> instead.</p>
 <p>On each platform that boils down to:</p>
 <ul>
 <li><strong>iOS</strong>: every container is a <code>PNContainerView</code> (a plain <code>UIView</code>)
@@ -3683,8 +3651,8 @@ whose frame changed.</p>
   with <code>View.measure(...)</code> and <code>MeasureSpec</code>. Shared visual props are
   applied by <code>ViewStyler</code>.</li>
 </ul>
-<p>Because layout is centralized, the same <code>style</code> dict produces the same
-geometry on Android and iOS.</p>
+<p>Yoga provides shared layout rules. Native font metrics and control sizes
+can produce different intrinsic measurements on Android and iOS.</p>
 <h2 id="children">Children<a class="headerlink" href="#children" title="Permanent link">&para;</a></h2>
 <p>Children of a container element become subviews of the corresponding
 native view. The reconciler determines insertion order (and reorders
@@ -3704,15 +3672,14 @@ tree of <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-sy
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Hello"</span><span class="p">)</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">ops_of</span><span class="p">(</span><span class="s2">"create"</span><span class="p">)</span>  <span class="c1"># every applied op is recorded</span>
 </span></code></pre></div>
-<p>Unlike the production backend, the fake <strong>raises</strong> on malformed
-transactions (unknown tags, double-destroys), so reconciler bugs fail
-tests loudly instead of being swallowed. See the
+<p>The fake raises on malformed transactions, including unknown tags and
+double destroys, so tests expose invalid mutation sequences. See the
 <a href="../../guides/testing/">Testing guide</a>.</p>
 <p>The bridge itself is tested with
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeTransport&lt;/span&gt;" href="../../api/bridge/#pythonnative.bridge.fake.FakeTransport"><code>FakeTransport</code></a>, which
 decodes the JSON transactions the <code>BridgeBackend</code> produces and keeps a
 view tree the way native would. Native decoders and managers have
-their own XCTest and JUnit suites inside the templates.</p>
+their own XCTest and JUnit suites inside the native libraries.</p>
 <h2 id="custom-widgets">Custom widgets<a class="headerlink" href="#custom-widgets" title="Permanent link">&para;</a></h2>
 <p>Adding a widget means a Swift manager, a Kotlin manager, and a Python
 registration; the <a href="../../api/sdk/"><code>pythonnative.sdk</code></a> module gives you

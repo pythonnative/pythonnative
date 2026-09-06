@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3717,23 +3687,22 @@ automatically.</p>
 <p>The dev server (<code>pythonnative.devserver</code>) watches the project's
 <code>app/</code> directory and tells every connected dev client which files
 changed. This module is the client's other half: it re-executes the
-changed modules with <code>importlib</code> and refreshes every mounted screen.</p>
+changed modules with <code>importlib</code> and refreshes the logical application tree.</p>
 <p>Two strategies share the surface:</p>
 <ul>
 <li><strong>Fast Refresh</strong> (default): after reloading the changed modules the
   reconciler tree is walked and every component function whose module
-  was reloaded is swapped in place. Hook state, navigation state, and
-  even scroll positions survive because the underlying <code>VNode</code>
-  objects are reused; the next render simply calls the new function
-  bodies through the old slots.</li>
-<li><strong>Full remount</strong>: when the in-place swap fails (e.g. the new module
-  raised at import time, or a render exception bubbled out while
-  running the new function), the host falls back to building a
-  brand-new reconciler tree. State is lost but the app keeps running.</li>
+  was reloaded is matched to its replacement. Compatible hook signatures
+  preserve state; hook-order or custom-hook changes remount the affected
+  component instances. Covered screens and mounted rows participate in the
+  same refresh.</li>
+<li><strong>Full remount</strong>: changes to helper classes or services, or an unsuccessful
+  component swap, rebuild the application tree. State is reset. A module
+  import failure is reported while its previous definition remains available.</li>
 </ul>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply_reload&lt;/span&gt;" href="#pythonnative.hot_reload.apply_reload"><code>apply_reload</code></a> is the single
-entry point: it reloads once per process (several screens may be
-mounted) and then refreshes each live host.</p>
+entry point: it reloads once per process and then refreshes each live
+application host.</p>
 <p>On device, sources arrive in a writable <strong>overlay</strong> directory that
 shadows the app bundle (see
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;configure_dev_environment&lt;/span&gt;" href="#pythonnative.hot_reload.configure_dev_environment"><code>configure_dev_environment</code></a>);

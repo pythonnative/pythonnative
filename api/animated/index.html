@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3748,9 +3718,11 @@
 animations declaratively by binding <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a>
 instances to the <code>style</code> of an <code>Animated.View</code>, <code>Animated.Text</code>, or
 <code>Animated.Image</code>. The reconciler holds a <code>ref</code> to the underlying
-native view; the animation driver pushes value changes directly to
-the native handler's <code>set_animated_property</code> hook so per-frame updates
-bypass full reconciliation.</p>
+native view. Connected values, derived expressions, and style bindings
+form a graph evaluated by the renderer, so supported animations bypass
+Python reconciliation on each frame. Unattached values, Python listeners,
+callable easing functions, and backends that decline native animation use
+the Python ticker.</p>
 
 
 <div class="doc doc-object doc-module">
@@ -3789,27 +3761,24 @@ completion contract. The core primitives are:</p>
   inside <code>transform</code> entries.</li>
 </ul>
 <p>Driver architecture (the <strong>native driver</strong>):</p>
-<p>When an animation starts, PythonNative compiles its spec (curve,
-duration, target value) and offers it to the platform handler of every
-native view the value is attached to
-(<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;start_animation&lt;/span&gt;" href="../native_views/#pythonnative.native_views.base.ViewHandler.start_animation"><code>ViewHandler.start_animation</code></a>).</p>
+<p>Mounted bindings install a serialized graph of connected values, arithmetic,
+interpolation, and view properties. When an animation starts, PythonNative
+offers its timing, spring, or decay specification to the renderer through
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;start_animation&lt;/span&gt;" href="../native_views/#pythonnative.native_views.base.ViewHandler.start_animation"><code>ViewHandler.start_animation</code></a>.</p>
 <ul>
-<li><strong>Accepted</strong> (iOS Core Animation, Android <code>ViewPropertyAnimator</code> /
-  <code>DynamicAnimation</code>): the platform animates the property entirely
-  natively; no Python code runs per frame. Python receives exactly one
-  callback when the animation settles, updates the
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a>, and resolves
-  any awaiting tasks.</li>
+<li><strong>Accepted</strong>: the renderer evaluates the graph and applies its bindings
+  without Python work on every frame. Completion callbacks settle the
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a> and resolve
+  awaiting tasks.</li>
 <li><strong>Declined</strong> (unattached values, callable easings,
-  values feeding Python-side listeners or derived nodes): a single
+  values feeding Python-side listeners, or an unsupported backend): a single
   background thread ticks the animation at ~60 Hz from Python, pushing
   each frame through <code>set_animated_property</code>. Semantics are
   identical; only the frame source differs.</li>
 </ul>
-<p>Values driven by <em>events</em> (scroll offsets via <code>Animated.event</code>,
-gesture translations) flow through Python: the native listener fires,
-the bound values update, and every attachment (including derived
-nodes) is pushed in the same call.</p>
+<p>On mobile, scroll and gesture bindings feed graph values before input is
+queued to Python. Derived expressions can run in the renderer alongside their
+source drivers. Backends without graph support use Python for derived bindings.</p>
 
 
 <details class="example" open>

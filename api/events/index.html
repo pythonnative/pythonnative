@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3690,10 +3660,8 @@ commit; platform handlers read from it when a native widget fires.</p>
     <div class="doc doc-contents first">
 
         <p>Tag-based event routing between native views and Python callbacks.</p>
-<p>Before the batched-commit overhaul, every event prop (<code>on_press</code>,
-<code>on_change</code>, …) was wired by storing the Python callable on (or next
-to) the native view, and every re-render re-pushed fresh closures across
-the bridge. This module replaces that with a single dispatch channel:</p>
+<p>Event props such as <code>on_press</code> and <code>on_change</code> stay in a Python
+registry. Native views send a tag and event name through the bridge:</p>
 <ul>
 <li>The reconciler strips callable props out of the payload sent to
   native handlers and registers them here, keyed by <code>(tag, name)</code>.</li>
@@ -3913,9 +3881,8 @@ event nobody listens to is a cheap dict miss.</p>
 
 
         <p>Process-wide map of <code>(tag, event name) -&gt; Python callback</code>.</p>
-<p>Thread-safe: native backends may dispatch from the platform UI
-thread while the reconciler updates registrations from the render
-thread.</p>
+<p>Registration and lookup are protected by a lock. Bridge backends queue
+native input to the Python application thread before dispatching it.</p>
 
 
 

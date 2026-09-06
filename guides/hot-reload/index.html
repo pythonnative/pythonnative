@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3491,7 +3461,7 @@ any debug build launched with <code>pn run</code> while it's running is a client
    imported modules under <code>app</code> that may hold bindings to it (the
    entry module's <code>from app.screens.home import HomeScreen</code>, for
    instance), leaves first.</li>
-<li>Every live screen host runs <strong>Fast Refresh</strong>: it walks its VNode
+<li>The application host runs <strong>Fast Refresh</strong>: it walks its VNode
    tree, finds each component function whose module was reloaded,
    looks up the replacement by <code>__module__</code> + <code>__qualname__</code>, and
    rewrites the <code>Element.type</code> references in place. The next
@@ -3553,11 +3523,9 @@ preview or relaunch the device build.</p>
 <div class="admonition warning">
 <p class="admonition-title">Hook signature changes</p>
 <p>Adding or removing a hook in a component changes the slot layout.
-Fast Refresh swaps the function in place, and the next render may
-read the wrong slots; the host falls back to a remount when it
-detects the swap raising. If you see suspicious state after a
-hook-shape edit, close and reopen the affected screen (or reload
-the app) to clear the slate.</p>
+Fast Refresh compares captured hook signatures before preserving
+state. Hook-order and custom-hook changes remount affected component
+instances. Changes to helper classes or services remount the application.</p>
 </div>
 <div class="admonition info">
 <p class="admonition-title">Renaming a component</p>

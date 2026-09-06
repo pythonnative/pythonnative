@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3588,10 +3558,11 @@ and routes the callbacks through the same tag-based event channel as
 <p>Recognition itself is native:</p>
 <ul>
 <li><strong>iOS</strong> attaches real <code>UIGestureRecognizer</code> instances.</li>
-<li><strong>Android</strong> feeds raw <code>MotionEvent</code> streams into a pure-Python
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;GestureArbiter&lt;/span&gt;" href="../../api/gestures/#pythonnative.gestures.GestureArbiter"><code>GestureArbiter</code></a>.</li>
+<li><strong>Android</strong> processes <code>MotionEvent</code> streams with Kotlin recognizers
+  and an arbiter in the native rendering library.</li>
 <li><strong>The browser preview</strong> streams the page's pointer events into the
-  same arbiter, so gesture code is testable on a laptop.</li>
+  Python <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;GestureArbiter&lt;/span&gt;" href="../../api/gestures/#pythonnative.gestures.GestureArbiter"><code>GestureArbiter</code></a>,
+  which also supports headless recognition tests.</li>
 </ul>
 <p>Gestures listed side by side in the <code>gestures=</code> list recognize
 <em>simultaneously</em>. Use the composition combinators below when you need
@@ -3628,9 +3599,8 @@ combinators, nestable to any depth, control how recognizers relate:</p>
 <p>With <code>Exclusive</code>, a single tap reports only after the double-tap
 window closes, and a double tap suppresses the single-tap callback
 entirely; you get exactly one of the two. On iOS this maps to
-<code>requireGestureRecognizerToFail</code>; on Android and desktop the
-pure-Python arbiter implements the same waiting semantics, so behavior
-matches across platforms.</p>
+<code>requireGestureRecognizerToFail</code>; Android's Kotlin arbiter and the
+browser's Python arbiter implement the corresponding priority rules.</p>
 <h2 id="fling">Fling<a class="headerlink" href="#fling" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Fling&lt;/span&gt;
 

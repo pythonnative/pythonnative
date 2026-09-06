@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3597,14 +3567,15 @@ without re-rendering the component tree on every frame.</p>
 animation bindings after mount. From there, the <strong>native driver</strong>
 takes over whenever it can.</p>
 <h2 id="the-native-driver">The native driver<a class="headerlink" href="#the-native-driver" title="Permanent link">&para;</a></h2>
-<p>When you <code>start()</code> (or await) an animation whose value is attached to
-mounted views, PythonNative first offers the animation to the
-platform: Core Animation (<code>CABasicAnimation</code> / <code>CASpringAnimation</code>)
-on iOS, <code>ViewPropertyAnimator</code> / <code>DynamicAnimation</code> on Android. If
-the platform accepts, the animation runs entirely natively at the
-display's refresh rate (<strong>no Python code executes per frame</strong>), and
-Python receives exactly one completion callback, which settles the
-<code>AnimatedValue</code> at its final number.</p>
+<p>When an animated node is bound to mounted views, PythonNative serializes
+its connected values, arithmetic, interpolation, and style bindings into
+an animation graph. Starting or awaiting a timing, spring, or decay driver
+sends its specification to the renderer.</p>
+<p>On mobile, Swift and Kotlin evaluate the graph and apply its bindings on
+the UI thread. Derived values, color interpolation, and native scroll and
+gesture inputs can update without Python work on every frame. The browser
+implements graph evaluation in JavaScript. Completion is delivered back to
+Python to settle the value and resolve an awaiting task.</p>
 <p>The Python-ticked fallback (a ~60 Hz loop) is used automatically
 when:</p>
 <ul>
@@ -3743,11 +3714,10 @@ an interpolation:</p>
 plain numbers or between two nodes. The result is a read-only node:
 bind it into styles like any <code>AnimatedValue</code>, but drive the underlying
 source value.</p>
-<p>One thing to know: a value with derived dependents animates on the
-Python ticker rather than the fully native driver, because the graph
-has to be re-evaluated per frame to push the derived outputs. The
-API and end state are identical; for most UI work the difference isn't
-observable.</p>
+<p>Derived nodes are part of the serialized animation graph. Arithmetic and
+interpolation can therefore run in the renderer alongside their source
+driver. A backend without graph support uses the Python ticker for
+derived bindings.</p>
 <h2 id="scroll-driven-animation-with-animatedevent">Scroll-driven animation with <code>Animated.event</code><a class="headerlink" href="#scroll-driven-animation-with-animatedevent" title="Permanent link">&para;</a></h2>
 <p><code>Animated.event</code> builds an event handler that writes fields from the
 event payload straight into <code>AnimatedValue</code>s. The classic use is

@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -5665,9 +5635,9 @@ rebuild it from scratch.</p>
 protocol implemented by Android and iOS handlers, plus the
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;parse_color_int&lt;/span&gt;" href="#pythonnative.native_views.base.parse_color_int"><code>parse_color_int</code></a>
 helper shared across platforms.</p>
-<p>Layout itself is <em>not</em> a handler responsibility. The pure-Python flex
-engine in <code>pythonnative.layout</code> owns sizing and positioning;
-handlers receive computed frames via
+<p>Yoga owns sizing and positioning. Mobile renderers run its C++ core beside
+their widgets; headless backends use the host binding in
+<code>pythonnative.layout</code>. Handlers receive computed frames via
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_frame&lt;/span&gt;" href="#pythonnative.native_views.base.ViewHandler.set_frame"><code>set_frame</code></a> and
 optionally expose an intrinsic-size hook via
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;measure_intrinsic&lt;/span&gt;" href="#pythonnative.native_views.base.ViewHandler.measure_intrinsic"><code>measure_intrinsic</code></a>

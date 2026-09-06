@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -4135,8 +4105,9 @@ implementation detail:</p>
     <div class="doc doc-contents first">
 
         <p>The <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a>: element trees in, native mutations out.</p>
-<p>One reconciler owns one mounted tree (a screen, a list row, a test
-render). Each pass runs the same phases in order:</p>
+<p>One reconciler owns a mounted application tree or headless test render.
+Logical screens, overlays, and mounted list rows share that tree.
+Each pass runs the same phases in order:</p>
 <ol>
 <li><strong>Render</strong>: component bodies run for the subtrees that need it,
    producing <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../element/#pythonnative.element.Element"><code>Element</code></a> descriptions. Hook state

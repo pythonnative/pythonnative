@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3670,11 +3640,12 @@ and their fixes, see <a href="../troubleshooting/">Troubleshooting</a>.</p>
 <p>PythonNative renders <strong>real</strong> native widgets through Swift and Kotlin
 component managers. A <code>pn.Text</code> becomes a <code>UILabel</code> /
 <code>TextView</code>; a <code>pn.Button</code> becomes a <code>UIButton</code> / <code>Button</code>.
-Accessibility, theming, and platform behaviors come along for free.</p>
+Platform controls provide native behavior. Applications still need appropriate
+accessibility labels, roles, and testing on each deployment target.</p>
 <p>The component model is React-style (functions plus hooks plus a
 reconciler) so you get a familiar declarative API on top of those
-native widgets, instead of an imperative widget toolkit. There is no
-JavaScript bridge: native APIs are direct method calls from Python.</p>
+native widgets. Python runs on its own application thread and communicates
+with the native UI through a versioned bridge.</p>
 <h2 id="can-i-write-android-only-or-ios-only-code">Can I write Android-only or iOS-only code?<a class="headerlink" href="#can-i-write-android-only-or-ios-only-code" title="Permanent link">&para;</a></h2>
 <p>Yes. Two patterns:</p>
 <ul>
@@ -3707,9 +3678,9 @@ a small Python factory that returns
 inside a phone frame, with Fast Refresh on every save. It's the fastest
 inner loop: see your real UI and iterate in seconds without booting a
 simulator or deploying to a device. The page speaks the same bridge
-protocol as the Swift and Kotlin runtimes, so the reconciler, layout
-engine, hooks, navigation, and screen host are the exact code that
-ships to the phone. See the
+protocol as the Swift and Kotlin runtimes. It shares Python components,
+hooks, reconciliation, and logical navigation with mobile apps; the page
+implements widgets in the DOM and layout with Yoga WebAssembly. See the
 <a href="../../guides/browser-preview/">Browser preview guide</a>.</p>
 <p>The browser preview is a <strong>development tool</strong>, not a production target:
 platform chrome and fonts are approximated, most device APIs are
@@ -3751,14 +3722,13 @@ and the live compatibility matrix.</p>
 <p>Don't put <code>pythonnative</code> itself in <code>[requirements].packages</code>; the CLI
 bundles the installed copy directly.</p>
 <h2 id="where-do-flex-padding-and-position-absolute-actually-run">Where do <code>flex</code>, <code>padding</code>, and <code>position: "absolute"</code> actually run?<a class="headerlink" href="#where-do-flex-padding-and-position-absolute-actually-run" title="Permanent link">&para;</a></h2>
-<p>In Python. PythonNative ships its own pure-Python flexbox engine
-(<code>pythonnative.layout</code>) and runs it after every commit. The engine produces an absolute frame for every element, and
-the reconciler hands those frames to the platform handlers via
-<code>set_frame</code>. Containers on both platforms are simple
-<code>UIView</code> / <code>FrameLayout</code> instances; there's no <code>UIStackView</code> or
-<code>LinearLayout</code> in the picture, so there's no platform drift between
-the two backends. See <a href="../../concepts/layout/">Layout engine</a> for
-details.</p>
+<p>In the Yoga C++ engine compiled into each mobile runtime. Python sends
+styles through the bridge; native widgets supply intrinsic measurements,
+and the renderer returns changed frames to Python. The browser uses Yoga
+WebAssembly, while headless tests use the Python host binding in
+<code>pythonnative.layout</code>. The layout rules are shared, but platform fonts
+and controls can have different intrinsic sizes. See
+<a href="../../concepts/layout/">Layout engine</a>.</p>
 <h2 id="how-is-state-shared-across-screens">How is state shared across screens?<a class="headerlink" href="#how-is-state-shared-across-screens" title="Permanent link">&para;</a></h2>
 <p>Two main options:</p>
 <ul>
@@ -3797,11 +3767,12 @@ identity for the function so it can keep state across re-renders.</p>
 <li><strong>State-driven</strong> (e.g., a fade triggered by a button press): keep
   the value in <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_state&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_state"><code>use_state</code></a> and let the
   reconciler push updates. Fine up to a few updates per second.</li>
-<li><strong>Frame-driven</strong> (e.g., a spring animation at 60Hz): hold a
-  reference to the native view via
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_ref&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_ref"><code>use_ref</code></a> and mutate it directly from a
-  display-link or <code>Choreographer</code> callback. Going through
-  <code>set_state</code> for every frame is wasteful.</li>
+<li><strong>Frame-driven</strong> (e.g., a spring animation): bind an
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="../../api/animated/#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a> into an
+  <code>Animated.View</code> style and drive it with <code>Animated.spring</code> or
+  <code>Animated.timing</code>. Native animation graphs update supported bindings
+  without running Python on every frame. See the
+  <a href="../../guides/animations/">Animations guide</a> for examples and fallback cases.</li>
 </ul>
 <h2 id="is-there-asyncawait-support">Is there async/await support?<a class="headerlink" href="#is-there-asyncawait-support" title="Permanent link">&para;</a></h2>
 <p>Yes, and it's the core of the framework. PythonNative runs a single

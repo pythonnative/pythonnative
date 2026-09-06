@@ -543,8 +543,6 @@
       
         
       
-        
-      
     
     
     
@@ -636,34 +634,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -871,6 +841,17 @@
     <span class="md-ellipsis">
       
         Headless layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation-and-app-builds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation and app builds
       
     </span>
   </a>
@@ -3389,6 +3370,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#installation-and-app-builds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation and app builds
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#style-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3504,6 +3496,18 @@ space. Providers and component ownership continue through those containers.</p>
 <p>Headless tests use <code>LayoutNode</code> and <code>calculate_layout()</code> through the host Yoga
 binding. Stub intrinsic measurements make geometry tests deterministic. Real
 font metrics and platform control sizes must also be tested on devices.</p>
+<h2 id="installation-and-app-builds">Installation and app builds<a class="headerlink" href="#installation-and-app-builds" title="Permanent link">&para;</a></h2>
+<p>The host binding is included in the platform-specific PythonNative wheel.
+Precompiled wheels cover CPython 3.13 and 3.14 on macOS (Intel and Apple
+Silicon), Linux with glibc (x86-64 and ARM64), and Windows (x86-64). Pip or uv
+selects the matching wheel. Building from a source distribution requires a
+C++20 compiler.</p>
+<p>Device builds compile the bundled Yoga source for the application target.
+Xcode builds the <code>YogaCore</code> Swift package for iOS devices or simulators;
+Gradle invokes CMake and the Android NDK for the configured Android ABIs.
+The mobile renderer calls this native library through Swift or Kotlin, so it
+doesn't load the desktop Python extension. See the <a href="../../guides/ios/">iOS</a>
+and <a href="../../guides/android/">Android</a> guides for toolchain setup.</p>
 <h2 id="style-keys">Style keys<a class="headerlink" href="#style-keys" title="Permanent link">&para;</a></h2>
 <p>The engine recognises (and the reconciler routes to it) the following
 style keys, listed as <code>pythonnative.layout.LAYOUT_STYLE_KEYS</code>:</p>
@@ -3590,8 +3594,7 @@ flow. Its size and position come from a combination of <code>top</code> /
 edge offsets are measured from the inside of the padding, just like
 in CSS.</p>
 <h2 id="testing-layouts">Testing layouts<a class="headerlink" href="#testing-layouts" title="Permanent link">&para;</a></h2>
-<p>The layout engine is pure Python, so it is trivial to test in
-isolation:</p>
+<p>Use the host Yoga binding to test layout without a simulator or emulator:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">LayoutNode</span><span class="p">,</span> <span class="n">calculate_layout</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">root</span> <span class="o">=</span> <span class="n">LayoutNode</span><span class="p">(</span>

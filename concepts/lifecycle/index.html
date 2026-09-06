@@ -543,8 +543,6 @@
       
         
       
-        
-      
     
     
     
@@ -636,34 +634,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3481,9 +3451,10 @@ fold into it, and where you can hook in.</p>
 </ul>
 <p>A <code>use_state</code> / <code>use_reducer</code> setter re-renders <strong>locally</strong>: only the
 component that owns the changed state (and the subtree it returns) is
-re-run, not the whole app. The full tree is rebuilt from the root only
-on initial mount, navigation, and hot reload. Sibling and ancestor
-components keep their existing native views and hook state untouched.</p>
+re-run. Sibling and ancestor components retain their native views and hook
+state unless their own inputs or context change. Screens and mounted list
+rows belong to the same logical tree. Navigation updates that tree, and
+Fast Refresh preserves compatible component instances.</p>
 <p>The phases:</p>
 <ol>
 <li><strong>Render</strong>. The affected <code>@component</code> function(s) run (for a state
@@ -3498,9 +3469,9 @@ components keep their existing native views and hook state untouched.</p>
    runs the layout pass.</li>
 <li><strong>Layout effects</strong>.
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_layout_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_layout_effect"><code>use_layout_effect</code></a> callbacks run
-   synchronously inside the commit, after frames are set, so they can
-   measure committed geometry or issue view commands before the frame
-   is presented.</li>
+   on the application thread after committed geometry is available,
+   before passive effects. They can inspect frames or issue view commands;
+   the platform UI thread owns presentation.</li>
 <li><strong>Passive effects</strong>. Cleanup callbacks from the <em>previous</em> render
    run first; new <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a> callbacks
    run after, in depth-first order so children run before parents.</li>
@@ -3556,7 +3527,7 @@ component unmounts; no manual task bookkeeping is needed. See the
 </tr>
 <tr>
 <td><code>getSnapshotBeforeUpdate</code></td>
-<td><code>use_layout_effect</code> (runs inside the commit, before paint-visible effects)</td>
+<td><code>use_layout_effect</code> (inspect committed geometry before passive effects)</td>
 </tr>
 </tbody>
 </table>

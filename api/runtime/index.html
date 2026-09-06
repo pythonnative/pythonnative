@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3715,7 +3685,7 @@ thread. Component rendering, effects, event handlers, and async tasks run on
 that thread. UIKit and Android retain their own UI threads; native bridge calls
 marshal view operations there and queue events back to Python.</p>
 <p>Ordinary asyncio networking, <code>TaskGroup</code>, timeouts, synchronization primitives,
-and third-party async libraries work without a guest-loop adapter. A synchronous
+and third-party async libraries run on this loop. A synchronous
 Python callback can still delay other Python work, so use <code>asyncio.to_thread</code>
 for blocking I/O and cooperative async work for long operations.</p>
 <p>Component effects and async event handlers have component lifetimes. Unmounting

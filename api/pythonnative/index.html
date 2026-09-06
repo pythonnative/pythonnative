@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3408,11 +3378,12 @@ an explicit dotted path like <code>"app.main.RootScreen"</code> instead.</p>
         <p>PythonNative: declarative native UI for Android and iOS.</p>
 <p>PythonNative is a cross-platform toolkit that turns Python <code>@component</code>
 functions into real, native Android and iOS views. The component model
-is React-like (function components plus hooks). Python owns the
-component tree, reconciliation, and layout; each commit crosses once
-into a native rendering core (Swift <code>PythonNativeKit</code> on iOS, the
-Kotlin <code>pythonnative</code> module on Android) that owns every platform
-view, gesture, animation, and device API. There is no JavaScript.</p>
+is React-like (function components plus hooks). Python owns the logical
+component tree and reconciliation on a dedicated asyncio application thread.
+Versioned commits cross into Swift <code>PythonNativeKit</code> on iOS and the Kotlin
+<code>pythonnative</code> module on Android. Those renderers own widgets, Yoga layout,
+measurement, gestures, and animation frames on the platform UI thread.
+The browser preview uses DOM widgets and Yoga WebAssembly.</p>
 <p>Key building blocks:</p>
 <ul>
 <li><strong>Element factories</strong> (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Text&lt;/span&gt;" href="../components/#pythonnative.components.Text"><code>Text</code></a>,
@@ -3432,9 +3403,10 @@ view, gesture, animation, and device API. There is no JavaScript.</p>
   dicts), composable via <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;StyleSheet&lt;/span&gt;" href="../style/#pythonnative.style.StyleSheet"><code>StyleSheet</code></a>.
   PythonNative ships a fully-typed <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Style&lt;/span&gt;" href="../style/#pythonnative.style.Style"><code>Style</code></a>
   TypedDict so editors and <code>mypy</code> validate every key as you type.</li>
-<li><strong>Animations</strong> use the <code>Animated</code> namespace, modeled on React
-  Native's animation API. Animations are driven natively (Core
-  Animation / <code>ViewPropertyAnimator</code>) whenever possible.</li>
+<li><strong>Animations</strong> use the <code>Animated</code> namespace. Serialized graphs
+  connect values, arithmetic, interpolation, and style bindings.
+  Native timing, spring, decay, scroll, and gesture drivers update
+  supported bindings without Python work on every frame.</li>
 <li><strong>Gestures</strong> attach to any view via the <code>gestures=</code> prop using
   descriptors from <code>pythonnative.gestures</code>
   (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Tap&lt;/span&gt;

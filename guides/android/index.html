@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3509,6 +3479,9 @@
 <li><strong>Android 7.0 (API 24) or newer</strong>, the Chaquopy 17 floor; <code>[android].min_sdk</code> can't go lower.</li>
 <li><strong>64-bit ABIs only</strong> (<code>arm64-v8a</code>, <code>x86_64</code>): CPython 3.13+ on Chaquopy and PEP 738 wheels don't ship 32-bit builds.</li>
 <li><strong>JDK 17</strong> and the Android SDK; <code>pn doctor android</code> checks both.</li>
+<li><strong>Android NDK and CMake 3.22.1</strong> for the bundled Yoga C++ library.
+  Gradle builds it for each configured ABI. Install these SDK components
+  through Android Studio's SDK Manager if they're missing.</li>
 </ul>
 <h2 id="component-model">Component model<a class="headerlink" href="#component-model" title="Permanent link">&para;</a></h2>
 <p>Your <code>app/</code> directory contains <code>@pn.component</code> function components.

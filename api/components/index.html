@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -8832,10 +8802,11 @@ on iOS.</p>
     <div class="doc doc-contents ">
 
         <p>Virtualized scrollable list that renders items from <code>data</code> lazily.</p>
-<p>Only the rows inside (and just beyond) the viewport are mounted;
-leading and trailing spacers stand in for everything else, and the
-window shifts as the user scrolls. Rows may have <strong>variable
-heights</strong>: pass <code>item_height</code> when rows are uniform,
+<p>A bounded window of keyed row components supplies content to the
+renderer. UIKit collection views and Android recycler views own native
+cells; the browser implements the same row-request protocol.
+Headless backends use a scroll container with spacers.
+Rows may have <strong>variable heights</strong>: pass <code>item_height</code> when rows are uniform,
 <code>get_item_height</code> for exact per-item extents, or nothing at all;
 unknown rows start at <code>estimated_item_height</code> and are corrected
 with their measured extent once they've been on screen.</p>

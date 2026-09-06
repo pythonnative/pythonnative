@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3483,18 +3453,17 @@
   (like <code>use_state</code>) work because the decorator establishes a hook
   context for each call.</li>
 <li><code>pn.use_state(0)</code> returns <code>(value, setter)</code>. The setter triggers a
-  re-render scheduled by the screen host.</li>
+  re-render scheduled on the Python application thread.</li>
 <li><code>pn.Column(*children, style=...)</code> returns a vertical container
   element. Both the children and the style are read on every render;
   the reconciler diffs them against the previous render and updates
   the underlying <code>UIView</code> / <code>FrameLayout</code> in place.</li>
 <li><code>pn.Text</code> and <code>pn.Button</code> map to native widgets via their
-  registered <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a>
-  implementations.</li>
+  Swift and Kotlin component managers.</li>
 <li>After every commit a <a href="../../concepts/layout/">layout pass</a> computes
-  an absolute frame for every element using PythonNative's pure-Python
-  flexbox engine, so <code>spacing</code>, <code>padding</code>, and <code>align_items</code> produce
-  the same geometry on Android and iOS.</li>
+  frame for each widget using Yoga and the platform's intrinsic
+  measurements. <code>spacing</code>, <code>padding</code>, and <code>align_items</code> follow shared
+  layout rules; fonts and control sizes can differ by platform.</li>
 </ul>
 <h2 id="run-it">Run it<a class="headerlink" href="#run-it" title="Permanent link">&para;</a></h2>
 <h3 id="preview-in-the-browser">Preview in the browser<a class="headerlink" href="#preview-in-the-browser" title="Permanent link">&para;</a></h3>

@@ -652,8 +652,6 @@
       
         
       
-        
-      
     
     
     
@@ -744,34 +742,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3443,7 +3413,7 @@
 and <strong>iOS</strong> apps in plain Python. The component model is React-style
 (function components plus hooks plus a reconciler); rendering and
 device APIs are native Swift and Kotlin, driven over a small bridge
-with one transaction per commit. There is no JavaScript anywhere.</p>
+with one transaction per commit. Application components run in Python.</p>
 <h2 id="a-taste">A taste<a class="headerlink" href="#a-taste" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -3459,13 +3429,14 @@ with one transaction per commit. There is no JavaScript anywhere.</p>
 </span></code></pre></div>
 <p>That same <code>Counter</code> mounts as a <code>UILabel</code> plus a <code>UIButton</code> inside a
 <code>UIView</code> on iOS, and as a <code>TextView</code> plus a <code>Button</code> inside a
-<code>FrameLayout</code> on Android. PythonNative ships its own pure-Python
-flexbox engine, so the same <code>flex</code> / <code>padding</code> / <code>position</code> rules
-produce identical frames on both platforms.</p>
+<code>FrameLayout</code> on Android. The shared Yoga layout engine interprets
+<code>flex</code>, <code>padding</code>, and <code>position</code> beside the native widgets.
+Platform controls and fonts supply their own intrinsic sizes.</p>
 <h2 id="why-pythonnative">Why PythonNative?<a class="headerlink" href="#why-pythonnative" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Real native widgets</strong>, not a custom renderer. Accessibility,
-  theming, and platform behaviors come along for free.</li>
+<li><strong>Real native widgets.</strong> UIKit and Android controls provide platform
+  behavior. Configure accessibility labels and roles, and test navigation
+  and interaction on each platform.</li>
 <li><strong>A familiar component model</strong>. If you know React or React Native,
   you already know how PythonNative works.</li>
 <li><strong>Python application code.</strong> Components run on a dedicated asyncio

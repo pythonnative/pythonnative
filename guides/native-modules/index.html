@@ -541,8 +541,6 @@
       
         
       
-        
-      
     
     
     
@@ -633,34 +631,6 @@
     
   
     Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../design/runtime-overhaul/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Runtime Overhaul
   
 
     
@@ -3876,7 +3846,8 @@ reads a single GPS fix.</p>
 loading/data/error state for you and exposes a <code>refetch()</code> callable.</p>
 <p>For continuous updates, write a small native module that subscribes
 to <code>CLLocationManagerDelegate</code> (iOS) or <code>LocationManager.requestUpdates</code>
-(Android) and pushes deltas through <code>set_state</code> from the main thread.</p>
+(Android). Send updates through the module event channel; the Python callback
+can call <code>set_state</code> on the application thread.</p>
 <h2 id="file-system">File system<a class="headerlink" href="#file-system" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FileSystem&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.file_system.FileSystem"><code>FileSystem</code></a>
 answers the one question the standard library can't, "where may this
@@ -4099,7 +4070,7 @@ them by that name and never imports platform code.</p>
 </span></code></pre></div>
 <p>Settling the promise before <code>call</code> returns answers Python inline (a
 plain synchronous return). Settling it later, from any thread, delivers
-the result through the bridge's event channel on the main thread. Push
+the result through the bridge's event channel to the Python application thread. Push
 unsolicited events with <code>PNModuleEvents.emit(module:event:payload:)</code> /
 <code>ModuleEvents.emit(module, event, payload)</code>.</p>
 <p>Register both in the plugin entry next to any component managers:</p>
