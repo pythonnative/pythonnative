@@ -16,6 +16,11 @@ The Xcode project links the framework at build time and embeds CPython through i
 
 ## Component model
 
+The staged `yoga/` directory supplies the `YogaCore` Swift package,
+which `PythonNativeKit` depends on. Xcode compiles its C++ source for
+the selected device or simulator architecture during the app build.
+The desktop PythonNative wheel's host extension isn't used by the app.
+
 Your `app/` directory contains `@pn.component` function components.
 The native iOS template boots Python with
 `pythonnative.bootstrap.start()` and asks the `Host` native module to

@@ -29,27 +29,24 @@ completion contract. The core primitives are:
 
 Driver architecture (the **native driver**):
 
-When an animation starts, PythonNative compiles its spec (curve,
-duration, target value) and offers it to the platform handler of every
-native view the value is attached to
-([`ViewHandler.start_animation`][pythonnative.native_views.base.ViewHandler.start_animation]).
+Mounted bindings install a serialized graph of connected values, arithmetic,
+interpolation, and view properties. When an animation starts, PythonNative
+offers its timing, spring, or decay specification to the renderer through
+[`ViewHandler.start_animation`][pythonnative.native_views.base.ViewHandler.start_animation].
 
-- **Accepted** (iOS Core Animation, Android ``ViewPropertyAnimator`` /
-  ``DynamicAnimation``): the platform animates the property entirely
-  natively; no Python code runs per frame. Python receives exactly one
-  callback when the animation settles, updates the
-  [`AnimatedValue`][pythonnative.animated.AnimatedValue], and resolves
-  any awaiting tasks.
+- **Accepted**: the renderer evaluates the graph and applies its bindings
+  without Python work on every frame. Completion callbacks settle the
+  [`AnimatedValue`][pythonnative.animated.AnimatedValue] and resolve
+  awaiting tasks.
 - **Declined** (unattached values, callable easings,
-  values feeding Python-side listeners or derived nodes): a single
+  values feeding Python-side listeners, or an unsupported backend): a single
   background thread ticks the animation at ~60 Hz from Python, pushing
   each frame through ``set_animated_property``. Semantics are
   identical; only the frame source differs.
 
-Values driven by *events* (scroll offsets via ``Animated.event``,
-gesture translations) flow through Python: the native listener fires,
-the bound values update, and every attachment (including derived
-nodes) is pushed in the same call.
+On mobile, scroll and gesture bindings feed graph values before input is
+queued to Python. Derived expressions can run in the renderer alongside their
+source drivers. Backends without graph support use Python for derived bindings.
 
 Example:
     ```python

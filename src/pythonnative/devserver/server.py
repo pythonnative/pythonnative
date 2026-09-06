@@ -2,8 +2,8 @@
 
 One [`DevServer`][pythonnative.devserver.server.DevServer] runs on its
 own thread with a private ``asyncio`` loop, so it works both inside
-``pn start`` (whose main thread runs the browser preview's app) and in
-tests. It exposes:
+``pn start`` and in tests independently of the Python application
+loop. It exposes:
 
 - ``GET /``: the browser preview page.
 - ``GET /static/<name>``: preview assets (JS, CSS).

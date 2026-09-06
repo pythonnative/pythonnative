@@ -74,9 +74,24 @@ custom-hook signatures remount affected instances. Changes to helper classes or
 services remount the application to avoid retaining instances of old definitions.
 Native contract changes require rebuilding the dev client.
 
-`PN_PROFILE=/path/to/trace.json` records bounded Python phase timings and bridge
-work counters in Chrome trace format. Tests can use `profiling.Profiler` directly.
-The profiler doesn't retain component trees or application snapshots.
+Python phase timings and bridge work counters can be captured in Chrome trace
+format. See [Profiling](../guides/dev-workflow.md#profiling) for collection and
+export instructions.
+
+## Runtime limits
+
+The application host uses one surface. A failed bridge commit requires a
+complete surface reset and remount; see [Commits](bridge.md#commits).
+Reconciliation reduces work at dirty component roots but doesn't time-slice
+arbitrary Python render functions. Long computations delay Python callbacks
+and commits even while native scrolling and animation drivers continue.
+Use cooperative async work, move blocking I/O off the application thread,
+and keep expensive computation out of render functions.
+
+Shared layout rules don't imply identical fonts or control sizes. Test
+intrinsic measurement, accessibility, and performance on your deployment
+targets. Simulator and emulator tests exercise app behavior; they don't
+validate device signing, store submission, or performance on physical devices.
 
 ## Source map
 
@@ -93,7 +108,6 @@ The profiler doesn't retain component trees or application snapshots.
 | Build and dependency locks | `project/`, `cli/` |
 | Browser preview | `preview.py`, `devserver/static/` |
 
-The offline inbox in `examples/inbox` exercises shared providers, 2,000
-variable-height rows, cancellable search, forms, optimistic persistence, native
-navigation, and a generated native extension. Its Maestro flow lives in
-`tests/e2e/reference/inbox.yaml`.
+The [Inbox example](../examples.md#complete-apps) combines shared providers,
+variable-height rows, cancellable search, forms, persistence, native navigation,
+and a generated native extension.

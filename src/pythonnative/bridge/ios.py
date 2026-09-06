@@ -2,10 +2,10 @@
 
 The Swift package exports ``@_cdecl`` symbols (see
 ``docs/concepts/bridge.md``). They're resolved from the running process
-with ``ctypes.CDLL(None)``: ``PyDLL`` keeps the GIL held across the
-call, so the main thread is never parked while native applies a
-transaction, and the Python callback registered with
-``pn_bridge_set_callback`` can re-enter Python safely.
+with ``ctypes.CDLL(None)``, which releases the GIL during native calls.
+Widget operations are marshaled to the platform UI thread, and incoming
+events are queued to the Python application thread. The callback registered
+with ``pn_bridge_set_callback`` acquires the GIL when it enters Python.
 
 Strings returned by native are ``strdup``'d; this module copies them
 and hands the pointer back to ``pn_bridge_free``.

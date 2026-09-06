@@ -33,7 +33,7 @@ the render loop.
 | `UpdateOp(tag, changed_props)` | Apply only the props that changed (removed props arrive as `None`). |
 | `InsertOp(parent_tag, child_tag, index)` | Place the child at `index` (move-aware: an attached child is repositioned, not duplicated). |
 | `DestroyOp(tag)` | Release the native view (detaching it from its parent) and drop the tag record. |
-| `SetFrameOp(tag, x, y, w, h)` | Apply a layout frame. Only emitted for frames that actually changed. |
+| `SetFrameOp(tag, x, y, w, h)` | Apply a frame from headless layout or an explicit frame operation. Bridge renderers compute ordinary layout beside their widgets. |
 
 Tags matter because the diff phase is pure: it runs before any native
 view exists, so ops can't reference views directly. Tags also give the
@@ -62,9 +62,8 @@ view. The hooks mirror the op list:
 | `command(view, name, args)` | For imperative actions (`focus`, `scroll_to_offset`, ...). |
 | `startAnimation` / `cancelAnimation` | For natively driven `Animated` values. |
 
-Managers do **not** read flex, margin, or padding props; those are
-interpreted by `pythonnative.layout` and turned into `f` ops. A
-manager only applies the frame it is given.
+Yoga interprets flex, margin, and padding props in the native renderer.
+Managers provide intrinsic measurements and apply computed frames.
 
 Managers fire events by tag through `PNEvents.emit(view, "on_change",
 [value])` (Swift) or `PNEvents.fire(view, "on_change", value)`
@@ -104,23 +103,22 @@ lazily by [`get_registry`][pythonnative.native_views.get_registry]:
   [`set_registry`][pythonnative.native_views.set_registry] (or by
   constructing the `Reconciler` with the fake directly).
 
-Per-op failures are isolated on both sides: a bad prop on one view
-logs a tripwire (Python) or a rate-limited native log instead of
-desyncing the whole transaction.
+The renderer validates an entire commit before applying it. A rejected
+commit fails the surface, and further incremental updates require a reset
+and remount. See [Commits](bridge.md#commits) for the failure contract.
 
 ## Layout and styling
 
-Layout-related style keys are interpreted by the central
-`pythonnative.layout` engine, *not* by the platform managers. The full
+Layout-related style keys are interpreted by the renderer's Yoga engine. The full
 list (sizing, flex, position, margin, padding, spacing, ...) is
 documented in [Component properties](../api/component-properties.md).
 The set of keys the layout engine consumes is exposed as
 `pythonnative.layout.LAYOUT_STYLE_KEYS`.
 
 Managers only deal with **visual** properties: colors, fonts, borders,
-corner radii, image scaling, text content. After each commit the
-reconciler runs the layout pass and emits `SetFrameOp`s for every node
-whose frame changed.
+corner radii, image scaling, and text content. After each commit the
+renderer computes layout and returns changed frames to Python.
+Headless backends use `pythonnative.layout` and `SetFrameOp` instead.
 
 On each platform that boils down to:
 
@@ -135,8 +133,8 @@ On each platform that boils down to:
   with `View.measure(...)` and `MeasureSpec`. Shared visual props are
   applied by `ViewStyler`.
 
-Because layout is centralized, the same `style` dict produces the same
-geometry on Android and iOS.
+Yoga provides shared layout rules. Native font metrics and control sizes
+can produce different intrinsic measurements on Android and iOS.
 
 ## Children
 
@@ -163,16 +161,15 @@ assert result.get_by_text("Hello")
 assert result.backend.ops_of("create")  # every applied op is recorded
 ```
 
-Unlike the production backend, the fake **raises** on malformed
-transactions (unknown tags, double-destroys), so reconciler bugs fail
-tests loudly instead of being swallowed. See the
+The fake raises on malformed transactions, including unknown tags and
+double destroys, so tests expose invalid mutation sequences. See the
 [Testing guide](../guides/testing.md).
 
 The bridge itself is tested with
 [`FakeTransport`][pythonnative.bridge.fake.FakeTransport], which
 decodes the JSON transactions the `BridgeBackend` produces and keeps a
 view tree the way native would. Native decoders and managers have
-their own XCTest and JUnit suites inside the templates.
+their own XCTest and JUnit suites inside the native libraries.
 
 ## Custom widgets
 

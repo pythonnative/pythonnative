@@ -15,6 +15,26 @@ cleanly inside a Python REPL on a developer machine or device.
   `` [`use_state`][pythonnative.use_state] ``.
 - Comments explain **why**, not **what** (the code already says what).
 
+## Document current behavior
+
+Concepts, guides, examples, and API references describe PythonNative as it
+currently works. When behavior changes, update the existing explanation and
+examples. Check related pages, the README (also displayed on PyPI), and source
+docstrings that feed the API reference for contradictory descriptions.
+
+Keep implementation progress, deleted-code inventories, one-time test counts,
+and local validation reports in the pull request. Release history belongs in the
+changelog and GitHub releases. Add a migration guide only when users need
+specific steps to update an existing application.
+
+Document current limitations and platform differences where they affect a
+reader's decisions. Put reusable development and release procedures in the
+contributing guide. A new page should teach a lasting concept or workflow;
+introducing a feature doesn't by itself call for a separate announcement page.
+
+A strict documentation build checks rendering and references. Review examples
+and behavioral claims against the implementation as well.
+
 ## Grammar and punctuation
 
 We follow the *Chicago Manual of Style* (17th edition) for prose. Highlights:

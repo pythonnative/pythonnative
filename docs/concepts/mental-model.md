@@ -18,8 +18,8 @@ runtime, however, is meaningfully different.
   the previous one and applies the smallest set of native mutations.
 - Native widgets are created and updated by Swift and Kotlin
   component managers that receive one serialized transaction per
-  commit over the [native bridge](bridge.md). There is no JavaScript
-  and no V8 / Hermes runtime.
+  commit over the [native bridge](bridge.md). Mobile applications embed
+  CPython; the browser preview has its own JavaScript renderer.
 
 ## The runtime in one diagram
 
@@ -60,11 +60,11 @@ that prevents render storms).
 | Preview without a device | Expo web / Snack | `pn preview` renders in a browser tab through the same bridge protocol the native runtimes speak |
 | Native widgets | Wrapped by Fabric component managers | Wrapped by `PNComponentManager` (Swift) / `ComponentManager` (Kotlin) classes |
 
-The single most important consequence: there is **no async boundary**
-between Python and the native widget. Reading a label's text in Python
-is a synchronous JNI / Objective-C method call. That keeps the model
-small (no message-passing protocol, no serialization) and lets native
-APIs that expect synchronous, on-thread access just work.
+Python components run on a dedicated application thread. Native calls cross
+a versioned, serialized bridge and marshal widget operations to the platform
+UI thread. Native events are queued back to Python. Some module calls can
+return synchronously; asynchronous results and cancellation use the bridge's
+promise protocol. See [The native bridge](bridge.md) for the contract.
 
 ## How PythonNative differs from Toga, BeeWare, Kivy
 
@@ -73,7 +73,8 @@ APIs that expect synchronous, on-thread access just work.
   figures out the diff.
 - Kivy renders its own widgets via OpenGL. PythonNative renders
   *real* native widgets, so your buttons look like UIKit buttons on
-  iOS and Material buttons on Android, and accessibility just works.
+  iOS and Material buttons on Android. Applications configure accessibility
+  labels and roles and test interaction on each platform.
 - BeeWare's Briefcase is a packaging story; PythonNative ships its
   own `pn` CLI for the same purpose, plus a UI runtime.
 
@@ -82,7 +83,8 @@ APIs that expect synchronous, on-thread access just work.
 When something feels surprising, fall back on these rules:
 
 !!! tip "It's just Python"
-    There is no compiler, no transpiler, and no JS runtime.
+    Application functions run in CPython. Native Swift, Kotlin, and C++
+    libraries are compiled when building the app.
     `print(x)` reaches the device console; `import foo` runs the
     bundled module. If a stack trace mentions `pythonnative.*`, you
     can open that file in your editor and read the source.

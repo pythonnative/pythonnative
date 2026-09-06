@@ -70,9 +70,9 @@ class WebTransport:
         self._warned_no_peer = False
         self._python_modules: Dict[str, Any] = {}
         self.on_dev_message: Optional[Callable[[Dict[str, Any]], None]] = None
-        """Hook for ``["dev", {...}]`` messages from the page (runs on the main thread)."""
+        """Hook for ``["dev", {...}]`` messages on the Python application thread."""
         self.on_peer_changed: Optional[Callable[[bool], None]] = None
-        """Called on the main thread with ``True`` on connect and ``False`` on disconnect."""
+        """Called on the application thread with ``True`` on connect and ``False`` on disconnect."""
 
     # ------------------------------------------------------------------
     # Transport protocol
@@ -118,11 +118,11 @@ class WebTransport:
         return self._call_python_module(module, method, args_json)
 
     # ------------------------------------------------------------------
-    # Main thread
+    # Application thread and fallback queue
     # ------------------------------------------------------------------
 
     def post_to_application(self, fn: Callable[[], None]) -> None:
-        """Queue ``fn`` for the main loop (never runs inline)."""
+        """Queue ``fn`` on the application loop, or the fallback queue if it isn't running."""
         from ..runtime import get_loop
 
         loop = get_loop()
@@ -132,11 +132,11 @@ class WebTransport:
             self._main.put(fn)
 
     def run_main_loop(self, *, until: Optional[Callable[[], bool]] = None) -> None:
-        """Drain main-thread work until ``stop`` is called (or ``until`` holds).
+        """Drain fallback work until ``stop`` is called or ``until`` holds.
 
-        This is the preview's event loop: the browser's stand-in for the
-        platform main queue. Call it from the thread that should own the
-        framework (the process main thread under ``pn preview``).
+        The preview uses this as a coordinator while application callbacks
+        run on the standard asyncio loop. When that loop isn't running,
+        queued jobs execute on the thread calling this method.
         """
         self._main_thread = threading.current_thread()
         self._stop.clear()
@@ -150,7 +150,7 @@ class WebTransport:
             self._run_job(job)
 
     def drain_main(self, timeout: float = 0.0) -> int:
-        """Run queued main-thread work inline (tests); returns how many jobs ran."""
+        """Run fallback-queue work inline for tests and return how many jobs ran."""
         self._main_thread = threading.current_thread()
         deadline = time.monotonic() + timeout
         ran = 0
@@ -307,7 +307,7 @@ class WebTransport:
             waiter.event.set()
 
     # ------------------------------------------------------------------
-    # Inbound (main thread)
+    # Inbound (application thread)
     # ------------------------------------------------------------------
 
     def _deliver_callback(self, message: List[Any]) -> Optional[str]:

@@ -3,24 +3,23 @@
 The dev server (``pythonnative.devserver``) watches the project's
 ``app/`` directory and tells every connected dev client which files
 changed. This module is the client's other half: it re-executes the
-changed modules with ``importlib`` and refreshes every mounted screen.
+changed modules with ``importlib`` and refreshes the logical application tree.
 
 Two strategies share the surface:
 
 - **Fast Refresh** (default): after reloading the changed modules the
   reconciler tree is walked and every component function whose module
-  was reloaded is swapped in place. Hook state, navigation state, and
-  even scroll positions survive because the underlying ``VNode``
-  objects are reused; the next render simply calls the new function
-  bodies through the old slots.
-- **Full remount**: when the in-place swap fails (e.g. the new module
-  raised at import time, or a render exception bubbled out while
-  running the new function), the host falls back to building a
-  brand-new reconciler tree. State is lost but the app keeps running.
+  was reloaded is matched to its replacement. Compatible hook signatures
+  preserve state; hook-order or custom-hook changes remount the affected
+  component instances. Covered screens and mounted rows participate in the
+  same refresh.
+- **Full remount**: changes to helper classes or services, or an unsuccessful
+  component swap, rebuild the application tree. State is reset. A module
+  import failure is reported while its previous definition remains available.
 
 [`apply_reload`][pythonnative.hot_reload.apply_reload] is the single
-entry point: it reloads once per process (several screens may be
-mounted) and then refreshes each live host.
+entry point: it reloads once per process and then refreshes each live
+application host.
 
 On device, sources arrive in a writable **overlay** directory that
 shadows the app bundle (see

@@ -121,7 +121,8 @@ loading/data/error state for you and exposes a `refetch()` callable.
 
 For continuous updates, write a small native module that subscribes
 to `CLLocationManagerDelegate` (iOS) or `LocationManager.requestUpdates`
-(Android) and pushes deltas through `set_state` from the main thread.
+(Android). Send updates through the module event channel; the Python callback
+can call `set_state` on the application thread.
 
 ## File system
 
@@ -415,7 +416,7 @@ class CompassModule : NativeModule {
 
 Settling the promise before `call` returns answers Python inline (a
 plain synchronous return). Settling it later, from any thread, delivers
-the result through the bridge's event channel on the main thread. Push
+the result through the bridge's event channel to the Python application thread. Push
 unsolicited events with `PNModuleEvents.emit(module:event:payload:)` /
 `ModuleEvents.emit(module, event, payload)`.
 

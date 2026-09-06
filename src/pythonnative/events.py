@@ -1,9 +1,7 @@
 """Tag-based event routing between native views and Python callbacks.
 
-Before the batched-commit overhaul, every event prop (``on_press``,
-``on_change``, …) was wired by storing the Python callable on (or next
-to) the native view, and every re-render re-pushed fresh closures across
-the bridge. This module replaces that with a single dispatch channel:
+Event props such as ``on_press`` and ``on_change`` stay in a Python
+registry. Native views send a tag and event name through the bridge:
 
 - The reconciler strips callable props out of the payload sent to
   native handlers and registers them here, keyed by ``(tag, name)``.
@@ -39,9 +37,8 @@ _NESTED_EVENT_PROPS: Dict[str, Dict[str, str]] = {
 class EventRegistry:
     """Process-wide map of ``(tag, event name) -> Python callback``.
 
-    Thread-safe: native backends may dispatch from the platform UI
-    thread while the reconciler updates registrations from the render
-    thread.
+    Registration and lookup are protected by a lock. Bridge backends queue
+    native input to the Python application thread before dispatching it.
     """
 
     def __init__(self) -> None:

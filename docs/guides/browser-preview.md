@@ -9,13 +9,12 @@ second, with no simulator boot, no device deploy, and no native build.
 pn preview
 ```
 
-The preview isn't a second rendering backend. The page is treated as a
-**native runtime**: it receives the same JSON transactions the Swift and
-Kotlin runtimes apply, answers the same `measure` / `command` /
-`animate` requests, and raises the same events. Your Python runs in the
-`pn preview` process with the on-device reconciler, screen host, hooks,
-navigation, async runtime, and flex layout engine unchanged. Only the
-leaf widgets differ: DOM elements instead of UIKit and Android views.
+The browser renderer speaks the same bridge protocol as the Swift and
+Kotlin renderers. Your components, hooks, reconciliation, logical navigation,
+and async work run in the `pn preview` Python process. The page implements
+widgets with DOM elements, layout with Yoga WebAssembly, and animation
+graphs with JavaScript. Platform controls, fonts, and device APIs differ
+from those in a mobile app.
 
 ## Quick start
 
@@ -90,7 +89,7 @@ mounted fresh on reconnect.
    the bridge transport. Transactions the reconciler commits become
    `["apply", request_id, commit]` messages to the page; the page's events come back
    as `["cb", ...]` callbacks. Commits acknowledge exact revisions, and native
-   Yoga layout returns a batch of changed frames.
+   Yoga WebAssembly layout returns a batch of changed frames.
 3. Runs Python callbacks and tasks on the standard application asyncio loop.
    The page owns DOM widgets and Yoga WebAssembly layout. Network I/O and Python
    work execute independently of the browser's UI thread.
@@ -114,8 +113,9 @@ and intrinsic sizes match what you see.
 Root navigators (`create_stack_navigator`, tabs, drawer) drive a real
 stack of screens in the page, the same way they drive
 `UINavigationController` / AndroidX Navigation on device. Each pushed
-screen gets its own host and reconciler; `navigate(...)` pushes,
-`go_back()` pops, and the previous screen's state survives underneath.
+screen remains a logical child of the application's shared tree;
+`navigate(...)` selects or adds a route, `go_back()` pops, and covered
+screens keep their state.
 Pushes and pops animate with a slide.
 
 ### Dev mode and errors
@@ -176,9 +176,10 @@ Faithful:
   borders, opacity, shadows, and overflow clipping.
 - `Animated` timing, spring, and decay, run through the same
   `animate` protocol the native animators implement; transforms,
-  opacity, and colors animate on the compositor.
+  opacity, and colors update through the page's animation graph.
 - Gestures: the page streams raw pointer events to the Python
-  [gesture arbiter](gestures.md), the same one Android uses.
+  [gesture arbiter](gestures.md). Mobile renderers recognize gestures
+  in Swift and Kotlin.
 - Scrolling, `FlatList` / `SectionList` windowing, pull to refresh,
   and scroll-driven `Animated.event` bindings.
 

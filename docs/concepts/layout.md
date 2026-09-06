@@ -22,6 +22,21 @@ Headless tests use `LayoutNode` and `calculate_layout()` through the host Yoga
 binding. Stub intrinsic measurements make geometry tests deterministic. Real
 font metrics and platform control sizes must also be tested on devices.
 
+## Installation and app builds
+
+The host binding is included in the platform-specific PythonNative wheel.
+Precompiled wheels cover CPython 3.13 and 3.14 on macOS (Intel and Apple
+Silicon), Linux with glibc (x86-64 and ARM64), and Windows (x86-64). Pip or uv
+selects the matching wheel. Building from a source distribution requires a
+C++20 compiler.
+
+Device builds compile the bundled Yoga source for the application target.
+Xcode builds the `YogaCore` Swift package for iOS devices or simulators;
+Gradle invokes CMake and the Android NDK for the configured Android ABIs.
+The mobile renderer calls this native library through Swift or Kotlin, so it
+doesn't load the desktop Python extension. See the [iOS](../guides/ios.md)
+and [Android](../guides/android.md) guides for toolchain setup.
+
 ## Style keys
 
 The engine recognises (and the reconciler routes to it) the following
@@ -100,8 +115,7 @@ in CSS.
 
 ## Testing layouts
 
-The layout engine is pure Python, so it is trivial to test in
-isolation:
+Use the host Yoga binding to test layout without a simulator or emulator:
 
 ```python
 from pythonnative.layout import LayoutNode, calculate_layout

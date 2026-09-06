@@ -142,8 +142,10 @@ Booting a screen "mid-stack" the way a pushed native screen does is
 
 ## Testing layouts
 
-The flexbox engine in `pythonnative.layout` is pure Python. Rendered
-views carry their computed `frame` (`x, y, width, height`) once
+Headless tests call Yoga through the `pythonnative.layout` host binding.
+The fake backend supplies deterministic intrinsic measurements; it doesn't
+reproduce platform fonts or control metrics. Rendered views carry their
+computed `frame` (`x, y, width, height`) once
 `render` runs the layout pass for the default 390x844 viewport (pass
 `viewport=(w, h)` to change it, or `viewport=None` to skip layout):
 
@@ -153,11 +155,11 @@ def test_row_distributes_flex_children():
         pn.Row(
             pn.View(test_id="a", style={"flex": 1, "height": 50}),
             pn.View(test_id="b", style={"flex": 2, "height": 50}),
-            style={"width": 300, "spacing": 10},
+            style={"width": 310, "spacing": 10},
         )
     )
     a, b = result.get_by_test_id("a"), result.get_by_test_id("b")
-    assert a.frame[2] == pytest.approx((300 - 10) / 3)
+    assert a.frame[2] == pytest.approx((310 - 10) / 3)
     assert b.frame[0] == pytest.approx(a.frame[2] + 10)
 ```
 

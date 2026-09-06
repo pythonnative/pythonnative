@@ -117,11 +117,10 @@ pn preview
 browser, and mounts your project's `App` in a phone frame. It **Fast
 Refreshes on every save**: edit a component, save, and the page updates
 in place while keeping component state (counters, form input, scroll
-position, the navigation stack). Navigation, hooks, async, and the flex
-layout engine run exactly as they do on device, because the page is a
-bridge peer like the Swift and Kotlin runtimes and reuses the same
-reconciler and screen host; only the leaf widgets differ (DOM elements
-instead of UIKit / Android views).
+position, the navigation stack). Your components, hooks, async work, and
+logical navigation use the shared Python runtime. The page speaks the
+same bridge protocol as the mobile renderers, implements widgets with DOM
+elements, and computes layout with Yoga WebAssembly.
 
 ```bash
 pn preview                    # server + browser tab for app/main.py -> App

@@ -15,6 +15,18 @@ project scaffolded with `pn init`.
 | [Navigation](examples/navigation.md) | Stack, tab, and drawer navigators side-by-side. |
 | [Collapsing header & bottom sheet](examples/collapsing-header.md) | Scroll-driven animation, `Animated.event`, gestures, and stacking. |
 
+## Complete apps
+
+The repository also includes runnable projects with their own setup instructions:
+
+- [Hello world](https://github.com/pythonnative/pythonnative/tree/main/examples/hello-world):
+  a small application for trying the development workflow.
+- [Inbox](https://github.com/pythonnative/pythonnative/tree/main/examples/inbox):
+  an offline app with variable-height lists, shared state, search, editing,
+  persistence, native navigation, and a generated native extension.
+- [Feature catalog](https://github.com/pythonnative/pythonnative/tree/main/examples/e2e-suite):
+  component and API demonstrations used by the mobile E2E suite.
+
 ## Working from a project
 
 ```bash

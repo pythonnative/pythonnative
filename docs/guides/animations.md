@@ -24,14 +24,16 @@ takes over whenever it can.
 
 ## The native driver
 
-When you `start()` (or await) an animation whose value is attached to
-mounted views, PythonNative first offers the animation to the
-platform: Core Animation (`CABasicAnimation` / `CASpringAnimation`)
-on iOS, `ViewPropertyAnimator` / `DynamicAnimation` on Android. If
-the platform accepts, the animation runs entirely natively at the
-display's refresh rate (**no Python code executes per frame**), and
-Python receives exactly one completion callback, which settles the
-`AnimatedValue` at its final number.
+When an animated node is bound to mounted views, PythonNative serializes
+its connected values, arithmetic, interpolation, and style bindings into
+an animation graph. Starting or awaiting a timing, spring, or decay driver
+sends its specification to the renderer.
+
+On mobile, Swift and Kotlin evaluate the graph and apply its bindings on
+the UI thread. Derived values, color interpolation, and native scroll and
+gesture inputs can update without Python work on every frame. The browser
+implements graph evaluation in JavaScript. Completion is delivered back to
+Python to settle the value and resolve an awaiting task.
 
 The Python-ticked fallback (a ~60 Hz loop) is used automatically
 when:
@@ -203,11 +205,10 @@ plain numbers or between two nodes. The result is a read-only node:
 bind it into styles like any `AnimatedValue`, but drive the underlying
 source value.
 
-One thing to know: a value with derived dependents animates on the
-Python ticker rather than the fully native driver, because the graph
-has to be re-evaluated per frame to push the derived outputs. The
-API and end state are identical; for most UI work the difference isn't
-observable.
+Derived nodes are part of the serialized animation graph. Arithmetic and
+interpolation can therefore run in the renderer alongside their source
+driver. A backend without graph support uses the Python ticker for
+derived bindings.
 
 ## Scroll-driven animation with `Animated.event`
 

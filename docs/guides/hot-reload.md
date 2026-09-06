@@ -29,7 +29,7 @@ pn run ios          # terminal 2 (or android, or open the browser preview)
    imported modules under `app` that may hold bindings to it (the
    entry module's `from app.screens.home import HomeScreen`, for
    instance), leaves first.
-5. Every live screen host runs **Fast Refresh**: it walks its VNode
+5. The application host runs **Fast Refresh**: it walks its VNode
    tree, finds each component function whose module was reloaded,
    looks up the replacement by `__module__` + `__qualname__`, and
    rewrites the `Element.type` references in place. The next
@@ -94,11 +94,9 @@ picks up the new bytes the next time it renders.
 
 !!! warning "Hook signature changes"
     Adding or removing a hook in a component changes the slot layout.
-    Fast Refresh swaps the function in place, and the next render may
-    read the wrong slots; the host falls back to a remount when it
-    detects the swap raising. If you see suspicious state after a
-    hook-shape edit, close and reopen the affected screen (or reload
-    the app) to clear the slate.
+    Fast Refresh compares captured hook signatures before preserving
+    state. Hook-order and custom-hook changes remount affected component
+    instances. Changes to helper classes or services remount the application.
 
 !!! info "Renaming a component"
     Fast Refresh keys on each function's `__qualname__`. Renaming a
