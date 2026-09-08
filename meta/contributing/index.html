@@ -4093,7 +4093,7 @@ or commit to check. This runs the full matrix without publishing anything:</p>
 <h3 id="ci">CI<a class="headerlink" href="#ci" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>CI</strong> (<code>ci.yml</code>): runs formatter, linter, type checker, and tests on every push and PR.</li>
-<li><strong>E2E</strong> (<code>e2e.yml</code>): builds the <code>e2e-suite</code> example on Android (Linux emulator) and iOS (macOS simulator), then runs Maestro flows. Triggers on pushes to <code>main</code>, PRs, and manual dispatch.</li>
+<li><strong>E2E</strong> (<code>e2e.yml</code>): builds <code>examples/e2e-suite</code> on Android (Linux emulator) and iOS (macOS simulator), then runs Maestro flows by category. Triggers on pushes to <code>main</code>, PRs, and manual dispatch.</li>
 <li><strong>Packages</strong> (<code>packages.yml</code>): resolves the PyPI compatibility matrix in <code>tests/packages/matrix.toml</code> against the live indexes with <code>scripts/package-matrix.py --check</code>, weekly and on changes to the resolver or manifest, and uploads the rendered Markdown table for <code>docs/guides/pypi-packages.md</code>.</li>
 <li><strong>PR Lint</strong> (<code>pr-lint.yml</code>): validates the PR title against Conventional Commits format (protects squash merges) and checks individual commit messages via commitlint (protects rebase merges). Recommended: add the <strong>PR title</strong> job as a required status check in branch-protection settings.</li>
 <li><strong>Release</strong> (<code>release.yml</code>): runs on merge to <code>main</code>; computes version, generates changelog, tags, creates GitHub Release, and (when <code>DRAFT_RELEASE</code> is <code>"false"</code>) publishes to PyPI.</li>
