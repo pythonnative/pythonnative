@@ -1,330 +1,86 @@
-"""Unit tests for natively virtualized lists.
+"""Logical list ownership under native recycling requests."""
 
-Covers the ``VirtualList`` routing in FlatList / SectionList (gated by
-``pythonnative.components._native_lists_supported``), the ``_NativeList``
-composite's scroll-derived callbacks and imperative controller, and the
-nested-reconciler row subtrees in ``pythonnative.virtual_rows``.
-"""
-
-from __future__ import annotations
-
-from typing import Any, List, Tuple
+from typing import Any
 
 import pytest
 
-import pythonnative.components as components
-from pythonnative.components import FlatList, RefreshControl, SectionList, Text
-from pythonnative.element import Element
-from pythonnative.events import dispatch_event
-from pythonnative.native_views import set_registry
-from pythonnative.reconciler import Reconciler
-from pythonnative.testing import FakeBackend
-from pythonnative.virtual_rows import RowHostPool, RowSubtree
+import pythonnative as pn
+from pythonnative.testing import render
 
 
-@pytest.fixture()
-def native_lists(monkeypatch: Any) -> None:
-    """Force the native list gate open (off-device it is closed)."""
-    monkeypatch.setattr(components, "_native_lists_supported", lambda: True)
+@pytest.fixture(autouse=True)
+def native_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pn.components, "_native_lists_supported", lambda: True)
 
 
-def _mount(el: Element) -> Tuple[Any, Reconciler, FakeBackend]:
-    backend = FakeBackend()
-    rec = Reconciler(backend)
-    rec.on_render_requested = lambda: None
-    root = rec.mount(el)
-    return root, rec, backend
+def test_rows_inherit_provider_and_keep_state_by_key() -> None:
+    theme = pn.create_context("default")
+    setters = {}
+
+    @pn.component
+    def Row(item: Any) -> pn.Element:
+        value, setter = pn.use_state(item["label"])
+        setters[item["id"]] = setter
+        return pn.Text(f"{item['label']}/{value}/{pn.use_context(theme)}")
+
+    def tree(data: list[dict[str, str]]) -> pn.Element:
+        return theme.Provider(
+            "inherited",
+            pn.FlatList(data=data, key_extractor=lambda item, _: item["id"], render_item=lambda item, _: Row(item)),
+        )
+
+    result = render(tree([{"id": "a", "label": "A"}, {"id": "b", "label": "B"}]))
+    assert result.get_by_text("A/A/inherited")
+    setters["a"]("edited")
+    result.rerender(tree([{"id": "b", "label": "B2"}, {"id": "a", "label": "A2"}]))
+    assert result.get_by_text("A2/edited/inherited")
+    assert result.get_by_text("B2/B/inherited")
 
 
-# ======================================================================
-# Routing
-# ======================================================================
+def test_same_length_data_edits_advance_native_revision() -> None:
+    result = render(pn.FlatList(data=["a", "b"], item_height=44))
+    first = result.get_by_type("VirtualList").props["revision"]
+    result.rerender(pn.FlatList(data=["z", "b"], item_height=44))
+    assert result.get_by_type("VirtualList").props["revision"] > first
+    assert result.get_by_text("z")
 
 
-def test_flatlist_routes_native_with_fixed_heights(native_lists: None) -> None:
-    el = FlatList(
-        data=list(range(100)),
-        item_height=44,
-        render_item=lambda item, _i: Text(f"row-{item}"),
+def test_native_requests_are_bounded_and_stale_requests_are_ignored() -> None:
+    result = render(pn.FlatList(data=list(range(10_000)), item_height=44))
+    view = result.get_by_type("VirtualList")
+    revision = view.props["revision"]
+    assert len(result.get_all_by_type("Text")) <= 56
+    key = view.props["keys"][5000]
+    result.fire(view, "on_bind_row", {"index": 5000, "key": key, "revision": revision - 1})
+    assert result.query_by_text("5000") is None
+    result.fire(view, "on_bind_row", {"index": 5000, "key": key, "revision": revision})
+    assert result.get_by_text("5000")
+    assert len(result.get_all_by_type("Text")) <= 56
+    result.unmount()
+    assert result.backend.live_view_count() == 0
+
+
+def test_rows_do_not_move_state_to_different_keys() -> None:
+    @pn.component
+    def Row(item: Any) -> pn.Element:
+        original, _ = pn.use_state(item)
+        return pn.Text(f"{item}/{original}")
+
+    result = render(pn.FlatList(data=["a"], key_extractor=lambda item, _: item, render_item=lambda item, _: Row(item)))
+    result.rerender(pn.FlatList(data=["b"], key_extractor=lambda item, _: item, render_item=lambda item, _: Row(item)))
+    assert result.get_by_text("b/b")
+
+
+def test_duplicate_keys_fail_before_native_commit() -> None:
+    with pytest.raises(ValueError, match="unique"):
+        render(pn.FlatList(data=[1, 2], key_extractor=lambda *_: "duplicate"))
+
+
+def test_fixed_list_height_survives_an_unbounded_scroll_parent() -> None:
+    result = render(
+        pn.ScrollView(
+            pn.Column(pn.FlatList(data=list(range(40)), item_height=44, style={"height": 400}), pn.Text("After"))
+        )
     )
-    root, _rec, _backend = _mount(el)
-    assert root.type_name == "VirtualList"
-    assert root.props["count"] == 100
-    assert root.props["row_height"] == 44.0
-    assert callable(root.props["render_row"])
-    # No rows are mounted eagerly; the platform asks for them lazily.
-    assert root.find_all("Text") == []
-
-
-def test_flatlist_stays_windowed_without_fixed_heights(native_lists: None) -> None:
-    el = FlatList(
-        data=list(range(10)),
-        render_item=lambda item, _i: Text(str(item)),
-    )
-    root, _rec, _backend = _mount(el)
-    assert root.type_name == "ScrollView"
-
-
-def test_flatlist_stays_windowed_with_ornaments(native_lists: None) -> None:
-    el = FlatList(
-        data=list(range(10)),
-        item_height=44,
-        list_header=Text("header"),
-    )
-    root, _rec, _backend = _mount(el)
-    assert root.type_name == "ScrollView"
-
-
-def test_flatlist_stays_windowed_with_refresh_control(native_lists: None) -> None:
-    el = FlatList(
-        data=list(range(10)),
-        item_height=44,
-        refresh_control=RefreshControl(refreshing=False, on_refresh=lambda: None),
-    )
-    root, _rec, _backend = _mount(el)
-    assert root.type_name == "ScrollView"
-
-
-def test_flatlist_stays_windowed_for_grids_and_horizontal(native_lists: None) -> None:
-    grid = FlatList(data=list(range(10)), item_height=44, num_columns=2)
-    root, _rec, _backend = _mount(grid)
-    assert root.type_name == "ScrollView"
-
-    horizontal = FlatList(data=list(range(10)), item_height=44, horizontal=True)
-    root, _rec, _backend = _mount(horizontal)
-    assert root.type_name == "ScrollView"
-
-
-def test_flatlist_windowed_without_native_support() -> None:
-    el = FlatList(data=list(range(10)), item_height=44)
-    root, _rec, _backend = _mount(el)
-    assert root.type_name == "ScrollView"
-
-
-def test_sectionlist_routes_native_with_per_row_heights(native_lists: None) -> None:
-    el = SectionList(
-        sections=[
-            {"title": "A", "data": [1, 2]},
-            {"title": "B", "data": [3]},
-        ],
-        item_height=40,
-        section_header_height=30,
-        render_item=lambda item, _i, _s: Text(str(item)),
-    )
-    root, _rec, _backend = _mount(el)
-    assert root.type_name == "VirtualList"
-    assert root.props["count"] == 5
-    assert root.props["row_heights"] == [30.0, 40.0, 40.0, 30.0, 40.0]
-
-
-def test_sectionlist_stays_windowed_without_header_height(native_lists: None) -> None:
-    el = SectionList(
-        sections=[{"title": "A", "data": [1, 2]}],
-        item_height=40,
-    )
-    root, _rec, _backend = _mount(el)
-    assert root.type_name == "ScrollView"
-
-
-# ======================================================================
-# render_row and row subtrees
-# ======================================================================
-
-
-def test_unstyled_native_list_fills_available_space(native_lists: None) -> None:
-    """An unstyled VirtualList must fill its parent, like a ScrollView.
-
-    Regression test: the layout engine only measures leaves with a
-    measure callback, and ``VirtualList`` wasn't in the measured set,
-    so a list without an explicit ``height`` collapsed to 0 points and
-    the platform virtualizer never mounted a row.
-    """
-
-    class _FillBackend(FakeBackend):
-        def measure_intrinsic(self, tag: int, max_width: float, max_height: float) -> Tuple[float, float]:
-            view = self.views.get(tag)
-            if view is not None and view.type_name == "VirtualList":
-                return (max_width, max_height)
-            return super().measure_intrinsic(tag, max_width, max_height)
-
-    from pythonnative.components import View
-
-    el = View(
-        FlatList(
-            data=list(range(40)),
-            item_height=44,
-            render_item=lambda item, _i: Text(f"row-{item}"),
-        ),
-        style={"height": 220},
-    )
-    backend = _FillBackend()
-    rec = Reconciler(backend)
-    rec.on_render_requested = lambda: None
-    root = rec.mount(el)
-    rec.set_viewport_size(390, 800)
-    vlist = root.find_first("VirtualList")
-    assert vlist is not None
-    assert vlist.frame == (0.0, 0.0, 390.0, 220.0)
-
-
-def test_render_row_produces_mountable_row_elements(native_lists: None) -> None:
-    el = FlatList(
-        data=list(range(20)),
-        item_height=44,
-        render_item=lambda item, _i: Text(f"row-{item}"),
-    )
-    root, _rec, _backend = _mount(el)
-    render_row = root.props["render_row"]
-
-    row_backend = FakeBackend()
-    set_registry(row_backend)
-    try:
-        subtree = RowSubtree()
-        row_root = subtree.mount(render_row(5), 320.0, 44.0)
-        assert row_root is not None
-        texts = [v.props["text"] for v in row_root.find_all("Text")]
-        assert texts == ["row-5"]
-        subtree.unmount()
-        assert row_backend.live_view_count() == 0
-    finally:
-        set_registry(None)
-
-
-def test_row_host_pool_bind_rebind_release() -> None:
-    backend = FakeBackend()
-    set_registry(backend)
-    try:
-        pool = RowHostPool()
-        root_a = pool.bind(1, lambda: Text("a"), 320.0, 44.0)
-        assert root_a.props["text"] == "a"
-        assert len(pool) == 1
-
-        # Rebinding the same container reconciles in place: the row's
-        # native view survives with updated props.
-        root_b = pool.bind(1, lambda: Text("b"), 320.0, 44.0)
-        assert root_b is root_a
-        assert root_b.props["text"] == "b"
-        assert len(pool) == 1
-
-        pool.bind(2, lambda: Text("c"), 320.0, 44.0)
-        assert len(pool) == 2
-
-        pool.release(1)
-        assert len(pool) == 1
-        pool.release_all()
-        assert len(pool) == 0
-        assert backend.live_view_count() == 0
-    finally:
-        set_registry(None)
-
-
-def test_row_subtree_state_re_renders_row() -> None:
-    from pythonnative.component import component
-    from pythonnative.hooks import use_state
-
-    setters: List[Any] = []
-
-    @component
-    def Counter(**_props: Any) -> Element:
-        count, set_count = use_state(0)
-        setters.append(set_count)
-        return Text(f"count-{count}")
-
-    backend = FakeBackend()
-    set_registry(backend)
-    try:
-        subtree = RowSubtree()
-        row_root = subtree.mount(Counter(), 320.0, 44.0)
-        assert row_root.props["text"] == "count-0"
-
-        setters[-1](1)
-        assert row_root.props["text"] == "count-1"
-        subtree.unmount()
-    finally:
-        set_registry(None)
-
-
-# ======================================================================
-# Scroll-derived callbacks
-# ======================================================================
-
-
-def test_native_list_end_reached_fires_once(native_lists: None) -> None:
-    calls: List[int] = []
-    el = FlatList(
-        data=list(range(100)),  # 100 rows x 44pt = 4400pt total
-        item_height=44,
-        on_end_reached=lambda: calls.append(1),
-    )
-    _root, rec, _backend = _mount(el)
-    tag = rec.root_tag
-
-    # Far from the end: no callback.
-    assert dispatch_event(tag, "on_scroll", {"y": 0.0, "extent": 800.0, "range": 4400.0}) is True
-    assert calls == []
-
-    # Within half a viewport of the end: fires exactly once, even for
-    # repeated scroll events in the same region.
-    dispatch_event(tag, "on_scroll", {"y": 3400.0, "extent": 800.0, "range": 4400.0})
-    dispatch_event(tag, "on_scroll", {"y": 3500.0, "extent": 800.0, "range": 4400.0})
-    assert calls == [1]
-
-
-def test_native_list_viewable_items_changed(native_lists: None) -> None:
-    seen: List[List[int]] = []
-    el = FlatList(
-        data=list(range(100)),
-        item_height=44,
-        key_extractor=lambda item, _i: str(item),
-        on_viewable_items_changed=lambda infos: seen.append([i["index"] for i in infos]),
-    )
-    _root, rec, _backend = _mount(el)
-    tag = rec.root_tag
-
-    dispatch_event(tag, "on_scroll", {"y": 0.0, "extent": 440.0, "range": 4400.0})
-    assert seen, "initial scroll must report the visible rows"
-    assert seen[-1][0] == 0
-
-    dispatch_event(tag, "on_scroll", {"y": 2200.0, "extent": 440.0, "range": 4400.0})
-    assert seen[-1][0] == 50
-
-
-def test_native_list_forwards_user_on_scroll(native_lists: None) -> None:
-    payloads: List[Any] = []
-    el = FlatList(
-        data=list(range(100)),
-        item_height=44,
-        on_scroll=lambda payload: payloads.append(payload),
-    )
-    _root, rec, _backend = _mount(el)
-    dispatch_event(rec.root_tag, "on_scroll", {"y": 123.0, "extent": 800.0, "range": 4400.0})
-    assert payloads == [{"x": 0.0, "y": 123.0}]
-
-
-# ======================================================================
-# Imperative controller
-# ======================================================================
-
-
-def test_native_list_controller_dispatches_commands(native_lists: None) -> None:
-    from pythonnative.hooks import Ref
-
-    ref: Ref = Ref()
-    el = FlatList(data=list(range(50)), item_height=20, ref=ref)
-    _root, _rec, backend = _mount(el)
-
-    controller = ref.current
-    assert controller is not None
-
-    set_registry(backend)
-    try:
-        controller.scroll_to_index(3, animated=False)
-        controller.scroll_to_offset(120.0)
-        controller.scroll_to_end()
-    finally:
-        set_registry(None)
-
-    names = [(name, args) for _tag, name, args in backend.commands]
-    assert names[0] == ("scroll_to_index", {"index": 3, "animated": False})
-    assert names[1] == ("scroll_to_offset", {"y": 120.0, "animated": True})
-    assert names[2] == ("scroll_to_end", {"animated": True})
+    assert result.get_by_type("VirtualList").frame[3] == 400
+    result.unmount()

@@ -1,0 +1,106 @@
+name: Distributions
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      source-ref:
+        description: Commit or tag to build and test (no publishing)
+        type: string
+        required: true
+        default: main
+  workflow_call:
+    inputs:
+      source-ref:
+        description: Immutable source commit selected by the release workflow
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  sdist:
+    name: Source distribution
+    runs-on: ubuntu-24.04
+    outputs:
+      filename: ${{ steps.build.outputs.filename }}
+      version: ${{ steps.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source-ref || github.sha }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: '3.13'
+      - name: Build source distribution
+        id: build
+        run: |
+          uv build --sdist --python 3.13
+          echo "filename=$(basename dist/*.tar.gz)" >> "$GITHUB_OUTPUT"
+          python -c 'import tomllib; print("version=" + tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distribution-sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  wheels:
+    name: Wheels (${{ matrix.runner }})
+    needs: sdist
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-14, windows-2022]
+    steps:
+      # Build policy comes from the workflow revision, source from the sdist.
+      # Recovery uses fixed tooling with an existing tag's unmodified source.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: distribution-sdist
+          path: dist
+      - name: Build, repair, install, and test wheels
+        uses: pypa/cibuildwheel@v4.2.1
+        with:
+          package-dir: dist/${{ needs.sdist.outputs.filename }}
+          config-file: ${{ github.workspace }}/scripts/cibuildwheel.toml
+          output-dir: wheelhouse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distribution-${{ matrix.runner }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  validate:
+    name: Validate release distributions
+    needs: [sdist, wheels]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: distribution-*
+          merge-multiple: true
+          path: dist
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: '3.13'
+      - name: Check metadata, platform tags, and complete wheel matrix
+        env:
+          RELEASE_VERSION: ${{ needs.sdist.outputs.version }}
+        run: |
+          uv run --no-project --with packaging python scripts/check-distributions.py dist --version "$RELEASE_VERSION"
+          uvx twine check --strict dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-distributions
+          path: dist/*
+          if-no-files-found: error

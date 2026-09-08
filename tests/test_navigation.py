@@ -404,32 +404,23 @@ def test_core_forwards_unknown_routes_and_pops_to_parent() -> None:
         child.navigate("Nowhere")
 
 
-def test_core_native_root_delegates_to_host() -> None:
+def test_core_native_root_commits_one_logical_navigation_state() -> None:
     host = FakeHost()
     screens = {"A": ScreenDef("A", lambda: None), "B": ScreenDef("B", lambda: None, title="Bee")}
     rec = _Recorder(NavigationState([Route("A")]))
     core = NavigatorCore("stack", screens, rec.state, rec, host=host)
-    assert core.is_native_root
-    h = core.handle_for(core.state.current)
-
-    h.push("B", id=1)
-    assert rec.commits == []  # state lives on the pushed native screen
-    state, options = host.pushed[0]
-    assert [r["name"] for r in state["routes"]] == ["A", "B"]
-    assert state["routes"][1]["params"] == {"id": 1}
-    assert options["title"] == "Bee"
-
-    h.replace("B")
-    assert host.replaced[0][0]["routes"][0]["name"] == "B"
-
-    h.reset(Route("B"))
-    assert host.resets[0][1]["title"] == "Bee"
-
-    two = NavigatorCore("stack", screens, NavigationState([Route("A"), Route("B")]), rec, host=host)
-    assert two.handle_for(two.state.current).pop() is True
-    assert host.popped == [1]
-    two.handle_for(two.state.current).navigate("A")
-    assert host.popped == [1, 1]
+    handle = core.handle_for(core.state.current)
+    handle.push("B", id=1)
+    core.state = rec.state
+    assert [route.name for route in core.state.routes] == ["A", "B"]
+    assert core.state.current.params == {"id": 1}
+    assert rec.commits
+    handle.replace("B", id=2)
+    core.state = rec.state
+    assert core.state.current.params == {"id": 2}
+    handle.reset(Route("A"))
+    core.state = rec.state
+    assert [route.name for route in core.state.routes] == ["A"]
 
 
 # ======================================================================
@@ -613,16 +604,14 @@ def test_native_root_stack_pushes_to_host_and_syncs_options() -> None:
         ),
         host=host,
     )
-    assert host.title == "Home!"
+    assert next(view for view in result.views() if view.type_name == "Screen").props["title"] == "Home!"
     assert result.query_by_label("Back") is None  # host draws the nav bar
 
     box["home"].navigate("Detail", id=1)
     result.settle()
-    assert result.get_by_text("home")  # this screen is unchanged
-    assert result.query_by_text("detail") is None
-    state, options = host.pushed[0]
-    assert [r["name"] for r in state["routes"]] == ["Home", "Detail"]
-    assert options["title"] == "Detail!"
+    assert result.get_by_text("home", hidden=True)  # Logical state stays mounted.
+    assert result.get_by_text("detail")
+    assert [route.name for route in box["detail"].get_state().routes] == ["Home", "Detail"]
 
 
 def test_native_root_stack_boots_from_host_state_and_pops_via_host() -> None:
@@ -644,8 +633,8 @@ def test_native_root_stack_boots_from_host_state_and_pops_via_host() -> None:
 
     box["detail"].go_back()
     result.settle()
-    assert host.popped == [1]
-    assert result.get_by_text("detail")  # host removes the screen, not Python
+    assert result.get_by_text("home")
+    assert result.query_by_text("detail", hidden=True) is None
 
 
 def test_native_root_stack_ignores_host_state_with_unknown_routes() -> None:
@@ -668,7 +657,6 @@ def test_native_root_stack_before_remove_blocks_system_back() -> None:
     )
     box["form"].add_listener("before_remove", lambda e: e.prevent_default())
     assert result.back() is True  # consumed: host must not pop
-    assert host.popped == []
 
 
 def test_native_host_focus_drives_use_is_focused() -> None:

@@ -24,17 +24,19 @@ pn run ios          # terminal 2 (or android, or open the browser preview)
    already on its path).
 3. The client resolves the path to a module (`app.screens.home`) and
    calls [`apply_reload`][pythonnative.hot_reload.apply_reload] on the
-   main thread.
+   application thread.
 4. `apply_reload` re-executes the changed module, then the other
    imported modules under `app` that may hold bindings to it (the
    entry module's `from app.screens.home import HomeScreen`, for
    instance), leaves first.
-5. Every live screen host runs **Fast Refresh**: it walks its VNode
+5. The application host runs **Fast Refresh**: it walks its VNode
    tree, finds each component function whose module was reloaded,
    looks up the replacement by `__module__` + `__qualname__`, and
    rewrites the `Element.type` references in place. The next
    reconcile sees the new function with the same `HookState`, so state
-   survives.
+   survives when the captured hook signature is compatible. Hook-order or
+   custom-hook changes remount the affected component. Helper-class and service
+   changes trigger an application remount.
 6. The host re-renders. Layout and native views update incrementally
    through the normal reconciler path.
 7. The client reports back (`fast_refresh: app.screens.home 42ms`),
@@ -51,10 +53,8 @@ previous module stays in `sys.modules`, the traceback shows in the
 RedBox and the terminal, and the app keeps running. Fix the file and
 save again.
 
-Per-screen scope: each native screen (`UIViewController` on iOS,
-`ScreenFragment` on Android, a screen element in the preview) runs its
-own host, so Fast Refresh operates independently per host. Two pushed
-screens that both use a changed module each swap their own references.
+Refresh walks the application's shared logical tree, including covered screens
+and mounted list rows. Native containers don't create separate Python hosts.
 
 ## What gets reloaded
 
@@ -94,11 +94,9 @@ picks up the new bytes the next time it renders.
 
 !!! warning "Hook signature changes"
     Adding or removing a hook in a component changes the slot layout.
-    Fast Refresh swaps the function in place, and the next render may
-    read the wrong slots; the host falls back to a remount when it
-    detects the swap raising. If you see suspicious state after a
-    hook-shape edit, close and reopen the affected screen (or reload
-    the app) to clear the slate.
+    Fast Refresh compares captured hook signatures before preserving
+    state. Hook-order and custom-hook changes remount affected component
+    instances. Changes to helper classes or services remount the application.
 
 !!! info "Renaming a component"
     Fast Refresh keys on each function's `__qualname__`. Renaming a

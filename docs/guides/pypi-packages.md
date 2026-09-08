@@ -17,9 +17,9 @@ List pip requirements in `[requirements].packages` in
 packages = ["httpx>=0.27", "numpy", "pillow~=11.0"]
 ```
 
-Every `pn run` and `pn build` resolves that list for each target the
-build needs, installs the resolved wheels, and bundles them into the
-app. Nothing from your host environment leaks in: a package that's
+Without a lock, `pn run` and `pn build` resolve that list for each target
+the build needs. With a lock, they install the recorded wheels and verify
+their hashes. Both paths bundle the resulting packages into the app. Nothing from your host environment leaks in: a package that's
 importable on your Mac but has no wheel for the device is a build
 error, not a runtime `ImportError`.
 
@@ -27,9 +27,30 @@ error, not a runtime `ImportError`.
     The CLI bundles the installed `pythonnative` package directly.
     Validation rejects it in `[requirements].packages`.
 
+## Lock dependencies
+
+Run `pn deps --lock` and commit the generated `pn.lock`. The lock records Python
+version, requirements, indexes, each target's wheel URLs, and SHA-256 hashes.
+The iOS targets include both Apple Silicon (`arm64`) and Intel (`x86_64`)
+simulators, so the same committed lock works on developer Macs and CI runners.
+`pn deps ios --lock` or `pn deps android --lock` updates selected targets.
+Builds reject stale locks, missing target entries, differing package versions
+across Android ABIs, and changed wheel bytes.
+
+Plugin discovery inspects the selected target wheels as archives. It doesn't
+import target binary modules on the host. A plugin's manifest, contract, source,
+and resources must agree across the selected architectures.
+
+Wheel selection isn't a guarantee of runtime compatibility. The resolver uses
+pip's cross-platform wheel options; dependencies with platform environment
+markers still need validation on each embedded runtime.
+
 ## What works
 
-**Pure-Python packages** (`py3-none-any` wheels) work on every target.
+**Pure-Python packages** (`py3-none-any` wheels) are installable on every
+target, but their runtime dependencies must also be available. Packages that
+require subprocesses, unsupported system services, or a desktop GUI still need
+an alternative on mobile.
 
 **Binary wheels** (compiled extensions) work when the package publishes
 a wheel for the target:

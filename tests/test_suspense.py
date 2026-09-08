@@ -14,7 +14,7 @@ from pythonnative.element import Element
 from pythonnative.hooks import use_resource, use_state
 from pythonnative.reconciler import Reconciler
 from pythonnative.runtime import create_future, drain, resolve_future
-from pythonnative.suspense import CoroDriver, Suspend, lazy, start_resource
+from pythonnative.suspense import Suspend, lazy, start_resource
 from pythonnative.testing import FakeBackend, FakeView
 
 
@@ -32,108 +32,6 @@ def _settle(rec: Reconciler, predicate: Any, timeout: float = 2.0) -> bool:
 def _texts(backend: FakeBackend) -> list:
     """Every live Text view's text prop, in creation order."""
     return [v.props.get("text") for v in backend.views.values() if v.type_name == "Text"]
-
-
-# ======================================================================
-# CoroDriver
-# ======================================================================
-
-
-def test_coro_driver_completes_synchronously_without_awaits() -> None:
-    async def body() -> int:
-        return 5
-
-    driver = CoroDriver(body())
-    driver.start()
-    assert driver.done
-    assert driver.result() == 5
-
-
-def test_coro_driver_resolves_done_futures_inline() -> None:
-    future = create_future()
-    resolve_future(future, "ready")
-    drain()
-
-    async def body() -> str:
-        return await future
-
-    driver = CoroDriver(body())
-    driver.start()
-    assert driver.done
-    assert driver.result() == "ready"
-
-
-def test_coro_driver_parks_on_pending_future_then_resumes() -> None:
-    future = create_future()
-    seen: list = []
-
-    async def body() -> str:
-        value = await future
-        seen.append(value)
-        return value
-
-    driver = CoroDriver(body())
-    driver.start()
-    assert not driver.done
-    assert seen == []
-
-    resolve_future(future, "later")
-    drain(until=lambda: driver.done)
-    assert driver.done
-    assert driver.result() == "later"
-    assert seen == ["later"]
-
-
-def test_coro_driver_supports_asyncio_sleep_in_sync_step() -> None:
-    """Steps outside the loop still satisfy ``get_running_loop()`` callers.
-
-    ``asyncio.sleep`` (and anything else using ``get_running_loop()``
-    internally) must work inside an ``async def`` component body even
-    when the first step runs synchronously during mount, before the
-    guest loop has ever run. Regression test: this raised
-    ``RuntimeError: no running event loop``.
-    """
-
-    async def body() -> str:
-        await asyncio.sleep(0.001)
-        return "slept"
-
-    driver = CoroDriver(body())
-    driver.start()
-    assert not driver.done
-
-    drain(until=lambda: driver.done)
-    assert driver.done
-    assert driver.result() == "slept"
-
-
-def test_coro_driver_captures_exception() -> None:
-    async def body() -> None:
-        raise ValueError("bad")
-
-    driver = CoroDriver(body())
-    driver.start()
-    assert driver.done
-    assert isinstance(driver.exception(), ValueError)
-
-
-def test_coro_driver_cancel() -> None:
-    future = create_future()
-    cancelled: list = []
-
-    async def body() -> None:
-        try:
-            await future
-        except asyncio.CancelledError:
-            cancelled.append(True)
-            raise
-
-    driver = CoroDriver(body())
-    driver.start()
-    assert driver.cancel()
-    assert driver.done
-    assert driver.cancelled()
-    assert cancelled == [True]
 
 
 # ======================================================================
@@ -168,6 +66,7 @@ def test_resource_read_reraises_fetcher_error() -> None:
         raise RuntimeError("fetch failed")
 
     resource = start_resource(fetch)
+    drain()
     assert resource.ready
     with pytest.raises(RuntimeError, match="fetch failed"):
         resource.read()
@@ -193,14 +92,15 @@ def test_resource_is_awaitable() -> None:
 # ======================================================================
 
 
-def test_async_component_without_pending_awaits_renders_synchronously() -> None:
+def test_async_component_runs_as_a_task() -> None:
     @component
     async def Hello() -> Element:
         return Text("hi from async")
 
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec.mount(Hello())
+    rec.mount(Suspense(Hello(), fallback=Text("loading")))
+    drain()
     assert "hi from async" in _texts(backend)
 
 
@@ -274,6 +174,7 @@ def test_suspense_retry_reuses_cached_resource() -> None:
     backend = FakeBackend()
     rec = Reconciler(backend)
     rec.mount(Suspense(Data(), fallback=Text("...")))
+    drain(timeout=0.01)
     assert len(fetches) == 1
 
     resolve_future(future, "cached")
@@ -306,6 +207,7 @@ def test_suspense_sibling_state_survives_suspension() -> None:
         )
     )
     assert _texts(backend) == ["waiting"]
+    drain(timeout=0.01)
     assert len(sibling_fetches) == 1
 
     resolve_future(future, "slow done")
@@ -405,7 +307,7 @@ def test_resource_error_reaches_error_boundary() -> None:
             fallback=lambda err: Text("recovered"),
         )
     )
-    assert _texts(backend) == ["recovered"]
+    assert _settle(rec, lambda: _texts(backend) == ["recovered"])
 
 
 async def _failing_fetch() -> None:

@@ -463,3 +463,48 @@ def test_apply_reload_with_no_hosts_is_a_noop() -> None:
     assert result.mode == "none"
     assert result.reloaded == []
     assert result.requested == ["anything.at.all"]
+
+
+@pytest.mark.parametrize("custom_hook", [False, True])
+def test_changed_hook_bindings_remount_instead_of_reusing_slots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, custom_hook: bool
+) -> None:
+    from pythonnative.testing import render
+
+    module_name = "pn_refresh_contract"
+    source = tmp_path / f"{module_name}.py"
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    monkeypatch.delitem(sys.modules, module_name, raising=False)
+
+    def write(extra: str) -> None:
+        if custom_hook:
+            body = f"def use_counter():\n{extra}    count, setter = pn.use_state(0)\n    return count, setter\n"
+            hook = "use_counter()"
+            insertion = ""
+        else:
+            body, hook, insertion = "", "pn.use_state(0)", extra
+        source.write_text(
+            "import pythonnative as pn\n"
+            + body
+            + "\n@pn.component\ndef Counter():\n"
+            + insertion
+            + f"    count, setter = {hook}\n"
+            + "    return pn.Button(str(count), on_press=lambda: setter(count + 1))\n",
+            encoding="utf-8",
+        )
+
+    write("")
+    old = importlib.import_module(module_name)
+    result = render(old.Counter())
+    result.press(result.get_by_text("0"))
+    assert result.get_by_text("1")
+    write("    inserted, _ = pn.use_state('new slot')\n")
+    try:
+        assert ModuleReloader.reload_module(module_name)
+        ModuleReloader.refresh_in_place(result.reconciler, [module_name])
+        result.rerender(sys.modules[module_name].Counter())
+        assert result.get_by_text("0")
+    finally:
+        result.unmount()
+        sys.modules.pop(module_name, None)

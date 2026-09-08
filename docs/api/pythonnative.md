@@ -47,7 +47,7 @@ The reference is split per module so each page stays scannable:
 | Testing | [Testing](testing.md) | [`render`][pythonnative.testing.render], [`render_hook`][pythonnative.testing.render_hook], [`FakeBackend`][pythonnative.testing.FakeBackend], [`FakeHost`][pythonnative.testing.FakeHost] |
 | Styling | [Style](style.md) | [`StyleSheet`][pythonnative.StyleSheet], [`Style`][pythonnative.style.Style], [`StyleProp`][pythonnative.style.StyleProp], [`style`][pythonnative.style.style], [`Theme`][pythonnative.Theme], [`ThemeContext`][pythonnative.style.ThemeContext], [`use_theme`][pythonnative.use_theme] |
 | Appearance | [Appearance](appearance.md) | [`use_color_scheme`][pythonnative.use_color_scheme], `appearance.set_color_scheme`, `appearance.get_color_scheme` |
-| Images | [Images](images.md) | `images.fetch`, `images.clear_cache` |
+| Images | [Images](images.md) | `Image`, `ImageBackground` |
 | Element descriptor | [Element](element.md) | [`Element`][pythonnative.Element] |
 | Screen host | [Hosts](hosts.md) | [`create_screen`][pythonnative.create_screen], [`ScreenHost`][pythonnative.hosts.base.ScreenHost] |
 | Reconciler | [Reconciler](reconciler.md) | [`Reconciler`][pythonnative.reconciler.Reconciler] |
@@ -61,7 +61,7 @@ The reference is split per module so each page stays scannable:
 | Diagnostics | [Diagnostics](diagnostics.md) | [`HookOrderError`][pythonnative.HookOrderError], [`warn`][pythonnative.diagnostics.warn], [`is_dev`][pythonnative.diagnostics.is_dev], [`report_error`][pythonnative.diagnostics.report_error] |
 | Custom components SDK | [SDK](sdk.md) | [`Props`][pythonnative.sdk._components.Props], [`ViewHandler`][pythonnative.native_views.base.ViewHandler], [`native_component`][pythonnative.sdk._components.native_component], [`register_component`][pythonnative.sdk._components.register_component], [`element_factory`][pythonnative.sdk._components.element_factory] |
 | Utilities | [Utilities](utils.md) | `IS_ANDROID`, `IS_IOS`, `IS_WEB` |
-| CLI | [CLI (`pn`)](cli.md) | `pn init`, `pn run`, `pn clean` |
+| CLI | [CLI (`pn`)](cli.md) | `pn init`, `pn run`, `pn clean`, and more in the [CLI reference](cli.md) |
 
 ## Property reference
 

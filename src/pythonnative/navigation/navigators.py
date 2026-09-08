@@ -170,6 +170,13 @@ def _use_container(core: NavigatorCore, state: NavigationState, container: Any) 
 
     use_effect(report, [state])
 
+    def cache() -> None:
+        publish = getattr(core.host, "cache_navigation_state", None)
+        if core.is_native_root and publish is not None:
+            publish(state.to_dict())
+
+    use_effect(cache, [state])
+
 
 def _use_focus_events(core: NavigatorCore, state: NavigationState, parent_focused: bool) -> None:
     """Emit ``blur`` / ``focus`` / ``state`` as the active route or focus changes."""
@@ -303,12 +310,8 @@ def _StackNavigatorImpl(*, screens: Tuple[ScreenDef, ...], initial_route: Option
     if not screens:
         return View(style={"flex": 1})
     core, state, parent_focused = _use_navigator("stack", screens, initial_route)
-    _use_host_options(core, state)
 
     def on_back() -> bool:
-        if core.is_native_root:
-            evt = core.emit(state.current, "before_remove", {"action": "back"})
-            return evt.default_prevented
         if len(state) > 1:
             return core.pop(1, source="back")
         return False
@@ -316,9 +319,28 @@ def _StackNavigatorImpl(*, screens: Tuple[ScreenDef, ...], initial_route: Option
     use_back_handler(on_back)
 
     current = state.current
+    stack_ref = use_ref(None)
     if core.is_native_root:
-        # Other routes live on other native screens; only ours renders here.
-        return View(_screen_element(core, current, active=True, parent_focused=parent_focused), style={"flex": 1})
+
+        def native_back(count: int = 1) -> None:
+            if not core.pop(count, source="back") and stack_ref.current is not None:
+                from ..native_views import get_registry
+
+                get_registry().command(stack_ref.current.tag, "restore_stack")
+
+        return Element(
+            "ScreenStack",
+            {"flex": 1, "on_native_back": native_back, "ref": stack_ref},
+            [
+                Element(
+                    "Screen",
+                    {"flex": 1, "active": route is current, "route_key": route.key, **core.options_for(route)},
+                    [_screen_element(core, route, active=route is current, parent_focused=parent_focused)],
+                    key=route.key,
+                )
+                for route in state.routes
+            ],
+        )
 
     layers: List[Element] = []
     for route in state.routes:

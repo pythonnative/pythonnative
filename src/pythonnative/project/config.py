@@ -372,7 +372,7 @@ class AppConfig:
             ConfigError: If the file is missing, isn't valid TOML, or
                 fails validation.
         """
-        root = Path(project_root) if project_root is not None else Path.cwd()
+        root = Path(project_root).resolve() if project_root is not None else Path.cwd()
         config_path = root / CONFIG_FILENAME
         if not config_path.is_file():
             raise ConfigError(f"No {CONFIG_FILENAME} found in {root}.")
@@ -400,7 +400,7 @@ class AppConfig:
         Raises:
             ConfigError: On any structural or value validation failure.
         """
-        root = Path(project_root) if project_root is not None else Path.cwd()
+        root = Path(project_root).resolve() if project_root is not None else Path.cwd()
         app = _expect_table(data, "app")
 
         config = cls(

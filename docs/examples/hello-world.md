@@ -31,18 +31,17 @@ def App():
   (like `use_state`) work because the decorator establishes a hook
   context for each call.
 - `pn.use_state(0)` returns `(value, setter)`. The setter triggers a
-  re-render scheduled by the screen host.
+  re-render scheduled on the Python application thread.
 - `pn.Column(*children, style=...)` returns a vertical container
   element. Both the children and the style are read on every render;
   the reconciler diffs them against the previous render and updates
   the underlying `UIView` / `FrameLayout` in place.
 - `pn.Text` and `pn.Button` map to native widgets via their
-  registered [`ViewHandler`][pythonnative.native_views.base.ViewHandler]
-  implementations.
+  Swift and Kotlin component managers.
 - After every commit a [layout pass](../concepts/layout.md) computes
-  an absolute frame for every element using PythonNative's pure-Python
-  flexbox engine, so `spacing`, `padding`, and `align_items` produce
-  the same geometry on Android and iOS.
+  frame for each widget using Yoga and the platform's intrinsic
+  measurements. `spacing`, `padding`, and `align_items` follow shared
+  layout rules; fonts and control sizes can differ by platform.
 
 ## Run it
 

@@ -61,43 +61,22 @@ def settle(reconciler: Any = None, timeout: float = 1.0) -> None:
 
 
 class FakeHost:
-    """A [`HostNavigator`][pythonnative.navigation.HostNavigator] that records native screen operations.
+    """Application lifecycle and restoration host for navigation tests.
 
-    Pass as ``render(..., host=FakeHost())`` to render a root stack the
-    way a device would: pushes are recorded in ``pushed`` instead of
-    creating screens in-tree. ``set_focused`` simulates the platform
-    covering / revealing the screen.
+    Pass as ``render(..., host=FakeHost())`` to provide restoration state.
+    Screens remain in the logical tree. ``set_focused`` simulates the
+    application entering or leaving the foreground.
     """
 
     def __init__(self, initial_state: Optional[Dict[str, Any]] = None) -> None:
         self.is_focused = True
         self.initial_state = initial_state
-        self.pushed: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
-        self.popped: List[int] = []
-        self.replaced: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
-        self.resets: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
         self.options: List[Dict[str, Any]] = []
         self._focus_listeners: List[Callable[[bool], None]] = []
 
     def initial_navigation_state(self) -> Optional[Dict[str, Any]]:
         """Return the ``initial_state`` the host was constructed with (``None`` for a fresh root)."""
         return self.initial_state
-
-    def push_screen(self, state: Dict[str, Any], options: Dict[str, Any]) -> None:
-        """Record the push in ``pushed`` instead of creating a native screen."""
-        self.pushed.append((state, dict(options)))
-
-    def pop_screens(self, count: int) -> None:
-        """Record the requested pop ``count`` in ``popped``."""
-        self.popped.append(count)
-
-    def replace_screen(self, state: Dict[str, Any], options: Dict[str, Any]) -> None:
-        """Record the replacement in ``replaced`` instead of swapping a native screen."""
-        self.replaced.append((state, dict(options)))
-
-    def reset_screens(self, state: Dict[str, Any], options: Dict[str, Any]) -> None:
-        """Record the stack reset in ``resets`` instead of rebuilding native screens."""
-        self.resets.append((state, dict(options)))
 
     def set_screen_options(self, options: Dict[str, Any]) -> None:
         """Append a copy of ``options`` to ``options`` (see the ``title`` property)."""
@@ -248,8 +227,8 @@ class RenderResult:
         self.fire(target, "on_press")
 
     def change_text(self, target: Target, value: str) -> None:
-        """Fire ``on_change_text`` on a ``TextInput``."""
-        self.fire(target, "on_change_text", value)
+        """Fire ``on_change`` on a ``TextInput``."""
+        self.fire(target, "on_change", value)
 
     def back(self) -> bool:
         """Simulate the system back action; returns whether a handler consumed it."""
@@ -294,8 +273,7 @@ def render(
         viewport: Size for the layout pass; ``None`` skips layout.
         backend: Reuse an existing backend (defaults to a fresh one).
         host: Render under a [`HostRoot`][pythonnative.navigation.host.HostRoot]
-            with this fake host, so root stacks push native screens
-            into ``host.pushed`` instead of the tree.
+            with this fake host for focus and restoration state.
         settle_first: Drain async work and effects before returning.
     """
     from ..reconciler import Reconciler

@@ -3,11 +3,9 @@
 Renders a virtualized list of 40 rows. Maestro asserts the first row,
 scrolls to the end, and asserts the last row.
 
-Because the demo passes a fixed ``item_height`` (with no header,
-footer, or refresh control), on Android and iOS this list takes the
-**native** virtualization path: a ``RecyclerView`` / ``UITableView``
-whose rows are nested PythonNative subtrees mounted on demand. The
-scroll assertion therefore exercises native cell recycling end to end.
+UIKit collection views and Android recycler views own physical cells; keyed
+Python rows remain in the application tree. The flow scrolls both vertical and
+horizontal lists to exercise native recycling and axis-specific measurement.
 
 The flow targets the *last* row because a Maestro fling can travel
 several hundred points between visibility polls, skipping clean past
@@ -26,6 +24,7 @@ from app.screens.scaffold import demo_screen, hint, section
 @pn.component
 def FlatListDemo() -> pn.Element:
     """Render a virtualized 40-row FlatList with stable row labels."""
+    horizontal, set_horizontal = pn.use_state(False)
     items = [{"id": i, "label": f"FlatRow {i + 1}"} for i in range(40)]
 
     def render_row(item: dict, _: int) -> pn.Element:
@@ -40,7 +39,7 @@ def FlatListDemo() -> pn.Element:
 
     return demo_screen(
         "FlatList",
-        "Virtualized 100-row list; scroll to reveal rows further down.",
+        "Virtualized 40-row list; scroll vertically and horizontally.",
         section(
             "List body",
             # See ``components/scroll_view.py`` for the rationale: this
@@ -48,12 +47,15 @@ def FlatListDemo() -> pn.Element:
             # the FlatList on both the iOS and Android CI emulators.
             pn.FlatList(
                 data=items,
-                item_height=44,
+                item_height=120 if horizontal else 44,
+                horizontal=horizontal,
+                key="horizontal" if horizontal else "vertical",
                 separator_height=4,
                 render_item=render_row,
                 key_extractor=lambda item, _: str(item["id"]),
                 style=pn.style(height=400, background_color="#F1F5F9"),
             ),
+            pn.Button("Show horizontal list", on_press=lambda: set_horizontal(True)),
             hint("Maestro asserts 'FlatRow 1' and (after scroll) 'FlatRow 40'."),
         ),
     )

@@ -1,24 +1,9 @@
-"""Platform-independent screen host.
+"""Platform-independent application surface host.
 
-A host bridges one native screen (an Android fragment, an iOS view
-controller, a browser preview screen) to a [`Reconciler`][pythonnative.reconciler.Reconciler]
-rendering the app's root component. It owns:
-
-- **Lifecycle**: ``on_create`` mounts the tree, ``on_resume`` /
-  ``on_pause`` track focus, ``on_destroy`` unmounts.
-- **Render scheduling**: state changes during a render are queued and
-  drained in bounded batches; platforms hop off-main-thread requests
-  onto the UI thread.
-- **Navigation bridging**: the host implements
-  [`HostNavigator`][pythonnative.navigation.HostNavigator], so a root
-  ``Stack.Navigator`` can push real native screens. Each pushed screen
-  runs the same root component with its navigation history in
-  ``args["pn_nav"]``.
-- **Dev tooling**: the RedBox error overlay and hot reload (Fast Refresh
-  with a full-remount fallback).
-
-Subclasses implement the handful of ``_native_*`` primitives for their
-platform (attach a root view, push a screen, set the title, ...).
+A host mounts one logical application tree, publishes native lifecycle and
+viewport changes, schedules Python work on the application thread, and caches
+navigation restoration state. Logical screen containers present the tree's
+screen roots through native navigation controllers and fragments.
 """
 
 from __future__ import annotations
@@ -159,25 +144,6 @@ class ScreenHost:
         """Defer a render to the platform's next UI turn; ``False`` renders inline."""
         return False
 
-    def _native_push(self, component_path: str, args: Dict[str, Any], options: Dict[str, Any]) -> None:
-        raise RuntimeError("Pushing native screens requires a native runtime (iOS, Android, or `pn preview`)")
-
-    def _native_pop(self, count: int) -> None:
-        raise RuntimeError("Popping native screens requires a native runtime (iOS, Android, or `pn preview`)")
-
-    def _native_replace(self, component_path: str, args: Dict[str, Any], options: Dict[str, Any]) -> None:
-        self._native_pop(1)
-        self._native_push(component_path, args, options)
-
-    def _native_reset(self, component_path: str, screens: Sequence[Tuple[Dict[str, Any], Dict[str, Any]]]) -> None:
-        """Pop to the root native screen, then push ``screens`` (``(args, options)`` pairs)."""
-        self._native_pop_to_root()
-        for args, options in screens:
-            self._native_push(component_path, args, options)
-
-    def _native_pop_to_root(self) -> None:
-        pass
-
     def _native_set_options(self, options: Dict[str, Any]) -> None:
         """Apply header options (``title`` at minimum) to the native chrome."""
 
@@ -191,37 +157,11 @@ class ScreenHost:
 
         return initial_state_from_args(self.args)
 
-    def push_screen(self, state: Dict[str, Any], options: Dict[str, Any]) -> None:
-        """Push a native screen running the same root component, seeded with ``state``."""
+    def cache_navigation_state(self, state: Dict[str, Any]) -> None:
+        """Publish a restorable immutable navigation snapshot to the native host."""
         from ..navigation.host import NAV_STATE_ARG
 
-        self._native_push(self.component_path, {NAV_STATE_ARG: state}, options)
-
-    def pop_screens(self, count: int) -> None:
-        """Pop ``count`` native screens (at least one)."""
-        self._native_pop(max(1, int(count)))
-
-    def replace_screen(self, state: Dict[str, Any], options: Dict[str, Any]) -> None:
-        """Replace the current native screen with one seeded with ``state``."""
-        from ..navigation.host import NAV_STATE_ARG
-
-        self._native_replace(self.component_path, {NAV_STATE_ARG: state}, options)
-
-    def reset_screens(self, state: Dict[str, Any], options: Dict[str, Any]) -> None:
-        """Rebuild the native stack for ``state``.
-
-        The root native screen stays; every route above the first gets
-        its own native screen carrying the history up to it, so the
-        back button walks the new stack.
-        """
-        from ..navigation.host import NAV_STATE_ARG
-
-        routes = list(state.get("routes") or [])
-        screens: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
-        for depth in range(2, len(routes) + 1):
-            partial = {"routes": routes[:depth], "index": depth - 1}
-            screens.append(({NAV_STATE_ARG: partial}, options if depth == len(routes) else {}))
-        self._native_reset(self.component_path, screens)
+        self.args = dict(self.args or {}) | {NAV_STATE_ARG: state}
 
     def set_screen_options(self, options: Dict[str, Any]) -> None:
         """Apply header ``options`` (``title`` and friends) to the native chrome."""
@@ -502,9 +442,9 @@ class ScreenHost:
                 print("[PN] RedBox failed to mount:", file=sys.stderr)
                 traceback.print_exc()
 
-        from ..runtime import call_on_main_thread
+        from ..runtime import call_on_application_thread
 
-        call_on_main_thread(mount)
+        call_on_application_thread(mount)
 
     def clear_redbox(self, reattach: bool = True) -> None:
         """Dismiss the dev error overlay, reattaching the app's root view unless ``reattach`` is ``False``."""
@@ -548,7 +488,7 @@ class ScreenHost:
             return "none"
         return self.refresh(reloaded)
 
-    def refresh(self, reloaded_modules: Sequence[str]) -> str:
+    def refresh(self, reloaded_modules: Sequence[str], *, force_remount: bool = False) -> str:
         """Refresh the mounted tree against already-reloaded modules.
 
         Tries Fast Refresh first (swap component functions in place so
@@ -569,7 +509,7 @@ class ScreenHost:
         if self.reconciler is None:
             return "none"
         self.clear_redbox()
-        if self._try_fast_refresh(reloaded):
+        if not force_remount and self._try_fast_refresh(reloaded):
             return "fast_refresh"
         try:
             self._full_remount(reloaded)

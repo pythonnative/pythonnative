@@ -19,8 +19,7 @@ tests that want to exercise the bridge itself install a
 from __future__ import annotations
 
 import threading
-from collections import deque
-from typing import Any, Callable, Deque, Dict, Optional, Protocol, Tuple
+from typing import Callable, Optional, Protocol, Tuple
 
 from . import codec
 
@@ -31,11 +30,11 @@ __all__ = [
     "has_transport",
     "handshake",
     "native_callback",
-    "post_to_main",
     "set_transport",
 ]
 
-PROTOCOL_VERSION = 1
+from .commits import PROTOCOL_VERSION
+
 """Bridge protocol version this Python package speaks."""
 
 
@@ -47,7 +46,7 @@ class Transport(Protocol):
     def protocol_version(self) -> int:
         """Return the protocol version compiled into the native library."""
 
-    def apply(self, transaction_json: str) -> None:
+    def apply(self, transaction_json: str) -> str:
         """Apply one serialized transaction (a JSON array of ops)."""
 
     def measure(self, tag: int, max_width: float, max_height: float) -> Tuple[float, float]:
@@ -154,58 +153,29 @@ def handshake() -> int:
             f"expects v{PROTOCOL_VERSION}. Re-run 'pn build' so the staged template matches the "
             "installed pythonnative package."
         )
+    if getattr(get_transport(), "name", "") in {"ios", "android"}:
+        from ..sdk.schema import fingerprint
+
+        reply = codec.loads(get_transport().call("Runtime", "capabilities", codec.dumps({"id": 0, "args": {}})))
+        capabilities = reply.get("value", {}) if isinstance(reply, dict) else {}
+        if capabilities.get("schema") != fingerprint() or capabilities.get("yoga") != "3.2.1":
+            raise RuntimeError("Native component contracts changed. Rebuild the app with 'pn run'.")
     return version
-
-
-# ======================================================================
-# Main-queue posting
-# ======================================================================
-#
-# The asyncio guest loop and ``call_on_main_thread`` need a way to run
-# a callable on the platform main thread's next turn. Native provides
-# it: ``Host.post()`` schedules ``callback("pump")``, which drains this
-# queue. Keeping the queue in Python means one native crossing per
-# batch of callables rather than one per callable.
-
-_main_queue: Deque[Callable[[], None]] = deque()
-_main_queue_lock = threading.Lock()
-_pump_requested = False
-
-
-def post_to_main(fn: Callable[[], None]) -> None:
-    """Queue ``fn`` for the next main-thread turn (never runs inline)."""
-    global _pump_requested
-    with _main_queue_lock:
-        _main_queue.append(fn)
-        if _pump_requested:
-            return
-        _pump_requested = True
-    try:
-        get_transport().call("Host", "post", codec.dumps({"call_id": 0, "args": {}}))
-    except Exception as exc:
-        with _main_queue_lock:
-            _pump_requested = False
-        print(f"[pn.bridge] Host.post failed; running {len(_main_queue)} queued callable(s) inline: {exc!r}")
-        _drain_main_queue()
-
-
-def _drain_main_queue() -> None:
-    global _pump_requested
-    while True:
-        with _main_queue_lock:
-            if not _main_queue:
-                _pump_requested = False
-                return
-            fn = _main_queue.popleft()
-        try:
-            fn()
-        except Exception as exc:
-            print(f"[pn.bridge] main-thread callable raised: {exc!r}")
 
 
 # ======================================================================
 # native -> Python
 # ======================================================================
+
+
+# Callback threads coalesce continuous input before the application loop drains.
+_continuous: dict[tuple[int, str], list[str]] = {}
+
+
+def _deliver_continuous(tag: int, name: str, slot: list[str]) -> None:
+    if _continuous.get((tag, name)) is slot:
+        _continuous.pop((tag, name), None)
+    native_callback("event", tag, name, slot[0])
 
 
 def native_callback(kind: str, tag: int, name: str, payload: str) -> Optional[str]:
@@ -225,7 +195,31 @@ def native_callback(kind: str, tag: int, name: str, payload: str) -> Optional[st
         ``diagnostics`` so nothing propagates into UIKit or the
         Android looper.
     """
+    from ..runtime import _on_loop_thread, get_loop
+
+    loop = get_loop()
+    if loop.is_running() and not _on_loop_thread(loop):
+        if kind == "event" and name in {"on_scroll", "on_selection_change", "on_gesture_update"}:
+            key = (tag, name)
+            slot = _continuous.get(key)
+            if slot is None:
+                slot = [payload]
+                _continuous[key] = slot
+                loop.call_soon_threadsafe(_deliver_continuous, tag, name, slot)
+            else:
+                slot[0] = payload
+        else:
+            _continuous.clear()
+            loop.call_soon_threadsafe(native_callback, kind, tag, name, payload)
+        return None
     try:
+        if kind == "layout":
+            from ..native_views import get_registry
+
+            backend = get_registry()
+            if backend.on_layout is not None:
+                backend.on_layout(codec.loads(payload))
+            return None
         if kind == "event":
             return _on_event(int(tag), name, payload)
         if kind == "module":
@@ -243,9 +237,6 @@ def native_callback(kind: str, tag: int, name: str, payload: str) -> Optional[st
             data = codec.loads(payload) or {}
             native_animation_completed(int(data.get("id", 0)), bool(data.get("finished", True)))
             return None
-        if kind == "pump":
-            _drain_main_queue()
-            return None
         print(f"[pn.bridge] unknown callback kind {kind!r}")
     except Exception as exc:
         from .. import diagnostics
@@ -261,6 +252,14 @@ def _on_event(tag: int, name: str, payload: str) -> Optional[str]:
     from ..events import get_event_registry
 
     args = codec.loads(payload)
+    from ..native_views import get_registry
+
+    backend = get_registry()
+    accept = getattr(backend, "accept_event", None)
+    if accept is not None:
+        if not accept(tag, name, args):
+            return None
+        args = args["args"]
     if args is None:
         args = []
     elif not isinstance(args, list):
@@ -276,7 +275,7 @@ def _on_event(tag: int, name: str, payload: str) -> Optional[str]:
             return None if result is None else codec.dumps(codec.to_jsonable(result))
         return None
     try:
-        result = callback(*args)
+        result = get_event_registry().invoke(tag, name, *args)
     except Exception as exc:
         from .. import diagnostics
 
@@ -285,7 +284,9 @@ def _on_event(tag: int, name: str, payload: str) -> Optional[str]:
 
             traceback.print_exc()
         return None
-    if result is None:
+    import inspect
+
+    if result is None or inspect.isawaitable(result):
         return None
     try:
         return codec.dumps(codec.to_jsonable(result))
@@ -294,20 +295,8 @@ def _on_event(tag: int, name: str, payload: str) -> Optional[str]:
 
 
 def _reset_for_tests() -> None:
-    """Drop the transport and any queued main-thread work (test isolation)."""
-    global _transport, _explicit, _pump_requested
+    """Drop the transport for test isolation."""
+    global _transport, _explicit
     with _transport_lock:
         _transport = None
         _explicit = False
-    with _main_queue_lock:
-        _main_queue.clear()
-        _pump_requested = False
-
-
-def transport_state() -> Dict[str, Any]:
-    """Diagnostics snapshot (used by ``pn doctor`` and tests)."""
-    return {
-        "transport": None if _transport is None else _transport.name,
-        "protocol_version": PROTOCOL_VERSION,
-        "queued_main_callables": len(_main_queue),
-    }

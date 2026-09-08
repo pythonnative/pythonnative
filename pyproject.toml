@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pythonnative"
-version = "0.39.0"
+version = "0.41.0"
 description = "Cross-platform native UI toolkit for Android and iOS"
 authors = [
   { name = "Owen Carey" }
@@ -44,6 +44,7 @@ dev = [
   "mypy>=1.10",
   "pytest>=8.0",
   "pytest-asyncio>=0.23",
+  "PyYAML>=6.0",
   "Pillow>=10.0",
   # `pn deps` and `pn run ios` shell out to `sys.executable -m pip` to
   # resolve and vendor the app's [requirements].packages for the device
@@ -93,8 +94,15 @@ license-files = ["LICENSE*"]
 [tool.setuptools.package-data]
 pythonnative = [
   "py.typed",
-  "templates/**",
-  "devserver/static/*",
+  "templates/**", "native/**", "sdk/templates/**",
+  "devserver/static/**",
+]
+
+[tool.setuptools.exclude-package-data]
+pythonnative = [
+  "**/build/**", "**/.build/**", "**/.gradle/**",
+  "**/.cxx/**", "**/.swiftpm/**", "**/.kotlin/**",
+  "**/__pycache__/**", "**/.DS_Store",
 ]
 
 [tool.ruff]
@@ -146,11 +154,11 @@ target-version = ['py313']
 # PSR stamps the new version into pyproject.toml before running this, so
 # `--upgrade-package` re-syncs only this project's own version in the lock
 # (never dependency upgrades), and the staged uv.lock lands in the release
-# commit. This also replaces the workflow's separate `python -m build`.
+# commit. The release workflow builds distributions from that tagged commit
+# using the same cibuildwheel matrix as PR CI.
 build_command = """
 uv lock --upgrade-package pythonnative
 git add uv.lock
-uv build
 """
 version_toml = ["pyproject.toml:project.version"]
 version_variables = ["src/pythonnative/__init__.py:__version__"]

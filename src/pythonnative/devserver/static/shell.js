@@ -172,11 +172,13 @@ class Shell {
 
   installBridgeHandlers() {
     const b = this.bridge;
-    b.handlers.apply = (message) => this.renderer.apply(message[1]);
+    b.handlers.apply = (message) => this.renderer.apply(message[2]);
     b.handlers.measure = (message) => this.renderer.measure(message[2], message[3], message[4]);
     b.handlers.command = (message) => this.renderer.command(message[2], message[3], message[4]);
     b.handlers.animate = (message) => this.renderer.animate(message[2], message[3]);
-    b.handlers.call = (message) => this.host.call(message[2], message[3], message[4]);
+    b.handlers.call = (message) => message[2] === "Layout"
+      ? {ok: true, value: this.renderer.computeLayout(JSON.parse(message[4]).args)}
+      : this.host.call(message[2], message[3], message[4]);
 
     b.onOpen = () => {
       this.setConnected(true);

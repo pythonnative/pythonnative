@@ -133,6 +133,7 @@ def compute(
     hash_tree(template_root, into=hasher)
     hasher.update(b"\0lib\0")
     hash_tree(lib_root, into=hasher)
+    hash_tree(config.project_root / "pn.lock", into=hasher)
     for plugin_path in _plugin_paths(config):
         hasher.update(b"\0plugin:" + str(plugin_path).encode("utf-8") + b"\0")
         hash_tree(plugin_path, into=hasher)

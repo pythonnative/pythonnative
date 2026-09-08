@@ -88,6 +88,12 @@ def split_props(props: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     python: Dict[str, Any] = {}
     for key, value in props.items():
         if callable(value) and not isinstance(value, type):
+            from ..animated import AnimatedEvent
+
+            if isinstance(value, AnimatedEvent):
+                wire.setdefault("_pn_animated_events", {})[key] = {
+                    name: id(node) for name, node in value._bindings.items()
+                }
             python[key] = value
             continue
         try:

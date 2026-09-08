@@ -13,6 +13,9 @@ No network is required for the template itself; the template zip is bundled with
 - **Android 7.0 (API 24) or newer**, the Chaquopy 17 floor; `[android].min_sdk` can't go lower.
 - **64-bit ABIs only** (`arm64-v8a`, `x86_64`): CPython 3.13+ on Chaquopy and PEP 738 wheels don't ship 32-bit builds.
 - **JDK 17** and the Android SDK; `pn doctor android` checks both.
+- **Android NDK and CMake 3.22.1** for the bundled Yoga C++ library.
+  Gradle builds it for each configured ABI. Install these SDK components
+  through Android Studio's SDK Manager if they're missing.
 
 ## Component model
 

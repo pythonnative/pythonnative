@@ -347,7 +347,12 @@ def write_requirements(project_dir: Path, config: AppConfig) -> None:
         config: The validated app configuration.
     """
     requirements_path = project_dir / "app" / "requirements.txt"
-    body = "\n".join(config.requirements)
+    from .deps import android_targets
+    from .lockfile import requirements
+
+    body = requirements(config, android_targets(config))
+    if body is None:
+        body = "\n".join(config.requirements)
     requirements_path.write_text(body + ("\n" if body else ""), encoding="utf-8")
 
 
@@ -484,7 +489,7 @@ def stage_python_sources(
     return python_root
 
 
-LIB_IGNORE = shutil.ignore_patterns("templates", "__pycache__", "*.pyc", "*.pyo")
+LIB_IGNORE = shutil.ignore_patterns("templates", "native", "*.so", "__pycache__", "*.pyc", "*.pyo")
 """Ignore rules for bundling the ``pythonnative`` package (skips templates)."""
 
 

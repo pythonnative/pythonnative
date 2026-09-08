@@ -37,7 +37,7 @@ import shutil
 from dataclasses import dataclass, field
 from importlib import import_module
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence
 
 __all__ = [
     "ENTRY_POINT_GROUP",
@@ -94,6 +94,10 @@ class NativePlugin:
     android_entry: Optional[str] = None
     ios_sources: Sequence[Path] = field(default_factory=tuple)
     android_sources: Sequence[Path] = field(default_factory=tuple)
+    ios_resources: Sequence[Path] = field(default_factory=tuple)
+    android_resources: Sequence[Path] = field(default_factory=tuple)
+    android_assets: Sequence[Path] = field(default_factory=tuple)
+    contracts: Optional[Path] = None
 
     @property
     def has_ios(self) -> bool:
@@ -163,6 +167,27 @@ def load_plugin(root: Path, *, name: Optional[str] = None) -> NativePlugin:
         if not android_sources:
             raise PluginError(f"{root} declares an Android entry but android/ contains no .kt or .java files.")
 
+    def resources(platform: str, key: str) -> tuple[Path, ...]:
+        section = manifest.get(platform, {})
+        patterns = section.get(key, []) if isinstance(section, dict) else []
+        if not isinstance(patterns, list) or not all(isinstance(item, str) for item in patterns):
+            raise PluginError(f"{manifest_path}: {platform}.{key} must be a list of relative globs")
+        selected: set[Path] = set()
+        for pattern in patterns:
+            if Path(pattern).is_absolute() or ".." in Path(pattern).parts:
+                raise PluginError(f"Resource pattern escapes the plugin: {pattern}")
+            for resource in root.glob(pattern):
+                if resource.is_file():
+                    if not resource.resolve().is_relative_to(root):
+                        raise PluginError(f"Resource symlink escapes the plugin: {resource}")
+                    selected.add(resource.relative_to(root))
+        return tuple(sorted(selected))
+
+    contract_path = Path(manifest["contracts"]) if "contracts" in manifest else None
+    if contract_path is not None and (
+        not (root / contract_path).is_file() or not (root / contract_path).resolve().is_relative_to(root)
+    ):
+        raise PluginError(f"{manifest_path}: contracts must name a file inside the plugin")
     return NativePlugin(
         name=plugin_name,
         root=root,
@@ -170,6 +195,10 @@ def load_plugin(root: Path, *, name: Optional[str] = None) -> NativePlugin:
         android_entry=android_entry,
         ios_sources=tuple(ios_sources),
         android_sources=tuple(android_sources),
+        ios_resources=resources("ios", "resources"),
+        android_resources=resources("android", "resources"),
+        android_assets=resources("android", "assets"),
+        contracts=contract_path,
     )
 
 
@@ -185,6 +214,7 @@ def _entry(manifest: Dict[str, object], platform: str, manifest_path: Path) -> O
 def discover_plugins(
     *,
     extra_paths: Iterable[Path] = (),
+    include_environment: bool = True,
     log: Optional[Logger] = None,
 ) -> List[NativePlugin]:
     """Find every plugin visible to this interpreter.
@@ -193,6 +223,8 @@ def discover_plugins(
         extra_paths: Plugin directories to include in addition to the
             ``pythonnative.plugins`` entry points (from
             ``[plugins].paths`` in the project config).
+        include_environment: Inspect this interpreter's installed entry points.
+            Mobile builds pass ``False`` and inspect the target wheels instead.
         log: Optional progress logger; broken entry points are reported
             here and skipped rather than failing the build.
 
@@ -204,7 +236,7 @@ def discover_plugins(
     plugins: List[NativePlugin] = []
     seen: set = set()
 
-    for ep_name, target in sorted(_entry_points().items()):
+    for ep_name, target in sorted(_entry_points().items() if include_environment else []):
         try:
             root = _resolve_entry_point(target)
             plugin = load_plugin(root, name=ep_name)
@@ -290,6 +322,24 @@ def stage_ios_plugins(project_dir: Path, plugins: Sequence[NativePlugin], *, log
             dest = target / Path(*rel.parts[1:])  # strip the leading "ios/"
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(plugin.root / rel, dest)
+    resource_root = Path(project_dir) / "PythonNativeKit/Sources/PythonNativeKit/PluginResources"
+    if resource_root.exists():
+        shutil.rmtree(resource_root)
+    for plugin in bundled:
+        for rel in plugin.ios_resources:
+            target = resource_root / plugin.name / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(plugin.root / rel, target)
+    package = Path(project_dir) / "PythonNativeKit/Package.swift"
+    if package.exists():
+        contents = package.read_text(encoding="utf-8")
+        contents = contents.replace(', resources: [.process("PluginResources")]', "")
+        if resource_root.exists():
+            contents = contents.replace(
+                'path: "Sources/PythonNativeKit"',
+                'path: "Sources/PythonNativeKit", resources: [.process("PluginResources")]',
+            )
+        package.write_text(contents, encoding="utf-8")
     registration.write_text(_render_swift_registration(bundled), encoding="utf-8")
     if bundled:
         emit(
@@ -309,15 +359,41 @@ def stage_android_plugins(project_dir: Path, plugins: Sequence[NativePlugin], *,
     source_root = Path(project_dir).joinpath(*_ANDROID_SOURCE_ROOT)
     registration = Path(project_dir).joinpath(*_ANDROID_REGISTRATION)
     source_root.mkdir(parents=True, exist_ok=True)
+    managed_manifest = Path(project_dir) / ".pn-plugin-files.json"
+    if managed_manifest.exists():
+        for relative in json.loads(managed_manifest.read_text(encoding="utf-8")):
+            old = Path(project_dir) / relative
+            if old.resolve().is_relative_to(Path(project_dir).resolve()) and old.is_file():
+                old.unlink()
+    managed = []
 
     bundled = [p for p in plugins if p.has_android]
     for plugin in bundled:
         for rel in plugin.android_sources:
             dest = source_root / Path(*rel.parts[1:])  # strip the leading "android/"
+            if dest.exists() and dest.read_bytes() != (plugin.root / rel).read_bytes():
+                raise PluginError(f"Conflicting plugin source: {dest}")
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(plugin.root / rel, dest)
+            managed.append(str(dest.relative_to(project_dir)))
+    native_root = Path(project_dir) / "pythonnative/src/main"
+    for plugin in bundled:
+        for kind, resources in (("res", plugin.android_resources), ("assets", plugin.android_assets)):
+            for rel in resources:
+                parts = rel.parts
+                # Android resource type directories (drawable, values, and so on) stay intact.
+                index = parts.index(kind) + 1 if kind in parts else max(0, len(parts) - 2)
+                target = native_root / kind / Path(*parts[index:])
+                if kind == "assets":
+                    target = native_root / kind / plugin.name / Path(*parts[index:])
+                if target.exists() and target.read_bytes() != (plugin.root / rel).read_bytes():
+                    raise PluginError(f"Conflicting plugin resource: {target}")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(plugin.root / rel, target)
+                managed.append(str(target.relative_to(project_dir)))
     registration.parent.mkdir(parents=True, exist_ok=True)
     registration.write_text(_render_kotlin_registration(bundled), encoding="utf-8")
+    managed_manifest.write_text(json.dumps(sorted(managed)) + "\n", encoding="utf-8")
     if bundled:
         emit(
             f"Bundled {len(bundled)} native plugin(s) into the pythonnative module: "
@@ -364,3 +440,80 @@ def _render_kotlin_registration(plugins: Sequence[NativePlugin]) -> str:
         f"{method}"
         "}\n"
     )
+
+
+def discover_target_plugins(config: Any, targets: Sequence[Any], runner: Any) -> List[NativePlugin]:
+    """Discover native source manifests from the wheels selected for each device.
+
+    Target wheels are inspected as data. Their Python code isn't imported into
+    the build interpreter, so binary extensions and host-only installations
+    don't affect native plugin discovery.
+    """
+    import hashlib
+    import zipfile
+
+    from . import deps
+    from .lockfile import read, target_key
+
+    if not config.requirements:
+        return []
+    selected: Dict[str, NativePlugin] = {}
+    fingerprints: Dict[str, str] = {}
+    lock = read(config)
+    for target in targets:
+        cache = config.project_root / "build" / "plugin_wheels" / target_key(target).replace(":", "_")
+        cache.mkdir(parents=True, exist_ok=True)
+        if lock is not None:
+            entry = lock["targets"].get(target_key(target))
+            if entry is None:
+                raise PluginError(f"pn.lock has no {target.label}; run 'pn deps --lock'.")
+            urls = [package["url"] + "#sha256=" + package["sha256"] for package in entry["packages"]]
+        else:
+            resolution = deps.resolve(config, target, runner=runner)
+            if not resolution.ok:
+                raise PluginError(f"Cannot resolve plugins for {target.label}: {resolution.error}")
+            urls = [package.url for package in resolution.packages]
+        if urls:
+            command = deps.pip_base_args(config, target)
+            command[3] = "download"
+            result = runner.run([*command, "--no-deps", "--dest", str(cache), *urls], capture=True)
+            if not result.ok:
+                raise PluginError(f"Could not download plugin metadata for {target.label}: {result.stderr}")
+        # Only inspect wheels in this resolution, excluding removed cached packages.
+        names = {url.split("#", 1)[0].rsplit("/", 1)[-1] for url in urls}
+        for wheel in sorted(cache.glob("*.whl")):
+            if wheel.name not in names:
+                continue
+            with zipfile.ZipFile(wheel) as archive:
+                manifests = [name for name in archive.namelist() if name.endswith("/" + MANIFEST_NAME)]
+                if not manifests:
+                    continue
+                digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+                destination = cache / "extracted" / digest
+                if not destination.exists():
+                    for info in archive.infolist():
+                        if Path(info.filename).is_absolute() or ".." in Path(info.filename).parts:
+                            raise PluginError(f"Unsafe wheel path: {info.filename}")
+                    destination.mkdir(parents=True)
+                    archive.extractall(destination)
+                for manifest_path in manifests:
+                    plugin = load_plugin((destination / manifest_path).parent)
+                    fingerprint = hashlib.sha256()
+                    fingerprint.update((plugin.root / MANIFEST_NAME).read_bytes())
+                    if plugin.contracts is not None:
+                        fingerprint.update((plugin.root / plugin.contracts).read_bytes())
+                    for rel in [
+                        *plugin.ios_sources,
+                        *plugin.android_sources,
+                        *plugin.ios_resources,
+                        *plugin.android_resources,
+                        *plugin.android_assets,
+                    ]:
+                        fingerprint.update(str(rel).encode())
+                        fingerprint.update((plugin.root / rel).read_bytes())
+                    value = fingerprint.hexdigest()
+                    if plugin.name in fingerprints and fingerprints[plugin.name] != value:
+                        raise PluginError(f"Plugin {plugin.name} has different native source across target wheels")
+                    fingerprints[plugin.name] = value
+                    selected[plugin.name] = plugin
+    return [selected[name] for name in sorted(selected)]

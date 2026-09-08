@@ -5,7 +5,8 @@ The console script `pn` (declared in `pyproject.toml`) dispatches to:
 - `pn init [name]`: scaffold a new project (``pythonnative.toml`` +
   ``app/``) into ``./name/``, or into the current directory when no name
   is given.
-- `pn doctor [platform]`: diagnose the local toolchain and config.
+- `pn doctor [platform]`: diagnose the local toolchain and config, as a
+  report or as JSON with `--json`.
 - `pn deps [platform]`: resolve ``[requirements].packages`` for every
   device target and report which wheels would be used (or why a package
   can't be installed), without building anything.
@@ -146,6 +147,37 @@ def _sanitize_name(name: str) -> str:
 
 
 def _app_id_from_name(name: str) -> str:
+    """Derive the default reverse-DNS app id from a project name.
+
+    The result is an identifier rather than a name, and it fills
+    ``app.id``, the default for both the Android application id and the
+    iOS bundle id. It therefore has to satisfy the stricter of the two
+    grammars, ``config._APP_ID_SEGMENT``, which admits no hyphen. An
+    explicit ``[ios].bundle_id`` may contain one, because
+    ``config._validate_app_id`` is called with ``allow_hyphen=True`` for
+    that field alone.
+
+    Deleting hyphens is lossy, so the derivation is not injective:
+    ``my-app`` and ``myapp`` both give ``com.example.myapp``. Mapping
+    ``-`` to ``_`` instead would not fix that, only move it, since
+    ``_NAME_RE`` permits both characters and ``my-app`` would then
+    collide with ``my_app``. Injectivity would need an escaping scheme;
+    deletion is the deliberate choice here.
+
+    The ``app`` prefix covers the name taken from the current directory
+    when ``pn init`` is given none. A typed name cannot reach it, because
+    ``_NAME_RE`` already guarantees a leading letter.
+
+    The result always satisfies ``_APP_ID_SEGMENT`` but is not guaranteed
+    to pass ``config._validate_app_id``, which also rejects reserved
+    words: ``class`` is a legal project name and passes through here.
+
+    Args:
+        name: A project name, either typed or taken from the directory.
+
+    Returns:
+        A reverse-DNS id under ``com.example``.
+    """
     slug = re.sub(r"[^a-z0-9_]", "", name.lower())
     if not slug or not slug[0].isalpha():
         slug = "app" + slug
@@ -264,26 +296,48 @@ def init_project(args: argparse.Namespace) -> None:
 # ======================================================================
 
 
+def _print_doctor_summary(level: str, stream: TextIO) -> None:
+    """Print the one-line verdict for ``level`` to ``stream``.
+
+    Shared by both output modes so the wording can't drift between the
+    report (stdout) and ``--json`` (stderr).
+    """
+    if level == doctor_mod.ERROR:
+        print("Found problems that will block builds. Address the [x] items above.", file=stream)
+    elif level == doctor_mod.WARN:
+        print("Ready, with warnings. Review the [!] items above.", file=stream)
+    else:
+        print("Everything looks good.", file=stream)
+
+
 def doctor_command(args: argparse.Namespace) -> None:
     """Run toolchain/config diagnostics and exit non-zero on errors.
 
+    With ``--json``, stdout carries a JSON array and nothing else, one
+    object per check (see ``CheckResult.to_dict``), and the verdict line
+    goes to stderr. The exit status stays keyed to the worst check level
+    either way.
+
     Args:
-        args: Parsed namespace with optional ``platform``.
+        args: Parsed namespace with optional ``platform`` and ``json``.
     """
     platform: Optional[str] = getattr(args, "platform", None)
+    as_json: bool = getattr(args, "json", False)
     results = doctor_mod.run_doctor(Path.cwd(), platform=platform)
-    print("PythonNative doctor\n")
-    for result in results:
-        print(result.format())
     level = doctor_mod.worst_level(results)
-    print()
-    if level == doctor_mod.ERROR:
-        print("Found problems that will block builds. Address the [x] items above.")
-        sys.exit(1)
-    if level == doctor_mod.WARN:
-        print("Ready, with warnings. Review the [!] items above.")
+
+    if as_json:
+        print(json.dumps([result.to_dict() for result in results], indent=2))
+        _print_doctor_summary(level, sys.stderr)
     else:
-        print("Everything looks good.")
+        print("PythonNative doctor\n")
+        for result in results:
+            print(result.format())
+        print()
+        _print_doctor_summary(level, sys.stdout)
+
+    if level == doctor_mod.ERROR:
+        sys.exit(1)
 
 
 def app_id_command(args: argparse.Namespace) -> None:
@@ -336,7 +390,7 @@ def deps_command(args: argparse.Namespace) -> None:
     python: Optional[str] = getattr(args, "python", None)
 
     config = _load_config_or_exit()
-    targets = deps_mod.targets_for(config, platform)
+    targets = deps_mod.targets_for(config, platform, all_simulator_archs=getattr(args, "lock", False))
     runner = builder_mod.SubprocessRunner()
     if not as_json and config.requirements:
         print(
@@ -344,6 +398,12 @@ def deps_command(args: argparse.Namespace) -> None:
             f"across {len(targets)} target(s)...\n"
         )
     resolutions = deps_mod.resolve_all(config, targets, runner=runner, python=python)
+    if getattr(args, "lock", False):
+        from ..project.lockfile import write
+
+        path = write(config, resolutions)
+        if not as_json:
+            print(f"Wrote {path}")
 
     if as_json:
         print(
@@ -1075,6 +1135,18 @@ def _terminate_subprocess(proc: Optional[subprocess.Popen]) -> None:
 # ======================================================================
 
 
+def codegen_command(args: argparse.Namespace) -> None:
+    """Generate native contracts after importing extension schema modules."""
+    import importlib
+
+    from ..sdk.codegen import generate
+
+    for name in args.module:
+        importlib.import_module(name)
+    for path in generate(args.output):
+        print(path)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pn", description="PythonNative CLI")
     parser.add_argument(
@@ -1084,6 +1156,13 @@ def _build_parser() -> argparse.ArgumentParser:
         version=f"pn {pkg_version('pythonnative')}",
     )
     subparsers = parser.add_subparsers()
+
+    parser_codegen = subparsers.add_parser("codegen", help="Generate typed native contracts")
+    parser_codegen.add_argument("--output", type=Path, default=Path("generated"))
+    parser_codegen.add_argument(
+        "--module", action="append", default=[], help="Import a module declaring extension schemas"
+    )
+    parser_codegen.set_defaults(func=codegen_command)
 
     parser_init = subparsers.add_parser("init", help="Scaffold a new project")
     parser_init.add_argument(
@@ -1096,6 +1175,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser_doctor = subparsers.add_parser("doctor", help="Diagnose the local toolchain and config")
     parser_doctor.add_argument("platform", nargs="?", choices=["android", "ios"], help="Restrict checks to a platform")
+    parser_doctor.add_argument(
+        "--json", action="store_true", help="Print a JSON array to stdout for scripting (the verdict goes to stderr)"
+    )
     parser_doctor.set_defaults(func=doctor_command)
 
     parser_deps = subparsers.add_parser(
@@ -1106,6 +1188,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_deps.add_argument(
         "--python",
         help="Interpreter to run pip with (default: the one running pn; any version works, pip cross-resolves)",
+    )
+    parser_deps.add_argument(
+        "--lock",
+        action="store_true",
+        help="Lock exact wheel versions and hashes, including both iOS Simulator architectures",
     )
     parser_deps.set_defaults(func=deps_command)
 
@@ -1140,7 +1227,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_devices.set_defaults(func=devices_command)
 
     parser_run = subparsers.add_parser("run", help="Build, install, and launch on a device/simulator")
-    parser_run.add_argument("platform", choices=["android", "ios"])
+    parser_run.add_argument("platform", choices=["android", "ios"], help="Target platform")
     parser_run.add_argument(
         "--device",
         "-d",
@@ -1167,7 +1254,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_run.set_defaults(func=run_project)
 
     parser_logs = subparsers.add_parser("logs", help="Stream logs from the running app")
-    parser_logs.add_argument("platform", choices=["android", "ios"])
+    parser_logs.add_argument("platform", choices=["android", "ios"], help="Target platform")
     parser_logs.add_argument(
         "--device",
         "-d",
@@ -1177,7 +1264,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_logs.set_defaults(func=logs_command)
 
     parser_build = subparsers.add_parser("build", help="Build distributable artifacts")
-    parser_build.add_argument("platform", choices=["android", "ios"])
+    parser_build.add_argument("platform", choices=["android", "ios"], help="Target platform")
     parser_build.add_argument("--debug", action="store_true", help="Build the debug variant instead of release")
     parser_build.add_argument(
         "--upload",
@@ -1187,7 +1274,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_build.set_defaults(func=build_project)
 
     parser_app_id = subparsers.add_parser("app-id", help="Print the resolved application/bundle id")
-    parser_app_id.add_argument("platform", choices=["android", "ios"])
+    parser_app_id.add_argument("platform", choices=["android", "ios"], help="Target platform")
     parser_app_id.add_argument(
         "--json", action="store_true", help="Print a JSON object to stdout for scripting (errors go to stderr)"
     )

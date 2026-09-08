@@ -7,10 +7,9 @@ hooks) while keeping a real tree of
 [`FakeView`][pythonnative.testing.FakeView] objects, so tests can assert
 on structure, props, and frames without a device.
 
-Unlike the production registries (which isolate per-op failures so a
-bad prop can't desync a device), the fake **raises** on malformed
-transactions (unknown tags, double destroys, inserting into a destroyed
-parent) so reconciler bugs fail tests loudly.
+The fake raises on malformed transactions, including unknown tags, double
+destroys, and insertion into a destroyed parent. Production bridge renderers
+validate versioned commits before mutation and fail the surface on rejection.
 
 Recorded op shapes (in ``FakeBackend.ops``):
 
@@ -83,7 +82,7 @@ class FakeView:
     @property
     def hidden(self) -> bool:
         """Whether this view is removed from layout (``display: "none"``)."""
-        return self.props.get("display") == "none"
+        return self.props.get("display") == "none" or self.type_name == "Screen" and self.props.get("active") is False
 
     @property
     def test_id(self) -> Optional[str]:

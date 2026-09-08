@@ -109,7 +109,7 @@ def Button(
     title: str = "",
     *,
     on_press: Optional[Callable[[], Any]] = None,
-    enabled: bool = True,
+    disabled: bool = False,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_hint: Optional[str] = None,
@@ -132,7 +132,7 @@ def Button(
     Args:
         title: Button label.
         on_press: Callback invoked when the user taps the button.
-        enabled: When ``False``, the button is disabled and cannot be
+        disabled: When ``True``, the button is disabled and cannot be
             tapped.
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
@@ -162,7 +162,7 @@ def Button(
         key=key,
         title=title,
         on_press=on_press,
-        enabled=enabled,
+        disabled=disabled,
         accessibility_label=accessibility_label,
         accessibility_hint=accessibility_hint,
         accessibility_role=accessibility_role,

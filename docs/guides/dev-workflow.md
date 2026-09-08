@@ -197,8 +197,8 @@ Start `pn start` and relaunch to connect it.
 | Demoing to someone at a desk | Browser preview (`--host` and share the URL) |
 
 The browser preview runs your real Python in the `pn start` process and
-uses the same reconciler, layout engine, hooks, and navigation as
-device builds. It approximates leaf widgets with DOM elements and
+shares Python reconciliation, hooks, and logical navigation with device
+builds. Its renderer uses Yoga WebAssembly and DOM widgets, and
 implements a subset of native modules (`Alert`, `Clipboard`, `Linking`,
 `Share`, `Haptics`, `NetInfo`, `AppState`, `Device`); everything else
 uses the pure-Python fallbacks in
@@ -227,6 +227,47 @@ package under `[requirements].packages` must be installed in the same
 Python environment (`pip install` it, or run `uv run --with <pkg> pn
 start`). `pn start` warns when one is missing. Device builds resolve
 their own wheels from the same list; see [PyPI packages](pypi-packages.md).
+
+## Profiling
+
+Set `PN_PROFILE` to a writable file path before starting the Python process:
+
+```bash
+PN_PROFILE=/tmp/pythonnative-trace.json pn preview
+```
+
+Collection retains the latest 10,000 timing events and exports the trace at
+normal process exit. The trace includes render, layout, and commit phases,
+plus counters for rendered components and bridge operations and bytes. This
+command captures the preview's Python process; it doesn't configure an
+environment variable inside a connected mobile app.
+
+For an explicit capture in a headless test:
+
+```python
+import pythonnative as pn
+from pythonnative.profiling import Profiler
+from pythonnative.testing import render
+
+
+@pn.component
+def App():
+    return pn.Text("Profiled render")
+
+
+with Profiler() as profiler:
+    result = render(App())
+    result.unmount()
+
+profiler.export("trace.json")
+```
+
+The same context manager can surround work on the application's Python
+thread in an embedded runtime. Choose an app-writable path when exporting
+on a device. Open the resulting
+Chrome trace in Perfetto or a compatible trace viewer. The profiler doesn't
+retain component trees or application snapshots. Use Instruments on iOS and
+Android's platform profiling tools for native frames, input, and scrolling.
 
 ## Next steps
 

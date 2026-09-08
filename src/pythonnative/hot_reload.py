@@ -3,24 +3,23 @@
 The dev server (``pythonnative.devserver``) watches the project's
 ``app/`` directory and tells every connected dev client which files
 changed. This module is the client's other half: it re-executes the
-changed modules with ``importlib`` and refreshes every mounted screen.
+changed modules with ``importlib`` and refreshes the logical application tree.
 
 Two strategies share the surface:
 
 - **Fast Refresh** (default): after reloading the changed modules the
   reconciler tree is walked and every component function whose module
-  was reloaded is swapped in place. Hook state, navigation state, and
-  even scroll positions survive because the underlying ``VNode``
-  objects are reused; the next render simply calls the new function
-  bodies through the old slots.
-- **Full remount**: when the in-place swap fails (e.g. the new module
-  raised at import time, or a render exception bubbled out while
-  running the new function), the host falls back to building a
-  brand-new reconciler tree. State is lost but the app keeps running.
+  was reloaded is matched to its replacement. Compatible hook signatures
+  preserve state; hook-order or custom-hook changes remount the affected
+  component instances. Covered screens and mounted rows participate in the
+  same refresh.
+- **Full remount**: changes to helper classes or services, or an unsuccessful
+  component swap, rebuild the application tree. State is reset. A module
+  import failure is reported while its previous definition remains available.
 
 [`apply_reload`][pythonnative.hot_reload.apply_reload] is the single
-entry point: it reloads once per process (several screens may be
-mounted) and then refreshes each live host.
+entry point: it reloads once per process and then refreshes each live
+application host.
 
 On device, sources arrive in a writable **overlay** directory that
 shadows the app bundle (see
@@ -459,13 +458,16 @@ class ModuleReloader:
         replacement_map = ModuleReloader.build_replacement_map(reconciler, reloaded_modules)
         if not replacement_map:
             return False
-        rewrites = ModuleReloader.swap_components_in_tree(reconciler, replacement_map)
-        if rewrites > 0 and hasattr(reconciler, "reset_hook_signatures"):
-            # New component bodies may legitimately call a different
-            # hook sequence; forget the recorded signatures so the
-            # dev-mode order guard doesn't flag the refresh itself.
-            reconciler.reset_hook_signatures()
-        return rewrites > 0
+        compatible = {
+            old: new
+            for old, new in replacement_map.items()
+            if getattr(old, "refresh_signature", None) is not None
+            and old.refresh_signature == getattr(new, "refresh_signature", None)
+        }
+        ModuleReloader.swap_components_in_tree(reconciler, compatible)
+        # Incompatible types remain old in the mounted tree. The next ordinary
+        # diff remounts those instances when their parent renders the new type.
+        return True
 
 
 # ======================================================================
@@ -524,6 +526,18 @@ def apply_reload(changed_modules: Sequence[str], hosts: Optional[Sequence[Any]] 
     # A changed module that was never imported needs no re-execution;
     # re-running the entry module (always last) imports it if it's used.
     imported = [m for m in result.requested if m in sys.modules]
+    # Instances of application classes can live in memo or ref slots. Replacing
+    # their defining module requires new instances, even if hooks didn't move.
+    from .component import Component
+
+    remount = any(
+        (isinstance(value, type) or callable(value))
+        and not isinstance(value, Component)
+        and getattr(value, "__module__", None) == name
+        and not key.startswith(("_", "use_"))
+        for name in imported
+        for key, value in vars(sys.modules[name]).items()
+    )
     targets = ModuleReloader.expand_reload_targets(imported, entry)
 
     # Changed modules are reloaded strictly so a syntax error is reported
@@ -552,7 +566,7 @@ def apply_reload(changed_modules: Sequence[str], hosts: Optional[Sequence[Any]] 
     modes: List[str] = []
     for host in hosts:
         try:
-            modes.append(host.refresh(reloaded))
+            modes.append(host.refresh(reloaded, force_remount=True) if remount else host.refresh(reloaded))
         except Exception as exc:
             result.error = traceback.format_exc()
             if diagnostics.is_dev():

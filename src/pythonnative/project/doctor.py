@@ -48,6 +48,10 @@ class CheckResult:
         suffix = f": {self.detail}" if self.detail else ""
         return f"  {symbol} {self.name}{suffix}"
 
+    def to_dict(self) -> dict[str, str]:
+        """Return a JSON-serializable view of this check for ``--json``."""
+        return {"name": self.name, "level": self.level, "message": self.detail}
+
 
 def _which_version(tool: str, version_args: List[str]) -> Optional[str]:
     path = shutil.which(tool)

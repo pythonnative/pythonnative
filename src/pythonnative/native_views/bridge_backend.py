@@ -1,34 +1,19 @@
-"""The on-device view backend: every mutation crosses the bridge as one transaction.
+"""Revisioned native view backend.
 
-[`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]
-implements the same protocol the reconciler expects from
-[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
-(``apply_mutations``, ``resolve_view``, ``measure_intrinsic``,
-``command``, and the animation hooks) but owns no native objects. It
-serializes each commit with
-[`encode_transaction`][pythonnative.bridge.codec.encode_transaction]
-and hands the JSON to the platform transport; Swift and Kotlin
-component managers do the rest.
-
-Python keeps two small pieces of per-tag state:
-
-- A **prop sidecar** for values that can't cross the bridge (the
-  ``render_row`` callable of a ``VirtualList``).
-- **Row pools** for virtualized lists, so the synchronous
-  ``on_bind_row`` protocol can mount a row subtree and answer with its
-  root tag.
-
-Views are addressed by tag everywhere. ``resolve_view`` returns a
-[`NativeViewRef`][pythonnative.native_views.bridge_backend.NativeViewRef],
-the opaque handle refs receive.
+Each commit is validated, sent as a protocol-2 envelope, and acknowledged before
+Python updates its native tag index. Rejected commits poison the surface until
+it is remounted. Native events carry application, revision, sequence, and text
+edit identities. NativeViewRef holds a live native tag rather than a UI object.
 """
 
 from __future__ import annotations
 
 import math
+import uuid
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from ..bridge import codec, get_transport
+from ..bridge.commits import PROTOCOL_VERSION, CommitError, CommitState
 from ..mutations import CreateOp, DestroyOp, Mutation, UpdateOp
 
 __all__ = ["BridgeBackend", "NativeViewRef"]
@@ -63,10 +48,15 @@ class BridgeBackend:
 
     def __init__(self, transport: Any = None) -> None:
         self._transport = transport
+        self._commit = CommitState(str(uuid.uuid4()), 1)
+        self._births: dict[int, int] = {}
+        self._event_sequences: dict[tuple[int, str], int] = {}
+        self._edit_revisions: dict[int, int] = {}
+        self._failed = False
+        self.on_layout: Any = None
         self._types: Dict[int, str] = {}
         self._refs: Dict[int, NativeViewRef] = {}
         self._python_props: Dict[int, Dict[str, Any]] = {}
-        self._row_pools: Dict[int, Any] = {}
         self._handlers: Dict[str, Any] = {}
 
     @property
@@ -75,6 +65,22 @@ class BridgeBackend:
         if self._transport is None:
             self._transport = get_transport()
         return self._transport
+
+    @property
+    def native_layout(self) -> bool:
+        """Whether layout runs beside the renderer's native widgets."""
+        return self.transport.name in {"ios", "android", "web"}
+
+    def compute_layout(self, roots: list[int], width: float, height: float) -> None:
+        """Compute native Yoga layout in one request, returning changed frames."""
+        raw = self.transport.call(
+            "Layout", "compute", codec.dumps({"call_id": 0, "args": {"roots": roots, "width": width, "height": height}})
+        )
+        result = codec.loads(raw)
+        if not isinstance(result, dict) or not result.get("ok"):
+            raise CommitError(f"Native layout failed: {result!r}")
+        if self.on_layout is not None:
+            self.on_layout(result.get("value", []))
 
     # ------------------------------------------------------------------
     # Registration (kept for protocol parity with NativeViewRegistry)
@@ -122,16 +128,42 @@ class BridgeBackend:
         """Serialize ``ops`` and apply them natively in one crossing."""
         if not ops:
             return
-        # Bookkeeping first so a native failure never leaves Python
-        # believing a destroyed tag is still live.
+        if self._failed:
+            raise CommitError("Native surface failed; remount the application with a new backend")
+        payload, sidecar = codec.encode_transaction(ops)
+        wire_ops = codec.loads(payload)
+        for op in wire_ops:
+            if op[0] == "u" and self._types.get(op[1]) == "TextInput" and "value" in op[2]:
+                op[2]["_pn_edit_revision"] = self._edit_revisions.get(op[1], 0)
+        envelope = {
+            "version": PROTOCOL_VERSION,
+            "application": self._commit.application,
+            "surface": self._commit.surface,
+            "revision": self._commit.revision + 1,
+            "ops": wire_ops,
+        }
+        from ..profiling import count
+
+        count("bridge.commits")
+        count("bridge.operations", len(ops))
+        count("bridge.bytes", len(payload.encode("utf-8")))
+        candidate = self._commit.prepare(envelope)
+        try:
+            ack = codec.loads(self.transport.apply(codec.dumps(envelope)))
+            if ack != candidate.acknowledgement():
+                raise CommitError(f"Native commit {candidate.revision} rejected: {ack!r}")
+        except Exception:
+            self._failed = True
+            raise
+        self._commit = candidate
         destroyed: List[int] = []
         for op in ops:
             if isinstance(op, CreateOp):
                 self._types[op.tag] = op.type_name
+                self._births[op.tag] = candidate.revision
                 self._refs[op.tag] = NativeViewRef(op.tag, op.type_name)
             elif isinstance(op, DestroyOp):
                 destroyed.append(op.tag)
-        payload, sidecar = codec.encode_transaction(ops)
         for tag, props in sidecar:
             self._python_props.setdefault(tag, {}).update(props)
         for op in ops:
@@ -145,17 +177,37 @@ class BridgeBackend:
                             bucket.pop(key, None)
                     if not bucket:
                         self._python_props.pop(op.tag, None)
-        self.transport.apply(payload)
         for tag in destroyed:
             self._forget(tag)
 
+    def accept_event(self, tag: int, name: str, envelope: Any) -> bool:
+        """Reject events from destroyed views, earlier applications, and replayed input."""
+        if self._failed or not isinstance(envelope, dict):
+            return False
+        if envelope.get("application") != self._commit.application or envelope.get("surface") != self._commit.surface:
+            return False
+        revision, sequence = envelope.get("revision"), envelope.get("sequence")
+        if type(revision) is not int or type(sequence) is not int or tag not in self._births:
+            return False
+        key = (tag, name)
+        if not self._births[tag] <= revision <= self._commit.revision or sequence <= self._event_sequences.get(key, 0):
+            return False
+        self._event_sequences[key] = sequence
+        if name == "on_change" and self._types.get(tag) == "TextInput":
+            edit = envelope.get("edit_revision")
+            if type(edit) is int:
+                self._edit_revisions[tag] = max(edit, self._edit_revisions.get(tag, 0))
+        return isinstance(envelope.get("args"), list)
+
     def _forget(self, tag: int) -> None:
         self._types.pop(tag, None)
+        self._births.pop(tag, None)
+        self._edit_revisions.pop(tag, None)
+        for key in tuple(self._event_sequences):
+            if key[0] == tag:
+                del self._event_sequences[key]
         self._refs.pop(tag, None)
         self._python_props.pop(tag, None)
-        pool = self._row_pools.pop(tag, None)
-        if pool is not None:
-            pool.release_all()
 
     # ------------------------------------------------------------------
     # Imperative escape hatches
@@ -171,7 +223,7 @@ class BridgeBackend:
     def command(self, tag: int, name: str, args: Optional[Dict[str, Any]] = None) -> Any:
         """Run an imperative command on one view; returns its JSON result or ``None``."""
         if tag not in self._types:
-            return None
+            raise CommitError(f"Command {name!r} addressed stale view {tag}")
         result = self.transport.command(tag, name, codec.dumps(codec.to_jsonable(args or {})))
         return codec.loads(result)
 
@@ -180,6 +232,11 @@ class BridgeBackend:
         if tag not in self._types:
             return
         self.transport.animate(tag, codec.dumps({"op": "set", "prop": prop_name, "value": codec.to_jsonable(value)}))
+
+    def install_animation_graph(self, tag: int, graph: dict[str, Any]) -> None:
+        """Install native expression nodes and view bindings in one crossing."""
+        if tag in self._types:
+            self.transport.animate(tag, codec.dumps({"op": "graph", "graph": graph}))
 
     def start_animation(self, tag: int, anim_id: int, prop_name: str, spec: Dict[str, Any]) -> bool:
         """Start a native-driven animation; returns whether native accepted it."""
@@ -198,60 +255,15 @@ class BridgeBackend:
             return result.get("value")
         return None
 
-    # ------------------------------------------------------------------
-    # Internal (native-originated) events
-    # ------------------------------------------------------------------
-
-    def handle_internal_event(self, tag: int, name: str, args: List[Any]) -> Any:
-        """Serve request-style events that no user callback owns.
-
-        Currently the virtualized-list row protocol:
-
-        - ``on_bind_row`` ``[{"container", "index", "width", "height"}]``
-          mounts or rebinds the row subtree and returns ``{"root": tag}``.
-        - ``on_unbind_row`` ``[{"container"}]`` releases it.
-        """
-        if name == "on_bind_row":
-            return self._bind_row(tag, args[0] if args else {})
-        if name == "on_unbind_row":
-            info = args[0] if args else {}
-            pool = self._row_pools.get(tag)
-            if pool is not None and isinstance(info, dict):
-                pool.release(int(info.get("container", 0)))
-            return None
-        return None
-
-    def _bind_row(self, tag: int, info: Any) -> Dict[str, Any]:
-        if not isinstance(info, dict):
-            return {"root": None}
-        render_row = self._python_props.get(tag, {}).get("render_row")
-        if not callable(render_row):
-            return {"root": None}
-        from ..virtual_rows import RowHostPool
-
-        pool = self._row_pools.get(tag)
-        if pool is None:
-            pool = RowHostPool()
-            self._row_pools[tag] = pool
-        index = int(info.get("index", 0))
-        width = float(info.get("width", 0.0) or 0.0)
-        height = float(info.get("height", 0.0) or 0.0)
-        root = pool.bind(int(info.get("container", 0)), lambda: render_row(index), width, height)
-        root_tag = getattr(root, "tag", None)
-        return {"root": int(root_tag) if root_tag is not None else None}
-
-    # ------------------------------------------------------------------
-    # Reset
-    # ------------------------------------------------------------------
-
     def reset(self) -> None:
-        """Forget every view: the native side is gone (browser tab closed, tests)."""
-        for pool in list(self._row_pools.values()):
-            pool.release_all()
-        self._row_pools.clear()
+        """Forget a disconnected surface before the host remounts its tree."""
         self._types.clear()
         self._refs.clear()
         self._python_props.clear()
+        self._commit = CommitState(str(uuid.uuid4()), 1)
+        self._births: dict[int, int] = {}
+        self._event_sequences: dict[tuple[int, str], int] = {}
+        self._failed = False
 
 
 def _bound(value: float) -> float:

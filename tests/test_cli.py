@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -12,6 +13,7 @@ import pytest
 
 import pythonnative.cli.pn as pn_cli
 from pythonnative.project.devices import Device
+from pythonnative.project.doctor import CheckResult
 
 
 def run_pn(args: List[str], cwd: str, env: Optional[Dict[str, str]] = None) -> "subprocess.CompletedProcess[str]":
@@ -308,16 +310,103 @@ def test_cli_init_suggestion_is_stable_for_legal_names() -> None:
         assert pn_cli._sanitize_name(name) == name
 
 
-def test_cli_init_without_name_accepts_a_cwd_that_fails_the_pattern(tmp_path: Path) -> None:
-    # Validation covers the typed name only. A directory named MyProject is
-    # extremely ordinary, and `pn init` there must keep working.
-    project_dir = tmp_path / "MyProject"
+# _app_id_from_name maps a project name onto a reverse-DNS segment, whose
+# grammar (config._APP_ID_SEGMENT) differs from _NAME_RE's. These two groups
+# split by which entry path can actually produce the input.
+
+# Reachable from a typed `pn init <name>`: _NAME_RE admits only [a-z][a-z0-9_-]*,
+# so the sole character the substitution can remove is the hyphen.
+_APP_ID_TYPED_CASES = [
+    pytest.param("my_app", "com.example.my_app", id="underscore"),
+    pytest.param("myapp", "com.example.myapp", id="plain"),
+    pytest.param("my-app", "com.example.myapp", id="hyphen"),
+    pytest.param("my--app", "com.example.myapp", id="doubled-hyphen"),
+    pytest.param("my-app-", "com.example.myapp", id="trailing-hyphen"),
+    pytest.param("e2e-suite", "com.example.e2esuite", id="digits-and-hyphen"),
+]
+
+# Reachable only from the derived path, `pn init` with no name taking cwd.name,
+# which is never validated. A typed name cannot produce any of these: _NAME_RE
+# rejects uppercase, a leading digit, a leading underscore, the empty string,
+# and non-ASCII.
+_APP_ID_DERIVED_ONLY_CASES = [
+    pytest.param("MyApp", "com.example.myapp", id="uppercase"),
+    pytest.param("MyProject", "com.example.myproject", id="mixed-case"),
+    pytest.param("3d_viewer", "com.example.app3d_viewer", id="digit-leading"),
+    pytest.param("2048", "com.example.app2048", id="all-digits"),
+    pytest.param("_leading", "com.example.app_leading", id="underscore-leading"),
+    pytest.param("", "com.example.app", id="empty"),
+    pytest.param("\u5de5\u7a0b", "com.example.app", id="all-non-ascii"),
+    pytest.param("caf\u00e9", "com.example.caf", id="partly-stripped-non-ascii"),
+    pytest.param("app.v2", "com.example.appv2", id="dotted"),
+]
+
+_APP_ID_ALL_CASES = _APP_ID_TYPED_CASES + _APP_ID_DERIVED_ONLY_CASES
+
+# The pattern the issue suggests asserting. It cannot fail against the current
+# implementation for any input, because the substitution leaves only [a-z0-9_]
+# and the "app" prefix supplies a leading letter otherwise. It still earns its
+# place: it catches a change that admits a character outside the segment
+# grammar, such as keeping hyphens. It does not catch a changed prefix, which
+# is what the exact-value cases above are for.
+_REVERSE_DNS_RE = re.compile(r"^com\.example\.[a-z][a-z0-9_]*$")
+
+
+@pytest.mark.parametrize(("name", "expected"), _APP_ID_TYPED_CASES)
+def test_cli_app_id_from_name_typed_names(name: str, expected: str) -> None:
+    assert pn_cli._NAME_RE.fullmatch(name), f"{name!r} should be typeable"
+    assert pn_cli._app_id_from_name(name) == expected
+
+
+@pytest.mark.parametrize(("name", "expected"), _APP_ID_DERIVED_ONLY_CASES)
+def test_cli_app_id_from_name_derived_only_names(name: str, expected: str) -> None:
+    assert not pn_cli._NAME_RE.fullmatch(name), f"{name!r} should not be typeable"
+    assert pn_cli._app_id_from_name(name) == expected
+
+
+@pytest.mark.parametrize(("name", "expected"), _APP_ID_ALL_CASES)
+def test_cli_app_id_from_name_is_reverse_dns(name: str, expected: str) -> None:
+    assert _REVERSE_DNS_RE.fullmatch(pn_cli._app_id_from_name(name))
+
+
+def test_cli_app_id_from_name_collides_on_hyphens() -> None:
+    # Deleting hyphens is lossy, so distinct names share an id. Recorded so
+    # the collision is known rather than discovered when two projects install
+    # over each other.
+    assert pn_cli._app_id_from_name("my-app") == pn_cli._app_id_from_name("myapp")
+    assert pn_cli._app_id_from_name("a-b-c") == pn_cli._app_id_from_name("abc")
+    # Mapping "-" to "_" would not fix this, only move it: _NAME_RE permits
+    # both characters, so this pair, distinct today, would merge under that
+    # scheme. Across every typed-legal name up to length 4 the two schemes
+    # lose the same number of names to collision.
+    assert pn_cli._app_id_from_name("my-app") != pn_cli._app_id_from_name("my_app")
+
+
+def _init_in_directory_named(tmp_path: Path, dirname: str) -> str:
+    """`pn init` with no name inside a directory called ``dirname``."""
+    project_dir = tmp_path / dirname
     project_dir.mkdir()
 
     result = run_pn(["init"], str(project_dir))
 
     assert result.returncode == 0, result.stdout
-    toml_text = (project_dir / "pythonnative.toml").read_text(encoding="utf-8")
+    return (project_dir / "pythonnative.toml").read_text(encoding="utf-8")
+
+
+def test_cli_init_without_name_reaches_the_app_prefix(tmp_path: Path) -> None:
+    # The prefix branch is unreachable from a typed name, so this is the only
+    # end-to-end path to it: a directory whose name starts with a digit.
+    toml_text = _init_in_directory_named(tmp_path, "3d_viewer")
+
+    assert 'id = "com.example.app3d_viewer"' in toml_text
+    assert 'name = "3d_viewer"' in toml_text
+
+
+def test_cli_init_without_name_accepts_a_cwd_that_fails_the_pattern(tmp_path: Path) -> None:
+    # Validation covers the typed name only. A directory named MyProject is
+    # extremely ordinary, and `pn init` there must keep working.
+    toml_text = _init_in_directory_named(tmp_path, "MyProject")
+
     assert 'name = "MyProject"' in toml_text
     assert 'id = "com.example.myproject"' in toml_text
 
@@ -330,6 +419,7 @@ def test_cli_run_help_lists_flags() -> None:
         assert "--no-logs" in result.stdout
         assert "--dev-server" in result.stdout
         assert "--prepare-only" in result.stdout
+        assert "Target platform" in result.stdout
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -340,6 +430,7 @@ def test_cli_build_help_lists_debug() -> None:
         result = run_pn(["build", "--help"], tmpdir)
         assert result.returncode == 0, result.stderr
         assert "--debug" in result.stdout
+        assert "Target platform" in result.stdout
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -552,6 +643,8 @@ class _FakePipRunner:
                 {"metadata": {"name": "numpy", "version": "2.2.1"}, "download_info": {"url": _NUMPY_IOS_WHEEL}},
             ]
         }
+        for package in report["install"]:
+            package["download_info"]["archive_info"] = {"hashes": {"sha256": "a" * 64}}
         return CommandResult(0, json.dumps(report), "")
 
 
@@ -580,6 +673,30 @@ def test_deps_command_reports_every_target(
         assert cmd[cmd.index("--python-version") + 1] == "3.13"
     android_cmds = [c for c in target_cmds if any(a.startswith("android_") for a in c)]
     assert len(android_cmds) == 2
+
+
+@pytest.mark.parametrize("host_arch", ["arm64", "x86_64"])
+@pytest.mark.parametrize("platform", [None, "ios", "android"])
+def test_deps_lock_is_usable_on_both_mac_architectures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, host_arch: str, platform: str | None
+) -> None:
+    from pythonnative.project import deps, lockfile
+    from pythonnative.project.config import AppConfig
+
+    monkeypatch.chdir(_deps_project(tmp_path))
+    monkeypatch.setattr(pn_cli.builder_mod, "SubprocessRunner", _FakePipRunner)
+    monkeypatch.setattr(deps, "host_simulator_arch", lambda: host_arch)
+    pn_cli.deps_command(argparse.Namespace(platform=platform, json=False, python=None, lock=True))
+
+    config = AppConfig.load(tmp_path)
+    document = lockfile.read(config)
+    assert document is not None
+    assert len(document["targets"]) == {None: 5, "ios": 3, "android": 2}[platform]
+    for arch in ("arm64", "x86_64"):
+        monkeypatch.setattr(deps, "host_simulator_arch", lambda: arch)
+        pinned = lockfile.requirements(config, deps.targets_for(config, platform))
+        assert "numpy==2.2.1" in pinned
+        assert "--hash=sha256:" + "a" * 64 in pinned
 
 
 def test_deps_command_platform_filter_and_json(
@@ -868,6 +985,87 @@ def test_devices_json_serializes_awkward_field_values(
         "state": "",
         "is_ready": False,
     }
+
+
+# `pn doctor` tests mirror the `pn devices --json` ones: run doctor_command()
+# in-process with run_doctor stubbed, so the result doesn't depend on whatever
+# toolchain the test machine has. The one run_pn test drives a real project.
+_FAKE_CHECKS = [
+    CheckResult("pythonnative.toml", "ok", "com.example.demo (v0.1.0)"),
+    CheckResult("Host Python", "ok", "3.13.0"),
+    CheckResult("adb (Android platform-tools)", "warn", "not found on PATH"),
+]
+
+_FAKE_CHECKS_WITH_ERROR = _FAKE_CHECKS + [CheckResult("Xcode (xcodebuild)", "error", "not found on PATH")]
+
+
+def _fake_run_doctor(
+    results: List[CheckResult], calls: Optional[List[Optional[str]]] = None
+) -> Callable[..., List[CheckResult]]:
+    def _run(project_root: Path, *, platform: Optional[str] = None) -> List[CheckResult]:
+        if calls is not None:
+            calls.append(platform)
+        return list(results)
+
+    return _run
+
+
+def test_doctor_json_emits_parseable_array(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setattr(pn_cli.doctor_mod, "run_doctor", _fake_run_doctor(_FAKE_CHECKS))
+
+    pn_cli.doctor_command(argparse.Namespace(platform=None, json=True))
+
+    payload = json.loads(capsys.readouterr().out)
+    assert [entry["name"] for entry in payload] == [
+        "pythonnative.toml",
+        "Host Python",
+        "adb (Android platform-tools)",
+    ]
+    for entry in payload:
+        assert set(entry) == {"name", "level", "message"}
+    assert payload[2] == {"name": "adb (Android platform-tools)", "level": "warn", "message": "not found on PATH"}
+
+
+def test_doctor_json_keeps_human_text_off_stdout(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls: List[Optional[str]] = []
+    monkeypatch.setattr(pn_cli.doctor_mod, "run_doctor", _fake_run_doctor(_FAKE_CHECKS, calls))
+
+    pn_cli.doctor_command(argparse.Namespace(platform="android", json=True))
+
+    captured = capsys.readouterr()
+    json.loads(captured.out)
+    assert calls == ["android"]
+    assert "PythonNative doctor" not in captured.out
+    for check in _FAKE_CHECKS:
+        assert check.format() not in captured.out
+    assert "Ready, with warnings" not in captured.out
+    assert "Ready, with warnings" in captured.err
+
+
+def test_doctor_json_exit_code_and_summary_track_worst_level(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(pn_cli.doctor_mod, "run_doctor", _fake_run_doctor(_FAKE_CHECKS_WITH_ERROR))
+
+    with pytest.raises(SystemExit) as info:
+        pn_cli.doctor_command(argparse.Namespace(platform=None, json=True))
+
+    assert info.value.code == 1
+    captured = capsys.readouterr()
+    assert [entry["level"] for entry in json.loads(captured.out)][-1] == "error"
+    assert "Found problems that will block builds" in captured.err
+    assert "Found problems" not in captured.out
+
+
+def test_doctor_json_flag_is_wired_through_argparse(tmp_path: Path) -> None:
+    assert run_pn(["init", "my_app"], str(tmp_path)).returncode == 0
+    result = run_pn(["doctor", "android", "--json"], str(tmp_path / "my_app"))
+
+    assert result.returncode in (0, 1)
+    payload = json.loads(result.stdout)
+    assert {entry["level"] for entry in payload} <= {"ok", "warn", "error", "info"}
 
 
 class _FakeCompletedProc:

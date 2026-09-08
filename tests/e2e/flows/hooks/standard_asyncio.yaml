@@ -1,0 +1,18 @@
+# Tests standard asyncio sockets, TaskGroup, timeout, and cancellation on mobile.
+# Demo screen: examples/e2e-suite/app/screens/hooks/standard_asyncio.py
+# Source under test: src/pythonnative/runtime.py
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: Standard asyncio
+- tapOn: "Run runtime checks"
+- extendedWaitUntil:
+    visible: "Runtime: passed"
+    timeout: 15000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

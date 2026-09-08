@@ -253,3 +253,9 @@ def test_rendered_toml_escapes_the_commented_examples() -> None:
     assert data["url_schemes"] == [raw]
     assert data["bundle_id"] == raw
     assert data["key_alias"] == raw
+
+
+def test_relative_project_root_is_resolved_before_staging(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    config = AppConfig.from_dict({"app": {"id": "dev.example.relative", "name": "relative"}}, project_root=Path("."))
+    assert config.project_root == tmp_path.resolve()

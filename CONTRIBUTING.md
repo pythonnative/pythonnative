@@ -62,18 +62,23 @@ Unsolicited pull requests for issues that are already assigned or already have a
 ## Project layout (high‑level)
 
 - `src/pythonnative/`: installable library and CLI
-  - `pythonnative/`: core cross‑platform UI components and utilities
+  - Core Python modules, UI components, and utilities
   - `bridge/`: JSON codec and per-platform transports into the native rendering core
   - `cli/`: `pn` command
   - `project/`: config loading, template configuration, native plugin staging, and the builder behind `pn`
-  - `templates/`: Android/iOS project templates (bundled with the package)
-    - `ios_template/PythonNativeKit/`: Swift package with the iOS rendering core (component managers, gestures, animations, native modules) and its XCTest target
-    - `android_template/pythonnative/`: Gradle library module with the Android rendering core and its JUnit target
+  - `native/`: native libraries and their tests, bundled with the Python package
+    - `ios/`: `PythonNativeKit` Swift package and its XCTest target
+    - `android/`: Android rendering library and its JUnit target
+    - `yoga/`: vendored Yoga source, native build definitions, and the host Python binding
+  - `sdk/`: native contract definitions, code generation, and generator templates
+  - `devserver/static/`: browser preview assets, including the vendored Yoga JavaScript/WebAssembly distribution
+  - `templates/`: Android/iOS app shells; the builder stages native libraries into generated app projects
 - `tests/`: unit tests for the library, plus the Maestro E2E suite
   - `e2e/`: the comprehensive E2E suite (see [E2E tests](#e2e-tests-maestro) below and `tests/e2e/AGENTS.md`)
 - `examples/`: runnable example apps
   - `hello-world/`: minimal marketing demo
   - `e2e-suite/`: comprehensive feature catalog that drives the Maestro E2E suite
+  - `inbox/`: offline reference app with a custom native extension
 - `scripts/`: helper scripts (`check.sh`, `run-e2e.sh`, `check-e2e-coverage.py`)
 - `README.md`, `pyproject.toml`: repo docs and packaging
 
@@ -83,7 +88,7 @@ Unsolicited pull requests for issues that are already assigned or already have a
 - Prefer explicit, descriptive names; keep platform abstractions clean.
 - Python never imports platform code. Everything that touches `UIView` or `android.view.View` lives in Swift (`PythonNativeKit`) or Kotlin (the `pythonnative` Gradle module) and is reached through `pythonnative.bridge`; see `docs/concepts/bridge.md` for the protocol. Bump `PROTOCOL_VERSION` on both sides when the wire format changes.
 - Add/extend tests under `tests/` for new behavior. Native changes get XCTest / JUnit coverage next to the code they touch.
-- Don't commit generated artifacts or large binaries; templates live under `src/pythonnative/templates/`.
+- Commit source, reviewed generated contracts, dependency locks, and vendored dependencies as described in [Generated source and vendored dependencies](#generated-source-and-vendored-dependencies). Don't commit local build outputs or caches.
 - Docstrings: Google style throughout. Ruff is configured with the Google
   convention (`pydocstyle.convention = "google"`) and enforces the `D` rule
   set on `src/pythonnative/`. See the
@@ -101,9 +106,52 @@ uv run black src examples tests # format
 uv run --group docs mkdocs serve # preview the docs site locally
 
 # native rendering core (macOS with Xcode for the Swift package; JDK 17 for Gradle)
-(cd src/pythonnative/templates/ios_template/PythonNativeKit && xcodebuild test -scheme PythonNativeKit -destination 'platform=iOS Simulator,name=iPhone 15 Pro')
-(cd src/pythonnative/templates/android_template && ./gradlew :pythonnative:testDebugUnitTest)
+(cd src/pythonnative/native/ios && xcodebuild test -scheme PythonNativeKit -destination 'platform=iOS Simulator,name=iPhone 15 Pro')
+(cd src/pythonnative/native/android && ../../templates/android_template/gradlew testDebugUnitTest)
 ```
+
+## Generated source and vendored dependencies
+
+Some generated files and third-party distribution files are intentional parts
+of the source tree. Keep these in version control:
+
+- Native contracts: `PNContracts`, `NativeProps`, and `NativeModules` in
+  `src/pythonnative/native/ios/Sources/PythonNativeKit/Generated/` and
+  `src/pythonnative/native/android/src/main/java/com/pythonnative/generated/`.
+  These support standalone native builds. Regenerate them from the Python
+  definitions and generator templates instead of editing them by hand.
+- Example extension schemas, such as `examples/inbox/native/schema.json`.
+  Commit schema updates alongside their Python definitions and native
+  implementations.
+- Dependency locks, including `uv.lock` and example apps' `pn.lock` files.
+- Vendored Yoga source and browser distribution files under
+  `src/pythonnative/native/yoga/` and `src/pythonnative/devserver/static/yoga/`.
+  The browser distribution includes its JavaScript/WebAssembly runtime, type
+  declarations, and source maps. Preserve upstream licenses and document the
+  version, source, and any local modifications when updating vendored code.
+
+After changing built-in contracts or their generators, regenerate the checked-in
+native files from the repository root:
+
+```bash
+uv run pn codegen --output build/contracts
+cp build/contracts/{PNContracts,NativeProps,NativeModules}.swift \
+  src/pythonnative/native/ios/Sources/PythonNativeKit/Generated/
+cp build/contracts/{PNContracts,NativeProps,NativeModules}.kt \
+  src/pythonnative/native/android/src/main/java/com/pythonnative/generated/
+uv run pytest tests/test_codegen.py
+```
+
+The test checks that the committed native contracts match generation in a clean
+Python interpreter. The other files under `build/contracts/` are local outputs;
+don't add the whole directory to the commit.
+
+Exclude staged app projects, compiled apps and libraries, package distributions,
+test reports, local storage, credentials, and tool caches. Examples include
+`build/`, `dist/`, `.build/`, `.gradle/`, `.cxx/`, `.swiftpm/`, and `__pycache__/`.
+The vendored browser runtime above is an explicit exception to excluding
+compiled dependencies; downloaded Python runtimes and locally compiled binaries
+aren't.
 
 ## Conventional Commits
 
@@ -154,7 +202,7 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `devserver`: dev server, file watcher, and WebSocket implementation (`devserver/`)
   - `devclient`: on-device dev client that syncs sources and Fast Refreshes (`devclient.py`)
   - `hot_reload`: module reloader and Fast Refresh (`hot_reload.py`)
-  - `layout`: pure-Python flexbox engine (`layout.py`)
+  - `layout`: Yoga layout integration and the host binding (`layout.py`, `native/yoga/`)
   - `mutations`: batched mutation ops between reconciler and native backends (`mutations.py`)
   - `native_modules`: native module registry, Python facades, and Python fallbacks (`native_modules/`)
   - `native_views`: view registry protocol and bridge backend (`native_views/`)
@@ -182,8 +230,8 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `repo`: repository metadata and top‑level files (`README.md`, `CONTRIBUTING.md`, `.gitignore`, licenses)
   - `scripts`: developer scripts under `scripts/` (e.g., `check.sh`)
   - `templates`: Android/iOS project templates under `src/pythonnative/templates/`
-  - `kit`: the Swift rendering core (`templates/ios_template/PythonNativeKit/`)
-  - `runtime-android`: the Kotlin rendering core (`templates/android_template/pythonnative/`)
+  - `kit`: the Swift rendering core (`native/ios/`)
+  - `runtime-android`: the Kotlin rendering core (`native/android/`)
   - `tests`: unit/integration/E2E tests under `tests/`
   - `workflows`: CI pipelines under `.github/workflows/`
 
@@ -281,21 +329,51 @@ Co-authored-by: Name <email>
 - Lint/format: `uv run ruff check .` and `uv run black --check src examples tests` pass.
 - Docs: update `README.md` if behavior changes.
 - Templates: update `src/pythonnative/templates/` if generator output changes.
-- No generated artifacts committed.
+- Generated contracts and example schemas are regenerated and reviewed when changed; vendored dependencies retain their licenses and provenance.
+- No local build outputs, caches, credentials, or machine-specific files are committed.
 
 ## Versioning and releases
 
 - The version is tracked in `pyproject.toml` (`project.version`) and mirrored in `src/pythonnative/__init__.py` as `__version__`. Both files are updated automatically by [python-semantic-release](https://python-semantic-release.readthedocs.io/).
 - **Automated release pipeline** (on every merge to `main`):
-  1. `python-semantic-release` scans Conventional Commit messages since the last tag.
-  2. It determines the next SemVer bump: `feat` → **minor**, `fix`/`perf` → **patch**, `BREAKING CHANGE` → **major** (minor while version < 1.0).
-  3. Version files are updated, `CHANGELOG.md` is generated, and a tagged release commit (`chore(release): vX.Y.Z`) is pushed.
-  4. A GitHub Release is created with auto-generated release notes and the built sdist/wheel attached.
-  5. When drafts are disabled, the package is also published to PyPI via Trusted Publishing.
-- **Draft / published toggle**: the `DRAFT_RELEASE` variable at the top of `.github/workflows/release.yml` controls release mode. Set to `"true"` (the default) for draft GitHub Releases with PyPI publishing skipped; flip to `"false"` to publish releases and upload to PyPI immediately.
-- Commit types that trigger a release: `feat` (minor), `fix` and `perf` (patch), `BREAKING CHANGE` (major). All other types (`build`, `chore`, `ci`, `docs`, `refactor`, `revert`, `style`, `test`) are recorded in the changelog but do **not** trigger a release on their own.
-- Tag format: `v`-prefixed (e.g., `v0.4.0`).
-- Manual version bumps are no longer needed: just merge PRs with valid Conventional Commit titles. For ad-hoc runs, use the workflow's **Run workflow** button (`workflow_dispatch`).
+  1. `python-semantic-release` scans Conventional Commits, updates the version files and `uv.lock`, generates `CHANGELOG.md`, and pushes the release commit and tag.
+  2. A published GitHub release is created with generated release notes.
+  3. The shared `Distributions` workflow builds a source archive from that exact commit, then uses [cibuildwheel](https://cibuildwheel.pypa.io/) to build all wheels from the archive.
+  4. Each wheel is repaired where needed, installed in an isolated environment, and tested with the Yoga layout suite and CLI. The complete artifact set must also pass platform, version, resource, and metadata checks.
+  5. Validated distributions are attached to the GitHub release before PyPI uploads begin. PyPI uses Trusted Publishing; no API token is needed.
+- The same distribution builds and checks run on PRs. The wheel matrix covers CPython 3.13 and 3.14 on Linux x86-64 and ARM64 (glibc 2.28 or newer), macOS Intel and Apple Silicon (macOS 11 or newer), and Windows x64. These are development-host wheels; mobile apps compile the bundled Yoga source in their native builds.
+- Build policy lives in `scripts/cibuildwheel.toml`, separately from the tagged package source, so fixed tooling can rebuild an existing release without changing its code or version.
+- Commit types that trigger a release: `feat` (minor), `fix` and `perf` (patch), and `BREAKING CHANGE` (major, or minor before 1.0). Other types, including `build` and `ci`, don't trigger a release on their own. Use a `build` or `ci` title for a publishing-only repair that should recover the existing version.
+- Tag format: `v`-prefixed (for example, `v0.40.0`). Manual version bumps aren't needed.
+
+### Recovering a failed publication
+
+Version creation and package publication are separate jobs. A GitHub release can
+exist even when its PyPI upload failed. Rerunning version creation won't create
+another release for the same commits.
+
+To resume publication, select **Actions → Release → Run workflow**, choose
+`main`, and enter the existing tag in the recovery field. If the failure
+requires a workflow repair, merge that repair first. For example, with the
+GitHub CLI:
+
+```bash
+gh workflow run release.yml --ref main -f tag=v0.40.0
+```
+
+Recovery verifies that the tag belongs to `main` and matches the package version,
+then runs the same build and validation jobs. It doesn't bump the version,
+rewrite the tag, or change the tagged source. Existing distribution assets are
+reused byte for byte; missing assets are uploaded before publishing to PyPI.
+Files already uploaded to PyPI are skipped, so a partial upload can resume.
+Release runs are serialized to prevent competing uploads.
+
+For a build-only rehearsal, run **Distributions** with a `source-ref` of the tag
+or commit to check. This runs the full matrix without publishing anything:
+
+```bash
+gh workflow run wheels.yml --ref main -f source-ref=v0.40.0
+```
 
 ### Branch naming (suggested)
 
@@ -372,7 +450,7 @@ When you add a new public symbol you must also:
 ### CI
 
 - **CI** (`ci.yml`): runs formatter, linter, type checker, and tests on every push and PR.
-- **E2E** (`e2e.yml`): builds the hello-world example on Android (Linux emulator) and iOS (macOS simulator), then runs Maestro flows. Triggers on pushes to `main`, PRs, and manual dispatch.
+- **E2E** (`e2e.yml`): builds `examples/e2e-suite` on Android (Linux emulator) and iOS (macOS simulator), then runs Maestro flows by category. Triggers on pushes to `main`, PRs, and manual dispatch.
 - **Packages** (`packages.yml`): resolves the PyPI compatibility matrix in `tests/packages/matrix.toml` against the live indexes with `scripts/package-matrix.py --check`, weekly and on changes to the resolver or manifest, and uploads the rendered Markdown table for `docs/guides/pypi-packages.md`.
 - **PR Lint** (`pr-lint.yml`): validates the PR title against Conventional Commits format (protects squash merges) and checks individual commit messages via commitlint (protects rebase merges). Recommended: add the **PR title** job as a required status check in branch-protection settings.
 - **Release** (`release.yml`): runs on merge to `main`; computes version, generates changelog, tags, creates GitHub Release, and (when `DRAFT_RELEASE` is `"false"`) publishes to PyPI.

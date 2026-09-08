@@ -9,6 +9,21 @@ For the conceptual model and the full API, see the
 [Navigation guide](../guides/navigation.md) and the
 [Navigation API reference](../api/navigation.md).
 
+## Run it
+
+Create a project with `pn init navigation-demo`, then `cd navigation-demo`.
+Replace `app/main.py` with the Stack, Tab, or Drawer snippet below.
+Each includes its imports and defines `App`, the project's root component.
+
+From the project root, run `pn preview` to open the app in your browser.
+To run on a device or simulator, leave the preview running and use
+`pn run android` or `pn run ios` in another terminal from the same
+directory. See the [Browser preview guide](../guides/browser-preview.md)
+and [Development workflow](../guides/dev-workflow.md) for more options.
+
+The Nesting and Focus-aware effects snippets need additional definitions;
+follow the note at the end of each section to try them.
+
 ## Stack navigator
 
 A pushable, poppable stack. The default for "go from screen A to
@@ -65,6 +80,8 @@ A persistent tab bar at the bottom (iOS) or top (Android), with one
 screen per tab. Each tab keeps its own state across switches.
 
 ```python
+import pythonnative as pn
+
 Tabs = pn.create_tab_navigator()
 
 
@@ -108,6 +125,8 @@ is configured otherwise.
 A side drawer for primary navigation in larger apps.
 
 ```python
+import pythonnative as pn
+
 Drawer = pn.create_drawer_navigator()
 
 
@@ -161,6 +180,14 @@ def HomeStack():
 Pushing onto the inner stack leaves the tab bar visible; switching
 tabs preserves each stack's own history.
 
+This snippet sketches the composition rather than a complete app.
+To try it, start from the Tab navigator example, keeping its import,
+`Tabs`, and `Feed`. Add `Stack = pn.create_stack_navigator()`, a `Post`
+screen, and a `ProfileStack` component that returns a `Stack.Navigator`
+with its own screens. Add `HomeStack` and replace the Tab example's
+`App` with the one above, which wraps the navigators in
+`pn.NavigationContainer`. Then follow the same run instructions.
+
 ## Focus-aware effects
 
 When you need to start something only while a screen is on screen
@@ -179,6 +206,13 @@ def CameraScreen():
 
 The cleanup runs as soon as the user navigates away, even if the
 screen stays mounted.
+
+To try this with the Tab navigator example, keep its import and `App`,
+add `CameraScreen` and stand-ins for `start_camera` and `stop_camera`,
+and replace `Tabs.Screen(name="Settings", component=Settings)` with
+`Tabs.Screen(name="Camera", component=CameraScreen)`. Run `pn preview`,
+then switch between the Camera and Feed tabs to trigger the effect
+and its cleanup.
 
 ## Next steps
 

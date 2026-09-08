@@ -1,10 +1,11 @@
-"""Screen hosts: the bridge between a native screen and the reconciler.
+"""Application surface hosts connecting renderers to the reconciler.
 
 On every bridge platform (iOS, Android, and the browser preview) the
-native runtime creates screens through the bridge
+renderer creates an application host through the bridge
 (``callback("host", screen_id, "create", {...})``), which lands in
-[`NativeScreenHost`][pythonnative.hosts.native.NativeScreenHost]. Unit
-tests use the headless base [`ScreenHost`][pythonnative.hosts.ScreenHost]
+[`NativeScreenHost`][pythonnative.hosts.native.NativeScreenHost].
+Screens, overlays, and mounted list rows remain in that host's logical tree.
+Tests use the headless base [`ScreenHost`][pythonnative.hosts.ScreenHost]
 with a fake backend, created through
 [`create_screen`][pythonnative.hosts.create_screen].
 """
@@ -29,16 +30,16 @@ def host_class() -> Type[ScreenHost]:
 
 
 def create_screen(component_path: str, native_instance: Any = None, args_json: Optional[str] = None) -> ScreenHost:
-    """Create the screen host for a root component.
+    """Create an application surface host for a root component.
 
     Args:
         component_path: ``"app.main"`` (the module's ``App`` is used) or a
             dotted path like ``"app.main.RootScreen"``. Imported lazily
             so the dev server can reload it.
-        native_instance: The platform object owning the screen (the
-            integer screen id on the bridge platforms).
-        args_json: Optional JSON launch arguments (pushed screens
-            receive their navigation history here).
+        native_instance: The platform object owning the surface (the
+            integer host id on the bridge platforms).
+        args_json: Optional JSON launch arguments, including cached
+            navigation restoration state.
 
     Returns:
         A host ready for ``on_create`` and the other lifecycle calls.

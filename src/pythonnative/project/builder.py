@@ -30,6 +30,7 @@ builder stops at producing installable/archivable artifacts.
 from __future__ import annotations
 
 import compileall
+import json
 import os
 import platform as platform_module
 import shutil
@@ -189,6 +190,8 @@ _TEMPLATE_IGNORE = shutil.ignore_patterns(
     "build",
     ".build",
     ".gradle",
+    ".cxx",
+    ".kotlin",
     ".swiftpm",
     "xcuserdata",
     "DerivedData",
@@ -240,6 +243,7 @@ def stage_template(template_name: str, destination: Path) -> Path:
     local = Path(__file__).resolve().parents[1] / "templates" / template_name
     if local.is_dir():
         shutil.copytree(local, dest_path, dirs_exist_ok=True, ignore=_TEMPLATE_IGNORE)
+        _stage_runtime(template_name, dest_path)
         return dest_path
 
     try:
@@ -247,6 +251,7 @@ def stage_template(template_name: str, destination: Path) -> Path:
         with resources.as_file(candidate) as resolved:
             if Path(resolved).is_dir():
                 shutil.copytree(resolved, dest_path, dirs_exist_ok=True, ignore=_TEMPLATE_IGNORE)
+                _stage_runtime(template_name, dest_path)
                 return dest_path
     except (ModuleNotFoundError, FileNotFoundError, OSError):
         pass
@@ -254,6 +259,35 @@ def stage_template(template_name: str, destination: Path) -> Path:
     raise BuildError(
         f"Could not find bundled template {template_name!r}. Reinstall pythonnative or run from a source checkout."
     )
+
+
+def _stage_runtime(name: str, destination: Path) -> None:
+    platform = name.removesuffix("_template")
+    source = Path(__file__).resolve().parents[1] / "native"
+    runtime_name = "PythonNativeKit" if platform == "ios" else "pythonnative"
+    managed = "Sources/PythonNativeKit" if platform == "ios" else "src/main/java/com/pythonnative/runtime"
+    staged_sources = destination / runtime_name / managed
+    if staged_sources.exists():
+        for path in staged_sources.rglob("*"):
+            rel = path.relative_to(staged_sources)
+            if path.is_file() and rel.parts[0] not in {"Plugins", "PluginResources", "Generated", "plugins"}:
+                if not (source / platform / managed / rel).exists():
+                    path.unlink()
+    shutil.copytree(source / platform, destination / runtime_name, dirs_exist_ok=True, ignore=_TEMPLATE_IGNORE)
+    shutil.copytree(source / "yoga", destination / "yoga", dirs_exist_ok=True, ignore=_TEMPLATE_IGNORE)
+    from ..sdk.codegen import generate
+
+    generated = destination / "contracts"
+    generate(generated)
+    if platform == "ios":
+        output = destination / runtime_name / "Sources/PythonNativeKit/Generated"
+        extension = "swift"
+    else:
+        output = destination / runtime_name / "src/main/java/com/pythonnative/generated"
+        extension = "kt"
+    output.mkdir(parents=True, exist_ok=True)
+    for name in ("PNContracts", "NativeProps", "NativeModules"):
+        shutil.copy2(generated / f"{name}.{extension}", output / f"{name}.{extension}")
 
 
 # ======================================================================
@@ -330,7 +364,10 @@ class Builder:
         build_dir = self.build_root / platform
         build_dir.mkdir(parents=True, exist_ok=True)
         project_dir = stage_template(_TEMPLATE_NAMES[platform], build_dir)
-        plugins = self._discover_plugins()
+        targets = (
+            deps.android_targets(self.config) if platform == "android" else deps.ios_targets(self.config, sdks=ios_sdks)
+        )
+        plugins = self._discover_plugins(targets)
 
         if platform == "android":
             layout = android_config.configure(
@@ -341,6 +378,7 @@ class Builder:
                 log=self.log,
             )
             native_plugins.stage_android_plugins(project_dir, plugins, log=self.log)
+            self._stage_contracts(project_dir, platform, plugins, [layout.python_root / "pythonnative"])
             return PreparedProject(
                 platform=platform,
                 build_dir=build_dir,
@@ -352,6 +390,12 @@ class Builder:
         ios_layout = ios_config.configure(project_dir, self.config, log=self.log)
         native_plugins.stage_ios_plugins(project_dir, plugins, log=self.log)
         self._stage_ios_python(project_dir, release=release, sdks=ios_sdks)
+        self._stage_contracts(
+            project_dir,
+            platform,
+            plugins,
+            [project_dir / target.slice_name / "pythonnative" for target in targets],
+        )
         self._link_ios_runtime(project_dir)
         return PreparedProject(
             platform=platform,
@@ -361,17 +405,57 @@ class Builder:
             ios=ios_layout,
         )
 
-    def _discover_plugins(self) -> List[native_plugins.NativePlugin]:
+    def _stage_contracts(
+        self,
+        project_dir: Path,
+        platform: str,
+        plugins: Sequence[native_plugins.NativePlugin],
+        python_roots: Sequence[Path],
+    ) -> None:
+        from ..sdk import schema
+        from ..sdk.codegen import generate
+
+        components, modules = dict(schema.COMPONENTS), dict(schema.MODULES)
+        try:
+            for plugin in plugins:
+                if plugin.contracts is not None:
+                    schema.load_manifest(json.loads((plugin.root / plugin.contracts).read_text(encoding="utf-8")))
+            generated = project_dir / "contracts"
+            generate(generated)
+            output = project_dir / (
+                "PythonNativeKit/Sources/PythonNativeKit/Generated"
+                if platform == "ios"
+                else "pythonnative/src/main/java/com/pythonnative/generated"
+            )
+            extension = "swift" if platform == "ios" else "kt"
+            for name in ("PNContracts", "NativeProps", "NativeModules"):
+                shutil.copy2(generated / f"{name}.{extension}", output / f"{name}.{extension}")
+            for root in python_roots:
+                root.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(generated / "schema.json", root / "_native_contracts.json")
+        finally:
+            schema.COMPONENTS.clear()
+            schema.COMPONENTS.update(components)
+            schema.MODULES.clear()
+            schema.MODULES.update(modules)
+
+    def _discover_plugins(self, targets: Sequence[deps.Target] = ()) -> List[native_plugins.NativePlugin]:
         """Collect native plugins from entry points and ``[plugins].paths``.
 
         Raises:
             BuildError: If a project-local plugin directory is invalid.
         """
         try:
-            return native_plugins.discover_plugins(
+            installed = native_plugins.discover_target_plugins(self.config, targets, self.runner)
+            local = native_plugins.discover_plugins(
+                include_environment=False,
                 extra_paths=[self.config.resolve_path(p) for p in self.config.plugin_paths],
                 log=self.log,
             )
+            names = {plugin.name for plugin in installed}
+            if any(plugin.name in names for plugin in local):
+                raise native_plugins.PluginError("A plugin appears in both target requirements and [plugins].paths")
+            return installed + local
         except native_plugins.PluginError as exc:
             raise BuildError(f"Invalid native plugin: {exc}") from exc
 

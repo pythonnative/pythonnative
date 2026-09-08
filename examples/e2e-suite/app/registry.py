@@ -72,6 +72,7 @@ from app.screens.gestures.gestures import GesturesDemo
 from app.screens.hooks.async_effect import AsyncEffectDemo
 from app.screens.hooks.batch_updates_demo import BatchUpdatesDemo
 from app.screens.hooks.memo_demo import MemoDemo
+from app.screens.hooks.standard_asyncio import StandardAsyncioDemo
 from app.screens.hooks.use_back_handler import UseBackHandlerDemo
 from app.screens.hooks.use_callback import UseCallbackDemo
 from app.screens.hooks.use_color_scheme import UseColorSchemeDemo
@@ -142,6 +143,7 @@ class DemoEntry:
 
 
 DEMOS: List[DemoEntry] = [
+    DemoEntry("standard_asyncio", "Hooks", "Standard asyncio", "run_async", StandardAsyncioDemo),
     # ------------------------------------------------------------------
     # Components
     # ------------------------------------------------------------------

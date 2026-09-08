@@ -2,8 +2,8 @@
 
 One [`DevServer`][pythonnative.devserver.server.DevServer] runs on its
 own thread with a private ``asyncio`` loop, so it works both inside
-``pn start`` (whose main thread runs the browser preview's app) and in
-tests. It exposes:
+``pn start`` and in tests independently of the Python application
+loop. It exposes:
 
 - ``GET /``: the browser preview page.
 - ``GET /static/<name>``: preview assets (JS, CSS).
@@ -489,10 +489,16 @@ class DevServer:
             return
         if path.startswith("/static/"):
             name = path[len("/static/") :]
-            if not name or "/" in name or name.startswith("."):
+            root = os.path.realpath(self.static_dir)
+            candidate = os.path.realpath(os.path.join(root, name))
+            if (
+                not name
+                or any(part.startswith(".") for part in name.split("/"))
+                or os.path.commonpath([root, candidate]) != root
+            ):
                 _respond(writer, 404, b"not found", "text/plain")
                 return
-            _respond_file(writer, os.path.join(self.static_dir, name))
+            _respond_file(writer, candidate)
             return
         if path == "/manifest":
             _respond_json(writer, self.manifest())

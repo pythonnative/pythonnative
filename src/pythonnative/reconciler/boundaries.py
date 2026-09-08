@@ -156,12 +156,22 @@ class BoundaryMixin:
     # ------------------------------------------------------------------
 
     def _create_suspense(self, element: Element) -> VNode:
+        if element.props.get("fallback") is None:
+            return self._create_wrapper(element, "Suspense")
         node = VNode(element, [])
         self._attempt_suspense_content(node)
         return node
 
     def _reconcile_suspense(self, old: VNode, new_el: Element) -> VNode:
+        previous = old.element
         old.element = new_el
+        if old.suspense_showing_fallback and previous.children != new_el.children:
+            if old.suspense_hydration:
+                self._dispose_hydration(old.suspense_hydration)
+            old.suspense_hydration = None
+            old.suspense_waits = None
+            self._attempt_suspense_content(old)
+            return old
         if old.suspense_showing_fallback:
             # Fallback showing; keep it in sync with the latest fallback
             # prop. Content retries are driven by waitable completions,

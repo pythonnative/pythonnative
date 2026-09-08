@@ -47,7 +47,7 @@ class FakePage:
         message = json.loads(text)
         self.sent.append(message)
         kind = message[0]
-        if kind in ("measure", "command", "animate", "call"):
+        if kind in ("apply", "measure", "command", "animate", "call"):
             result = self._answer(message)
             reply = codec.dumps(["res", message[1], result])
             if self.answer_in_thread:
@@ -61,6 +61,11 @@ class FakePage:
     # -- page behavior ------------------------------------------------------
     def _answer(self, message: List[Any]) -> Any:
         kind = message[0]
+        if kind == "apply":
+            from pythonnative.bridge.commits import CommitState
+
+            self.commit = getattr(self, "commit", CommitState()).prepare(message[2])
+            return self.commit.acknowledgement()
         if kind == "measure":
             return list(self.measure_size)
         if kind == "command":
@@ -76,6 +81,8 @@ class FakePage:
             self.calls.append((module, method, args))
             if (module, method) in self.module_results:
                 return codec.dumps(self.module_results[(module, method)])
+            if module == "Layout":
+                return codec.dumps({"ok": True, "value": []})
             if method in ("attach_root", "viewport"):
                 return codec.dumps({"ok": True, "value": self.viewport})
             return codec.dumps({"ok": True, "value": None})
@@ -86,17 +93,28 @@ class FakePage:
         out: List[List[Any]] = []
         for message in self.sent:
             if message[0] == "apply":
-                out.extend(message[1])
+                out.extend(message[2]["ops"])
         return out
 
     def dev_messages(self) -> List[Dict[str, Any]]:
         return [m[1] for m in self.sent if m[0] == "dev"]
 
+    def _event(self, args: Any) -> Any:
+        self.sequence = getattr(self, "sequence", 0) + 1
+        state = self.commit.acknowledgement()
+        state.pop("ok")
+        state.update(sequence=self.sequence, args=args)
+        return state
+
     def callback(self, kind: str, tag: int, name: str, payload: Any) -> None:
+        if kind == "event":
+            payload = self._event(payload)
         text = codec.dumps(["cb", kind, tag, name, payload if isinstance(payload, str) else codec.dumps(payload)])
         self.transport.on_preview_message(self, text)
 
     def request(self, request_id: int, kind: str, tag: int, name: str, payload: Any) -> None:
+        if kind == "event":
+            payload = self._event(payload)
         text = codec.dumps(
             ["req", request_id, kind, tag, name, payload if isinstance(payload, str) else codec.dumps(payload)]
         )
@@ -139,9 +157,12 @@ def _install_app(monkeypatch: pytest.MonkeyPatch, name: str, root: Any) -> str:
 # ----------------------------------------------------------------------
 
 
-def test_apply_forwards_the_transaction_verbatim(web: Any) -> None:
-    web.transport.apply('[["c", 1, "View", {}]]')
-    assert web.page.sent[-1] == ["apply", [["c", 1, "View", {}]]]
+def test_apply_waits_for_revision_acknowledgement(web: Any) -> None:
+    envelope = {"version": 2, "application": "test", "surface": 1, "revision": 1, "ops": [["c", 1, "View", {}]]}
+    result = json.loads(web.transport.apply(codec.dumps(envelope)))
+    assert result == {"ok": True, "application": "test", "surface": 1, "revision": 1}
+    assert web.page.sent[-1][0] == "apply"
+    assert web.page.sent[-1][2] == envelope
 
 
 def test_measure_blocks_until_the_page_answers(web: Any) -> None:
@@ -210,7 +231,7 @@ def test_browser_modules_go_to_the_page_and_others_fall_back_to_python(web: Any)
 
 def test_host_post_pumps_the_main_queue_without_touching_the_page(web: Any) -> None:
     ran: List[int] = []
-    bridge.post_to_main(lambda: ran.append(1))
+    web.transport.post_to_application(lambda: ran.append(1))
     assert ran == []  # queued, not inline
     assert not any(m[0] == "call" for m in web.page.sent)
     web.transport.drain_main()
@@ -242,6 +263,9 @@ def test_events_from_the_page_reach_handlers_on_the_main_thread(web: Any) -> Non
     from pythonnative.events import get_event_registry
 
     seen: List[Any] = []
+    from pythonnative.mutations import CreateOp
+
+    web.backend.apply_mutations([CreateOp(42, "View", {})])
     get_event_registry().set_events(42, {"on_press": lambda *args: seen.append(args)})
     web.page.callback("event", 42, "on_press", [])
     assert seen == []  # delivered on the main loop, not on the socket thread
@@ -251,7 +275,9 @@ def test_events_from_the_page_reach_handlers_on_the_main_thread(web: Any) -> Non
 
 def test_requests_from_the_page_are_answered(web: Any) -> None:
     from pythonnative.events import get_event_registry
+    from pythonnative.mutations import CreateOp
 
+    web.backend.apply_mutations([CreateOp(5, "View", {})])
     get_event_registry().set_events(5, {"on_bind_row": lambda payload: {"root": 77}})
     web.page.request(3, "event", 5, "on_bind_row", [{"index": 0}])
     web.transport.drain_main()
@@ -293,6 +319,9 @@ def test_gesture_stream_drives_the_python_arbiter(web: Any) -> None:
     from pythonnative.events import get_event_registry
 
     taps: List[Any] = []
+    from pythonnative.mutations import CreateOp
+
+    web.backend.apply_mutations([CreateOp(9, "View", {})])
     get_event_registry().set_events(9, {"gesture:0": lambda payload: taps.append(payload)})
     specs = [{"kind": "tap", "n_taps": 1, "max_distance": 20.0}]
     t = web.transport
@@ -346,9 +375,8 @@ def test_screen_mounts_through_the_page(web: Any, monkeypatch: pytest.MonkeyPatc
     assert "Text" in created.values() and "Button" in created.values()
     assert ("Host", "attach_root", {"screen": 1, "tag": root_tag}) in web.page.calls
     # Children get frames (the root fills the viewport), and the Text was measured by the page.
-    framed = {op[1] for op in web.page.ops() if op[0] == "f"}
-    assert framed >= {tag for tag in created if tag != root_tag}
-    assert any(m[0] == "measure" for m in web.page.sent)
+    assert any(module == "Layout" and method == "compute" for module, method, _ in web.page.calls)
+    assert not any(m[0] == "measure" for m in web.page.sent)
     assert platform_metrics.get_window_dimensions() == (390.0, 800.0)
 
     host = hosts.host_for_screen(1)
@@ -357,6 +385,9 @@ def test_screen_mounts_through_the_page(web: Any, monkeypatch: pytest.MonkeyPatc
     text_tag = next(tag for tag, name in created.items() if name == "Text")
     web.page.callback("event", button_tag, "on_press", [])
     web.transport.drain_main(timeout=1.0)
+    from pythonnative.runtime import drain
+
+    drain()
     assert pressed == [1]
     updates = [op for op in web.page.ops() if op[0] == "u" and op[1] == text_tag]
     assert updates and updates[-1][2]["text"] == "count 1"

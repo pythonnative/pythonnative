@@ -144,7 +144,7 @@ def test_handshake_rejects_mismatch() -> None:
 
 def test_set_transport_installs_callback(transport: FakeTransport) -> None:
     assert transport.callback is bridge.native_callback
-    assert bridge.transport_state()["transport"] == "fake"
+    assert bridge.get_transport() is transport
 
 
 # ======================================================================
@@ -152,33 +152,33 @@ def test_set_transport_installs_callback(transport: FakeTransport) -> None:
 # ======================================================================
 
 
-def test_post_to_main_batches_one_native_crossing(transport: FakeTransport) -> None:
-    ran: List[str] = []
-    bridge.post_to_main(lambda: ran.append("a"))
-    bridge.post_to_main(lambda: ran.append("b"))
-    assert transport.posted == 1
-    assert ran == []
-    transport.pump()
-    assert ran == ["a", "b"]
-    bridge.post_to_main(lambda: ran.append("c"))
-    assert transport.posted == 2
-    transport.pump()
-    assert ran == ["a", "b", "c"]
+def test_application_callbacks_do_not_cross_the_native_bridge(transport: FakeTransport) -> None:
+    import threading
+
+    from pythonnative import runtime
+
+    runtime.start()
+    done = threading.Event()
+    threads: List[str] = []
+    runtime.call_on_application_thread(lambda: threads.append(threading.current_thread().name))
+    runtime.call_on_application_thread(done.set)
+    assert done.wait(2)
+    assert threads == ["PythonNative"]
+    assert not any(module == "Host" and method == "post" for module, method, _ in transport.calls)
 
 
-def test_call_on_main_thread_off_main_posts(transport: FakeTransport, monkeypatch: pytest.MonkeyPatch) -> None:
-    from pythonnative import platform, runtime
+def test_application_callback_runs_inline_on_its_owner(transport: FakeTransport) -> None:
+    from pythonnative import runtime
 
-    monkeypatch.setattr(platform.Platform, "is_ios", True)
-    monkeypatch.setattr(runtime, "_is_main_thread", lambda: False)
-    ran: List[int] = []
-    runtime.call_on_main_thread(lambda: ran.append(1))
-    assert ran == [] and transport.posted == 1
-    transport.pump()
-    assert ran == [1]
-    monkeypatch.setattr(runtime, "_is_main_thread", lambda: True)
-    runtime.call_on_main_thread(lambda: ran.append(2))
-    assert ran == [1, 2]
+    runtime.start()
+
+    async def check() -> list[int]:
+        order = [1]
+        runtime.call_on_application_thread(lambda: order.append(2))
+        order.append(3)
+        return order
+
+    assert runtime.run_blocking(check()) == [1, 2, 3]
 
 
 # ======================================================================
@@ -270,6 +270,7 @@ def test_reconciler_commits_through_bridge(transport: FakeTransport) -> None:
 def test_event_handler_return_value_is_returned_to_native(transport: FakeTransport) -> None:
     from pythonnative.events import get_event_registry
 
+    get_registry().apply_mutations([CreateOp(11, "View", {})])
     get_event_registry().set_events(11, {"on_ask": lambda x: {"answer": x * 2}})
     try:
         assert transport.fire(11, "on_ask", 21) == {"answer": 42}
@@ -278,24 +279,17 @@ def test_event_handler_return_value_is_returned_to_native(transport: FakeTranspo
         get_event_registry().clear(11)
 
 
-def test_virtual_list_rows_bound_through_bridge(transport: FakeTransport) -> None:
+def test_destroyed_view_drops_queued_event(transport: FakeTransport) -> None:
+    from pythonnative.events import get_event_registry
+
     backend = get_registry()
-    rows = [pn.Text(f"row {i}") for i in range(3)]
-    backend.apply_mutations([CreateOp(50, "VirtualList", {"count": 3, "render_row": lambda i: rows[i]})])
-    result = transport.fire(50, "on_bind_row", {"container": 900, "index": 1, "width": 320, "height": 44})
-    root_tag = result["root"]
-    assert transport.views[root_tag].type_name == "Text"
-    assert transport.views[root_tag].props["text"] == "row 1"
-    # Rebinding the same container reuses the subtree.
-    result2 = transport.fire(50, "on_bind_row", {"container": 900, "index": 2, "width": 320, "height": 44})
-    assert result2["root"] == root_tag
-    assert transport.views[root_tag].props["text"] == "row 2"
-    transport.fire(50, "on_unbind_row", {"container": 900})
-    assert root_tag not in transport.views
-    # Destroying the list releases every remaining row subtree.
-    transport.fire(50, "on_bind_row", {"container": 901, "index": 0, "width": 320, "height": 44})
+    backend.apply_mutations([CreateOp(50, "View", {})])
+    seen: list[str] = []
+    get_event_registry().set_events(50, {"on_press": lambda: seen.append("press")})
+    transport.fire(50, "on_press")
     backend.apply_mutations([DestroyOp(50)])
-    assert transport.find("Text") == []
+    transport.fire(50, "on_press")
+    assert seen == ["press"]
 
 
 def test_animation_completion_callback_routes_to_animated(
@@ -511,15 +505,9 @@ def test_native_host_lifecycle_and_navigation(transport: FakeTransport, monkeypa
     transport.host_event(1, "restore_state", {"state": "{}"})
     transport.host_event(1, "resume", {"width": 390.0, "height": 844.0})
     assert host.is_focused is True
-    assert transport.host_event(1, "back_pressed") is False
+    assert transport.host_event(1, "back_pressed") is None
 
-    host.push_screen({"routes": [{"name": "a"}], "index": 0}, {"title": "Detail"})
-    module, method, args = transport.calls[-1]
-    assert (module, method) == ("Host", "push")
-    assert args["screen"] == 1 and args["path"] == path and args["options"] == {"title": "Detail"}
-    assert '"pn_nav"' in args["args"]
-    host.pop_screens(2)
-    assert transport.calls[-1] == ("Host", "pop", {"screen": 1, "count": 2})
+    assert transport.calls[-1] == ("Host", "finish", {"screen": 1})
     host.set_screen_options({"title": "T"})
     assert transport.calls[-1] == ("Host", "set_options", {"screen": 1, "options": {"title": "T"}})
 
@@ -531,7 +519,9 @@ def test_native_host_lifecycle_and_navigation(transport: FakeTransport, monkeypa
     platform_metrics.reset_window_dimensions()
 
 
-def test_native_host_defers_renders_through_pump(transport: FakeTransport, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_native_host_defers_renders_to_application_loop(
+    transport: FakeTransport, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from pythonnative.hosts import native as hosts
 
     hosts._reset_for_tests()
@@ -546,11 +536,11 @@ def test_native_host_defers_renders_through_pump(transport: FakeTransport, monke
     path = _install_app(monkeypatch, "bridge_host_defer_app", Root)
     transport.host_event(2, "create", {"path": path, "width": 100, "height": 100})
     assert transport.find("Text")[0].props["text"] == "n=0"
-    posted_before = transport.posted
     setters[-1](5)
     # The state change is committed on the next main-queue turn, not inline.
-    assert transport.posted == posted_before + 1
     assert transport.find("Text")[0].props["text"] == "n=0"
-    transport.pump()
+    from pythonnative.runtime import drain
+
+    drain()
     assert transport.find("Text")[0].props["text"] == "n=5"
     transport.host_event(2, "destroy")

@@ -223,7 +223,7 @@ def SegmentedControl(
     segments: Optional[List[str]] = None,
     selected_index: int = 0,
     on_change: Optional[Callable[[int], Any]] = None,
-    enabled: bool = True,
+    disabled: bool = False,
     tint_color: Optional[Color] = None,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
@@ -242,7 +242,7 @@ def SegmentedControl(
         segments: Ordered list of segment labels.
         selected_index: Index of the currently selected segment.
         on_change: Callback invoked with the newly selected index.
-        enabled: When ``False``, the control is disabled.
+        disabled: When ``True``, the control is disabled.
         tint_color: Accent color for the selected segment.
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
@@ -270,7 +270,7 @@ def SegmentedControl(
         segments=list(segments) if segments is not None else [],
         selected_index=selected_index,
         on_change=on_change,
-        enabled=False if enabled is False else None,
+        disabled=disabled or None,
         tint_color=tint_color,
         accessibility_label=accessibility_label,
         accessible=accessible,
@@ -287,7 +287,7 @@ def DatePicker(
     on_change: Optional[Callable[[str], Any]] = None,
     minimum: Optional[str] = None,
     maximum: Optional[str] = None,
-    enabled: bool = True,
+    disabled: bool = False,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessible: Optional[bool] = None,
@@ -312,7 +312,7 @@ def DatePicker(
         on_change: Callback invoked with the new ISO-8601 string.
         minimum: Earliest selectable value (ISO-8601), if any.
         maximum: Latest selectable value (ISO-8601), if any.
-        enabled: When ``False``, the picker is disabled.
+        disabled: When ``True``, the picker is disabled.
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
         accessible: Override whether the element is exposed to AT.
@@ -340,7 +340,7 @@ def DatePicker(
         on_change=on_change,
         minimum=minimum,
         maximum=maximum,
-        enabled=False if enabled is False else None,
+        disabled=disabled or None,
         accessibility_label=accessibility_label,
         accessible=accessible,
         accessibility_state=accessibility_state,
@@ -353,6 +353,7 @@ def DatePicker(
 def Picker(
     *,
     value: Any = None,
+    disabled: bool = False,
     items: Optional[List[Dict[str, Any]]] = None,
     on_change: Optional[Callable[[Any], Any]] = None,
     placeholder: str = "Select…",
@@ -377,6 +378,7 @@ def Picker(
     entries (``label`` defaults to ``str(value)`` when omitted).
 
     Args:
+        disabled: Whether the control ignores user input.
         value: Currently selected value (matched against
             ``items[i]["value"]``).
         items: Selectable options.
@@ -408,6 +410,7 @@ def Picker(
         ref=ref,
         key=key,
         value=value,
+        disabled=disabled or None,
         items=list(items) if items is not None else [],
         on_change=on_change,
         placeholder=placeholder,

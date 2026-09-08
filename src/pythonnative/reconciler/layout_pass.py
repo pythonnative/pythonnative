@@ -1,11 +1,12 @@
 """The layout phase of a reconciler pass.
 
-After native mutations commit, the reconciler builds a
-[`LayoutNode`][pythonnative.layout.LayoutNode] tree mirroring the
-native nodes of the mounted tree, runs the flexbox engine against the
-viewport, and emits a ``SetFrameOp`` for every frame that changed.
+After mutations commit, bridge backends request Yoga layout from the
+renderer and receive changed frames. Native widgets supply their own
+measurements; screen and row containers define their content rectangles.
 
-Two details keep this cheap on every state update:
+Headless backends build a [`LayoutNode`][pythonnative.layout.LayoutNode]
+tree, run the host Yoga binding, and emit ``SetFrameOp`` mutations.
+That path uses two optimizations:
 
 - **Incremental rebuild.** Each native ``VNode`` caches its
   ``LayoutNode``; subtrees whose props and child list are unchanged
@@ -27,6 +28,7 @@ from .. import diagnostics
 from ..element import Element
 from ..layout import LAYOUT_STYLE_KEYS, LayoutNode, calculate_layout, extract_layout_style
 from ..mutations import Mutation, SetFrameOp
+from ..profiling import profiled
 from .vnode import DETACHED_TYPES, VNode
 
 if TYPE_CHECKING:
@@ -64,7 +66,12 @@ MEASURED_LEAF_TYPES = INTRINSIC_TYPES | {"VirtualList"}
 
 def affects_layout(type_name: str, changed: Dict[str, Any]) -> bool:
     """Whether ``changed`` props can alter a native node's layout."""
-    if type_name in INTRINSIC_TYPES:
+    from ..sdk.schema import COMPONENTS
+
+    schema = COMPONENTS.get(type_name)
+    if schema is None or schema.measurement == "intrinsic":
+        return True
+    if any(schema.props.get(key, {}).get("native", {}).get("invalidates_layout") for key in changed):
         return True
     return any(key in LAYOUT_STYLE_KEYS for key in changed)
 
@@ -140,6 +147,7 @@ class LayoutMixin:
     # The pass
     # ------------------------------------------------------------------
 
+    @profiled("layout")
     def _run_layout(self) -> None:
         """Build/refresh the layout tree, compute frames, and emit changed ones.
 
@@ -160,6 +168,9 @@ class LayoutMixin:
             return
 
         self._layout_pass_count += 1
+        if getattr(self.backend, "native_layout", False):
+            self.backend.compute_layout([node.tag for node in self._native_roots(root)], viewport_w, viewport_h)
+            return
         layout_roots = self._build_layout_list_cached(root)
         if layout_roots:
             viewport = LayoutNode(style={"width": viewport_w, "height": viewport_h}, children=list(layout_roots))
@@ -173,6 +184,22 @@ class LayoutMixin:
                     self._collect_frames(layout_root, 0.0, 0.0)
         self._layout_detached_subtrees(root, viewport_w, viewport_h)
         self._clear_layout_dirty(root)
+
+    def _accept_native_layout(self, frames: list[list[float]]) -> None:
+        """Update refs and queue observations only for acknowledged native frames."""
+        for tag, x, y, width, height in frames:
+            node = self._tag_nodes.get(int(tag))
+            if node is None or not node.mounted:
+                continue
+            frame = (x, y, width, height)
+            node.last_frame = frame
+            ref = node.element.props.get("ref")
+            if ref is not None:
+                ref._pn_frame = frame
+            if "on_layout" in node.element.props:
+                self._pending_layout_events.append((int(tag), frame))
+        if not self._rendering:
+            self._dispatch_layout_events()
 
     def _layout_detached_subtrees(self, node: VNode, viewport_w: float, viewport_h: float) -> None:
         element = node.element
@@ -293,7 +320,15 @@ class LayoutMixin:
 
     def _make_measure_callback(self, node: VNode) -> Optional[Callable[[float, float], Tuple[float, float]]]:
         """Return a measure callback for ``node`` if it has an intrinsic size."""
-        if node.element.type not in MEASURED_LEAF_TYPES or node.tag is None:
+        if node.tag is None or node.element.type in {
+            "View",
+            "Row",
+            "Column",
+            "ScrollView",
+            "Modal",
+            "Portal",
+            "ScreenStack",
+        }:
             return None
         backend = self.backend
         tag = node.tag

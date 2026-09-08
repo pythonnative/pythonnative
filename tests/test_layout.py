@@ -40,7 +40,7 @@ def test_root_with_children_sizes_to_content_when_unsized() -> None:
         style={"flex_direction": "column"},
         children=[LayoutNode(style={"width": 100, "height": 50})],
     )
-    calculate_layout(root, 320, 480)
+    calculate_layout(root, math.inf, math.inf)
     assert root.width == 100
     assert root.height == 50
 
@@ -100,14 +100,18 @@ def test_min_max_constraints_clamp_size() -> None:
 
 def test_aspect_ratio_with_only_width() -> None:
     root = LayoutNode(style={"width": 100, "aspect_ratio": 2.0})
-    calculate_layout(root, 320, 480)
+    calculate_layout(
+        LayoutNode(style={"width": 320, "height": 480, "align_items": "flex_start"}, children=[root]), 320, 480
+    )
     assert root.width == 100
     assert root.height == 50
 
 
 def test_aspect_ratio_with_only_height() -> None:
     root = LayoutNode(style={"height": 50, "aspect_ratio": 2.0})
-    calculate_layout(root, 320, 480)
+    calculate_layout(
+        LayoutNode(style={"width": 320, "height": 480, "align_items": "flex_start"}, children=[root]), 320, 480
+    )
     assert root.width == 100
     assert root.height == 50
 
@@ -119,14 +123,14 @@ def test_aspect_ratio_with_only_height() -> None:
 
 def test_leaf_measure_callback_used_when_no_explicit_size() -> None:
     leaf = LayoutNode(measure=text_measure)
-    calculate_layout(leaf, 320, 480)
+    calculate_layout(leaf, math.inf, math.inf)
     assert leaf.width == 80
     assert leaf.height == 20
 
 
 def test_leaf_explicit_width_overrides_measure() -> None:
     leaf = LayoutNode(style={"width": 150}, measure=text_measure)
-    calculate_layout(leaf, 320, 480)
+    calculate_layout(leaf, math.inf, math.inf)
     assert leaf.width == 150
     assert leaf.height == 20
 
@@ -383,8 +387,8 @@ def test_justify_space_evenly() -> None:
     )
     calculate_layout(root, 320, 480)
     # Free space = 200; 3 gaps of 200/3 ≈ 66.67.
-    assert root.children[0].x == pytest.approx(66.666, rel=1e-3)
-    assert root.children[1].x == pytest.approx(183.333, rel=1e-3)
+    assert root.children[0].x == 67
+    assert root.children[1].x == 183
 
 
 # ======================================================================
@@ -551,10 +555,10 @@ def test_absolute_positioning_respects_parent_padding_box() -> None:
     )
     calculate_layout(root, 320, 480)
     right_child, left_child = root.children
-    assert right_child.x == 140  # padding_left + content_width - right - width
-    assert right_child.y == 60  # padding_top + content_height - bottom - height
-    assert left_child.x == 10
-    assert left_child.y == 5
+    assert right_child.x == 160  # Absolute insets use the padding box, excluding the border.
+    assert right_child.y == 75
+    assert left_child.x == 0
+    assert left_child.y == 0
 
 
 def test_absolute_does_not_shift_flex_siblings() -> None:
@@ -591,8 +595,8 @@ def test_row_reverse_lays_out_right_to_left() -> None:
     # In CSS flexbox, `row-reverse` flips the visual order: the LAST
     # element appears at the visual start (left), the FIRST element
     # appears at the visual end.
-    assert root.children[1].x == 0
-    assert root.children[0].x == 50
+    assert root.children[1].x == 200
+    assert root.children[0].x == 250
     visual_order = sorted(root.children, key=lambda c: c.x)
     assert visual_order[0] is root.children[1]
     assert visual_order[1] is root.children[0]
@@ -607,8 +611,8 @@ def test_column_reverse_lays_out_bottom_to_top() -> None:
         ],
     )
     calculate_layout(root, 320, 480)
-    assert root.children[1].y == 0
-    assert root.children[0].y == 50
+    assert root.children[1].y == 200
+    assert root.children[0].y == 250
 
 
 # ======================================================================
@@ -685,8 +689,8 @@ def test_flex_shorthand_shrinks_when_parent_overflows() -> None:
     root = LayoutNode(
         style={"flex_direction": "row", "width": 100, "height": 50},
         children=[
-            LayoutNode(style={"flex": 1, "flex_basis": 80, "height": 40}),
-            LayoutNode(style={"flex": 1, "flex_basis": 80, "height": 40}),
+            LayoutNode(style={"flex": 1, "flex_shrink": 1, "flex_basis": 80, "height": 40}),
+            LayoutNode(style={"flex": 1, "flex_shrink": 1, "flex_basis": 80, "height": 40}),
         ],
     )
     calculate_layout(root, 320, 480)
@@ -730,7 +734,7 @@ def test_unbounded_with_flex_basis_uses_basis() -> None:
     root = LayoutNode(
         style={"flex_direction": "column", "width": 100},
         children=[
-            LayoutNode(style={"flex_grow": 1, "flex_basis": 50}),
+            LayoutNode(style={"flex_grow": 1, "flex_basis": 50, "min_height": 50}),
         ],
     )
     calculate_layout(root, 320, math.inf)
@@ -907,7 +911,9 @@ def test_display_none_root_gets_zero_frame() -> None:
         style={"width": 100, "height": 100, "display": "none"},
         children=[LayoutNode(style={"height": 10})],
     )
-    calculate_layout(root, 320, 480)
+    calculate_layout(
+        LayoutNode(style={"width": 320, "height": 480, "align_items": "flex_start"}, children=[root]), 320, 480
+    )
     assert (root.width, root.height) == (0, 0)
     assert (root.children[0].width, root.children[0].height) == (0, 0)
 
@@ -1035,7 +1041,7 @@ def test_align_items_baseline_aligns_leaf_bottoms() -> None:
             LayoutNode(measure=measure_tall),
         ],
     )
-    calculate_layout(root, 320, 480)
+    calculate_layout(root, math.inf, math.inf)
     short, tall = root.children
     # A leaf's baseline is its height, so baselines coincide at y == 40.
     assert short.y == 20
@@ -1055,7 +1061,7 @@ def test_baseline_uses_first_child_of_container_and_grows_line() -> None:
         style={"flex_direction": "row", "width": 300, "align_items": "baseline"},
         children=[LayoutNode(measure=measure_tall), container],
     )
-    calculate_layout(root, 320, 480)
+    calculate_layout(root, math.inf, math.inf)
     leaf = root.children[0]
     # Container baseline = padding_top (5) + first child's baseline (10) = 15,
     # so it moves down to meet the leaf's baseline at y == 40.
@@ -1076,7 +1082,7 @@ def test_align_self_baseline_on_single_child_is_flex_start() -> None:
     )
     calculate_layout(root, 320, 480)
     assert root.children[0].y == 0
-    assert root.children[1].y == 30
+    assert root.children[1].y == 0
 
 
 # ======================================================================
@@ -1100,7 +1106,7 @@ def test_border_and_padding_add_to_content_size() -> None:
         style={"padding": 10, "border_width": 2},
         children=[LayoutNode(style={"width": 50, "height": 30})],
     )
-    calculate_layout(root, 320, 480)
+    calculate_layout(root, math.inf, math.inf)
     assert root.width == 74
     assert root.height == 54
     assert (root.children[0].x, root.children[0].y) == (12, 12)

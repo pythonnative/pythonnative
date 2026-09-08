@@ -1,3 +1,5 @@
+import { AnimationGraph } from "./animation_graph.js";
+import {computeLayout, disposeLayout} from "./layout.js";
 // The DOM "native runtime" for the browser preview.
 //
 // This module plays the role PythonNativeKit (Swift) and the pythonnative
@@ -462,7 +464,7 @@ class ButtonManager extends ViewManager {
       const color = parseColor(props.color, scheme);
       el.style.color = color ?? (bg ? "#fff" : "");
     }
-    if ("enabled" in changed) el.disabled = props.enabled === false;
+    if ("disabled" in changed) el.disabled = props.disabled === true;
     applyStyle(view, props, changed, scheme, { leaf: true });
     view.measureCache = null;
   }
@@ -494,6 +496,9 @@ class TextInputManager extends ViewManager {
     if (!multiline) el.type = "text";
     view.el = el;
     view.suppressEcho = false;
+    view.composing = false;
+    el.addEventListener("compositionstart", () => { view.composing = true; });
+    el.addEventListener("compositionend", () => { view.composing = false; });
     el.addEventListener("input", () => {
       const props = view.props;
       if (props.max_length != null && el.value.length > Number(props.max_length)) {
@@ -508,19 +513,28 @@ class TextInputManager extends ViewManager {
         if (event.key === "Enter") view.ctx.emit(view.tag, "on_submit", [el.value]);
       });
     }
-    document.addEventListener("selectionchange", () => {
+    view.selectionListener = () => {
       if (document.activeElement !== el || !view.hasEvent("on_selection_change")) return;
       view.ctx.emit(view.tag, "on_selection_change", [{ start: el.selectionStart || 0, end: el.selectionEnd || 0 }]);
-    });
+    };
+    document.addEventListener("selectionchange", view.selectionListener);
     this.update(view, props);
     if (props.auto_focus) setTimeout(() => el.focus(), 0);
+  }
+  destroy(view) {
+    document.removeEventListener("selectionchange", view.selectionListener);
   }
   update(view, changed) {
     const props = view.props;
     const el = view.el;
     const scheme = view.ctx.scheme();
     const has = (k) => k in changed;
-    if (has("value") && props.value != null && el.value !== String(props.value)) el.value = String(props.value);
+    if (has("value") && props.value != null && !view.composing &&
+        Number(changed._pn_edit_revision || 0) >= Number(view.editRevision || 0) && el.value !== String(props.value)) {
+      const start = el.selectionStart, end = el.selectionEnd;
+      el.value = String(props.value);
+      if (start != null) el.setSelectionRange(Math.min(start, el.value.length), Math.min(end, el.value.length));
+    }
     if (has("placeholder")) el.placeholder = props.placeholder == null ? "" : String(props.placeholder);
     if (has("placeholder_color")) el.style.setProperty("--pn-placeholder", parseColor(props.placeholder_color, scheme) ?? "");
     if (has("font_size")) el.style.fontSize = props.font_size != null ? px(Number(props.font_size)) : "";
@@ -661,7 +675,7 @@ class SwitchManager extends ViewManager {
     knob.className = "pn-knob";
     el.appendChild(knob);
     el.addEventListener("click", () => {
-      if (view.props.enabled === false) return;
+      if (view.props.disabled === true) return;
       const next = !view.props.value;
       view.ctx.emit(view.tag, "on_change", [next]);
     });
@@ -680,7 +694,7 @@ class SwitchManager extends ViewManager {
       el.style.backgroundColor = on ? onColor : "";
     }
     if ("thumb_color" in changed) el.firstChild.style.backgroundColor = parseColor(props.thumb_color, scheme) ?? "";
-    if ("enabled" in changed) el.classList.toggle("pn-disabled", props.enabled === false);
+    if ("disabled" in changed) el.classList.toggle("pn-disabled", props.disabled === true);
     applyStyle(view, props, changed, scheme, { leaf: true });
   }
   measure() {
@@ -713,7 +727,7 @@ class SliderManager extends ViewManager {
     }
     if ("maximum_track_color" in changed) el.style.setProperty("--pn-track", parseColor(props.maximum_track_color, scheme) ?? "");
     if ("thumb_color" in changed) el.style.setProperty("--pn-thumb", parseColor(props.thumb_color, scheme) ?? "");
-    if ("enabled" in changed) el.disabled = props.enabled === false;
+    if ("disabled" in changed) el.disabled = props.disabled === true;
     applyStyle(view, props, changed, scheme, { leaf: true });
   }
   measure(view, maxW) {
@@ -944,7 +958,7 @@ class PressableManager extends ViewManager {
     view.pressed = false;
     view.longPressTimer = null;
     view.longPressed = false;
-    const enabled = () => view.props.enabled !== false && !view.props.disabled;
+    const enabled = () => !view.props.disabled;
     const setPressed = (on) => {
       view.pressed = on;
       view.pressedOpacityActive = on;
@@ -994,7 +1008,7 @@ class PressableManager extends ViewManager {
   }
   update(view, changed) {
     const props = view.props;
-    const disabled = props.enabled === false || !!props.disabled;
+    const disabled = !!props.disabled;
     view.el.classList.toggle("pn-disabled", disabled);
     view.el.tabIndex = disabled ? -1 : 0;
     applyStyle(view, props, changed, view.ctx.scheme());
@@ -1048,14 +1062,14 @@ class SegmentedControlManager extends ViewManager {
     const props = view.props;
     const el = view.el;
     const scheme = view.ctx.scheme();
-    if ("segments" in changed || "selected_index" in changed || "enabled" in changed || "tint_color" in changed) {
+    if ("segments" in changed || "selected_index" in changed || "disabled" in changed || "tint_color" in changed) {
       el.textContent = "";
       const segments = Array.isArray(props.segments) ? props.segments : [];
       segments.forEach((label, index) => {
         const button = document.createElement("button");
         button.type = "button";
         button.textContent = String(label);
-        button.disabled = props.enabled === false;
+        button.disabled = props.disabled === true;
         if (index === Number(props.selected_index)) {
           button.classList.add("pn-selected");
           const tint = parseColor(props.tint_color, scheme);
@@ -1130,7 +1144,7 @@ class DatePickerManager extends ViewManager {
     if ("value" in changed && props.value != null) el.value = String(props.value);
     if ("minimum" in changed) el.min = props.minimum == null ? "" : String(props.minimum);
     if ("maximum" in changed) el.max = props.maximum == null ? "" : String(props.maximum);
-    if ("enabled" in changed) el.disabled = props.enabled === false;
+    if ("disabled" in changed) el.disabled = props.disabled === true;
     if ("tint_color" in changed) el.style.accentColor = parseColor(props.tint_color, view.ctx.scheme()) ?? "";
     applyStyle(view, props, changed, view.ctx.scheme(), { leaf: true });
   }
@@ -1410,161 +1424,62 @@ class WebViewManager extends ViewManager {
 
 class VirtualListManager extends ViewManager {
   create(view, props) {
-    const el = document.createElement("div");
-    el.className = "pn-view pn-vlist";
-    const spacer = document.createElement("div");
-    spacer.className = "pn-vlist-spacer";
-    el.appendChild(spacer);
-    view.el = el;
-    view.spacer = spacer;
-    view.rows = new Map(); // index -> {container, el, key}
-    view.freeKeys = [];
-    view.nextKey = 1;
-    view.offsets = [];
-    view.binding = 0;
-    el.addEventListener(
-      "scroll",
-      () => {
-        this.refill(view);
-        if (view.hasEvent("on_scroll")) view.ctx.emit(view.tag, "on_scroll", [scrollPayload(el, false)]);
-        clearTimeout(view.idle);
-        view.idle = setTimeout(() => {
-          if (view.hasEvent("on_momentum_scroll_end")) view.ctx.emit(view.tag, "on_momentum_scroll_end", [scrollPayload(el, false)]);
-        }, 120);
-      },
-      { passive: true },
-    );
+    view.el = document.createElement("div"); view.el.className = "pn-view pn-vlist";
+    view.spacer = document.createElement("div"); view.spacer.className = "pn-vlist-spacer";
+    view.el.appendChild(view.spacer); view.requested = new Set();
+    view.el.addEventListener("scroll", () => {
+      this.childrenChanged(view);
+      view.ctx.emit(view.tag, "on_scroll", [{...scrollPayload(view.el, false), first:view.first, last:view.last}]);
+    }, {passive:true});
     this.update(view, props);
   }
-  container(view) {
-    return view.spacer;
+  container(view) { return view.spacer; }
+  update(view, props) {
+    super.update(view, props);
+    view.el.style.overflow = "auto";
+    if ("revision" in props) view.requested.clear();
+    this.childrenChanged(view);
   }
-  update(view, changed) {
-    const props = view.props;
-    const has = (k) => k in changed;
-    if (has("count") || has("row_height") || has("row_heights")) this.layoutRows(view);
-    if (has("shows_scroll_indicator")) view.el.classList.toggle("pn-no-indicator", props.shows_scroll_indicator === false);
-    if (has("scroll_enabled")) view.el.classList.toggle("pn-scroll-disabled", props.scroll_enabled === false);
-    if (has("generation") || has("data_version")) this.reload(view);
-    if (has("content_inset")) {
-      const inset = props.content_inset || {};
-      view.spacer.style.marginTop = px(Number(inset.top) || 0);
-      view.spacer.style.marginBottom = px(Number(inset.bottom) || 0);
+  measure(view, w, h) { return [w < 1e6 ? w : 0, h < 1e6 ? h : 0]; }
+  childrenChanged(view) {
+    const keys = view.props.keys || [];
+    const roots = new Map(view.children.map(child => [child.props._pn_list_key, child]));
+    const horizontal = view.props.horizontal;
+    const offset = horizontal ? view.el.scrollLeft : view.el.scrollTop;
+    const extent = (horizontal ? view.el.clientWidth : view.el.clientHeight) || 800;
+    let position = 0; view.first = 0; view.last = -1;
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i], child = roots.get(key);
+      const size = child?.frame?.[horizontal ? "w" : "h"] || view.props.row_heights?.[i] || 44;
+      const visible = position + size >= offset - extent && position <= offset + 2 * extent;
+      if (child) {
+        child.el.style.display = visible ? "" : "none";
+        child.el.style[horizontal ? "left" : "top"] = px(position);
+      }
+      if (visible) {
+        if (view.last < 0) view.first = i;
+        view.last = i;
+        if (!child && !view.requested.has(key)) {
+          view.requested.add(key);
+          view.ctx.emit(view.tag, "on_bind_row", [{key, index:i, revision:view.props.revision, width:view.el.clientWidth}]);
+        }
+      }
+      position += size;
     }
-    applyStyle(view, props, changed, view.ctx.scheme());
-    view.el.style.overflow = props.scroll_enabled === false ? "hidden" : "auto";
-    this.refill(view);
-  }
-  layoutRows(view) {
-    const props = view.props;
-    const count = Math.max(0, Number(props.count) || 0);
-    const heights = Array.isArray(props.row_heights) ? props.row_heights : null;
-    const rowHeight = Number(props.row_height) || 44;
-    const offsets = new Array(count + 1);
-    offsets[0] = 0;
-    for (let i = 0; i < count; i++) {
-      const h = heights && heights[i] != null ? Number(heights[i]) : rowHeight;
-      offsets[i + 1] = offsets[i] + h;
-    }
-    view.offsets = offsets;
-    view.spacer.style.height = px(offsets[count]);
-    for (const [index, row] of [...view.rows]) {
-      if (index >= count) this.unbind(view, index, row);
-    }
-  }
-  frame(view, x, y, w, h) {
-    super.frame(view, x, y, w, h);
-    this.refill(view);
-  }
-  reload(view) {
-    for (const [index, row] of [...view.rows]) this.unbind(view, index, row);
-    this.refill(view);
-  }
-  visibleRange(view) {
-    const offsets = view.offsets;
-    const count = offsets.length - 1;
-    if (count <= 0) return [0, 0];
-    const top = view.el.scrollTop - view.el.clientHeight * 0.5;
-    const bottom = view.el.scrollTop + view.el.clientHeight * 1.5;
-    let first = 0;
-    while (first < count && offsets[first + 1] < top) first++;
-    let last = first;
-    while (last < count && offsets[last] < bottom) last++;
-    return [first, last];
-  }
-  refill(view) {
-    if (!view.el.clientHeight) return;
-    const [first, last] = this.visibleRange(view);
-    for (const [index, row] of [...view.rows]) {
-      if (index < first || index >= last) this.unbind(view, index, row);
-    }
-    for (let index = first; index < last; index++) {
-      if (!view.rows.has(index)) this.bind(view, index);
-    }
-  }
-  async bind(view, index) {
-    const key = view.freeKeys.length ? view.freeKeys.pop() : view.nextKey++;
-    const container = document.createElement("div");
-    container.className = "pn-vlist-row";
-    if (view.props.separator !== false) container.classList.add("pn-separator");
-    container.style.top = px(view.offsets[index]);
-    container.style.height = px(view.offsets[index + 1] - view.offsets[index]);
-    view.spacer.appendChild(container);
-    const row = { key, container, root: null };
-    view.rows.set(index, row);
-    const payload = { container: key, index, width: view.el.clientWidth, height: view.offsets[index + 1] - view.offsets[index] };
-    const reply = await view.ctx.request(view.tag, "on_bind_row", [payload]);
-    if (view.rows.get(index) !== row) return; // recycled meanwhile
-    let rootTag = null;
-    try {
-      const parsed = typeof reply === "string" ? JSON.parse(reply) : reply;
-      rootTag = parsed && parsed.root != null ? Number(parsed.root) : null;
-    } catch (err) {
-      rootTag = null;
-    }
-    if (rootTag == null) return;
-    const rootView = view.ctx.viewFor(rootTag);
-    if (!rootView) return;
-    row.root = rootView;
-    container.appendChild(rootView.el);
-  }
-  unbind(view, index, row) {
-    view.rows.delete(index);
-    row.container.remove();
-    view.freeKeys.push(row.key);
-    view.ctx.emit(view.tag, "on_unbind_row", [{ container: row.key }]);
+    view.spacer.style[horizontal ? "width" : "height"] = px(position);
   }
   command(view, name, args) {
-    const el = view.el;
-    const behavior = args.animated !== false ? "smooth" : "auto";
-    switch (name) {
-      case "scroll_to_offset":
-        el.scrollTo({ top: Number(args.y ?? args.offset) || 0, behavior });
-        return null;
-      case "scroll_to_index": {
-        const index = Math.max(0, Math.min(view.offsets.length - 2, Number(args.index) || 0));
-        let top = view.offsets[index] || 0;
-        const position = args.position;
-        const rowH = (view.offsets[index + 1] || 0) - top;
-        if (position === "middle" || position === "center") top -= (el.clientHeight - rowH) / 2;
-        else if (position === "bottom" || position === "end") top -= el.clientHeight - rowH;
-        el.scrollTo({ top: Math.max(0, top), behavior });
-        return null;
-      }
-      case "scroll_to_end":
-        el.scrollTo({ top: el.scrollHeight, behavior });
-        return null;
-      case "get_scroll_offset":
-        return { x: el.scrollLeft, y: el.scrollTop };
-      case "reload":
-        this.reload(view);
-        return null;
-      default:
-        return null;
-    }
+    let offset = args.y || 0;
+    if (name === "scroll_to_end") offset = view.el.scrollHeight;
+    if (name === "scroll_to_index") offset = (view.props.row_heights || []).slice(0, args.index).reduce((a,b) => a+b, 0);
+    view.el.scrollTo({top: offset, behavior: args.animated ? "smooth" : "instant"});
+    return null;
   }
-  destroy(view) {
-    for (const [index, row] of [...view.rows]) this.unbind(view, index, row);
+}
+
+class ScreenStackManager extends ViewManager {
+  childrenChanged(view) {
+    for (const [index, child] of view.children.entries()) child.el.style.display = index === view.children.length - 1 ? "" : "none";
   }
 }
 
@@ -1609,6 +1524,8 @@ const MANAGERS = {
   StatusBar: StatusBarManager,
   WebView: WebViewManager,
   VirtualList: VirtualListManager,
+  Screen: ViewManager,
+  ScreenStack: ScreenStackManager,
 };
 
 // ---------------------------------------------------------------------------
@@ -1658,6 +1575,7 @@ class Animator {
     this.active = new Map(); // id -> {view, prop, cancel}
   }
   set(view, prop, value) {
+    if (prop.startsWith("_pn_graph:")) { this.renderer.graph.set(Number(prop.slice(10)), value); return; }
     if (ANIM_TRANSFORM.has(prop)) {
       view.animTransform = view.animTransform || {};
       view.animTransform[prop] = Number(value) || 0;
@@ -1673,6 +1591,7 @@ class Animator {
     view.animValues[prop] = value;
   }
   current(view, prop) {
+    if (prop.startsWith("_pn_graph:")) return this.renderer.graph.values.get(Number(prop.slice(10))) || 0;
     if (view.animValues && prop in view.animValues) return view.animValues[prop];
     if (prop === "opacity") return view.el.style.opacity === "" ? 1 : Number(view.el.style.opacity);
     if (prop === "scale" || prop === "scale_x" || prop === "scale_y") return 1;
@@ -1825,11 +1744,22 @@ export class Renderer {
    * }}
    */
   constructor(ctx) {
-    this.ctx = ctx;
+    this.ctx = {...ctx};
+    this.eventSequence = 0;
+    this.ctx.emit = (tag, name, args) => {
+      this.graph.event(tag, name, args);
+      const view = this.views.get(tag);
+      const edit = name === "on_change" && view?.type === "TextInput" ? (view.editRevision = (view.editRevision || 0) + 1) : 0;
+      return ctx.emit(tag, name, {
+      application: this.application, surface: this.surface, revision: this.revision,
+      sequence: ++this.eventSequence, args, edit_revision: edit,
+      });
+    };
     this.ctx.viewFor = (tag) => this.views.get(tag) || null;
     this.views = new Map();
     this.managers = {};
     this.animator = new Animator(this);
+    this.graph = new AnimationGraph(this);
     this.dirtyContainers = new Set();
     for (const [name, Manager] of Object.entries(MANAGERS)) this.managers[name] = new Manager();
     this.placeholder = new PlaceholderManager();
@@ -1839,6 +1769,7 @@ export class Renderer {
   reset() {
     for (const view of this.views.values()) {
       try {
+        disposeLayout(view);
         view.manager.destroy(view);
       } catch (err) {
         /* ignore */
@@ -1851,20 +1782,43 @@ export class Renderer {
 
   // -- transactions ------------------------------------------------------
 
-  apply(ops) {
-    if (!Array.isArray(ops)) return;
+  apply(envelope) {
+    const {version, application, surface, revision, ops} = envelope || {};
+    const fail = (error) => ({ok: false, application, surface, revision, error});
+    if (version !== 2 || !application || surface < 1 || !Array.isArray(ops)) return fail("invalid v2 commit");
+    const replacing = this.application !== application;
+    if (revision !== (replacing ? 1 : this.revision + 1)) return fail("stale revision");
+    const tags = new Set(replacing ? [] : this.views.keys());
+    const parents = new Map(replacing ? [] : [...this.views].map(([tag, view]) => [tag, view.parent?.tag]));
     for (const op of ops) {
-      try {
-        this.applyOne(op);
-      } catch (err) {
-        console.error("[pn] op failed", op, err);
+      if (!Array.isArray(op) || op.length !== {c:4,u:3,i:4,d:2,f:6}[op[0]] || !Number.isSafeInteger(op[1]) || op[1] <= 0) return fail("invalid operation");
+      const [code, tag] = op;
+      if (code === "c") {
+        if (tags.has(tag) || typeof op[2] !== "string" || !op[3] || typeof op[3] !== "object") return fail("invalid create");
+        tags.add(tag);
+      } else {
+        if (!tags.has(tag)) return fail("unknown tag");
+        if (code === "i") {
+          if (!tags.has(op[2]) || !Number.isSafeInteger(op[3]) || op[3] < 0) return fail("invalid insertion");
+          for (let ancestor = tag; ancestor; ancestor = parents.get(ancestor)) if (ancestor === op[2]) return fail("cycle");
+          parents.set(op[2], tag);
+        } else if (code === "d") {
+          if ([...parents.values()].includes(tag)) return fail("destroy children first");
+          parents.delete(tag); tags.delete(tag);
+        } else if (code === "f" && (op.slice(2).some(n => !Number.isFinite(n)) || op[4] < 0 || op[5] < 0)) return fail("invalid frame");
       }
     }
-    for (const view of this.dirtyContainers) {
-      if (this.views.has(view.tag)) view.manager.childrenChanged(view);
-    }
-    this.dirtyContainers.clear();
+    try {
+      if (replacing && this.application) this.reset();
+      for (const op of ops) this.applyOne(op);
+      for (const view of this.dirtyContainers) if (this.views.has(view.tag)) view.manager.childrenChanged(view);
+      this.dirtyContainers.clear();
+      this.application = application; this.surface = surface; this.revision = revision;
+      return {ok: true, application, surface, revision};
+    } catch (error) { this.reset(); return fail(String(error)); }
   }
+
+  computeLayout(request) { return computeLayout(this, request); }
 
   applyOne(op) {
     switch (op[0]) {
@@ -1958,6 +1912,7 @@ export class Renderer {
   }
 
   destroyView(view) {
+    this.graph.forget(view.tag);
     this.animator.cancelForView(view);
     for (const child of [...view.children]) this.destroyView(child);
     if (view.parent) {
@@ -1966,6 +1921,7 @@ export class Renderer {
       this.dirtyContainers.add(view.parent);
       view.parent = null;
     }
+    disposeLayout(view);
     try {
       view.manager.destroy(view);
     } catch (err) {
@@ -2012,6 +1968,7 @@ export class Renderer {
       return null;
     }
     if (!request || typeof request !== "object") return null;
+    if (request.op === "graph") { this.graph.install(request.graph); return null; }
     if (request.op === "cancel") return this.animator.cancel(request.id);
     if (!view) return request.op === "start" ? { ok: false } : null;
     if (request.op === "set") {

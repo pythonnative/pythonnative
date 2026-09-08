@@ -23,8 +23,8 @@ How the pieces fit:
   for the next launch.
 
 All network I/O runs on a daemon thread; file writes happen there too,
-and only the reload itself hops to the main thread through
-``call_on_main_thread``.
+and the reload itself runs on the application thread through
+``call_on_application_thread``.
 """
 
 from __future__ import annotations
@@ -258,8 +258,7 @@ class DevClient:
         if self._thread is not None:
             return
         self._stop.clear()
-        # Native modules expect the main thread; ``start`` runs there (the
-        # bootstrap or a tap handler), the client thread never does.
+        # Resolve device metadata before starting the network worker.
         self._device = _device_name()
         self._install_tee()
         self._thread = threading.Thread(target=self._run, name="pn-dev-client", daemon=True)
@@ -475,7 +474,7 @@ class DevClient:
             self._schedule_reload(modules, version)
 
     def _schedule_reload(self, modules: List[str], version: str) -> None:
-        from .runtime import call_on_main_thread
+        from .runtime import call_on_application_thread
 
         def _apply() -> None:
             from .hot_reload import apply_reload
@@ -488,7 +487,7 @@ class DevClient:
                     {"type": "reloaded", "version": version, "mode": result.mode, "modules": result.reloaded or modules}
                 )
 
-        call_on_main_thread(_apply)
+        call_on_application_thread(_apply)
 
     def _safe_relpath(self, rel: str) -> bool:
         parts = rel.split("/")
@@ -713,13 +712,13 @@ def _connect_screen() -> Any:
                 return None
 
             def _on_state(state: str, info: str) -> None:
-                from .runtime import call_on_main_thread
+                from .runtime import call_on_application_thread
 
                 def _update() -> None:
                     set_status(state)
                     set_detail(info)
 
-                call_on_main_thread(_update)
+                call_on_application_thread(_update)
 
             return live.add_listener(_on_state)
 

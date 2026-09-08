@@ -211,7 +211,20 @@ class BridgeModule(NativeModule):
             if result.get("ok", True):
                 return result.get("value")
             raise NativeModuleError(self.name, method, str(result.get("error", "unknown error")), result.get("code"))
-        return await future
+        try:
+            return await future
+        except asyncio.CancelledError:
+            # Native implementations can release their work through the
+            # promise's cancellation hook; late settlements are discarded.
+            try:
+                self._invoke("_pn_cancel", {"call_id": call_id}, 0)
+            except Exception:
+                pass
+            raise
+        finally:
+            with _pending_lock:
+                _pending.pop(call_id, None)
+                _pending_meta.pop(call_id, None)
 
 
 def _settle(call_id: int, message: Dict[str, Any]) -> None:
