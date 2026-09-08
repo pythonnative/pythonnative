@@ -3648,7 +3648,9 @@ the documented behavior never drifts from the code.</p>
 <li><code>pn doctor [android|ios]</code>: diagnose the local toolchain and validate
   <code>pythonnative.toml</code>, including that a <code>python3.X</code> matching
   <code>[app].python_version</code> is available for package resolution. Exits
-  non-zero when something will block a build.</li>
+  non-zero when something will block a build. Flag: <code>--json</code> to print a
+  JSON array of check results to stdout for scripting; the verdict line
+  goes to stderr instead, and the exit status is unchanged.</li>
 <li><code>pn deps [android|ios]</code>: resolve <code>[requirements].packages</code> for every
   device target (iOS device, iOS Simulator, and each Android ABI)
   without installing anything, and report the wheel each package would
@@ -3707,7 +3709,8 @@ the documented behavior never drifts from the code.</p>
 <li><code>pn init [name]</code>: scaffold a new project (<code>pythonnative.toml</code> +
   <code>app/</code>) into <code>./name/</code>, or into the current directory when no name
   is given.</li>
-<li><code>pn doctor [platform]</code>: diagnose the local toolchain and config.</li>
+<li><code>pn doctor [platform]</code>: diagnose the local toolchain and config, as a
+  report or as JSON with <code>--json</code>.</li>
 <li><code>pn deps [platform]</code>: resolve <code>[requirements].packages</code> for every
   device target and report which wheels would be used (or why a package
   can't be installed), without building anything.</li>
@@ -4015,6 +4018,10 @@ directory, and <code>--force</code> lifts neither of the rules above.</p>
     <div class="doc doc-contents ">
 
         <p>Run toolchain/config diagnostics and exit non-zero on errors.</p>
+<p>With <code>--json</code>, stdout carries a JSON array and nothing else, one
+object per check (see <code>CheckResult.to_dict</code>), and the verdict line
+goes to stderr. The exit status stays keyed to the worst check level
+either way.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4037,7 +4044,7 @@ directory, and <code>--force</code> lifts neither of the rules above.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parsed namespace with optional <code>platform</code>.</p>
+                <p>Parsed namespace with optional <code>platform</code> and <code>json</code>.</p>
               </div>
             </td>
             <td>
