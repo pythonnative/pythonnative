@@ -53,6 +53,22 @@ For most apps the dedicated
 [`KeyboardAvoidingView`][pythonnative.KeyboardAvoidingView] component
 is preferable to consuming `use_keyboard_height` directly.
 
+## Batching and transitions
+
+State setters schedule a render through `pythonnative.scheduler`.
+[`batch_updates`][pythonnative.scheduler.batch_updates] coalesces
+several setter calls into one render, and each reconciler owns a
+[`TransitionQueue`][pythonnative.scheduler.TransitionQueue] that
+defers renders started inside
+[`use_transition`][pythonnative.use_transition].
+
+::: pythonnative.scheduler
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
+
 ## Next steps
 
 - Compose hooks into a screen: [Components](components.md).
@@ -61,6 +77,6 @@ is preferable to consuming `use_keyboard_height` directly.
   [`use_focus_effect`][pythonnative.use_focus_effect] (after focus).
 - Share state across the tree with
   [`create_context`][pythonnative.create_context] and
-  [`Provider`][pythonnative.Provider].
+  [`Context.Provider`][pythonnative.hooks.Context.Provider].
 - Animate without re-rendering using [`use_ref`][pythonnative.use_ref]
   + `Animated`; see the [Animations guide](../guides/animations.md).

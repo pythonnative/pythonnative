@@ -7,7 +7,7 @@
 # invisible to this flow while it only used the buttons.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/switch.py
-# Source under test: src/pythonnative/components.py :: Switch
+# Source under test: src/pythonnative/components/controls.py :: Switch
 appId: ${APP_ID}
 ---
 - runFlow:

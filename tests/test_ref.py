@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from fake_backend import FakeBackend as MockBackend
-from fake_backend import FakeView as MockView
-
+from pythonnative.component import component
 from pythonnative.element import Element
-from pythonnative.hooks import Ref, component, use_ref
+from pythonnative.hooks import Ref, use_ref
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend as MockBackend
+from pythonnative.testing import FakeView as MockView
 
 
 def test_ref_populated_on_mount() -> None:

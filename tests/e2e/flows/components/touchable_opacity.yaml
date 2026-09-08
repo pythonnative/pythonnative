@@ -1,7 +1,7 @@
 # Tests TouchableOpacity fires on_press, incrementing a tap counter.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/touchable_opacity.py
-# Source under test: src/pythonnative/components.py :: TouchableOpacity
+# Source under test: src/pythonnative/components/pressable.py :: TouchableOpacity
 appId: ${APP_ID}
 ---
 - runFlow:

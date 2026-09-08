@@ -1,7 +1,7 @@
 """Showcase screen: visual primitives (Animated, typography, borders, chips).
 
 Pushed onto the native stack by tapping "View Showcase" on the Home
-tab. Receives a ``message`` param via ``nav.get_params()`` to
+tab. Receives a ``message`` param via ``pn.use_route().params`` to
 demonstrate route parameters.
 """
 
@@ -139,7 +139,7 @@ def section_heading(title: str, hint: str) -> pn.Element:
 @pn.component
 def ShowcaseScreen() -> pn.Element:
     nav = pn.use_navigation()
-    message = nav.get_params().get("message", "Visual showcase")
+    message = pn.use_route().params.get("message", "Visual showcase")
     print(f"[ShowcaseScreen] render message={message!r}")
 
     pressed_color, set_pressed_color = pn.use_state("#0EA5E9")

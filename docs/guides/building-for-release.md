@@ -117,7 +117,9 @@ package to `.pyc` and drop the `.py` files, which shrinks the bundle
 and avoids shipping plain-text source. Because bytecode is
 version-specific, this requires the Python running `pn` to match
 `app.python_version`; otherwise `pn` prints a notice and ships `.py`
-sources instead.
+sources instead. Debug builds (`pn run`, `pn build --debug`) keep the
+`.py` files on both platforms so tracebacks show source lines and the
+dev client can tell which sources the app already has.
 
 ### Signing
 
@@ -145,11 +147,14 @@ project. On the first iOS build, `pn` downloads the pinned, checksum-
 verified runtime for your `app.python_version` and caches it under
 `build/ios/ios_runtime/`. The Xcode build links `Python.xcframework`,
 installs the standard library, and bundles your `app/` sources, the
-`pythonnative` package, and any pure-Python `[requirements].packages`.
+`pythonnative` package, and the `[requirements].packages` resolved for
+the SDK being built (device or Simulator), binary wheels included.
 
-Pinned, verified runtimes exist for **Python 3.10, 3.11, and 3.12**;
-set `python_version` in `[app]` accordingly. Unpinned versions are
-rejected rather than fetched unverified.
+Pinned, verified runtimes exist for **Python 3.13 and 3.14**; set
+`python_version` in `[app]` accordingly. Unpinned versions are
+rejected rather than fetched unverified. See
+[PyPI packages](pypi-packages.md) for how requirements are resolved
+per target.
 
 ---
 

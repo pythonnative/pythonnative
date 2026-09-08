@@ -1,7 +1,7 @@
-# Tests use_route reads navigation params; navigating with new params updates them.
+# Tests use_route reads navigation params; pushing with new params updates them.
 #
 # Demo screen: examples/e2e-suite/app/screens/navigation/params_passing.py
-# Source under test: src/pythonnative/navigation.py :: use_route, NavigationHandle.navigate
+# Source under test: src/pythonnative/navigation/hooks.py :: use_route, Navigation.push
 appId: ${APP_ID}
 ---
 - runFlow:

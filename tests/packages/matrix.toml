@@ -1,0 +1,153 @@
+# PyPI package compatibility matrix.
+#
+# Each [[package]] is resolved for every device target PythonNative
+# builds for (iOS device, iOS Simulator, Android arm64-v8a, Android
+# x86_64) with the same pip cross-resolution `pn deps` uses. The test
+# in test_matrix.py asserts the outcome matches the expectations below,
+# so a change on PyPI, BeeWare's index, or Chaquopy's index that breaks
+# (or fixes) a package shows up as a failing test instead of a user
+# report. scripts/package-matrix.py renders the live results as the
+# table in docs/guides/pypi-packages.md.
+#
+# Fields:
+#   name     Requirement string handed to pip (may carry a specifier).
+#   kind     "pure" (py3-none-any wheel) or "binary" (compiled extension).
+#   ios      Whether resolution is expected to succeed for iOS targets.
+#   android  Whether resolution is expected to succeed for Android targets.
+#   downgrade  Platforms ("ios", "android") where pip is known to pick a
+#            materially older release than a desktop gets, because the
+#            newer ones have no wheel there. The test asserts the gap is
+#            still present (so the guide can be corrected when an index
+#            catches up); smaller, transient lags are not listed.
+#   note     Free text shown in the generated table.
+#
+# When a package flips state, update `ios` / `android` here and the
+# guide's table together, in the same commit, so the doc never claims
+# something the test disproves.
+
+python_version = "3.13"
+
+# ----------------------------------------------------------------------
+# Pure Python: works everywhere by construction. These pin down that the
+# resolver itself keeps working (index reachability, tag handling).
+# ----------------------------------------------------------------------
+
+[[package]]
+name = "httpx"
+kind = "pure"
+ios = true
+android = true
+note = "HTTP client; PythonNative's own `fetch` is a lighter alternative."
+
+[[package]]
+name = "attrs"
+kind = "pure"
+ios = true
+android = true
+
+[[package]]
+name = "python-dateutil"
+kind = "pure"
+ios = true
+android = true
+
+[[package]]
+name = "rich"
+kind = "pure"
+ios = true
+android = true
+
+[[package]]
+name = "emoji"
+kind = "pure"
+ios = true
+android = true
+note = "Used by examples/hello-world."
+
+# ----------------------------------------------------------------------
+# Binary wheels available for both platforms. Chaquopy builds its Android
+# wheels itself and lags PyPI by a release line or two, so "android" is
+# listed under `downgrade` for nearly every binary package; iOS wheels
+# on PyPI and BeeWare's index track the current release.
+# ----------------------------------------------------------------------
+
+[[package]]
+name = "numpy"
+kind = "binary"
+ios = true
+android = true
+downgrade = ["android"]
+note = "iOS wheel from BeeWare (current release); Android wheel from Chaquopy's index (1.26 line). Exercised on device by the E2E suite."
+
+[[package]]
+name = "pillow"
+kind = "binary"
+ios = true
+android = true
+downgrade = ["android"]
+note = "iOS wheel on PyPI itself (PEP 730); Android from Chaquopy's index."
+
+[[package]]
+name = "cryptography"
+kind = "binary"
+ios = true
+android = true
+downgrade = ["ios", "android"]
+note = "Pulls cffi, also binary. BeeWare's iOS build lags the newest release line."
+
+[[package]]
+name = "cffi"
+kind = "binary"
+ios = true
+android = true
+downgrade = ["android"]
+
+# ----------------------------------------------------------------------
+# Binary wheels for Android only. These fail on iOS because no index
+# publishes an ios_* wheel yet; pip refuses to build from source for a
+# foreign platform (and could not cross-compile for iOS anyway).
+# ----------------------------------------------------------------------
+
+[[package]]
+name = "pandas"
+kind = "binary"
+ios = false
+android = true
+downgrade = ["android"]
+note = "No iOS wheel published yet."
+
+[[package]]
+name = "lxml"
+kind = "binary"
+ios = false
+android = true
+downgrade = ["android"]
+note = "No iOS wheel published yet."
+
+[[package]]
+name = "pyyaml"
+kind = "binary"
+ios = false
+android = true
+note = "No iOS wheel; `ruamel.yaml` is a pure-Python alternative."
+
+[[package]]
+name = "markupsafe"
+kind = "binary"
+ios = false
+android = true
+note = "Ships only sdist + binary wheels; the pure-Python fallback inside the sdist can't be used because pip won't build for a foreign platform."
+
+# ----------------------------------------------------------------------
+# Packages that resolve, but to an older release than a desktop would
+# get: pip walks back through versions until it finds one with a usable
+# wheel. `pn deps` flags these as downgrades.
+# ----------------------------------------------------------------------
+
+[[package]]
+name = "pydantic"
+kind = "pure"
+ios = true
+android = true
+downgrade = ["ios", "android"]
+note = "Resolves to the 1.x line: pydantic 2 needs pydantic-core, which has no iOS or Android wheel. Pin `pydantic<2` explicitly or expect the older API."

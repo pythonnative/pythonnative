@@ -2,7 +2,7 @@
 
 Off-device (neither Android nor iOS) every module falls back to a safe
 default path: in-memory buffers, ``"unknown"`` states, and no-op
-feedback. These tests exercise those desktop fallbacks plus the
+feedback. These tests exercise those Python fallbacks plus the
 listener/dispatch machinery and the ``use_app_state`` / ``use_net_info``
 hooks, none of which need a real device.
 """
@@ -13,7 +13,6 @@ import asyncio
 from typing import Dict, Generator, List
 
 import pytest
-from fake_backend import FakeBackend as MockBackend
 
 from pythonnative import (
     AppState,
@@ -30,10 +29,12 @@ from pythonnative import (
     use_app_state,
     use_net_info,
 )
+from pythonnative.component import component
 from pythonnative.element import Element
-from pythonnative.hooks import component
-from pythonnative.native_modules import app_state, battery, linking, net_info, secure_store
+from pythonnative.native_modules import app_state, battery, linking, net_info
+from pythonnative.native_modules import registry as module_registry
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend as MockBackend
 
 
 @pytest.fixture(autouse=True)
@@ -44,7 +45,7 @@ def _reset_module_state() -> Generator[None, None, None]:
     net_info._listeners.clear()
     net_info._last_state = {"is_connected": True, "type": "unknown", "is_internet_reachable": True}
     battery._listeners.clear()
-    secure_store._desktop_store.clear()
+    module_registry.native_module("SecureStore").impl.clear()  # type: ignore[attr-defined]
     linking.set_initial_url(None)
     Clipboard.set_string("")
     yield
@@ -58,7 +59,7 @@ def _reset_module_state() -> Generator[None, None, None]:
 # ======================================================================
 
 
-def test_clipboard_roundtrip_desktop() -> None:
+def test_clipboard_roundtrip_fallback() -> None:
     Clipboard.set_string("hello world")
     assert Clipboard.get_string() == "hello world"
     assert Clipboard.has_string() is True
@@ -107,7 +108,7 @@ def test_use_app_state_returns_current_and_rerenders() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: rec.reconcile(comp())
+    rec.on_render_requested = lambda: rec.reconcile(comp())
     rec.mount(comp())
     before = len(rendered)
     assert rendered[0] == "active"
@@ -122,7 +123,7 @@ def test_use_app_state_returns_current_and_rerenders() -> None:
 # ======================================================================
 
 
-def test_net_info_fetch_desktop_default() -> None:
+def test_net_info_fetch_fallback_default() -> None:
     state = NetInfo.fetch()
     assert state["is_connected"] is True
     assert state["type"] == "unknown"
@@ -146,7 +147,7 @@ def test_use_net_info_rerenders_on_change() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: rec.reconcile(comp())
+    rec.on_render_requested = lambda: rec.reconcile(comp())
     rec.mount(comp())
     before = len(rendered)
 
@@ -160,7 +161,7 @@ def test_use_net_info_rerenders_on_change() -> None:
 # ======================================================================
 
 
-def test_battery_desktop_defaults() -> None:
+def test_battery_fallback_defaults() -> None:
     assert Battery.get_level() == -1.0
     assert Battery.get_state() == "unknown"
 
@@ -177,8 +178,8 @@ def test_battery_listener_dispatch() -> None:
 # ======================================================================
 
 
-def test_secure_store_roundtrip_desktop() -> None:
-    assert SecureStore.set_item("token", "abc123") is True
+def test_secure_store_roundtrip_fallback() -> None:
+    assert SecureStore.set_item("token", "abc123") is None
     assert SecureStore.get_item("token") == "abc123"
     assert SecureStore.delete_item("token") is True
     assert SecureStore.get_item("token") is None
@@ -190,12 +191,42 @@ def test_secure_store_roundtrip_desktop() -> None:
 # ======================================================================
 
 
-def test_permissions_check_undetermined_desktop() -> None:
+def test_permissions_check_undetermined_fallback() -> None:
     assert Permissions.check("camera") == "undetermined"
 
 
-def test_permissions_request_undetermined_desktop() -> None:
+def test_permissions_request_undetermined_fallback() -> None:
     assert asyncio.run(Permissions.request("camera")) == "undetermined"
+
+
+def test_permissions_names_match_the_config_vocabulary() -> None:
+    """Runtime permission names are the [permissions] keys from pythonnative.toml."""
+    from pythonnative.native_modules.permissions import RUNTIME_PERMISSIONS
+    from pythonnative.project.permissions import CAPABILITIES
+
+    assert set(RUNTIME_PERMISSIONS) <= set(CAPABILITIES)
+    assert "photo_library" in RUNTIME_PERMISSIONS and "location_when_in_use" in RUNTIME_PERMISSIONS
+
+
+@pytest.mark.parametrize("name", ["photos", "location", "Camera", ""])
+def test_permissions_reject_names_outside_the_vocabulary(name: str) -> None:
+    with pytest.raises(ValueError, match="Unknown permission"):
+        Permissions.check(name)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="Unknown permission"):
+        asyncio.run(Permissions.request(name))  # type: ignore[arg-type]
+
+
+def test_permissions_surface_native_errors() -> None:
+    class Broken:
+        def check(self, permission: str) -> str:
+            raise RuntimeError("no activity")
+
+    module_registry.register_python_module("Permissions", Broken())
+    try:
+        with pytest.raises(module_registry.NativeModuleError, match="no activity"):
+            Permissions.check("camera")
+    finally:
+        module_registry.unregister_python_module("Permissions")
 
 
 # ======================================================================
@@ -203,7 +234,7 @@ def test_permissions_request_undetermined_desktop() -> None:
 # ======================================================================
 
 
-def test_linking_desktop_false() -> None:
+def test_linking_fallback_false() -> None:
     assert Linking.can_open_url("https://example.com") is False
     assert Linking.open_url("https://example.com") is False
     assert Linking.open_settings() is False
@@ -254,67 +285,154 @@ def test_linking_listener_errors_do_not_break_dispatch() -> None:
 # ======================================================================
 
 
-def test_get_device_token_none_on_desktop() -> None:
+def test_get_device_token_none_on_fallback() -> None:
     from pythonnative.native_modules.notifications import Notifications
 
     assert asyncio.run(Notifications.get_device_token()) is None
 
 
-def test_dispatch_device_token_resolves_waiters() -> None:
-    from pythonnative.native_modules import notifications
+def test_get_device_token_surfaces_native_error() -> None:
+    from pythonnative.native_modules.notifications import Notifications
 
-    async def scenario() -> str:
-        future: asyncio.Future = asyncio.get_running_loop().create_future()
-        notifications._token_waiters.append(future)
-        notifications.dispatch_device_token("aabbccdd")
-        return await future
+    class FailingNotifications:
+        def get_device_token(self) -> str:
+            raise module_registry.NativeModuleError("Notifications", "get_device_token", "no entitlement")
 
+    module_registry.register_python_module("Notifications", FailingNotifications())
     try:
-        assert asyncio.run(scenario()) == "aabbccdd"
-        assert notifications._device_token == "aabbccdd"
+        with pytest.raises(module_registry.NativeModuleError, match="no entitlement"):
+            asyncio.run(Notifications.get_device_token())
     finally:
-        notifications._device_token = None
-        notifications._device_token_error = None
+        module_registry.unregister_python_module("Notifications")
 
 
-def test_dispatch_device_token_error_rejects_waiters() -> None:
-    from pythonnative.native_modules import notifications
+def test_async_facades_surface_native_errors() -> None:
+    """Camera / Share / Biometrics propagate a rejected promise instead of returning a default."""
+    from pythonnative import Camera
 
-    async def scenario() -> None:
-        future: asyncio.Future = asyncio.get_running_loop().create_future()
-        notifications._token_waiters.append(future)
-        notifications.dispatch_device_token_error("no entitlement")
-        await future
+    class Busy:
+        def take_photo(self) -> str:
+            raise module_registry.NativeModuleError("Camera", "take_photo", "a picker is already open", code="busy")
 
+    module_registry.register_python_module("Camera", Busy())
     try:
-        with pytest.raises(RuntimeError, match="no entitlement"):
-            asyncio.run(scenario())
+        with pytest.raises(module_registry.NativeModuleError) as info:
+            asyncio.run(Camera.take_photo())
+        assert info.value.code == "busy"
     finally:
-        notifications._device_token = None
-        notifications._device_token_error = None
+        module_registry.unregister_python_module("Camera")
+
+
+def test_camera_cancel_is_none_not_an_error() -> None:
+    from pythonnative import Camera
+
+    assert asyncio.run(Camera.take_photo()) is None
+    assert asyncio.run(Camera.pick_from_gallery()) is None
 
 
 # ======================================================================
-# Share / Biometrics / Haptics (desktop no-ops)
+# Module events pushed from native
 # ======================================================================
 
 
-def test_share_returns_false_desktop() -> None:
+def test_native_module_events_reach_facade_listeners() -> None:
+    seen_states: List[str] = []
+    seen_urls: List[str] = []
+    seen_battery: List[Dict[str, object]] = []
+    seen_net: List[Dict[str, object]] = []
+    AppState.add_listener(seen_states.append)
+    Linking.add_listener(seen_urls.append)
+    Battery.add_listener(seen_battery.append)
+    NetInfo.add_listener(seen_net.append)
+
+    module_registry.dispatch_module_message("AppState", {"event": "change", "payload": "background"})
+    module_registry.dispatch_module_message("Linking", {"event": "url", "payload": "myapp://deep"})
+    module_registry.dispatch_module_message("Battery", {"event": "change", "payload": {"level": 0.25, "state": "full"}})
+    module_registry.dispatch_module_message(
+        "NetInfo", {"event": "change", "payload": {"is_connected": False, "type": "none"}}
+    )
+
+    assert seen_states == ["background"]
+    assert AppState.current_state() == "background"
+    assert seen_urls == ["myapp://deep"]
+    assert Linking.get_initial_url() == "myapp://deep"
+    assert seen_battery == [{"level": 0.25, "state": "full"}]
+    assert seen_net == [{"is_connected": False, "type": "none", "is_internet_reachable": False}]
+    assert net_info._last_state["type"] == "none"
+
+
+# ======================================================================
+# Share / Biometrics / Haptics (fallback no-ops)
+# ======================================================================
+
+
+def test_share_returns_false_fallback() -> None:
     assert asyncio.run(Share.share(message="hi", url="https://example.com")) is False
 
 
-def test_biometrics_unavailable_desktop() -> None:
+def test_biometrics_unavailable_fallback() -> None:
     assert Biometrics.is_available() is False
 
 
-def test_biometrics_authenticate_false_desktop() -> None:
+def test_biometrics_authenticate_false_fallback() -> None:
     assert asyncio.run(Biometrics.authenticate("Unlock")) is False
 
 
-def test_haptics_and_vibration_are_noops_desktop() -> None:
-    # Should not raise on desktop.
+def test_haptics_and_vibration_are_noops_fallback() -> None:
+    # Should not raise off device.
     Haptics.impact("light")
     Haptics.notification("success")
     Haptics.selection()
     Vibration.vibrate(100)
     Vibration.cancel()
+
+
+# ======================================================================
+# FileSystem
+# ======================================================================
+
+
+@pytest.fixture
+def app_dir(tmp_path, monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
+    from pythonnative.native_modules import file_system
+
+    monkeypatch.setattr(file_system, "_app_dir_cache", str(tmp_path))
+    return tmp_path
+
+
+def test_file_system_paths_resolve_against_app_dir(app_dir) -> None:  # type: ignore[no-untyped-def]
+    from pythonnative import FileSystem
+
+    assert FileSystem.app_dir() == str(app_dir)
+    assert FileSystem.path() == app_dir
+    assert FileSystem.path("notes/a.txt") == app_dir / "notes" / "a.txt"
+    assert FileSystem.path(str(app_dir / "abs.txt")) == app_dir / "abs.txt"
+
+
+def test_file_system_roundtrip_creates_parents(app_dir) -> None:  # type: ignore[no-untyped-def]
+    from pythonnative import FileSystem
+
+    FileSystem.write_text("notes/today.txt", "hello")
+    assert FileSystem.read_text("notes/today.txt") == "hello"
+    FileSystem.write_bytes("blobs/x.bin", b"\x00\x01")
+    assert FileSystem.read_bytes("blobs/x.bin") == b"\x00\x01"
+    assert FileSystem.get_size("blobs/x.bin") == 2
+    assert FileSystem.exists("notes/today.txt") and not FileSystem.exists("nope")
+    assert FileSystem.list_dir() == ["blobs", "notes"]
+    assert FileSystem.ensure_dir("cache/img") == app_dir / "cache" / "img"
+    FileSystem.delete("notes/today.txt")
+    assert not FileSystem.exists("notes/today.txt")
+    FileSystem.delete("notes/today.txt", missing_ok=True)
+
+
+def test_file_system_raises_os_errors_like_pathlib(app_dir) -> None:  # type: ignore[no-untyped-def]
+    from pythonnative import FileSystem
+
+    with pytest.raises(FileNotFoundError):
+        FileSystem.read_text("missing.txt")
+    with pytest.raises(FileNotFoundError):
+        FileSystem.get_size("missing.txt")
+    with pytest.raises(FileNotFoundError):
+        FileSystem.delete("missing.txt")
+    with pytest.raises(FileNotFoundError):
+        FileSystem.list_dir("missing-dir")

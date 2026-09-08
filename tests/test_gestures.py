@@ -1,5 +1,5 @@
 """Tests for the gesture system: descriptors, serialization, and the
-pure-Python `GestureArbiter` used by the Android and desktop backends.
+pure-Python `GestureArbiter` used by the browser preview (and as the reference semantics).
 
 The arbiter tests drive scripted pointer streams (positions in points,
 times in seconds) and assert on the emitted payloads, which is exactly
@@ -8,12 +8,16 @@ the contract the platform handlers rely on.
 
 from __future__ import annotations
 
+import json
 import math
 from typing import Any, Dict, List, Tuple
+
+import pytest
 
 from pythonnative.gestures import (
     GestureArbiter,
     GestureEvent,
+    GestureState,
     Pan,
     Tap,
     serialize_gestures,
@@ -66,6 +70,23 @@ def test_router_drops_unknown_payload_keys() -> None:
     _specs, events = serialize_gestures([Tap(on_tap=seen.append)])
     events["gesture:0"]({"kind": "tap", "state": "ended", "x": 1.0, "_debug": "extra"})
     assert seen[0].x == 1.0
+
+
+def test_gesture_state_is_a_str_enum_coerced_from_wire_strings() -> None:
+    event = GestureEvent(kind="tap", state="ended")  # type: ignore[arg-type]
+    assert event.state is GestureState.ENDED
+    assert event.state == "ended"
+    assert str(GestureState.BEGAN) == "began"
+    assert json.dumps({"state": GestureState.CANCELLED}) == '{"state": "cancelled"}'
+    with pytest.raises(ValueError):
+        GestureEvent(kind="tap", state="exploded")  # type: ignore[arg-type]
+
+
+def test_arbiter_emits_plain_string_states() -> None:
+    arbiter, emitted = _arbiter({"kind": "tap"})
+    arbiter.pointer_down(0, 10.0, 10.0, 0.0)
+    arbiter.pointer_up(0, 10.0, 10.0, 0.05)
+    assert emitted and all(type(p["state"]) is str for _i, p in emitted)
 
 
 def test_descriptor_callback_routing_by_state() -> None:
@@ -308,19 +329,18 @@ def test_multiple_gestures_recognize_simultaneously() -> None:
 
 
 def test_gesture_events_route_through_view_tag() -> None:
-    from fake_backend import FakeBackend
-
     from pythonnative.element import Element
     from pythonnative.events import dispatch_event
     from pythonnative.reconciler import Reconciler
+    from pythonnative.testing import FakeBackend
 
     taps: List[GestureEvent] = []
     el = Element("View", {"gestures": [Tap(on_tap=taps.append)]}, [])
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     rec.mount(el)
-    tag = rec.root_tag()
+    tag = rec.root_tag
     assert tag is not None
 
     # The native payload received serialized specs (no closures).
@@ -329,7 +349,7 @@ def test_gesture_events_route_through_view_tag() -> None:
         {"kind": "tap", "n_taps": 1, "max_distance": 12.0, "simultaneous": [], "wait_for": []}
     ]
 
-    # A handler-side arbiter (as Android/desktop run) feeds dispatch_event.
+    # A handler-side arbiter (as the browser preview runs) feeds dispatch_event.
     def _emit(i: int, payload: Dict[str, Any]) -> None:
         dispatch_event(tag, f"gesture:{i}", payload)
 

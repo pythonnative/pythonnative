@@ -72,6 +72,7 @@ from app.screens.gestures.gestures import GesturesDemo
 from app.screens.hooks.async_effect import AsyncEffectDemo
 from app.screens.hooks.batch_updates_demo import BatchUpdatesDemo
 from app.screens.hooks.memo_demo import MemoDemo
+from app.screens.hooks.standard_asyncio import StandardAsyncioDemo
 from app.screens.hooks.use_back_handler import UseBackHandlerDemo
 from app.screens.hooks.use_callback import UseCallbackDemo
 from app.screens.hooks.use_color_scheme import UseColorSchemeDemo
@@ -101,6 +102,7 @@ from app.screens.navigation.drawer_navigator import DrawerNavigatorDemo
 from app.screens.navigation.focus_effect import FocusEffectDemo
 from app.screens.navigation.params_passing import ParamsPassingDemo
 from app.screens.navigation.tab_navigator import TabNavigatorDemo
+from app.screens.packages.pypi_packages import PyPIPackagesDemo
 from app.screens.platform.platform_info import PlatformInfoDemo
 from app.screens.runtime.run_async_demo import RunAsyncDemo
 from app.screens.sdk.custom_component import CustomComponentDemo
@@ -141,6 +143,7 @@ class DemoEntry:
 
 
 DEMOS: List[DemoEntry] = [
+    DemoEntry("standard_asyncio", "Hooks", "Standard asyncio", "run_async", StandardAsyncioDemo),
     # ------------------------------------------------------------------
     # Components
     # ------------------------------------------------------------------
@@ -414,7 +417,7 @@ DEMOS: List[DemoEntry] = [
         GestureCompositionDemo,
     ),
     # ------------------------------------------------------------------
-    # Alerts, storage, runtime, platform, SDK
+    # Alerts, storage, runtime, platform, packages, SDK
     # ------------------------------------------------------------------
     DemoEntry("simple_alert", "Alerts", "Alert.show", "Alert", SimpleAlertDemo),
     DemoEntry(
@@ -433,6 +436,7 @@ DEMOS: List[DemoEntry] = [
     ),
     DemoEntry("run_async", "Runtime", "run_async", "run_async", RunAsyncDemo),
     DemoEntry("platform_info", "Platform", "Platform info", "Platform", PlatformInfoDemo),
+    DemoEntry("pypi_packages", "Packages", "PyPI packages", "packages::requirements", PyPIPackagesDemo),
     DemoEntry(
         "custom_component",
         "SDK",

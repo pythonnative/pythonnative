@@ -1,9 +1,7 @@
 """Tag-based event routing between native views and Python callbacks.
 
-Before the batched-commit overhaul, every event prop (``on_press``,
-``on_change``, …) was wired by storing the Python callable on (or next
-to) the native view, and every re-render re-pushed fresh closures across
-the bridge. This module replaces that with a single dispatch channel:
+Event props such as ``on_press`` and ``on_change`` stay in a Python
+registry. Native views send a tag and event name through the bridge:
 
 - The reconciler strips callable props out of the payload sent to
   native handlers and registers them here, keyed by ``(tag, name)``.
@@ -39,13 +37,13 @@ _NESTED_EVENT_PROPS: Dict[str, Dict[str, str]] = {
 class EventRegistry:
     """Process-wide map of ``(tag, event name) -> Python callback``.
 
-    Thread-safe: native backends may dispatch from the platform UI
-    thread while the reconciler updates registrations from the render
-    thread.
+    Registration and lookup are protected by a lock. Bridge backends queue
+    native input to the Python application thread before dispatching it.
     """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
+        self._scopes: Dict[int, Any] = {}
         self._callbacks: Dict[int, Dict[str, Callable[..., Any]]] = {}
 
     def set_events(self, tag: int, events: Dict[str, Callable[..., Any]]) -> None:
@@ -56,10 +54,24 @@ class EventRegistry:
             else:
                 self._callbacks.pop(tag, None)
 
+    def set_scope(self, tag: int, scope: Any) -> None:
+        """Associate callbacks with the component that owns this view."""
+        self._scopes[tag] = scope
+
+    def invoke(self, tag: int, name: str, *args: Any) -> Any:
+        """Invoke a sync or async handler with component cancellation."""
+        from .runtime import invoke
+
+        callback = self.get(tag, name)
+        if callback is not None:
+            return invoke(callback, *args, scope=self._scopes.get(tag))
+        return None
+
     def clear(self, tag: int) -> None:
         """Drop every registration for ``tag`` (called on view destroy)."""
         with self._lock:
             self._callbacks.pop(tag, None)
+            self._scopes.pop(tag, None)
 
     def get(self, tag: int, name: str) -> Optional[Callable[..., Any]]:
         """Return the callback for ``(tag, name)``, or ``None``."""
@@ -88,7 +100,7 @@ class EventRegistry:
         if callback is None:
             return False
         try:
-            callback(*args)
+            self.invoke(tag, name, *args)
         except Exception as exc:
             from . import diagnostics
 
@@ -102,6 +114,7 @@ class EventRegistry:
         """Drop every registration (test helper)."""
         with self._lock:
             self._callbacks.clear()
+            self._scopes.clear()
 
 
 _registry = EventRegistry()

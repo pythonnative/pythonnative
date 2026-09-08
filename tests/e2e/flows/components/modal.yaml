@@ -1,7 +1,7 @@
 # Tests Modal opens and closes on demand.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/modal.py
-# Source under test: src/pythonnative/components.py :: Modal
+# Source under test: src/pythonnative/components/overlays.py :: Modal
 #
 # The intermediate ``Modal: open`` text from the outer screen is
 # *not* asserted while the modal is presented; on iOS the modal

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>PythonNative preview</title>
+  <link rel="stylesheet" href="/static/preview.css" />
+</head>
+<body>
+  <header id="pn-toolbar">
+    <div class="pn-brand">
+      <span class="pn-dot" id="pn-status-dot" title="Disconnected"></span>
+      <strong>PythonNative</strong>
+      <span id="pn-project-name" class="pn-muted"></span>
+    </div>
+    <div class="pn-controls">
+      <label>Device
+        <select id="pn-device"></select>
+      </label>
+      <button id="pn-rotate" title="Rotate (r)">Rotate</button>
+      <button id="pn-scheme" title="Toggle light/dark (d)">Dark</button>
+      <button id="pn-back" title="Back (Esc)">Back</button>
+      <button id="pn-reload" title="Remount the app (shift+r)">Reload app</button>
+      <button id="pn-console-toggle" title="Show/hide console (`)">Console</button>
+    </div>
+  </header>
+
+  <main id="pn-stage">
+    <div id="pn-device-frame" class="pn-frame">
+      <div id="pn-statusbar" class="pn-statusbar">
+        <span class="pn-time" id="pn-clock">9:41</span>
+        <span class="pn-status-icons">●●● ⌒ ▮</span>
+      </div>
+      <div id="pn-screens" class="pn-screens"></div>
+      <div id="pn-overlays" class="pn-overlays"></div>
+      <div id="pn-home" class="pn-home"></div>
+    </div>
+    <div id="pn-connect" class="pn-connect">
+      <div class="pn-connect-card">
+        <h1>Waiting for <code>pn start</code></h1>
+        <p id="pn-connect-detail">Connecting to the dev server...</p>
+      </div>
+    </div>
+  </main>
+
+  <section id="pn-console" class="pn-console pn-hidden">
+    <div class="pn-console-bar">
+      <span>Console</span>
+      <button id="pn-console-clear">Clear</button>
+    </div>
+    <div id="pn-console-lines" class="pn-console-lines"></div>
+  </section>
+
+  <div id="pn-toasts" class="pn-toasts"></div>
+  <div id="pn-measure" class="pn-measure" aria-hidden="true"></div>
+
+  <script type="module" src="/static/shell.js"></script>
+</body>
+</html>

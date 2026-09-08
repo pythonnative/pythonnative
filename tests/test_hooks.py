@@ -1,30 +1,41 @@
 """Unit tests for function components and hooks."""
 
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
-from fake_backend import FakeBackend as MockBackend
-
+from pythonnative.component import Component, component, memo
 from pythonnative.element import Element
 from pythonnative.hooks import (
     HookState,
-    NavigationHandle,
-    Provider,
-    _NavigationContext,
-    _set_hook_state,
-    batch_updates,
-    component,
     create_context,
-    memo,
+    current_hook_state,
+    install_hook_state,
+    restore_hook_state,
     use_callback,
     use_context,
     use_effect,
     use_memo,
-    use_navigation,
     use_reducer,
     use_ref,
     use_state,
 )
 from pythonnative.reconciler import Reconciler
+from pythonnative.scheduler import batch_updates
+from pythonnative.testing import FakeBackend as MockBackend
+from pythonnative.testing import render, render_hook
+
+
+@contextmanager
+def _rendering(state: HookState) -> Iterator[None]:
+    """Run a bare render pass against ``state`` (no reconciler involved)."""
+    state.begin_render()
+    token = install_hook_state(state)
+    try:
+        yield
+        state.finish_render()
+    finally:
+        restore_hook_state(token)
+
 
 # ======================================================================
 # use_state
@@ -32,49 +43,51 @@ from pythonnative.reconciler import Reconciler
 
 
 def test_use_state_returns_initial_value() -> None:
-    ctx = HookState()
-    _set_hook_state(ctx)
-    try:
-        val, setter = use_state(42)
-        assert val == 42
-    finally:
-        _set_hook_state(None)
+    result = render_hook(lambda: use_state(42))
+    val, setter = result.current
+    assert val == 42
+    assert callable(setter)
 
 
 def test_use_state_lazy_initialiser() -> None:
-    ctx = HookState()
-    _set_hook_state(ctx)
-    try:
-        val, _ = use_state(lambda: 99)
-        assert val == 99
-    finally:
-        _set_hook_state(None)
+    calls: list = []
+
+    def init() -> int:
+        calls.append(1)
+        return 99
+
+    result = render_hook(lambda: use_state(init))
+    assert result.current[0] == 99
+    result.rerender()
+    assert result.current[0] == 99
+    assert len(calls) == 1, "lazy initialiser runs once"
 
 
 def test_use_state_setter_triggers_render() -> None:
-    renders = []
-    ctx = HookState()
-    ctx._trigger_render = lambda: renders.append(1)
-    _set_hook_state(ctx)
-    try:
-        val, setter = use_state(0)
-        setter(1)
-        assert len(renders) == 1
-        assert ctx.states[0] == 1
-    finally:
-        _set_hook_state(None)
+    result = render_hook(lambda: use_state(0))
+    assert result.render_count == 1
+
+    _, setter = result.current
+    result.act(lambda: setter(1))
+    assert result.render_count == 2
+    assert result.current[0] == 1
 
 
 def test_use_state_setter_functional_update() -> None:
-    ctx = HookState()
-    _set_hook_state(ctx)
+    result = render_hook(lambda: use_state(10))
+    _, setter = result.current
+    result.act(lambda: setter(lambda prev: prev + 5))
+    assert result.current[0] == 15
+
+
+def test_use_state_outside_component_raises() -> None:
+    assert current_hook_state() is None
     try:
-        _, setter = use_state(10)
-        _set_hook_state(None)
-        setter(lambda prev: prev + 5)
-        assert ctx.states[0] == 15
-    finally:
-        _set_hook_state(None)
+        use_state(0)
+    except RuntimeError as exc:
+        assert "use_state" in str(exc)
+    else:
+        raise AssertionError("use_state outside a component should raise")
 
 
 # ======================================================================
@@ -86,31 +99,21 @@ def test_use_reducer_returns_initial_state() -> None:
     def reducer(state: int, action: str) -> int:
         return state
 
-    ctx = HookState()
-    _set_hook_state(ctx)
-    try:
-        state, dispatch = use_reducer(reducer, 42)
-        assert state == 42
-    finally:
-        _set_hook_state(None)
+    result = render_hook(lambda: use_reducer(reducer, 42))
+    state, dispatch = result.current
+    assert state == 42
+    assert callable(dispatch)
 
 
 def test_use_reducer_lazy_initial_state() -> None:
     def reducer(state: int, action: str) -> int:
         return state
 
-    ctx = HookState()
-    _set_hook_state(ctx)
-    try:
-        state, _ = use_reducer(reducer, lambda: 99)
-        assert state == 99
-    finally:
-        _set_hook_state(None)
+    result = render_hook(lambda: use_reducer(reducer, lambda: 99))
+    assert result.current[0] == 99
 
 
 def test_use_reducer_dispatch_triggers_render() -> None:
-    renders: list = []
-
     def reducer(state: int, action: str) -> int:
         if action == "increment":
             return state + 1
@@ -118,39 +121,28 @@ def test_use_reducer_dispatch_triggers_render() -> None:
             return 0
         return state
 
-    ctx = HookState()
-    ctx._trigger_render = lambda: renders.append(1)
-    _set_hook_state(ctx)
-    try:
-        state, dispatch = use_reducer(reducer, 0)
-        dispatch("increment")
-        assert ctx.states[0] == 1
-        assert len(renders) == 1
-        dispatch("increment")
-        assert ctx.states[0] == 2
-        assert len(renders) == 2
-        dispatch("reset")
-        assert ctx.states[0] == 0
-        assert len(renders) == 3
-    finally:
-        _set_hook_state(None)
+    result = render_hook(lambda: use_reducer(reducer, 0))
+    _, dispatch = result.current
+
+    result.act(lambda: dispatch("increment"))
+    assert result.current[0] == 1
+    assert result.render_count == 2
+    result.act(lambda: dispatch("increment"))
+    assert result.current[0] == 2
+    assert result.render_count == 3
+    result.act(lambda: dispatch("reset"))
+    assert result.current[0] == 0
+    assert result.render_count == 4
 
 
 def test_use_reducer_no_render_on_same_state() -> None:
-    renders: list = []
-
     def reducer(state: int, action: str) -> int:
         return state
 
-    ctx = HookState()
-    ctx._trigger_render = lambda: renders.append(1)
-    _set_hook_state(ctx)
-    try:
-        _, dispatch = use_reducer(reducer, 5)
-        dispatch("noop")
-        assert len(renders) == 0
-    finally:
-        _set_hook_state(None)
+    result = render_hook(lambda: use_reducer(reducer, 5))
+    _, dispatch = result.current
+    result.act(lambda: dispatch("noop"))
+    assert result.render_count == 1
 
 
 def test_use_reducer_in_reconciler() -> None:
@@ -170,7 +162,7 @@ def test_use_reducer_in_reconciler() -> None:
     backend = MockBackend()
     rec = Reconciler(backend)
     re_rendered: list = []
-    rec._screen_re_render = lambda: re_rendered.append(1)
+    rec.on_render_requested = lambda: re_rendered.append(1)
 
     root = rec.mount(counter())
     assert root.props["text"] == "0"
@@ -179,6 +171,9 @@ def test_use_reducer_in_reconciler() -> None:
     assert dispatch_fn is not None
     dispatch_fn("increment")
     assert len(re_rendered) == 1
+
+    rec.flush_dirty()
+    assert root.props["text"] == "1"
 
 
 # ======================================================================
@@ -190,12 +185,9 @@ def test_use_effect_is_deferred() -> None:
     """Effects are queued during render, not run immediately."""
     calls: list = []
     ctx = HookState()
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         use_effect(lambda: calls.append("mounted"), [])
         assert calls == [], "Effect should NOT run during render"
-    finally:
-        _set_hook_state(None)
 
     ctx.flush_pending_effects()
     assert calls == ["mounted"], "Effect should run after flush"
@@ -212,19 +204,12 @@ def test_use_effect_cleanup_on_rerun() -> None:
 
     ctx = HookState()
 
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         use_effect(make_effect("first"), None)
-    finally:
-        _set_hook_state(None)
     ctx.flush_pending_effects()
 
-    ctx.begin_render()
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         use_effect(make_effect("second"), None)
-    finally:
-        _set_hook_state(None)
     ctx.flush_pending_effects()
 
     assert "first" in cleanups
@@ -234,19 +219,12 @@ def test_use_effect_skips_with_same_deps() -> None:
     calls: list = []
     ctx = HookState()
 
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         use_effect(lambda: calls.append("run"), [1, 2])
-    finally:
-        _set_hook_state(None)
     ctx.flush_pending_effects()
 
-    ctx.begin_render()
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         use_effect(lambda: calls.append("run"), [1, 2])
-    finally:
-        _set_hook_state(None)
     ctx.flush_pending_effects()
 
     assert calls == ["run"]
@@ -290,15 +268,26 @@ def test_use_effect_cleanup_on_unmount() -> None:
     cleanups: list = []
     ctx = HookState()
 
-    _set_hook_state(ctx)
-    try:
-        use_effect(lambda: (lambda: cleanups.append("cleaned")), [])
-    finally:
-        _set_hook_state(None)
+    with _rendering(ctx):
+        use_effect(lambda: lambda: cleanups.append("cleaned"), [])
     ctx.flush_pending_effects()
 
     assert cleanups == []
     ctx.cleanup_all_effects()
+    assert cleanups == ["cleaned"]
+
+
+def test_use_effect_cleanup_on_reconciler_unmount() -> None:
+    cleanups: list = []
+
+    @component
+    def my_comp() -> Element:
+        use_effect(lambda: lambda: cleanups.append("cleaned"), [])
+        return Element("Text", {"text": "hi"}, [])
+
+    result = render(my_comp())
+    assert cleanups == []
+    result.unmount()
     assert cleanups == ["cleaned"]
 
 
@@ -308,59 +297,42 @@ def test_use_effect_cleanup_on_unmount() -> None:
 
 
 def test_batch_updates_defers_render() -> None:
-    renders: list = []
-    ctx = HookState()
-    ctx._trigger_render = lambda: renders.append(1)
-    _set_hook_state(ctx)
-    try:
-        _, set_a = use_state(0)
-        _, set_b = use_state(0)
-    finally:
-        _set_hook_state(None)
+    result = render_hook(lambda: (use_state(0), use_state(0)))
+    (_, set_a), (_, set_b) = result.current
+    assert result.render_count == 1
 
     with batch_updates():
         set_a(1)
         set_b(2)
-        assert len(renders) == 0, "Render should be deferred inside batch"
+        assert result.render_count == 1, "Render should be deferred inside batch"
 
-    assert len(renders) == 1, "Exactly one render after batch exits"
+    assert result.render_count == 2, "Exactly one render after batch exits"
+    assert result.current[0][0] == 1
+    assert result.current[1][0] == 2
 
 
 def test_batch_updates_nested() -> None:
-    renders: list = []
-    ctx = HookState()
-    ctx._trigger_render = lambda: renders.append(1)
-    _set_hook_state(ctx)
-    try:
-        _, set_a = use_state(0)
-        _, set_b = use_state(0)
-    finally:
-        _set_hook_state(None)
+    result = render_hook(lambda: (use_state(0), use_state(0)))
+    (_, set_a), (_, set_b) = result.current
 
     with batch_updates():
         set_a(1)
         with batch_updates():
             set_b(2)
-            assert len(renders) == 0
-        assert len(renders) == 0, "Nested batch should not trigger render"
+            assert result.render_count == 1
+        assert result.render_count == 1, "Nested batch should not trigger render"
 
-    assert len(renders) == 1
+    assert result.render_count == 2
 
 
 def test_batch_updates_no_render_when_unchanged() -> None:
-    renders: list = []
-    ctx = HookState()
-    ctx._trigger_render = lambda: renders.append(1)
-    _set_hook_state(ctx)
-    try:
-        _, set_a = use_state(5)
-    finally:
-        _set_hook_state(None)
+    result = render_hook(lambda: use_state(5))
+    _, set_a = result.current
 
     with batch_updates():
         set_a(5)
 
-    assert len(renders) == 0
+    assert result.render_count == 1
 
 
 # ======================================================================
@@ -380,18 +352,11 @@ def test_use_memo_caches() -> None:
         calls.append(1)
         return 99
 
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         val1 = use_memo(factory_a, [1])
-    finally:
-        _set_hook_state(None)
 
-    ctx.begin_render()
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         val2 = use_memo(factory_b, [1])
-    finally:
-        _set_hook_state(None)
 
     assert val1 == 42
     assert val2 == 42
@@ -401,39 +366,42 @@ def test_use_memo_caches() -> None:
 def test_use_memo_recomputes_on_dep_change() -> None:
     ctx = HookState()
 
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         val1 = use_memo(lambda: "first", ["a"])
-    finally:
-        _set_hook_state(None)
 
-    ctx.begin_render()
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         val2 = use_memo(lambda: "second", ["b"])
-    finally:
-        _set_hook_state(None)
 
     assert val1 == "first"
     assert val2 == "second"
+
+
+def test_use_memo_in_component() -> None:
+    calls: list = []
+
+    def compute(n: int) -> int:
+        calls.append(n)
+        return n * 2
+
+    result = render_hook(lambda n: use_memo(lambda: compute(n), [n]), 1)
+    assert result.current == 2
+    result.rerender(1)
+    assert result.current == 2
+    assert calls == [1]
+    result.rerender(3)
+    assert result.current == 6
+    assert calls == [1, 3]
 
 
 def test_use_callback_returns_stable_reference() -> None:
     ctx = HookState()
     fn = lambda: None  # noqa: E731
 
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         cb1 = use_callback(fn, [1])
-    finally:
-        _set_hook_state(None)
 
-    ctx.begin_render()
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         cb2 = use_callback(lambda: None, [1])
-    finally:
-        _set_hook_state(None)
 
     assert cb1 is fn
     assert cb2 is fn
@@ -446,22 +414,25 @@ def test_use_callback_returns_stable_reference() -> None:
 
 def test_use_ref_persists() -> None:
     ctx = HookState()
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         ref = use_ref(0)
         assert ref.current == 0
         ref.current = 5
-    finally:
-        _set_hook_state(None)
 
-    ctx.begin_render()
-    _set_hook_state(ctx)
-    try:
+    with _rendering(ctx):
         ref2 = use_ref(0)
         assert ref2.current == 5
         assert ref2 is ref
-    finally:
-        _set_hook_state(None)
+
+
+def test_use_ref_mutation_does_not_rerender() -> None:
+    result = render_hook(lambda: use_ref(0))
+    ref = result.current
+    result.act(lambda: setattr(ref, "current", 7))
+    assert result.render_count == 1
+    result.rerender()
+    assert result.current is ref
+    assert ref.current == 7
 
 
 # ======================================================================
@@ -471,28 +442,40 @@ def test_use_ref_persists() -> None:
 
 def test_create_context_default() -> None:
     ctx = create_context("default_val")
-    assert ctx._current() == "default_val"
+    assert ctx.current() == "default_val"
 
 
 def test_context_stack() -> None:
     ctx = create_context("default")
-    ctx._stack.append("override")
-    assert ctx._current() == "override"
-    ctx._stack.pop()
-    assert ctx._current() == "default"
+    ctx._push("override")
+    assert ctx.current() == "override"
+    ctx._push("inner")
+    assert ctx.current() == "inner"
+    ctx._pop()
+    assert ctx.current() == "override"
+    ctx._pop()
+    assert ctx.current() == "default"
 
 
 def test_use_context_reads_current() -> None:
     my_ctx = create_context("fallback")
-    my_ctx._stack.append("active")
-    hook_state = HookState()
-    _set_hook_state(hook_state)
-    try:
-        val = use_context(my_ctx)
-        assert val == "active"
-    finally:
-        _set_hook_state(None)
-        my_ctx._stack.pop()
+    seen: list = []
+
+    @component
+    def reader() -> None:
+        seen.append(use_context(my_ctx))
+        return None
+
+    result = render(my_ctx.Provider("active", reader()))
+    assert seen == ["active"]
+    assert my_ctx.current() == "fallback", "Provider value is scoped to the render"
+    result.unmount()
+
+
+def test_use_context_without_provider_returns_default() -> None:
+    my_ctx = create_context("fallback")
+    result = render_hook(lambda: use_context(my_ctx))
+    assert result.current == "fallback"
 
 
 # ======================================================================
@@ -505,10 +488,13 @@ def test_component_decorator_creates_element() -> None:
     def my_comp(label: str = "hello") -> Element:
         return Element("Text", {"text": label}, [])
 
+    assert isinstance(my_comp, Component)
     el = my_comp(label="world")
     assert isinstance(el, Element)
-    assert el.type is getattr(my_comp, "__wrapped__")
+    assert el.type is my_comp
+    assert getattr(my_comp, "__wrapped__") is my_comp.fn
     assert el.props == {"label": "world"}
+    assert el.children == []
 
 
 def test_component_with_positional_args() -> None:
@@ -520,12 +506,27 @@ def test_component_with_positional_args() -> None:
     assert el.props == {"name": "Alice", "age": 30}
 
 
+def test_component_with_children() -> None:
+    @component
+    def card(*children: Element, title: str = "") -> Element:
+        return Element("Column", {}, [Element("Text", {"text": title}, []), *children])
+
+    child_a = Element("Text", {"text": "a"}, [])
+    child_b = Element("Text", {"text": "b"}, [])
+    el = card(child_a, child_b, title="Hello")
+    assert el.props == {"title": "Hello"}
+    assert el.children == [child_a, child_b]
+
+    root = Reconciler(MockBackend()).mount(el)
+    assert [v.props.get("text") for v in root.children] == ["Hello", "a", "b"]
+
+
 def test_component_key_extraction() -> None:
     @component
     def widget(text: str = "") -> Element:
         return Element("Text", {"text": text}, [])
 
-    el = widget(text="hi", key="k1")
+    el = widget(text="hi", key="k1")  # type: ignore[call-arg]
     assert el.key == "k1"
     assert "key" not in el.props
 
@@ -559,7 +560,7 @@ def test_reconciler_reconciles_function_component() -> None:
     backend.ops.clear()
     rec.reconcile(display(value=2))
 
-    update_ops = [op for op in backend.ops if op[0] == "update"]
+    update_ops = backend.ops_of("update")
     assert len(update_ops) == 1
     assert "text" in update_ops[0][3]
 
@@ -578,7 +579,7 @@ def test_function_component_use_state() -> None:
     backend = MockBackend()
     rec = Reconciler(backend)
     re_rendered: list = []
-    rec._screen_re_render = lambda: re_rendered.append(1)
+    rec.on_render_requested = lambda: re_rendered.append(1)
 
     root = rec.mount(counter())
     assert root.props["text"] == "0"
@@ -588,6 +589,11 @@ def test_function_component_use_state() -> None:
     assert setter_fn is not None
     setter_fn(5)
     assert len(re_rendered) == 1
+    assert render_count[0] == 1, "host callback defers the actual render"
+
+    rec.flush_dirty()
+    assert render_count[0] == 2
+    assert root.props["text"] == "5"
 
 
 def test_function_component_preserves_state_across_reconcile() -> None:
@@ -600,15 +606,16 @@ def test_function_component_preserves_state_across_reconcile() -> None:
     rec = Reconciler(backend)
     rec.mount(stateful(label="A"))
 
-    tree_node = rec._tree
+    tree_node = rec.root
     assert tree_node is not None
     assert tree_node.hook_state is not None
     tree_node.hook_state.states[0] = 42
 
-    rec.reconcile(stateful(label="B"))
-    assert rec._tree is not None
-    assert rec._tree.hook_state is not None
-    assert rec._tree.hook_state.states[0] == 42
+    root = rec.reconcile(stateful(label="B"))
+    assert rec.root is not None
+    assert rec.root.hook_state is not None
+    assert rec.root.hook_state.states[0] == 42
+    assert root.props["text"] == "B:42"
 
 
 # ======================================================================
@@ -626,63 +633,9 @@ def test_provider_in_reconciler() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    el = Provider(theme, "dark", themed())
+    el = theme.Provider("dark", themed())
     root = rec.mount(el)
     assert root.props["text"] == "dark"
-
-
-# ======================================================================
-# use_navigation
-# ======================================================================
-
-
-def test_use_navigation_reads_context() -> None:
-    class FakeHost:
-        def _get_nav_args(self) -> dict:
-            return {"id": 42}
-
-        def _push(self, page: Any, args: Any = None) -> None:
-            pass
-
-        def _pop(self) -> None:
-            pass
-
-    handle = NavigationHandle(FakeHost())
-    _NavigationContext._stack.append(handle)
-    hook_state = HookState()
-    _set_hook_state(hook_state)
-    try:
-        nav = use_navigation()
-        assert nav is handle
-        assert nav.get_params() == {"id": 42}
-    finally:
-        _set_hook_state(None)
-        _NavigationContext._stack.pop()
-
-
-def test_navigation_handle_methods() -> None:
-    pushed: list = []
-    popped: list = []
-
-    class FakeHost:
-        def _push(self, page: Any, args: Any = None) -> None:
-            pushed.append((page, args))
-
-        def _pop(self) -> None:
-            popped.append(1)
-
-        def _get_nav_args(self) -> dict:
-            return {"key": "value"}
-
-    handle = NavigationHandle(FakeHost())
-
-    handle.navigate("SomePage", params={"x": 1})
-    assert pushed == [("SomePage", {"x": 1})]
-
-    handle.go_back()
-    assert len(popped) == 1
-
-    assert handle.get_params() == {"key": "value"}
 
 
 # ======================================================================
@@ -696,8 +649,9 @@ def test_provider_with_multiple_children_kept_flat() -> None:
     child_a = Element("Text", {"text": "a"}, [])
     child_b = Element("Text", {"text": "b"}, [])
 
-    el = Provider(theme, "dark", child_a, child_b)
-    assert el.type == "__Provider__"
+    el = theme.Provider("dark", child_a, child_b)
+    assert el.type is theme
+    assert el.props == {"value": "dark"}
     assert el.children == [child_a, child_b]
 
 
@@ -705,8 +659,8 @@ def test_provider_with_single_child_no_fragment_wrap() -> None:
     theme = create_context("light")
     child = Element("Text", {"text": "single"}, [])
 
-    el = Provider(theme, "dark", child)
-    assert el.type == "__Provider__"
+    el = theme.Provider("dark", child)
+    assert el.type is theme
     assert el.children == [child]
 
 
@@ -721,7 +675,8 @@ def test_memo_marks_component() -> None:
     def my_comp(label: str = "x") -> Element:
         return Element("Text", {"text": label}, [])
 
-    assert getattr(my_comp, "_pn_memo", False) is True
+    assert isinstance(my_comp, Component)
+    assert my_comp.memoized is True
 
 
 def test_memo_skips_rerender_with_same_props() -> None:
@@ -772,15 +727,20 @@ def test_memo_rerenders_when_internal_state_changes() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec.mount(stateful())
+    # Defer the state-driven flush so the reconcile below is what
+    # re-renders the memoized component.
+    rec.on_render_requested = lambda: None
+    root = rec.mount(stateful())
     assert render_count[0] == 1
 
     setter_fn = captured_setter[0]
     assert setter_fn is not None
     setter_fn(5)
+    assert render_count[0] == 1
 
     rec.reconcile(stateful())
     assert render_count[0] == 2, "memo should still re-render when internal state changed"
+    assert root.props["text"] == "5"
 
 
 def test_memo_can_be_called_with_explicit_argument() -> None:
@@ -791,6 +751,6 @@ def test_memo_can_be_called_with_explicit_argument() -> None:
         return Element("Text", {"text": label}, [])
 
     wrapped = memo(my_comp)
-    assert getattr(wrapped, "_pn_memo", False) is True
+    assert wrapped.memoized is True
     el = wrapped(label="hi")
     assert isinstance(el, Element)

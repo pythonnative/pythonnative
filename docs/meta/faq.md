@@ -5,15 +5,16 @@ and their fixes, see [Troubleshooting](troubleshooting.md).
 
 ## Why "PythonNative" and not, say, Toga or Kivy?
 
-PythonNative renders **real** native widgets via Chaquopy on Android
-and rubicon-objc on iOS. A `pn.Text` becomes a `UILabel` /
+PythonNative renders **real** native widgets through Swift and Kotlin
+component managers. A `pn.Text` becomes a `UILabel` /
 `TextView`; a `pn.Button` becomes a `UIButton` / `Button`.
-Accessibility, theming, and platform behaviors come along for free.
+Platform controls provide native behavior. Applications still need appropriate
+accessibility labels, roles, and testing on each deployment target.
 
 The component model is React-style (functions plus hooks plus a
 reconciler) so you get a familiar declarative API on top of those
-native widgets, instead of an imperative widget toolkit. There is no
-JavaScript bridge: native APIs are direct method calls from Python.
+native widgets. Python runs on its own application thread and communicates
+with the native UI through a versioned bridge.
 
 ## Can I write Android-only or iOS-only code?
 
@@ -44,23 +45,24 @@ a small Python factory that returns
 `Element(<type>, props, children)`. Step-by-step instructions live in
 [Native views (concept)](../concepts/native-views.md#custom-widgets).
 
-## Does PythonNative work on the desktop?
+## Does PythonNative work on the desktop or the web?
 
-Yes, for **previewing**. `pn preview` renders your app in a native
-desktop window using a built-in Tkinter backend, with instant Fast
-Refresh on every save. It's the fastest inner-loop: see your real UI
-and iterate in seconds without booting a simulator or deploying to a
-device. The same flex layout engine and reconciler drive it, so what
-you see closely matches the device. See the
-[Desktop preview guide](../guides/desktop-preview.md).
+For **previewing**, yes. `pn preview` renders your app in a browser tab
+inside a phone frame, with Fast Refresh on every save. It's the fastest
+inner loop: see your real UI and iterate in seconds without booting a
+simulator or deploying to a device. The page speaks the same bridge
+protocol as the Swift and Kotlin runtimes. It shares Python components,
+hooks, reconciliation, and logical navigation with mobile apps; the page
+implements widgets in the DOM and layout with Yoga WebAssembly. See the
+[Browser preview guide](../guides/browser-preview.md).
 
-The desktop backend is a **development tool**, not a production target:
-chrome like rounded corners, shadows, and overflow clipping are
-approximated, and there's no app packaging for desktop. Ship to devices
-with `pn run android` / `pn run ios`.
+The browser preview is a **development tool**, not a production target:
+platform chrome and fonts are approximated, most device APIs are
+simulated, and there's no web or desktop packaging. Ship to devices
+with `pn run android` / `pn run ios` and `pn build`.
 
 The core (components, hooks, reconciler) is also platform-agnostic and
-runs headless with a [fake backend](../guides/testing.md#a-minimal-fake-backend);
+runs headless with a [fake backend](../guides/testing.md);
 that's how the unit-test suite works.
 
 ## How do I package and distribute my app?
@@ -77,42 +79,45 @@ Play Console / App Store Connect).
 
 ## Can I use any Python package?
 
-Pure-Python packages, mostly yes. List them in
-`[requirements].packages` in `pythonnative.toml` and the `pn` CLI
-bundles them into the app:
+Most of them. List packages in `[requirements].packages` in
+`pythonnative.toml` and the `pn` CLI resolves them **for the phone,
+not for your laptop**, then bundles them into the app:
 
-- **Android**: the packages are written to the staged template's
-  `requirements.txt` and Chaquopy installs them into the APK at build
-  time.
-- **iOS**: pure-Python packages are copied into the app bundle's
-  `platform-site/`.
+- **Pure-Python packages** (requests, httpx, pydantic-core-free
+  libraries, and so on) work everywhere.
+- **Binary wheels** work when the package publishes wheels for the
+  target: iOS wheels (PEP 730, `ios_13_0_arm64_iphoneos` and the
+  Simulator tags) from the BeeWare index, and Android wheels from the
+  Chaquopy index. numpy, Pillow, cryptography, cffi, lxml, and pandas
+  all resolve out of the box today.
+- **No wheel for the target** is a build-time error, reported by
+  `pn deps` with the package name and the target that failed, never a
+  silent import error on the device.
 
-C extensions are harder. You need a wheel that targets the right
-platform / architecture (`armeabi-v7a` and `arm64-v8a` on Android,
-`arm64`, `x86_64` for iOS Simulator on iOS). Many popular
-extensions (numpy, Pillow) have no upstream iOS wheels yet, so you'd
-need to build them locally.
+Run `pn deps` to see how every requirement resolves for each iOS and
+Android target before you build. The
+[PyPI packages guide](../guides/pypi-packages.md) covers the details
+and the live compatibility matrix.
 
 Don't put `pythonnative` itself in `[requirements].packages`; the CLI
 bundles the installed copy directly.
 
 ## Where do `flex`, `padding`, and `position: "absolute"` actually run?
 
-In Python. PythonNative ships its own pure-Python flexbox engine
-(`pythonnative.layout`) and runs it after every commit. The engine produces an absolute frame for every element, and
-the reconciler hands those frames to the platform handlers via
-`set_frame`. Containers on both platforms are simple
-`UIView` / `FrameLayout` instances; there's no `UIStackView` or
-`LinearLayout` in the picture, so there's no platform drift between
-the two backends. See [Layout engine](../concepts/layout.md) for
-details.
+In the Yoga C++ engine compiled into each mobile runtime. Python sends
+styles through the bridge; native widgets supply intrinsic measurements,
+and the renderer returns changed frames to Python. The browser uses Yoga
+WebAssembly, while headless tests use the Python host binding in
+`pythonnative.layout`. The layout rules are shared, but platform fonts
+and controls can have different intrinsic sizes. See
+[Layout engine](../concepts/layout.md).
 
 ## How is state shared across screens?
 
 Two main options:
 
 - [`use_context`][pythonnative.use_context] /
-  [`Provider`][pythonnative.Provider] for tree-scoped values
+  [`Context.Provider`][pythonnative.hooks.Context.Provider] for tree-scoped values
   (themes, current user). The provider sits at the top of the
   navigator and descendants subscribe.
 - A plain Python module-level object (a "store") for app-wide,
@@ -154,17 +159,18 @@ Two strategies, depending on the cadence:
 - **State-driven** (e.g., a fade triggered by a button press): keep
   the value in [`use_state`][pythonnative.use_state] and let the
   reconciler push updates. Fine up to a few updates per second.
-- **Frame-driven** (e.g., a spring animation at 60Hz): hold a
-  reference to the native view via
-  [`use_ref`][pythonnative.use_ref] and mutate it directly from a
-  display-link or `Choreographer` callback. Going through
-  `set_state` for every frame is wasteful.
+- **Frame-driven** (e.g., a spring animation): bind an
+  [`AnimatedValue`][pythonnative.AnimatedValue] into an
+  `Animated.View` style and drive it with `Animated.spring` or
+  `Animated.timing`. Native animation graphs update supported bindings
+  without running Python on every frame. See the
+  [Animations guide](../guides/animations.md) for examples and fallback cases.
 
 ## Is there async/await support?
 
 Yes, and it's the core of the framework. PythonNative runs a single
-`asyncio` event loop on the platform's main thread, pumped as a guest
-of the native run loop. Components themselves can be `async def` (pair
+standard `asyncio` loop on a dedicated application thread. Native UI threads
+own widgets, scrolling, and animation frames. Components themselves can be `async def` (pair
 them with [`Suspense`][pythonnative.Suspense] for loading states),
 `use_effect` accepts coroutine callbacks and cancels them on unmount,
 [`use_resource`][pythonnative.use_resource] fetches during render, and
@@ -177,7 +183,7 @@ synchronous event handler, kick off work with
 
 | Tool | Model | Widgets |
 |---|---|---|
-| **PythonNative** | Declarative components plus reconciler | Real native (`UILabel`, `TextView`) via Chaquopy / rubicon-objc |
+| **PythonNative** | Declarative components plus reconciler | Real native (`UILabel`, `TextView`) via Swift / Kotlin component managers |
 | Toga | Imperative widgets | Real native via per-platform backend |
 | Kivy | Imperative widgets | Custom OpenGL renderer |
 | Briefcase | Packaging only (no widgets) | n/a |

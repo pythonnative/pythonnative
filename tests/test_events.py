@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from typing import Any, List
 
-from fake_backend import FakeBackend
-
 from pythonnative.element import Element
 from pythonnative.events import (
     EVENTS_PROP,
@@ -22,6 +20,7 @@ from pythonnative.events import (
     get_event_registry,
 )
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend
 
 # ======================================================================
 # extract_events: prop splitting
@@ -147,7 +146,7 @@ def test_dispatch_swallows_callback_exceptions() -> None:
 def _mounted(el: Element) -> tuple:
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     rec.mount(el)
     return rec, backend
 
@@ -155,7 +154,7 @@ def _mounted(el: Element) -> tuple:
 def test_mounted_view_routes_events_by_tag() -> None:
     pressed: List[int] = []
     rec, backend = _mounted(Element("Button", {"title": "Go", "on_press": lambda: pressed.append(1)}, []))
-    tag = rec.root_tag()
+    tag = rec.root_tag
     assert tag is not None
 
     # The native payload carries the marker, never the closure.
@@ -170,7 +169,7 @@ def test_mounted_view_routes_events_by_tag() -> None:
 def test_event_args_forwarded_to_callback() -> None:
     seen: List[Any] = []
     rec, _backend = _mounted(Element("TextInput", {"on_change": seen.append}, []))
-    tag = rec.root_tag()
+    tag = rec.root_tag
     assert tag is not None
 
     dispatch_event(tag, "on_change", "hello")
@@ -180,7 +179,7 @@ def test_event_args_forwarded_to_callback() -> None:
 def test_destroy_clears_event_registrations() -> None:
     pressed: List[int] = []
     rec, _backend = _mounted(Element("Button", {"title": "Go", "on_press": lambda: pressed.append(1)}, []))
-    tag = rec.root_tag()
+    tag = rec.root_tag
     assert tag is not None
 
     rec.unmount()
@@ -192,7 +191,7 @@ def test_destroy_clears_event_registrations() -> None:
 
 def test_listener_removal_updates_marker_prop() -> None:
     rec, backend = _mounted(Element("Button", {"title": "Go", "on_press": lambda: None}, []))
-    tag = rec.root_tag()
+    tag = rec.root_tag
     assert tag is not None
 
     # Dropping the listener must update _pn_events so handlers can

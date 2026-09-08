@@ -1,11 +1,14 @@
 # Layout
 
-The pure-Python flexbox engine that computes a frame
-`(x, y, width, height)` for every node in the rendered tree. The
-[`Reconciler`][pythonnative.reconciler.Reconciler] runs
-[`calculate_layout`][pythonnative.layout.calculate_layout] after every
-commit and forwards the resulting frames to the platform handlers via
-`set_frame`.
+The Python binding to Yoga's C++ flexbox engine. Headless tests use
+[`LayoutNode`][pythonnative.layout.LayoutNode] and
+[`calculate_layout`][pythonnative.layout.calculate_layout] to compute
+frames `(x, y, width, height)` with stub intrinsic measurements.
+
+Mobile renderers compile the same Yoga core into their native libraries and
+measure content beside their widgets. The browser preview runs Yoga
+WebAssembly. Those renderers return changed frames to the Python reconciler
+through the bridge.
 
 For a conceptual overview, see [Layout engine](../concepts/layout.md).
 

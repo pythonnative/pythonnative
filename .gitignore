@@ -165,3 +165,8 @@ cython_debug/
 
 # macOS
 .DS_Store
+**/.cxx/
+**/.build/
+**/.gradle/
+**/.kotlin/
+**/.swiftpm/

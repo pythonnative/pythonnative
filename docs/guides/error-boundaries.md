@@ -122,7 +122,7 @@ pn.ErrorBoundary(
 ```
 
 Most crash reporters (Sentry, Bugsnag, etc.) ship Python clients that
-work fine inside the Chaquopy or rubicon-objc runtime, although you'll
+work fine inside the embedded CPython runtime, although you'll
 need to declare them in `[requirements].packages` so the bundler picks
 them up.
 

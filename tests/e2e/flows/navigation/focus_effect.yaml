@@ -1,7 +1,7 @@
 # Tests use_focus_effect fires on focus / refocus.
 #
 # Demo screen: examples/e2e-suite/app/screens/navigation/focus_effect.py
-# Source under test: src/pythonnative/navigation.py :: use_focus_effect
+# Source under test: src/pythonnative/navigation/hooks.py :: use_focus_effect
 appId: ${APP_ID}
 ---
 - runFlow:

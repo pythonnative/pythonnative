@@ -41,6 +41,6 @@ def BatchUpdatesDemo() -> pn.Element:
                 pn.Button("Unbatched bump", on_press=update_both_unbatched),
                 pn.Button("Batched bump", on_press=update_both_batched),
             ),
-            hint("Tapping 'Batched bump' increases render count by 1; " "'Unbatched bump' may increase by 2."),
+            hint("Tapping 'Batched bump' increases render count by 1; 'Unbatched bump' may increase by 2."),
         ),
     )

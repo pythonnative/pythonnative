@@ -1,71 +1,41 @@
 # Layout engine
 
-PythonNative ships its own pure-Python flexbox engine. It is a small,
-React-Native-compatible re-implementation of the subset of the
-[Yoga](https://www.yogalayout.com/) algorithm that real apps use.
-Every screen on every platform is sized and positioned by the same
-Python code; the native handlers only get told *what frame to apply*.
+PythonNative uses Yoga 3.2.1 for flexbox layout on every renderer. The vendored
+C++ source compiles into the Python host binding, Swift runtime, and Android
+runtime. The browser preview uses Yoga WebAssembly from the same release.
+Native leaf widgets supply intrinsic sizes and text baselines.
 
-This page covers what the engine does, where it sits in the render
-pipeline, what `style` keys it understands, and how to test layouts
-without a device.
+## Layout and commits
 
-## Why a Python engine?
+Rendering first commits view creation, relationships, and props. The native
+layout pass then computes geometry and returns changed frames as a batch.
+Layout effects run after those frames exist, followed by passive effects.
+Viewport changes, text edits, and image completion can invalidate geometry.
 
-The handlers used to delegate to `LinearLayout` (Android) and
-`UIStackView` (iOS), which made `View` / `Column` / `Row` look right
-"on average" but came with three problems:
+Native screens and recycled rows own their physical content rectangles. Yoga
+lays out each detached logical root within its native container's available
+space. Providers and component ownership continue through those containers.
 
-1. **Platform drift.** The two stacks have subtly different alignment
-   semantics, padding handling, and weight rules. A layout that looked
-   correct on iOS could be off by a few points on Android.
-2. **No `position: "absolute"`.** Neither container natively supports
-   removing a child from the flow and pinning it by edge offsets.
-3. **Limited expressiveness.** `flex_basis`, `aspect_ratio`,
-   percentage sizes, `min_*` / `max_*` constraints, and `align_self`
-   were either missing or partial.
+## Headless layout
 
-Centralising layout in Python fixes all three: the rules are written
-once, exercised by unit tests, and produce identical frames on Android
-and iOS.
+Headless tests use `LayoutNode` and `calculate_layout()` through the host Yoga
+binding. Stub intrinsic measurements make geometry tests deterministic. Real
+font metrics and platform control sizes must also be tested on devices.
 
-## Where it sits in the render loop
+## Installation and app builds
 
-```text
-render -> commit (create / update native views via handlers)
-      -> flush effects
-      -> build LayoutNode tree from VNodes
-      -> calculate_layout(viewport_w, viewport_h)
-      -> backend.set_frame(view, x, y, w, h) for every node
-```
+The host binding is included in the platform-specific PythonNative wheel.
+Precompiled wheels cover CPython 3.13 and 3.14 on macOS (Intel and Apple
+Silicon), Linux with glibc (x86-64 and ARM64), and Windows (x86-64). Pip or uv
+selects the matching wheel. Building from a source distribution requires a
+C++20 compiler.
 
-The layout pass runs after the commit and effect phases, so by the
-time it executes:
-
-- All native views exist.
-- All visual props are up to date.
-- All effects have run (including any that may set state and trigger
-  another render).
-
-A render that does not change the tree still triggers a layout pass
-when the viewport size changes (e.g., on rotation).
-
-## The `LayoutNode` tree
-
-The reconciler walks the [`VNode`][pythonnative.reconciler.VNode]
-tree and builds a parallel tree of
-[`LayoutNode`][pythonnative.layout.LayoutNode] objects. Each node
-carries:
-
-- The element `type` and the resolved `style` dict.
-- A reference back to the `VNode` (so frames can be applied to its
-  native handle).
-- An optional `measure` callback for leaf widgets that need to ask
-  their handler for an intrinsic content size.
-
-The reconciler always wraps the user's root in a synthetic
-*viewport node* sized to the current screen so that `flex: 1` / `100%`
-at the top level "just work".
+Device builds compile the bundled Yoga source for the application target.
+Xcode builds the `YogaCore` Swift package for iOS devices or simulators;
+Gradle invokes CMake and the Android NDK for the configured Android ABIs.
+The mobile renderer calls this native library through Swift or Kotlin, so it
+doesn't load the desktop Python extension. See the [iOS](../guides/ios.md)
+and [Android](../guides/android.md) guides for toolchain setup.
 
 ## Style keys
 
@@ -98,7 +68,7 @@ Leaf widgets (`Text`, `Button`, `Image`, `TextInput`, `Switch`,
 an intrinsic size when neither dimension is fixed. The handler
 implements `measure_intrinsic(view, max_w, max_h)`:
 
-- iOS uses `UIView.sizeThatFits_(CGSize(max_w, max_h))`.
+- iOS uses the native manager and `UIView.sizeThatFits` with UIKit text metrics.
 - Android wraps `View.measure(...)` with `MeasureSpec.AT_MOST` /
   `UNSPECIFIED`.
 
@@ -145,8 +115,7 @@ in CSS.
 
 ## Testing layouts
 
-The layout engine is pure Python, so it is trivial to test in
-isolation:
+Use the host Yoga binding to test layout without a simulator or emulator:
 
 ```python
 from pythonnative.layout import LayoutNode, calculate_layout
@@ -167,7 +136,7 @@ assert root.children[1].width == 125  # 200 - 10 - 10 - 50 - 5
 ```
 
 The reconciler also exposes
-[`Reconciler.compute_layout_for_test`][pythonnative.reconciler.Reconciler.compute_layout_for_test]
+[`Reconciler.compute_layout_for_test`][pythonnative.reconciler.core.Reconciler.compute_layout_for_test]
 so you can render a real component tree (with the mock registry) and
 inspect the computed `LayoutNode` tree without having to dig into
 private attributes.
@@ -183,8 +152,8 @@ Wrapping (`flex_wrap: "wrap"` / `"wrap_reverse"`) and RTL flipping
 (`direction: "rtl"`, with `start` / `end` edge insets resolving against
 the inherited direction) are both supported.
 
-Everything else from the React Native flexbox cheat-sheet is
-supported.
+Supported properties follow the public `Style` annotations and the pinned Yoga
+version. Platform font metrics can produce different intrinsic sizes.
 
 ## Next steps
 

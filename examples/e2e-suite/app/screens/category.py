@@ -17,8 +17,8 @@ from app.theme import styles
 def CategoryListScreen() -> pn.Element:
     """Render every demo in the route's ``name`` category as a button."""
     nav = pn.use_navigation()
-    params = nav.get_params()
-    category: str = params.get("name", "Components")
+    route = pn.use_route()
+    category: str = route.params.get("name", "Components")
     demos = demos_for_category(category)
 
     def open_demo(demo_id: str) -> None:

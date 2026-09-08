@@ -5,6 +5,9 @@ handler. Demonstrates [`TextInput`][pythonnative.TextInput],
 controlled patterns with [`use_state`][pythonnative.use_state], and
 how to wire submission.
 
+Paste it into `app/main.py` of a project scaffolded with `pn init`,
+then run `pn preview app.main.SignUp`.
+
 ## The code
 
 ```python

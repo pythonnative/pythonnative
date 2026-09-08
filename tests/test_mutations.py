@@ -11,11 +11,10 @@ from __future__ import annotations
 
 from typing import Any, List, Tuple
 
-from fake_backend import FakeBackend
-
 from pythonnative.element import Element
 from pythonnative.events import dispatch_event
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend
 
 
 def _text(value: str, key: str | None = None, **props: Any) -> Element:
@@ -29,7 +28,7 @@ def _column(*children: Element) -> Element:
 def _mounted(el: Element) -> Tuple[Reconciler, FakeBackend]:
     backend = FakeBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     rec.mount(el)
     return rec, backend
 
@@ -74,7 +73,7 @@ def test_layout_pass_flushes_frames_as_followup_batch() -> None:
     assert new_ops, "viewport arrival must trigger a layout flush"
     assert {op[0] for op in new_ops} == {"set_frame"}
     # The root's frame is host-owned and never framed by layout.
-    root = backend.views[rec.root_tag()]
+    root = backend.views[rec.root_tag]
     assert root.frame == (0.0, 0.0, 0.0, 0.0)
     # Children got real frames (FakeBackend reports 60x16 Text intrinsics).
     text = root.find_first("Text")
@@ -116,7 +115,7 @@ def test_callback_identity_change_never_crosses_the_bridge() -> None:
         hits.append("second")
 
     rec, backend = _mounted(Element("Button", {"title": "Go", "on_press": first}, []))
-    tag = rec.root_tag()
+    tag = rec.root_tag
     assert tag is not None
     batches_before = len(backend.batches)
 
@@ -137,7 +136,7 @@ def test_removed_prop_signaled_with_none() -> None:
     new_ops = _ops_since(backend, marker)
     assert len(new_ops) == 1
     assert new_ops[0][0] == "update" and new_ops[0][3] == ("color",)
-    assert backend.views[rec.root_tag()].props["color"] is None
+    assert backend.views[rec.root_tag].props["color"] is None
 
 
 def test_frame_diffing_suppresses_unchanged_frames() -> None:
@@ -160,7 +159,7 @@ def test_frame_diffing_suppresses_unchanged_frames() -> None:
 
 def test_keyed_reorder_moves_views_without_recreating() -> None:
     rec, backend = _mounted(_column(_text("a", key="a"), _text("b", key="b"), _text("c", key="c")))
-    root = backend.views[rec.root_tag()]
+    root = backend.views[rec.root_tag]
     ids_before = [c.id for c in root.children]
     marker = len(backend.ops)
 
@@ -187,7 +186,7 @@ def test_dropping_a_child_destroys_only_that_child() -> None:
 def test_subtree_replacement_destroys_children_first() -> None:
     inner = Element("Row", {}, [_text("deep")])
     rec, backend = _mounted(_column(inner))
-    root = backend.views[rec.root_tag()]
+    root = backend.views[rec.root_tag]
     row = root.find_first("Row")
     deep = root.find_first("Text")
     assert row is not None and deep is not None
@@ -217,7 +216,8 @@ def test_unmount_destroys_every_view_in_one_batch() -> None:
 
 
 def test_flush_dirty_commits_one_transaction_for_many_setters() -> None:
-    from pythonnative.hooks import component, use_state
+    from pythonnative.component import component
+    from pythonnative.hooks import use_state
 
     setters: List[Any] = []
 

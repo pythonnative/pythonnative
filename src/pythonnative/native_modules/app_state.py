@@ -2,10 +2,10 @@
 
 [`AppState`][pythonnative.AppState] exposes the current lifecycle phase
 (``"active"``, ``"inactive"``, or ``"background"``) and lets you
-subscribe to transitions. The native host (the iOS app delegate /
-Android ``Activity``) forwards lifecycle callbacks by calling
-[`dispatch_app_state`][pythonnative.native_modules.app_state.dispatch_app_state],
-so the same listener machinery works on every platform and in tests.
+subscribe to transitions. The native ``AppState`` module pushes a
+``change`` event on every transition; off device, tests drive the same
+path through
+[`dispatch_app_state`][pythonnative.native_modules.app_state.dispatch_app_state].
 
 Prefer the [`use_app_state`][pythonnative.use_app_state] hook inside
 components; use the imperative API for non-UI code.
@@ -27,6 +27,7 @@ from typing import Callable, List
 
 from .. import diagnostics
 from ..hooks import use_effect, use_state
+from .registry import on_event
 
 AppStateStatus = str  # "active" | "inactive" | "background"
 
@@ -64,8 +65,8 @@ class AppState:
 def dispatch_app_state(state: AppStateStatus) -> None:
     """Update the current state and notify every listener.
 
-    Called by the native host on lifecycle transitions. Unknown values
-    are ignored so a misbehaving host can't push garbage into the tree.
+    Unknown values are ignored so a misbehaving host can't push garbage
+    into the tree.
     """
     global _current
     if state not in _VALID or state == _current:
@@ -76,6 +77,9 @@ def dispatch_app_state(state: AppStateStatus) -> None:
             listener(state)
         except Exception:
             diagnostics.swallowed("app_state.dispatch_app_state")
+
+
+on_event("AppState", "change", lambda payload: dispatch_app_state(str(payload)))
 
 
 def use_app_state() -> AppStateStatus:

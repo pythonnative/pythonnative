@@ -1,12 +1,8 @@
 package com.pythonnative.android_template
 
-import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.util.Log
 import android.util.TypedValue
@@ -15,11 +11,20 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import com.pythonnative.runtime.PNBridge
+import com.pythonnative.runtime.PythonHost
+import com.pythonnative.runtime.modules.BuiltinModules
 
+/**
+ * The single activity. It starts Python, wires the `PNBridge` host
+ * callback into `pythonnative.bridge.native_callback`, runs the
+ * protocol handshake, and forwards activity callbacks to the Kotlin
+ * native modules. Screens live in `ScreenFragment`s inside the
+ * `NavHostFragment` from `activity_main.xml`.
+ */
 class MainActivity : AppCompatActivity() {
     private val TAG = javaClass.simpleName
     private var pythonReady = false
-    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,134 +34,84 @@ class MainActivity : AppCompatActivity() {
             Python.start(AndroidPlatform(this))
         }
         try {
+            PNBridge.setContext(this)
+            val py = Python.getInstance()
+            PNBridge.setHost(object : PythonHost {
+                override fun callback(kind: String, tag: Long, name: String, payloadJson: String): String? =
+                    py.getModule("pythonnative.bridge")
+                        .callAttr("native_callback", kind, tag, name, payloadJson)
+                        ?.toString()
+            })
+            if (BuildConfig.DEBUG) {
+                // Dev-only: the writable source overlay the dev client syncs
+                // into, and the dev server `pn run` asked us to connect to
+                // (an intent extra; a remembered server is used otherwise).
+                py.getModule("pythonnative.hot_reload").callAttr(
+                    "configure_dev_environment",
+                    filesDir.absolutePath,
+                    intent?.getStringExtra("pn_dev_server")
+                )
+            }
+            // Handshake with the runtime library (raises on a protocol
+            // mismatch, before any screen is created), enable dev mode in
+            // debug builds, and warm the asyncio runtime.
+            py.getModule("pythonnative.bootstrap").callAttr("start", BuildConfig.DEBUG, true)
+            // Import the entry module now so a broken app fails here,
+            // with a full traceback, instead of inside the first fragment.
+            py.getModule(getString(R.string.pn_entry_module))
+            pythonReady = true
             // Set content view to the NavHost layout; the initial screen
             // loads via nav_graph startDestination.
             setContentView(R.layout.activity_main)
-            val py = Python.getInstance()
-            if (BuildConfig.DEBUG) {
-                // Dev-only writable source overlay for hot reload.
-                py.getModule("pythonnative.hot_reload").callAttr(
-                    "configure_dev_environment",
-                    filesDir.absolutePath
-                )
-            }
-            // Import the entry module now so a broken app fails here,
-            // with a full traceback, instead of inside the first fragment.
-            py.getModule("app.main")
-            pythonReady = true
         } catch (e: Exception) {
             Log.e("PythonNative", "Bootstrap failed", e)
             showBootstrapError(e)
             return
         }
-
-        // A cold start from a deep link carries the URL on the launch intent.
-        intent?.dataString?.let { dispatchUrl(it) }
-
-        registerNetworkCallback()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        networkCallback?.let {
-            try {
-                (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
-                    .unregisterNetworkCallback(it)
-            } catch (e: Exception) {
-                Log.e("PythonNative", "unregisterNetworkCallback failed", e)
-            }
-            networkCallback = null
-        }
+        BuiltinModules.onActivityDestroyed(this)
+        PNBridge.clearContext(this)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        BuiltinModules.onActivityResult(requestCode, resultCode, data)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        BuiltinModules.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent.dataString?.let { dispatchUrl(it) }
+        BuiltinModules.onNewIntent(intent)
     }
-
-    // MARK: - AppState forwarding
 
     override fun onResume() {
         super.onResume()
-        dispatchAppState("active")
+        if (pythonReady) BuiltinModules.onActivityResumed()
     }
 
     override fun onPause() {
         super.onPause()
-        dispatchAppState("inactive")
+        if (pythonReady) BuiltinModules.onActivityPaused()
     }
 
     override fun onStop() {
         super.onStop()
-        dispatchAppState("background")
+        if (pythonReady) BuiltinModules.onActivityStopped()
     }
-
-    private fun dispatchAppState(state: String) {
-        if (!pythonReady) return
-        try {
-            Python.getInstance()
-                .getModule("pythonnative.native_modules.app_state")
-                .callAttr("dispatch_app_state", state)
-        } catch (e: Exception) {
-            Log.e("PythonNative", "dispatch_app_state($state) failed", e)
-        }
-    }
-
-    // MARK: - NetInfo forwarding
-
-    // Live connectivity updates. The callback must be a NetworkCallback
-    // subclass, which Chaquopy's dynamic_proxy can't create from Python
-    // (interfaces only), so the registration lives here and forwards
-    // into the pythonnative net_info module.
-    private fun registerNetworkCallback() {
-        if (!pythonReady || networkCallback != null) return
-        try {
-            val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val callback = object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) = dispatchNetInfo()
-                override fun onLost(network: Network) = dispatchNetInfo()
-                override fun onCapabilitiesChanged(
-                    network: Network,
-                    capabilities: NetworkCapabilities
-                ) = dispatchNetInfo()
-            }
-            manager.registerDefaultNetworkCallback(callback)
-            networkCallback = callback
-        } catch (e: Exception) {
-            Log.e("PythonNative", "registerDefaultNetworkCallback failed", e)
-        }
-    }
-
-    private fun dispatchNetInfo() {
-        // NetworkCallback fires on a ConnectivityManager binder thread;
-        // hop to the main thread before crossing into Python.
-        runOnUiThread {
-            if (!pythonReady) return@runOnUiThread
-            try {
-                Python.getInstance()
-                    .getModule("pythonnative.native_modules.net_info")
-                    .callAttr("dispatch_android_change")
-            } catch (e: Exception) {
-                Log.e("PythonNative", "dispatch_android_change failed", e)
-            }
-        }
-    }
-
-    // MARK: - Deep links
-
-    private fun dispatchUrl(url: String) {
-        if (!pythonReady) return
-        try {
-            Python.getInstance()
-                .getModule("pythonnative.native_modules.linking")
-                .callAttr("dispatch_url", url)
-        } catch (e: Exception) {
-            Log.e("PythonNative", "dispatch_url failed", e)
-        }
-    }
-
-    // MARK: - Bootstrap error UI
 
     private fun showBootstrapError(error: Exception) {
         val text = TextView(this)

@@ -1,7 +1,7 @@
 # Tests the nested Drawer navigator switches screens back and forth.
 #
 # Demo screen: examples/e2e-suite/app/screens/navigation/drawer_navigator.py
-# Source under test: src/pythonnative/navigation.py :: create_drawer_navigator
+# Source under test: src/pythonnative/navigation/navigators.py :: create_drawer_navigator
 #
 # The "Go to One" / "Go to Two" controls live in the demo body, OUTSIDE the
 # navigator's swappable screens (they drive the drawer handle published on a

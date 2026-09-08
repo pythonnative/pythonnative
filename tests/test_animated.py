@@ -7,12 +7,12 @@ import time
 from typing import Any
 
 import pytest
-from fake_backend import FakeBackend as _StubBackend
 
 from pythonnative.animated import Animated, AnimatedValue, use_animated_value
+from pythonnative.component import component
 from pythonnative.element import Element
-from pythonnative.hooks import component
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend as _StubBackend
 
 # ======================================================================
 # AnimatedValue
@@ -250,7 +250,7 @@ def test_animated_components_mount_through_reconciler() -> None:
     from pythonnative.native_views import set_registry
 
     backend = _StubBackend()
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
 
         @component
@@ -391,7 +391,7 @@ def test_partial_native_acceptance_rolls_back_and_falls_back() -> None:
     from pythonnative.native_views import set_registry
 
     backend = _NativeBackend(accept_tags={1})
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         v = AnimatedValue(0.0)
         v.attach(1, "opacity")

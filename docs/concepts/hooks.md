@@ -156,8 +156,10 @@ commit, so heavy work here delays the frame.
 
 ### use_navigation
 
-Access navigation from any component. Returns a navigation handle with
-`.navigate()`, `.go_back()`, and `.get_params()`.
+Access navigation from any screen. Returns the
+[`Navigation`][pythonnative.Navigation] handle for the current route,
+with `.navigate()`, `.push()`, `.go_back()`, `.set_options()`,
+`.add_listener()`, and more.
 
 ```python
 @pn.component
@@ -168,7 +170,7 @@ def HomeScreen():
         pn.Text("Home", style={"font_size": 24}),
         pn.Button(
             "Go to Details",
-            on_press=lambda: nav.navigate("Detail", params={"id": 42}),
+            on_press=lambda: nav.navigate("Detail", id=42),
         ),
         style={"spacing": 12, "padding": 16},
     )
@@ -176,7 +178,7 @@ def HomeScreen():
 @pn.component
 def DetailScreen():
     nav = pn.use_navigation()
-    item_id = nav.get_params().get("id", 0)
+    item_id = pn.use_route().params.get("id", 0)
 
     return pn.Column(
         pn.Text(f"Detail #{item_id}", style={"font_size": 20}),
@@ -189,13 +191,14 @@ See the [Navigation guide](../guides/navigation.md) for full details.
 
 ### use_route
 
-Convenience hook to read the current route's parameters:
+Read the current [`Route`][pythonnative.navigation.Route]: its
+`name`, `params`, and stable `key`:
 
 ```python
 @pn.component
 def DetailScreen():
-    params = pn.use_route()
-    item_id = params.get("id", 0)
+    route = pn.use_route()
+    item_id = route.params.get("id", 0)
     return pn.Text(f"Detail #{item_id}")
 ```
 
@@ -278,7 +281,7 @@ def Screen():
 ### use_back_handler
 
 Intercept the system back action (the Android hardware back button and
-predictive back gesture; Escape in the desktop preview). Return `True`
+predictive back gesture; Escape in the browser preview). Return `True`
 to consume the event, `False` to pass it along:
 
 ```python
@@ -308,9 +311,18 @@ pn.Animated.timing(opacity, to=1.0, duration=300).start()
 Read a value from the nearest `Provider` ancestor:
 
 ```python
-theme = pn.use_context(pn.ThemeContext)
-color = theme["primary_color"]
+Locale = pn.create_context("en")
+
+
+@pn.component
+def Greeting():
+    locale = pn.use_context(Locale)
+    return pn.Text("Hello" if locale == "en" else "Hola")
 ```
+
+For theming specifically, prefer [`use_theme`][pythonnative.use_theme],
+which returns a typed [`Theme`][pythonnative.Theme] and falls back to
+the built-in light or dark theme when no provider is mounted.
 
 ### Async hooks
 
@@ -338,9 +350,7 @@ user_context = pn.create_context({"name": "Guest"})
 
 @pn.component
 def App():
-    return pn.Provider(user_context, {"name": "Alice"},
-        UserProfile()
-    )
+    return user_context.Provider({"name": "Alice"}, UserProfile())
 
 @pn.component
 def UserProfile():
@@ -358,7 +368,7 @@ theme or session values.
 
 By default, each state setter call triggers a re-render. When you
 need to update multiple pieces of state at once, use
-[`batch_updates`][pythonnative.batch_updates] to coalesce them into a
+[`batch_updates`][pythonnative.scheduler.batch_updates] to coalesce them into a
 single render pass:
 
 ```python
