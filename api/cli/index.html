@@ -3690,7 +3690,10 @@ the documented behavior never drifts from the code.</p>
   an iOS release build to App Store Connect. See
   <a href="../../guides/building-for-release/">Building for release</a>.</li>
 <li><code>pn app-id android|ios</code>: print the resolved application id (Android)
-  or bundle id (iOS), handy for scripts and CI.</li>
+  or bundle id (iOS), handy for scripts and CI. Flag: <code>--json</code> to print
+  a <code>{"platform": "...", "app_id": "..."}</code> object to stdout for
+  scripting; the config
+  error goes to stderr instead, and a missing config still exits 1.</li>
 <li><code>pn clean</code>: remove the local <code>build/</code> directory.</li>
 <li><code>pn --version</code> (<code>-V</code>): print the installed PythonNative version.</li>
 </ul>
@@ -3729,7 +3732,7 @@ the documented behavior never drifts from the code.</p>
 <li><code>pn build android|ios</code>: produce standalone artifacts (signed APK/AAB,
   or an iOS archive/IPA, optionally uploaded to App Store Connect).</li>
 <li><code>pn app-id android|ios</code>: print the resolved application/bundle id
-  (handy for scripts and CI).</li>
+  (handy for scripts and CI), as plain text or as JSON with <code>--json</code>.</li>
 <li><code>pn clean</code>: remove the local <code>build/</code> directory.</li>
 </ul>
 <p>The heavy lifting lives in the <code>pythonnative.project</code> and
@@ -4073,6 +4076,15 @@ either way.</p>
     <div class="doc doc-contents ">
 
         <p>Print the resolved application id (Android) or bundle id (iOS).</p>
+<p>With <code>--json</code>, stdout carries one object,
+<code>{"platform": "...", "app_id": "..."}</code>, and nothing else; the config
+error goes to stderr instead so stdout stays parseable. Keys may be
+added to that object later, but none will be removed or renamed, so
+a caller reading <code>app_id</code> keeps working.</p>
+<p>A missing or invalid config still exits 1, with or without the flag.
+That differs from <code>pn devices --json</code>, which exits 0 on an empty
+result, because "no devices" is a valid answer to a query whereas
+an unreadable config means there is no id to report at all.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4095,7 +4107,7 @@ either way.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parsed namespace with <code>platform</code>.</p>
+                <p>Parsed namespace with <code>platform</code> and optional <code>json</code>.</p>
               </div>
             </td>
             <td>
