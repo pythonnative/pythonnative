@@ -22,13 +22,13 @@ def UseThemeDemo() -> pn.Element:
         "The built-in theme follows the color scheme unless a provider pins one.",
         section(
             "Theme values",
-            result_text("Theme background", theme["background_color"]),
-            result_text("Theme primary", theme["primary_color"]),
+            result_text("Theme background", theme.background_color),
+            result_text("Theme primary", theme.primary_color),
             pn.View(
                 style=pn.style(
                     width=64,
                     height=24,
-                    background_color=theme["primary_color"],
+                    background_color=theme.primary_color,
                     border_radius=6,
                 ),
             ),

@@ -7,9 +7,9 @@ from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 
 import pytest
-from fake_backend import FakeBackend as MockBackend
 
 from pythonnative import diagnostics
+from pythonnative.component import component, memo
 from pythonnative.components import (
     ErrorBoundary,
     Fragment,
@@ -18,11 +18,8 @@ from pythonnative.components import (
 )
 from pythonnative.element import Element
 from pythonnative.hooks import (
-    Provider,
     Ref,
-    component,
     create_context,
-    memo,
     use_back_handler,
     use_context,
     use_effect,
@@ -32,12 +29,13 @@ from pythonnative.hooks import (
     use_state,
 )
 from pythonnative.reconciler import Reconciler
+from pythonnative.testing import FakeBackend as MockBackend
 
 
 def _make_reconciler() -> Tuple[Reconciler, MockBackend]:
     backend = MockBackend()
     rec = Reconciler(backend)
-    rec._screen_re_render = lambda: None
+    rec.on_render_requested = lambda: None
     return rec, backend
 
 
@@ -230,7 +228,7 @@ def test_layout_effect_cleanup_on_unmount() -> None:
 
     @component
     def Child() -> Element:
-        use_layout_effect(lambda: (lambda: cleaned.append("layout")), [])
+        use_layout_effect(lambda: lambda: cleaned.append("layout"), [])
         return Element("Text", {"text": "c"}, [])
 
     rec, _backend = _make_reconciler()
@@ -307,7 +305,7 @@ def test_context_change_rerenders_consumer_under_memo() -> None:
     def App() -> Element:
         theme, set_theme = use_state("light")
         setters["set"] = set_theme
-        return Provider(theme_ctx, theme, Wall())
+        return theme_ctx.Provider(theme, Wall())
 
     rec, backend = _make_reconciler()
     rec.mount(App())
@@ -342,7 +340,7 @@ def test_context_same_value_does_not_rerender_consumer() -> None:
         _tick, set_tick = use_state(0)
         setters["set"] = set_tick
         # Provider value is constant even though App re-renders.
-        return Provider(ctx, 42, Wall())
+        return ctx.Provider(42, Wall())
 
     rec, _backend = _make_reconciler()
     rec.mount(App())
@@ -366,7 +364,7 @@ def test_provider_multiple_children_render_flat() -> None:
         Element(
             "Column",
             {},
-            [Provider(ctx, "v", Leaf(label="a"), Leaf(label="b"))],
+            [ctx.Provider("v", Leaf(label="a"), Leaf(label="b"))],
         )
     )
     assert [c.props["text"] for c in root.children] == ["a:v", "b:v"]

@@ -8,7 +8,6 @@ import time
 from typing import Any, List
 
 import pytest
-from fake_backend import FakeBackend
 
 from pythonnative.animated import (
     Animated,
@@ -16,8 +15,9 @@ from pythonnative.animated import (
     AnimatedValue,
     _resolve_style_with_values,
 )
-from pythonnative.gestures import GestureEvent
+from pythonnative.gestures import GestureEvent, GestureState
 from pythonnative.native_views import set_registry
+from pythonnative.testing import FakeBackend
 
 # ======================================================================
 # interpolate: numbers
@@ -161,7 +161,7 @@ def test_operator_divide_by_zero_is_safe() -> None:
 
 def test_derived_node_pushes_to_native_attachment() -> None:
     backend = FakeBackend()
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         v = AnimatedValue(0.0)
         iv = v.interpolate([0, 1], [0, 100])
@@ -175,7 +175,7 @@ def test_derived_node_pushes_to_native_attachment() -> None:
 
 def test_derived_chain_pushes_through_operators() -> None:
     backend = FakeBackend()
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         v = AnimatedValue(1.0)
         node = v * 10 + 5
@@ -226,7 +226,7 @@ def test_event_binds_dict_payload_fields() -> None:
 def test_event_binds_gesture_event_attributes() -> None:
     tx = AnimatedValue(0.0)
     handler = Animated.event(translation_x=tx)
-    handler(GestureEvent(kind="pan", state="changed", translation_x=7.0))
+    handler(GestureEvent(kind="pan", state=GestureState.CHANGED, translation_x=7.0))
     assert tx.value == 7.0
 
 
@@ -270,7 +270,7 @@ class _AcceptingBackend(FakeBackend):
 
 def test_values_with_derived_dependents_stay_on_python_driver() -> None:
     backend = _AcceptingBackend()
-    set_registry(backend)  # type: ignore[arg-type]
+    set_registry(backend)
     try:
         v = AnimatedValue(0.0)
         v.attach(1, "translate_y")

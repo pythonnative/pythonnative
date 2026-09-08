@@ -34,7 +34,7 @@ def HomeScreen() -> pn.Element:
     nav = pn.use_navigation()
 
     def open_category(name: str) -> None:
-        nav.navigate("Category", {"name": name})
+        nav.navigate("Category", name=name)
 
     return pn.ScrollView(
         pn.Column(

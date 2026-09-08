@@ -16,7 +16,7 @@ def SchemeAwareBadge():
     theme = pn.use_theme()  # built-in theme for the scheme
     return pn.Text(
         f"Currently {scheme}",
-        style={"color": theme["text_color"]},
+        style={"color": theme.text_color},
     )
 ```
 

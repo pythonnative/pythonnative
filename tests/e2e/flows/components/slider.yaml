@@ -11,7 +11,7 @@
 # buttons below still verify exact values.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/slider.py
-# Source under test: src/pythonnative/components.py :: Slider
+# Source under test: src/pythonnative/components/controls.py :: Slider
 appId: ${APP_ID}
 ---
 - runFlow:

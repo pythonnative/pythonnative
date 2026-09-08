@@ -6,8 +6,9 @@ props and styles, the [`HookOrderError`][pythonnative.HookOrderError]
 raised on conditional hooks, and the RedBox overlay that surfaces
 uncaught errors from renders, effects, and event handlers.
 
-Dev mode is enabled automatically by `pn preview` and by `pn run
---hot-reload`, or explicitly with the `PN_DEV=1` environment variable.
+Dev mode is enabled automatically by `pn start` / `pn preview` and in
+the debug builds `pn run` produces, or explicitly with the `PN_DEV=1`
+environment variable.
 In production builds every check in this module is skipped, so
 shipping apps pay no overhead.
 

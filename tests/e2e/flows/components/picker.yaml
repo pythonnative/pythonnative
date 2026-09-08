@@ -7,7 +7,7 @@
 # Pick buttons bypass entirely.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/picker.py
-# Source under test: src/pythonnative/components.py :: Picker
+# Source under test: src/pythonnative/components/controls.py :: Picker
 appId: ${APP_ID}
 ---
 - runFlow:

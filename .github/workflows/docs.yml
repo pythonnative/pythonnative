@@ -17,7 +17,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
-          python-version: '3.11'
+          python-version: '3.13'
       # `uv sync` installs the project itself, which mkdocstrings needs in
       # order to import and introspect it.
       - name: Install docs deps

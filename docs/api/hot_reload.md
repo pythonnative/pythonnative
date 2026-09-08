@@ -1,9 +1,11 @@
 # Hot reload
 
-Hot-reload comes in two cooperating pieces: a host-side file watcher
-that pushes changed `.py` files to the device, and a device-side
-module reloader that swaps the new code in and re-renders the active
-page. Both are wired up automatically by `pn run --hot-reload`.
+Fast Refresh comes in two cooperating pieces: the
+[dev server](devserver.md) that watches `app/` and pushes changed files
+to every connected client, and this device-side module reloader that
+swaps the new code in and refreshes every mounted screen. Debug builds
+launched with `pn run` while `pn start` is running are wired up
+automatically.
 
 ::: pythonnative.hot_reload
     options:
@@ -14,4 +16,5 @@ page. Both are wired up automatically by `pn run --hot-reload`.
 
 ## Next steps
 
-- See the workflow in [Hot reload guide](../guides/hot-reload.md).
+- See the workflow in the [Fast Refresh guide](../guides/hot-reload.md).
+- The other half: [Dev server and dev client](devserver.md).

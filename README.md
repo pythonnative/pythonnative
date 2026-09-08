@@ -26,33 +26,27 @@
 
 ## Overview
 
-PythonNative is a cross-platform toolkit for building native Android and iOS apps in Python. It provides a **declarative, React-like component model** with hooks and automatic reconciliation, powered by Chaquopy on Android and rubicon-objc on iOS. Write function components with `use_state`, `use_effect`, and friends, just like React, and let PythonNative handle creating and updating native views.
+PythonNative is a cross-platform toolkit for building native Android and iOS apps in Python. It provides a **declarative, React-like component model** with hooks and automatic reconciliation on top of a **native rendering core** written in Swift and Kotlin. Write function components with `use_state`, `use_effect`, and friends, just like React, and let PythonNative handle creating and updating native views.
 
 ## Features
 
-- **Declarative UI:** Describe *what* your UI should look like with element functions (`Text`, `Button`, `Column`, `Row`, etc.). PythonNative creates and updates native views automatically.
-- **Rich component library:** 25+ built-in components backed by real native widgets: `TextInput`, `Image` / `ImageBackground`, `ScrollView`, `FlatList` / `SectionList`, `Modal`, `Pressable` / `TouchableOpacity`, `Switch` / `Checkbox`, `Slider`, `SegmentedControl`, `Picker`, `DatePicker`, `ProgressBar` / `ActivityIndicator`, `WebView`, and more.
-- **Device APIs:** Cross-platform modules for `Camera`, `Location`, `FileSystem`, `Notifications`, `Clipboard`, `Share`, `Linking`, `Permissions`, `AppState`, `NetInfo`, `SecureStore`, `Battery`, `Haptics` / `Vibration`, and `Biometrics`, plus reactive `use_app_state` and `use_net_info` hooks.
-- **Hooks and function components:** Manage state with `use_state`, side effects with `use_effect` / `use_layout_effect`, refs and imperative handles with `use_ref` / `use_imperative_handle`, and navigation with `use_navigation`, all through one consistent pattern. Components can return a single element, a list of siblings, or `None`, and `Fragment`, `Portal`, and reactive `Provider` context work the way they do in React.
-- **Async-first rendering:** One `asyncio` event loop runs the whole framework on the platform's main thread. Components can be `async def` and `await` data directly in the body; `Suspense` boundaries show declarative loading states while they wait. `use_resource` fetches during render, `use_effect` accepts coroutine callbacks (cancelled automatically on unmount), `lazy` code-splits components, and `use_transition` / `use_deferred_value` keep the UI responsive during expensive updates.
-- **Developer feedback that finds your bugs:** In dev mode (`pn preview`, hot reload, or `PN_DEV=1`), uncaught errors from renders, effects, and event handlers show a full-screen RedBox with the traceback; unknown style keys and duplicate list keys print "did you mean" warnings; and conditional hooks raise a `HookOrderError` at the source instead of silently cross-wiring state.
-- **Typed `style` prop:** Pass all visual and layout properties through a single `style` dict, fully described by the `pn.Style` `TypedDict` and the ergonomic `pn.style(...)` helper for IDE autocomplete and static checking. Compose reusable styles with `StyleSheet`.
-- **Cross-platform flexbox engine:** A pure-Python, Yoga-style layout engine computes frames once and applies them to native views, so `flex`, `padding`, `aspect_ratio`, and `position: "absolute"` produce the same geometry on Android and iOS.
-- **Virtual view tree + reconciler:** Element trees are diffed and patched with minimal native mutations, similar to React's reconciliation. Each commit lands as **one batched transaction** of mutation ops, and event callbacks are routed through a tag-based registry so re-renders that only change closures cost zero native calls. State updates re-render **locally**: only the component whose state changed (and its subtree) re-runs, and unchanged leaves reuse cached intrinsic measurements, so deep UIs stay responsive instead of re-rendering the whole app from the root on every tap.
-- **Native-driven animations:** The `Animated` API (timing / spring / decay / loop / stagger, awaitable or fire-and-forget) hands animations to Core Animation and `ViewPropertyAnimator` whenever possible, so no Python code runs per frame; a pure-Python ticker covers the rest. `interpolate`, arithmetic operators on animated nodes, `Animated.event` scroll binding, and `diff_clamp` cover the scroll-driven patterns (collapsing headers, parallax) that define native feel.
-- **Native gesture system:** Attach `Tap`, `LongPress`, `Pan`, `Swipe`, `Fling`, `Pinch`, and `Rotation` recognizers to any view via the `gestures=` prop, backed by `UIGestureRecognizer` on iOS and a unit-testable pure-Python arbiter on Android and desktop. Compose them with `Race`, `Exclusive`, and `Simultaneous` for cross-gesture arbitration (single vs. double tap, drag vs. long press).
-- **Virtualized lists:** `FlatList` / `SectionList` window their rows in Python over the platform scroll view: uniform, exact, or measured variable heights, grids, headers/footers, infinite scroll, and an imperative scroll controller, identical on every platform.
-- **Direct native bindings:** Python calls platform APIs directly through Chaquopy and rubicon-objc, with no JavaScript bridge.
-- **Custom-component SDK:** Wrap any platform widget as a first-class element with type-checked props via `pythonnative.sdk` (`Props`, `@native_component`, `element_factory`). Plugins distributed on PyPI auto-register through the `pythonnative.handlers` entry-point group.
-- **CLI scaffolding:** `pn init` creates a ready-to-run project; `pn run android` and `pn run ios` build and launch your app.
-- **Instant desktop preview:** `pn preview` renders your app in a native desktop window via Tkinter with Fast Refresh on every save: iterate on layout, state, and navigation in milliseconds without booting a simulator or device. The reconciler, hooks, layout engine, and navigation are the same code that ships to the phone.
-- **Native-backed navigation:** Declarative `Stack`, `Tab`, and `Drawer` navigators inspired by React Navigation. The root stack drives the platform's native navigation controller (`UINavigationController` on iOS, AndroidX Navigation Component on Android), so transitions, back gestures, and the hardware back button match what users expect; `use_back_handler` intercepts the back action when a screen needs to.
-- **Fast Refresh hot reload:** `pn run --hot-reload` watches `app/` and patches edits into the running app on save, preserving component state across most changes.
-- **Bundled templates:** Android Gradle and iOS Xcode templates are included, so scaffolding requires no network access.
+- **Declarative components and hooks:** Describe native UI with Python functions, immutable elements, and typed styles. State, effects, context, and suspense boundaries follow one logical application tree across screens, overlays, and mounted list rows.
+- **Native widgets and layout:** Swift and Kotlin component managers own UIKit and Android widgets. The shared Yoga C++ engine computes layout beside the controls, using platform measurements for text and intrinsic sizes.
+- **Standard asyncio:** Components, effects, event handlers, and tasks run on a dedicated Python application thread. Native UI threads handle widgets, scrolling, and animation frames. Component-owned tasks are canceled on unmount.
+- **Incremental reconciliation:** State changes update affected component subtrees. Versioned bridge commits validate operations and acknowledge revisions; events and controlled text inputs carry identities that prevent stale updates.
+- **Native lists and navigation:** UIKit collection views and Android recycler views recycle cells for fixed or variable row sizes, grids, sections, and horizontal lists. Native navigation containers present logical screen roots while providers and component state remain in the shared Python tree.
+- **Animation and gestures:** Serialized animation graphs support timing, springs, decay, arithmetic, interpolation, and native scroll and gesture bindings. Swift and Kotlin recognize mobile gestures and update supported animation bindings without Python work on every frame.
+- **Device APIs:** Python facades expose camera, location, notifications, storage, permissions, and other native services. Test permissions and platform behavior on your deployment targets.
+- **Native extension SDK:** Python dataclasses and protocols define contracts; `pn codegen` generates props and module adapters for Swift and Kotlin. Plugins package native sources and resources, and builds verify matching contracts at startup.
+- **Development tools:** `pn start` serves the browser preview and connected mobile dev clients. Fast Refresh preserves compatible component state, while diagnostics report errors and invalid hook usage. Changes to native inputs trigger a rebuild.
+- **Browser preview:** `pn preview` runs your Python application against a browser renderer with DOM widgets, Yoga WebAssembly layout, and JavaScript animation graphs. It supports iteration on application logic and UI; fonts, platform controls, and device APIs require mobile testing.
+- **App packaging and dependency locks:** `pn run` and `pn build` stage bundled app templates, native libraries, and Python sources. Target-specific wheel locks record dependency versions and hashes for mobile builds. Binary dependencies need compatible mobile wheels; `pn deps` reports target resolution.
 
 ## Quick Start
 
 ### Installation
+
+Requires Python 3.13 or newer.
 
 ```bash
 pip install pythonnative
@@ -75,6 +69,16 @@ def App():
         ),
         style=pn.style(spacing=12, padding=16),
     )
+```
+
+### Develop
+
+```bash
+pn init my-app && cd my-app
+pn preview          # dev server + browser preview with Fast Refresh
+pn run ios          # in another terminal: debug build that connects to the same server
+pn run android
+pn build ios        # standalone release artifacts
 ```
 
 ## Documentation

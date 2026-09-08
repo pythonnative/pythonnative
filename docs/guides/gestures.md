@@ -44,10 +44,11 @@ and routes the callbacks through the same tag-based event channel as
 Recognition itself is native:
 
 - **iOS** attaches real `UIGestureRecognizer` instances.
-- **Android** feeds raw `MotionEvent` streams into a pure-Python
-  [`GestureArbiter`][pythonnative.gestures.GestureArbiter].
-- **Desktop preview** feeds Tk pointer events into the same arbiter,
-  so gesture code is testable on a laptop.
+- **Android** processes `MotionEvent` streams with Kotlin recognizers
+  and an arbiter in the native rendering library.
+- **The browser preview** streams the page's pointer events into the
+  Python [`GestureArbiter`][pythonnative.gestures.GestureArbiter],
+  which also supports headless recognition tests.
 
 Gestures listed side by side in the `gestures=` list recognize
 *simultaneously*. Use the composition combinators below when you need
@@ -88,9 +89,8 @@ pn.View(
 With `Exclusive`, a single tap reports only after the double-tap
 window closes, and a double tap suppresses the single-tap callback
 entirely; you get exactly one of the two. On iOS this maps to
-`requireGestureRecognizerToFail`; on Android and desktop the
-pure-Python arbiter implements the same waiting semantics, so behavior
-matches across platforms.
+`requireGestureRecognizerToFail`; Android's Kotlin arbiter and the
+browser's Python arbiter implement the corresponding priority rules.
 
 ## Fling
 
@@ -172,10 +172,26 @@ gestures.Pan(min_distance=4, min_pointers=2)
 gestures.Swipe(direction="left", min_velocity=200)
 ```
 
-`GestureEvent.state` is one of
-[`GestureState`][pythonnative.gestures.GestureState] (`"began"`,
-`"changed"`, `"ended"`, `"cancelled"`), which matters mostly when you
-share one handler across slots.
+`GestureEvent.state` is a
+[`GestureState`][pythonnative.gestures.GestureState] enum member
+(`BEGAN`, `CHANGED`, `ENDED`, `CANCELLED`), which matters mostly when
+you share one handler across slots:
+
+```python
+from pythonnative.gestures import GestureState
+
+
+def on_pan(event):
+    match event.state:
+        case GestureState.BEGAN:
+            grab()
+        case GestureState.CHANGED:
+            move(event.translation_x, event.translation_y)
+        case GestureState.ENDED | GestureState.CANCELLED:
+            release()
+```
+
+It is a `str` enum, so `event.state == "ended"` also works.
 
 ## Gestures vs. `Pressable`
 

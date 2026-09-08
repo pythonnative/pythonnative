@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds are dev clients: they open a WebSocket to `pn start`
+     to sync sources and stream logs. Release builds don't merge this
+     file, so they gain no network permission the app didn't ask for. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

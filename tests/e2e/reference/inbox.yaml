@@ -1,0 +1,44 @@
+# Tests search, recycled rows, shared state, native navigation, editing, and persistence.
+# Demo screen: examples/inbox/app/main.py
+# Source under test: src/pythonnative/hooks.py, navigation/, components/lists.py, storage.py
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "2000 issues"
+    timeout: 30000
+- assertVisible: "Offline ready"
+- assertVisible: "2000 offline records"
+- tapOn: "Search issues"
+- inputText: "2000"
+- extendedWaitUntil:
+    visible: "1 issues"
+    timeout: 10000
+- tapOn: "Issue 2000: Check accessibility"
+- assertVisible: "Issue #2000"
+- tapOn: "Issue title"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - longPressOn: "Issue title"
+      - tapOn: "Select all"
+- eraseText: 80
+- inputText: "Reviewed issue 2000"
+- pressKey: Enter
+- tapOn: "Close issue"
+- assertVisible: "Reopen"
+- tapOn: "Save"
+- assertVisible: "Reviewed issue 2000"
+- assertVisible: "Closed"
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "2000 issues"
+    timeout: 30000
+- tapOn: "Search issues"
+- inputText: "2000"
+- pressKey: Enter
+- assertVisible: "Reviewed issue 2000"
+- assertVisible: "Closed"

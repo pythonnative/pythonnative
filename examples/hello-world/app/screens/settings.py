@@ -31,7 +31,7 @@ def SettingsScreen() -> pn.Element:
         pn.run_async(_run())
 
     def _view_showcase() -> None:
-        nav.navigate("Showcase", {"message": "Visual showcase"})
+        nav.navigate("Showcase", message="Visual showcase")
 
     return pn.ScrollView(
         pn.Column(
@@ -43,7 +43,7 @@ def SettingsScreen() -> pn.Element:
                 style=styles["subtitle"],
             ),
             pn.Text(
-                f"Window: {dims['width']:.0f} × {dims['height']:.0f}",
+                f"Window: {dims.width:.0f} × {dims.height:.0f}",
                 style=styles["subtitle"],
             ),
             pn.Button("Show alert", on_press=_show_alert),

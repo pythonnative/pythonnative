@@ -54,6 +54,7 @@ env:
 - runFlow: flows/hooks/use_callback.yaml
 - runFlow: flows/hooks/use_context.yaml
 - runFlow: flows/hooks/async_effect.yaml
+- runFlow: flows/hooks/standard_asyncio.yaml
 - runFlow: flows/hooks/use_resource.yaml
 - runFlow: flows/hooks/use_transition.yaml
 - runFlow: flows/hooks/use_deferred_value.yaml
@@ -94,4 +95,5 @@ env:
 - runFlow: flows/storage/async_storage.yaml
 - runFlow: flows/runtime/run_async.yaml
 - runFlow: flows/platform/platform_info.yaml
+- runFlow: flows/packages/pypi_packages.yaml
 - runFlow: flows/sdk/custom_component.yaml

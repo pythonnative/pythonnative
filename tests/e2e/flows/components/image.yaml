@@ -1,7 +1,7 @@
 # Tests Image renders without crashing alongside its labels.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/image.py
-# Source under test: src/pythonnative/components.py :: Image
+# Source under test: src/pythonnative/components/media.py :: Image
 appId: ${APP_ID}
 ---
 - runFlow:

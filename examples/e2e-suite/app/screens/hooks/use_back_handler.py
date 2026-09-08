@@ -1,7 +1,7 @@
 """Demo screen for [`pn.use_back_handler`][pythonnative.use_back_handler].
 
 ``use_back_handler`` intercepts the system back action (the Android
-hardware back button / predictive back gesture; Escape in the desktop
+hardware back button / predictive back gesture; Escape in the browser
 preview). The demo arms a guard that consumes back presses and counts
 them, so a Maestro flow can press device back and assert the screen
 did not pop. iOS has no system back button, so there the demo only

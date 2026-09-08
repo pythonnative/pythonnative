@@ -9,7 +9,7 @@
 # covered by direct interaction in their flows.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/date_picker.py
-# Source under test: src/pythonnative/components.py :: DatePicker
+# Source under test: src/pythonnative/components/controls.py :: DatePicker
 appId: ${APP_ID}
 ---
 - runFlow:

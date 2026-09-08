@@ -5,13 +5,13 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from fake_backend import FakeBackend
-
+from pythonnative.component import component
 from pythonnative.components import Text
 from pythonnative.element import Element
-from pythonnative.hooks import component, use_deferred_value, use_state, use_transition
+from pythonnative.hooks import use_deferred_value, use_state, use_transition
 from pythonnative.reconciler import Reconciler
 from pythonnative.runtime import drain
+from pythonnative.testing import FakeBackend
 
 
 def _settle(rec: Reconciler, predicate: Any, timeout: float = 2.0) -> bool:

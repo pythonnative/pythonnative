@@ -21,7 +21,7 @@ def UseWindowDimensionsDemo() -> pn.Element:
         "Current window size, returned reactively by the hook.",
         section(
             "Dimensions",
-            result_text("Window", f"{int(dims['width'])} × {int(dims['height'])}"),
+            result_text("Window", f"{int(dims.width)} × {int(dims.height)}"),
             hint("Maestro asserts the 'Window:' line is visible (size varies)."),
         ),
     )

@@ -4,6 +4,9 @@ A counter with two buttons (increment and decrement), a reset, and a
 small bit of conditional styling. Practical introduction to
 [`use_state`][pythonnative.use_state] and event handlers.
 
+Paste it into `app/main.py` of a project scaffolded with `pn init`,
+then run `pn preview app.main.Counter`.
+
 ## The code
 
 ```python

@@ -3,9 +3,11 @@
 //  ios_template
 //
 //  Creates the window programmatically and forwards scene-level events
-//  (deep links, foreground/background transitions) to the Python side.
+//  (deep links, foreground/background transitions) to the Swift native
+//  modules, which relay them to Python over the bridge.
 //
 
+import PythonNativeKit
 import UIKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
@@ -18,10 +20,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     ) {
         guard let windowScene = (scene as? UIWindowScene) else { return }
         // A cold start from a deep link delivers the URL here, before
-        // Python is running; PythonRuntime buffers it and flushes after
-        // startup so Linking.get_initial_url() sees it.
+        // Python is running; LinkingModule buffers it until the bridge
+        // callback is registered so Linking.get_initial_url() sees it.
         for context in connectionOptions.urlContexts {
-            PythonRuntime.shared.deliverURL(context.url.absoluteString)
+            LinkingModule.deliver(url: context.url.absoluteString)
         }
         let window = UIWindow(windowScene: windowScene)
         let root = ViewController()
@@ -33,33 +35,26 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         for context in URLContexts {
-            PythonRuntime.shared.deliverURL(context.url.absoluteString)
+            LinkingModule.deliver(url: context.url.absoluteString)
         }
     }
 
     // MARK: - AppState forwarding
 
-    private func dispatchAppState(_ state: String) {
-        guard PythonRuntime.shared.started else { return }
-        PythonRuntime.shared.notify(
-            module: "pythonnative.native_modules.app_state", function: "dispatch_app_state", state
-        )
-    }
-
     func sceneDidBecomeActive(_ scene: UIScene) {
-        dispatchAppState("active")
+        AppStateModule.dispatch("active")
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
-        dispatchAppState("inactive")
+        AppStateModule.dispatch("inactive")
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {
-        dispatchAppState("inactive")
+        AppStateModule.dispatch("inactive")
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {
-        dispatchAppState("background")
+        AppStateModule.dispatch("background")
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {}

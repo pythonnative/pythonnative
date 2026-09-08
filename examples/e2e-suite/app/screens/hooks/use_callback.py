@@ -39,6 +39,6 @@ def UseCallbackDemo() -> pn.Element:
                 pn.Button("Change dep", on_press=lambda: set_dep(dep + 1)),
                 pn.Button("Change other", on_press=lambda: set_other(other + 1)),
             ),
-            hint("Tapping 'Change other' must NOT bump 'Identity changes'. " "Tapping 'Change dep' bumps it by 1."),
+            hint("Tapping 'Change other' must NOT bump 'Identity changes'. Tapping 'Change dep' bumps it by 1."),
         ),
     )

@@ -29,27 +29,24 @@ completion contract. The core primitives are:
 
 Driver architecture (the **native driver**):
 
-When an animation starts, PythonNative compiles its spec (curve,
-duration, target value) and offers it to the platform handler of every
-native view the value is attached to
-([`ViewHandler.start_animation`][pythonnative.native_views.base.ViewHandler.start_animation]).
+Mounted bindings install a serialized graph of connected values, arithmetic,
+interpolation, and view properties. When an animation starts, PythonNative
+offers its timing, spring, or decay specification to the renderer through
+[`ViewHandler.start_animation`][pythonnative.native_views.base.ViewHandler.start_animation].
 
-- **Accepted** (iOS Core Animation, Android ``ViewPropertyAnimator`` /
-  ``DynamicAnimation``): the platform animates the property entirely
-  natively; no Python code runs per frame. Python receives exactly one
-  callback when the animation settles, updates the
-  [`AnimatedValue`][pythonnative.animated.AnimatedValue], and resolves
-  any awaiting tasks.
-- **Declined** (desktop preview, unattached values, callable easings,
-  values feeding Python-side listeners or derived nodes): a single
+- **Accepted**: the renderer evaluates the graph and applies its bindings
+  without Python work on every frame. Completion callbacks settle the
+  [`AnimatedValue`][pythonnative.animated.AnimatedValue] and resolve
+  awaiting tasks.
+- **Declined** (unattached values, callable easings,
+  values feeding Python-side listeners, or an unsupported backend): a single
   background thread ticks the animation at ~60 Hz from Python, pushing
   each frame through ``set_animated_property``. Semantics are
   identical; only the frame source differs.
 
-Values driven by *events* (scroll offsets via ``Animated.event``,
-gesture translations) flow through Python: the native listener fires,
-the bound values update, and every attachment (including derived
-nodes) is pushed in the same call.
+On mobile, scroll and gesture bindings feed graph values before input is
+queued to Python. Derived expressions can run in the renderer alongside their
+source drivers. Backends without graph support use Python for derived bindings.
 
 Example:
     ```python
@@ -85,7 +82,7 @@ import weakref
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from .element import Element
-from .hooks import use_effect, use_ref
+from .hooks import Ref, use_effect, use_ref
 from .runtime import resolve_future
 from .style import StyleProp, resolve_style
 
@@ -243,12 +240,17 @@ class AnimatedNode:
         except Exception:
             pass
 
+        from .animation_graph import install
+
+        install(self)
+
         def _detach() -> None:
             with self._lock:
                 try:
                     self._attachments.remove(binding)
                 except ValueError:
                     pass
+            install(self, detached_tag=tag)
 
         return _detach
 
@@ -404,6 +406,12 @@ class AnimatedValue(AnimatedNode):
     def set_value(self, new_value: float) -> None:
         """Set the value immediately, pushing to native views and listeners."""
         self._apply(float(new_value), push_native=True)
+        from .animation_graph import install
+
+        graph = install(self)
+        if graph and graph["bindings"]:
+            backend = _backend()
+            backend.set_animated_property(graph["bindings"][0][0], f"_pn_graph:{id(self)}", float(new_value))
 
     def _apply(self, new_value: float, push_native: bool) -> None:
         with self._lock:
@@ -695,7 +703,12 @@ class AnimatedEvent:
             if raw is None:
                 continue
             try:
-                node.set_value(float(raw))
+                if getattr(_backend(), "install_animation_graph", None) is not None:
+                    # Native already evaluated the graph at the input timestamp.
+                    # Python observes the sample without echoing an older frame.
+                    node._value = float(raw)
+                else:
+                    node.set_value(float(raw))
             except (TypeError, ValueError):
                 continue
         if self._listener is not None:
@@ -1041,20 +1054,20 @@ def _start_native(value: AnimatedValue, spec: Dict[str, Any]) -> Optional[_Nativ
     animation; otherwise rolls back any accepted targets and returns
     ``None`` so the caller falls back to the Python ticker.
     """
-    targets = value.attachments()
-    if not targets:
-        return None
-    if value.has_listeners():
-        # Python listeners want per-frame values; only the ticker
-        # provides those.
-        return None
-    if value._has_dependents():
-        # Derived nodes (interpolations, arithmetic) need per-frame
-        # Python evaluation to keep their own attachments in sync.
-        return None
     try:
         backend = _backend()
     except Exception:
+        return None
+    from .animation_graph import install
+
+    graph = install(value)
+    if graph and graph["bindings"]:
+        targets = [(graph["bindings"][0][0], f"_pn_graph:{id(value)}")]
+    else:
+        targets = value.attachments()
+        if value._has_dependents():
+            return None
+    if not targets or value.has_listeners():
         return None
 
     group = _NativeAnimationGroup(value, _projected_final_value(spec))
@@ -1356,54 +1369,56 @@ def _make_animated_factory(
     accept_children: bool,
 ) -> Callable[..., Element]:
     """Build an animated wrapper for ``element_type``."""
-    from .hooks import component  # local import to avoid cycle
+    from .component import Component
 
-    @component
-    def _animated(*args: Any, **kwargs: Any) -> Element:
+    def _animated(*children: Any, **kwargs: Any) -> Element:
         from .components import Image as _Image
         from .components import Text as _Text
         from .components import View as _View
 
-        # ``@component`` packs positional children into the ``children``
-        # prop (this function declares ``*args``), and the reconciler
-        # re-invokes it with keyword props only, so at render time the
-        # payload arrives in ``kwargs``, never in ``args``.
-        children = list(args) or list(kwargs.pop("children", ()) or ())
-
+        kids: List[Any] = list(children)
         style = kwargs.pop("style", None)
         plain_style, bindings = _resolve_style_with_values(style)
 
         ref = use_ref(None)
+        attached: Ref[List[Callable[[], None]]] = use_ref([])
 
-        def _attach_bindings() -> Callable[[], None]:
+        def _attach_bindings() -> None:
             tag = ref._pn_tag
             if tag is None:
-                return lambda: None
+                return
+            # Derived nodes can be rebuilt on every render. Install their new
+            # bindings before releasing the old ones so a running native graph
+            # never temporarily loses every owner.
             detachers = [value.attach(tag, _animated_prop_name(prop)) for prop, value in bindings.items()]
+            previous = attached.current
+            attached.current = detachers
+            for detach in previous:
+                detach()
 
+        def _unmount_bindings() -> Callable[[], None]:
             def _cleanup() -> None:
-                for fn in detachers:
-                    try:
-                        fn()
-                    except Exception:
-                        pass
+                for detach in attached.current:
+                    detach()
+                attached.current = []
 
             return _cleanup
 
         # Re-attach whenever the binding set changes identity.
         use_effect(_attach_bindings, [tuple(sorted((k, id(v)) for k, v in bindings.items()))])
+        use_effect(_unmount_bindings, [])
 
         if element_type == "Text":
             text = children[0] if children else kwargs.pop("text", "")
             return _Text(text, style=plain_style, ref=ref, **kwargs)
         if element_type == "Image":
-            source = children[0] if children else kwargs.pop("source", "")
+            source = kids[0] if kids else kwargs.pop("source", "")
             return _Image(source, style=plain_style, ref=ref, **kwargs)
         if not accept_children:
-            children = []
-        return _View(*children, style=plain_style, ref=ref, **kwargs)
+            kids = []
+        return _View(*kids, style=plain_style, ref=ref, **kwargs)
 
-    return _animated
+    return Component(_animated, display_name=f"Animated.{element_type}")
 
 
 def _animated_prop_name(prop: str) -> str:

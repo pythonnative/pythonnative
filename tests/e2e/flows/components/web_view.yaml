@@ -1,7 +1,7 @@
 # Tests WebView mounts; surrounding labels remain visible.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/web_view.py
-# Source under test: src/pythonnative/components.py :: WebView
+# Source under test: src/pythonnative/components/media.py :: WebView
 appId: ${APP_ID}
 ---
 - runFlow:
