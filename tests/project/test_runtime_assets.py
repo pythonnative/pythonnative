@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import hashlib
 import io
+import os
 import socket
 import tarfile
-import warnings
 from pathlib import Path
 from typing import Any, List, Tuple
 
@@ -19,11 +19,9 @@ import pytest
 
 from pythonnative.project import config, runtime_assets
 
-# Version literals are derived from the source constants, never hardcoded, so
-# a supported-version bump does not need edits here. main moved from
-# 3.10-3.12 to 3.13-3.14 while this was in review, which is the drift this
-# avoids. ``UNPINNED_VERSION`` is the one deliberate literal; the test that
-# uses it asserts it really is absent.
+# Derive supported versions from the source constants so version updates
+# don't require edits here. The rejection test verifies that the deliberate
+# unsupported literal remains absent from the pins.
 PINNED_VERSION = sorted(runtime_assets.PINNED_ASSETS)[0]
 OTHER_PINNED_VERSION = sorted(runtime_assets.PINNED_ASSETS)[-1]
 UNPINNED_VERSION = "2.7"
@@ -71,56 +69,6 @@ def test_sha256_reads_across_chunk_boundaries(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # _safe_extract
 # ---------------------------------------------------------------------------
-
-
-class _NoFilterTar:
-    """Wrap a TarFile so ``extractall(filter=...)`` raises TypeError.
-
-    ``filter="data"`` landed in 3.12 and was backported to 3.10.12 and
-    3.11.4, so CI (which runs current patch releases) always takes the
-    filter path. Without this shim the manual checks in ``_safe_extract``
-    are never exercised, and they are the only protection an older
-    interpreter in the supported range has.
-    """
-
-    def __init__(self, inner: tarfile.TarFile) -> None:
-        self._inner = inner
-
-    def __enter__(self) -> "_NoFilterTar":
-        self._inner.__enter__()
-        return self
-
-    def __exit__(self, *exc: Any) -> Any:
-        return self._inner.__exit__(*exc)
-
-    def getmembers(self) -> List[tarfile.TarInfo]:
-        return self._inner.getmembers()
-
-    def extractall(self, *args: Any, **kwargs: Any) -> Any:
-        if "filter" in kwargs:
-            raise TypeError("extractall() got an unexpected keyword argument 'filter'")
-        # Extracting with no filter is deprecated from 3.12 and warns on
-        # 3.14. That warning is this shim doing exactly what it simulates,
-        # not the code under test, so keep it out of the suite's output.
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            return self._inner.extractall(*args, **kwargs)
-
-
-@pytest.fixture
-def force_no_filter(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make _safe_extract take its pre-3.10.12 fallback path."""
-    real_open = tarfile.open
-
-    def _open(*args: Any, **kwargs: Any) -> Any:
-        # runtime_assets.tarfile is the shared module, so this patch is
-        # visible to the tests' own tarball writing too. Wrap read mode
-        # only, which is the single call _safe_extract makes.
-        mode = kwargs.get("mode", args[1] if len(args) > 1 else "r")
-        opened = real_open(*args, **kwargs)
-        return _NoFilterTar(opened) if str(mode).startswith("r") else opened
-
-    monkeypatch.setattr(runtime_assets.tarfile, "open", _open)
 
 
 def _workspace(tmp_path: Path) -> Tuple[Path, Path]:
@@ -209,16 +157,7 @@ def test_safe_extract_refuses_escaping_members(tmp_path: Path, member: str) -> N
     _assert_member_refused(tmp_path, member)
 
 
-@pytest.mark.parametrize("member", ESCAPING_MEMBERS)
-def test_safe_extract_refuses_escaping_members_without_the_filter(
-    tmp_path: Path, member: str, force_no_filter: None
-) -> None:
-    # Same members with extractall's filter unavailable, so the manual
-    # checks are the only thing between the archive and the disk.
-    _assert_member_refused(tmp_path, member)
-
-
-def test_safe_extract_refuses_a_symlink_that_escapes_via_linkname(tmp_path: Path, force_no_filter: None) -> None:
+def test_safe_extract_refuses_a_symlink_that_escapes_via_linkname(tmp_path: Path) -> None:
     # Both member names resolve inside dest; only the link target escapes.
     # Extracting the pair writes through the symlink, outside dest.
     root, dest = _workspace(tmp_path)
@@ -234,7 +173,7 @@ def test_safe_extract_refuses_a_symlink_that_escapes_via_linkname(tmp_path: Path
     assert list((root / "outside_target").iterdir()) == []
 
 
-def test_safe_extract_refuses_a_hardlink_that_escapes_via_linkname(tmp_path: Path, force_no_filter: None) -> None:
+def test_safe_extract_refuses_a_hardlink_that_escapes_via_linkname(tmp_path: Path) -> None:
     root, dest = _workspace(tmp_path)
     tar_path = root / "a.tar.gz"
     with tarfile.open(tar_path, "w:gz") as tar:
@@ -244,7 +183,7 @@ def test_safe_extract_refuses_a_hardlink_that_escapes_via_linkname(tmp_path: Pat
         runtime_assets._safe_extract(tar_path, dest)
 
 
-def test_safe_extract_allows_a_symlink_that_stays_inside(tmp_path: Path, force_no_filter: None) -> None:
+def test_safe_extract_allows_a_symlink_that_stays_inside(tmp_path: Path) -> None:
     # Guards against over-blocking: a link pointing within dest is fine.
     root, dest = _workspace(tmp_path)
     tar_path = root / "a.tar.gz"
@@ -258,6 +197,44 @@ def test_safe_extract_allows_a_symlink_that_stays_inside(tmp_path: Path, force_n
     assert (dest / "subdir" / "alias.txt").read_text(encoding="utf-8") == "ok\n"
 
 
+def test_safe_extract_rechecks_paths_after_creating_links(tmp_path: Path) -> None:
+    # Preflight resolves both names inside dest. Once alias points to dest,
+    # the payload path traverses to its parent instead. The data filter must
+    # check against the filesystem as each member is extracted.
+    root, dest = _workspace(tmp_path)
+    outside = root / "outside_target"
+    outside.mkdir()
+    tar_path = root / "a.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tar:
+        _add_link(tar, "alias", ".")
+        _add_file(tar, "alias/../outside_target/payload.txt")
+
+    with pytest.raises(tarfile.OutsideDestinationError):
+        runtime_assets._safe_extract(tar_path, dest)
+
+    assert (dest / "alias").is_symlink()
+    assert list(outside.iterdir()) == []
+    assert _files_outside(root, dest) == []
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows doesn't preserve POSIX executable bits")
+def test_safe_extract_preserves_executable_build_helper(tmp_path: Path) -> None:
+    root, dest = _workspace(tmp_path)
+    tar_path = root / "a.tar.gz"
+    script = b"install_python() { :; }\n"
+    with tarfile.open(tar_path, "w:gz") as tar:
+        info = tarfile.TarInfo("Python.xcframework/build/utils.sh")
+        info.size = len(script)
+        info.mode = 0o755
+        tar.addfile(info, io.BytesIO(script))
+
+    runtime_assets._safe_extract(tar_path, dest)
+
+    installed = dest / "Python.xcframework" / "build" / "utils.sh"
+    assert installed.read_bytes() == script
+    assert installed.stat().st_mode & 0o111 == 0o111
+
+
 @pytest.mark.parametrize(
     "kind",
     [
@@ -266,10 +243,8 @@ def test_safe_extract_allows_a_symlink_that_stays_inside(tmp_path: Path, force_n
         pytest.param("blk", id="block-device"),
     ],
 )
-def test_safe_extract_refuses_special_files(tmp_path: Path, kind: str, force_no_filter: None) -> None:
-    # filter="data" raises SpecialFileError for these. Without it the
-    # fallback creates the FIFO outright and reaches mknod for the device
-    # nodes, which fail only for lack of privilege.
+def test_safe_extract_refuses_special_files(tmp_path: Path, kind: str) -> None:
+    # Refuse these during preflight, before extraction creates any members.
     root, dest = _workspace(tmp_path)
     tar_path = root / "a.tar.gz"
     with tarfile.open(tar_path, "w:gz") as tar:

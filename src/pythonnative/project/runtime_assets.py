@@ -82,12 +82,9 @@ def _sha256(path: Path) -> str:
 def _safe_extract(tar_path: Path, dest: Path) -> None:
     """Extract a tarball, refusing entries that escape ``dest``.
 
-    The manual checks below cover path escapes, link escapes, and special
-    files. They are not a ``data_filter`` equivalent: notably they do not
-    sanitize modes, so on the fallback path setuid/setgid bits and a
-    directory member's permissions are applied as the archive states them.
-    That is accepted here because the asset is pinned by SHA-256 and its
-    ``build/utils.sh`` has to stay executable.
+    Preflight checks reject unsafe paths, link targets, and special files.
+    The data filter also checks each member during extraction, accounting
+    for links created by earlier members and sanitizing file permissions.
     """
     dest = dest.resolve()
     with tarfile.open(tar_path, "r:gz") as tar:
@@ -108,20 +105,12 @@ def _safe_extract(tar_path: Path, dest: Path) -> None:
                 if not link_target.is_relative_to(dest):
                     raise RuntimeError(f"Refusing to extract unsafe link: {member.name} -> {member.linkname}")
             if member.isdev():
-                # FIFOs and device nodes. ``filter="data"`` rejects these;
-                # the fallback would otherwise mknod them. Every member of
-                # the pinned archives is a file, directory, or symlink.
+                # The pinned archives only need files, directories, and
+                # links, so refuse FIFOs and device nodes before extraction.
                 raise RuntimeError(f"Refusing to extract special file: {member.name}")
-        # ``filter='data'`` is available on every supported interpreter, so
-        # it always runs and blocks unsafe members too. The manual checks
-        # above are the primary boundary check: they run first, and their
-        # refusals are what the tests pin. The ``except TypeError`` branch
-        # below is unreachable on >=3.13; it is kept rather than removed
-        # unilaterally.
-        try:
-            tar.extractall(dest, filter="data")
-        except TypeError:
-            tar.extractall(dest)
+        # Every supported interpreter provides the data filter. Keep it
+        # explicit because Python 3.13 defaults to unfiltered extraction.
+        tar.extractall(dest, filter="data")
 
 
 def _locate_runtime(extract_root: Path, python_version: str) -> IOSRuntime:
