@@ -1366,6 +1366,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#runtime-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime enforcement
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3292,6 +3303,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#runtime-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime enforcement
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3328,8 +3350,9 @@
 <h1 id="generated-native-contracts">Generated native contracts<a class="headerlink" href="#generated-native-contracts" title="Permanent link">&para;</a></h1>
 <p>Declare an extension's interface in Python, generate its native adapters, and
 implement the platform behavior in Swift and Kotlin. The complete working
-example is <code>examples/inbox</code>: its badge uses generated props, and its module
-has synchronous and asynchronous methods.</p>
+example is the separately packaged <code>examples/inbox-extension</code>, consumed by
+<code>examples/inbox</code>. Its badge uses generated props, and its module has synchronous
+and asynchronous methods.</p>
 <h2 id="define-the-interface">Define the interface<a class="headerlink" href="#define-the-interface" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Protocol</span>
@@ -3379,8 +3402,8 @@ as an interface, and keep it in source control.</p>
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span><span class="p">}</span>
 </span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>The schema should contain the extension's own components and modules. The inbox
-example's <code>generate_contracts.py</code> demonstrates extracting those definitions.
+<p>The schema should contain the extension's own components and modules. The
+<code>examples/inbox-extension/generate_contracts.py</code> script demonstrates extracting those definitions.
 Builders merge plugin contracts with the built-ins, regenerate native bindings,
 and bundle the matching schema into embedded Python. Startup rejects a client
 whose protocol, Yoga version, or schema fingerprint doesn't match.</p>
@@ -3401,6 +3424,28 @@ on the next preparation. Target wheel discovery reads archives without importing
 mobile binary extensions into the desktop build process.</p>
 <p>Rebuild after changing a contract or native implementation. Fast Refresh applies
 to Python application behavior; it can't change a compiled native interface.</p>
+<h2 id="runtime-enforcement">Runtime enforcement<a class="headerlink" href="#runtime-enforcement" title="Permanent link">&para;</a></h2>
+<p>Built-in widgets and services use these contracts too. Unknown props, methods,
+events, and arguments fail validation. Nested dataclasses and <code>TypedDict</code> values
+validate required fields and reject unknown fields. Wire integers must be exact
+numbers within JavaScript's safe integer range; booleans don't count as numbers.
+Methods declare both their arguments and their return types. Python validates
+native results before exposing them to application code.</p>
+<p>A <code>null</code> update removes a prop. The renderer restores its declared default, or
+recreates the physical widget to restore a platform default. Creation-only
+changes, including <code>TextInput.multiline</code>, preserve the logical tag, component
+state, child ownership, focus, and selection where the platform permits it.
+Refs keep addressing that logical tag. <code>NativeField.platforms</code> limits where a
+field can be used; unsupported fields are rejected by the target renderer.</p>
+<p>Regenerate the repository's built-in bindings with:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/generate-native-contracts.py
+</span></code></pre></div>
+<p>The shared fixtures run in Python, Swift, Kotlin, and JavaScript. The actual
+browser renderer runs in Chrome with Yoga WebAssembly:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/run-browser-tests.py
+</span></code></pre></div>
+<p>Native service adapters are named <code>NameModuleAdapter</code>, which keeps the generated
+base class distinct from a platform's <code>NameModule</code> implementation.</p>
 
 
 

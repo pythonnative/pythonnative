@@ -3833,7 +3833,7 @@ style.</p>
 <h2 id="testing-native-code">Testing native code<a class="headerlink" href="#testing-native-code" title="Permanent link">&para;</a></h2>
 <p>The Swift and Kotlin halves have their own suites next to the code:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">cd</span><span class="w"> </span>src/pythonnative/native/ios
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>xcodebuild<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-scheme<span class="w"> </span>PythonNativeKit<span class="w"> </span>-destination<span class="w"> </span><span class="s1">'platform=iOS Simulator,name=iPhone 15 Pro'</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>xcodebuild<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-project<span class="w"> </span>Tests/NativeTests.xcodeproj<span class="w"> </span>-scheme<span class="w"> </span>NativeTests<span class="w"> </span>-destination<span class="w"> </span><span class="s1">'platform=iOS Simulator,name=iPhone 15 Pro'</span>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nb">cd</span><span class="w"> </span>src/pythonnative/templates/android_template
 </span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>./gradlew<span class="w"> </span>:pythonnative:testDebugUnitTest
@@ -3842,6 +3842,12 @@ style.</p>
 promise envelopes, so a wire-format change is caught on every side. Add
 cases there when you change a manager or module rather than relying on
 the Maestro E2E suite alone.</p>
+<p>The iOS <code>NativeTests</code> scheme runs the Swift tests inside a minimal UIKit
+app. Use that scheme for native tests: composition, selection, and focus
+need an application event loop and keyboard session, which the standalone
+Swift package test runner doesn't provide. Add new Swift test files to
+both the test directory and the Xcode project's <code>PythonNativeKitTests</code>
+target.</p>
 <h2 id="testing-async-code">Testing async code<a class="headerlink" href="#testing-async-code" title="Permanent link">&para;</a></h2>
 <p><code>render</code> and every event helper settle the framework's <code>asyncio</code> loop
 before returning, so <code>use_effect</code> coroutines, <code>use_resource</code>,

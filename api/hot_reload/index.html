@@ -4509,7 +4509,12 @@ information needed to re-resolve after a module reload.</p>
             <td>
               <div class="doc-md-description">
                 <p>The function captured in an
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../element/#pythonnative.element.Element"><code>Element</code></a>'s <code>type</code> slot.</p>
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../element/#pythonnative.element.Element"><code>Element</code></a>'s <code>type</code> slot.</p>
               </div>
             </td>
             <td>
@@ -4721,7 +4726,7 @@ considered).</p>
     <div class="doc doc-contents ">
 
         <p>Apply a <code>{old: new}</code> map to every node in the reconciler tree.</p>
-<p>Mutates <code>vnode.element.type</code> directly so the NEXT diff sees
+<p>Replaces immutable element descriptions so the next diff sees
 identical types and reuses VNodes (preserving hook state).
 The element lists stored on <code>vnode.rendered</code> are rewritten
 too because the reconciler reads from them when comparing keys

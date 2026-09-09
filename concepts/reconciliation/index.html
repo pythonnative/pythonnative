@@ -918,6 +918,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#elements-and-update-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Elements and update priority
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3490,6 +3501,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#elements-and-update-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Elements and update priority
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3525,13 +3547,23 @@
 
 <h1 id="reconciliation">Reconciliation<a class="headerlink" href="#reconciliation" title="Permanent link">&para;</a></h1>
 <p>Reconciliation is the process that turns a freshly produced
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> tree into the smallest set of native
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> tree into the smallest set of native
 view mutations that bring the on-screen tree into agreement with it.
 This page covers the rules that govern keyed
 diffing, function components, providers, and error boundaries.</p>
 <h2 id="why-we-need-a-reconciler">Why we need a reconciler<a class="headerlink" href="#why-we-need-a-reconciler" title="Permanent link">&para;</a></h2>
 <p>Re-running a <code>@component</code> function returns a brand-new
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> tree. Naively recreating native
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> tree. Naively recreating native
 widgets every render would be slow (Auto Layout passes, JNI roundtrips)
 and would lose user state (text selections, scroll position, focus).</p>
 <p>The reconciler instead asks: what is the <em>minimal</em> list of native
@@ -3568,13 +3600,17 @@ tree:</p>
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
   &lt;/span&gt;" href="../../api/mutations/#pythonnative.mutations.DestroyOp"><code>DestroyOp</code></a>.</li>
 </ul>
-<p>The reconciler runs each render function synchronously to completion on the
-application thread. Expensive Python work delays callbacks and commits.
+<p>The reconciler runs synchronous render functions to completion on the
+application thread. Async components capture their provider environment across
+awaits. Changes to their inputs cancel obsolete work before it can publish.
+Expensive Python work delays callbacks and commits.
 Native scrolling and supported animation drivers run independently; see
 <a href="../architecture/#runtime-limits">Runtime limits</a>.</p>
 <h2 id="commits-are-transactions">Commits are transactions<a class="headerlink" href="#commits-are-transactions" title="Permanent link">&para;</a></h2>
-<p>The diff phase is pure: it only accumulates ops. At the end of the
-pass the staged mutations are applied through a single
+<p>Rendering records changes in an undo journal and stages native operations,
+callbacks, refs, and effects. A render that fails restores the committed tree
+without publishing those changes. At the end of the pass, staged mutations are
+applied through a single
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply_mutations&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.NativeViewRegistry.apply_mutations"><code>apply_mutations</code></a>
 call. The renderer validates the versioned transaction before applying it
 and acknowledges the committed revision. Layout then runs beside the native
@@ -3614,7 +3650,12 @@ all. Use a stable identifier (database id, file path, etc.).</p>
 <li>It calls the function with the current props inside an active hook
    context.</li>
 <li>It recursively reconciles whatever the function returned: a single
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a>, a <code>list</code> of elements (which
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a>, a <code>list</code> of elements (which
    mount as siblings at the component's position), or <code>None</code> (which
    mounts nothing).</li>
 </ol>
@@ -3666,7 +3707,12 @@ exception escapes a child component or handler, the reconciler:</p>
    callback, if provided.</li>
 <li>Tears down the partially-mounted subtree.</li>
 <li>Renders the boundary's <code>fallback</code> (a static
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a>, <code>fallback(error)</code>, or
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a>, <code>fallback(error)</code>, or
    <code>fallback(error, reset)</code> where <code>reset</code> remounts the children).</li>
 <li>Continues reconciling the rest of the page.</li>
 </ol>
@@ -3699,6 +3745,21 @@ bottleneck.</p>
 <li>Understand handlers underneath the diff: <a href="../native-views/">Native views</a>.</li>
 <li>See how mounting interacts with hooks: <a href="../lifecycle/">Lifecycle</a>.</li>
 </ul>
+<h2 id="elements-and-update-priority">Elements and update priority<a class="headerlink" href="#elements-and-update-priority" title="Permanent link">&para;</a></h2>
+<p>Elements hold read-only property snapshots and tuple children. Values inside
+application props aren't deep-copied; replace mutable application data when its
+meaning changes. Component construction follows the decorated function's Python
+signature, including positional-only parameters, keyword-only parameters,
+variadic children, and normal argument errors.</p>
+<p>State setters and reducer dispatch functions retain their identity across renders.
+Deferred updates stay out of urgent renders. When deferred work runs, the state
+queue replays urgent updates in their original order so an urgent edit isn't lost.
+Python rendering remains cooperative: a long synchronous function cannot be
+preempted by a later urgent update.</p>
+<p>A native mount failure retires the surface and cancels its work. Validation
+failure before native mutation preserves the previous revision and can be retried.
+Property validation copies only changed records, so a one-property update doesn't
+clone the rest of the live native tree.</p>
 
 
 
