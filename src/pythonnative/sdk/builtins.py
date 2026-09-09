@@ -41,6 +41,9 @@ def install(factories: dict[str, Any]) -> None:
             name, props_type, measurement="container" if name in CONTAINERS else "intrinsic"
         )
         wire = dict(style_fields) | schema.props
+        # Some controls supply their role internally rather than exposing an
+        # override in their factory signature. It still crosses the bridge.
+        wire.setdefault("accessibility_role", {"type": "string"})
         wire.update(ref={}, on_layout=type_schema(Callable[..., Any]))
         for key in wire:
             wire[key] = dict(wire[key])

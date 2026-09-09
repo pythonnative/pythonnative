@@ -1,0 +1,128 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000000000000000000001 = {isa = PBXBuildFile; fileRef = B00000000000000000000001; };
+		A00000000000000000000002 = {isa = PBXBuildFile; fileRef = B00000000000000000000002; };
+		A00000000000000000000003 = {isa = PBXBuildFile; fileRef = B00000000000000000000003; };
+		A00000000000000000000004 = {isa = PBXBuildFile; fileRef = B00000000000000000000004; };
+		A00000000000000000000005 = {isa = PBXBuildFile; fileRef = B00000000000000000000005; };
+		A00000000000000000000006 = {isa = PBXBuildFile; fileRef = B00000000000000000000006; };
+		A00000000000000000000007 = {isa = PBXBuildFile; fileRef = B00000000000000000000007; };
+		A00000000000000000000008 = {isa = PBXBuildFile; fileRef = B00000000000000000000008; };
+		A00000000000000000000009 = {isa = PBXBuildFile; fileRef = B00000000000000000000009; };
+		A0000000000000000000000A = {isa = PBXBuildFile; fileRef = B0000000000000000000000A; };
+		A0000000000000000000000B = {isa = PBXBuildFile; fileRef = B0000000000000000000000B; };
+		A0000000000000000000000C = {isa = PBXBuildFile; productRef = C00000000000000000000002; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		B00000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHost/main.swift; sourceTree = "<group>"; };
+		B00000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNAnimationGraphTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNColorTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNCommitTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000005 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNContractFixtureTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000006 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNGestureTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000007 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNLifecycleTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000008 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNManagerTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000009 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNModuleTests.swift; sourceTree = "<group>"; };
+		B0000000000000000000000A = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNTransactionTests.swift; sourceTree = "<group>"; };
+		B0000000000000000000000B = {isa = PBXFileReference; lastKnownFileType = folder; path = Fixtures; sourceTree = "<group>"; };
+		B0000000000000000000000C = {isa = PBXFileReference; explicitFileType = wrapper.application; path = TestHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B0000000000000000000000D = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = PythonNativeKitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		D00000000000000000000001 = {
+			isa = PBXGroup;
+			children = (B00000000000000000000001, D00000000000000000000002, D00000000000000000000003);
+			sourceTree = "<group>";
+		};
+		D00000000000000000000002 = {
+			isa = PBXGroup;
+			children = (B00000000000000000000002, B00000000000000000000003, B00000000000000000000004, B00000000000000000000005, B00000000000000000000006, B00000000000000000000007, B00000000000000000000008, B00000000000000000000009, B0000000000000000000000A, B0000000000000000000000B);
+			path = PythonNativeKitTests;
+			sourceTree = "<group>";
+		};
+		D00000000000000000000003 = {isa = PBXGroup; children = (B0000000000000000000000C, B0000000000000000000000D); name = Products; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E00000000000000000000001 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F00000000000000000000002;
+			buildPhases = (A10000000000000000000001);
+			buildRules = ();
+			dependencies = ();
+			name = TestHost;
+			productName = TestHost;
+			productReference = B0000000000000000000000C;
+			productType = "com.apple.product-type.application";
+		};
+		E00000000000000000000002 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F00000000000000000000003;
+			buildPhases = (A10000000000000000000002, A10000000000000000000003, A10000000000000000000004);
+			buildRules = ();
+			dependencies = (E10000000000000000000001);
+			name = PythonNativeKitTests;
+			packageProductDependencies = (C00000000000000000000002);
+			productName = PythonNativeKitTests;
+			productReference = B0000000000000000000000D;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E00000000000000000000003 = {
+			isa = PBXProject;
+			attributes = {BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 1500; TargetAttributes = {E00000000000000000000002 = {TestTargetID = E00000000000000000000001; }; }; };
+			buildConfigurationList = F00000000000000000000001;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base);
+			mainGroup = D00000000000000000000001;
+			packageReferences = (C00000000000000000000001);
+			productRefGroup = D00000000000000000000003;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (E00000000000000000000001, E00000000000000000000002);
+		};
+/* End PBXProject section */
+
+/* Begin build phases and target dependency */
+		A10000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001); runOnlyForDeploymentPostprocessing = 0; };
+		A10000000000000000000002 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000002, A00000000000000000000003, A00000000000000000000004, A00000000000000000000005, A00000000000000000000006, A00000000000000000000007, A00000000000000000000008, A00000000000000000000009, A0000000000000000000000A); runOnlyForDeploymentPostprocessing = 0; };
+		A10000000000000000000003 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (A0000000000000000000000C); runOnlyForDeploymentPostprocessing = 0; };
+		A10000000000000000000004 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A0000000000000000000000B); runOnlyForDeploymentPostprocessing = 0; };
+		E10000000000000000000001 = {isa = PBXTargetDependency; target = E00000000000000000000001; targetProxy = E10000000000000000000002; };
+		E10000000000000000000002 = {isa = PBXContainerItemProxy; containerPortal = E00000000000000000000003; proxyType = 1; remoteGlobalIDString = E00000000000000000000001; remoteInfo = TestHost; };
+/* End build phases and target dependency */
+
+/* Begin XCBuildConfiguration section */
+		F10000000000000000000001 = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; ENABLE_TESTABILITY = YES; GCC_OPTIMIZATION_LEVEL = 0; IPHONEOS_DEPLOYMENT_TARGET = 13.0; ONLY_ACTIVE_ARCH = YES; SDKROOT = iphoneos; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_VERSION = 5.0; }; name = Debug; };
+		F10000000000000000000002 = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 13.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; }; name = Release; };
+		F10000000000000000000003 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_UILaunchScreen_Generation = YES; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.pythonnative.tests.host; PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Debug; };
+		F10000000000000000000004 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_UILaunchScreen_Generation = YES; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.pythonnative.tests.host; PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Release; };
+		F10000000000000000000005 = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks"); PRODUCT_BUNDLE_IDENTIFIER = com.pythonnative.tests; PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = "1,2"; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TestHost.app/TestHost"; }; name = Debug; };
+		F10000000000000000000006 = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks"); PRODUCT_BUNDLE_IDENTIFIER = com.pythonnative.tests; PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = "1,2"; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TestHost.app/TestHost"; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F00000000000000000000001 = {isa = XCConfigurationList; buildConfigurations = (F10000000000000000000001, F10000000000000000000002); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		F00000000000000000000002 = {isa = XCConfigurationList; buildConfigurations = (F10000000000000000000003, F10000000000000000000004); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		F00000000000000000000003 = {isa = XCConfigurationList; buildConfigurations = (F10000000000000000000005, F10000000000000000000006); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+
+/* Begin Swift package references */
+		C00000000000000000000001 = {isa = XCLocalSwiftPackageReference; relativePath = ..; };
+		C00000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = C00000000000000000000001; productName = PythonNativeKit; };
+/* End Swift package references */
+	};
+	rootObject = E00000000000000000000003;
+}

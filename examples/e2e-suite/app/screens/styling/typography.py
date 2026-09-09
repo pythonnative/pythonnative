@@ -1,7 +1,7 @@
 """Demo screen for typography styling.
 
-Shows several font sizes, weights, colors, and a text-decoration
-example. Maestro asserts each labelled line is present.
+Shows several font sizes, weights, colors, the boolean italic style,
+and text decoration. Maestro asserts each labelled line is present.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ def TypographyDemo() -> pn.Element:
             pn.Text("type-headline", style=pn.style(font_size=24, font_weight="700")),
             pn.Text("type-body", style=pn.style(font_size=16)),
             pn.Text("type-caption", style=pn.style(font_size=12, color="#6B7280")),
-            pn.Text("type-italic", style=pn.style(font_size=15, font_style="italic")),
+            pn.Text("type-italic", style=pn.style(font_size=15, italic=True)),
             pn.Text("type-underline", style=pn.style(font_size=15, text_decoration="underline")),
             pn.Text(
                 "type-letter-spacing",

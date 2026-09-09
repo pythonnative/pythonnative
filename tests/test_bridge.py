@@ -10,6 +10,7 @@ back, and how the on-device screen host drives navigation.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import math
 import types
 from typing import Any, Dict, Generator, List
@@ -28,6 +29,7 @@ from pythonnative.native_modules import registry as modules
 from pythonnative.native_views import get_registry, set_registry
 from pythonnative.native_views.bridge_backend import BridgeBackend, NativeViewRef
 from pythonnative.reconciler import Reconciler
+from pythonnative.sdk.schema import COMPONENTS
 
 
 @pytest.fixture
@@ -268,6 +270,50 @@ def test_reconciler_commits_through_bridge(transport: FakeTransport) -> None:
     assert transport.find("Text")[0].props["text"] == "count=1"
     rec.unmount()
     assert transport.views == {}
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        name
+        for name in pn.components.__all__
+        if name in COMPONENTS
+        and inspect.isfunction(getattr(pn, name))
+        and name
+        not in {
+            "KeyboardAvoidingView",
+            "SafeAreaView",
+            "FlatList",
+            "SectionList",
+            "ErrorBoundary",
+            "Fragment",
+            "Suspense",
+        }
+    ],
+)
+def test_builtin_factory_defaults_cross_the_bridge(name: str, backend: BridgeBackend, transport: FakeTransport) -> None:
+    element = getattr(pn, name)()
+    assert isinstance(element.type, str)
+    backend.apply_mutations([CreateOp(1, element.type, dict(element.props))])
+    assert transport.views[1].type_name == element.type
+    if name in {"Checkbox", "DatePicker", "Picker"}:
+        assert transport.views[1].props["accessibility_role"] == ("checkbox" if name == "Checkbox" else "button")
+
+
+@pytest.mark.parametrize("name", ["View", "Text", "Image"])
+def test_animated_transform_shorthands_cross_the_bridge(name: str, transport: FakeTransport) -> None:
+    scale = pn.Animated.Value(0.5)
+    translate = pn.Animated.Value(10)
+    factory = getattr(pn.Animated, name)
+    children = [] if name == "View" else ["box" if name == "Text" else "https://example.com/image.png"]
+    rec = Reconciler(get_registry())
+    try:
+        rec.mount(factory(*children, style={"scale": scale, "translate_x": translate, "rotate": 45}))
+        props = transport.find(name)[0].props
+        assert props["transform"] == [{"scale": 0.5}, {"translate_x": 10.0}, {"rotate": 45}]
+        assert not {"scale", "translate_x", "rotate"} & props.keys()
+    finally:
+        rec.unmount()
 
 
 def test_event_handler_return_value_is_returned_to_native(transport: FakeTransport) -> None:

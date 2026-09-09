@@ -106,7 +106,7 @@ uv run black src examples tests # format
 uv run --group docs mkdocs serve # preview the docs site locally
 
 # native rendering core (macOS with Xcode for the Swift package; JDK 17 for Gradle)
-(cd src/pythonnative/native/ios && xcodebuild test -scheme PythonNativeKit -destination 'platform=iOS Simulator,name=iPhone 15 Pro')
+(cd src/pythonnative/native/ios && xcodebuild test -project Tests/NativeTests.xcodeproj -scheme NativeTests -destination 'platform=iOS Simulator,name=iPhone 15 Pro')
 (cd src/pythonnative/native/android && ../../templates/android_template/gradlew testDebugUnitTest)
 ```
 

@@ -99,6 +99,7 @@ public struct ActivityIndicatorProps {
     public var pointer_events: Any? { values["pointer_events"] }
     public var animating: Bool? { values["animating"] as? Bool }
     public var size: Any? { values["size"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -329,6 +330,7 @@ public struct CheckboxProps {
     public var accessibility_state: Any? { values["accessibility_state"] }
     public var accessibility_live_region: Any? { values["accessibility_live_region"] }
     public var test_id: Any? { values["test_id"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -558,6 +560,7 @@ public struct DatePickerProps {
     public var accessibility_state: Any? { values["accessibility_state"] }
     public var accessibility_live_region: Any? { values["accessibility_live_region"] }
     public var test_id: Any? { values["test_id"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -665,6 +668,7 @@ public struct ErrorBoundaryProps {
     public var pointer_events: Any? { values["pointer_events"] }
     public var fallback: Any? { values["fallback"] }
     public var on_error: Any? { values["on_error"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -789,6 +793,7 @@ public struct FlatListProps {
     public var on_scroll: Any? { values["on_scroll"] }
     public var shows_scroll_indicator: Bool? { values["shows_scroll_indicator"] as? Bool }
     public var content_container_style: Any? { values["content_container_style"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -894,6 +899,7 @@ public struct FragmentProps {
     public var transform: Any? { values["transform"] }
     public var z_index: Int? { values["z_index"] as? Int }
     public var pointer_events: Any? { values["pointer_events"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -1121,6 +1127,7 @@ public struct ImageBackgroundProps {
     public var accessibility_state: Any? { values["accessibility_state"] }
     public var accessibility_live_region: Any? { values["accessibility_live_region"] }
     public var test_id: Any? { values["test_id"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -1228,6 +1235,7 @@ public struct KeyboardAvoidingViewProps {
     public var pointer_events: Any? { values["pointer_events"] }
     public var behavior: Any? { values["behavior"] }
     public var keyboard_vertical_offset: Double? { values["keyboard_vertical_offset"] as? Double }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -1341,6 +1349,7 @@ public struct ModalProps {
     public var transparent: Bool? { values["transparent"] as? Bool }
     public var presentation_style: Any? { values["presentation_style"] }
     public var dismiss_on_backdrop: Bool? { values["dismiss_on_backdrop"] as? Bool }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -1457,6 +1466,7 @@ public struct PickerProps {
     public var accessibility_state: Any? { values["accessibility_state"] }
     public var accessibility_live_region: Any? { values["accessibility_live_region"] }
     public var test_id: Any? { values["test_id"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -1562,6 +1572,7 @@ public struct PortalProps {
     public var transform: Any? { values["transform"] }
     public var z_index: Int? { values["z_index"] as? Int }
     public var pointer_events: Any? { values["pointer_events"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -1788,6 +1799,7 @@ public struct ProgressBarProps {
     public var value: Double? { values["value"] as? Double }
     public var track_color: Any? { values["track_color"] }
     public var indeterminate: Bool? { values["indeterminate"] as? Bool }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -1895,6 +1907,7 @@ public struct RefreshControlProps {
     public var pointer_events: Any? { values["pointer_events"] }
     public var refreshing: Bool? { values["refreshing"] as? Bool }
     public var on_refresh: Any? { values["on_refresh"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -2114,6 +2127,7 @@ public struct SafeAreaViewProps {
     public var z_index: Int? { values["z_index"] as? Int }
     public var pointer_events: Any? { values["pointer_events"] }
     public var edges: Any? { values["edges"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -2475,6 +2489,7 @@ public struct ScrollViewProps {
     public var bounces: Bool? { values["bounces"] as? Bool }
     public var content_container_style: Any? { values["content_container_style"] }
     public var keyboard_dismiss_mode: Any? { values["keyboard_dismiss_mode"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -2596,6 +2611,7 @@ public struct SectionListProps {
     public var on_end_reached: Any? { values["on_end_reached"] }
     public var on_end_reached_threshold: Double? { values["on_end_reached_threshold"] as? Double }
     public var on_scroll: Any? { values["on_scroll"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -2710,6 +2726,7 @@ public struct SegmentedControlProps {
     public var accessibility_state: Any? { values["accessibility_state"] }
     public var accessibility_live_region: Any? { values["accessibility_live_region"] }
     public var test_id: Any? { values["test_id"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -2820,6 +2837,7 @@ public struct SliderProps {
     public var max_value: Double? { values["max_value"] as? Double }
     public var on_change: Any? { values["on_change"] }
     public var accessibility_label: Any? { values["accessibility_label"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -2926,6 +2944,7 @@ public struct SpacerProps {
     public var z_index: Int? { values["z_index"] as? Int }
     public var pointer_events: Any? { values["pointer_events"] }
     public var size: Any? { values["size"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -3033,6 +3052,7 @@ public struct StatusBarProps {
     public var pointer_events: Any? { values["pointer_events"] }
     public var bar_style: Any? { values["bar_style"] }
     public var hidden: Any? { values["hidden"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -3139,6 +3159,7 @@ public struct SuspenseProps {
     public var z_index: Int? { values["z_index"] as? Int }
     public var pointer_events: Any? { values["pointer_events"] }
     public var fallback: Any? { values["fallback"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -3247,6 +3268,7 @@ public struct SwitchProps {
     public var value: Bool? { values["value"] as? Bool }
     public var on_change: Any? { values["on_change"] }
     public var accessibility_label: Any? { values["accessibility_label"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -3607,6 +3629,7 @@ public struct TextInputProps {
     public var accessibility_state: Any? { values["accessibility_state"] }
     public var accessibility_live_region: Any? { values["accessibility_live_region"] }
     public var test_id: Any? { values["test_id"] }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }
@@ -4072,6 +4095,7 @@ public struct WebViewProps {
     public var on_navigation_state_change: Any? { values["on_navigation_state_change"] }
     public var inject_javascript: Any? { values["inject_javascript"] }
     public var scroll_enabled: Bool? { values["scroll_enabled"] as? Bool }
+    public var accessibility_role: String? { values["accessibility_role"] as? String }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
     public var _pn_events: Any? { values["_pn_events"] }

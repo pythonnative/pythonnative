@@ -1339,8 +1339,14 @@ def _resolve_style_with_values(style: StyleProp) -> Tuple[Dict[str, Any], Dict[s
     flat = resolve_style(style)
     bindings: Dict[str, AnimatedNode] = {}
     plain: Dict[str, Any] = {}
+    transforms: List[Dict[str, Any]] = []
     for k, v in flat.items():
-        if isinstance(v, AnimatedNode):
+        if k in _ANIMATED_TRANSFORM_KEYS:
+            if isinstance(v, AnimatedNode):
+                bindings[k] = v
+                v = v.value
+            transforms.append({k: v})
+        elif isinstance(v, AnimatedNode):
             bindings[k] = v
             plain[k] = v.value
         elif k == "transform" and v is not None:
@@ -1361,6 +1367,11 @@ def _resolve_style_with_values(style: StyleProp) -> Tuple[Dict[str, Any], Dict[s
             plain[k] = plain_entries
         else:
             plain[k] = v
+    if transforms:
+        # Native styles use the same transform shape for the initial frame
+        # and later renders, even when Animated accepts a top-level binding.
+        existing = plain.get("transform") or []
+        plain["transform"] = (existing if isinstance(existing, list) else [existing]) + transforms
     return plain, bindings
 
 

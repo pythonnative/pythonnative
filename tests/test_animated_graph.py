@@ -391,6 +391,16 @@ def test_resolve_style_extracts_transform_bindings() -> None:
     assert bindings == {"translate_x": tx, "scale": scale}
 
 
+def test_transform_shorthands_preserve_explicit_transforms_and_bindings() -> None:
+    scale = AnimatedValue(0.5)
+    translate = AnimatedValue(10)
+    plain, bindings = _resolve_style_with_values(
+        {"scale": scale, "transform": [{"translate_x": translate}], "rotate": 45}
+    )
+    assert plain == {"transform": [{"translate_x": 10.0}, {"scale": 0.5}, {"rotate": 45}]}
+    assert bindings == {"scale": scale, "translate_x": translate}
+
+
 def test_resolve_style_extracts_interpolation_in_transform() -> None:
     v = AnimatedValue(0.5)
     iv = v.interpolate([0, 1], [0, 200])

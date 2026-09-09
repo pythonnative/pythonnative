@@ -10,7 +10,8 @@
 #   runs first).
 # - Race(long_press, pan): holding still long enough activates the
 #   long press; the pan loses the race and is cancelled.
-# - Fling: a quick horizontal flick reports its direction.
+# - Fling: center the target before a 200 ms horizontal flick so it stays
+#   clear of system navigation and exceeds the recognizer's speed threshold.
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -36,10 +37,15 @@ appId: ${APP_ID}
     visible: "Race winner: long_press"
     timeout: 5000
 # Horizontal swipe so the page ScrollView doesn't steal the motion.
+- scrollUntilVisible:
+    element: "Fling target"
+    centerElement: true
+    visibilityPercentage: 100
 - swipe:
     from:
       text: "Fling target"
     direction: LEFT
+    duration: 200
 - extendedWaitUntil:
     visible: "Fling: left"
     timeout: 5000

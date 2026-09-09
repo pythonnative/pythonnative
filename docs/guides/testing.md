@@ -221,7 +221,7 @@ The Swift and Kotlin halves have their own suites next to the code:
 
 ```bash
 cd src/pythonnative/native/ios
-xcodebuild test -scheme PythonNativeKit -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
+xcodebuild test -project Tests/NativeTests.xcodeproj -scheme NativeTests -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
 
 cd src/pythonnative/templates/android_template
 ./gradlew :pythonnative:testDebugUnitTest
@@ -231,6 +231,13 @@ Both drive component managers and modules with decoded transactions and
 promise envelopes, so a wire-format change is caught on every side. Add
 cases there when you change a manager or module rather than relying on
 the Maestro E2E suite alone.
+
+The iOS `NativeTests` scheme runs the Swift tests inside a minimal UIKit
+app. Use that scheme for native tests: composition, selection, and focus
+need an application event loop and keyboard session, which the standalone
+Swift package test runner doesn't provide. Add new Swift test files to
+both the test directory and the Xcode project's `PythonNativeKitTests`
+target.
 
 ## Testing async code
 

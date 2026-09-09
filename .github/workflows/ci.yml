@@ -83,10 +83,19 @@ jobs:
           ')"
           echo "Using simulator $UDID"
           xcodebuild test \
-            -scheme PythonNativeKit \
+            -project Tests/NativeTests.xcodeproj \
+            -scheme NativeTests \
+            -parallel-testing-enabled NO \
             -destination "platform=iOS Simulator,id=$UDID" \
             -derivedDataPath "$RUNNER_TEMP/pnkit" \
-            -quiet
+            -resultBundlePath "$RUNNER_TEMP/pnkit-results.xcresult"
+
+      - name: Upload native test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-ios-results
+          path: ${{ runner.temp }}/pnkit-results.xcresult
 
   # JUnit covers contracts; Robolectric exercises native widget lifecycles.
   native-android:
