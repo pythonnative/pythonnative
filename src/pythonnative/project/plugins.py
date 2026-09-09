@@ -260,22 +260,9 @@ def discover_plugins(
 
 
 def _entry_points() -> Dict[str, str]:
-    try:
-        from importlib.metadata import entry_points
-    except ImportError:  # pragma: no cover - Python < 3.8
-        return {}
-    try:
-        eps = entry_points()
-    except Exception:
-        return {}
-    selected = []
-    if hasattr(eps, "select"):
-        selected = list(eps.select(group=ENTRY_POINT_GROUP))
-    else:  # pragma: no cover - importlib.metadata < 3.10
-        getter = getattr(eps, "get", None)
-        if callable(getter):
-            selected = list(getter(ENTRY_POINT_GROUP, []))
-    return {ep.name: ep.value for ep in selected}
+    from importlib.metadata import entry_points
+
+    return {ep.name: ep.value for ep in entry_points(group=ENTRY_POINT_GROUP)}
 
 
 def _resolve_entry_point(target: str) -> Path:

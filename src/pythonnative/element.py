@@ -1,8 +1,8 @@
 """Lightweight element descriptors for the virtual view tree.
 
 An [`Element`][pythonnative.Element] is an immutable description of a UI
-node, analogous to a React element. It captures a type, a props dict,
-and an ordered list of children without creating any native platform
+node, analogous to a React element. It captures a type, a read-only property snapshot,
+and an immutable sequence of children without creating any native platform
 objects. The reconciler consumes these trees to determine what native
 views must be created, updated, or removed.
 
@@ -35,7 +35,9 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Union
+from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Any, Iterable, Mapping, Optional, Union
 
 __all__ = [
     "ERROR_BOUNDARY",
@@ -74,6 +76,7 @@ SUSPENSE = StructuralType("Suspense")
 """Type of [`Suspense`][pythonnative.Suspense] elements."""
 
 
+@dataclass(frozen=True, init=False, eq=False, slots=True)
 class Element:
     """Immutable description of a single UI node.
 
@@ -86,9 +89,9 @@ class Element:
 
     Attributes:
         type: The element kind (see the module docstring).
-        props: Dict of properties passed to the native handler or the
+        props: Read-only snapshot of properties passed to the native handler or the
             component function.
-        children: Ordered list of child nodes. ``None`` and ``False``
+        children: Immutable tuple of child nodes. ``None`` and ``False``
             entries are permitted and dropped during reconciliation, so
             conditional children (``cond and Text(...)``) need no special
             casing. Components receive these as their ``*children``.
@@ -97,19 +100,22 @@ class Element:
             ``key`` are treated as the same logical node across renders.
     """
 
-    __slots__ = ("type", "props", "children", "key")
+    type: Any
+    props: Mapping[str, Any]
+    children: tuple[Any, ...]
+    key: Optional[str]
 
     def __init__(
         self,
         type_: Any,
-        props: Optional[Dict[str, Any]] = None,
+        props: Optional[Mapping[str, Any]] = None,
         children: Optional[Iterable[Any]] = None,
         key: Optional[str] = None,
     ) -> None:
-        self.type = type_
-        self.props: Dict[str, Any] = props if props is not None else {}
-        self.children: List[Any] = list(children) if children is not None else []
-        self.key = key
+        object.__setattr__(self, "type", type_)
+        object.__setattr__(self, "props", MappingProxyType(dict(props or {})))
+        object.__setattr__(self, "children", tuple(children) if children is not None else ())
+        object.__setattr__(self, "key", key)
 
     def __repr__(self) -> str:
         return f"Element({type_label(self.type)!r}, props={sorted(self.props)}, children={len(self.children)})"

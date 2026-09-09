@@ -96,7 +96,7 @@ object TextStyle {
             try {
                 PNColor.parse(span.value("color"))?.let { set(ForegroundColorSpan(it)) }
                 PNColor.parse(span.value("background_color"))?.let { set(BackgroundColorSpan(it)) }
-                span.num("font_size")?.let { set(AbsoluteSizeSpan(it.toInt(), true)) }
+                span.num("font_size")?.let { set(AbsoluteSizeSpan(android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, it.toFloat(), com.pythonnative.runtime.PNBridge.context().resources.displayMetrics).toInt(), false)) }
                 var bold = JsonUtil.truthy(span.value("bold"))
                 val weight = span.value("font_weight")
                 if (!bold && weight != null) bold = isBold(weight)

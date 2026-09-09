@@ -95,7 +95,7 @@ def generate_modules() -> dict[str, str]:
             [
                 "}",
                 "",
-                f"public final class {name}Module<Implementation: {name}Implementation>: PNNativeModule {{",
+                f"public final class {name}ModuleAdapter<Implementation: {name}Implementation>: PNNativeModule {{",
                 f'    public static var name: String {{ "{name}" }}',
                 "    let implementation: Implementation",
                 "    public init() { implementation = Implementation() }",
@@ -108,7 +108,7 @@ def generate_modules() -> dict[str, str]:
             [
                 "}",
                 "",
-                f"class {name}Module(private val implementation: {name}Implementation): NativeModule {{",
+                f"class {name}ModuleAdapter(private val implementation: {name}Implementation): NativeModule {{",
                 f'    override val name = "{name}"',
                 "    override fun call(method: String, args: JSONObject, promise: Promise) {",
                 "        try {",

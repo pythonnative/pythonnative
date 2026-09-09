@@ -8,6 +8,7 @@ import enum
 import hashlib
 import inspect
 import json
+import math
 import types
 import typing
 from dataclasses import dataclass, field
@@ -52,13 +53,29 @@ def type_schema(annotation: Any) -> dict[str, Any]:
     if origin in (typing.Callable, collections.abc.Callable):
         return {
             "type": "event",
-            "arguments": [type_schema(arg) for arg in args[0]] if args and args[0] is not Ellipsis else [],
+            "arguments": [type_schema(arg) for arg in args[0]] if args and args[0] is not Ellipsis else None,
         }
     if inspect.isclass(annotation) and issubclass(annotation, enum.Enum):
         return {"enum": [value.value for value in annotation]}
-    if dataclasses.is_dataclass(annotation):
+    if dataclasses.is_dataclass(annotation) or typing.is_typeddict(annotation):
         hints = typing.get_type_hints(annotation, include_extras=True)
-        return {"type": "object", "properties": {name: type_schema(value) for name, value in hints.items()}}
+        required = (
+            list(annotation.__required_keys__)
+            if typing.is_typeddict(annotation)
+            else [
+                f.name
+                for f in dataclasses.fields(annotation)
+                if f.default is dataclasses.MISSING and f.default_factory is dataclasses.MISSING
+            ]
+        )
+        return {
+            "type": "object",
+            "properties": {name: type_schema(value) for name, value in hints.items()},
+            "required": sorted(required),
+            "additionalProperties": False,
+        }
+    if origin in (typing.Required, typing.NotRequired):
+        return type_schema(args[0])
     return {}
 
 
@@ -74,18 +91,25 @@ def validate(value: Any, schema: Mapping[str, Any], path: str = "value") -> None
         raise TypeError(f"{path} does not match its annotation")
     if "enum" in schema:
         candidate = value.value if isinstance(value, enum.Enum) else value
-        if candidate not in schema["enum"]:
+        if not any(
+            (type(candidate) is type(item) or type(candidate) in (int, float) and type(item) in (int, float))
+            and candidate == item
+            for item in schema["enum"]
+        ):
             raise TypeError(f"{path} must be one of {schema['enum']!r}")
     kind = schema.get("type")
     checks = {
         "null": lambda: value is None,
         "string": lambda: isinstance(value, str),
         "boolean": lambda: type(value) is bool,
-        "integer": lambda: type(value) is int,
-        "number": lambda: type(value) in (int, float),
+        "integer": lambda: type(value) in (int, float)
+        and math.isfinite(value)
+        and value == int(value)
+        and abs(value) <= 2**53 - 1,
+        "number": lambda: type(value) in (int, float) and math.isfinite(value),
         "array": lambda: isinstance(value, (list, tuple, set)),
         "object": lambda: isinstance(value, Mapping) or dataclasses.is_dataclass(value),
-        "event": lambda: callable(value),
+        "event": lambda: callable(value) or type(value) is bool,
     }
     if kind in checks and not checks[kind]():
         raise TypeError(f"{path} must be {kind}, received {type(value).__name__}")
@@ -94,10 +118,16 @@ def validate(value: Any, schema: Mapping[str, Any], path: str = "value") -> None
             validate(item, schema.get("items", {}), f"{path}[{index}]")
     if kind == "object":
         values = dataclasses.asdict(value) if dataclasses.is_dataclass(value) and not isinstance(value, type) else value
+        missing = set(schema.get("required", ())) - values.keys()
+        if missing:
+            raise TypeError(f"{path} requires {', '.join(sorted(missing))}")
         for name, item in values.items():
-            validate(
-                item, schema.get("properties", {}).get(name, schema.get("additionalProperties", {})), f"{path}.{name}"
-            )
+            if not isinstance(name, str):
+                raise TypeError(f"{path} requires string keys")
+            nested = schema.get("properties", {}).get(name, schema.get("additionalProperties", {}))
+            if nested is False:
+                raise TypeError(f"Unknown {path}.{name}")
+            validate(item, nested if isinstance(nested, Mapping) else {}, f"{path}.{name}")
 
 
 @dataclass(frozen=True)
@@ -129,7 +159,7 @@ class ComponentSchema:
             name, {key: type_schema(value) for key, value in hints.items()}, tuple(required), defaults, measurement
         )
 
-    def validate(self, props: Mapping[str, Any], *, partial: bool = False) -> None:
+    def validate(self, props: Mapping[str, Any], *, partial: bool = False, platform: str | None = None) -> None:
         """Validate a construction or a partial update against this contract."""
         if not partial:
             missing = set(self.required) - props.keys()
@@ -138,7 +168,32 @@ class ComponentSchema:
         for key, value in props.items():
             if key not in self.props:
                 raise TypeError(f"Unknown {self.name} prop {key!r}")
+            platforms = self.props[key].get("native", {}).get("platforms")
+            if platform is not None and platforms is not None and platform not in platforms:
+                raise TypeError(f"{self.name}.{key} isn't supported on {platform}")
+            if partial and value is None:
+                if key in self.required:
+                    raise TypeError(f"Cannot remove required {self.name}.{key}")
+                continue
             validate(value, self.props[key], f"{self.name}.{key}")
+
+    def validate_event(self, name: str, arguments: list[Any]) -> None:
+        """Validate a typed callback payload before application code receives it."""
+        if name.startswith("gesture:"):
+            return
+        schema = self.props.get(name, {})
+        if name == "on_refresh":
+            schema = self.props.get("refresh_control", {}).get("properties", {}).get(name, {})
+        alternatives = schema.get("anyOf", [schema])
+        event = next((item for item in alternatives if item.get("type") == "event"), None)
+        if event is None:
+            raise TypeError(f"Unknown event {self.name}.{name}")
+        expected = event.get("arguments")
+        if expected is not None:
+            if len(arguments) != len(expected):
+                raise TypeError(f"{self.name}.{name} requires {len(expected)} event arguments")
+            for index, (value, field) in enumerate(zip(arguments, expected)):
+                validate(value, field, f"{self.name}.{name}[{index}]")
 
 
 @dataclass(frozen=True)
@@ -161,8 +216,43 @@ class ModuleSchema:
                 "arguments": {key: type_schema(hints.get(key, Any)) for key in signature.parameters if key != "self"},
                 "result": type_schema(hints.get("return", Any)),
                 "async": inspect.iscoroutinefunction(method),
+                "required": [
+                    key
+                    for key, param in signature.parameters.items()
+                    if key != "self" and param.default is inspect.Parameter.empty
+                ],
+                "defaults": {
+                    key: param.default
+                    for key, param in signature.parameters.items()
+                    if key != "self" and param.default is not inspect.Parameter.empty
+                },
             }
         return cls(name, methods)
+
+    def validate_call(self, method: str, arguments: Mapping[str, Any]) -> dict[str, Any]:
+        """Validate and normalize a method invocation before crossing a bridge."""
+        contract = self.methods.get(method)
+        if contract is None:
+            raise TypeError(f"Unknown command {self.name}.{method}")
+        validate(
+            arguments,
+            {
+                "type": "object",
+                "properties": contract["arguments"],
+                "required": contract.get("required", list(contract["arguments"])),
+                "additionalProperties": False,
+            },
+            f"{self.name}.{method}",
+        )
+        return {**contract.get("defaults", {}), **arguments}
+
+    def validate_result(self, method: str, result: Any) -> Any:
+        """Reject a native result that doesn't satisfy its declared return type."""
+        contract = self.methods.get(method)
+        if contract is None:
+            raise TypeError(f"Unknown command {self.name}.{method}")
+        validate(result, contract["result"], f"{self.name}.{method} result")
+        return result
 
 
 COMPONENTS: dict[str, ComponentSchema] = {}

@@ -133,12 +133,18 @@ class TransitionQueue:
         callbacks = self._callbacks
         self._triggers = []
         self._callbacks = []
-        for fn in triggers + callbacks:
-            try:
-                fn()
-            except Exception as exc:
-                if not diagnostics.report_error(exc, phase="transition"):
-                    raise
+        token = _transition_var.set(False)
+        try:
+            with batch_updates():
+                for fn in triggers:
+                    fn()
+            for callback in callbacks:
+                callback()
+        except Exception as exc:
+            if not diagnostics.report_error(exc, phase="transition"):
+                raise
+        finally:
+            _transition_var.reset(token)
 
     def clear(self) -> None:
         """Drop queued work (used on unmount)."""

@@ -487,6 +487,13 @@ class DevServer:
         if path in ("/", "/index.html"):
             _respond_file(writer, os.path.join(self.static_dir, "index.html"))
             return
+        if path == "/static/schema.js":
+            from ..sdk.schema import manifest
+
+            _respond(
+                writer, 200, ("export default " + json.dumps(manifest(), default=str) + ";").encode(), "text/javascript"
+            )
+            return
         if path.startswith("/static/"):
             name = path[len("/static/") :]
             root = os.path.realpath(self.static_dir)

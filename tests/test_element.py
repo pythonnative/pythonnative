@@ -7,7 +7,7 @@ def test_element_creation() -> None:
     el = Element("Text", {"text": "hello"}, [])
     assert el.type == "Text"
     assert el.props == {"text": "hello"}
-    assert el.children == []
+    assert el.children == ()
     assert el.key is None
 
 

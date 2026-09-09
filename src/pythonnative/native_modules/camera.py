@@ -30,12 +30,13 @@ class Camera:
     """Camera and image-picker interface (static coroutines)."""
 
     @staticmethod
-    async def take_photo(**options: Any) -> Optional[str]:
+    async def take_photo(*, quality: float = 0.9, allow_editing: bool = False) -> Optional[str]:
         """Launch the device camera to capture a photo.
 
         Args:
-            **options: Forwarded to the native module (``quality``,
-                ``allow_editing``, ...). Unknown keys are ignored.
+            quality: JPEG compression quality from 0 to 1 on iOS. Android's
+                system capture application controls its output quality.
+            allow_editing: Present the iOS crop editor before saving.
 
         Returns:
             The saved image path, or ``None`` if the user cancelled (or
@@ -45,10 +46,10 @@ class Camera:
             NativeModuleError: If the picker can't be presented, for
                 example because another picker is already open.
         """
-        return await _launch("take_photo", options)
+        return await _launch("take_photo", {"quality": quality, "allow_editing": allow_editing})
 
     @staticmethod
-    async def pick_from_gallery(**options: Any) -> Optional[str]:
+    async def pick_from_gallery(*, quality: float = 0.9, allow_editing: bool = False) -> Optional[str]:
         """Open the system gallery picker.
 
         Returns:
@@ -57,7 +58,7 @@ class Camera:
         Raises:
             NativeModuleError: If the picker can't be presented.
         """
-        return await _launch("pick_from_gallery", options)
+        return await _launch("pick_from_gallery", {"quality": quality, "allow_editing": allow_editing})
 
 
 async def _launch(method: str, options: Any) -> Optional[str]:

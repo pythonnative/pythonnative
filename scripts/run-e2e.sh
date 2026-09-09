@@ -14,7 +14,7 @@
 #     ./scripts/run-e2e.sh ios hooks                   # only the hooks suite on iOS
 #     ./scripts/run-e2e.sh android hooks navigation    # two categories, one session
 #
-# Available suites: full, components, hooks, navigation, layout, styling,
+# Available suites: inbox, full, components, hooks, navigation, layout, styling,
 # animations, gestures, misc.
 #
 # Multiple category suites can be passed at once; they run sequentially in
@@ -73,6 +73,10 @@ if ! command -v maestro > /dev/null; then
   echo "Error: 'maestro' CLI not found on PATH." >&2
   echo "Install: curl -Ls 'https://get.maestro.mobile.dev' | bash" >&2
   exit 2
+fi
+
+if [[ "${SUITES[*]}" == "inbox" ]]; then
+  exec "$SCRIPT_DIR/run-inbox-e2e.sh" "$PLATFORM"
 fi
 
 # Resolve the app/bundle id straight from the example's pythonnative.toml so

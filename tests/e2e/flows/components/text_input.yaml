@@ -1,5 +1,5 @@
 # Tests TextInput: native focus and typing mirror into the echo line,
-# dismissing the keyboard before checking the echo on smaller viewports.
+# selection events and creation-only changes preserve the controlled value.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/text_input.py
 # Source under test: src/pythonnative/components/text.py :: TextInput
@@ -27,6 +27,13 @@ appId: ${APP_ID}
       text: "Echo: Maestro"
     direction: DOWN
     timeout: 20000
+- assertVisible: "Echo: Maestro"
+- assertVisible: "Selection: 7:7"
+- tapOn: "Use multiline name"
+- assertVisible: "Use single line"
+- assertVisible: "Echo: Maestro"
+- tapOn: "Use single line"
+- assertVisible: "Use multiline name"
 - assertVisible: "Echo: Maestro"
 - runFlow:
     file: ../../helpers/close_demo.yaml

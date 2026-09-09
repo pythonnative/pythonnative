@@ -79,6 +79,16 @@ StateSetter = Callable[[Union[T, Callable[[T], T]]], None]
 
 _SENTINEL = object()
 
+# Immutable environments are inherited by asyncio tasks. Never mutate the
+# mapping or its tuples after publication to an execution context.
+_providers: ContextVar[Dict[int, Tuple[Any, ...]]] = ContextVar("pn_providers", default={})
+
+
+def provider_environment() -> Dict[int, Any]:
+    """Return the current immutable provider environment for render identity."""
+    return {key: stack[-1] for key, stack in _providers.get().items()}
+
+
 # The component whose body is currently executing. A ContextVar (not a
 # global or thread-local) so coroutine component bodies resume with the
 # right hook state after every ``await``, no matter how renders
@@ -146,6 +156,12 @@ class Ref(Generic[T]):
         # without a native round-trip.
         self._pn_frame: Optional[Tuple[float, float, float, float]] = None
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        from .reconciler.journal import record_attribute
+
+        record_attribute(self, name)
+        object.__setattr__(self, name, value)
+
     def __repr__(self) -> str:
         return f"Ref({self.current!r})"
 
@@ -179,6 +195,10 @@ class HookState:
 
     __slots__ = (
         "states",
+        "_setters",
+        "_state_queues",
+        "_reducers",
+        "_dispatchers",
         "effects",
         "layout_effects",
         "memos",
@@ -208,6 +228,10 @@ class HookState:
 
     def __init__(self) -> None:
         self.states: List[Any] = []
+        self._setters: Dict[int, Callable[[Any], None]] = {}
+        self._state_queues: Dict[int, Tuple[Any, List[Any]]] = {}
+        self._reducers: Dict[int, Callable] = {}
+        self._dispatchers: Dict[int, Callable] = {}
         self.effects: List[Tuple[Any, Any]] = []
         self.layout_effects: List[Tuple[Any, Any]] = []
         self.memos: List[Tuple[Any, Any]] = []
@@ -598,22 +622,54 @@ def use_state(initial: Any = None) -> Tuple[Any, StateSetter[Any]]:
         val = initial() if callable(initial) else initial
         ctx.states.append(val)
 
-    current = ctx.states[idx]
+    return ctx.states[idx], _state_setter(ctx, idx)
 
-    def setter(new_value: Any) -> None:
+
+def _state_setter(ctx: HookState, idx: int) -> Callable[[Any], None]:
+    if idx in ctx._setters:
+        return ctx._setters[idx]
+
+    def setter(update: Any) -> None:
+        deferred = in_transition() and ctx.owner is not None
+
         def apply() -> None:
             if ctx.task_scope.closed:
                 return
-            value = new_value(ctx.states[idx]) if callable(new_value) else new_value
             from .equality import equal
 
+            if deferred:
+                if idx not in ctx._state_queues:
+                    ctx._state_queues[idx] = (ctx.states[idx], [])
+                    assert ctx.owner is not None
+                    ctx.owner.transitions.defer(flush)
+                ctx._state_queues[idx][1].append(update)
+                return
+            # An urgent update after skipped work is replayed when that work
+            # commits, so functional and replacement updates retain their order.
+            if idx in ctx._state_queues:
+                ctx._state_queues[idx][1].append(update)
+            value = update(ctx.states[idx]) if callable(update) else update
             if not equal(ctx.states[idx], value):
                 ctx.states[idx] = value
                 _notify_state_changed(ctx)
 
         call_on_application_thread(apply)
 
-    return current, setter
+    def flush() -> None:
+        queued = ctx._state_queues.pop(idx, None)
+        if queued is None or ctx.task_scope.closed:
+            return
+        value, updates = queued
+        for update in updates:
+            value = update(value) if callable(update) else update
+        from .equality import equal
+
+        if not equal(ctx.states[idx], value):
+            ctx.states[idx] = value
+            _notify_state_changed(ctx)
+
+    ctx._setters[idx] = setter
+    return setter
 
 
 def use_reducer(
@@ -651,15 +707,15 @@ def use_reducer(
         val = initial_state() if callable(initial_state) else initial_state
         ctx.states.append(val)
 
-    current = ctx.states[idx]
+    ctx._reducers[idx] = reducer
+    if idx not in ctx._dispatchers:
 
-    def dispatch(action: Any) -> None:
-        new_state = reducer(ctx.states[idx], action)
-        if ctx.states[idx] is not new_state and ctx.states[idx] != new_state:
-            ctx.states[idx] = new_state
-            _notify_state_changed(ctx)
+        def dispatch(action: Any) -> None:
+            reduce = ctx._reducers[idx]
+            _state_setter(ctx, idx)(lambda value: reduce(value, action))
 
-    return current, dispatch
+        ctx._dispatchers[idx] = dispatch
+    return ctx.states[idx], ctx._dispatchers[idx]
 
 
 # ======================================================================
@@ -1427,12 +1483,11 @@ class Context(Generic[T]):
         name: Optional label for diagnostics.
     """
 
-    __slots__ = ("default", "name", "_stack")
+    __slots__ = ("default", "name")
 
     def __init__(self, default: T, name: Optional[str] = None) -> None:
         self.default = default
         self.name = name
-        self._stack: List[T] = []
 
     def Provider(self, value: T, *children: Node, key: Optional[str] = None) -> Element:
         """Provide ``value`` to every descendant of ``children``.
@@ -1462,7 +1517,8 @@ class Context(Generic[T]):
 
     def current(self) -> T:
         """Return the innermost provided value, or ``default``."""
-        return self._stack[-1] if self._stack else self.default
+        stack = _providers.get().get(id(self), ())
+        return stack[-1] if stack else self.default
 
     def __repr__(self) -> str:
         return f"<Context {self.name or id(self):x}>" if self.name is None else f"<Context {self.name}>"
@@ -1471,10 +1527,17 @@ class Context(Generic[T]):
     # while it walks a Provider's subtree.
 
     def _push(self, value: T) -> None:
-        self._stack.append(value)
+        env = _providers.get()
+        _providers.set({**env, id(self): (*env.get(id(self), ()), value)})
 
     def _pop(self) -> None:
-        self._stack.pop()
+        env = dict(_providers.get())
+        stack = env[id(self)][:-1]
+        if stack:
+            env[id(self)] = stack
+        else:
+            del env[id(self)]
+        _providers.set(env)
 
 
 def create_context(default: T = None, *, name: Optional[str] = None) -> Context[T]:  # type: ignore[assignment,unused-ignore]

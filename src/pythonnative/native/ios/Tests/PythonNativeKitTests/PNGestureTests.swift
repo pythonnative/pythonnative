@@ -90,7 +90,7 @@ final class PNGestureTests: XCTestCase {
     }
 
     func testAnimatorSetAppliesImmediately() {
-        PNTransaction.apply("[[\"c\", 50, \"View\", {}]]")
+        try! PNTransaction.apply([.create(tag: 50, type: "View", props: [:])])
         _ = PNAnimator.shared.handle(tag: 50, request: ["op": "set", "prop": "opacity", "value": 0.25])
         XCTAssertEqual(PNViewRegistry.shared.view(for: 50)?.alpha ?? 0, 0.25, accuracy: 0.001)
         _ = PNAnimator.shared.handle(tag: 50, request: ["op": "set", "prop": "translate_x", "value": 12])

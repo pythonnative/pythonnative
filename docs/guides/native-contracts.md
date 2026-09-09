@@ -2,8 +2,9 @@
 
 Declare an extension's interface in Python, generate its native adapters, and
 implement the platform behavior in Swift and Kotlin. The complete working
-example is `examples/inbox`: its badge uses generated props, and its module
-has synchronous and asynchronous methods.
+example is the separately packaged `examples/inbox-extension`, consumed by
+`examples/inbox`. Its badge uses generated props, and its module has synchronous
+and asynchronous methods.
 
 ## Define the interface
 
@@ -66,8 +67,8 @@ Set `contracts` in the plugin's `pn_plugin.json` to its schema file:
 }
 ```
 
-The schema should contain the extension's own components and modules. The inbox
-example's `generate_contracts.py` demonstrates extracting those definitions.
+The schema should contain the extension's own components and modules. The
+`examples/inbox-extension/generate_contracts.py` script demonstrates extracting those definitions.
 Builders merge plugin contracts with the built-ins, regenerate native bindings,
 and bundle the matching schema into embedded Python. Startup rejects a client
 whose protocol, Yoga version, or schema fingerprint doesn't match.
@@ -92,3 +93,35 @@ mobile binary extensions into the desktop build process.
 
 Rebuild after changing a contract or native implementation. Fast Refresh applies
 to Python application behavior; it can't change a compiled native interface.
+
+## Runtime enforcement
+
+Built-in widgets and services use these contracts too. Unknown props, methods,
+events, and arguments fail validation. Nested dataclasses and `TypedDict` values
+validate required fields and reject unknown fields. Wire integers must be exact
+numbers within JavaScript's safe integer range; booleans don't count as numbers.
+Methods declare both their arguments and their return types. Python validates
+native results before exposing them to application code.
+
+A `null` update removes a prop. The renderer restores its declared default, or
+recreates the physical widget to restore a platform default. Creation-only
+changes, including `TextInput.multiline`, preserve the logical tag, component
+state, child ownership, focus, and selection where the platform permits it.
+Refs keep addressing that logical tag. `NativeField.platforms` limits where a
+field can be used; unsupported fields are rejected by the target renderer.
+
+Regenerate the repository's built-in bindings with:
+
+```sh
+uv run python scripts/generate-native-contracts.py
+```
+
+The shared fixtures run in Python, Swift, Kotlin, and JavaScript. The actual
+browser renderer runs in Chrome with Yoga WebAssembly:
+
+```sh
+uv run python scripts/run-browser-tests.py
+```
+
+Native service adapters are named `NameModuleAdapter`, which keeps the generated
+base class distinct from a platform's `NameModule` implementation.

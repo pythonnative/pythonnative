@@ -1,6 +1,6 @@
 """Text-centric leaf factories: ``Text``, ``Button``, and ``TextInput``."""
 
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Callable, Dict, Literal, Optional
 
 from ..element import Element
 from ..hooks import Ref
@@ -179,6 +179,7 @@ def TextInput(
     value: str = "",
     placeholder: Optional[str] = None,
     on_change: Optional[Callable[[str], Any]] = None,
+    on_selection_change: Optional[Callable[[Dict[str, int]], Any]] = None,
     on_submit: Optional[Callable[[str], Any]] = None,
     secure: bool = False,
     multiline: bool = False,
@@ -214,6 +215,7 @@ def TextInput(
         value: Current text content (controlled-input pattern).
         placeholder: Hint shown when ``value`` is empty.
         on_change: Callback invoked with the new string each keystroke.
+        on_selection_change: Receives ``{"start": int, "end": int}`` UTF-16 offsets.
         on_submit: Callback invoked when the user submits (Return /
             Done / etc.). Receives the final text.
         secure: When ``True``, characters are masked (use for passwords).
@@ -266,6 +268,7 @@ def TextInput(
         value=value,
         placeholder=placeholder,
         on_change=on_change,
+        on_selection_change=on_selection_change,
         on_submit=on_submit,
         secure=secure or None,
         multiline=multiline or None,

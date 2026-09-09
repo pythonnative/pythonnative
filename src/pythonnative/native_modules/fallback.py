@@ -278,15 +278,15 @@ class FallbackNotifications:
 
 
 class FallbackCamera:
-    def take_photo(self) -> Optional[str]:
+    def take_photo(self, *, quality: float = 0.9, allow_editing: bool = False) -> Optional[str]:
         return None
 
-    def pick_from_gallery(self) -> Optional[str]:
+    def pick_from_gallery(self, *, quality: float = 0.9, allow_editing: bool = False) -> Optional[str]:
         return None
 
 
 class FallbackLocation:
-    def get_current(self) -> Optional[Dict[str, float]]:
+    def get_current(self, *, accuracy: str = "balanced", timeout: float = 10.0) -> Optional[Dict[str, float]]:
         return None
 
 

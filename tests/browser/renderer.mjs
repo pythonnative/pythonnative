@@ -1,0 +1,46 @@
+import {Renderer} from '../../src/pythonnative/devserver/static/renderer.js';
+import {matches} from '../../src/pythonnative/devserver/static/contracts.js';
+const assert = (condition, message) => { if (!condition) throw Error(message); };
+const fixtures = await (await fetch('../contracts/validation.json')).json();
+for (const item of fixtures) assert(matches(item.value, item.schema) === item.valid, item.name);
+const events = [], overlay = document.createElement('div'); document.body.append(overlay);
+const renderer = new Renderer({emit: (...args) => events.push(args), gesture() {}, request() {},
+  animationFinished() {}, scheme: () => 'light', overlays: () => overlay, bottomInset: () => 0,
+  frameWidth: () => 390, pointInFrame: () => ({x:0, y:0}), statusBar() {}});
+let revision = 0;
+const envelope = ops => ({version:2, application:'browser-test', surface:1, revision:revision+1, ops});
+const commit = ops => { const result=renderer.apply(envelope(ops)); assert(result.ok, result.error); revision++; };
+commit([['c',1,'Column',{width:300}], ['c',2,'TextInput',{value:'hello', multiline:false, font_size:20,
+  _pn_events:['on_change','on_selection_change']}], ['i',1,2,0], ['c',3,'Text',{text:'Label',color:'#ff0000'}], ['i',1,3,1]]);
+document.body.append(renderer.views.get(1).el);
+const layout = renderer.computeLayout({roots:[1],width:300,height:500});
+assert(layout.application==='browser-test' && layout.revision===revision && layout.frames.length===3,'layout identity');
+const original = renderer.views.get(2).el; original.focus(); original.setSelectionRange(1,3);
+commit([['u',2,{multiline:true}]]);
+let input = renderer.views.get(2).el;
+assert(input !== original && input.tagName==='TEXTAREA','creation-only property replaces native control');
+assert(input.value==='hello' && input.selectionStart===1 && input.selectionEnd===3,'replacement preserves text and selection');
+assert(document.activeElement===input && input.parentElement===renderer.views.get(1).el,'replacement retains focus and parent');
+assert(input.style.width !== '', 'replacement retains layout');
+commit([['u',3,{color:null}]]);
+assert(renderer.views.get(3).props.color === undefined,'removed color restores platform default');
+const before = renderer.views.get(3).el;
+const rejected = renderer.apply(envelope([['u',3,{text:'must not publish'}],['u',2,{typo:true}]]));
+assert(!rejected.ok && renderer.views.get(3).el===before && renderer.views.get(3).props.text==='Label','invalid transaction is atomic');
+assert(!renderer.apply({...envelope([]), surface:2}).ok,'foreign surface rejected');
+input.dispatchEvent(new CompositionEvent('compositionstart'));
+commit([['u',2,{value:'controlled',_pn_edit_revision:0}]]);
+assert(input.value==='hello','controlled update waits for composition');
+input.dispatchEvent(new CompositionEvent('compositionend'));
+assert(input.value==='controlled','controlled update publishes at composition end');
+input.value='typed'; input.dispatchEvent(new Event('input', {bubbles:true}));
+assert(events.some(([tag,name,body]) => tag===2 && name==='on_change' && body.edit_revision===1),'input emits monotonic edit revision');
+commit([['u',2,{value:'stale',_pn_edit_revision:0}]]);
+assert(input.value==='typed','stale controlled update rejected');
+const container = renderer.views.get(1).el;
+commit([['u',1,{background_color:'#eeeeee'}]]); commit([['u',1,{background_color:null}]]);
+assert(renderer.views.get(1).el!==container && renderer.views.get(1).el.contains(input),'container replacement retains children');
+commit([['d',2],['d',3],['d',1]]);
+assert(renderer.views.size===0,'teardown releases records');
+const result=document.getElementById('result'); result.dataset.status='passed';
+result.textContent=`${fixtures.length} shared fixtures and renderer acceptance assertions passed`;

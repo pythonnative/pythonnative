@@ -11,6 +11,7 @@ public final class PNTextManager: PNComponentManager {
     public override func makeView(props: [String: Any]) -> UIView {
         let label = UILabel(frame: .zero)
         label.numberOfLines = 0
+        label.adjustsFontForContentSizeCategory = true
         label.translatesAutoresizingMaskIntoConstraints = true
         return label
     }
@@ -23,7 +24,7 @@ public final class PNTextManager: PNComponentManager {
         if textChanged, !hasSpans {
             label.text = PNTextManager.transform(PNProps.string(PNProps.value(merged, "text")), mode: PNProps.string(PNProps.value(merged, "text_transform")))
         }
-        if PNTextManager.fontKeys.contains(where: { PNProps.has(props, $0) }) {
+        if initial || PNTextManager.fontKeys.contains(where: { PNProps.has(props, $0) }) {
             label.font = PNTextManager.font(from: merged, base: label.font)
         }
         if let color = PNColor.parse(PNProps.value(props, "color")) {
@@ -60,7 +61,7 @@ public final class PNTextManager: PNComponentManager {
 
     /// Resolve a `UIFont` from the element's font props.
     static func font(from props: [String: Any], base: UIFont?) -> UIFont {
-        let currentSize = base?.pointSize ?? 17
+        let currentSize: CGFloat = 17
         let size = CGFloat(PNProps.double(PNProps.value(props, "font_size")) ?? Double(currentSize))
         var weight: Any? = PNProps.value(props, "font_weight")
         if weight == nil, PNProps.bool(PNProps.value(props, "bold")) == true { weight = "bold" }
@@ -71,10 +72,10 @@ public final class PNTextManager: PNComponentManager {
 
     static func font(size: CGFloat, weight: Any?, family: String?, italic: Bool) -> UIFont {
         if let family = family, !family.isEmpty, let named = UIFont(name: family, size: size) {
-            return italic ? italicized(named, size: size) : named
+            return UIFontMetrics(forTextStyle: .body).scaledFont(for: italic ? italicized(named, size: size) : named)
         }
         let font = UIFont.systemFont(ofSize: size, weight: fontWeight(weight))
-        return italic ? italicized(font, size: size) : font
+        return UIFontMetrics(forTextStyle: .body).scaledFont(for: italic ? italicized(font, size: size) : font)
     }
 
     static func italicized(_ font: UIFont, size: CGFloat) -> UIFont {
@@ -193,7 +194,7 @@ public final class PNTextManager: PNComponentManager {
         let spans = ((PNProps.value(merged, "spans") as? [Any]) ?? []).compactMap { $0 as? [String: Any] }
         let texts = spans.map { PNTextManager.transform(PNProps.string($0["text"]), mode: mode) }
         let full = NSMutableAttributedString(string: texts.joined(), attributes: PNTextManager.baseAttributes(merged, font: label.font))
-        let baseSize = label.font?.pointSize ?? 17
+        let baseSize = CGFloat(PNProps.double(merged["font_size"]) ?? 17)
         var location = 0
         for (span, text) in zip(spans, texts) {
             let length = (text as NSString).length

@@ -11,11 +11,34 @@ private final class PNLogicalScreen: UIView {
     }
 }
 
+private final class PNLogicalScreenController: UIViewController {
+    let screen: UIView
+    init(screen: UIView) { self.screen = screen; super.init(nibName: nil, bundle: nil) }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    override func loadView() {
+        view = UIView()
+        view.addSubview(screen)
+        screen.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    }
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        screen.frame = view.bounds
+    }
+}
+
 public final class PNScreenManager: PNComponentManager {
+    // UINavigationController must detach its outgoing screen as part of the
+    // transition. Removing it early prevents UIKit from attaching the destination.
+    public override var detachesOnDestroy: Bool { false }
     public override func makeView(props: [String: Any]) -> UIView { PNLogicalScreen(frame: .zero) }
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        if let controller = view.next as? UIViewController {
-            HostModule.applyOptions(PNViewState.existing(for: view)?.props ?? props, to: controller)
+        var responder: UIResponder? = view.next
+        while let current = responder {
+            if let controller = current as? PNLogicalScreenController {
+                HostModule.applyOptions(PNViewState.existing(for: view)?.props ?? props, to: controller)
+                break
+            }
+            responder = current.next
         }
     }
     // UIKit owns the controller's content rectangle, including its navigation bar.
@@ -42,7 +65,7 @@ private final class PNLogicalStack: UIView, UINavigationControllerDelegate {
             if let parent = current as? UIViewController {
                 parent.addChild(navigation)
                 navigation.didMove(toParent: parent)
-                parent.navigationController?.setNavigationBarHidden(true, animated: false)
+                if !(parent is PNLogicalScreenController) { parent.navigationController?.setNavigationBarHidden(true, animated: false) }
                 break
             }
             responder = current.next
@@ -58,15 +81,24 @@ private final class PNLogicalStack: UIView, UINavigationControllerDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.scheduled = false
-            self.applying = true
-            self.navigation.setViewControllers(self.order.compactMap { self.controllers[$0] }, animated: false)
+            if let transition = self.navigation.transitionCoordinator {
+                transition.animate(alongsideTransition: nil) { [weak self] _ in self?.schedule() }
+                return
+            }
+            let target = self.order.compactMap { self.controllers[$0] }
+            let changed = target != self.navigation.viewControllers
+            let options = self.order.last.flatMap { PNViewRegistry.shared.view(for: $0) }.flatMap { PNViewState.existing(for: $0)?.props } ?? [:]
+            let animated = changed && self.window != nil && !self.navigation.viewControllers.isEmpty && options["animation"] as? String != "none"
+            self.applying = changed
+            if changed { self.navigation.setViewControllers(target, animated: animated) }
+            if !animated { self.applying = false }
             if let tag = self.order.last, let state = PNViewRegistry.shared.view(for: tag).flatMap({ PNViewState.existing(for: $0) }),
                let controller = self.controllers[tag] { HostModule.applyOptions(state.props, to: controller) }
-            self.applying = false
         }
     }
     func navigationController(_ navigationController: UINavigationController, didShow viewController: UIViewController, animated: Bool) {
-        if !applying && navigation.viewControllers.count < order.count {
+        if applying { applying = false; return }
+        if navigation.viewControllers.count < order.count {
             PNEvents.emit(self, "on_native_back", [order.count - navigation.viewControllers.count])
         }
     }
@@ -77,9 +109,8 @@ public final class PNScreenStackManager: PNComponentManager {
     public override func makeView(props: [String: Any]) -> UIView { PNLogicalStack(frame: .zero) }
     public override func insertChild(parent: UIView, child: UIView, index: Int) {
         guard let stack = parent as? PNLogicalStack, let state = PNViewState.existing(for: child) else { return }
-        let controller = stack.controllers[state.tag] ?? UIViewController()
+        let controller = stack.controllers[state.tag] ?? PNLogicalScreenController(screen: child)
         controller.edgesForExtendedLayout = []
-        controller.view = child
         controller.title = state.props["title"] as? String
         stack.controllers[state.tag] = controller
         stack.order.removeAll { $0 == state.tag }

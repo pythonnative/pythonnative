@@ -44,13 +44,3 @@ open class PNContainerView: UIView {
         }
     }
 }
-
-/// Manager used for element types nobody registered. Creates a plain
-/// `UIView` so the tree stays consistent.
-final class PNPlaceholderManager: PNComponentManager {
-    override func createView(tag: Int64, props: [String: Any]) -> UIView {
-        let view = PNContainerView(frame: .zero)
-        view.backgroundColor = .clear
-        return view
-    }
-}

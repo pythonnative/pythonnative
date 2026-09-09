@@ -186,7 +186,7 @@ def test_element_factory_validates_kwargs_via_props() -> None:
     assert el.type == "Badge"
     assert el.props["text"] == "3"
     assert el.props["color"] == "#0A84FF"
-    assert el.children == []
+    assert el.children == ()
 
 
 def test_element_factory_accepts_props_instance() -> None:
@@ -222,7 +222,7 @@ def test_element_factory_passes_children() -> None:
     Container = element_factory("Container")
     inner = pn.Text("inner")
     el = Container(inner, key="root")
-    assert el.children == [inner]
+    assert el.children == (inner,)
     assert el.key == "root"
 
 
@@ -319,7 +319,7 @@ def test_entry_point_discovery_runs_once(monkeypatch: pytest.MonkeyPatch) -> Non
     import importlib
 
     em = importlib.import_module("importlib.metadata")
-    monkeypatch.setattr(em, "entry_points", lambda: FakeEntryPoints())
+    monkeypatch.setattr(em, "entry_points", lambda *, group: FakeEntryPoints().select(group=group))
 
     nc_internals._reset_discovery_state_for_tests()
     nc_internals._discover_entry_points()
@@ -356,7 +356,7 @@ def test_entry_point_failure_does_not_break_discovery(monkeypatch: pytest.Monkey
     import importlib
 
     em = importlib.import_module("importlib.metadata")
-    monkeypatch.setattr(em, "entry_points", lambda: FakeEntryPoints())
+    monkeypatch.setattr(em, "entry_points", lambda *, group: FakeEntryPoints().select(group=group))
 
     nc_internals._reset_discovery_state_for_tests()
     nc_internals._discover_entry_points()

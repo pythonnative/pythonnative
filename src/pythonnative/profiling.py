@@ -99,3 +99,23 @@ def start_session() -> None:
 
 
 start_session()
+
+
+def native_sample(phase: str, duration_ns: int, **work: int) -> None:
+    """Record a completed native phase without mixing native and host clocks."""
+    profiler = _active.get() or _session
+    if profiler is None:
+        return
+    profiler.events.append(
+        {
+            "name": "native." + phase,
+            "ph": "X",
+            "pid": 1,
+            "tid": 2,
+            "ts": (time.perf_counter_ns() - duration_ns) / 1000,
+            "dur": duration_ns / 1000,
+            "args": {"clock": "duration placed at host receipt", **work},
+        }
+    )
+    for name, value in work.items():
+        profiler.counters["native." + phase + "." + name] += value

@@ -145,6 +145,7 @@ object PNBridge {
         val record = registry.get(tag) ?: return null
         return try {
             val args = if (argsJson.isBlank()) JSONObject() else JSONObject(argsJson)
+            require(com.pythonnative.generated.PNContracts.validateCommand(record.typeName, name, args)) { "Invalid view command" }
             JsonUtil.encode(record.manager.command(record.view, name, args))
         } catch (e: Exception) {
             Log.e(TAG, "command '$name' failed for ${record.typeName}#$tag", e)
@@ -181,10 +182,16 @@ object PNBridge {
         if (module == "Runtime") return JSONObject().put("ok", true).put("value", JSONObject()
             .put("protocol", 2).put("yoga", "3.2.1").put("schema", com.pythonnative.generated.PNContracts.fingerprint)
             .put("animation_graph", true).put("logical_lists", true).put("native_layout", true)).toString()
-        if (module == "Layout") return JSONObject().put("ok", true).put("value",
-            com.pythonnative.runtime.layout.NativeLayout.compute(args)).toString()
+        if (module == "Layout") {
+            val started = System.nanoTime()
+            val frames = com.pythonnative.runtime.layout.NativeLayout.compute(args)
+            val value = commits.layout(frames).put("metrics", JSONObject().put("layout_ns", System.nanoTime() - started).put("views", registry.size))
+            return JSONObject().put("ok", true).put("value", value).toString()
+        }
         val target = PNRegistry.module(module)
             ?: return ModuleEnvelope.error("unknown module '$module'", "unknown_module")
+        if (!com.pythonnative.generated.PNContracts.validateModule(module, method, args))
+            return ModuleEnvelope.error("Invalid native method arguments", "invalid_arguments")
         val promise = Promise(callId, module)
         if (callId > 0) {
             modulePromises[callId] = promise
@@ -221,7 +228,7 @@ object PNBridge {
                 record.state["edit_revision"] = editRevision
             }
         }
-        val payload = if (kind == "event") commits.event(org.json.JSONArray(payloadJson), editRevision) else payloadJson
+        val payload = if (kind == "event") commits.event(org.json.JSONArray(payloadJson), editRevision) else if (kind == "layout") commits.layout(org.json.JSONArray(payloadJson)).toString() else payloadJson
         val message = Message(kind, tag, name, payload)
         val schedule = synchronized(mailbox) {
             val last = mailbox.peekLast()

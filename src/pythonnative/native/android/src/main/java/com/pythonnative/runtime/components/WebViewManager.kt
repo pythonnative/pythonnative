@@ -125,8 +125,8 @@ class WebViewManager : ComponentManager() {
             "go_back" -> if (wv.canGoBack()) wv.goBack()
             "go_forward" -> if (wv.canGoForward()) wv.goForward()
             "stop_loading" -> wv.stopLoading()
-            "inject_javascript", "evaluate_javascript" -> {
-                val script = args.str("script") ?: args.str("javascript") ?: return null
+            "inject_javascript", "eval_js" -> {
+                val script = args.str("script") ?: return null
                 wv.evaluateJavascript(script, null)
             }
             "post_message" -> {
@@ -135,7 +135,7 @@ class WebViewManager : ComponentManager() {
             }
             "can_go_back" -> return wv.canGoBack()
             "can_go_forward" -> return wv.canGoForward()
-            "get_url" -> return wv.url
+            "get_url" -> return wv.url ?: ""
         }
         return null
     }

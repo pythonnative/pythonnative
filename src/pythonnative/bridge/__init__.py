@@ -217,8 +217,7 @@ def native_callback(kind: str, tag: int, name: str, payload: str) -> Optional[st
             from ..native_views import get_registry
 
             backend = get_registry()
-            if backend.on_layout is not None:
-                backend.on_layout(codec.loads(payload))
+            backend.accept_layout(codec.loads(payload))
             return None
         if kind == "event":
             return _on_event(int(tag), name, payload)

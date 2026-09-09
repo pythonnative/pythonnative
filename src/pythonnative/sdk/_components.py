@@ -270,32 +270,9 @@ def _discover_entry_points() -> None:
         return
     _DISCOVERED = True
 
-    try:
-        from importlib.metadata import entry_points
-    except ImportError:
-        return
+    from importlib.metadata import entry_points
 
-    try:
-        eps = entry_points()
-    except Exception:
-        return
-
-    # importlib.metadata's API changed across Python versions; both
-    # ``select`` and direct ``.get`` are normalized here.
-    selected: List[Any] = []
-    if hasattr(eps, "select"):
-        try:
-            selected = list(eps.select(group=ENTRY_POINT_GROUP))
-        except Exception:
-            selected = []
-    if not selected:
-        try:
-            getter = getattr(eps, "get", None)
-            if getter is not None:
-                selected = list(getter(ENTRY_POINT_GROUP, []))
-        except Exception:
-            selected = []
-
+    selected = entry_points(group=ENTRY_POINT_GROUP)
     for ep in selected:
         name = getattr(ep, "name", "?")
         try:

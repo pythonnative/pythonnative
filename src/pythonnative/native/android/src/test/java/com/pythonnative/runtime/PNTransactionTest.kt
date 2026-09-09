@@ -5,6 +5,7 @@ import com.pythonnative.runtime.bridge.Op
 import com.pythonnative.runtime.bridge.PNTransaction
 import com.pythonnative.runtime.bridge.value
 import org.json.JSONObject
+import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -22,7 +23,7 @@ class PNTransactionTest {
               ["d", 2]
             ]
         """.trimIndent()
-        val ops = PNTransaction.decode(json)
+        val ops = (JSONArray(json).let { array -> (0 until array.length()).map { PNTransaction.decodeOp(array.getJSONArray(it)) } })
         assertEquals(5, ops.size)
         val create = ops[0] as Op.Create
         assertEquals(1L, create.tag)
@@ -34,27 +35,6 @@ class PNTransactionTest {
         assertEquals(Op.Insert(1, 2, 0), ops[2])
         assertEquals(Op.Frame(2, 10.0, 20.5, 100.0, 40.0), ops[3])
         assertEquals(Op.Destroy(2), ops[4])
-    }
-
-    @Test
-    fun infinityStringsBecomeInfinity() {
-        val ops = PNTransaction.decode("""[["f", 1, 0, 0, "inf", "-inf"]]""")
-        val frame = ops[0] as Op.Frame
-        assertEquals(Double.POSITIVE_INFINITY, frame.width, 0.0)
-        assertEquals(Double.NEGATIVE_INFINITY, frame.height, 0.0)
-        assertEquals(Double.POSITIVE_INFINITY, JsonUtil.toDouble("Infinity"), 0.0)
-    }
-
-    @Test
-    fun malformedOpsAreIsolated() {
-        val errors = ArrayList<Int>()
-        val ops = PNTransaction.decode(
-            """[["c", 1, "View", {}], ["zz", 1], "not-an-array", ["i"], ["d", 1]]""",
-        ) { index, _ -> errors.add(index) }
-        assertEquals(listOf(1, 2, 3), errors)
-        assertEquals(2, ops.size)
-        assertTrue(ops[0] is Op.Create)
-        assertEquals(Op.Destroy(1), ops[1])
     }
 
     @Test

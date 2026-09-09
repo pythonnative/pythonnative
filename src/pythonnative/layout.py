@@ -100,6 +100,8 @@ def _api() -> Any:
     signatures: dict[str, Any] = {
         "YGNodeNew": (C.c_void_p, []),
         "YGNodeFree": (None, [C.c_void_p]),
+        "YGNodeGetOwner": (C.c_void_p, [C.c_void_p]),
+        "YGNodeRemoveChild": (None, [C.c_void_p, C.c_void_p]),
         "YGNodeRemoveAllChildren": (None, [C.c_void_p]),
         "YGNodeInsertChild": (None, [C.c_void_p, C.c_void_p, C.c_size_t]),
         "YGNodeCopyStyle": (None, [C.c_void_p, C.c_void_p]),
@@ -296,6 +298,12 @@ class LayoutNode:
         if children != self._last_children:
             lib.YGNodeRemoveAllChildren(ptr)
             for i, child in enumerate(children):
+                owner = lib.YGNodeGetOwner(child)
+                if owner:
+                    lib.YGNodeRemoveChild(owner, child)
+                    previous = _nodes.get(owner)
+                    if previous is not None:
+                        previous._last_children = ()
                 lib.YGNodeInsertChild(ptr, child, i)
             self._last_children = children
         return ptr

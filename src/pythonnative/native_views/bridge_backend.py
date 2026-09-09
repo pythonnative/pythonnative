@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from ..bridge import codec, get_transport
 from ..bridge.commits import PROTOCOL_VERSION, CommitError, CommitState
-from ..mutations import CreateOp, DestroyOp, Mutation, UpdateOp
+from ..mutations import CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
 
 __all__ = ["BridgeBackend", "NativeViewRef"]
 
@@ -58,6 +58,8 @@ class BridgeBackend:
         self._refs: Dict[int, NativeViewRef] = {}
         self._python_props: Dict[int, Dict[str, Any]] = {}
         self._handlers: Dict[str, Any] = {}
+        self._layout_request: Any = None
+        self._layout_required = True
 
     @property
     def transport(self) -> Any:
@@ -73,14 +75,42 @@ class BridgeBackend:
 
     def compute_layout(self, roots: list[int], width: float, height: float) -> None:
         """Compute native Yoga layout in one request, returning changed frames."""
+        request = (tuple(roots), width, height)
+        if not self._layout_required and self._layout_request == request:
+            return
+        from ..profiling import count
+
+        count("layout.requests")
         raw = self.transport.call(
             "Layout", "compute", codec.dumps({"call_id": 0, "args": {"roots": roots, "width": width, "height": height}})
         )
         result = codec.loads(raw)
         if not isinstance(result, dict) or not result.get("ok"):
             raise CommitError(f"Native layout failed: {result!r}")
+        self._layout_required = False
+        self._layout_request = request
+        self.accept_layout(result.get("value"))
+
+    def accept_layout(self, payload: Any) -> None:
+        """Accept geometry only for this surface's current committed revision."""
+        if not isinstance(payload, dict):
+            raise CommitError("Layout must identify its committed surface")
+        identity = tuple(payload.get(key) for key in ("application", "surface", "revision"))
+        if identity != (self._commit.application, self._commit.surface, self._commit.revision):
+            return
+        frames = payload.get("frames")
+        if not isinstance(frames, list):
+            raise CommitError("Layout frames must be an array")
+        from ..profiling import native_sample
+
+        metrics = payload.get("metrics", {})
+        if isinstance(metrics, dict):
+            duration = metrics.get("layout_ns")
+            visited = metrics.get("views", 0)
+            if type(duration) is int and duration >= 0 and type(visited) is int and visited >= 0:
+                native_sample("layout", duration, views=visited, changed_frames=len(frames))
         if self.on_layout is not None:
-            self.on_layout(result.get("value", []))
+            self.on_layout(frames)
 
     # ------------------------------------------------------------------
     # Registration (kept for protocol parity with NativeViewRegistry)
@@ -148,14 +178,33 @@ class BridgeBackend:
         count("bridge.operations", len(ops))
         count("bridge.bytes", len(payload.encode("utf-8")))
         candidate = self._commit.prepare(envelope)
+        from ..profiling import native_sample, span
+
         try:
-            ack = codec.loads(self.transport.apply(codec.dumps(envelope)))
-            if ack != candidate.acknowledgement():
-                raise CommitError(f"Native commit {candidate.revision} rejected: {ack!r}")
+            with span("transport.apply"):
+                ack = codec.loads(self.transport.apply(codec.dumps(envelope)))
         except Exception:
             self._failed = True
             raise
-        self._commit = candidate
+        expected = candidate.acknowledgement()
+        if not isinstance(ack, dict) or any(ack.get(key) != value for key, value in expected.items()):
+            # An explicit pre-mutation rejection can be retried at the same
+            # revision. Unknown transport outcomes invalidate the surface.
+            self._failed = not (isinstance(ack, dict) and ack.get("failed") is False)
+            raise CommitError(f"Native commit {candidate.revision} rejected: {ack!r}")
+        metrics = ack.get("metrics", {})
+        if isinstance(metrics, dict):
+            duration = metrics.get("mutation_ns")
+            if type(duration) is int and duration >= 0:
+                native_sample("mutation", duration, operations=len(ops))
+        self._commit = candidate.publish()
+        from ..reconciler.layout_pass import affects_layout
+
+        for op in ops:
+            if isinstance(op, (CreateOp, DestroyOp, InsertOp)) or (
+                isinstance(op, UpdateOp) and affects_layout(self._types.get(op.tag, ""), op.changed_props)
+            ):
+                self._layout_required = True
         destroyed: List[int] = []
         for op in ops:
             if isinstance(op, CreateOp):
@@ -192,12 +241,23 @@ class BridgeBackend:
         key = (tag, name)
         if not self._births[tag] <= revision <= self._commit.revision or sequence <= self._event_sequences.get(key, 0):
             return False
+        arguments = envelope.get("args")
+        if not isinstance(arguments, list):
+            return False
+        from ..sdk.schema import COMPONENTS
+
+        contract = COMPONENTS.get(self._types[tag])
+        if contract is not None:
+            try:
+                contract.validate_event(name, arguments)
+            except TypeError:
+                return False
         self._event_sequences[key] = sequence
         if name == "on_change" and self._types.get(tag) == "TextInput":
             edit = envelope.get("edit_revision")
             if type(edit) is int:
                 self._edit_revisions[tag] = max(edit, self._edit_revisions.get(tag, 0))
-        return isinstance(envelope.get("args"), list)
+        return True
 
     def _forget(self, tag: int) -> None:
         self._types.pop(tag, None)
@@ -224,8 +284,14 @@ class BridgeBackend:
         """Run an imperative command on one view; returns its JSON result or ``None``."""
         if tag not in self._types:
             raise CommitError(f"Command {name!r} addressed stale view {tag}")
+        from ..sdk.schema import COMPONENTS, ModuleSchema
+
+        schema = COMPONENTS.get(self._types[tag])
+        if schema is not None:
+            args = ModuleSchema(schema.name, schema.commands).validate_call(name, args or {})
         result = self.transport.command(tag, name, codec.dumps(codec.to_jsonable(args or {})))
-        return codec.loads(result)
+        value = codec.loads(result)
+        return ModuleSchema(schema.name, schema.commands).validate_result(name, value) if schema is not None else value
 
     def set_animated_property(self, tag: int, prop_name: str, value: Any) -> None:
         """Write one animated property value without animating (a Python-driven frame)."""
@@ -264,6 +330,9 @@ class BridgeBackend:
         self._births: dict[int, int] = {}
         self._event_sequences: dict[tuple[int, str], int] = {}
         self._failed = False
+        self._edit_revisions.clear()
+        self._layout_required = True
+        self._layout_request = None
 
 
 def _bound(value: float) -> float:

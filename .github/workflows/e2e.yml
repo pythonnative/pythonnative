@@ -53,6 +53,8 @@ jobs:
             suites: navigation gestures layout styling
           - name: anim-misc
             suites: animations misc
+          - name: inbox
+            suites: inbox
 
     name: e2e-android (${{ matrix.name }})
 
@@ -164,6 +166,8 @@ jobs:
             suites: navigation gestures layout styling
           - name: anim-misc
             suites: animations misc
+          - name: inbox
+            suites: inbox
 
     name: e2e-ios (${{ matrix.name }})
 

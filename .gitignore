@@ -170,3 +170,6 @@ cython_debug/
 **/.gradle/
 **/.kotlin/
 **/.swiftpm/
+
+# Built sample extension wheels
+examples/inbox/vendor/

@@ -76,14 +76,14 @@ def test_to_jsonable_normalizes_python_only_values() -> None:
 
 def test_to_jsonable_rejects_callables() -> None:
     with pytest.raises(TypeError):
-        codec.to_jsonable({"render_row": lambda i: i})
+        codec.to_jsonable({"on_bind_row": lambda i: i})
 
 
 def test_split_props_keeps_callables_python_side() -> None:
     fn = lambda i: i  # noqa: E731
-    wire, python = codec.split_props({"count": 3, "render_row": fn, "obj": object()})
+    wire, python = codec.split_props({"count": 3, "on_bind_row": fn, "obj": object()})
     assert wire == {"count": 3}
-    assert python["render_row"] is fn
+    assert python["on_bind_row"] is fn
     assert "obj" in python
 
 
@@ -91,7 +91,7 @@ def test_encode_transaction_shapes() -> None:
     render = lambda i: i  # noqa: E731
     ops: List[Mutation] = [
         CreateOp(1, "Column", {"flex": 1, "_pn_events": frozenset({"on_press"})}),
-        CreateOp(2, "VirtualList", {"count": 2, "render_row": render}),
+        CreateOp(2, "VirtualList", {"count": 2, "on_bind_row": render}),
         UpdateOp(1, {"flex": None, "padding": 4}),
         InsertOp(1, 2, 0),
         SetFrameOp(2, 0, 0, 100.5, math.nan),
@@ -107,7 +107,7 @@ def test_encode_transaction_shapes() -> None:
         ["f", 2, 0.0, 0.0, 100.5, 0.0],
         ["d", 2],
     ]
-    assert sidecar == [(2, {"render_row": render})]
+    assert sidecar == [(2, {"on_bind_row": render})]
 
 
 def test_loads_handles_empty_and_bytes() -> None:
@@ -215,10 +215,13 @@ def test_backend_measure_command_and_animation(backend: BridgeBackend, transport
     assert backend.measure_intrinsic(7, math.inf, 200) == (60.0, 16.0)
     assert backend.measure_intrinsic(99, 10, 10) == (0.0, 0.0)
 
+    backend.apply_mutations([CreateOp(8, "ScrollView", {}), CreateOp(9, "TextInput", {})])
     transport.command_results["get_scroll_offset"] = {"x": 0, "y": 42}
-    assert backend.command(7, "get_scroll_offset", {}) == {"x": 0, "y": 42}
-    assert backend.command(7, "focus") is None
-    assert transport.commands[-1] == (7, "focus", {})
+    assert backend.command(8, "get_scroll_offset", {}) == {"x": 0, "y": 42}
+    assert backend.command(9, "focus") is None
+    assert transport.commands[-1] == (9, "focus", {})
+    with pytest.raises(TypeError, match="Unknown command"):
+        backend.command(7, "focus")
 
     backend.set_animated_property(7, "opacity", 0.5)
     assert transport.animations[-1] == (7, {"op": "set", "prop": "opacity", "value": 0.5})
@@ -230,10 +233,10 @@ def test_backend_measure_command_and_animation(backend: BridgeBackend, transport
 
 def test_backend_holds_callable_props_in_sidecar(backend: BridgeBackend, transport: FakeTransport) -> None:
     render = lambda i: Element("Text", {"text": str(i)}, [])  # noqa: E731
-    backend.apply_mutations([CreateOp(5, "VirtualList", {"count": 3, "render_row": render})])
+    backend.apply_mutations([CreateOp(5, "VirtualList", {"count": 3, "on_bind_row": render})])
     assert transport.views[5].props == {"count": 3}
-    assert backend.python_props(5)["render_row"] is render
-    backend.apply_mutations([UpdateOp(5, {"render_row": None})])
+    assert backend.python_props(5)["on_bind_row"] is render
+    backend.apply_mutations([UpdateOp(5, {"on_bind_row": None})])
     assert backend.python_props(5) == {}
     assert transport.views[5].props == {"count": 3}
 
@@ -270,10 +273,10 @@ def test_reconciler_commits_through_bridge(transport: FakeTransport) -> None:
 def test_event_handler_return_value_is_returned_to_native(transport: FakeTransport) -> None:
     from pythonnative.events import get_event_registry
 
-    get_registry().apply_mutations([CreateOp(11, "View", {})])
-    get_event_registry().set_events(11, {"on_ask": lambda x: {"answer": x * 2}})
+    get_registry().apply_mutations([CreateOp(11, "VirtualList", {})])
+    get_event_registry().set_events(11, {"on_bind_row": lambda payload: {"root": payload["index"] * 2}})
     try:
-        assert transport.fire(11, "on_ask", 21) == {"answer": 42}
+        assert transport.fire(11, "on_bind_row", {"index": 21}) == {"root": 42}
         assert transport.fire(11, "on_missing") is None
     finally:
         get_event_registry().clear(11)
@@ -283,7 +286,7 @@ def test_destroyed_view_drops_queued_event(transport: FakeTransport) -> None:
     from pythonnative.events import get_event_registry
 
     backend = get_registry()
-    backend.apply_mutations([CreateOp(50, "View", {})])
+    backend.apply_mutations([CreateOp(50, "Button", {"title": "Press"})])
     seen: list[str] = []
     get_event_registry().set_events(50, {"on_press": lambda: seen.append("press")})
     transport.fire(50, "on_press")
@@ -332,7 +335,7 @@ def test_bridge_module_pending_call_resolves_later(transport: FakeTransport) -> 
         task = asyncio.ensure_future(modules.native_module("Camera").call_async("take_photo", quality=0.8))
         await asyncio.sleep(0)
         _module, call_id, method, args = transport.pending_calls[0]
-        assert method == "take_photo" and args == {"quality": 0.8}
+        assert method == "take_photo" and args == {"quality": 0.8, "allow_editing": False}
         transport.resolve_pending(call_id, "/tmp/photo.jpg")
         return await task
 
@@ -544,3 +547,43 @@ def test_native_host_defers_renders_to_application_loop(
     drain()
     assert transport.find("Text")[0].props["text"] == "n=5"
     transport.host_event(2, "destroy")
+
+
+def test_drawing_only_commit_skips_layout_until_geometry_changes(
+    backend: BridgeBackend, transport: FakeTransport
+) -> None:
+    from pythonnative.profiling import Profiler
+
+    def layout(_method: str, _args: Dict[str, Any]) -> Dict[str, Any]:
+        identity = transport.commit_state.acknowledgement()
+        identity.pop("ok")
+        return identity | {"frames": [], "metrics": {"layout_ns": 1000, "views": 1}}
+
+    transport.module_handlers["Layout"] = layout
+    with Profiler() as profiler:
+        backend.apply_mutations([CreateOp(91, "Text", {"text": "before"})])
+        backend.compute_layout([91], 300, 500)
+        backend.apply_mutations([UpdateOp(91, {"color": "#ff0000", "opacity": 0.5})])
+        backend.compute_layout([91], 300, 500)
+        assert profiler.counters["layout.requests"] == 1
+        backend.apply_mutations([UpdateOp(91, {"text": "a longer label"})])
+        backend.compute_layout([91], 300, 500)
+        assert profiler.counters["layout.requests"] == 2
+        backend.compute_layout([91], 500, 300)
+        assert profiler.counters["layout.requests"] == 3
+        assert profiler.counters["native.layout.views"] == 3
+
+
+def test_geometry_from_an_obsolete_revision_cannot_update_the_tree(backend: BridgeBackend) -> None:
+    accepted: list[Any] = []
+    backend.on_layout = accepted.append
+    backend.apply_mutations([CreateOp(92, "Text", {"text": "before"})])
+    identity = backend._commit.acknowledgement()
+    identity.pop("ok")
+    backend.apply_mutations([UpdateOp(92, {"text": "after"})])
+    backend.accept_layout(identity | {"frames": [[92, 0, 0, 10, 10]]})
+    assert accepted == []
+    current = backend._commit.acknowledgement()
+    current.pop("ok")
+    backend.accept_layout(current | {"frames": [[92, 0, 0, 20, 10]]})
+    assert accepted == [[[92, 0, 0, 20, 10]]]

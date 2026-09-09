@@ -22,30 +22,8 @@ sealed class Op {
     data class Frame(val tag: Long, val x: Double, val y: Double, val width: Double, val height: Double) : Op()
 }
 
-/**
- * Decoder for the transaction wire format: a JSON array of ops, each an
- * array whose first element is a one-letter opcode.
- *
- * Decoding is isolated per op: a malformed entry is reported through
- * `onError` and skipped so the rest of the commit still applies.
- */
+/** Decodes individual operations after CommitState validates the entire batch. */
 object PNTransaction {
-    /** Decode `json`; invalid ops are skipped after `onError(index, error)`. */
-    fun decode(json: String, onError: (Int, Throwable) -> Unit = { _, _ -> }): List<Op> {
-        val array = JSONArray(json)
-        val ops = ArrayList<Op>(array.length())
-        for (i in 0 until array.length()) {
-            try {
-                val raw = array.get(i) as? JSONArray
-                    ?: throw JSONException("op $i is not an array")
-                ops.add(decodeOp(raw))
-            } catch (e: Exception) {
-                onError(i, e)
-            }
-        }
-        return ops
-    }
-
     /** Decode a single op array. */
     fun decodeOp(raw: JSONArray): Op {
         val code = raw.optString(0, "")

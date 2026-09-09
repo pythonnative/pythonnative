@@ -352,7 +352,12 @@ def write_requirements(project_dir: Path, config: AppConfig) -> None:
 
     body = requirements(config, android_targets(config))
     if body is None:
-        body = "\n".join(config.requirements)
+        # Chaquopy invokes pip from the staged app directory, not the project
+        # root. Preserve local wheel requirements across that change of cwd.
+        body = "\n".join(
+            str(config.resolve_path(item)) if config.resolve_path(item).is_file() else item
+            for item in config.requirements
+        )
     requirements_path.write_text(body + ("\n" if body else ""), encoding="utf-8")
 
 

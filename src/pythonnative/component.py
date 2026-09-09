@@ -46,7 +46,7 @@ from __future__ import annotations
 
 import functools
 import inspect
-from typing import Any, Awaitable, Callable, Dict, Generic, List, Optional, ParamSpec, Tuple, Union, overload
+from typing import Any, Awaitable, Callable, Dict, Generic, Mapping, Optional, ParamSpec, Union, overload
 
 from .element import Element, Node
 
@@ -82,7 +82,7 @@ class Component(Generic[P]):
         "memoized",
         "props_equal",
         "accepts_children",
-        "_positional",
+        "_signature",
         "_declares_key",
         "_is_async",
         "refresh_signature",
@@ -94,13 +94,10 @@ class Component(Generic[P]):
         if isinstance(fn, Component):
             raise TypeError(f"{fn!r} is already a component; remove the duplicate @component")
         sig = inspect.signature(fn)
-        positional: List[str] = []
         accepts_children = False
         declares_key = False
         for name, param in sig.parameters.items():
-            if param.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD):
-                positional.append(name)
-            elif param.kind is inspect.Parameter.VAR_POSITIONAL:
+            if param.kind is inspect.Parameter.VAR_POSITIONAL:
                 accepts_children = True
             if name == "key":
                 declares_key = True
@@ -110,9 +107,9 @@ class Component(Generic[P]):
         self.fn = fn
         self.display_name = display_name or getattr(fn, "__name__", "Component")
         self.memoized = False
-        self.props_equal: Optional[Callable[[Dict[str, Any], Dict[str, Any]], bool]] = None
+        self.props_equal: Optional[Callable[[Mapping[str, Any], Mapping[str, Any]], bool]] = None
         self.accepts_children = accepts_children
-        self._positional: Tuple[str, ...] = tuple(positional)
+        self._signature = sig
         self._declares_key = declares_key
         self._is_async = inspect.iscoroutinefunction(fn)
         self.__wrapped__ = fn
@@ -126,21 +123,16 @@ class Component(Generic[P]):
         """Describe a render of this component with the given props."""
         props: Dict[str, Any] = dict(kwargs)
         key = props.pop("key", None) if not self._declares_key else props.get("key")
-        children: List[Any] = []
-        if args:
-            if self.accepts_children:
-                children = list(args)
+        bound = self._signature.bind(*args, **props)
+        bound.apply_defaults()
+        children = ()
+        props = {}
+        for name, value in bound.arguments.items():
+            kind = self._signature.parameters[name].kind
+            if kind is inspect.Parameter.VAR_POSITIONAL:
+                children = value
             else:
-                names = self._positional
-                if len(args) > len(names):
-                    raise TypeError(
-                        f"{self.display_name}() takes {len(names)} positional argument(s) but "
-                        f"{len(args)} were given. Declare *children to accept child elements."
-                    )
-                for name, value in zip(names, args):
-                    if name in props:
-                        raise TypeError(f"{self.display_name}() got multiple values for argument {name!r}")
-                    props[name] = value
+                props[name] = value
         return Element(self, props, children, key=key if isinstance(key, str) or key is None else str(key))
 
     # ------------------------------------------------------------------
@@ -155,9 +147,12 @@ class Component(Generic[P]):
         (an element, a list, ``None``, or a coroutine for ``async def``
         bodies).
         """
-        if self.accepts_children:
-            return self.fn(*element.children, **element.props)
-        return self.fn(**element.props)  # type: ignore[call-arg]
+        arguments = dict(element.props)
+        for name, param in self._signature.parameters.items():
+            if param.kind is inspect.Parameter.VAR_POSITIONAL:
+                arguments[name] = element.children
+        bound = inspect.BoundArguments(self._signature, arguments)
+        return self.fn(*bound.args, **bound.kwargs)
 
     @property
     def is_async(self) -> bool:
@@ -204,20 +199,20 @@ def component(fn: RenderFn[P]) -> Component[P]:
 
 @overload
 def memo(
-    target: Component[P], *, equal: Optional[Callable[[Dict[str, Any], Dict[str, Any]], bool]] = None
+    target: Component[P], *, equal: Optional[Callable[[Mapping[str, Any], Mapping[str, Any]], bool]] = None
 ) -> Component[P]: ...
 
 
 @overload
 def memo(
-    target: None = None, *, equal: Optional[Callable[[Dict[str, Any], Dict[str, Any]], bool]] = None
+    target: None = None, *, equal: Optional[Callable[[Mapping[str, Any], Mapping[str, Any]], bool]] = None
 ) -> Callable[[Component[P]], Component[P]]: ...
 
 
 def memo(
     target: Optional[Component[P]] = None,
     *,
-    equal: Optional[Callable[[Dict[str, Any], Dict[str, Any]], bool]] = None,
+    equal: Optional[Callable[[Mapping[str, Any], Mapping[str, Any]], bool]] = None,
 ) -> Any:
     """Skip a component's render when its props haven't changed.
 

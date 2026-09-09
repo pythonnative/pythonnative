@@ -494,7 +494,7 @@ def test_component_decorator_creates_element() -> None:
     assert el.type is my_comp
     assert getattr(my_comp, "__wrapped__") is my_comp.fn
     assert el.props == {"label": "world"}
-    assert el.children == []
+    assert el.children == ()
 
 
 def test_component_with_positional_args() -> None:
@@ -515,7 +515,7 @@ def test_component_with_children() -> None:
     child_b = Element("Text", {"text": "b"}, [])
     el = card(child_a, child_b, title="Hello")
     assert el.props == {"title": "Hello"}
-    assert el.children == [child_a, child_b]
+    assert el.children == (child_a, child_b)
 
     root = Reconciler(MockBackend()).mount(el)
     assert [v.props.get("text") for v in root.children] == ["Hello", "a", "b"]
@@ -652,7 +652,7 @@ def test_provider_with_multiple_children_kept_flat() -> None:
     el = theme.Provider("dark", child_a, child_b)
     assert el.type is theme
     assert el.props == {"value": "dark"}
-    assert el.children == [child_a, child_b]
+    assert el.children == (child_a, child_b)
 
 
 def test_provider_with_single_child_no_fragment_wrap() -> None:
@@ -661,7 +661,7 @@ def test_provider_with_single_child_no_fragment_wrap() -> None:
 
     el = theme.Provider("dark", child)
     assert el.type is theme
-    assert el.children == [child]
+    assert el.children == (child,)
 
 
 # ======================================================================

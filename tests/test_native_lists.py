@@ -8,11 +8,6 @@ import pythonnative as pn
 from pythonnative.testing import render
 
 
-@pytest.fixture(autouse=True)
-def native_contract(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(pn.components, "_native_lists_supported", lambda: True)
-
-
 def test_rows_inherit_provider_and_keep_state_by_key() -> None:
     theme = pn.create_context("default")
     setters = {}
@@ -83,4 +78,35 @@ def test_fixed_list_height_survives_an_unbounded_scroll_parent() -> None:
         )
     )
     assert result.get_by_type("VirtualList").frame[3] == 400
+    result.unmount()
+
+
+def test_parent_renders_keep_dataset_revision_and_only_changed_items_advance() -> None:
+    def row(item: str, _: int) -> pn.Element:
+        return pn.Text(item)
+
+    result = render(pn.FlatList(data=["a", "b"], render_item=row))
+    view = result.get_by_type("VirtualList")
+    revision, items = view.props["revision"], view.props["item_revisions"]
+    result.rerender(pn.FlatList(data=["a", "b"], render_item=row))
+    assert view.props["revision"] == revision
+    assert view.props["item_revisions"] == items
+    result.rerender(pn.FlatList(data=["changed", "b"], render_item=row))
+    assert view.props["item_revisions"] == [items[0] + 1, items[1]]
+    result.unmount()
+
+
+def test_public_indices_exclude_global_and_section_headers() -> None:
+    reference: pn.Ref[Any] = pn.Ref()
+    result = render(
+        pn.SectionList(
+            sections=[{"title": "A", "data": ["a", "b"]}, {"title": "B", "data": ["c"]}],
+            list_header=pn.Text("Global header"),
+            ref=reference,
+        )
+    )
+    reference.current.scroll_to_index(2, animated=False)
+    assert result.backend.commands[-1][-1]["index"] == 5
+    with pytest.raises(IndexError):
+        reference.current.scroll_to_index(3)
     result.unmount()

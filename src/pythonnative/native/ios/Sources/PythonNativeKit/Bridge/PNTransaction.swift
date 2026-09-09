@@ -10,8 +10,7 @@ import UIKit
 /// - `["d", tag]` destroy the view
 /// - `["f", tag, x, y, w, h]` set the frame in points
 ///
-/// Ops are applied strictly in order; a failing op is logged and skipped
-/// so one bad prop can't desync the rest of the tree.
+/// Only PNCommit may submit validated operation batches.
 public enum PNTransaction {
     /// A decoded op.
     public enum Op: Equatable {
@@ -47,22 +46,6 @@ public enum PNTransaction {
     }
 
     // MARK: - Decoding
-
-    /// Decode a transaction document into ops. Malformed ops are skipped
-    /// (and logged) rather than failing the whole batch.
-    public static func decode(_ json: String) throws -> [Op] {
-        guard let root = PNJSON.decode(json) as? [Any] else { throw DecodeError.notAnArray }
-        var ops: [Op] = []
-        ops.reserveCapacity(root.count)
-        for (index, raw) in root.enumerated() {
-            do {
-                ops.append(try decodeOp(raw, index: index))
-            } catch {
-                PNLog.rateLimited(PNLog.bridge, key: "decode-op", "skipping malformed op #\(index): \(error)")
-            }
-        }
-        return ops
-    }
 
     static func decodeOp(_ raw: Any, index: Int) throws -> Op {
         guard let parts = raw as? [Any], let code = parts.first as? String else {
@@ -104,44 +87,38 @@ public enum PNTransaction {
 
     // MARK: - Applying
 
-    /// Decode and apply a transaction document.
-    public static func apply(_ json: String) {
-        let ops: [Op]
-        do {
-            ops = try decode(json)
-        } catch {
-            PNLog.bridge.error("transaction rejected: \(String(describing: error))")
-            return
-        }
-        apply(ops)
-    }
+    enum MountError: Error { case duplicateTag(Int64), missingTag(Int64), missingManager(String) }
 
-    /// Apply already-decoded ops in order with per-op error isolation.
-    public static func apply(_ ops: [Op]) {
+    /// Apply a validated batch; runtime inconsistencies fail the entire surface.
+    static func apply(_ ops: [Op]) throws {
         let registry = PNViewRegistry.shared
         for op in ops {
             switch op {
             case let .create(tag, type, props):
                 if registry.resolve(tag) != nil {
-                    PNLog.rateLimited(PNLog.bridge, key: "dup-create", "create for tag \(tag) ignored: already exists")
-                    continue
+                    throw MountError.duplicateTag(tag)
                 }
-                let manager = PNRegistry.shared.manager(for: type)
+                guard let manager = PNRegistry.shared.manager(for: type) else {
+                    throw MountError.missingManager(type)
+                }
                 let view = manager.createView(tag: tag, props: props)
                 registry.register(PNViewRecord(tag: tag, typeName: type, view: view, manager: manager))
                 manager.didCreate(view: view, tag: tag, props: props)
 
             case let .update(tag, changed):
                 guard let record = registry.resolve(tag) else {
-                    PNLog.rateLimited(PNLog.bridge, key: "missing-update", "update for unknown tag \(tag)")
-                    continue
+                    throw MountError.missingTag(tag)
                 }
-                record.manager.update(view: record.view, changed: changed)
+                let normalized = PNContracts.normalize(record.typeName, changed)
+                if PNContracts.requiresRecreation(record.typeName, changed) {
+                    recreate(record, changed: normalized)
+                } else {
+                    record.manager.update(view: record.view, changed: normalized)
+                }
 
             case let .insert(parent, child, index):
                 guard let parentRecord = registry.resolve(parent), let childRecord = registry.resolve(child) else {
-                    PNLog.rateLimited(PNLog.bridge, key: "missing-insert", "insert \(child) into \(parent): unknown tag")
-                    continue
+                    throw MountError.missingTag(child)
                 }
                 parentRecord.manager.insertChild(parent: parentRecord.view, child: childRecord.view, index: index)
 
@@ -158,9 +135,56 @@ public enum PNTransaction {
                 PNViewState.detach(record.view)
 
             case let .frame(tag, x, y, w, h):
-                guard let record = registry.resolve(tag) else { continue }
+                guard let record = registry.resolve(tag) else { throw MountError.missingTag(tag) }
                 record.manager.setFrame(view: record.view, x: x, y: y, w: w, h: h)
             }
+            // Later operations in this batch need the current logical owners,
+            // especially when replacing a container after moving its children.
+            PNLayout.observe([op])
         }
     }
+    /// Replace a physical widget while retaining its logical tag and children.
+    private static func recreate(_ record: PNViewRecord, changed: [String: Any]) {
+        let registry = PNViewRegistry.shared
+        let old = record.view
+        var props = PNViewState.existing(for: old)?.props ?? [:]
+        for (key, value) in changed {
+            if value is NSNull { props.removeValue(forKey: key) } else { props[key] = value }
+        }
+        let parent = PNLayout.nodes[record.tag]?.parent.flatMap { registry.resolve($0) }
+        let siblings = parent.flatMap { PNLayout.nodes[$0.tag]?.children } ?? []
+        let index = siblings.firstIndex(of: record.tag) ?? 0
+        let children = (PNLayout.nodes[record.tag]?.children ?? []).compactMap { registry.resolve($0) }
+        let superview = old.superview
+        let physicalIndex = superview?.subviews.firstIndex(of: old) ?? 0
+        let focused = old.isFirstResponder
+        let input = old as? UITextInput
+        let selection = input?.selectedTextRange.map { range in
+            (input!.offset(from: input!.beginningOfDocument, to: range.start), input!.offset(from: input!.beginningOfDocument, to: range.end))
+        }
+        // End the previous input session before moving focus to a new widget.
+        // UIKit can otherwise finish an old composition in the new responder.
+        if focused && record.typeName == "TextInput" { old.resignFirstResponder() }
+        for child in children { record.manager.removeChild(parent: old, child: child.view) }
+        if let parent = parent { parent.manager.removeChild(parent: parent.view, child: old) }
+        let edited = PNViewState.existing(for: old)?.extras["edit_revision"] as? Int ?? 0
+        if record.typeName == "TextInput", changed["value"] == nil || (PNProps.int(changed["_pn_edit_revision"]) ?? 0) < edited {
+            props["value"] = (old as? UITextField)?.text ?? (old as? UITextView)?.text ?? ""
+        }
+        let replacement = record.manager.createView(tag: record.tag, props: props)
+        replacement.frame = old.frame
+        registry.register(PNViewRecord(tag: record.tag, typeName: record.typeName, view: replacement, manager: record.manager))
+        record.manager.didCreate(view: replacement, tag: record.tag, props: props)
+        if record.typeName == "TextInput" { PNViewState.existing(for: replacement)?.extras["edit_revision"] = edited }
+        for (index, child) in children.enumerated() { record.manager.insertChild(parent: replacement, child: child.view, index: index) }
+        if let parent = parent { parent.manager.insertChild(parent: parent.view, child: replacement, index: index) }
+        else { superview?.insertSubview(replacement, at: min(physicalIndex, superview?.subviews.count ?? 0)) }
+        record.manager.destroy(view: old)
+        PNViewState.detach(old)
+        if focused { replacement.becomeFirstResponder() }
+        if let selection = selection, record.typeName == "TextInput" {
+            _ = record.manager.command(view: replacement, name: "set_selection", args: ["start": selection.0, "end": selection.1])
+        }
+    }
+
 }

@@ -1,0 +1,222 @@
+[
+  {
+    "name": "integer",
+    "schema": {
+      "type": "integer"
+    },
+    "value": 12,
+    "valid": true
+  },
+  {
+    "name": "boolean is not integer",
+    "schema": {
+      "type": "integer"
+    },
+    "value": true,
+    "valid": false
+  },
+  {
+    "name": "fraction is not integer",
+    "schema": {
+      "type": "integer"
+    },
+    "value": 1.5,
+    "valid": false
+  },
+  {
+    "name": "enum does not coerce strings",
+    "schema": {
+      "enum": [
+        1,
+        2
+      ]
+    },
+    "value": "1",
+    "valid": false
+  },
+  {
+    "name": "enum does not coerce booleans",
+    "schema": {
+      "enum": [
+        1,
+        2
+      ]
+    },
+    "value": true,
+    "valid": false
+  },
+  {
+    "name": "nullable union",
+    "schema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "value": null,
+    "valid": true
+  },
+  {
+    "name": "array element type",
+    "schema": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "value": [
+      1,
+      "2"
+    ],
+    "valid": false
+  },
+  {
+    "name": "nested required field",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "point": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "x"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "point"
+      ],
+      "additionalProperties": false
+    },
+    "value": {
+      "point": {}
+    },
+    "valid": false
+  },
+  {
+    "name": "nested unknown field",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "point": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "x"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "point"
+      ],
+      "additionalProperties": false
+    },
+    "value": {
+      "point": {
+        "x": 1,
+        "y": 2
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "valid nested object",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "point": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "x"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "point"
+      ],
+      "additionalProperties": false
+    },
+    "value": {
+      "point": {
+        "x": 1
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "typed dictionary values",
+    "schema": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    },
+    "value": {
+      "a": 1,
+      "b": false
+    },
+    "valid": false
+  },
+  {
+    "name": "event wire flag",
+    "schema": {
+      "type": "event"
+    },
+    "value": true,
+    "valid": true
+  },
+  {
+    "name": "event null removed only in patch",
+    "schema": {
+      "type": "event"
+    },
+    "value": null,
+    "valid": false
+  },
+  {
+    "name": "integer accepts exact numeric representation",
+    "schema": {
+      "type": "integer"
+    },
+    "value": 2.0,
+    "valid": true
+  },
+  {
+    "name": "unsafe integer rejected",
+    "schema": {
+      "type": "integer"
+    },
+    "value": 9007199254740992,
+    "valid": false
+  },
+  {
+    "name": "numeric enum uses JSON number equality",
+    "schema": {
+      "enum": [
+        2
+      ]
+    },
+    "value": 2.0,
+    "valid": true
+  }
+]

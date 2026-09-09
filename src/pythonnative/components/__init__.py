@@ -56,11 +56,8 @@ from .lists import (  # noqa: F401
     FlatList,
     ListController,
     SectionList,
-    _dispatch_scroll_command,
-    _native_lists_supported,
     _NativeList,
     _RowSpec,
-    _VirtualizedList,
 )
 from .media import Image, ImageBackground, WebView
 from .overlays import Modal, Portal

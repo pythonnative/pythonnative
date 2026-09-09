@@ -101,6 +101,11 @@ public struct ActivityIndicatorProps {
     public var size: Any? { values["size"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct ButtonProps {
@@ -211,6 +216,11 @@ public struct ButtonProps {
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct CheckboxProps {
@@ -321,6 +331,11 @@ public struct CheckboxProps {
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct ColumnProps {
@@ -430,6 +445,10 @@ public struct ColumnProps {
     public var accessibility_live_region: Any? { values["accessibility_live_region"] }
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
 }
 
 public struct DatePickerProps {
@@ -541,6 +560,11 @@ public struct DatePickerProps {
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct ErrorBoundaryProps {
@@ -643,6 +667,11 @@ public struct ErrorBoundaryProps {
     public var on_error: Any? { values["on_error"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct FlatListProps {
@@ -762,6 +791,11 @@ public struct FlatListProps {
     public var content_container_style: Any? { values["content_container_style"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct FragmentProps {
@@ -862,6 +896,11 @@ public struct FragmentProps {
     public var pointer_events: Any? { values["pointer_events"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct ImageProps {
@@ -972,6 +1011,11 @@ public struct ImageProps {
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct ImageBackgroundProps {
@@ -1079,6 +1123,11 @@ public struct ImageBackgroundProps {
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct KeyboardAvoidingViewProps {
@@ -1181,6 +1230,11 @@ public struct KeyboardAvoidingViewProps {
     public var keyboard_vertical_offset: Double? { values["keyboard_vertical_offset"] as? Double }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct ModalProps {
@@ -1289,6 +1343,11 @@ public struct ModalProps {
     public var dismiss_on_backdrop: Bool? { values["dismiss_on_backdrop"] as? Bool }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct PickerProps {
@@ -1400,6 +1459,11 @@ public struct PickerProps {
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct PortalProps {
@@ -1500,6 +1564,11 @@ public struct PortalProps {
     public var pointer_events: Any? { values["pointer_events"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct PressableProps {
@@ -1614,6 +1683,10 @@ public struct PressableProps {
     public var accessibility_live_region: Any? { values["accessibility_live_region"] }
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
 }
 
 public struct ProgressBarProps {
@@ -1717,6 +1790,11 @@ public struct ProgressBarProps {
     public var indeterminate: Bool? { values["indeterminate"] as? Bool }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct RefreshControlProps {
@@ -1819,6 +1897,11 @@ public struct RefreshControlProps {
     public var on_refresh: Any? { values["on_refresh"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct RowProps {
@@ -1928,6 +2011,10 @@ public struct RowProps {
     public var accessibility_live_region: Any? { values["accessibility_live_region"] }
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
 }
 
 public struct SafeAreaViewProps {
@@ -2029,6 +2116,11 @@ public struct SafeAreaViewProps {
     public var edges: Any? { values["edges"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct ScreenProps {
@@ -2141,6 +2233,28 @@ public struct ScreenProps {
     public var route_key: String? { values["route_key"] as? String }
     public var title: String? { values["title"] as? String }
     public var active: Bool? { values["active"] as? Bool }
+    public var options: Any? { values["options"] }
+    public var header_shown: Bool? { values["header_shown"] as? Bool }
+    public var header_large_title: Bool? { values["header_large_title"] as? Bool }
+    public var header_back_title: String? { values["header_back_title"] as? String }
+    public var header_back_visible: Bool? { values["header_back_visible"] as? Bool }
+    public var header_left: Any? { values["header_left"] }
+    public var header_right: Any? { values["header_right"] }
+    public var header_tint_color: String? { values["header_tint_color"] as? String }
+    public var header_style: Any? { values["header_style"] }
+    public var header_title_style: Any? { values["header_title_style"] }
+    public var presentation: Any? { values["presentation"] }
+    public var gesture_enabled: Bool? { values["gesture_enabled"] as? Bool }
+    public var animation: Any? { values["animation"] }
+    public var tab_bar_icon: Any? { values["tab_bar_icon"] }
+    public var tab_bar_badge: Any? { values["tab_bar_badge"] }
+    public var tab_bar_label: String? { values["tab_bar_label"] as? String }
+    public var lazy: Bool? { values["lazy"] as? Bool }
+    public var unmount_on_blur: Bool? { values["unmount_on_blur"] as? Bool }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
 }
 
 public struct ScreenStackProps {
@@ -2251,6 +2365,10 @@ public struct ScreenStackProps {
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
     public var on_native_back: Any? { values["on_native_back"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
 }
 
 public struct ScrollViewProps {
@@ -2359,6 +2477,11 @@ public struct ScrollViewProps {
     public var keyboard_dismiss_mode: Any? { values["keyboard_dismiss_mode"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct SectionListProps {
@@ -2475,6 +2598,11 @@ public struct SectionListProps {
     public var on_scroll: Any? { values["on_scroll"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct SegmentedControlProps {
@@ -2584,6 +2712,11 @@ public struct SegmentedControlProps {
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct SliderProps {
@@ -2689,6 +2822,11 @@ public struct SliderProps {
     public var accessibility_label: Any? { values["accessibility_label"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct SpacerProps {
@@ -2790,6 +2928,11 @@ public struct SpacerProps {
     public var size: Any? { values["size"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct StatusBarProps {
@@ -2892,6 +3035,11 @@ public struct StatusBarProps {
     public var hidden: Any? { values["hidden"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct SuspenseProps {
@@ -2993,6 +3141,11 @@ public struct SuspenseProps {
     public var fallback: Any? { values["fallback"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct SwitchProps {
@@ -3096,6 +3249,127 @@ public struct SwitchProps {
     public var accessibility_label: Any? { values["accessibility_label"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
+}
+
+public struct TabBarProps {
+    public let values: [String: Any]
+    public init(_ values: [String: Any]) throws {
+        self.values = values
+    }
+    public var width: Any? { values["width"] }
+    public var height: Any? { values["height"] }
+    public var min_width: Any? { values["min_width"] }
+    public var max_width: Any? { values["max_width"] }
+    public var min_height: Any? { values["min_height"] }
+    public var max_height: Any? { values["max_height"] }
+    public var aspect_ratio: Double? { values["aspect_ratio"] as? Double }
+    public var flex: Double? { values["flex"] as? Double }
+    public var flex_grow: Double? { values["flex_grow"] as? Double }
+    public var flex_shrink: Double? { values["flex_shrink"] as? Double }
+    public var flex_basis: Any? { values["flex_basis"] }
+    public var flex_direction: Any? { values["flex_direction"] }
+    public var flex_wrap: Any? { values["flex_wrap"] }
+    public var justify_content: Any? { values["justify_content"] }
+    public var align_items: Any? { values["align_items"] }
+    public var align_self: Any? { values["align_self"] }
+    public var align_content: Any? { values["align_content"] }
+    public var direction: Any? { values["direction"] }
+    public var display: Any? { values["display"] }
+    public var position: Any? { values["position"] }
+    public var top: Any? { values["top"] }
+    public var right: Any? { values["right"] }
+    public var bottom: Any? { values["bottom"] }
+    public var left: Any? { values["left"] }
+    public var start: Any? { values["start"] }
+    public var end: Any? { values["end"] }
+    public var padding: Any? { values["padding"] }
+    public var padding_top: Any? { values["padding_top"] }
+    public var padding_bottom: Any? { values["padding_bottom"] }
+    public var padding_left: Any? { values["padding_left"] }
+    public var padding_right: Any? { values["padding_right"] }
+    public var padding_start: Any? { values["padding_start"] }
+    public var padding_end: Any? { values["padding_end"] }
+    public var padding_horizontal: Any? { values["padding_horizontal"] }
+    public var padding_vertical: Any? { values["padding_vertical"] }
+    public var margin: Any? { values["margin"] }
+    public var margin_top: Any? { values["margin_top"] }
+    public var margin_bottom: Any? { values["margin_bottom"] }
+    public var margin_left: Any? { values["margin_left"] }
+    public var margin_right: Any? { values["margin_right"] }
+    public var margin_start: Any? { values["margin_start"] }
+    public var margin_end: Any? { values["margin_end"] }
+    public var margin_horizontal: Any? { values["margin_horizontal"] }
+    public var margin_vertical: Any? { values["margin_vertical"] }
+    public var spacing: Double? { values["spacing"] as? Double }
+    public var gap: Double? { values["gap"] as? Double }
+    public var row_gap: Double? { values["row_gap"] as? Double }
+    public var column_gap: Double? { values["column_gap"] as? Double }
+    public var overflow: Any? { values["overflow"] }
+    public var background_color: String? { values["background_color"] as? String }
+    public var color: String? { values["color"] as? String }
+    public var border_color: String? { values["border_color"] as? String }
+    public var placeholder_color: String? { values["placeholder_color"] as? String }
+    public var tint_color: String? { values["tint_color"] as? String }
+    public var border_width: Double? { values["border_width"] as? Double }
+    public var border_radius: Double? { values["border_radius"] as? Double }
+    public var border_top_left_radius: Double? { values["border_top_left_radius"] as? Double }
+    public var border_top_right_radius: Double? { values["border_top_right_radius"] as? Double }
+    public var border_bottom_left_radius: Double? { values["border_bottom_left_radius"] as? Double }
+    public var border_bottom_right_radius: Double? { values["border_bottom_right_radius"] as? Double }
+    public var border_top_width: Double? { values["border_top_width"] as? Double }
+    public var border_right_width: Double? { values["border_right_width"] as? Double }
+    public var border_bottom_width: Double? { values["border_bottom_width"] as? Double }
+    public var border_left_width: Double? { values["border_left_width"] as? Double }
+    public var border_top_color: String? { values["border_top_color"] as? String }
+    public var border_right_color: String? { values["border_right_color"] as? String }
+    public var border_bottom_color: String? { values["border_bottom_color"] as? String }
+    public var border_left_color: String? { values["border_left_color"] as? String }
+    public var font_size: Double? { values["font_size"] as? Double }
+    public var font_family: String? { values["font_family"] as? String }
+    public var font_weight: Any? { values["font_weight"] }
+    public var bold: Bool? { values["bold"] as? Bool }
+    public var italic: Bool? { values["italic"] as? Bool }
+    public var text_align: Any? { values["text_align"] }
+    public var text_decoration: Any? { values["text_decoration"] }
+    public var text_transform: Any? { values["text_transform"] }
+    public var line_height: Double? { values["line_height"] as? Double }
+    public var letter_spacing: Double? { values["letter_spacing"] as? Double }
+    public var max_lines: Int? { values["max_lines"] as? Int }
+    public var text_shadow_color: String? { values["text_shadow_color"] as? String }
+    public var text_shadow_offset: Any? { values["text_shadow_offset"] }
+    public var text_shadow_radius: Double? { values["text_shadow_radius"] as? Double }
+    public var shadow_color: String? { values["shadow_color"] as? String }
+    public var shadow_offset: Any? { values["shadow_offset"] }
+    public var shadow_opacity: Double? { values["shadow_opacity"] as? Double }
+    public var shadow_radius: Double? { values["shadow_radius"] as? Double }
+    public var elevation: Double? { values["elevation"] as? Double }
+    public var opacity: Double? { values["opacity"] as? Double }
+    public var transform: Any? { values["transform"] }
+    public var z_index: Int? { values["z_index"] as? Int }
+    public var pointer_events: Any? { values["pointer_events"] }
+    public var gestures: Any? { values["gestures"] }
+    public var hit_slop: Any? { values["hit_slop"] }
+    public var on_layout: Any? { values["on_layout"] }
+    public var accessibility_label: Any? { values["accessibility_label"] }
+    public var accessibility_hint: Any? { values["accessibility_hint"] }
+    public var accessibility_role: Any? { values["accessibility_role"] }
+    public var accessible: Any? { values["accessible"] }
+    public var accessibility_state: Any? { values["accessibility_state"] }
+    public var accessibility_live_region: Any? { values["accessibility_live_region"] }
+    public var test_id: Any? { values["test_id"] }
+    public var ref: Any? { values["ref"] }
+    public var items: Any? { values["items"] }
+    public var active_tab: String? { values["active_tab"] as? String }
+    public var on_tab_select: Any? { values["on_tab_select"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
 }
 
 public struct TextProps {
@@ -3205,6 +3479,11 @@ public struct TextProps {
     public var on_layout: Any? { values["on_layout"] }
     public var text: String? { values["text"] as? String }
     public var spans: Any? { values["spans"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct TextInputProps {
@@ -3306,6 +3585,7 @@ public struct TextInputProps {
     public var value: String? { values["value"] as? String }
     public var placeholder: Any? { values["placeholder"] }
     public var on_change: Any? { values["on_change"] }
+    public var on_selection_change: Any? { values["on_selection_change"] }
     public var on_submit: Any? { values["on_submit"] }
     public var secure: Bool? { values["secure"] as? Bool }
     public var multiline: Bool? { values["multiline"] as? Bool }
@@ -3329,6 +3609,11 @@ public struct TextInputProps {
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct TouchableOpacityProps {
@@ -3440,6 +3725,11 @@ public struct TouchableOpacityProps {
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public struct ViewProps {
@@ -3549,6 +3839,10 @@ public struct ViewProps {
     public var accessibility_live_region: Any? { values["accessibility_live_region"] }
     public var test_id: Any? { values["test_id"] }
     public var ref: Any? { values["ref"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
 }
 
 public struct VirtualListProps {
@@ -3663,6 +3957,16 @@ public struct VirtualListProps {
     public var count: Int? { values["count"] as? Int }
     public var estimated_item_size: Double? { values["estimated_item_size"] as? Double }
     public var on_bind_row: Any? { values["on_bind_row"] }
+    public var on_scroll: Any? { values["on_scroll"] }
+    public var horizontal: Bool? { values["horizontal"] as? Bool }
+    public var row_heights: Any? { values["row_heights"] }
+    public var item_revisions: Any? { values["item_revisions"] }
+    public var shows_scroll_indicator: Bool? { values["shows_scroll_indicator"] as? Bool }
+    public var refresh_control: Any? { values["refresh_control"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
 }
 
 public struct WebViewProps {
@@ -3770,6 +4074,11 @@ public struct WebViewProps {
     public var scroll_enabled: Bool? { values["scroll_enabled"] as? Bool }
     public var ref: Any? { values["ref"] }
     public var on_layout: Any? { values["on_layout"] }
+    public var _pn_events: Any? { values["_pn_events"] }
+    public var _pn_animated_events: Any? { values["_pn_animated_events"] }
+    public var _pn_list_key: String? { values["_pn_list_key"] as? String }
+    public var _pn_edit_revision: Int? { values["_pn_edit_revision"] as? Int }
+    public var gestures: Any? { values["gestures"] }
 }
 
 public enum NativeDecodeError: Error { case invalid(String) }

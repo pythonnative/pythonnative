@@ -86,13 +86,16 @@ open class PNComponentManager {
 
     // MARK: - Lifecycle
 
+    /// Native controller containers can own final view detachment.
+    open var detachesOnDestroy: Bool { true }
+
     /// Release the view's resources and detach it from the hierarchy.
     open func destroy(view: UIView) {
         teardown(view: view)
         PNGestureCoordinator.shared.unwire(view: view)
         PNAnimator.shared.forget(view: view)
         view.layer.removeAllAnimations()
-        if view.superview != nil {
+        if detachesOnDestroy && view.superview != nil {
             view.removeFromSuperview()
         }
     }

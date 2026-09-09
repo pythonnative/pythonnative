@@ -7,6 +7,7 @@ import inspect
 import typing
 from typing import Any, Callable
 
+from ..layout import LAYOUT_STYLE_KEYS
 from ..style import Style
 from .schema import COMPONENTS, ComponentSchema, NativeField, register_schema, type_schema
 
@@ -45,7 +46,24 @@ def install(factories: dict[str, Any]) -> None:
             wire[key] = dict(wire[key])
             wire[key]["native"] = dataclasses.asdict(
                 NativeField(
-                    invalidates_layout=key in style_fields or key in {"text", "value", "title", "source", "spans"},
+                    invalidates_layout=key in LAYOUT_STYLE_KEYS
+                    or key
+                    in {
+                        "text",
+                        "value",
+                        "title",
+                        "source",
+                        "spans",
+                        "font_size",
+                        "font_family",
+                        "font_weight",
+                        "bold",
+                        "italic",
+                        "letter_spacing",
+                        "line_height",
+                        "number_of_lines",
+                        "multiline",
+                    },
                     recreate=key in {"multiline"},
                     animated=key
                     in {
@@ -62,11 +80,37 @@ def install(factories: dict[str, Any]) -> None:
                 )
             )
         if name == "Text":
-            wire.update(text={"type": "string"}, spans={"type": "array"})
+            wire.update(
+                text={"type": "string", "native": {"invalidates_layout": True}},
+                spans={"type": "array", "native": {"invalidates_layout": True}},
+            )
         register_schema(dataclasses.replace(schema, props=wire, required=()))
     base = COMPONENTS["View"]
-    for name, extra in {
-        "Screen": {"route_key": {"type": "string"}, "title": {"type": "string"}, "active": {"type": "boolean"}},
+    extras: dict[str, dict[str, Any]] = {
+        "Screen": {
+            "route_key": {"type": "string"},
+            "title": {"type": "string"},
+            "active": {"type": "boolean"},
+            "options": {"type": "object"},
+        },
+        "TabBar": {
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "title": {"type": "string"},
+                        "icon": {"type": "string"},
+                        "badge": {"type": "string"},
+                    },
+                    "required": ["name", "title"],
+                    "additionalProperties": False,
+                },
+            },
+            "active_tab": {"type": "string"},
+            "on_tab_select": {"type": "event", "arguments": [{"type": "string"}]},
+        },
         "ScreenStack": {"on_native_back": {"type": "event"}},
         "VirtualList": {
             "keys": {"type": "array"},
@@ -74,18 +118,48 @@ def install(factories: dict[str, Any]) -> None:
             "count": {"type": "integer"},
             "estimated_item_size": {"type": "number"},
             "on_bind_row": {"type": "event"},
+            "on_scroll": {"type": "event"},
+            "horizontal": {"type": "boolean"},
+            "row_heights": {"type": "array", "items": {"type": "number"}},
+            "item_revisions": {"type": "array", "items": {"type": "integer"}},
+            "shows_scroll_indicator": {"type": "boolean"},
+            "refresh_control": {"type": "object"},
         },
-    }.items():
+    }
+    for name, extra in extras.items():
         register_schema(ComponentSchema(name, base.props | extra, measurement="container"))
+
+    # Reserved fields travel through the same validation path as public fields.
+    runtime: dict[str, Any] = {
+        "_pn_events": {"type": "array", "items": {"type": "string"}},
+        "_pn_animated_events": {"type": "object"},
+        "_pn_list_key": {"type": "string"},
+        "_pn_edit_revision": {"type": "integer"},
+        "gestures": {"type": "array"},
+    }
+    from ..navigation.screen import ScreenOptions
+
+    COMPONENTS["Screen"].props.update(
+        {name: type_schema(value) for name, value in typing.get_type_hints(ScreenOptions).items()}
+    )
+    refresh = COMPONENTS["RefreshControl"].props
+    for name in ("ScrollView", "VirtualList"):
+        COMPONENTS[name].props["refresh_control"] = {
+            "type": "object",
+            "properties": refresh,
+            "additionalProperties": False,
+        }
+    from .commands import commands
+
+    for name, schema in list(COMPONENTS.items()):
+        register_schema(dataclasses.replace(schema, props=schema.props | runtime, commands=commands(name)))
+    from .services import install_services
+
+    install_services()
 
 
 def validate_props(name: str, props: dict[str, Any]) -> None:
-    """Check known built-in arguments while preserving composed internal props."""
+    """Validate resolved factory arguments, including reserved runtime fields."""
     schema = COMPONENTS.get(name)
-    if schema is None:
-        return
-    for key, value in props.items():
-        if value is not None and key in schema.props:
-            from .schema import validate
-
-            validate(value, schema.props[key], f"{name}.{key}")
+    if schema is not None:
+        schema.validate({key: value for key, value in props.items() if value is not None})

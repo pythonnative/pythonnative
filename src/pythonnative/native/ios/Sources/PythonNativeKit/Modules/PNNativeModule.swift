@@ -134,7 +134,8 @@ public enum PNMain {
 public final class PNModuleDispatcher {
     public static let shared = PNModuleDispatcher()
 
-    private init() {}
+    private let validate: (String, String, [String: Any]) -> Bool
+    init(validate: @escaping (String, String, [String: Any]) -> Bool = PNContracts.validateModule) { self.validate = validate }
     private var pending: [Int64: PNPromise] = [:]
     private let pendingLock = NSLock()
 
@@ -154,6 +155,9 @@ public final class PNModuleDispatcher {
         }
         guard let instance = PNRegistry.shared.module(named: module) else {
             return ["ok": false, "error": "unknown native module '\(module)'", "code": "unknown_module"]
+        }
+        guard validate(module, method, args) else {
+            return ["ok": false, "error": "Invalid native method arguments", "code": "invalid_arguments"]
         }
         let promise = PNPromise(callId: callId, module: module, method: method)
         if callId > 0 {

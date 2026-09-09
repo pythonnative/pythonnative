@@ -35,7 +35,7 @@ def test_text_defaults() -> None:
     el = Text()
     assert el.type == "Text"
     assert el.props.get("text", "") == ""
-    assert el.children == []
+    assert el.children == ()
 
 
 def test_text_single_string_has_no_spans() -> None:
@@ -57,7 +57,7 @@ def test_text_rich_spans_flatten_and_concatenate() -> None:
         {"text": "world", "bold": True, "color": "#0A84FF"},
         {"text": "!"},
     ]
-    assert el.children == []  # spans are props, not native children
+    assert el.children == ()  # spans are props, not native children
 
 
 def test_text_nested_spans_inherit_and_override() -> None:
@@ -208,7 +208,7 @@ def test_scrollview_with_child() -> None:
 
 def test_scrollview_empty() -> None:
     el = ScrollView()
-    assert el.children == []
+    assert el.children == ()
 
 
 # ---------------------------------------------------------------------------
@@ -402,7 +402,7 @@ def test_flat_list_basic() -> None:
     # a ScrollView whose window contains every (small-list) row.
     assert callable(el.type)
     root, _rec, _backend = _mount(el)
-    assert root.type_name == "ScrollView"
+    assert root.type_name == "VirtualList"
     texts = [v.props["text"] for v in root.find_all("Text")]
     assert texts == ["a", "b", "c"]
 
@@ -467,7 +467,7 @@ def test_error_boundary_with_key() -> None:
 def test_fragment_no_children() -> None:
     el = Fragment()
     assert el.type == FRAGMENT
-    assert el.children == []
+    assert el.children == ()
     assert el.props == {}
 
 
@@ -476,7 +476,7 @@ def test_fragment_with_children() -> None:
     b = Text("b")
     el = Fragment(a, b)
     assert el.type == FRAGMENT
-    assert el.children == [a, b]
+    assert el.children == (a, b)
 
 
 def test_fragment_with_key() -> None:
@@ -489,7 +489,7 @@ def test_fragment_drops_none_children() -> None:
     a = Text("a")
     c = Text("c")
     el = Fragment(a, None, c, None)
-    assert el.children == [a, c]
+    assert el.children == (a, c)
 
 
 # ======================================================================

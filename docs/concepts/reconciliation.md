@@ -34,15 +34,19 @@ tree:
   as needed using [`InsertOp`][pythonnative.mutations.InsertOp] /
   [`DestroyOp`][pythonnative.mutations.DestroyOp].
 
-The reconciler runs each render function synchronously to completion on the
-application thread. Expensive Python work delays callbacks and commits.
+The reconciler runs synchronous render functions to completion on the
+application thread. Async components capture their provider environment across
+awaits. Changes to their inputs cancel obsolete work before it can publish.
+Expensive Python work delays callbacks and commits.
 Native scrolling and supported animation drivers run independently; see
 [Runtime limits](architecture.md#runtime-limits).
 
 ## Commits are transactions
 
-The diff phase is pure: it only accumulates ops. At the end of the
-pass the staged mutations are applied through a single
+Rendering records changes in an undo journal and stages native operations,
+callbacks, refs, and effects. A render that fails restores the committed tree
+without publishing those changes. At the end of the pass, staged mutations are
+applied through a single
 [`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]
 call. The renderer validates the versioned transaction before applying it
 and acknowledges the committed revision. Layout then runs beside the native
@@ -182,3 +186,22 @@ bottleneck.
 - Browse the algorithm in code: [Reconciler API](../api/reconciler.md).
 - Understand handlers underneath the diff: [Native views](native-views.md).
 - See how mounting interacts with hooks: [Lifecycle](lifecycle.md).
+
+## Elements and update priority
+
+Elements hold read-only property snapshots and tuple children. Values inside
+application props aren't deep-copied; replace mutable application data when its
+meaning changes. Component construction follows the decorated function's Python
+signature, including positional-only parameters, keyword-only parameters,
+variadic children, and normal argument errors.
+
+State setters and reducer dispatch functions retain their identity across renders.
+Deferred updates stay out of urgent renders. When deferred work runs, the state
+queue replays urgent updates in their original order so an urgent edit isn't lost.
+Python rendering remains cooperative: a long synchronous function cannot be
+preempted by a later urgent update.
+
+A native mount failure retires the surface and cancels its work. Validation
+failure before native mutation preserves the previous revision and can be retried.
+Property validation copies only changed records, so a one-property update doesn't
+clone the rest of the live native tree.

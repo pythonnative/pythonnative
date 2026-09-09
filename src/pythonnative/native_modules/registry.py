@@ -92,6 +92,12 @@ class NativeModule:
         self._listeners: Dict[str, List[Listener]] = {}
         self._lock = threading.Lock()
 
+    def _checked_result(self, method: str, value: Any) -> Any:
+        from ..sdk.schema import MODULES
+
+        contract = MODULES.get(self.name)
+        return contract.validate_result(method, value) if contract is not None else value
+
     def call(self, method: str, **args: Any) -> Any:
         """Invoke ``method`` synchronously and return its value.
 
@@ -171,6 +177,14 @@ class BridgeModule(NativeModule):
         return self._transport
 
     def _invoke(self, method: str, args: Dict[str, Any], call_id: int) -> Any:
+        from ..sdk.schema import MODULES
+
+        contract = MODULES.get(self.name)
+        if method == "_pn_cancel":
+            if set(args) != {"call_id"} or type(args["call_id"]) is not int:
+                raise TypeError("Cancellation requires an integer call_id")
+        elif contract is not None:
+            args = contract.validate_call(method, args)
         envelope = codec.dumps({"call_id": call_id, "args": codec.to_jsonable(args)})
         raw = self.transport.call(self.name, method, envelope)
         result = codec.loads(raw)
@@ -186,7 +200,7 @@ class BridgeModule(NativeModule):
         if result.get("pending"):
             raise RuntimeError(f"{self.name}.{method} completes asynchronously; use call_async()")
         if result.get("ok", True):
-            return result.get("value")
+            return self._checked_result(method, result.get("value"))
         raise NativeModuleError(self.name, method, str(result.get("error", "unknown error")), result.get("code"))
 
     async def call_async(self, method: str, **args: Any) -> Any:
@@ -209,10 +223,10 @@ class BridgeModule(NativeModule):
                 _pending.pop(call_id, None)
                 _pending_meta.pop(call_id, None)
             if result.get("ok", True):
-                return result.get("value")
+                return self._checked_result(method, result.get("value"))
             raise NativeModuleError(self.name, method, str(result.get("error", "unknown error")), result.get("code"))
         try:
-            return await future
+            return self._checked_result(method, await future)
         except asyncio.CancelledError:
             # Native implementations can release their work through the
             # promise's cancellation hook; late settlements are discarded.
@@ -288,6 +302,10 @@ class PythonModule(NativeModule):
     def call(self, method: str, **args: Any) -> Any:
         """Call a native module method with a ``{"call_id", "args"}`` envelope."""
         fn = self._method(method)
+        from ..sdk.schema import MODULES
+
+        if self.name in MODULES:
+            args = MODULES[self.name].validate_call(method, args)
         if inspect.iscoroutinefunction(fn):
             raise RuntimeError(f"{self.name}.{method} is asynchronous; use call_async()")
         try:
@@ -298,11 +316,15 @@ class PythonModule(NativeModule):
             raise NativeModuleError(self.name, method, str(exc)) from exc
         if inspect.isawaitable(value):
             raise RuntimeError(f"{self.name}.{method} returned an awaitable; use call_async()")
-        return value
+        return self._checked_result(method, value)
 
     async def call_async(self, method: str, **args: Any) -> Any:
         """Invoke ``method`` and await its result."""
         fn = self._method(method)
+        from ..sdk.schema import MODULES
+
+        if self.name in MODULES:
+            args = MODULES[self.name].validate_call(method, args)
         try:
             value = fn(**args)
             if inspect.isawaitable(value):
@@ -311,7 +333,7 @@ class PythonModule(NativeModule):
             raise
         except Exception as exc:
             raise NativeModuleError(self.name, method, str(exc)) from exc
-        return value
+        return self._checked_result(method, value)
 
 
 # ======================================================================
@@ -400,27 +422,9 @@ def _discover_entry_points() -> None:
     if _discovered:
         return
     _discovered = True
-    try:
-        from importlib.metadata import entry_points
-    except ImportError:  # pragma: no cover
-        return
-    try:
-        eps = entry_points()
-    except Exception:  # pragma: no cover
-        return
-    selected: List[Any] = []
-    if hasattr(eps, "select"):
-        try:
-            selected = list(eps.select(group=ENTRY_POINT_GROUP))
-        except Exception:
-            selected = []
-    if not selected:
-        getter = getattr(eps, "get", None)
-        if getter is not None:
-            try:
-                selected = list(getter(ENTRY_POINT_GROUP, []))
-            except Exception:
-                selected = []
+    from importlib.metadata import entry_points
+
+    selected = entry_points(group=ENTRY_POINT_GROUP)
     for ep in selected:
         try:
             loaded = ep.load()

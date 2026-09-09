@@ -38,8 +38,19 @@ private let baselineLeaf: YGBaselineFunc = { raw, _, height in
 
 enum PNLayout {
     static var nodes: [Int64: PNLayoutNode] = [:]
+    static var metrics: [String: Any] = [:]
+    private static var portals: Set<Int64> = []
+    private static var detachedRoots: Set<Int64> = []
     static var viewport: [String: Any] = [:]
     private static var scheduled = false
+    private static let fontObserver = NotificationCenter.default.addObserver(forName: UIContentSizeCategory.didChangeNotification, object: nil, queue: .main) { _ in
+        for (tag, entry) in nodes {
+            guard let record = PNViewRegistry.shared.resolve(tag), ["Text", "TextInput", "Button"].contains(record.typeName) else { continue }
+            record.manager.update(view: record.view, changed: ["font_size": entry.props["font_size"] ?? 17])
+            if YGNodeHasMeasureFunc(entry.node) { YGNodeMarkDirty(entry.node) }
+        }
+        containerDidLayout()
+    }
 
     static func containerDidLayout() {
         guard !scheduled else { return }
@@ -54,13 +65,17 @@ enum PNLayout {
     static func reset() {
         for entry in nodes.values { YGNodeRemoveAllChildren(entry.node) }
         nodes.removeAll()
+        portals.removeAll()
+        detachedRoots.removeAll()
         viewport = [:]
     }
 
     static func observe(_ ops: [PNTransaction.Op]) {
+        _ = fontObserver
         for op in ops {
             switch op {
-            case let .create(tag, _, props):
+            case let .create(tag, type, props):
+                if type == "Portal" { portals.insert(tag) }
                 let entry = PNLayoutNode(tag)
                 nodes[tag] = entry
                 update(entry, props)
@@ -79,8 +94,11 @@ enum PNLayout {
                 if !["VirtualList", "Modal", "ScreenStack"].contains(type) {
                     YGNodeSetMeasureFunc(p.node, nil)
                     YGNodeInsertChild(p.node, c.node, min(index, Int(YGNodeGetChildCount(p.node))))
-                }
+                    detachedRoots.remove(child)
+                } else { detachedRoots.insert(child) }
             case let .destroy(tag):
+                portals.remove(tag)
+                detachedRoots.remove(tag)
                 if let entry = nodes.removeValue(forKey: tag), let parent = entry.parent, let p = nodes[parent] {
                     p.children.removeAll { $0 == tag }
                     YGNodeRemoveChild(p.node, entry.node)
@@ -95,6 +113,8 @@ enum PNLayout {
             if value is NSNull { entry.props.removeValue(forKey: key) }
             else { entry.props[key] = value }
         }
+        let type = PNViewRegistry.shared.resolve(entry.tag)?.typeName ?? ""
+        guard PNContracts.invalidatesLayout(type, changed) || entry.frame.isEmpty else { return }
         let fresh = YGNodeNew()!
         for (key, value) in entry.props {
             if let edges = value as? [String: Any], key == "margin" || key == "padding" {
@@ -104,7 +124,6 @@ enum PNLayout {
                 }
             } else { _ = PNYogaSetStyle(fresh, key, String(describing: value)) }
         }
-        let type = PNViewRegistry.shared.resolve(entry.tag)?.typeName ?? ""
         if ["ScrollView", "VirtualList", "ScreenStack"].contains(type) {
             YGNodeStyleSetOverflow(fresh, YGOverflow(rawValue: 1)!)
             YGNodeStyleSetFlexShrink(fresh, 1)
@@ -119,18 +138,20 @@ enum PNLayout {
     }
 
     static func compute(_ request: [String: Any]) -> [[Double]] {
+        let started = DispatchTime.now().uptimeNanoseconds
+        defer { metrics = ["layout_ns": DispatchTime.now().uptimeNanoseconds - started, "views": nodes.count] }
         viewport = request
         let width = (request["width"] as? NSNumber)?.floatValue ?? 0
         let height = (request["height"] as? NSNumber)?.floatValue ?? 0
         guard width > 0, height > 0 else { return [] }
-        let roots = request["roots"] as? [Int64] ?? []
+        let roots = (request["roots"] as? [Any] ?? []).compactMap { ($0 as? NSNumber)?.int64Value }
         for tag in roots {
             if let entry = nodes[tag] { YGNodeCalculateLayout(entry.node, width, height, YGDirection(rawValue: 1)!) }
         }
         // A portal is absent from the screen tree, but remains a Yoga parent
         // so absolute insets and sibling layout resolve against its viewport.
-        for entry in nodes.values {
-            guard let record = PNViewRegistry.shared.resolve(entry.tag), record.typeName == "Portal" else { continue }
+        for tag in portals {
+            guard let entry = nodes[tag], let record = PNViewRegistry.shared.resolve(tag) else { continue }
             let size = record.view.bounds.size
             let portalWidth = size.width > 0 ? Float(size.width) : width
             let portalHeight = size.height > 0 ? Float(size.height) : height
@@ -139,7 +160,8 @@ enum PNLayout {
             YGNodeCalculateLayout(entry.node, portalWidth, portalHeight, YGDirection(rawValue: 1)!)
         }
         // Every detached root is laid out in its native container's available space.
-        for entry in nodes.values where entry.parent != nil && YGNodeGetOwner(entry.node) == nil {
+        for tag in detachedRoots {
+            guard let entry = nodes[tag] else { continue }
             let parent = entry.parent.flatMap { PNViewRegistry.shared.resolve($0) }
             let screen = PNViewRegistry.shared.resolve(entry.tag)
             let size = (screen?.typeName == "Screen" ? screen?.view.bounds.size : parent?.view.bounds.size)

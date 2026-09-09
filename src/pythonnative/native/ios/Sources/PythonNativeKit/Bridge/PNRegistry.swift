@@ -22,7 +22,6 @@ public final class PNRegistry {
     private var moduleTypes: [String: PNNativeModule.Type] = [:]
     private var moduleInstances: [String: PNNativeModule] = [:]
     private var builtinsRegistered = false
-    private let placeholder = PNPlaceholderManager()
 
     private init() {}
 
@@ -54,8 +53,8 @@ public final class PNRegistry {
 
     // MARK: - Lookup
 
-    /// The shared manager for `type`, or a placeholder manager for unknown types.
-    public func manager(for type: String) -> PNComponentManager {
+    /// The shared manager for `type`, or nil if its implementation is missing.
+    public func manager(for type: String) -> PNComponentManager? {
         ensureBuiltins()
         if let existing = componentManagers[type] { return existing }
         if let factory = componentFactories[type] {
@@ -63,8 +62,7 @@ public final class PNRegistry {
             componentManagers[type] = manager
             return manager
         }
-        PNLog.once(PNLog.components, key: "unknown-type:\(type)", "unknown element type '\(type)'; using a placeholder UIView")
-        return placeholder
+        return nil
     }
 
     /// The module instance registered under `name`, created on first use.

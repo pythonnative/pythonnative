@@ -32,13 +32,13 @@ from __future__ import annotations
 import os
 from contextlib import contextmanager
 from functools import partial
-from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Set, Tuple
 
 from .. import diagnostics
 from ..component import Component
 from ..element import ERROR_BOUNDARY, FRAGMENT, SUSPENSE, Element
 from ..events import extract_events, get_event_registry
-from ..hooks import Context, HookState, install_hook_state, restore_hook_state
+from ..hooks import Context, HookState, install_hook_state, provider_environment, restore_hook_state
 from ..mutations import CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
 from ..profiling import profiled
 from ..runtime import _scope
@@ -46,6 +46,7 @@ from ..scheduler import TransitionQueue, schedule_trigger
 from ..suspense import Suspend
 from .boundaries import BoundaryMixin, HydrationMap
 from .children import plan_child_moves
+from .journal import Journal, JournalDict, _current
 from .layout_pass import LayoutMixin, affects_layout
 from .vnode import VNode, next_tag, normalize_children, shallow_equal_props
 
@@ -92,9 +93,11 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     def __init__(self, backend: Any) -> None:
         self.backend = backend
         self.root: Optional[VNode] = None
-        self._tag_nodes: Dict[int, VNode] = {}
-        self._effect_states: Dict[int, HookState] = {}
-        self._native_children: Dict[int, List[int]] = {}
+        self._tag_nodes: Dict[int, VNode] = JournalDict()
+        self._effect_states: Dict[int, HookState] = JournalDict()
+        self._native_children: Dict[int, List[int]] = JournalDict()
+        self._publications: List[Callable[[], None]] = []
+        self._native_committed = False
         if hasattr(backend, "on_layout"):
             backend.on_layout = self._accept_native_layout
         self.on_render_requested: Optional[Callable[[], None]] = None
@@ -216,6 +219,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         self._back_handlers.clear()
         self.transitions.clear()
         self._flush_ops()
+        self._publish()
 
     def dispatch_command(self, tag: Optional[int], name: str, args: Optional[Dict[str, Any]] = None) -> Any:
         """Run an imperative command against the view registered under ``tag``."""
@@ -288,6 +292,10 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             yield
             return
         self._rendering = True
+        journal = Journal()
+        token = _current.set(journal)
+        journal.attribute(self, "root")
+        self._native_committed = False
         try:
             yield
             passes = 0
@@ -304,7 +312,44 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 self._destroyed_tags.clear()
                 self._drain_dirty()
                 self._commit()
+        except BaseException:
+            if self._native_committed or getattr(self.backend, "_failed", False):
+                # Native mutations can't be undone. Retire this surface and its
+                # work, so no Python tree can keep targeting partial widgets.
+                rejected_nodes = list(self.walk())
+                rejected_states = list(self._effect_states.values())
+                journal.rollback()
+                retired_nodes = rejected_nodes + list(self.walk())
+                states = {id(state): state for state in rejected_states}
+                for node in retired_nodes:
+                    if node.hook_state is not None:
+                        states[id(node.hook_state)] = node.hook_state
+                    self._clear_ref(node.element.props.get("ref"))
+                    if node.tag is not None:
+                        self._events.clear(node.tag)
+                for state in states.values():
+                    state.cleanup_all_effects()
+                    state.detach()
+                self.transitions.clear()
+                self._back_handlers.clear()
+                self._native_children.clear()
+                self.root = None
+                self._tag_nodes.clear()
+                self._effect_states.clear()
+                if hasattr(self.backend, "_failed"):
+                    self.backend._failed = True
+            else:
+                journal.rollback()
+            self._ops.clear()
+            self._created.clear()
+            self._publications.clear()
+            self._dirty_nodes.clear()
+            self._dirty_boundaries.clear()
+            self._dirty_suspense.clear()
+            raise
         finally:
+            journal.active = False
+            _current.reset(token)
             self._rendering = False
             self._render_queued = False
 
@@ -363,11 +408,22 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         self._flush_ops()
         self._run_layout()
         self._flush_ops()
+        journal = _current.get()
+        if journal is not None:
+            journal.accept()
+            journal.attribute(self, "root")
+        self._native_committed = False
+        self._publish()
         self._dispatch_layout_events()
         self._flush_layout_effects()
         self._flush_ops()
         self._flush_passive_effects()
         self._flush_ops()
+
+    def _publish(self) -> None:
+        publications, self._publications = self._publications, []
+        for publish in publications:
+            publish()
 
     @profiled("commit")
     def _flush_ops(self) -> None:
@@ -375,16 +431,17 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         ops = self._ops
         created = self._created
         if ops:
+            self.backend.apply_mutations(ops)
+            self._native_committed = True
             self._ops = []
             self._created = []
-            self.backend.apply_mutations(ops)
         elif created:
             self._created = []
         for node in created:
             if not node.mounted or node.tag is None:
                 continue
             node.native_view = self.backend.resolve_view(node.tag)
-            self._attach_ref(node.element, node.native_view, node.tag)
+            self._publications.append(partial(self._attach_ref, node.element, node.native_view, node.tag))
             ancestor = node.parent
             scope = None
             while ancestor is not None:
@@ -393,7 +450,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 if not ancestor.is_native:
                     self._refresh_identity(ancestor)
                 ancestor = ancestor.parent
-            self._events.set_scope(node.tag, scope)
+            self._publications.append(partial(self._events.set_scope, node.tag, scope))
 
     def _flush_layout_effects(self) -> None:
         for state in sorted(
@@ -403,7 +460,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 state.flush_layout_effects()
 
     def _flush_passive_effects(self) -> None:
-        states, self._effect_states = self._effect_states, {}
+        states, self._effect_states = self._effect_states, JournalDict()
         for state in sorted(states.values(), key=lambda hs: hs.vnode.depth() if hs.vnode else 0, reverse=True):
             if state.vnode is not None and state.vnode.mounted:
                 state.flush_pending_effects()
@@ -438,7 +495,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         self._tag_nodes[tag] = node
         node.clean_props = clean_props
         if events:
-            self._events.set_events(tag, events)
+            self._publications.append(partial(self._events.set_events, tag, events))
         self._ops.append(CreateOp(tag, element.type, clean_props))
         self._created.append(node)
 
@@ -470,6 +527,9 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         # component's hook state from the attempt that suspended;
         # reclaiming it keeps cached resources warm.
         hook_state = self._take_hydrated_hook_state(element) or HookState()
+        journal = _current.get()
+        if journal is not None and hook_state.owner is None:
+            journal.undo.append(hook_state.cleanup_all_effects)
         rendered = self._render_component_body(hook_state, element)
         try:
             children = self._create_child_list(rendered)
@@ -546,17 +606,23 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         from ..profiling import count
 
         count("components.rendered")
+        journal = _current.get()
+        if journal is not None:
+            for name in HookState.__slots__:
+                journal.attribute(hook_state, name)
         self._effect_states[id(hook_state)] = hook_state
         component: Component = element.type
         label = component.display_name
         hook_state.owner = self
         if component.is_async:
             previous = hook_state._async_task
-            inputs = (element.props, element.children)
+            inputs = (element.props, element.children, provider_environment())
             from ..equality import equal
 
             if previous is not None and not equal(hook_state._async_inputs, inputs):
-                previous.cancel()
+                # Retire accepted work only after its replacement commits.
+                # A later sibling can still reject this render pass.
+                self._publications.append(previous.cancel)
                 previous = hook_state._async_task = None
             if previous is None:
 
@@ -574,6 +640,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                         restore_hook_state(token)
 
                 previous = hook_state.task_scope.create_task(render_body())
+                if journal is not None and journal.active:
+                    journal.undo.append(previous.cancel)
                 hook_state._async_task = previous
                 hook_state._async_inputs = inputs
             if not previous.done():
@@ -598,6 +666,9 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 signal.key = (id(element.type), element.key)
             if not signal.label:
                 signal.label = label
+            raise
+        except BaseException:
+            hook_state.abort_render()
             raise
         finally:
             _scope.reset(scope_token)
@@ -771,7 +842,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     def _reconcile_native(self, old: VNode, new_el: Element) -> VNode:
         new_clean, events = self._split_props(new_el.props)
         if old.tag is not None:
-            self._events.set_events(old.tag, events)
+            self._publications.append(partial(self._events.set_events, old.tag, events))
         changed = self._diff_props(old.clean_props, new_clean)
         if changed:
             if old.tag is not None:
@@ -784,8 +855,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         old_ref = old.element.props.get("ref")
         new_ref = new_el.props.get("ref")
         if old_ref is not new_ref:
-            self._clear_ref(old_ref)
-            self._attach_ref(new_el, old.native_view, old.tag)
+            self._publications.append(partial(self._clear_ref, old_ref))
+            self._publications.append(partial(self._attach_ref, new_el, old.native_view, old.tag))
 
         before = self._flattened_child_tags(old)
         children = self._reconcile_child_list(old.children, normalize_children(new_el.children, owner=new_el.type))
@@ -969,15 +1040,15 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             if salvage is not None and node.is_component:
                 salvage.setdefault((id(node.element.type), node.element.key), []).append(hs)
             else:
-                hs.cleanup_all_effects()
-            hs.detach()
-        self._clear_ref(node.element.props.get("ref"))
+                self._publications.append(hs.cleanup_all_effects)
+            self._publications.append(hs.detach)
+        self._publications.append(partial(self._clear_ref, node.element.props.get("ref")))
         for child in node.children:
             self._destroy_tree(child, salvage=salvage)
         if node.is_native and node.tag is not None:
             self._native_children.pop(node.tag, None)
             self._tag_nodes.pop(node.tag, None)
-            self._events.clear(node.tag)
+            self._publications.append(partial(self._events.clear, node.tag))
             self._ops.append(DestroyOp(node.tag))
             self._destroyed_tags.add(node.tag)
         node.children = []
@@ -1069,7 +1140,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _split_props(props: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Callable[..., Any]]]:
+    def _split_props(props: Mapping[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Callable[..., Any]]]:
         """Strip reconciler-owned keys, then split event callables from native props."""
         if not props:
             return {}, {}

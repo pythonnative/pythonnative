@@ -201,7 +201,9 @@ class BoundaryMixin:
         is swapped out for the content; on suspension the fallback
         mounts (or stays) and a retry is wired to the pending work.
         """
-        hydration: HydrationMap = node.suspense_hydration or {}
+        # Claim states from a candidate map. A later render failure must leave
+        # the committed boundary's buckets available for its original retry.
+        hydration: HydrationMap = {key: list(states) for key, states in (node.suspense_hydration or {}).items()}
         node.suspense_hydration = None
         saved_hydration = self._hydration
         saved_salvage = self._suspense_salvage
@@ -311,8 +313,9 @@ class BoundaryMixin:
 
         def _on_done(_w: Any = None) -> None:
             live_waits = node.suspense_waits
-            if live_waits is not None:
-                live_waits.discard(marker)
+            if live_waits is None or marker not in live_waits:
+                return
+            live_waits.discard(marker)
             if not node.mounted or not node.suspense_showing_fallback:
                 return
             self._dirty_suspense[id(node)] = node
@@ -332,16 +335,11 @@ class BoundaryMixin:
             return None
         return bucket.pop(0)
 
-    @staticmethod
-    def _dispose_hydration(hydration: HydrationMap) -> None:
+    def _dispose_hydration(self, hydration: HydrationMap) -> None:
         """Clean up preserved hook states that no component reclaimed."""
         for states in hydration.values():
             for hook_state in states:
-                try:
-                    hook_state.cleanup_all_effects()
-                except Exception as exc:
-                    diagnostics.warn(f"Error disposing a suspended component's state: {exc!r}")
-        hydration.clear()
+                self._publications.append(hook_state.cleanup_all_effects)
 
     def _discard_salvage(self) -> None:
         """Dispose hook states salvaged during a Suspend that no boundary caught."""

@@ -36,6 +36,11 @@ public final class CameraModule: PNNativeModule {
         picker.sourceType = source
         picker.allowsEditing = PNProps.bool(args["allow_editing"]) ?? false
         picker.delegate = session
+        promise.onCancel { [weak self, weak picker] in
+            picker?.delegate = nil
+            picker?.dismiss(animated: true)
+            self?.activePicker = nil
+        }
         top.present(picker, animated: true)
     }
 }
@@ -96,9 +101,16 @@ public final class LocationModule: PNNativeModule {
                 self?.sessions.removeAll { $0 === finished }
             }
             promise.resolve(fix)
+            session = nil
         }
         guard let started = session else { return }
         sessions.append(started)
+        promise.onCancel { [weak self, weak started] in
+            guard let started = started else { return }
+            started.cancel()
+            self?.sessions.removeAll { $0 === started }
+            session = nil
+        }
         started.start()
     }
 }
@@ -167,11 +179,17 @@ final class PNLocationSession: NSObject, CLLocationManagerDelegate {
         finish(nil)
     }
 
-    private func finish(_ fix: [String: Any]?) {
-        if finished { return }
+    func cancel() {
         finished = true
         timer?.invalidate()
+        timer = nil
         manager.stopUpdatingLocation()
+        manager.delegate = nil
+    }
+
+    private func finish(_ fix: [String: Any]?) {
+        if finished { return }
+        cancel()
         done(fix)
     }
 }

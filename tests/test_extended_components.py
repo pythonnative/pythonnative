@@ -272,10 +272,10 @@ def test_flatlist_horizontal_scrolls_on_x_axis() -> None:
     assert el.props["horizontal"] is True
 
     root, _rec, _backend = _mount(el)
-    assert root.type_name == "ScrollView"
-    assert root.props["scroll_axis"] == "horizontal"
+    assert root.type_name == "VirtualList"
+    assert root.props["horizontal"] is True
     # The content wrapper lays rows out horizontally.
-    assert root.find_first("Row") is not None
+    assert len(root.children) == 3
 
 
 def test_flatlist_header_and_footer() -> None:
@@ -306,7 +306,6 @@ def test_flatlist_empty_state() -> None:
 
 
 def test_flatlist_on_end_reached_fires_near_the_end() -> None:
-    from pythonnative.events import dispatch_event
 
     fired: list = []
     el = FlatList(
@@ -321,14 +320,14 @@ def test_flatlist_on_end_reached_fires_near_the_end() -> None:
     tag = rec.root_tag
 
     # Far from the end: no callback.
-    dispatch_event(tag, "on_scroll", {"x": 0.0, "y": 0.0})
+    _backend.request_list(tag, 0)
     assert fired == []
 
     # Content extent is 100 * 30 = 3000; the default viewport estimate is
     # 800, so an offset near the bottom crosses the 0.5-viewport line.
-    dispatch_event(tag, "on_scroll", {"x": 0.0, "y": 3000.0 - 800.0 - 100.0})
+    _backend.request_list(tag, 70)
     assert fired == [1]
 
     # The latch prevents refiring while still near the end.
-    dispatch_event(tag, "on_scroll", {"x": 0.0, "y": 3000.0 - 800.0 - 50.0})
+    _backend.request_list(tag, 71)
     assert fired == [1]

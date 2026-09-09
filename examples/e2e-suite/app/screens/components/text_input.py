@@ -1,8 +1,8 @@
 """Demo screen for [`pn.TextInput`][pythonnative.TextInput].
 
-Maestro types into the single-line input and asserts the ``Echo:``
-line mirrors the typed value. The multiline variant is also rendered
-so flows can confirm both modes coexist on one screen.
+Maestro types into the name input, checks its echo and selection, then
+switches between single-line and multiline widgets without losing the value.
+A separate multiline note field shows a live character count.
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ def TextInputDemo() -> pn.Element:
     name, set_name = pn.use_state("")
     notes, set_notes = pn.use_state("")
     focused, set_focused = pn.use_state(False)
+    multiline, set_multiline = pn.use_state(False)
+    selection, set_selection = pn.use_state({"start": 0, "end": 0})
 
     field_style = pn.style(
         padding=10,
@@ -39,6 +41,8 @@ def TextInputDemo() -> pn.Element:
                 value=name,
                 placeholder="Type your name here",
                 on_change=set_name,
+                multiline=multiline,
+                on_selection_change=set_selection,
                 on_focus=lambda: set_focused(True),
                 on_blur=lambda: set_focused(False),
                 clear_button=True,
@@ -48,7 +52,11 @@ def TextInputDemo() -> pn.Element:
                 style=field_style,
             ),
             result_text("Echo", name or "(empty)"),
-            hint("Maestro types here and asserts the echo + focus update."),
+            result_text("Selection", f"{selection['start']}:{selection['end']}"),
+            pn.Button(
+                "Use single line" if multiline else "Use multiline name", on_press=lambda: set_multiline(not multiline)
+            ),
+            hint("Switch the name field between modes while keeping its text."),
         ),
         section(
             "Multiline",

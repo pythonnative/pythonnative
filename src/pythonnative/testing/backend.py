@@ -241,7 +241,54 @@ class FakeBackend:
     def command(self, tag: int, name: str, args: Optional[Dict[str, Any]] = None) -> Any:
         """Record an imperative view command in ``commands`` and return ``None``."""
         self.commands.append((tag, name, dict(args or {})))
+        view = self.views.get(tag)
+        if view is not None and view.type_name == "VirtualList":
+            arguments = args or {}
+            if name == "scroll_to_index":
+                self.request_list(tag, int(arguments["index"]))
+            elif name == "scroll_to_end":
+                self.request_list(tag, max(0, len(view.props["keys"]) - 1))
         return None
+
+    def request_list(self, tag: int, first: int, *, extent: float = 800.0) -> None:
+        """Simulate a native viewport using the shared list request protocol."""
+        from ..events import dispatch_event
+
+        view = self._require(tag, "request_list")
+        if view.type_name != "VirtualList":
+            raise TypeError("request_list requires a VirtualList tag")
+        keys = view.props["keys"]
+        heights = view.props["row_heights"]
+        first = max(0, min(first, len(keys) - 1))
+        last, covered = first, 0.0
+        while last < len(keys) and covered < extent:
+            covered += heights[last]
+            last += 1
+        offset = sum(heights[:first])
+        dispatch_event(
+            tag,
+            "on_scroll",
+            {
+                "first": first,
+                "last": last - 1,
+                "extent": extent,
+                "range": sum(heights),
+                "x": offset if view.props.get("horizontal") else 0,
+                "y": 0 if view.props.get("horizontal") else offset,
+            },
+        )
+        if keys:
+            dispatch_event(
+                tag,
+                "on_bind_row",
+                {
+                    "key": keys[first],
+                    "index": first,
+                    "revision": view.props["revision"],
+                    "extent": extent,
+                    "width": view.frame[2],
+                },
+            )
 
     def set_animated_property(self, tag: int, prop_name: str, value: Any) -> None:
         """Record an animated property write in ``animated`` without touching ``props``."""

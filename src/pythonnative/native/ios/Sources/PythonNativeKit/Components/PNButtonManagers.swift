@@ -53,8 +53,9 @@ public final class PNButtonManager: PNComponentManager {
         if PNProps.has(props, "title") {
             button.setTitle(PNProps.string(PNProps.value(props, "title")) ?? "", for: .normal)
         }
-        if let size = PNProps.double(PNProps.value(props, "font_size")) {
-            button.titleLabel?.font = UIFont.systemFont(ofSize: CGFloat(size))
+        if initial || PNTextManager.fontKeys.contains(where: { PNProps.has(props, $0) }) {
+            button.titleLabel?.font = PNTextManager.font(from: PNViewState.existing(for: view)?.props ?? props, base: nil)
+            button.titleLabel?.adjustsFontForContentSizeCategory = true
         }
         if let color = PNColor.parse(PNProps.value(props, "background_color")) {
             button.backgroundColor = color

@@ -17,6 +17,7 @@ from pythonnative.testing import render
 
 @pytest.fixture
 def inbox(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[types.ModuleType, dict[str, Any]]]:
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "examples/inbox-extension/src"))
     package = types.ModuleType("pn_reference_inbox")
     package.__path__ = [str(Path(__file__).parents[1] / "examples/inbox/app")]
     monkeypatch.setitem(sys.modules, package.__name__, package)

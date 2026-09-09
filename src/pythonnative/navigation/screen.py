@@ -2,13 +2,7 @@
 
 from __future__ import annotations
 
-import sys
-from typing import Any, Callable, Dict, Literal, Mapping, Optional, TypedDict, Union
-
-if sys.version_info >= (3, 11):
-    from typing import Unpack
-else:  # pragma: no cover
-    from typing_extensions import Unpack
+from typing import Any, Callable, Dict, Literal, Mapping, Optional, TypedDict, Union, Unpack
 
 from ..element import Element
 

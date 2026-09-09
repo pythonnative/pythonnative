@@ -19,35 +19,39 @@ final class PNTestEchoModule: PNNativeModule {
 }
 
 final class PNModuleTests: XCTestCase {
+    private let dispatcher = PNModuleDispatcher { module, method, args in
+        if module != "TestEcho" { return PNContracts.validateModule(module, method, args) }
+        return method == "echo" ? (args.count == 1 && args["value"] is Int) : (["fail", "later"].contains(method) && args.isEmpty)
+    }
     override func setUp() {
         super.setUp()
         PNRegistry.shared.registerModule(PNTestEchoModule.self)
     }
 
     func testSynchronousResolveProducesOkEnvelope() {
-        let result = PNModuleDispatcher.shared.call(module: "TestEcho", method: "echo", envelope: ["call_id": 7, "args": ["value": 42]])
+        let result = dispatcher.call(module: "TestEcho", method: "echo", envelope: ["call_id": 7, "args": ["value": 42]])
         XCTAssertEqual(result["ok"] as? Bool, true)
         XCTAssertEqual(result["value"] as? Int, 42)
         XCTAssertNil(result["pending"])
     }
 
     func testRejectProducesErrorEnvelope() {
-        let result = PNModuleDispatcher.shared.call(module: "TestEcho", method: "fail", envelope: ["call_id": 8, "args": [:]])
+        let result = dispatcher.call(module: "TestEcho", method: "fail", envelope: ["call_id": 8, "args": [:]])
         XCTAssertEqual(result["ok"] as? Bool, false)
         XCTAssertEqual(result["error"] as? String, "nope")
         XCTAssertEqual(result["code"] as? String, "test_code")
     }
 
     func testUnknownModuleAndMethod() {
-        let missing = PNModuleDispatcher.shared.call(module: "Nope", method: "x", envelope: [:])
+        let missing = dispatcher.call(module: "Nope", method: "x", envelope: [:])
         XCTAssertEqual(missing["ok"] as? Bool, false)
         XCTAssertEqual(missing["code"] as? String, "unknown_module")
-        let method = PNModuleDispatcher.shared.call(module: "TestEcho", method: "zzz", envelope: [:])
+        let method = dispatcher.call(module: "TestEcho", method: "zzz", envelope: [:])
         XCTAssertEqual(method["ok"] as? Bool, false)
     }
 
     func testAsynchronousSettlementReturnsPending() {
-        let result = PNModuleDispatcher.shared.call(module: "TestEcho", method: "later", envelope: ["call_id": 9, "args": [:]])
+        let result = dispatcher.call(module: "TestEcho", method: "later", envelope: ["call_id": 9, "args": [:]])
         XCTAssertEqual(result["pending"] as? Bool, true)
         guard let promise = PNTestEchoModule.pending else { return XCTFail("promise not captured") }
         XCTAssertFalse(promise.isSettled)
@@ -70,11 +74,11 @@ final class PNModuleTests: XCTestCase {
     }
 
     func testCancellationReleasesNativeWorkAndIgnoresLateCompletion() {
-        _ = PNModuleDispatcher.shared.call(module: "TestEcho", method: "later", envelope: ["call_id": 99, "args": [:]])
+        _ = dispatcher.call(module: "TestEcho", method: "later", envelope: ["call_id": 99, "args": [:]])
         guard let promise = PNTestEchoModule.pending else { return XCTFail("missing promise") }
         var cancelled = 0
         promise.onCancel { cancelled += 1 }
-        _ = PNModuleDispatcher.shared.call(module: "TestEcho", method: "_pn_cancel", envelope: ["args": ["call_id": 99]])
+        _ = dispatcher.call(module: "TestEcho", method: "_pn_cancel", envelope: ["args": ["call_id": 99]])
         promise.cancel()
         promise.resolve("late")
         XCTAssertTrue(promise.isCancelled)
@@ -93,7 +97,7 @@ final class PNModuleTests: XCTestCase {
 
     func testStorageModuleRoundTrip() {
         let storage = StorageModule()
-        _ = PNModuleDispatcher.shared.call(module: "Storage", method: "clear", envelope: [:])
+        _ = dispatcher.call(module: "Storage", method: "clear", envelope: [:])
         let set = PNPromise(callId: 1, module: "Storage", method: "set")
         storage.call("set", args: ["key": "k", "value": "v"], promise: set)
         let get = PNPromise(callId: 2, module: "Storage", method: "get")

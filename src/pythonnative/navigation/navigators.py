@@ -312,7 +312,7 @@ def _StackNavigatorImpl(*, screens: Tuple[ScreenDef, ...], initial_route: Option
     core, state, parent_focused = _use_navigator("stack", screens, initial_route)
 
     def on_back() -> bool:
-        if len(state) > 1:
+        if parent_focused and len(state) > 1:
             return core.pop(1, source="back")
         return False
 
@@ -320,7 +320,7 @@ def _StackNavigatorImpl(*, screens: Tuple[ScreenDef, ...], initial_route: Option
 
     current = state.current
     stack_ref = use_ref(None)
-    if core.is_native_root:
+    if core.host is not None:
 
         def native_back(count: int = 1) -> None:
             if not core.pop(count, source="back") and stack_ref.current is not None:
@@ -383,10 +383,9 @@ class StackNavigator:
 def create_stack_navigator() -> StackNavigator:
     """Create a stack navigator: push and pop screens with history.
 
-    At the root of a native host the stack pushes real native screens
-    (``UINavigationController`` on iOS, fragments on Android), so users
-    get system transitions and swipe-back for free. Nested stacks are
-    drawn in Python with their own header.
+    Stacks use native screen containers at every nesting level on mobile:
+    ``UINavigationController`` on iOS and fragments on Android. The browser
+    and headless renderer preserve the same logical screen ownership.
 
     Example:
         ```python

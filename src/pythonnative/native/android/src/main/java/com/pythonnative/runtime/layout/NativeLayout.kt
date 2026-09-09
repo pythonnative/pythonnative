@@ -15,6 +15,8 @@ object NativeLayout {
         var frame = floatArrayOf()
     }
     private val nodes = HashMap<Long, Entry>()
+    private val portals = HashSet<Long>()
+    private val detachedRoots = HashSet<Long>()
     private var viewport = JSONObject()
     private val detached = setOf("VirtualList", "Modal", "ScreenStack")
     private val containers = detached + setOf("View", "Row", "Column", "ScrollView", "Screen", "Portal")
@@ -36,16 +38,20 @@ object NativeLayout {
         }
         for (entry in nodes.values) entry.yoga.close()
         nodes.clear()
+        portals.clear()
+        detachedRoots.clear()
         viewport = JSONObject()
     }
 
     fun parent(tag: Long): Long? = nodes[tag]?.parent
+    fun children(tag: Long): List<Long> = nodes[tag]?.children?.toList() ?: emptyList()
 
     fun observe(ops: List<Op>) {
         for (op in ops) when (op) {
             is Op.Create -> {
                 val entry = Entry(YogaNode(op.tag))
                 nodes[op.tag] = entry
+                if (op.typeName == "Portal") portals.add(op.tag)
                 update(entry, op.props)
             }
             is Op.Update -> nodes[op.tag]?.let { update(it, op.changed) }
@@ -59,9 +65,14 @@ object NativeLayout {
                 child.parent = op.parent
                 parent.children.add(op.index.coerceAtMost(parent.children.size), op.child)
                 child.attached = PNBridge.registry.get(op.parent)?.typeName !in detached
-                if (child.attached) parent.yoga.insert(parent.yoga.ptr, child.yoga.ptr, op.index)
+                if (child.attached) {
+                    detachedRoots.remove(op.child)
+                    parent.yoga.insert(parent.yoga.ptr, child.yoga.ptr, op.index)
+                } else detachedRoots.add(op.child)
             }
             is Op.Destroy -> nodes.remove(op.tag)?.let { child ->
+                portals.remove(op.tag)
+                detachedRoots.remove(op.tag)
                 child.parent?.let { old -> nodes[old]?.let { parent ->
                     parent.children.remove(op.tag)
                     if (child.attached) parent.yoga.remove(parent.yoga.ptr, child.yoga.ptr)
@@ -77,6 +88,8 @@ object NativeLayout {
             if (changed.isNull(key)) entry.props.remove(key) else entry.props.put(key, changed.get(key))
         }
         val yoga = entry.yoga
+        val type = PNBridge.registry.get(yoga.tag)?.typeName
+        if (type != null && entry.frame.isNotEmpty() && !com.pythonnative.generated.PNContracts.invalidatesLayout(type, changed)) return
         yoga.resetStyle(yoga.ptr)
         for (key in entry.props.keys()) {
             val value = entry.props.get(key)
@@ -84,7 +97,6 @@ object NativeLayout {
                 for (edge in value.keys()) yoga.style(yoga.ptr, if (edge == "all") key else "${key}_$edge", value.get(edge).toString())
             } else yoga.style(yoga.ptr, key, value.toString())
         }
-        val type = PNBridge.registry.get(yoga.tag)?.typeName
         if (type in setOf("ScrollView", "VirtualList", "ScreenStack")) yoga.style(yoga.ptr, "flex_shrink", "1")
         yoga.measureLeaf(yoga.ptr, entry.children.isEmpty() && type !in containers)
     }
@@ -99,9 +111,9 @@ object NativeLayout {
         for (tag in rootTags) nodes[tag]?.yoga?.let { it.calculate(it.ptr, width, height) }
         // Portals have no on-screen parent. Their own Yoga node supplies the
         // viewport for all children, including absolute insets and sibling layout.
-        for ((tag, entry) in nodes) {
+        for (tag in portals) {
+            val entry = nodes[tag] ?: continue
             val record = PNBridge.registry.get(tag) ?: continue
-            if (record.typeName != "Portal") continue
             val containerWidth = record.view.width / PNBridge.density()
             val containerHeight = record.view.height / PNBridge.density()
             val portalWidth = if (containerWidth > 0) containerWidth else width
@@ -110,7 +122,8 @@ object NativeLayout {
             entry.yoga.style(entry.yoga.ptr, "height", portalHeight.toString())
             entry.yoga.calculate(entry.yoga.ptr, portalWidth, portalHeight)
         }
-        for (entry in nodes.values) if (entry.parent != null && !entry.attached) {
+        for (tag in detachedRoots) {
+            val entry = nodes[tag] ?: continue
             val parent = PNBridge.registry.get(entry.parent!!)
             val record = PNBridge.registry.get(entry.yoga.tag)
             val container = if (record?.typeName == "Screen") record.view else parent?.view

@@ -98,7 +98,7 @@ class FakeTransport:
         self.transactions.append(ops)
         for op in ops:
             self._apply_one(op)
-        self.commit_state = candidate
+        self.commit_state = candidate.publish()
         return codec.dumps(candidate.acknowledgement())
 
     def _apply_one(self, op: List[Any]) -> None:

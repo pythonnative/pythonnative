@@ -28,6 +28,10 @@ class ViewRecord(
     /** Whether the initial props have been applied. */
     var initialized = false
 
+    /** Logical ownership, updated as each mount operation completes. */
+    var parent: Long? = null
+    val children = ArrayList<Long>()
+
     /** Whether the element wired a callback named `name` this render. */
     fun hasEvent(name: String): Boolean {
         val events = props.opt("_pn_events") as? JSONArray ?: return false

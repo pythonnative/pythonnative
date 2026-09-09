@@ -7,7 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import com.pythonnative.generated.InboxBadgeProps
 import com.pythonnative.generated.InboxToolsImplementation
-import com.pythonnative.generated.InboxToolsModule
+import com.pythonnative.generated.InboxToolsModuleAdapter
 import com.pythonnative.runtime.bridge.PNPlugin
 import com.pythonnative.runtime.bridge.PNRegistry
 import com.pythonnative.runtime.components.ComponentManager
@@ -16,7 +16,7 @@ import org.json.JSONObject
 object InboxExtension: PNPlugin {
     override fun register(registry: PNRegistry) {
         registry.registerComponent("InboxBadge") { InboxBadgeManager() }
-        registry.registerModule { InboxToolsModule(InboxToolsService()) }
+        registry.registerModule { InboxToolsModuleAdapter(InboxToolsService()) }
     }
 }
 

@@ -86,7 +86,7 @@ final class PNManagerTests: XCTestCase {
     }
 
     func testVirtualListBindsRowsThroughRegistry() {
-        PNTransaction.apply("[[\"c\", 40, \"View\", {\"background_color\": \"#123456\"}]]")
+        try! PNTransaction.apply([.create(tag: 40, type: "View", props: ["background_color": "#123456"])])
         let manager = PNVirtualListManager()
         guard let table = manager.createView(tag: 41, props: ["keys": ["a", "b", "c"], "revision": 1, "row_heights": [50.0, 50.0, 50.0]]) as? UICollectionView else {
             return XCTFail("expected a collection view")

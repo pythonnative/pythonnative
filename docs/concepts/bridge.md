@@ -48,7 +48,9 @@ A surface commit has this shape:
 The renderer validates the entire operation sequence before mutation: operation
 arity, live tags, insertion bounds, cycles, typed values, and finite geometry.
 An accepted commit returns `ok`, `application`, `surface`, and the exact
-`revision`. Python advances its native bookkeeping only after that acknowledgement.
+`revision`, plus optional native timing metrics. Python advances its bookkeeping
+only after that acknowledgment. A rejection with `failed: false` reports
+validation failure before mutation and preserves the previous revision.
 A failed surface rejects further incremental updates. A new application identity
 and a complete remount establish a clean surface; replaying a partial commit
 isn't a recovery strategy. The current app host uses one surface.
@@ -73,14 +75,24 @@ core, and the browser preview uses the corresponding Yoga WebAssembly package.
 
 The application sends styles as props. Native leaf managers measure text,
 controls, and images next to their widgets. One `Layout.compute` request returns
-a batch of changed frames. Python doesn't make one measurement RPC per leaf.
+a batch of changed frames with `application`, `surface`, and `revision`.
+Geometry from another surface or revision is ignored. Drawing-only prop updates
+skip the request entirely. Python doesn't make one measurement RPC per leaf.
+
+Commit and required layout acknowledgments precede ref and effect publication.
+Native navigation animations and later platform layout changes may continue after
+that boundary; their geometry returns through the same identified layout channel.
 
 A native screen, portal, modal, or recycled row can be physically attached to a
 platform container while remaining a child in the same Python component tree.
 Context, error boundaries, suspense boundaries, and task ownership follow that
 logical tree. Lists use stable keys and data revisions to validate row requests.
 UIKit collection views and Android recycler views own physical cells; a bounded
-window of ordinary keyed Python row components supplies their contents.
+window of ordinary keyed Python row components supplies their contents. Headless
+tests simulate the same viewport and row requests. Dataset revisions change when
+data or rendering inputs change; per-item revisions avoid reloading unchanged
+cells. Global and section headers don't change public item indices. Row instances
+can unmount outside the window, so persistent item state belongs in app data.
 
 ## Modules, contracts, and animations
 
@@ -99,3 +111,12 @@ Animation graphs describe values, arithmetic, interpolation, colors, and
 clamping. Native timing, spring, and decay drivers evaluate connected bindings
 on the UI thread. Scroll and gesture mappings feed graph values directly, so
 visual updates can continue while the Python application thread is busy.
+
+## Profiling the boundary
+
+`PN_PROFILE` traces separate rendering, validation, transport, native mutation,
+and layout. Native duration samples appear on a separate trace track, placed at
+host receipt without assuming synchronized clocks. Work counters report copied
+validation records, operations, native views visited, and changed frames. A
+one-property regression test uses 10,000 records to check work growth directly.
+These counters and host timings aren't device frame-rate claims.

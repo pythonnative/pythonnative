@@ -183,10 +183,10 @@ def test_invalid_tree_commit_has_no_partial_effect() -> None:
     backend.apply_mutations([CreateOp(1, "View", {})])
     envelope = backend._commit.acknowledgement() | {"sequence": 1, "args": []}
     envelope.pop("ok")
-    assert backend.accept_event(1, "on_press", envelope)
-    assert not backend.accept_event(1, "on_press", envelope)
+    assert backend.accept_event(1, "on_layout", envelope)
+    assert not backend.accept_event(1, "on_layout", envelope)
     backend.apply_mutations([DestroyOp(1)])
-    assert not backend.accept_event(1, "on_press", envelope | {"sequence": 2})
+    assert not backend.accept_event(1, "on_layout", envelope | {"sequence": 2})
 
 
 def test_schema_rejects_wrong_types_and_records_layout_metadata() -> None:

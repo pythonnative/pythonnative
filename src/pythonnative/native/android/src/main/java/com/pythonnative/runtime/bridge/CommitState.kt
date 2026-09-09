@@ -10,6 +10,7 @@ class CommitState {
     private var revision = 0
     private var live = mutableSetOf<Long>()
     private var parents = mutableMapOf<Long, Long>()
+    private var childCounts = mutableMapOf<Long, Int>()
     private var types = mutableMapOf<Long, String>()
     private var failed = false
 
@@ -17,6 +18,9 @@ class CommitState {
     @Synchronized fun event(args: JSONArray, editRevision: Long = 0): String = JSONObject()
         .put("application", application).put("surface", surface).put("revision", revision)
         .put("sequence", ++sequence).put("args", args).put("edit_revision", editRevision).toString()
+
+    fun layout(frames: JSONArray): JSONObject = JSONObject().put("application", application)
+        .put("surface", surface).put("revision", revision).put("frames", frames)
 
     fun apply(json: String, applier: TransactionApplier): String {
         try {
@@ -28,10 +32,12 @@ class CommitState {
             val replacing = app != application
             require(next == (if (replacing) 1 else revision + 1)) { "stale revision" }
             require(replacing || (!failed && target == surface)) { "failed or foreign surface" }
-            val tags = if (replacing) mutableSetOf() else live.toMutableSet()
-            val links = if (replacing) mutableMapOf() else parents.toMutableMap()
-            val names = if (replacing) mutableMapOf() else types.toMutableMap()
             val raw = envelope.getJSONArray("ops")
+            val structural = replacing || (0 until raw.length()).any { raw.getJSONArray(it).getString(0) in setOf("c", "i", "d") }
+            val tags = if (replacing) mutableSetOf() else if (structural) live.toMutableSet() else live
+            val links = if (replacing) mutableMapOf() else if (structural) parents.toMutableMap() else parents
+            val names = if (replacing) mutableMapOf() else if (structural) types.toMutableMap() else types
+            val counts = if (replacing) mutableMapOf() else if (structural) childCounts.toMutableMap() else childCounts
             val ops = ArrayList<Op>()
             for (i in 0 until raw.length()) {
                 val parts = raw.getJSONArray(i)
@@ -61,14 +67,17 @@ class CommitState {
                                 require(ancestor != child) { "cycle" }
                                 ancestor = links[ancestor]
                             }
-                            require(parts.getInt(3) <= links.count { (key, value) -> value == tag && key != child }) { "insertion index exceeds child count" }
+                            require(parts.getInt(3) <= (counts[tag] ?: 0) - (if (links[child] == tag) 1 else 0)) { "insertion index exceeds child count" }
+                            links[child]?.let { counts[it] = (counts[it] ?: 1) - 1 }
+                            counts[tag] = (counts[tag] ?: 0) + 1
                             links[child] = tag
                         }
                         "d" -> {
-                            require(tag !in links.values) { "destroy children first" }
+                            require((counts[tag] ?: 0) == 0) { "destroy children first" }
                             tags.remove(tag)
                             names.remove(tag)
-                            links.remove(tag)
+                            links.remove(tag)?.let { counts[it] = (counts[it] ?: 1) - 1 }
+                            counts.remove(tag)
                         }
                         "f" -> {
                             for (j in 2..5) require(parts.getDouble(j).isFinite()) { "invalid frame" }
@@ -78,6 +87,7 @@ class CommitState {
                 }
                 ops.add(PNTransaction.decodeOp(parts))
             }
+            val mutationStarted = System.nanoTime()
             try {
                 if (replacing) {
                     for (tag in live) applier.applyOp(Op.Destroy(tag))
@@ -96,11 +106,13 @@ class CommitState {
             live = tags
             parents = links
             types = names
+            childCounts = counts
             failed = false
             return JSONObject().put("ok", true).put("application", app)
-                .put("surface", target).put("revision", next).toString()
+                .put("surface", target).put("revision", next)
+                .put("metrics", JSONObject().put("mutation_ns", System.nanoTime() - mutationStarted)).toString()
         } catch (error: Exception) {
-            return JSONObject().put("ok", false).put("error", error.message).toString()
+            return JSONObject().put("ok", false).put("error", error.message).put("failed", failed).toString()
         }
     }
 }

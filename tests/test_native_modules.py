@@ -311,7 +311,7 @@ def test_async_facades_surface_native_errors() -> None:
     from pythonnative import Camera
 
     class Busy:
-        def take_photo(self) -> str:
+        def take_photo(self, *, quality: float = 0.9, allow_editing: bool = False) -> str:
             raise module_registry.NativeModuleError("Camera", "take_photo", "a picker is already open", code="busy")
 
     module_registry.register_python_module("Camera", Busy())

@@ -17,7 +17,8 @@ let package = Package(
         .testTarget(
             name: "PythonNativeKitTests",
             dependencies: ["PythonNativeKit"],
-            path: "Tests/PythonNativeKitTests"
+            path: "Tests/PythonNativeKitTests",
+            resources: [.copy("Fixtures")]
         ),
     ]
 )

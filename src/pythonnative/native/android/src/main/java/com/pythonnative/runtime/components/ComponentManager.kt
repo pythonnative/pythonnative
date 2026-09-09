@@ -206,8 +206,3 @@ object PNEvents {
     fun fireTag(tag: Long, name: String, args: JSONArray): String? =
         PNBridge.callPython("event", tag, name, args.toString())
 }
-
-/** Fallback for unknown element types: an empty container that hosts children. */
-class PlaceholderManager : ComponentManager() {
-    override fun createView(context: Context, tag: Long, props: JSONObject): View = FrameLayout(context)
-}

@@ -403,7 +403,7 @@ class ModuleReloader:
     def swap_components_in_tree(reconciler: Any, replacement_map: Dict[Any, Any]) -> int:
         """Apply a ``{old: new}`` map to every node in the reconciler tree.
 
-        Mutates ``vnode.element.type`` directly so the NEXT diff sees
+        Replaces immutable element descriptions so the next diff sees
         identical types and reuses VNodes (preserving hook state).
         The element lists stored on ``vnode.rendered`` are rewritten
         too because the reconciler reads from them when comparing keys
@@ -417,29 +417,27 @@ class ModuleReloader:
 
         rewrites = 0
 
-        def rewrite_element_tree(element: Any) -> None:
+        def rewrite_element_tree(element: Any) -> Any:
             nonlocal rewrites
-            if element is None:
-                return
-            new_type = replacement_map.get(element.type)
-            if new_type is not None:
-                element.type = new_type
+            from .element import Element
+
+            if not isinstance(element, Element):
+                return element
+            new_type = replacement_map.get(element.type, element.type)
+            children = tuple(rewrite_element_tree(child) for child in element.children)
+            if new_type is not element.type:
                 rewrites += 1
-            for child in element.children or []:
-                rewrite_element_tree(child)
+            if new_type is not element.type or any(a is not b for a, b in zip(children, element.children)):
+                return Element(new_type, element.props, children, element.key)
+            return element
 
         def visit(vnode: Any) -> None:
             if vnode is None:
                 return
-            if getattr(vnode, "element", None) is not None:
-                rewrite_element_tree(vnode.element)
-            rendered = getattr(vnode, "rendered", None)
-            if isinstance(rendered, (list, tuple)):
-                for rendered_el in rendered:
-                    rewrite_element_tree(rendered_el)
-            elif rendered is not None:
-                rewrite_element_tree(rendered)
-            for child in getattr(vnode, "children", []) or []:
+            vnode.element = rewrite_element_tree(vnode.element)
+            if vnode.rendered is not None:
+                vnode.rendered = [rewrite_element_tree(el) for el in vnode.rendered]
+            for child in vnode.children:
                 visit(child)
 
         visit(reconciler.root)

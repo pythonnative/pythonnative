@@ -3,7 +3,7 @@ import UIKit
 public enum InboxExtension: PNPlugin {
     public static func register(into registry: PNRegistry) {
         registry.registerComponent("InboxBadge") { InboxBadgeManager() }
-        registry.registerModule(InboxToolsModule<InboxToolsService>.self)
+        registry.registerModule(InboxToolsModuleAdapter<InboxToolsService>.self)
     }
 }
 

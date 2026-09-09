@@ -38,6 +38,10 @@ class TextInputManager : ComponentManager() {
     }
 
     private fun bindListeners(et: PNEditText) {
+        et.onCompositionEnded = {
+            val pending = stateOf(et).remove("pending_value") as? JSONObject
+            if (pending != null) applyProps(et, pending, false)
+        }
         et.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -64,6 +68,9 @@ class TextInputManager : ComponentManager() {
             val incoming = props.str("value") ?: ""
             val acknowledged = props.optLong("_pn_edit_revision", 0)
             val edited = (state["edit_revision"] as? Number)?.toLong() ?: 0L
+            if (acknowledged >= edited && android.view.inputmethod.BaseInputConnection.getComposingSpanStart(et.text) >= 0) {
+                state["pending_value"] = JSONObject().put("value", incoming).put("_pn_edit_revision", acknowledged)
+            }
             if (et.text.toString() != incoming && acknowledged >= edited && android.view.inputmethod.BaseInputConnection.getComposingSpanStart(et.text) < 0) {
                 val selStart = et.selectionStart
                 val selEnd = et.selectionEnd

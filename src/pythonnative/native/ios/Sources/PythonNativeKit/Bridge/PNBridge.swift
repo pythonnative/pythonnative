@@ -71,7 +71,8 @@ public final class PNBridge {
     /// callback is registered.
     @discardableResult
     public func callPython(kind: String, tag: Int64, name: String, payload: String) -> String? {
-        let message = Message(kind: kind, tag: tag, name: name, payload: payload)
+        let encoded = kind == "layout" ? PNJSON.encode(PNCommit.layout(PNJSON.decode(payload) ?? [])) : payload
+        let message = Message(kind: kind, tag: tag, name: name, payload: encoded)
         mailboxLock.lock()
         if message.continuous, let last = mailbox.last, last.continuous,
            last.tag == tag, last.name == name {
@@ -183,6 +184,9 @@ public func pn_bridge_command(
     PNBridge.ensureMainThread("pn_bridge_command")
     guard let name = name, let record = PNViewRegistry.shared.resolve(tag) else { return nil }
     let args = PNJSON.decodeObject(argsJSON.map { String(cString: $0) })
+    guard PNContracts.validateCommand(record.typeName, String(cString: name), args) else {
+        return PNBridge.duplicate(PNJSON.encode(["error": "Invalid view command"]))
+    }
     let result = record.manager.command(view: record.view, name: String(cString: name), args: args)
     guard let result = result else { return nil }
     return PNBridge.duplicate(PNJSON.encode(result))
@@ -222,7 +226,7 @@ public func pn_bridge_call(
             "animation_graph": true, "logical_lists": true, "native_layout": true]]))
     }
     if String(cString: module) == "Layout" {
-        return PNBridge.duplicate(PNJSON.encode(["ok": true, "value": PNLayout.compute(envelope["args"] as? [String: Any] ?? [:])]))
+        return PNBridge.duplicate(PNJSON.encode(["ok": true, "value": PNCommit.layout(PNLayout.compute(envelope["args"] as? [String: Any] ?? [:]))]))
     }
     let result = PNModuleDispatcher.shared.call(
         module: String(cString: module), method: String(cString: method), envelope: envelope

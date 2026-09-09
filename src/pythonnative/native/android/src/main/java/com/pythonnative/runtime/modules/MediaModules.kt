@@ -44,6 +44,11 @@ class CameraModule : NativeModule {
         val activity = PNBridge.activity() ?: return promise.resolve(null)
         val code = RequestCodes.next()
         pending[code] = promise
+        promise.onCancel {
+            pending.remove(code)
+            @Suppress("DEPRECATION")
+            activity.finishActivity(code)
+        }
         try {
             @Suppress("DEPRECATION")
             activity.startActivityForResult(intent, code)
@@ -94,13 +99,13 @@ class LocationModule : NativeModule {
 
     override fun call(method: String, args: JSONObject, promise: Promise) {
         when (method) {
-            "get_current" -> getCurrent(promise)
+            "get_current" -> getCurrent(args, promise)
             else -> promise.rejectUnknownMethod(method)
         }
     }
 
     @SuppressLint("MissingPermission")
-    private fun getCurrent(promise: Promise) {
+    private fun getCurrent(args: JSONObject, promise: Promise) {
         val ctx = PNBridge.context()
         val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return promise.resolve(null)
         try {
@@ -114,10 +119,12 @@ class LocationModule : NativeModule {
             PNLog.swallowed("Location.lastKnown", e)
         }
         var settled = false
+        var timeout: Runnable? = null
         val listener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
                 if (settled) return
                 settled = true
+                timeout?.let { MainThread.remove(it) }
                 lm.removeUpdates(this)
                 promise.resolve(coords(location))
             }
@@ -127,19 +134,26 @@ class LocationModule : NativeModule {
             override fun onProviderEnabled(provider: String) {}
             override fun onProviderDisabled(provider: String) {}
         }
+        promise.onCancel {
+            settled = true
+            timeout?.let { MainThread.remove(it) }
+            lm.removeUpdates(listener)
+        }
         try {
             val provider = when {
+                args.optString("accuracy") in listOf("high", "best") && lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
                 lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
                 lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
                 else -> return promise.resolve(null)
             }
             lm.requestLocationUpdates(provider, 1000L, 0f, listener)
-            MainThread.postDelayed({
-                if (settled) return@postDelayed
+            timeout = Runnable {
+                if (settled) return@Runnable
                 settled = true
                 lm.removeUpdates(listener)
                 promise.resolve(null)
-            }, 15_000L)
+            }
+            MainThread.postDelayed(timeout!!, (args.optDouble("timeout", 15.0).coerceAtLeast(1.0) * 1000).toLong())
         } catch (e: Exception) {
             PNLog.swallowed("Location.requestUpdates", e)
             promise.resolve(null)
@@ -151,7 +165,7 @@ class LocationModule : NativeModule {
         "longitude" to location.longitude,
         "accuracy" to location.accuracy.toDouble(),
         "altitude" to if (location.hasAltitude()) location.altitude else null,
-        "timestamp" to location.time,
+        "timestamp" to location.time / 1000.0,
     )
 }
 
@@ -191,6 +205,7 @@ class BiometricsModule : NativeModule {
                 .setNegativeButtonText("Cancel")
                 .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
                 .build()
+            promise.onCancel { prompt.cancelAuthentication() }
             prompt.authenticate(info)
         } catch (e: Exception) {
             PNLog.swallowed("Biometrics.authenticate", e)

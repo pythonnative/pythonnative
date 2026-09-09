@@ -5,11 +5,11 @@ notifications, backed by the native ``Notifications`` module
 (``UNUserNotificationCenter`` on iOS, ``NotificationManager`` on
 Android).
 
-On iOS you must ``await Notifications.request_permission()`` before
-scheduling. On Android 13+ the ``POST_NOTIFICATIONS`` runtime
-permission is requested automatically the first time you schedule a
-notification (the template manifest declares it); earlier Android
-versions don't prompt at all.
+Call ``await Notifications.request_permission()`` before scheduling on either
+platform. Android 13+ requests ``POST_NOTIFICATIONS``; scheduling returns
+``False`` when notifications aren't enabled. Android delayed notifications use
+OS-owned, inexact alarms and survive ordinary process death. Delivery may be
+deferred by power management. Reboot, force-stop, and app removal clear alarms.
 
 For remote (server-sent) pushes, enable the ``remote_notifications``
 capability in ``pythonnative.toml`` and call
@@ -37,7 +37,7 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 from .registry import native_module
 
@@ -70,7 +70,6 @@ class Notifications:
         *,
         delay_seconds: float = 0,
         identifier: str = "default",
-        **options: Any,
     ) -> bool:
         """Schedule a local notification.
 
@@ -82,8 +81,6 @@ class Notifications:
             identifier: Stable ID used by
                 [`cancel`][pythonnative.native_modules.notifications.Notifications.cancel]
                 to target this notification.
-            **options: Forwarded to the native module (``sound``,
-                ``badge``, ...). Unknown keys are ignored.
 
         Returns:
             ``True`` once scheduled, ``False`` if the user has denied
@@ -98,7 +95,6 @@ class Notifications:
             body=body,
             delay_seconds=float(delay_seconds),
             identifier=identifier,
-            **options,
         )
         return bool(result)
 

@@ -181,6 +181,12 @@ class VNode:
         "suspense_waits",
     )
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        from .journal import record_attribute
+
+        record_attribute(self, name)
+        object.__setattr__(self, name, value)
+
     def __init__(self, element: Element, children: Optional[List["VNode"]] = None, tag: Optional[int] = None) -> None:
         self.element = element
         self.tag = tag

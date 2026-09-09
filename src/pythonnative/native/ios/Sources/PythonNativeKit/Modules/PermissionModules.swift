@@ -256,6 +256,7 @@ public final class BiometricsModule: PNNativeModule {
             var error: NSError?
             let policy: LAPolicy = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
                 ? .deviceOwnerAuthenticationWithBiometrics : .deviceOwnerAuthentication
+            promise.onCancel { context.invalidate() }
             context.evaluatePolicy(policy, localizedReason: reason) { success, _ in
                 DispatchQueue.main.async { promise.resolve(success) }
             }

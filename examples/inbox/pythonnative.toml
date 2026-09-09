@@ -15,5 +15,5 @@ min_sdk = 24
 target_sdk = 34
 abi_filters = ["arm64-v8a", "x86_64"]
 
-[plugins]
-paths = ["native"]
+[requirements]
+packages = ["vendor/pn_inbox_extension-0.1.0-py3-none-any.whl"]

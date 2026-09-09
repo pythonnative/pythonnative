@@ -37,7 +37,7 @@ class VirtualListManager : ComponentManager() {
                 holders[item.key] = holder
                 attach(holder, item)
                 fire(this@ListView, "on_bind_row", JSONObject().put("index", position).put("key", item.key)
-                    .put("revision", item.revision).put("width", width / PNBridge.density()))
+                    .put("revision", PNBridge.registry.recordFor(this@ListView)?.props?.optInt("revision") ?: 0).put("extent", height / PNBridge.density()).put("width", width / PNBridge.density()))
             }
             override fun onViewRecycled(holder: Holder) {
                 holders.remove(holder.key)
@@ -91,7 +91,7 @@ class VirtualListManager : ComponentManager() {
         if (initial || props.has("keys") || props.has("revision") || props.has("row_heights")) {
             val keys = all.optJSONArray("keys")
             val heights = all.optJSONArray("row_heights")
-            val items = (0 until (keys?.length() ?: 0)).map { Item(keys!!.getString(it), all.optInt("revision"), heights?.optDouble(it, 44.0) ?: 44.0) }
+            val items = (0 until (keys?.length() ?: 0)).map { Item(keys!!.getString(it), all.optJSONArray("item_revisions")?.optInt(it) ?: 0, heights?.optDouble(it, 44.0) ?: 44.0) }
             val first = list.manager.findFirstVisibleItemPosition()
             val anchor = list.rows.currentList.getOrNull(first)?.key
             val anchorView = list.manager.findViewByPosition(first)
@@ -136,6 +136,10 @@ class VirtualListManager : ComponentManager() {
         floatArrayOf(if (maxWidth < 1e6) maxWidth.toFloat() else 0f, if (maxHeight < 1e6) maxHeight.toFloat() else 0f)
     override fun command(view: View, name: String, args: JSONObject): Any? {
         val list = view as ListView
+        if (name == "get_scroll_offset") return mapOf(
+            "x" to list.recycler.computeHorizontalScrollOffset() / PNBridge.density(),
+            "y" to list.recycler.computeVerticalScrollOffset() / PNBridge.density())
+        if (name == "flash_scroll_indicators") { list.recycler.isVerticalScrollBarEnabled = true; list.recycler.invalidate(); return null }
         val animated = args.optBoolean("animated", true)
         val index = when (name) {
             "scroll_to_end" -> (list.rows.itemCount - 1).coerceAtLeast(0)

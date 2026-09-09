@@ -30,6 +30,7 @@ android {
 
     testOptions {
         unitTests.returnDefaultValues = true
+        unitTests.includeAndroidResources = true
     }
 }
 
@@ -47,6 +48,7 @@ dependencies {
     api 'androidx.navigation:navigation-ui-ktx:2.7.7'
 
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
     // Real org.json for host-side unit tests (the android.jar stubs are empty).
     testImplementation 'org.json:json:20231013'
 }

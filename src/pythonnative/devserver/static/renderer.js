@@ -1,3 +1,5 @@
+import specification from "./schema.js";
+import {validateProps, normalize, requiresRecreation, validateCommand} from "./contracts.js";
 import { AnimationGraph } from "./animation_graph.js";
 import {computeLayout, disposeLayout} from "./layout.js";
 // The DOM "native runtime" for the browser preview.
@@ -6,13 +8,12 @@ import {computeLayout, disposeLayout} from "./layout.js";
 // Gradle module (Kotlin) play on device: it applies transactions
 // (create/update/insert/destroy/frame ops), answers `measure`,
 // `command`, and `animate`, and raises `callback("event", ...)` for
-// user interaction. Layout is not done here; the Python flexbox engine
-// positions every view and sends frames in points, which are CSS px
-// inside the phone frame.
+// user interaction. Yoga WebAssembly computes layout beside these views;
+// frames use points, represented by CSS pixels inside the phone frame.
 //
 // Component managers mirror the Swift `PN*Manager` classes prop for
-// prop (see docs/concepts/bridge.md and the iOS sources); where the
-// browser cannot honor a prop it is accepted and ignored, never thrown.
+// prop (see docs/concepts/bridge.md and the iOS sources). Shared contracts
+// validate the wire interface before a manager changes a widget.
 
 import { color as parseColor, isColorProp } from "./colors.js";
 
@@ -498,11 +499,17 @@ class TextInputManager extends ViewManager {
     view.suppressEcho = false;
     view.composing = false;
     el.addEventListener("compositionstart", () => { view.composing = true; });
-    el.addEventListener("compositionend", () => { view.composing = false; });
+    el.addEventListener("compositionend", () => {
+      view.composing = false;
+      if (view.pendingValue) { const pending = view.pendingValue; view.pendingValue = null; this.update(view, pending); }
+    });
     el.addEventListener("input", () => {
       const props = view.props;
       if (props.max_length != null && el.value.length > Number(props.max_length)) {
-        el.value = el.value.slice(0, Number(props.max_length));
+        let limit = Number(props.max_length);
+        const last = el.value.charCodeAt(limit - 1);
+        if (last >= 0xD800 && last <= 0xDBFF) limit--;
+        el.value = el.value.slice(0, limit);
       }
       view.ctx.emit(view.tag, "on_change", [el.value]);
     });
@@ -529,6 +536,7 @@ class TextInputManager extends ViewManager {
     const el = view.el;
     const scheme = view.ctx.scheme();
     const has = (k) => k in changed;
+    if (has("value") && view.composing) view.pendingValue = {...changed};
     if (has("value") && props.value != null && !view.composing &&
         Number(changed._pn_edit_revision || 0) >= Number(view.editRevision || 0) && el.value !== String(props.value)) {
       const start = el.selectionStart, end = el.selectionEnd;
@@ -580,6 +588,8 @@ class TextInputManager extends ViewManager {
         return null;
       case "get_value":
         return el.value;
+      case "select_all":
+        el.select(); return null;
       case "set_selection": {
         const start = Number(args.start) || 0;
         const end = args.end != null ? Number(args.end) : start;
@@ -1461,7 +1471,7 @@ class VirtualListManager extends ViewManager {
         view.last = i;
         if (!child && !view.requested.has(key)) {
           view.requested.add(key);
-          view.ctx.emit(view.tag, "on_bind_row", [{key, index:i, revision:view.props.revision, width:view.el.clientWidth}]);
+          view.ctx.emit(view.tag, "on_bind_row", [{key, index:i, revision:view.props.revision, width:view.el.clientWidth, extent}]);
         }
       }
       position += size;
@@ -1469,10 +1479,13 @@ class VirtualListManager extends ViewManager {
     view.spacer.style[horizontal ? "width" : "height"] = px(position);
   }
   command(view, name, args) {
-    let offset = args.y || 0;
-    if (name === "scroll_to_end") offset = view.el.scrollHeight;
+    if (name === "get_scroll_offset") return {x:view.el.scrollLeft, y:view.el.scrollTop};
+    if (name === "flash_scroll_indicators") return null;
+    const horizontal = !!view.props.horizontal;
+    let offset = args[horizontal ? "x" : "y"] || 0;
+    if (name === "scroll_to_end") offset = horizontal ? view.el.scrollWidth : view.el.scrollHeight;
     if (name === "scroll_to_index") offset = (view.props.row_heights || []).slice(0, args.index).reduce((a,b) => a+b, 0);
-    view.el.scrollTo({top: offset, behavior: args.animated ? "smooth" : "instant"});
+    view.el.scrollTo({[horizontal ? "left" : "top"]: offset, behavior: args.animated ? "smooth" : "instant"});
     return null;
   }
 }
@@ -1483,19 +1496,6 @@ class ScreenStackManager extends ViewManager {
   }
 }
 
-class PlaceholderManager extends ViewManager {
-  create(view, props) {
-    const el = document.createElement("div");
-    el.className = "pn-view pn-placeholder";
-    el.textContent = view.type;
-    el.title = `No browser implementation for ${view.type}; it renders natively on device.`;
-    view.el = el;
-    this.update(view, props);
-  }
-  measure(view, maxW) {
-    return [Math.min(isFiniteConstraint(maxW) ? maxW : 120, 120), 32];
-  }
-}
 
 const MANAGERS = {
   View: ViewManager,
@@ -1762,8 +1762,6 @@ export class Renderer {
     this.graph = new AnimationGraph(this);
     this.dirtyContainers = new Set();
     for (const [name, Manager] of Object.entries(MANAGERS)) this.managers[name] = new Manager();
-    this.placeholder = new PlaceholderManager();
-    this.warnedTypes = new Set();
   }
 
   reset() {
@@ -1784,51 +1782,77 @@ export class Renderer {
 
   apply(envelope) {
     const {version, application, surface, revision, ops} = envelope || {};
-    const fail = (error) => ({ok: false, application, surface, revision, error});
-    if (version !== 2 || !application || surface < 1 || !Array.isArray(ops)) return fail("invalid v2 commit");
+    const fail = (error) => ({ok: false, application, surface, revision, error, failed: !!this.failed});
+    if (version !== 2 || typeof application !== "string" || !application || !Number.isSafeInteger(surface) || surface < 1 || !Array.isArray(ops)) return fail("invalid v2 commit");
     const replacing = this.application !== application;
     if (revision !== (replacing ? 1 : this.revision + 1)) return fail("stale revision");
-    const tags = new Set(replacing ? [] : this.views.keys());
-    const parents = new Map(replacing ? [] : [...this.views].map(([tag, view]) => [tag, view.parent?.tag]));
-    for (const op of ops) {
-      if (!Array.isArray(op) || op.length !== {c:4,u:3,i:4,d:2,f:6}[op[0]] || !Number.isSafeInteger(op[1]) || op[1] <= 0) return fail("invalid operation");
-      const [code, tag] = op;
-      if (code === "c") {
-        if (tags.has(tag) || typeof op[2] !== "string" || !op[3] || typeof op[3] !== "object") return fail("invalid create");
-        tags.add(tag);
-      } else {
-        if (!tags.has(tag)) return fail("unknown tag");
-        if (code === "i") {
-          if (!tags.has(op[2]) || !Number.isSafeInteger(op[3]) || op[3] < 0) return fail("invalid insertion");
-          for (let ancestor = tag; ancestor; ancestor = parents.get(ancestor)) if (ancestor === op[2]) return fail("cycle");
-          parents.set(op[2], tag);
-        } else if (code === "d") {
-          if ([...parents.values()].includes(tag)) return fail("destroy children first");
-          parents.delete(tag); tags.delete(tag);
-        } else if (code === "f" && (op.slice(2).some(n => !Number.isFinite(n)) || op[4] < 0 || op[5] < 0)) return fail("invalid frame");
+    if (!replacing && surface !== this.surface) return fail("wrong surface");
+    if (this.failed && !replacing) return fail("failed surface requires remount");
+    const edited = new Map(), deleted = new Set();
+    const get = tag => deleted.has(tag) ? null : edited.get(tag) || (replacing ? null : this.views.get(tag));
+    const edit = tag => {
+      if (!edited.has(tag)) {
+        const view = get(tag);
+        if (!view) throw new Error("unknown tag");
+        edited.set(tag, {type: view.type, children: view.children.map(child => child.tag), parentTag: view.parent?.tag});
       }
-    }
+      return edited.get(tag);
+    };
+    const parentOf = tag => edited.has(tag) ? edited.get(tag).parentTag : get(tag)?.parent?.tag;
+    try {
+      for (const op of ops) {
+        if (!Array.isArray(op) || op.length !== {c:4,u:3,i:4,d:2,f:6}[op[0]] || !Number.isSafeInteger(op[1]) || op[1] <= 0) return fail("invalid operation");
+        const [code, tag] = op;
+        if (code === "c") {
+          if (get(tag) || !this.managers[op[2]] || !validateProps(specification, op[2], op[3])) return fail("invalid create");
+          deleted.delete(tag);
+          edited.set(tag, {type: op[2], children: [], parentTag: null});
+        } else {
+          const view = get(tag);
+          if (!view) return fail("unknown tag");
+          if (code === "u" && !validateProps(specification, view.type, op[2], true)) return fail("invalid properties");
+          if (code === "i") {
+            if (!get(op[2]) || !Number.isSafeInteger(op[3]) || op[3] < 0) return fail("invalid insertion");
+            for (let ancestor = tag; ancestor; ancestor = parentOf(ancestor)) if (ancestor === op[2]) return fail("cycle");
+            const child = edit(op[2]);
+            if (child.parentTag) {
+              const old = edit(child.parentTag);
+              old.children.splice(old.children.indexOf(op[2]), 1);
+            }
+            const parent = edit(tag);
+            if (op[3] > parent.children.length) return fail("invalid insertion index");
+            parent.children.splice(op[3], 0, op[2]); child.parentTag = tag;
+          } else if (code === "d") {
+            if (view.children.length) return fail("destroy children first");
+            const parent = parentOf(tag);
+            if (parent) { const siblings = edit(parent).children; siblings.splice(siblings.indexOf(tag), 1); }
+            edited.delete(tag); deleted.add(tag);
+          } else if (code === "f" && (op.slice(2).some(n => !Number.isFinite(n)) || op[4] < 0 || op[5] < 0)) return fail("invalid frame");
+        }
+      }
+    } catch (error) { return fail(String(error)); }
+    const mutationStarted = performance.now();
     try {
       if (replacing && this.application) this.reset();
       for (const op of ops) this.applyOne(op);
       for (const view of this.dirtyContainers) if (this.views.has(view.tag)) view.manager.childrenChanged(view);
       this.dirtyContainers.clear();
-      this.application = application; this.surface = surface; this.revision = revision;
-      return {ok: true, application, surface, revision};
-    } catch (error) { this.reset(); return fail(String(error)); }
+      this.failed = false; this.application = application; this.surface = surface; this.revision = revision;
+      return {ok: true, application, surface, revision, metrics:{mutation_ns: Math.round((performance.now() - mutationStarted)*1e6)}};
+    } catch (error) { this.reset(); this.failed = true; return fail(String(error)); }
   }
 
-  computeLayout(request) { return computeLayout(this, request); }
+  computeLayout(request) {
+    const started = performance.now(), frames = computeLayout(this, request);
+    return {application: this.application, surface: this.surface, revision: this.revision, frames,
+      metrics:{layout_ns:Math.round((performance.now()-started)*1e6), views:this.views.size}};
+  }
 
   applyOne(op) {
     switch (op[0]) {
       case "c": {
         const [, tag, type, props] = op;
-        const manager = this.managers[type] || this.placeholder;
-        if (manager === this.placeholder && !this.warnedTypes.has(type)) {
-          this.warnedTypes.add(type);
-          console.warn(`[pn] no browser renderer for element type ${type}; drawing a placeholder`);
-        }
+        const manager = this.managers[type];
         const view = {
           tag,
           type,
@@ -1853,11 +1877,31 @@ export class Renderer {
         const [, tag, changed] = op;
         const view = this.views.get(tag);
         if (!view || !changed) return;
-        for (const [key, value] of Object.entries(changed)) {
+        const normalized = normalize(specification, view.type, changed);
+        for (const [key, value] of Object.entries(normalized)) {
           if (value === null || value === undefined) delete view.props[key];
           else view.props[key] = value;
         }
-        view.manager.update(view, changed);
+        if (requiresRecreation(specification, view.type, changed)) {
+          const old = view.el, focused = document.activeElement === old;
+          const selection = [old.selectionStart, old.selectionEnd];
+          const scroll = [old.scrollLeft, old.scrollTop];
+          if (view.type === "TextInput" && (!("value" in changed) || (changed._pn_edit_revision || 0) < (view.editRevision || 0))) view.props.value = old.value;
+          const edited = view.editRevision || 0;
+          view.editRevision = 0;
+          view.manager.destroy(view);
+          view.manager.create(view, view.props);
+          view.editRevision = edited;
+          old.replaceWith(view.el);
+          view.el.dataset.pnTag = String(tag); view.el.dataset.pnType = view.type;
+          const container = view.manager.container(view);
+          for (const child of view.children) container.appendChild(child.el);
+          view.manager.childrenChanged(view);
+          if (view.frame) view.manager.frame(view, view.frame.x, view.frame.y, view.frame.w, view.frame.h);
+          view.el.scrollLeft = scroll[0]; view.el.scrollTop = scroll[1];
+          if (focused) view.el.focus();
+          if (selection[0] != null && view.el.setSelectionRange) view.el.setSelectionRange(...selection);
+        } else view.manager.update(view, normalized);
         if ("gestures" in changed) {
           if (Array.isArray(view.props.gestures) && view.props.gestures.length) installGestureSource(view);
           else this.ctx.gesture(tag, "clear", {});
@@ -1955,6 +1999,7 @@ export class Renderer {
     } catch (err) {
       args = {};
     }
+    if (!validateCommand(specification, view.type, name, args)) throw new Error("Invalid view command");
     const result = view.manager.command(view, name, args);
     return result === undefined ? null : result;
   }

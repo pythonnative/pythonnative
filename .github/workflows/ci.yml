@@ -44,6 +44,16 @@ jobs:
       - name: Run tests
         run: uv run pytest -q
 
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: '3.13'
+      - run: uv sync --locked --group dev
+      - run: uv run python scripts/run-browser-tests.py
+
   # The Swift half of the rendering core: decoders, component managers,
   # gestures, and module promises run under XCTest on a simulator.
   native-ios:
@@ -78,7 +88,7 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/pnkit" \
             -quiet
 
-  # The Kotlin half has no Chaquopy dependency, so plain JUnit covers it.
+  # JUnit covers contracts; Robolectric exercises native widget lifecycles.
   native-android:
     runs-on: ubuntu-latest
     steps:

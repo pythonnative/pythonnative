@@ -28,7 +28,7 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Literal, Optional, Tuple
 
 from .registry import NativeModuleError, native_module
 
@@ -39,12 +39,14 @@ class Location:
     """GPS / location-services interface."""
 
     @staticmethod
-    async def get_current(**options: Any) -> Optional[Coords]:
+    async def get_current(
+        *, accuracy: Literal["balanced", "high"] = "balanced", timeout: float = 10.0
+    ) -> Optional[Coords]:
         """Request the device's current location.
 
         Args:
-            **options: Forwarded to the native module (``accuracy``,
-                ``timeout``). Unknown keys are ignored.
+            accuracy: Balanced accuracy or the highest available accuracy.
+            timeout: Maximum seconds to wait for a fix.
 
         Returns:
             ``(latitude, longitude)`` if a fix was obtained, otherwise
@@ -53,20 +55,22 @@ class Location:
         Raises:
             NativeModuleError: If the native module fails.
         """
-        fix = await Location.get_current_fix(**options)
+        fix = await Location.get_current_fix(accuracy=accuracy, timeout=timeout)
         if fix is None:
             return None
         return (fix["latitude"], fix["longitude"])
 
     @staticmethod
-    async def get_current_fix(**options: Any) -> Optional[Dict[str, float]]:
+    async def get_current_fix(
+        *, accuracy: Literal["balanced", "high"] = "balanced", timeout: float = 10.0
+    ) -> Optional[Dict[str, float]]:
         """Like ``get_current`` but returns the full fix dict.
 
         Keys: ``latitude``, ``longitude``, and when the platform reports
         them ``accuracy`` (meters), ``altitude`` (meters), ``speed``
         (m/s), ``heading`` (degrees), ``timestamp`` (Unix seconds).
         """
-        result = await native_module("Location").call_async("get_current", **options)
+        result = await native_module("Location").call_async("get_current", accuracy=accuracy, timeout=timeout)
         if not isinstance(result, dict):
             return None
         fix: Dict[str, float] = {k: float(v) for k, v in result.items() if v is not None}

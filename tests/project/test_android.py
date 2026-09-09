@@ -213,3 +213,12 @@ def test_write_requirements_empty(template: Path, tmp_path: Path) -> None:
     cfg = _config(tmp_path)
     android.write_requirements(template, cfg)
     assert (template / "app" / "requirements.txt").read_text() == ""
+
+
+def test_local_wheel_is_resolved_before_chaquopy_changes_directory(template: Path, tmp_path: Path) -> None:
+    wheel = tmp_path / "vendor" / "extension-0.1-py3-none-any.whl"
+    wheel.parent.mkdir()
+    wheel.write_bytes(b"test wheel")
+    cfg = _config(tmp_path, requirements={"packages": ["vendor/extension-0.1-py3-none-any.whl"]})
+    android.write_requirements(template, cfg)
+    assert (template / "app/requirements.txt").read_text() == str(wheel) + "\n"

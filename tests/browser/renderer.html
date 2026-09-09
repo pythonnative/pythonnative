@@ -1,0 +1,8 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>PythonNative renderer acceptance</title></head>
+<body><pre id="result" data-status="running">Starting renderer...</pre>
+<script>
+window.addEventListener("error", e => { document.getElementById("result").dataset.status = "failed"; document.getElementById("result").textContent = e.message; });
+window.addEventListener("unhandledrejection", e => { document.getElementById("result").dataset.status = "failed"; document.getElementById("result").textContent = String(e.reason?.stack || e.reason); });
+</script>
+<script type="module" src="./renderer.mjs"></script></body></html>

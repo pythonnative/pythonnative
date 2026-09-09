@@ -64,7 +64,7 @@ class FakePage:
         if kind == "apply":
             from pythonnative.bridge.commits import CommitState
 
-            self.commit = getattr(self, "commit", CommitState()).prepare(message[2])
+            self.commit = getattr(self, "commit", CommitState()).prepare(message[2]).publish()
             return self.commit.acknowledgement()
         if kind == "measure":
             return list(self.measure_size)
@@ -82,7 +82,17 @@ class FakePage:
             if (module, method) in self.module_results:
                 return codec.dumps(self.module_results[(module, method)])
             if module == "Layout":
-                return codec.dumps({"ok": True, "value": []})
+                return codec.dumps(
+                    {
+                        "ok": True,
+                        "value": {
+                            "application": self.commit.application,
+                            "surface": self.commit.surface,
+                            "revision": self.commit.revision,
+                            "frames": [],
+                        },
+                    }
+                )
             if method in ("attach_root", "viewport"):
                 return codec.dumps({"ok": True, "value": self.viewport})
             return codec.dumps({"ok": True, "value": None})
@@ -265,7 +275,7 @@ def test_events_from_the_page_reach_handlers_on_the_main_thread(web: Any) -> Non
     seen: List[Any] = []
     from pythonnative.mutations import CreateOp
 
-    web.backend.apply_mutations([CreateOp(42, "View", {})])
+    web.backend.apply_mutations([CreateOp(42, "Button", {"title": "Press"})])
     get_event_registry().set_events(42, {"on_press": lambda *args: seen.append(args)})
     web.page.callback("event", 42, "on_press", [])
     assert seen == []  # delivered on the main loop, not on the socket thread
@@ -277,7 +287,7 @@ def test_requests_from_the_page_are_answered(web: Any) -> None:
     from pythonnative.events import get_event_registry
     from pythonnative.mutations import CreateOp
 
-    web.backend.apply_mutations([CreateOp(5, "View", {})])
+    web.backend.apply_mutations([CreateOp(5, "VirtualList", {})])
     get_event_registry().set_events(5, {"on_bind_row": lambda payload: {"root": 77}})
     web.page.request(3, "event", 5, "on_bind_row", [{"index": 0}])
     web.transport.drain_main()

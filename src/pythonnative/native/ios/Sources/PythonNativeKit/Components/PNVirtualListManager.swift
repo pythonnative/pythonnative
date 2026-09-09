@@ -12,6 +12,7 @@ private final class PNListCell: UICollectionViewCell {
 private final class PNCollectionList: UICollectionView, UICollectionViewDelegateFlowLayout {
     var keys: [String] = []
     var revision = 0
+    var itemRevisions: [String: Int] = [:]
     var estimates: [Double] = []
     var heights: [String: CGFloat] = [:]
     var roots: [String: UIView] = [:]
@@ -33,7 +34,7 @@ private final class PNCollectionList: UICollectionView, UICollectionViewDelegate
             cell.rowKey = key
             self.attach(cell, key)
             PNBridge.shared.emitEvent(tag: self.listTag, name: "on_bind_row", args: [[
-                "index": path.item, "key": key, "revision": self.revision, "width": self.bounds.width,
+                "index": path.item, "key": key, "revision": self.revision, "width": self.bounds.width, "extent": self.horizontal ? self.bounds.width : self.bounds.height,
             ]])
             return cell
         }
@@ -57,12 +58,16 @@ private final class PNCollectionList: UICollectionView, UICollectionViewDelegate
         estimates = props["row_heights"] as? [Double] ?? []
         horizontal = props["horizontal"] as? Bool ?? false
         flow.scrollDirection = horizontal ? .horizontal : .vertical
-        heights = heights.filter { keys.contains($0.key) }
+        let keySet = Set(keys)
+        heights = heights.filter { keySet.contains($0.key) }
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
         snapshot.appendSections([0])
         snapshot.appendItems(keys)
         let previous = Set(source.snapshot().itemIdentifiers)
-        snapshot.reloadItems(keys.filter { previous.contains($0) })
+        let revisions = props["item_revisions"] as? [Int] ?? []
+        let nextRevisions = Dictionary(uniqueKeysWithValues: keys.enumerated().map { ($0.element, $0.offset < revisions.count ? revisions[$0.offset] : 0) })
+        snapshot.reloadItems(keys.filter { previous.contains($0) && itemRevisions[$0] != nextRevisions[$0] })
+        itemRevisions = nextRevisions
         source.apply(snapshot, animatingDifferences: false) { [weak self] in
             guard let self = self, let anchor = anchor, let position = self.keys.firstIndex(of: anchor) else { return }
             self.layoutIfNeeded()
@@ -144,7 +149,11 @@ public final class PNVirtualListManager: PNComponentManager {
         let animated = args["animated"] as? Bool ?? true
         if name == "scroll_to_offset" {
             list.setContentOffset(CGPoint(x: PNProps.double(args["x"]) ?? 0, y: PNProps.double(args["y"]) ?? 0), animated: animated)
-        } else if !list.keys.isEmpty {
+        } else if name == "get_scroll_offset" {
+            return ["x": list.contentOffset.x, "y": list.contentOffset.y]
+        } else if name == "flash_scroll_indicators" {
+            list.flashScrollIndicators()
+        } else if ["scroll_to_index", "scroll_to_end"].contains(name) && !list.keys.isEmpty {
             let index = name == "scroll_to_end" ? list.keys.count - 1 : args["index"] as? Int ?? 0
             list.scrollToItem(at: IndexPath(item: max(0, min(list.keys.count - 1, index)), section: 0),
                               at: list.horizontal ? .left : .top, animated: animated)

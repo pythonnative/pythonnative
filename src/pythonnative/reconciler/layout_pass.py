@@ -69,7 +69,7 @@ def affects_layout(type_name: str, changed: Dict[str, Any]) -> bool:
     from ..sdk.schema import COMPONENTS
 
     schema = COMPONENTS.get(type_name)
-    if schema is None or schema.measurement == "intrinsic":
+    if schema is None:
         return True
     if any(schema.props.get(key, {}).get("native", {}).get("invalidates_layout") for key in changed):
         return True
@@ -274,7 +274,7 @@ class LayoutMixin:
 
     def _new_layout_node(self, node: VNode) -> LayoutNode:
         element = node.element
-        layout = LayoutNode(style=extract_layout_style(element.props), user_data=node)
+        layout = LayoutNode(style=extract_layout_style(dict(element.props)), user_data=node)
         layout.dirty = True
         if element.type == "ScrollView":
             # Mark the scroll axis so the engine clamps the container's

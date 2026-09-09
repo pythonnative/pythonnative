@@ -1,33 +1,36 @@
 {
+  "protocol": 2,
+  "yoga": "3.2.1",
   "components": {
     "InboxBadge": {
-      "commands": {},
-      "defaults": {
-        "count": 0
-      },
-      "measurement": "intrinsic",
       "name": "InboxBadge",
       "props": {
         "count": {
+          "type": "integer",
           "native": {
-            "animated": false,
-            "description": "",
             "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
             "platforms": [
               "ios",
               "android",
               "web"
             ],
-            "recreate": false
-          },
-          "type": "integer"
+            "description": ""
+          }
         }
       },
-      "required": []
+      "required": [],
+      "defaults": {
+        "count": 0
+      },
+      "measurement": "intrinsic",
+      "commands": {}
     }
   },
   "modules": {
     "InboxTools": {
+      "name": "InboxTools",
       "methods": {
         "format_count": {
           "arguments": {
@@ -35,22 +38,25 @@
               "type": "integer"
             }
           },
-          "async": false,
           "result": {
             "type": "string"
-          }
+          },
+          "async": false,
+          "required": [
+            "count"
+          ],
+          "defaults": {}
         },
         "ready": {
           "arguments": {},
-          "async": true,
           "result": {
             "type": "string"
-          }
+          },
+          "async": true,
+          "required": [],
+          "defaults": {}
         }
-      },
-      "name": "InboxTools"
+      }
     }
-  },
-  "protocol": 2,
-  "yoga": "3.2.1"
+  }
 }

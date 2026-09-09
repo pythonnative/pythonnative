@@ -42,8 +42,13 @@ public final class PNTextInputManager: PNComponentManager {
             let current = field?.text ?? textView?.text ?? ""
             let acknowledged = PNProps.int(props["_pn_edit_revision"]) ?? 0
             let edited = state.extras["edit_revision"] as? Int ?? 0
-            if current != value && acknowledged >= edited && (view as? UITextInput)?.markedTextRange == nil {
-                PNTextInputManager.setText(view, value)
+            if current != value && acknowledged >= edited {
+                if (view as? UITextInput)?.markedTextRange != nil {
+                    state.extras["pending_value"] = ["value": value, "revision": acknowledged]
+                } else {
+                    state.extras.removeValue(forKey: "pending_value")
+                    PNTextInputManager.setText(view, value)
+                }
             }
         }
         if let field = field {
@@ -58,10 +63,12 @@ public final class PNTextInputManager: PNComponentManager {
                 field.clearButtonMode = PNProps.bool(PNProps.value(props, "clear_button")) == true ? .whileEditing : .never
             }
         }
-        if let size = PNProps.double(PNProps.value(props, "font_size")) {
-            let font = UIFont.systemFont(ofSize: CGFloat(size))
+        if initial || PNTextManager.fontKeys.contains(where: { PNProps.has(props, $0) }) {
+            let font = PNTextManager.font(from: state.props, base: nil)
             field?.font = font
             textView?.font = font
+            field?.adjustsFontForContentSizeCategory = true
+            textView?.adjustsFontForContentSizeCategory = true
         }
         if let color = PNColor.parse(PNProps.value(props, "color")) {
             field?.textColor = color
@@ -129,6 +136,9 @@ public final class PNTextInputManager: PNComponentManager {
             PNTextInputManager.setText(view, "")
         case "get_value":
             return (view as? UITextField)?.text ?? (view as? UITextView)?.text ?? ""
+        case "select_all":
+            (view as? UITextField)?.selectAll(nil)
+            (view as? UITextView)?.selectAll(nil)
         case "set_selection":
             if let start = PNProps.int(args["start"]) {
                 let end = PNProps.int(args["end"]) ?? start
@@ -142,6 +152,26 @@ public final class PNTextInputManager: PNComponentManager {
 
     // MARK: - Helpers
 
+    static func scheduleCompositionFlush(_ view: UIView) {
+        guard let state = PNViewState.existing(for: view), state.extras["pending_value"] != nil,
+              !state.flag("composition_flush") else { return }
+        state.extras["composition_flush"] = true
+        DispatchQueue.main.async { [weak view] in
+            guard let view = view, let state = PNViewState.existing(for: view) else { return }
+            state.extras["composition_flush"] = false
+            flushComposition(view)
+        }
+    }
+
+    static func flushComposition(_ view: UIView) {
+        guard (view as? UITextInput)?.markedTextRange == nil, let state = PNViewState.existing(for: view),
+              let pending = state.extras.removeValue(forKey: "pending_value") as? [String: Any],
+              let revision = pending["revision"] as? Int,
+              revision >= (state.extras["edit_revision"] as? Int ?? 0), let value = pending["value"] as? String else { return }
+        setText(view, value)
+        PNLayout.invalidate(state.tag)
+    }
+
     static func setText(_ view: UIView, _ text: String) {
         guard let state = PNViewState.existing(for: view) else { return }
         let input = view as? UITextInput
@@ -150,12 +180,31 @@ public final class PNTextInputManager: PNComponentManager {
         let end = selection.flatMap { range in input.map { $0.offset(from: $0.beginningOfDocument, to: range.end) } } ?? start
         state.extras["suppress"] = true
         (view as? UITextField)?.text = text
-        (view as? UITextView)?.text = text
+        if let textView = view as? UITextView {
+            // Complete any pending correction in the old document before
+            // replacing it. Otherwise UIKit can apply it to the new value.
+            textView.selectedRange = NSRange(location: 0, length: textView.text.utf16.count)
+            // Typing attributes can contain IME annotations after unmarking.
+            // A controlled value inherits visual styling, never those edits.
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = textView.textAlignment
+            textView.attributedText = NSAttributedString(string: text, attributes: [
+                .font: textView.font ?? UIFont.systemFont(ofSize: 17),
+                .foregroundColor: textView.textColor ?? UIColor.label,
+                .paragraphStyle: paragraph,
+            ])
+        }
         setSelection(view, start: min(start, text.utf16.count), end: min(end, text.utf16.count))
         state.extras["suppress"] = false
     }
 
     static func setSelection(_ view: UIView, start: Int, end: Int) {
+        if let textView = view as? UITextView {
+            let length = textView.text.utf16.count
+            guard start >= 0, end >= start, end <= length else { return }
+            textView.selectedRange = NSRange(location: start, length: end - start)
+            return
+        }
         guard let input = view as? UITextInput else { return }
         let begin = input.beginningOfDocument
         guard let from = input.position(from: begin, offset: start),
@@ -231,9 +280,12 @@ final class PNTextInputDelegate: NSObject, UITextFieldDelegate, UITextViewDelega
 
     private func emitChange() {
         guard let view = view, let state = PNViewState.existing(for: view), !state.flag("suppress") else { return }
+        PNTextInputManager.scheduleCompositionFlush(view)
         var text = currentText()
-        if let maxLength = state.extras["max_length"] as? Int, maxLength >= 0, text.count > maxLength {
-            text = String(text.prefix(maxLength))
+        if let maxLength = state.extras["max_length"] as? Int, maxLength >= 0, (view as? UITextInput)?.markedTextRange == nil, text.utf16.count > maxLength {
+            var units = Array(text.utf16.prefix(maxLength))
+            if let last = units.last, (0xD800...0xDBFF).contains(last) { units.removeLast() }
+            text = String(decoding: units, as: UTF16.self)
             PNTextInputManager.setText(view, text)
         }
         PNEvents.emit(view, "on_change", [text])
@@ -274,6 +326,7 @@ final class PNTextInputDelegate: NSObject, UITextFieldDelegate, UITextViewDelega
     }
 
     func textFieldDidChangeSelection(_ textField: UITextField) {
+        if let view = view { PNTextInputManager.scheduleCompositionFlush(view) }
         emitSelection()
     }
 
@@ -292,6 +345,7 @@ final class PNTextInputDelegate: NSObject, UITextFieldDelegate, UITextViewDelega
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
+        if let view = view { PNTextInputManager.scheduleCompositionFlush(view) }
         emitSelection()
     }
 }

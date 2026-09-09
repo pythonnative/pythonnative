@@ -37,7 +37,7 @@ def _mount(el: Element) -> Tuple[Any, Reconciler, FakeBackend]:
 def test_status_bar_default() -> None:
     el = StatusBar()
     assert el.type == "StatusBar"
-    assert el.children == []
+    assert el.children == ()
     assert el.props == {}
 
 
@@ -116,7 +116,7 @@ def test_refresh_control_is_an_element() -> None:
     assert isinstance(control, Element)
     assert control.type == "RefreshControl"
     assert control.props == {"refreshing": True, "on_refresh": cb, "tint_color": "#FF0000"}
-    assert control.children == []
+    assert control.children == ()
 
 
 def test_refresh_control_minimal() -> None:
@@ -188,7 +188,7 @@ def test_flatlist_small_list_mounts_every_row() -> None:
     assert [r.key for r in rows] == ["0", "1", "2"]
 
     root, _rec, _backend = _mount(el)
-    assert root.type_name == "ScrollView"
+    assert root.type_name == "VirtualList"
     texts = [v.props["text"] for v in root.find_all("Text")]
     assert texts == ["Item 0", "Item 1", "Item 2"]
 
@@ -215,7 +215,6 @@ def test_flatlist_windows_large_lists() -> None:
 
 
 def test_flatlist_window_shifts_on_scroll() -> None:
-    from pythonnative.events import dispatch_event
 
     items = list(range(500))
     el = FlatList(
@@ -230,7 +229,7 @@ def test_flatlist_window_shifts_on_scroll() -> None:
     # Simulate the native scroll event landing deep in the list, then
     # flush the dirty component to re-render the shifted window.
     scroll_tag = rec.root_tag
-    assert dispatch_event(scroll_tag, "on_scroll", {"x": 0.0, "y": 44.0 * 300}) is True
+    _backend.request_list(scroll_tag, 300)
     rec.flush_dirty()
 
     texts = {v.props["text"] for v in root.find_all("Text")}
@@ -279,8 +278,8 @@ def test_flatlist_scroll_controller_attached_to_ref() -> None:
         set_registry(None)
     assert backend.commands, "scroll_to_index must dispatch a native command"
     _tag, name, args = backend.commands[-1]
-    assert name == "scroll_to_offset"
-    assert args["y"] == 40.0  # two rows of 20pt scrolled past
+    assert name == "scroll_to_index"
+    assert args["index"] == 2
 
 
 # ======================================================================

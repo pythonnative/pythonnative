@@ -3,10 +3,11 @@
 import asyncio
 from dataclasses import replace
 
+from inbox_extension import InboxBadge
+
 import pythonnative as pn
 from pythonnative.hooks import Context
 
-from .native_contracts import InboxBadge
 from .repository import Issue, Repository, Snapshot
 
 RepositoryContext: Context[Repository | None] = pn.create_context(None)
