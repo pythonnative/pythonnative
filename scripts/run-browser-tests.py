@@ -5,6 +5,7 @@ import functools
 import json
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
 import threading
@@ -13,6 +14,7 @@ import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from websockets.exceptions import WebSocketException
 from websockets.sync.client import connect
 
 from pythonnative.sdk.schema import manifest
@@ -37,6 +39,34 @@ class Handler(SimpleHTTPRequestHandler):
 
     def log_message(self, *_args: object) -> None:
         """Keep successful asset requests out of test output."""
+
+
+def stop_browser(process: subprocess.Popen, port_file: Path) -> None:
+    """Finish Chrome's profile writes before its temporary directory is removed."""
+    try:
+        if process.poll() is None:
+            try:
+                port, endpoint = port_file.read_text().splitlines()[:2]
+                with connect(f"ws://127.0.0.1:{port}{endpoint}", open_timeout=5, close_timeout=5) as socket:
+                    socket.send(json.dumps({"id": 1, "method": "Browser.close"}))
+                    socket.recv(timeout=5)
+            except (OSError, ValueError, TimeoutError, WebSocketException):
+                # Chrome can close the socket before acknowledging shutdown.
+                # Give it time to exit before the process-group fallback.
+                pass
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                pass  # The process-group fallback below also stops its children.
+    finally:
+        try:
+            if os.name == "posix":
+                os.killpg(process.pid, signal.SIGKILL)
+            else:
+                process.kill()
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=10)
 
 
 def main() -> None:
@@ -68,9 +98,10 @@ def main() -> None:
                     ],
                     stdout=log,
                     stderr=log,
+                    start_new_session=True,
                 )
+                port_file = Path(profile) / "DevToolsActivePort"
                 try:
-                    port_file = Path(profile) / "DevToolsActivePort"
                     deadline = time.monotonic() + 45
                     while not port_file.exists() and process.poll() is None and time.monotonic() < deadline:
                         time.sleep(0.1)
@@ -123,13 +154,8 @@ def main() -> None:
                                 )
                             )
                 finally:
-                    process.terminate()
-                    try:
-                        process.wait(timeout=10)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait(timeout=10)
-            print("Browser renderer acceptance tests passed (Chrome + Yoga WASM)")
+                    stop_browser(process, port_file)
+        print("Browser renderer acceptance tests passed (Chrome + Yoga WASM)")
     finally:
         server.shutdown()
         server.server_close()
