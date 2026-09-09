@@ -1,4 +1,4 @@
-# Tests search, recycled rows, shared state, native navigation, editing, and persistence.
+# Tests live search before and after relaunch, recycled rows, editing, and persistence.
 # Demo screen: examples/inbox/app/main.py
 # Source under test: src/pythonnative/hooks.py, navigation/, components/lists.py, storage.py
 appId: ${APP_ID}
@@ -12,9 +12,11 @@ appId: ${APP_ID}
 - assertVisible: "2000 offline records"
 - tapOn: "Search issues"
 - inputText: "2000"
+# A cold iOS keyboard can make the first XCTest hierarchy snapshot take more
+# than 10 seconds. Keep polling for the actual result before dismissing it.
 - extendedWaitUntil:
     visible: "1 issues"
-    timeout: 10000
+    timeout: 30000
 - tapOn: "Issue 2000: Check accessibility"
 - assertVisible: "Issue #2000"
 - tapOn: "Issue title"
@@ -39,6 +41,9 @@ appId: ${APP_ID}
     timeout: 30000
 - tapOn: "Search issues"
 - inputText: "2000"
+- extendedWaitUntil:
+    visible: "1 issues"
+    timeout: 30000
 - pressKey: Enter
 - assertVisible: "Reviewed issue 2000"
 - assertVisible: "Closed"
