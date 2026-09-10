@@ -34,10 +34,12 @@ Yes. Two patterns:
         ...
     ```
 
-    `pn preview` runs the app with `IS_WEB` set; see the
+    `pn preview` and `pn start` set `PN_PLATFORM=web`, so `IS_WEB` is
+    `True` in the browser preview; see the
     [Browser preview guide](../guides/browser-preview.md).
     For a declarative alternative, use
-    [`Platform.select`][pythonnative.platform.Platform.select].
+    [`Platform.select`][pythonnative.platform.Platform.select] with the
+    `"web"` key.
 
 - **Per-platform native modules** for larger pieces (a custom widget,
   a device API). Implement once per platform behind a single Python
