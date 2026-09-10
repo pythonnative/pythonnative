@@ -3650,15 +3650,28 @@ with the native UI through a versioned bridge.</p>
 <p>Yes. Two patterns:</p>
 <ul>
 <li>
-<p><strong>Branch on <code>IS_ANDROID</code> / <code>IS_IOS</code></strong> for small differences inside
-  a shared component:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">IS_ANDROID</span><span class="p">,</span> <span class="n">IS_IOS</span>
+<p><strong>Branch on <code>IS_ANDROID</code> / <code>IS_IOS</code> / <code>IS_WEB</code></strong> for small
+  differences inside a shared component:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">IS_ANDROID</span><span class="p">,</span> <span class="n">IS_IOS</span><span class="p">,</span> <span class="n">IS_WEB</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">if</span> <span class="n">IS_ANDROID</span><span class="p">:</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">...</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">elif</span> <span class="n">IS_IOS</span><span class="p">:</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="o">...</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="k">elif</span> <span class="n">IS_WEB</span><span class="p">:</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="o">...</span>
 </span></code></pre></div>
+<p><code>pn preview</code> and <code>pn start</code> set <code>PN_PLATFORM=web</code>, so <code>IS_WEB</code> is
+<code>True</code> in the browser preview; see the
+<a href="../../guides/browser-preview/">Browser preview guide</a>.
+For a declarative alternative, use
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;select&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-staticmethod&quot;&gt;&lt;code&gt;staticmethod&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/platform/#pythonnative.platform.Platform.select"><code>Platform.select</code></a> with the
+<code>"web"</code> key.</p>
 </li>
 <li>
 <p><strong>Per-platform native modules</strong> for larger pieces (a custom widget,
