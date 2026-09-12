@@ -64,7 +64,16 @@ def read(config: AppConfig) -> dict[str, Any] | None:
     path = config.project_root / NAME
     if not path.exists():
         return None
-    value = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise DependencyError(
+            f"{NAME} is not valid JSON. Run 'pn deps --lock' to regenerate it."
+        ) from exc
+    if not isinstance(value, dict):
+        raise DependencyError(
+            f"{NAME} must be a JSON object. Run 'pn deps --lock' to regenerate it."
+        )
     if (
         value.get("version") != 1
         or value.get("python") != config.python_version
