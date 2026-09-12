@@ -1,6 +1,29 @@
 # CHANGELOG
 
 
+## v0.43.1 (2026-09-12)
+
+### Bug Fixes
+
+- **net**: Preserve custom content type regardless of header casing
+  ([#97](https://github.com/pythonnative/pythonnative/pull/97),
+  [`d902e5e`](https://github.com/pythonnative/pythonnative/commit/d902e5e293b72eb2d6b38d922f5a796e51f272e7))
+
+Refs: #87
+
+Co-authored-by: Owen Carey <37121709+owenthcarey@users.noreply.github.com>
+
+### Documentation
+
+- **mkdocs**: Cover IS_WEB in the platform-specific code FAQ
+  ([#85](https://github.com/pythonnative/pythonnative/pull/85),
+  [`8da8fd6`](https://github.com/pythonnative/pythonnative/commit/8da8fd63edc086ed10016643bc1060d83cc4a117))
+
+Refs: #59
+
+Co-authored-by: Owen Carey <37121709+owenthcarey@users.noreply.github.com>
+
+
 ## v0.43.0 (2026-09-09)
 
 ### Features
