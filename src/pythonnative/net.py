@@ -147,7 +147,7 @@ async def fetch(
 
     Args:
         url: Target URL. Relative URLs are not supported.
-        method: HTTP method (``"GET"``, ``"POST"``, ``"PUT"`` …).
+        method: HTTP method (``GET``, ``POST``, ``PUT`` …).
         headers: Optional request headers.
         body: Request body. ``bytes`` are sent as-is; ``str`` is
             UTF-8 encoded; ``dict`` is JSON-encoded with a
@@ -203,7 +203,8 @@ def _build_request(
         payload = body.encode("utf-8")
     elif isinstance(body, Mapping):
         payload = json.dumps(body, default=str).encode("utf-8")
-        header_dict.setdefault("Content-Type", "application/json")
+        if not any(name.lower() == "content-type" for name in header_dict):
+            header_dict["Content-Type"] = "application/json"
     else:
         raise TypeError(f"Unsupported body type: {type(body)!r}")
 
