@@ -1,6 +1,15 @@
 import XCTest
 @testable import PythonNativeKit
 
+private final class PNInvalidLocation: LocationImplementation {
+    var complete: ((Result<[String: Double]?, Error>) -> Void)?
+    init() {}
+    func get_current(accuracy: PNLocationGetCurrentAccuracy, timeout: Double, completion: @escaping (Result<[String: Double]?, Error>) -> Void) -> (() -> Void)? {
+        complete = completion
+        return nil
+    }
+}
+
 /// A module that settles inline or later depending on the method.
 final class PNTestEchoModule: PNNativeModule {
     static let name = "TestEcho"
@@ -19,6 +28,17 @@ final class PNTestEchoModule: PNNativeModule {
 }
 
 final class PNModuleTests: XCTestCase {
+    func testGeneratedAdapterRejectsInvalidLateNativeResult() {
+        let implementation = PNInvalidLocation()
+        let adapter = LocationModuleAdapter(implementation: implementation)
+        let promise = PNPromise(callId: 200, module: "Location", method: "get_current")
+        adapter.call("get_current", args: [:], promise: promise)
+        XCTAssertEqual(promise.takeInlineResult()["pending"] as? Bool, true)
+        implementation.complete?(.success(["latitude": .nan]))
+        XCTAssertEqual(promise.result?["ok"] as? Bool, false)
+        XCTAssertNotNil(promise.result?["error"])
+    }
+
     private let dispatcher = PNModuleDispatcher { module, method, args in
         if module != "TestEcho" { return PNContracts.validateModule(module, method, args) }
         return method == "echo" ? (args.count == 1 && args["value"] is Int) : (["fail", "later"].contains(method) && args.isEmpty)
@@ -73,6 +93,16 @@ final class PNModuleTests: XCTestCase {
         XCTAssertEqual(PNJSON.encode(nil), "null")
     }
 
+    func testGeneratedValuesPreserveNumbersAndBooleansAcrossBridgeEncoding() throws {
+        let values: [Any] = [PNValues.encode(Int64(0)), PNValues.encode(Int64(1)),
+                             PNValues.encode(true), PNValues.encode(false),
+                             PNValues.encode(["index": Int64(1)])]
+        let encoded = PNJSON.encode(values)
+        let decoded = try JSONDecoder().decode([PNJSONValue].self, from: Data(encoded.utf8))
+        XCTAssertEqual(decoded, [.number(0), .number(1), .bool(true), .bool(false),
+                                 .object(["index": .number(1)])])
+    }
+
     func testCancellationReleasesNativeWorkAndIgnoresLateCompletion() {
         _ = dispatcher.call(module: "TestEcho", method: "later", envelope: ["call_id": 99, "args": [:]])
         guard let promise = PNTestEchoModule.pending else { return XCTFail("missing promise") }
@@ -87,7 +117,7 @@ final class PNModuleTests: XCTestCase {
     }
 
     func testDeviceInfoShape() {
-        let info = DeviceModule.info()
+        let info = DeviceModule.snapshot()
         XCTAssertEqual(info["os"] as? String, "ios")
         XCTAssertNotNil(info["os_version"])
         XCTAssertNotNil(info["app_dir"])
@@ -96,7 +126,7 @@ final class PNModuleTests: XCTestCase {
     }
 
     func testStorageModuleRoundTrip() {
-        let storage = StorageModule()
+        let storage = StorageModuleAdapter<StorageModule>()
         _ = dispatcher.call(module: "Storage", method: "clear", envelope: [:])
         let set = PNPromise(callId: 1, module: "Storage", method: "set")
         storage.call("set", args: ["key": "k", "value": "v"], promise: set)

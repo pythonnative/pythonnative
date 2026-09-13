@@ -1,5 +1,7 @@
 package com.pythonnative.runtime.components
 
+import com.pythonnative.generated.*
+
 import android.content.Context
 import android.graphics.Paint
 import android.graphics.Typeface
@@ -123,7 +125,7 @@ object TextStyle {
         if (!family.isNullOrEmpty()) {
             tv.setTypeface(Typeface.create(family, style))
         } else {
-            tv.setTypeface(tv.typeface, style)
+            tv.setTypeface(Typeface.DEFAULT, style)
         }
     }
 }
@@ -135,9 +137,11 @@ class TextManager : ComponentManager() {
     override fun createView(context: Context, tag: Long, props: JSONObject): View = TextView(context)
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        val typed = TextProps(props)
+
         val tv = view as TextView
         val merged = propsOf(tv)
-        if (props.has("spans") || props.has("text") || props.has("text_transform")) {
+        if (typed.has_spans || typed.has_text || typed.has_text_transform) {
             val transform = merged.str("text_transform")
             val spans = merged.value("spans") as? JSONArray
             if (spans != null && spans.length() > 0) {
@@ -150,8 +154,8 @@ class TextManager : ComponentManager() {
                 tv.text = TextStyle.transform(merged.str("text"), transform)
             }
         }
-        props.num("font_size")?.let { tv.textSize = it.toFloat() }
-        PNColor.parse(props.value("color"))?.let { tv.setTextColor(it) }
+        if (typed.has_font_size) tv.textSize = (typed.font_size ?: 17.0).toFloat()
+        if (typed.has_color) tv.setTextColor(PNColor.parse(props.value("color")) ?: defaultTextColor(tv))
         if (listOf("font_family", "font_weight", "italic", "bold").any { props.has(it) }) {
             try {
                 TextStyle.applyTypeface(tv, merged)
@@ -159,40 +163,41 @@ class TextManager : ComponentManager() {
                 PNLog.swallowed("TextManager.typeface", e)
             }
         }
-        if (props.has("max_lines") || props.has("number_of_lines")) {
-            val lines = merged.num("number_of_lines") ?: merged.num("max_lines")
+        if (typed.has_max_lines) {
+            val lines = merged.num("max_lines")
             if (lines != null && lines > 0) {
                 tv.maxLines = lines.toInt()
-                tv.ellipsize = ellipsizeMode(merged.str("ellipsize_mode") ?: merged.str("ellipsize"))
+                tv.ellipsize = ellipsizeMode(merged.str("ellipsize_mode"))
             } else {
                 tv.maxLines = Int.MAX_VALUE
                 tv.ellipsize = null
             }
         }
-        if (props.has("ellipsize_mode") || props.has("ellipsize")) {
-            if (tv.maxLines != Int.MAX_VALUE) tv.ellipsize = ellipsizeMode(merged.str("ellipsize_mode") ?: merged.str("ellipsize"))
+        if (props.has("ellipsize_mode")) {
+            if (tv.maxLines != Int.MAX_VALUE) tv.ellipsize = ellipsizeMode(merged.str("ellipsize_mode"))
         }
         if (props.has("selectable")) tv.setTextIsSelectable(JsonUtil.truthy(props.value("selectable")))
-        if (props.has("text_align")) {
-            tv.gravity = when (props.str("text_align")) {
+        if (typed.has_text_align) {
+            tv.gravity = when (typed.text_align?.rawValue) {
                 "center" -> Gravity.CENTER
                 "right", "end" -> Gravity.END
                 "justify" -> Gravity.START
                 else -> Gravity.START
             }
         }
-        props.num("letter_spacing")?.let {
+        if (typed.has_letter_spacing) {
+            val spacing = typed.letter_spacing ?: 0.0
             // Android takes letter spacing in ems (a ratio of the font size).
             val size = merged.num("font_size") ?: 16.0
-            tv.letterSpacing = (it / max(size, 1.0)).toFloat()
+            tv.letterSpacing = (spacing / max(size, 1.0)).toFloat()
         }
-        props.num("line_height")?.let {
-            val size = merged.num("font_size") ?: 16.0
-            tv.setLineSpacing(0f, (it / max(size, 1.0)).toFloat())
+        if (typed.has_line_height) {
+            val size = merged.num("font_size") ?: 17.0
+            tv.setLineSpacing(0f, ((typed.line_height ?: size) / max(size, 1.0)).toFloat())
         }
-        if (props.has("text_decoration")) {
+        if (typed.has_text_decoration) {
             var flags = tv.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv() and Paint.STRIKE_THRU_TEXT_FLAG.inv()
-            when (props.str("text_decoration")) {
+            when (typed.text_decoration?.rawValue) {
                 "underline" -> flags = flags or Paint.UNDERLINE_TEXT_FLAG
                 "line_through" -> flags = flags or Paint.STRIKE_THRU_TEXT_FLAG
             }
@@ -200,6 +205,12 @@ class TextManager : ComponentManager() {
         }
         if (shadowKeys.any { props.has(it) }) applyTextShadow(tv, merged)
         ViewStyler.apply(tv, props)
+    }
+
+    private fun defaultTextColor(view: TextView): Int {
+        val value = android.util.TypedValue()
+        view.context.theme.resolveAttribute(android.R.attr.textColorPrimary, value, true)
+        return if (value.resourceId != 0) view.context.getColor(value.resourceId) else value.data
     }
 
     private fun ellipsizeMode(mode: String?): TextUtils.TruncateAt = when (mode) {

@@ -1,5 +1,7 @@
 package com.pythonnative.runtime.components
 
+import com.pythonnative.generated.*
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.view.MotionEvent
@@ -55,18 +57,20 @@ class ScrollViewManager : ComponentManager() {
     private fun isHorizontal(outer: View): Boolean = outer is HorizontalScrollView
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        val typed = ScrollViewProps(props)
+
         val sv = inner(view)
         ViewStyler.apply(sv, props)
-        if (props.has("shows_scroll_indicator")) {
+        if (typed.has_shows_scroll_indicator) {
             val show = props.value("shows_scroll_indicator") != false
             sv.isVerticalScrollBarEnabled = show
             sv.isHorizontalScrollBarEnabled = show
         }
-        if (props.has("bounces")) {
+        if (typed.has_bounces) {
             sv.overScrollMode = if (props.value("bounces") == false) View.OVER_SCROLL_NEVER else View.OVER_SCROLL_IF_CONTENT_SCROLLS
         }
         if (props.has("scroll_enabled")) stateOf(view)["scroll_enabled"] = props.value("scroll_enabled") != false
-        if (props.has("refresh_control") && view is SwipeRefreshLayout) applyRefresh(view, props.obj("refresh_control"))
+        if (typed.has_refresh_control && view is SwipeRefreshLayout) applyRefresh(view, props.obj("refresh_control"))
         // paging_enabled and keyboard_dismiss_mode are read from merged props at touch time.
     }
 

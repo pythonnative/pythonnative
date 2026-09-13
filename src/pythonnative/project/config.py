@@ -51,7 +51,7 @@ provisioning_profile = "My App Distribution"
 
 [android]
 min_sdk = 24
-target_sdk = 34
+target_sdk = 36
 abi_filters = ["arm64-v8a", "x86_64"]  # the default and the full set (64-bit only)
 
 [android.signing]
@@ -172,6 +172,7 @@ class IOSConfig:
         development_team: Apple Developer Team ID used for signing.
         bundle_id: Optional override of ``app.id`` for the iOS bundle
             identifier.
+        privacy_manifest: Optional app privacy manifest path, relative to the project root.
         extra_info_plist: Arbitrary additional ``Info.plist`` key/values
             merged verbatim into the generated plist.
         signing: Nested [`IOSSigning`][pythonnative.project.config.IOSSigning].
@@ -180,6 +181,7 @@ class IOSConfig:
     deployment_target: str = "13.0"
     development_team: Optional[str] = None
     bundle_id: Optional[str] = None
+    privacy_manifest: Optional[str] = None
     extra_info_plist: Dict[str, Any] = field(default_factory=dict)
     signing: IOSSigning = field(default_factory=IOSSigning)
 
@@ -230,8 +232,8 @@ class AndroidConfig:
     """
 
     min_sdk: int = 24
-    target_sdk: int = 34
-    compile_sdk: int = 34
+    target_sdk: int = 36
+    compile_sdk: int = 36
     application_id: Optional[str] = None
     # arm64 devices plus x86_64 emulators: the only ABIs CPython 3.12+
     # on Chaquopy (and PEP 738 wheels on PyPI) are built for.
@@ -502,6 +504,8 @@ class AppConfig:
 
         if self.android.min_sdk < MIN_ANDROID_SDK:
             raise ConfigError(f"[android].min_sdk must be at least {MIN_ANDROID_SDK} (Chaquopy requirement).")
+        if self.android.compile_sdk < self.android.target_sdk:
+            raise ConfigError("[android].compile_sdk must be >= target_sdk.")
         if self.android.target_sdk < self.android.min_sdk:
             raise ConfigError("[android].target_sdk must be >= min_sdk.")
         for abi in self.android.abi_filters:
@@ -524,6 +528,7 @@ def _parse_ios(table: Mapping[str, Any]) -> IOSConfig:
         deployment_target=_opt_str(table, "deployment_target") or "13.0",
         development_team=_opt_str(table, "development_team"),
         bundle_id=_opt_str(table, "bundle_id"),
+        privacy_manifest=_opt_str(table, "privacy_manifest"),
         extra_info_plist=dict(extra),
         signing=IOSSigning(
             export_method=(_opt_str(signing_table, "export_method") or "development").lower(),
@@ -536,8 +541,8 @@ def _parse_android(table: Mapping[str, Any]) -> AndroidConfig:
     signing_table = _expect_table(table, "signing", optional=True, parent="android")
     cfg = AndroidConfig(
         min_sdk=_opt_int(table, "min_sdk", default=24),
-        target_sdk=_opt_int(table, "target_sdk", default=34),
-        compile_sdk=_opt_int(table, "compile_sdk", default=34),
+        target_sdk=_opt_int(table, "target_sdk", default=36),
+        compile_sdk=_opt_int(table, "compile_sdk", default=36),
         application_id=_opt_str(table, "application_id"),
         permissions=_opt_str_list(table, "permissions"),
         signing=AndroidSigning(
@@ -762,7 +767,7 @@ export_method = "development"   # development | ad-hoc | app-store | enterprise
 
 [android]
 min_sdk = {MIN_ANDROID_SDK}
-target_sdk = 34
+target_sdk = 36
 # arm64 devices + x86_64 emulators. These are the only ABIs the embedded
 # CPython (3.12+) and Android wheels on PyPI ship for.
 # abi_filters = ["arm64-v8a", "x86_64"]

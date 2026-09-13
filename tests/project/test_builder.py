@@ -1,4 +1,5 @@
 import sys
+import zipfile
 from pathlib import Path
 from typing import List, Optional, Sequence
 
@@ -6,7 +7,14 @@ import pytest
 
 from pythonnative.project import builder as builder_mod
 from pythonnative.project import runtime_assets
-from pythonnative.project.builder import Builder, BuildError, CommandResult, CommandRunner, stage_template
+from pythonnative.project.builder import (
+    Builder,
+    BuildError,
+    CommandResult,
+    CommandRunner,
+    PreparedProject,
+    stage_template,
+)
 from pythonnative.project.config import AppConfig
 
 
@@ -28,16 +36,32 @@ class RecordingRunner(CommandRunner):
         if cwd and any("assembleRelease" in a for a in args):
             apk = Path(cwd) / "app" / "build" / "outputs" / "apk" / "release"
             apk.mkdir(parents=True, exist_ok=True)
-            (apk / "app-release-unsigned.apk").write_bytes(b"apk")
+            with zipfile.ZipFile(apk / "app-release-unsigned.apk", "w") as archive:
+                archive.writestr("AndroidManifest.xml", b"test")
         if cwd and any("bundleRelease" in a for a in args):
             aab = Path(cwd) / "app" / "build" / "outputs" / "bundle" / "release"
             aab.mkdir(parents=True, exist_ok=True)
-            (aab / "app-release.aab").write_bytes(b"aab")
+            with zipfile.ZipFile(aab / "app-release.aab", "w") as archive:
+                archive.writestr("BundleConfig.pb", b"\x12\x06\x12\x04\x08\x01\x10\x02")
         if cwd and any("assembleDebug" in a for a in args):
             apk = Path(cwd) / "app" / "build" / "outputs" / "apk" / "debug"
             apk.mkdir(parents=True, exist_ok=True)
             (apk / "app-debug.apk").write_bytes(b"apk")
         return CommandResult(0)
+
+
+def test_archive_rejects_old_xcode_before_build_or_export(tmp_path: Path) -> None:
+    class OldXcode(RecordingRunner):
+        def run(self, args: Sequence[str], **kwargs: object) -> CommandResult:
+            self.commands.append(list(args))
+            return CommandResult(0, stdout="Xcode 16.4\nBuild version 16F6")
+
+    config = AppConfig.load(_project(tmp_path, _TOML))
+    runner = OldXcode()
+    prepared = PreparedProject(platform="ios", build_dir=tmp_path, project_dir=tmp_path, app_id="com.acme.cool")
+    with pytest.raises(BuildError, match="Xcode 26"):
+        Builder(config, runner=runner).build_ios_archive(prepared)
+    assert runner.commands == [["xcodebuild", "-version"]]
 
 
 def _project(tmp_path: Path, toml: str) -> Path:
@@ -256,3 +280,17 @@ def test_config_has_android_signing(tmp_path: Path) -> None:
     root = _project(tmp_path, _TOML + '\n[android.signing]\nkeystore = "r.keystore"\nkey_alias = "k"\n')
     cfg = AppConfig.load(root)
     assert builder_mod.config_has_android_signing(cfg) is True
+
+
+def test_release_preflight_requires_current_target_and_frozen_dependencies(tmp_path: Path) -> None:
+    root = _project(tmp_path, _TOML)
+    config = AppConfig.load(root)
+    builder = Builder(config, runner=RecordingRunner(), log=lambda _: None)
+    with pytest.raises(BuildError, match="target_sdk"):
+        builder.prepare("android", release=True)
+    assert not (root / "build/android/android_template").exists()
+    config.android.target_sdk = 36
+    config.requirements = ["example==1.0"]
+    with pytest.raises(BuildError, match="pn.lock"):
+        builder.prepare("android", release=True)
+    assert not (root / "build/android/android_template").exists()

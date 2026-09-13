@@ -192,7 +192,7 @@ def test_secure_store_roundtrip_fallback() -> None:
 
 
 def test_permissions_check_undetermined_fallback() -> None:
-    assert Permissions.check("camera") == "undetermined"
+    assert asyncio.run(Permissions.check("camera")) == "undetermined"
 
 
 def test_permissions_request_undetermined_fallback() -> None:
@@ -211,7 +211,7 @@ def test_permissions_names_match_the_config_vocabulary() -> None:
 @pytest.mark.parametrize("name", ["photos", "location", "Camera", ""])
 def test_permissions_reject_names_outside_the_vocabulary(name: str) -> None:
     with pytest.raises(ValueError, match="Unknown permission"):
-        Permissions.check(name)  # type: ignore[arg-type]
+        asyncio.run(Permissions.check(name))  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="Unknown permission"):
         asyncio.run(Permissions.request(name))  # type: ignore[arg-type]
 
@@ -224,7 +224,7 @@ def test_permissions_surface_native_errors() -> None:
     module_registry.register_python_module("Permissions", Broken())
     try:
         with pytest.raises(module_registry.NativeModuleError, match="no activity"):
-            Permissions.check("camera")
+            asyncio.run(Permissions.check("camera"))
     finally:
         module_registry.unregister_python_module("Permissions")
 

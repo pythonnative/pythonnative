@@ -6,40 +6,41 @@ import Photos
 import UIKit
 import UserNotifications
 
-/// `Permissions`: `check` (sync) and `request` (async).
+/// `Permissions`: `check` and `request` (async).
 ///
 /// Permission names are the `[permissions]` keys from pythonnative.toml
 /// (`camera`, `microphone`, `photo_library`, `location_when_in_use`,
 /// `contacts`, `notifications`). The Python facade validates them before
 /// the call reaches this module, so an unknown name here is a bug rather
 /// than user input, and is rejected rather than answered.
-public final class PermissionsModule: PNNativeModule {
-    public static let name = "Permissions"
+public final class PermissionsModule: PermissionsImplementation {
 
     /// Every accepted permission name, in the `[permissions]` vocabulary.
     public static let names: Set<String> = [
         "camera", "microphone", "photo_library", "location_when_in_use", "contacts", "notifications",
     ]
 
-    private var locationRequester: PNLocationPermissionRequester?
+    private var locationRequesters: [UUID: PNLocationPermissionRequester] = [:]
 
     public init() {}
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        let permission = PNProps.string(args["permission"]) ?? ""
-        switch method {
-        case "check", "request":
-            guard PermissionsModule.names.contains(permission) else {
-                return promise.reject("unknown permission '\(permission)'", code: "bad_args")
-            }
-            if method == "check" {
-                check(permission) { promise.resolve($0) }
-            } else {
-                request(permission) { promise.resolve($0) }
-            }
-        default:
-            promise.reject("Permissions has no method '\(method)'", code: "unknown_method")
+    public func check(permission: String, completion: @escaping (Result<String, Error>) -> Void) -> (() -> Void)? {
+        guard Self.names.contains(permission) else {
+            completion(.failure(NativeDecodeError.invalid("Unknown permission: " + permission))); return nil
         }
+        var cancelled = false
+        check(permission) { if !cancelled { completion(.success($0)) } }
+        return { cancelled = true }
+    }
+
+    public func request(permission: String, completion: @escaping (Result<String, Error>) -> Void) -> (() -> Void)? {
+        guard Self.names.contains(permission) else {
+            completion(.failure(NativeDecodeError.invalid("Unknown permission: " + permission))); return nil
+        }
+        var cancelled = false
+        let cancel = request(permission) { if !cancelled { completion(.success($0)) } }
+        // System permission prompts can't be dismissed by an app. Detach the waiter.
+        return { cancelled = true; cancel?() }
     }
 
     // MARK: - Check
@@ -74,7 +75,7 @@ public final class PermissionsModule: PNNativeModule {
 
     // MARK: - Request
 
-    private func request(_ permission: String, _ done: @escaping (String) -> Void) {
+    private func request(_ permission: String, _ done: @escaping (String) -> Void) -> (() -> Void)? {
         let finish: (String) -> Void = { status in DispatchQueue.main.async { done(status) } }
         switch permission {
         case "camera":
@@ -90,15 +91,18 @@ public final class PermissionsModule: PNNativeModule {
                 finish(granted ? "granted" : "blocked")
             }
         case "location_when_in_use":
+            let id = UUID()
             let requester = PNLocationPermissionRequester { [weak self] status in
-                self?.locationRequester = nil
+                self?.locationRequesters.removeValue(forKey: id)
                 finish(status)
             }
-            locationRequester = requester
+            locationRequesters[id] = requester
             requester.start()
+            return { [weak self] in self?.locationRequesters.removeValue(forKey: id)?.cancel() }
         default:
             done("undetermined")
         }
+        return nil
     }
 
     // MARK: - Status mapping
@@ -172,96 +176,91 @@ final class PNLocationPermissionRequester: NSObject, CLLocationManagerDelegate {
 
     private func finish(_ status: String) {
         if finished { return }
-        finished = true
+        cancel()
         done(status)
+    }
+
+    func cancel() {
+        finished = true
+        manager.delegate = nil
     }
 }
 
 /// `Notifications`: local notifications plus APNs registration.
-public final class NotificationsModule: PNNativeModule {
-    public static let name = "Notifications"
-
-    private static var tokenWaiters: [PNPromise] = []
-
+public final class NotificationsModule: NotificationsImplementation {
+    private static var tokenWaiters: [UUID: (Result<String?, Error>) -> Void] = [:]
     public init() {}
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        let center = UNUserNotificationCenter.current()
-        switch method {
-        case "request_permission":
-            center.requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
-                DispatchQueue.main.async { promise.resolve(granted) }
+    public func request_permission(completion: @escaping (Result<Bool, Error>) -> Void) -> (() -> Void)? {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+            DispatchQueue.main.async {
+                if let error = error { completion(.failure(error)) } else { completion(.success(granted)) }
             }
-        case "schedule":
-            let content = UNMutableNotificationContent()
-            content.title = PNProps.string(args["title"]) ?? ""
-            content.body = PNProps.string(args["body"]) ?? ""
-            if PNProps.bool(args["sound"]) != false { content.sound = .default }
-            if let badge = PNProps.int(args["badge"]) { content.badge = NSNumber(value: badge) }
-            let delay = max(0.1, PNProps.double(args["delay_seconds"]) ?? 0)
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
-            let identifier = PNProps.string(args["identifier"]) ?? "default"
-            center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)) { error in
-                DispatchQueue.main.async {
-                    if let error = error {
-                        PNLog.modules.error("schedule failed: \(error.localizedDescription)")
-                    }
-                    promise.resolve(error == nil)
-                }
-            }
-        case "cancel":
-            let identifier = PNProps.string(args["identifier"]) ?? "default"
-            center.removePendingNotificationRequests(withIdentifiers: [identifier])
-            center.removeDeliveredNotifications(withIdentifiers: [identifier])
-            promise.resolve(nil)
-        case "get_device_token":
-            NotificationsModule.tokenWaiters.append(promise)
-            UIApplication.shared.registerForRemoteNotifications()
-        default:
-            promise.reject("Notifications has no method '\(method)'", code: "unknown_method")
         }
+        return nil
     }
 
-    /// Called by the app delegate with the APNs token.
+    public func schedule(title: String, body: String, delay_seconds: Double, identifier: String, completion: @escaping (Result<Bool, Error>) -> Void) -> (() -> Void)? {
+        guard delay_seconds >= 0 else {
+            completion(.failure(NativeDecodeError.invalid("delay_seconds must be nonnegative"))); return nil
+        }
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, delay_seconds), repeats: false)
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)) { error in
+            DispatchQueue.main.async {
+                if let error = error { completion(.failure(error)) } else { completion(.success(true)) }
+            }
+        }
+        return nil
+    }
+
+    public func cancel(identifier: String, completion: @escaping (Result<Void, Error>) -> Void) -> (() -> Void)? {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
+        center.removeDeliveredNotifications(withIdentifiers: [identifier])
+        completion(.success(()))
+        return nil
+    }
+
+    public func get_device_token(completion: @escaping (Result<String?, Error>) -> Void) -> (() -> Void)? {
+        let id = UUID()
+        Self.tokenWaiters[id] = completion
+        UIApplication.shared.registerForRemoteNotifications()
+        return { Self.tokenWaiters.removeValue(forKey: id) }
+    }
+
     public static func deliverToken(_ token: Data) {
         let hex = token.map { String(format: "%02x", $0) }.joined()
-        let waiters = tokenWaiters
-        tokenWaiters = []
-        for waiter in waiters { waiter.resolve(hex) }
+        let waiters = tokenWaiters; tokenWaiters = [:]
+        for waiter in waiters.values { waiter(.success(hex)) }
     }
 
-    /// Called by the app delegate when APNs registration fails.
     public static func deliverError(_ error: Error) {
-        let waiters = tokenWaiters
-        tokenWaiters = []
-        for waiter in waiters { waiter.reject(String(describing: error), code: "apns") }
+        let waiters = tokenWaiters; tokenWaiters = [:]
+        for waiter in waiters.values { waiter(.failure(error)) }
     }
 }
 
 /// `Biometrics`: `LAContext` availability and authentication.
-public final class BiometricsModule: PNNativeModule {
-    public static let name = "Biometrics"
-
+public final class BiometricsModule: BiometricsImplementation {
     public init() {}
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        switch method {
-        case "is_available":
-            let context = LAContext()
-            var error: NSError?
-            promise.resolve(context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error))
-        case "authenticate":
-            let context = LAContext()
-            let reason = PNProps.string(args["reason"]) ?? "Authenticate"
-            var error: NSError?
-            let policy: LAPolicy = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
-                ? .deviceOwnerAuthenticationWithBiometrics : .deviceOwnerAuthentication
-            promise.onCancel { context.invalidate() }
-            context.evaluatePolicy(policy, localizedReason: reason) { success, _ in
-                DispatchQueue.main.async { promise.resolve(success) }
-            }
-        default:
-            promise.reject("Biometrics has no method '\(method)'", code: "unknown_method")
+    public func is_available() -> Bool {
+        var error: NSError?
+        return LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+    }
+
+    public func authenticate(reason: String, completion: @escaping (Result<Bool, Error>) -> Void) -> (() -> Void)? {
+        let context = LAContext()
+        var error: NSError?
+        let policy: LAPolicy = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+            ? .deviceOwnerAuthenticationWithBiometrics : .deviceOwnerAuthentication
+        context.evaluatePolicy(policy, localizedReason: reason) { success, _ in
+            DispatchQueue.main.async { completion(.success(success)) }
         }
+        return { context.invalidate() }
     }
 }

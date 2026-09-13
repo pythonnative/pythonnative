@@ -8,7 +8,7 @@ hook used to import third-party PyPI plugins.
 
 import itertools
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 import pytest
 
@@ -142,6 +142,37 @@ def test_register_component_declares_without_handler() -> None:
     assert get_test_handler("Badge") is None
     Badge = element_factory("Badge")
     assert Badge(text="1").type == "Badge"
+
+
+def test_custom_component_callbacks_cross_the_validated_bridge() -> None:
+    from pythonnative.bridge.fake import FakeTransport
+    from pythonnative.events import dispatch_event
+    from pythonnative.native_views.bridge_backend import BridgeBackend
+    from pythonnative.reconciler import Reconciler
+
+    @dataclass(frozen=True)
+    class InteractiveBadgeProps:
+        on_press: Callable[[int], Any] | None = None
+
+    register_component(name="InteractiveBadge", props=InteractiveBadgeProps)
+    Badge = element_factory("InteractiveBadge")
+    received: list[int] = []
+    transport = FakeTransport()
+    reconciler = Reconciler(BridgeBackend(transport))
+    try:
+        reconciler.reconcile(Badge(on_press=received.append))
+        tag = reconciler.root_tag
+        assert tag is not None
+        assert transport.views[tag].props["_pn_events"] == ["on_press"]
+        dispatch_event(tag, "on_press", 42)
+        assert received == [42]
+        reconciler.reconcile(Badge())
+        assert not transport.views[tag].props.get("_pn_events")
+        dispatch_event(tag, "on_press", 43)
+        assert received == [42]
+    finally:
+        reconciler.unmount()
+        unregister_component("InteractiveBadge")
 
 
 def test_register_component_merges_later_calls() -> None:

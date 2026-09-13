@@ -11,32 +11,35 @@ public final class PNSwitchManager: PNComponentManager {
         if let control = view as? UISwitch {
             PNActionTarget.attach(control, events: .valueChanged) { [weak control] in
                 guard let control = control, PNViewState.existing(for: control)?.flag("suppress") != true else { return }
-                PNEvents.emit(control, "on_change", [control.isOn])
+                PNComponentEvents.Switch.on_change(control, control.isOn)
             }
         }
         return view
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! SwitchProps(props)
+
         guard let control = view as? UISwitch, let state = PNViewState.existing(for: control) else { return }
-        if PNProps.has(props, "value") {
-            let value = PNProps.bool(PNProps.value(props, "value")) ?? false
+        if typed.has_value {
+            let value = typed.value ?? false
             if control.isOn != value {
                 state.extras["suppress"] = true
                 control.setOn(value, animated: !initial)
                 state.extras["suppress"] = false
             }
         }
-        if let color = PNColor.parse(PNProps.value(props, "on_tint_color") ?? PNProps.value(props, "tint_color")) {
-            control.onTintColor = color
+        if typed.has_on_tint_color || typed.has_tint_color {
+            let merged = try! SwitchProps(state.props)
+            control.onTintColor = (merged.on_tint_color ?? merged.tint_color).flatMap { PNColor.parse(PNValues.encode($0)) }
         }
-        if let color = PNColor.parse(PNProps.value(props, "thumb_color")) {
-            control.thumbTintColor = color
+        if typed.has_thumb_color {
+            control.thumbTintColor = typed.thumb_color.flatMap { PNColor.parse(PNValues.encode($0)) }
         }
-        if PNProps.has(props, "disabled") {
-            control.isEnabled = !(PNProps.bool(PNProps.value(props, "disabled")) ?? false)
+        if typed.has_disabled {
+            control.isEnabled = !(typed.disabled ?? false)
         }
-        PNViewStyler.applyAccessibility(control, props)
+        PNViewStyler.applyCommon(control, props)
     }
 
     public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize {
@@ -66,32 +69,44 @@ public final class PNSliderManager: PNComponentManager {
         if let slider = view as? UISlider {
             PNActionTarget.attach(slider, events: .valueChanged) { [weak slider] in
                 guard let slider = slider, PNViewState.existing(for: slider)?.flag("suppress") != true else { return }
-                PNEvents.emit(slider, "on_change", [Double(slider.value)])
+                let props = try! SliderProps(PNViewState.existing(for: slider)?.props ?? [:])
+                if let step = props.step, step > 0 {
+                    let minimum = Double(slider.minimumValue)
+                    slider.value = Float(minimum + ((Double(slider.value) - minimum) / step).rounded() * step)
+                }
+                PNComponentEvents.Slider.on_change(slider, Double(slider.value))
+            }
+            PNActionTarget.attach(slider, events: .touchDown) { [weak slider] in
+                guard let slider = slider else { return }
+                PNComponentEvents.Slider.on_sliding_start(slider, Double(slider.value))
             }
             PNActionTarget.attach(slider, events: [.touchUpInside, .touchUpOutside, .touchCancel]) { [weak slider] in
                 guard let slider = slider else { return }
-                PNEvents.emitIfWired(slider, "on_sliding_complete", [Double(slider.value)])
+                PNComponentEvents.Slider.on_sliding_complete(slider, Double(slider.value))
             }
         }
         return view
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! SliderProps(props)
+
         guard let slider = view as? UISlider, let state = PNViewState.existing(for: slider) else { return }
-        if let min = PNProps.double(PNProps.value(props, "min_value")) { slider.minimumValue = Float(min) }
-        if let max = PNProps.double(PNProps.value(props, "max_value")) { slider.maximumValue = Float(max) }
-        if let value = PNProps.double(PNProps.value(props, "value")), abs(Double(slider.value) - value) > 1e-9 {
+        if let min = typed.min_value { slider.minimumValue = Float(min) }
+        if let max = typed.max_value { slider.maximumValue = Float(max) }
+        if let value = typed.value, abs(Double(slider.value) - value) > 1e-9 {
             state.extras["suppress"] = true
             slider.setValue(Float(value), animated: !initial)
             state.extras["suppress"] = false
         }
-        if let color = PNColor.parse(PNProps.value(props, "minimum_track_color") ?? PNProps.value(props, "tint_color")) {
-            slider.minimumTrackTintColor = color
+        if typed.has_minimum_track_color || typed.has_tint_color {
+            let merged = try! SliderProps(state.props)
+            slider.minimumTrackTintColor = (merged.minimum_track_color ?? merged.tint_color).flatMap { PNColor.parse(PNValues.encode($0)) }
         }
-        if let color = PNColor.parse(PNProps.value(props, "maximum_track_color")) { slider.maximumTrackTintColor = color }
-        if let color = PNColor.parse(PNProps.value(props, "thumb_color")) { slider.thumbTintColor = color }
-        if PNProps.has(props, "disabled") { slider.isEnabled = !(PNProps.bool(PNProps.value(props, "disabled")) ?? false) }
-        PNViewStyler.applyAccessibility(slider, props)
+        if typed.has_maximum_track_color { slider.maximumTrackTintColor = typed.maximum_track_color.flatMap { PNColor.parse(PNValues.encode($0)) } }
+        if typed.has_thumb_color { slider.thumbTintColor = typed.thumb_color.flatMap { PNColor.parse(PNValues.encode($0)) } }
+        if typed.has_disabled { slider.isEnabled = !(typed.disabled ?? false) }
+        PNViewStyler.applyCommon(slider, props)
     }
 
     public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize {
@@ -110,19 +125,18 @@ public final class PNActivityIndicatorManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! ActivityIndicatorProps(props)
+
         guard let indicator = view as? UIActivityIndicatorView else { return }
-        if !initial, let size = PNProps.string(PNProps.value(props, "size")) {
+        if !initial, let size = typed.size?.rawValue {
             indicator.style = size == "large" ? .large : .medium
         }
-        if let color = PNColor.parse(PNProps.value(props, "color")) { indicator.color = color }
-        if PNProps.has(props, "animating") || initial {
-            let animating = PNProps.bool(PNProps.value(props, "animating")) ?? true
+        if typed.has_color { indicator.color = typed.color.flatMap { PNColor.parse(PNValues.encode($0)) } }
+        if typed.has_animating || initial {
+            let animating = typed.animating ?? true
             if animating { indicator.startAnimating() } else { indicator.stopAnimating() }
         }
-        if PNProps.has(props, "hides_when_stopped") {
-            indicator.hidesWhenStopped = PNProps.bool(PNProps.value(props, "hides_when_stopped")) ?? true
-        }
-        PNViewStyler.applyAccessibility(indicator, props)
+        PNViewStyler.applyCommon(indicator, props)
     }
 
     public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize {
@@ -144,17 +158,18 @@ public final class PNProgressBarManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! ProgressBarProps(props)
         if let spinner = view as? UIActivityIndicatorView {
-            if let color = PNColor.parse(PNProps.value(props, "color")) { spinner.color = color }
+            if typed.has_color { spinner.color = typed.color.flatMap { PNColor.parse(PNValues.encode($0)) } }
             spinner.startAnimating()
         } else if let bar = view as? UIProgressView {
-            if let value = PNProps.double(PNProps.value(props, "value") ?? PNProps.value(props, "progress")) {
+            if let value = typed.value {
                 bar.setProgress(Float(max(0, min(1, value))), animated: !initial)
             }
-            if let color = PNColor.parse(PNProps.value(props, "color")) { bar.progressTintColor = color }
-            if let color = PNColor.parse(PNProps.value(props, "track_color")) { bar.trackTintColor = color }
+            if typed.has_color { bar.progressTintColor = typed.color.flatMap { PNColor.parse(PNValues.encode($0)) } }
+            if typed.has_track_color { bar.trackTintColor = typed.track_color.flatMap { PNColor.parse(PNValues.encode($0)) } }
         }
-        PNViewStyler.applyAccessibility(view, props)
+        PNViewStyler.applyCommon(view, props)
     }
 
     public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize {
@@ -176,13 +191,15 @@ public final class PNSegmentedControlManager: PNComponentManager {
         if let control = view as? UISegmentedControl {
             PNActionTarget.attach(control, events: .valueChanged) { [weak control] in
                 guard let control = control, PNViewState.existing(for: control)?.flag("suppress") != true else { return }
-                PNEvents.emit(control, "on_change", [control.selectedSegmentIndex])
+                PNComponentEvents.SegmentedControl.on_change(control, Int64(control.selectedSegmentIndex))
             }
         }
         return view
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! SegmentedControlProps(props)
+
         guard let control = view as? UISegmentedControl, let state = PNViewState.existing(for: control) else { return }
         let merged = state.props
         var rebuilt = false
@@ -204,14 +221,15 @@ public final class PNSegmentedControlManager: PNComponentManager {
             control.selectedSegmentIndex = PNProps.int(PNProps.value(merged, "selected_index")) ?? 0
             state.extras["suppress"] = false
         }
-        if let color = PNColor.parse(PNProps.value(props, "tint_color")) {
+        if typed.has_tint_color {
+            let color = typed.tint_color.flatMap { PNColor.parse(PNValues.encode($0)) }
             control.selectedSegmentTintColor = color
             control.tintColor = color
         }
-        if PNProps.has(props, "disabled") {
-            control.isEnabled = !(PNProps.bool(PNProps.value(props, "disabled")) ?? false)
+        if typed.has_disabled {
+            control.isEnabled = !(typed.disabled ?? false)
         }
-        PNViewStyler.applyAccessibility(control, props)
+        PNViewStyler.applyCommon(control, props)
     }
 }
 
@@ -249,6 +267,8 @@ public final class PNDatePickerManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! DatePickerProps(props)
+
         guard let picker = view as? UIDatePicker, let state = PNViewState.existing(for: picker) else { return }
         let mode = PNProps.string(PNProps.value(state.props, "mode")) ?? "date"
         if PNProps.value(props, "mode") != nil {
@@ -259,23 +279,21 @@ public final class PNDatePickerManager: PNComponentManager {
             }
         }
         let formatter = PNDatePickerManager.formatter(mode: mode)
-        if PNProps.has(props, "minimum") {
-            picker.minimumDate = PNProps.string(PNProps.value(props, "minimum")).flatMap { formatter.date(from: $0) }
+        if typed.has_minimum {
+            picker.minimumDate = typed.minimum.flatMap { formatter.date(from: $0) }
         }
-        if PNProps.has(props, "maximum") {
-            picker.maximumDate = PNProps.string(PNProps.value(props, "maximum")).flatMap { formatter.date(from: $0) }
+        if typed.has_maximum {
+            picker.maximumDate = typed.maximum.flatMap { formatter.date(from: $0) }
         }
-        if let value = PNProps.string(PNProps.value(props, "value")), !value.isEmpty, let date = formatter.date(from: value) {
+        if let value = typed.value, !value.isEmpty, let date = formatter.date(from: value) {
             state.extras["suppress"] = true
             picker.setDate(date, animated: false)
             state.extras["suppress"] = false
         }
-        if PNProps.has(props, "disabled") {
-            picker.isEnabled = !(PNProps.bool(PNProps.value(props, "disabled")) ?? false)
+        if typed.has_disabled {
+            picker.isEnabled = !(typed.disabled ?? false)
         }
-        if let color = PNColor.parse(PNProps.value(props, "tint_color")) {
-            picker.tintColor = color
-        }
-        PNViewStyler.applyAccessibility(picker, props)
+        if typed.has_tint_color { picker.tintColor = typed.tint_color.flatMap { PNColor.parse(PNValues.encode($0)) } }
+        PNViewStyler.applyCommon(picker, props)
     }
 }

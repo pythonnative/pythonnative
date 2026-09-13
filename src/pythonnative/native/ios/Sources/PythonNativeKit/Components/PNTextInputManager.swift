@@ -32,13 +32,15 @@ public final class PNTextInputManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! TextInputProps(props)
+
         guard let state = PNViewState.existing(for: view) else { return }
         let field = view as? UITextField
         let textView = view as? UITextView
-        if PNProps.has(props, "max_length") {
-            state.extras["max_length"] = PNProps.int(PNProps.value(props, "max_length")) as Any? ?? NSNull()
+        if typed.has_max_length {
+            state.extras["max_length"] = typed.max_length.map { Int($0) } as Any? ?? NSNull()
         }
-        if let value = PNProps.string(PNProps.value(props, "value")) {
+        if let value = typed.value {
             let current = field?.text ?? textView?.text ?? ""
             let acknowledged = PNProps.int(props["_pn_edit_revision"]) ?? 0
             let edited = state.extras["edit_revision"] as? Int ?? 0
@@ -52,15 +54,15 @@ public final class PNTextInputManager: PNComponentManager {
             }
         }
         if let field = field {
-            if PNProps.has(props, "placeholder") {
-                field.placeholder = PNProps.string(PNProps.value(props, "placeholder")) ?? ""
+            if typed.has_placeholder {
+                field.placeholder = typed.placeholder ?? ""
             }
             if let color = PNColor.parse(PNProps.value(props, "placeholder_color")) {
                 let placeholder = PNProps.string(PNProps.value(state.props, "placeholder")) ?? ""
                 field.attributedPlaceholder = NSAttributedString(string: placeholder, attributes: [.foregroundColor: color])
             }
-            if PNProps.has(props, "clear_button") {
-                field.clearButtonMode = PNProps.bool(PNProps.value(props, "clear_button")) == true ? .whileEditing : .never
+            if typed.has_clear_button {
+                field.clearButtonMode = typed.clear_button == true ? .whileEditing : .never
             }
         }
         if initial || PNTextManager.fontKeys.contains(where: { PNProps.has(props, $0) }) {
@@ -77,27 +79,27 @@ public final class PNTextInputManager: PNComponentManager {
         if let color = PNColor.parse(PNProps.value(props, "background_color")) {
             view.backgroundColor = color
         }
-        if PNProps.has(props, "secure") {
-            let secure = PNProps.bool(PNProps.value(props, "secure")) ?? false
+        if typed.has_secure {
+            let secure = typed.secure ?? false
             field?.isSecureTextEntry = secure
             textView?.isSecureTextEntry = secure
         }
-        if let keyboard = PNProps.string(PNProps.value(props, "keyboard_type")) {
+        if let keyboard = typed.keyboard_type?.rawValue {
             let type = PNTextInputManager.keyboardType(keyboard)
             field?.keyboardType = type
             textView?.keyboardType = type
         }
-        if let cap = PNProps.string(PNProps.value(props, "auto_capitalize")) {
+        if let cap = typed.auto_capitalize?.rawValue {
             let type = PNTextInputManager.capitalization(cap)
             field?.autocapitalizationType = type
             textView?.autocapitalizationType = type
         }
-        if PNProps.has(props, "auto_correct") {
-            let type: UITextAutocorrectionType = PNProps.bool(PNProps.value(props, "auto_correct")) == true ? .yes : .no
+        if typed.has_auto_correct {
+            let type: UITextAutocorrectionType = typed.auto_correct == true ? .yes : .no
             field?.autocorrectionType = type
             textView?.autocorrectionType = type
         }
-        if let key = PNProps.string(PNProps.value(props, "return_key_type")) {
+        if let key = typed.return_key_type?.rawValue {
             let type = PNTextInputManager.returnKey(key)
             field?.returnKeyType = type
             textView?.returnKeyType = type
@@ -105,17 +107,17 @@ public final class PNTextInputManager: PNComponentManager {
         if let color = PNColor.parse(PNProps.value(props, "selection_color")) {
             view.tintColor = color
         }
-        if PNProps.has(props, "text_content_type") {
-            let type = PNProps.string(PNProps.value(props, "text_content_type")).flatMap(PNTextInputManager.contentType)
+        if typed.has_text_content_type {
+            let type = typed.text_content_type.flatMap(PNTextInputManager.contentType)
             field?.textContentType = type
             textView?.textContentType = type
         }
-        if PNProps.has(props, "editable") {
-            let editable = PNProps.bool(PNProps.value(props, "editable")) ?? true
+        if typed.has_editable {
+            let editable = typed.editable ?? true
             field?.isEnabled = editable
             textView?.isEditable = editable
         }
-        if PNProps.bool(PNProps.value(props, "auto_focus")) == true {
+        if typed.auto_focus == true {
             view.becomeFirstResponder()
         }
         PNViewStyler.applyDecoration(view, props)

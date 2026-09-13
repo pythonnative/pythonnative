@@ -26,8 +26,8 @@ public enum PNViewStyler {
 
     /// Apply every shared visual prop present in `props`.
     public static func applyCommon(_ view: UIView, _ props: [String: Any]) {
-        if let color = PNColor.parse(PNProps.value(props, "background_color")) {
-            view.backgroundColor = color
+        if PNProps.has(props, "background_color") {
+            view.backgroundColor = PNColor.parse(PNProps.value(props, "background_color"))
         }
         if PNProps.has(props, "overflow") {
             view.clipsToBounds = PNProps.string(PNProps.value(props, "overflow")) == "hidden"
@@ -35,8 +35,8 @@ public enum PNViewStyler {
         if PNProps.has(props, "display") {
             view.isHidden = PNProps.string(PNProps.value(props, "display")) == "none"
         }
-        if let opacity = PNProps.double(PNProps.value(props, "opacity")) {
-            view.alpha = CGFloat(opacity)
+        if PNProps.has(props, "opacity") {
+            view.alpha = CGFloat(PNProps.double(PNProps.value(props, "opacity")) ?? 1)
         }
         if PNProps.has(props, "z_index") {
             view.layer.zPosition = CGFloat(PNProps.double(PNProps.value(props, "z_index")) ?? 0)
@@ -66,8 +66,8 @@ public enum PNViewStyler {
             PNTransform.apply(view, spec: PNProps.value(props, "transform"))
         }
         applyAccessibility(view, props)
-        if let opacity = PNProps.double(PNProps.value(props, "opacity")) {
-            view.alpha = CGFloat(opacity)
+        if PNProps.has(props, "opacity") {
+            view.alpha = CGFloat(PNProps.double(PNProps.value(props, "opacity")) ?? 1)
         }
     }
 
@@ -108,16 +108,22 @@ public enum PNViewStyler {
         } else if PNProps.has(props, "border_width") {
             layer.borderWidth = 0
         }
-        if let color = PNColor.parse(PNProps.value(props, "border_color")) {
-            layer.borderColor = color.cgColor
+        if PNProps.has(props, "border_color") {
+            layer.borderColor = PNColor.parse(PNProps.value(props, "border_color"))?.cgColor
         }
     }
 
     static func applySideBorders(_ view: UIView, _ props: [String: Any]) {
-        guard sideWidthKeys.contains(where: { PNProps.value(props, $0) != nil }),
-              let state = PNViewState.existing(for: view)
-        else { return }
+        guard let state = PNViewState.existing(for: view),
+              (sideWidthKeys + sideColorKeys + ["border_width", "border_color"]).contains(where: { PNProps.has(props, $0) }) else { return }
         let merged = state.props
+        if !(sideWidthKeys + sideColorKeys).contains(where: { PNProps.value(merged, $0) != nil }) {
+            state.sideBorderWidths = nil
+            state.sideBorderColors = nil
+            for index in 0..<4 { state.sideBorderLayers[index]?.removeFromSuperlayer(); state.sideBorderLayers[index] = nil }
+            view.layer.borderWidth = CGFloat(PNProps.double(PNProps.value(merged, "border_width")) ?? 0)
+            return
+        }
         let baseWidth = CGFloat(PNProps.double(PNProps.value(merged, "border_width")) ?? 0)
         let baseColor = PNColor.parse(PNProps.value(merged, "border_color")) ?? .black
         state.sideBorderWidths = sideWidthKeys.map { key in
@@ -239,17 +245,11 @@ public enum PNViewStyler {
             layer.masksToBounds = false
             view.clipsToBounds = false
         }
-        if let color = PNColor.parse(PNProps.value(props, "shadow_color")) {
-            layer.shadowColor = color.cgColor
-        }
-        if let opacity = PNProps.double(PNProps.value(props, "shadow_opacity")) {
-            layer.shadowOpacity = Float(opacity)
-        }
-        if let radius = PNProps.double(PNProps.value(props, "shadow_radius")) {
-            layer.shadowRadius = CGFloat(radius)
-        }
-        if let offset = PNProps.value(props, "shadow_offset") {
-            let (dx, dy) = shadowOffset(offset)
+        if PNProps.has(props, "shadow_color") { layer.shadowColor = PNColor.parse(PNProps.value(props, "shadow_color"))?.cgColor }
+        if PNProps.has(props, "shadow_opacity") { layer.shadowOpacity = Float(PNProps.double(PNProps.value(props, "shadow_opacity")) ?? 0) }
+        if PNProps.has(props, "shadow_radius") { layer.shadowRadius = CGFloat(PNProps.double(PNProps.value(props, "shadow_radius")) ?? 3) }
+        if PNProps.has(props, "shadow_offset") {
+            let (dx, dy) = shadowOffset(PNProps.value(props, "shadow_offset"))
             layer.shadowOffset = CGSize(width: dx, height: dy)
         }
     }
@@ -318,10 +318,12 @@ public enum PNViewStyler {
         if PNProps.has(props, "test_id") {
             view.accessibilityIdentifier = PNProps.string(PNProps.value(props, "test_id"))
         }
-        let role = PNProps.string(PNProps.value(props, "accessibility_role"))
-        let state = PNProps.dict(PNProps.value(props, "accessibility_state"))
-        if role == nil, state == nil { return }
+        guard PNProps.has(props, "accessibility_role") || PNProps.has(props, "accessibility_state") else { return }
+        let merged = PNViewState.existing(for: view)?.props ?? props
+        let role = PNProps.string(PNProps.value(merged, "accessibility_role"))
+        let state = PNProps.dict(PNProps.value(merged, "accessibility_state"))
         var traits: UIAccessibilityTraits = []
+        view.accessibilityValue = nil
         if let role = role {
             traits.formUnion(traitByRole[role.lowercased()] ?? [])
         }

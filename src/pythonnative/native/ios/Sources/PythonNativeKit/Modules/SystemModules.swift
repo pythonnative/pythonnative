@@ -3,22 +3,17 @@ import Security
 import UIKit
 
 /// `Device`: static device and app-path information.
-public final class DeviceModule: PNNativeModule {
+public final class DeviceModule: DeviceImplementation {
     public static let name = "Device"
 
     public init() {}
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        switch method {
-        case "info":
-            promise.resolve(DeviceModule.info())
-        default:
-            promise.reject("Device has no method '\(method)'", code: "unknown_method")
-        }
+    public func info() throws -> [String: PNJSONValue] {
+        try Self.snapshot().mapValues { try PNValues.decode(PNJSONValue.self, $0) }
     }
 
     /// The `Device.info()` payload.
-    public static func info() -> [String: Any] {
+    public static func snapshot() -> [String: Any] {
         let paths = FileManager.default
         let documents = paths.urls(for: .documentDirectory, in: .userDomainMask).first?.path ?? NSHomeDirectory() + "/Documents"
         let caches = paths.urls(for: .cachesDirectory, in: .userDomainMask).first?.path ?? NSTemporaryDirectory()
@@ -45,64 +40,31 @@ public final class DeviceModule: PNNativeModule {
 }
 
 /// `Storage`: `AsyncStorage` over the `pn_async_storage` defaults suite.
-public final class StorageModule: PNNativeModule {
-    public static let name = "Storage"
+public final class StorageModule: StorageImplementation {
     static let suiteName = "pn_async_storage"
-
     private let defaults: UserDefaults
-
-    public init() {
-        defaults = UserDefaults(suiteName: StorageModule.suiteName) ?? .standard
-    }
-
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        switch method {
-        case "get":
-            guard let key = PNProps.string(args["key"]) else { return promise.reject("missing key", code: "bad_args") }
-            promise.resolve(defaults.string(forKey: key))
-        case "set":
-            guard let key = PNProps.string(args["key"]) else { return promise.reject("missing key", code: "bad_args") }
-            defaults.set(PNProps.string(args["value"]) ?? "", forKey: key)
-            promise.resolve(nil)
-        case "delete":
-            guard let key = PNProps.string(args["key"]) else { return promise.reject("missing key", code: "bad_args") }
-            defaults.removeObject(forKey: key)
-            promise.resolve(nil)
-        case "all_keys":
-            let keys: [String] = defaults.persistentDomain(forName: StorageModule.suiteName)?.keys.map { $0 } ?? []
-            promise.resolve(keys.sorted())
-        case "clear":
-            defaults.removePersistentDomain(forName: StorageModule.suiteName)
-            promise.resolve(nil)
-        default:
-            promise.reject("Storage has no method '\(method)'", code: "unknown_method")
-        }
-    }
+    public init() { defaults = UserDefaults(suiteName: Self.suiteName) ?? .standard }
+    public func get(key: String) -> String? { defaults.string(forKey: key) }
+    public func set(key: String, value: String) { defaults.set(value, forKey: key) }
+    public func delete(key: String) { defaults.removeObject(forKey: key) }
+    public func all_keys() -> [String] { (defaults.persistentDomain(forName: Self.suiteName)?.keys.map { $0 } ?? []).sorted() }
+    public func clear() { defaults.removePersistentDomain(forName: Self.suiteName) }
 }
 
 /// `SecureStore`: Keychain generic passwords under one service.
-public final class SecureStoreModule: PNNativeModule {
+public final class SecureStoreModule: SecureStoreImplementation {
     public static let name = "SecureStore"
     static let service = "com.pythonnative.securestore"
 
     public init() {}
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        guard let key = PNProps.string(args["key"]) else {
-            promise.reject("missing key", code: "bad_args")
-            return
-        }
-        switch method {
-        case "set_item":
-            promise.resolve(SecureStoreModule.set(key, PNProps.string(args["value"]) ?? ""))
-        case "get_item":
-            promise.resolve(SecureStoreModule.get(key))
-        case "delete_item":
-            promise.resolve(SecureStoreModule.delete(key))
-        default:
-            promise.reject("SecureStore has no method '\(method)'", code: "unknown_method")
-        }
+    public func clear() throws {
+        let status = SecItemDelete([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: Self.service] as CFDictionary)
+        if status != errSecSuccess && status != errSecItemNotFound { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
     }
+    public func set_item(key: String, value: String) -> Bool { Self.set(key, value) }
+    public func get_item(key: String) -> String? { Self.get(key) }
+    public func delete_item(key: String) -> Bool { Self.delete(key) }
 
     private static func query(_ key: String) -> [String: Any] {
         [
@@ -139,48 +101,27 @@ public final class SecureStoreModule: PNNativeModule {
 }
 
 /// `Clipboard`: the general pasteboard.
-public final class ClipboardModule: PNNativeModule {
-    public static let name = "Clipboard"
-
+public final class ClipboardModule: ClipboardImplementation {
     public init() {}
-
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        switch method {
-        case "set_string":
-            UIPasteboard.general.string = PNProps.string(args["text"]) ?? ""
-            promise.resolve(nil)
-        case "get_string":
-            promise.resolve(UIPasteboard.general.string ?? "")
-        default:
-            promise.reject("Clipboard has no method '\(method)'", code: "unknown_method")
-        }
-    }
+    public func set_string(text: String) { UIPasteboard.general.string = text }
+    public func get_string() -> String { UIPasteboard.general.string ?? "" }
 }
 
 /// `Share`: `UIActivityViewController`, resolving whether a share completed.
-public final class ShareModule: PNNativeModule {
+public final class ShareModule: ShareImplementation {
     public static let name = "Share"
 
     public init() {}
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        guard method == "share" else {
-            promise.reject("Share has no method '\(method)'", code: "unknown_method")
-            return
-        }
+    public func share(message: String?, url: String?, title: String?, completion: @escaping (Result<Bool, Error>) -> Void) -> (() -> Void)? {
         var items: [Any] = []
-        if let message = PNProps.string(args["message"]), !message.isEmpty { items.append(message) }
-        if let url = PNProps.string(args["url"]).flatMap({ URL(string: $0) }) { items.append(url) }
-        guard !items.isEmpty, let top = PNWindow.topViewController() else {
-            promise.resolve(false)
-            return
-        }
+        if let message = message, !message.isEmpty { items.append(message) }
+        if let url = url.flatMap({ URL(string: $0) }) { items.append(url) }
+        guard !items.isEmpty, let top = PNWindow.topViewController() else { completion(.success(false)); return nil }
         let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        if let title = PNProps.string(args["title"]) {
-            controller.setValue(title, forKey: "subject")
-        }
-        controller.completionWithItemsHandler = { _, completed, _, _ in
-            promise.resolve(completed)
+        if let title = title { controller.setValue(title, forKey: "subject") }
+        controller.completionWithItemsHandler = { _, completed, _, error in
+            if let error = error { completion(.failure(error)) } else { completion(.success(completed)) }
         }
         if let popover = controller.popoverPresentationController {
             popover.sourceView = top.view
@@ -188,48 +129,42 @@ public final class ShareModule: PNNativeModule {
             popover.permittedArrowDirections = []
         }
         top.present(controller, animated: true)
+        return { [weak controller] in
+            PNMain.run {
+                controller?.completionWithItemsHandler = nil
+                controller?.dismiss(animated: true)
+            }
+        }
     }
 }
 
 /// `Haptics`: feedback generators plus the legacy vibration sound.
-public final class HapticsModule: PNNativeModule {
+public final class HapticsModule: HapticsImplementation {
     public static let name = "Haptics"
 
     public init() {}
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        switch method {
-        case "impact":
-            let generator = UIImpactFeedbackGenerator(style: HapticsModule.impactStyle(PNProps.string(args["style"])))
-            generator.prepare()
-            generator.impactOccurred()
-            promise.resolve(nil)
-        case "notification":
-            let generator = UINotificationFeedbackGenerator()
-            generator.prepare()
-            generator.notificationOccurred(HapticsModule.notificationType(PNProps.string(args["type"])))
-            promise.resolve(nil)
-        case "selection":
-            let generator = UISelectionFeedbackGenerator()
-            generator.prepare()
-            generator.selectionChanged()
-            promise.resolve(nil)
-        case "vibrate":
-            let duration = PNProps.int(args["duration_ms"]) ?? 400
-            if duration <= 100 {
-                let generator = UIImpactFeedbackGenerator(style: .heavy)
-                generator.prepare()
-                generator.impactOccurred()
-            } else {
-                AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
-            }
-            promise.resolve(nil)
-        case "cancel":
-            promise.resolve(nil)
-        default:
-            promise.reject("Haptics has no method '\(method)'", code: "unknown_method")
-        }
+    public func impact(style: String) {
+        let generator = UIImpactFeedbackGenerator(style: Self.impactStyle(style))
+        generator.prepare()
+        generator.impactOccurred()
     }
+    public func notification(type: String) {
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(Self.notificationType(type))
+    }
+    public func selection() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
+    }
+    public func vibrate(duration_ms: Int64) {
+        guard duration_ms > 0 else { return }
+        if duration_ms <= 100 { impact(style: "heavy") }
+        else { AudioServicesPlaySystemSound(kSystemSoundID_Vibrate) }
+    }
+    public func cancel() {}
 
     static func impactStyle(_ name: String?) -> UIImpactFeedbackGenerator.FeedbackStyle {
         switch name {

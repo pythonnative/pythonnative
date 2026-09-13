@@ -38,6 +38,7 @@ packages = ["humanize", "httpx", "numpy"]
 [ios]
 deployment_target = "13.0"
 development_team = "ABCDE12345"
+privacy_manifest = "PrivacyInfo.xcprivacy"  # optional app declarations
 # bundle_id = "com.example.myapp"
 
 [ios.signing]
@@ -46,7 +47,7 @@ export_method = "development"   # development | ad-hoc | app-store | enterprise
 
 [android]
 min_sdk = 24
-target_sdk = 34
+target_sdk = 36
 # abi_filters = ["arm64-v8a", "x86_64"]   # the default; add 32-bit ABIs if needed
 
 [android.signing]
@@ -200,6 +201,7 @@ generated registration file calls every plugin's `register`. See
 [ios]
 deployment_target = "13.0"
 development_team = "ABCDE12345"
+privacy_manifest = "PrivacyInfo.xcprivacy"  # optional app declarations
 
 [ios.signing]
 export_method = "app-store"

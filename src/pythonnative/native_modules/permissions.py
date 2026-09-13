@@ -4,8 +4,8 @@
 iOS and Android permission models behind two calls, both served by the
 native ``Permissions`` module:
 
-- ``check(permission)``: synchronous, returns a status without
-  prompting.
+- ``check(permission)``: a coroutine that returns a status without prompting.
+  Some platform settings APIs answer asynchronously.
 - ``request(permission)``: a coroutine that shows the system prompt
   (if needed) and resolves to the resulting status.
 
@@ -94,9 +94,9 @@ class Permissions:
     """
 
     @staticmethod
-    def check(permission: PermissionName) -> PermissionStatus:
+    async def check(permission: PermissionName) -> PermissionStatus:
         """Return the current status of ``permission`` without prompting."""
-        return _coerce(native_module("Permissions").call("check", permission=_validate(permission)))
+        return _coerce(await native_module("Permissions").call_async("check", permission=_validate(permission)))
 
     @staticmethod
     async def request(permission: PermissionName) -> PermissionStatus:

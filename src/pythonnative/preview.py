@@ -1,6 +1,6 @@
 """Development server and browser preview.
 
-The browser is a protocol-2 renderer with Yoga WebAssembly layout. Python runs
+The browser is a protocol-3 renderer with Yoga WebAssembly layout. Python runs
 on the standard application asyncio loop; the transport's coordinator and
 network threads forward messages to their owners. The dev server watches app
 sources, synchronizes mobile clients, and applies compatible Fast Refresh.

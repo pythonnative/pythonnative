@@ -184,7 +184,13 @@ class BridgeModule(NativeModule):
             if set(args) != {"call_id"} or type(args["call_id"]) is not int:
                 raise TypeError("Cancellation requires an integer call_id")
         elif contract is not None:
+            platforms = contract.methods.get(method, {}).get("platforms")
+            if platforms is not None and self.transport.name not in platforms:
+                raise NativeModuleError(self.name, method, f"Unsupported on {self.transport.name}", "unsupported")
             args = contract.validate_call(method, args)
+            from ..sdk.types import encode_value
+
+            args = {key: encode_value(value, contract.methods[method]["arguments"][key]) for key, value in args.items()}
         envelope = codec.dumps({"call_id": call_id, "args": codec.to_jsonable(args)})
         raw = self.transport.call(self.name, method, envelope)
         result = codec.loads(raw)
@@ -504,6 +510,11 @@ def emit(module: str, event: str, payload: Any = None) -> None:
     counterparts (a test can emit ``AppState`` ``change`` events, for
     example).
     """
+    from ..sdk.schema import MODULES
+
+    contract = MODULES.get(module)
+    if contract is not None and contract.events:
+        payload = contract.decode_event(event, payload)
     with _registry_lock:
         hooks = list(_hooks.get((module, event), ()))
     for hook in hooks:

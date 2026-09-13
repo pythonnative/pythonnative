@@ -112,7 +112,7 @@ public final class PNPromise {
 /// Unsolicited module events: `callback("module", 0, module, {"event", "payload"})`.
 public enum PNModuleEvents {
     /// Emit `event` from `module` with `payload` on the main thread.
-    public static func emit(module: String, event: String, payload: [String: Any]) {
+    public static func emit(module: String, event: String, payload: Any) {
         PNMain.run {
             PNBridge.shared.callPython(kind: "module", tag: 0, name: module, payload: PNJSON.encode(["event": event, "payload": payload]))
         }

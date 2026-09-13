@@ -25,7 +25,7 @@ A surface commit has this shape:
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "application": "unique-application-id",
   "surface": 1,
   "revision": 1,
@@ -40,7 +40,7 @@ A surface commit has this shape:
 | Operation | Fields |
 | --- | --- |
 | `c` | tag, component type, props |
-| `u` | tag, changed props; `null` removes a prop |
+| `u` | tag, changed props, removed property names; `null` remains a value |
 | `i` | parent tag, child tag, insertion index |
 | `d` | tag; children must already be destroyed |
 | `f` | tag, x, y, width, height |
@@ -74,10 +74,15 @@ provenance. Python tests build a host binding, iOS and Android compile the same
 core, and the browser preview uses the corresponding Yoga WebAssembly package.
 
 The application sends styles as props. Native leaf managers measure text,
-controls, and images next to their widgets. One `Layout.compute` request returns
-a batch of changed frames with `application`, `surface`, and `revision`.
+controls, and images next to their widgets. When the viewport is known, a commit
+includes a `layout` object with `roots`, `width`, and `height`. Its acknowledgment
+includes the resulting frames, so mutation and required layout share one bridge
+crossing. `Layout.compute` remains available for viewport changes without
+mutations. Both return frames with `application`, `surface`, and `revision`.
 Geometry from another surface or revision is ignored. Drawing-only prop updates
-skip the request entirely. Python doesn't make one measurement RPC per leaf.
+skip a separate request. Yoga calculations reuse unchanged constraints, and
+frame collection visits only subtrees with new layout. Python doesn't make one
+measurement RPC per leaf.
 
 Commit and required layout acknowledgments precede ref and effect publication.
 Native navigation animations and later platform layout changes may continue after
@@ -91,7 +96,12 @@ UIKit collection views and Android recycler views own physical cells; a bounded
 window of ordinary keyed Python row components supplies their contents. Headless
 tests simulate the same viewport and row requests. Dataset revisions change when
 data or rendering inputs change; per-item revisions avoid reloading unchanged
-cells. Global and section headers don't change public item indices. Row instances
+cells. Dataset indexing is memoized separately from viewport changes. Stable
+sequence identity, callbacks, and `data_revision` reuse that index even when a
+parent rerenders. Replace an edited sequence or increment `data_revision` after
+in-place edits. Native prefetch requests warm the bounded row window. Native
+containers preserve the first visible key and its offset across dataset changes;
+iOS also preserves it as measured row heights replace estimates. Global and section headers don't change public item indices. Row instances
 can unmount outside the window, so persistent item state belongs in app data.
 
 ## Modules, contracts, and animations

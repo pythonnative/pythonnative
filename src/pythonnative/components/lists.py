@@ -1,6 +1,7 @@
 """Keyed virtualized lists with one logical component tree."""
 
-from typing import Any, Callable, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from ..component import component, memo
 from ..element import Element
@@ -10,6 +11,74 @@ from .layout import Row, View
 from .text import Text
 
 _DEFAULT_ROW_EXTENT = 44.0
+
+
+class _Identity:
+    """Keep a dependency alive and compare it without traversing its values."""
+
+    __slots__ = ("value",)
+
+    def __init__(self, value: Any) -> None:
+        self.value = value
+
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, _Identity) and self.value is other.value
+
+
+@dataclass(frozen=True)
+class _ListSnapshot:
+    """Dataset metadata built once, independently of the visible window."""
+
+    rows: list["_RowSpec"]
+    keys: list[str]
+    heights: list[float]
+    item_revisions: list[int]
+    inputs: dict[str, tuple[Any, int]]
+    public_indices: dict[int, int]
+    source_ids: frozenset[int]
+    revision: int
+    render_inputs: Any
+
+
+def _prepare_snapshot(
+    source: Sequence["_RowSpec"],
+    before: Optional[_ListSnapshot],
+    render_inputs: Any,
+    header: Optional[Element],
+    footer: Optional[Element],
+    empty: Optional[Element],
+    estimated: float,
+) -> _ListSnapshot:
+    from ..equality import equal
+
+    rows = list(source)
+    if not rows and empty is not None:
+        rows.append(_RowSpec("__empty__", lambda: empty, None, item=empty, item_count=0))
+    if header is not None:
+        rows.insert(0, _RowSpec("__header__", lambda: header, None, item=header, item_count=0))
+    if footer is not None:
+        rows.append(_RowSpec("__footer__", lambda: footer, None, item=footer, item_count=0))
+    keys = [row.key for row in rows]
+    if len(set(keys)) != len(keys):
+        raise ValueError("List keys must be unique")
+    prior = before.inputs if before is not None else {}
+    render_changed = before is None or not equal(before.render_inputs, render_inputs)
+    inputs, revisions, public = {}, [], {}
+    for native_index, row in enumerate(rows):
+        values = (row.item, row.index, row.extent, row.item_count)
+        old = prior.get(row.key)
+        changed = render_changed or old is None or not equal(old[0], values)
+        revision = 1 if old is None else old[1] + int(changed)
+        inputs[row.key] = (values, revision)
+        revisions.append(revision)
+        for public_index in range(row.index, row.index + row.item_count):
+            public[public_index] = native_index
+    heights = [row.extent if row.extent is not None else estimated for row in rows]
+    changed = before is None or keys != before.keys or revisions != before.item_revisions or heights != before.heights
+    revision = 1 if before is None else before.revision + int(changed)
+    return _ListSnapshot(
+        rows, keys, heights, revisions, inputs, public, frozenset(id(row) for row in source), revision, render_inputs
+    )
 
 
 class _RowSpec:
@@ -91,7 +160,7 @@ def _ListRow(row: _RowSpec, revision: int) -> Element:
 
 @component
 def _NativeList(
-    rows: Optional[List[_RowSpec]] = None,
+    rows: Optional[Sequence[_RowSpec]] = None,
     render_inputs: Any = None,
     on_end_reached: Optional[Callable[[], Any]] = None,
     on_end_reached_threshold: Optional[float] = None,
@@ -123,38 +192,27 @@ def _NativeList(
             return getattr(owner, "backend").command(tag, name, args)
         return None
 
-    source = rows or []
-    rows = list(source)
-    if not rows and empty is not None:
-        rows.append(_RowSpec("__empty__", lambda: empty, None, item=empty))
-    if header is not None:
-        rows.insert(0, _RowSpec("__header__", lambda: header, None, item=header))
-    if footer is not None:
-        rows.append(_RowSpec("__footer__", lambda: footer, None, item=footer))
-    keys = [row.key for row in rows]
-    if len(set(keys)) != len(keys):
-        raise ValueError("List keys must be unique")
+    source = rows if rows is not None else ()
     previous: Any = use_ref(None)
-    signature = [(row.key, row.item, row.index, row.extent, row.item_count) for row in rows]
 
-    def snapshot() -> Any:
-        from ..equality import equal
+    def prepare() -> _ListSnapshot:
+        result = _prepare_snapshot(source, previous.current, render_inputs, header, footer, empty, estimated_row_extent)
+        previous.current = result
+        return result
 
-        before = previous.current
-        dataset_revision = 1 if before is None else before[0] + 1
-        prior: dict[str, Any] = before[1] if before is not None else {}
-        render_changed = before is None or not equal(before[2], render_inputs)
-        items = {}
-        for row in rows:
-            inputs = (row.item, row.index, row.extent, row.item_count)
-            old = prior.get(row.key)
-            changed = render_changed or old is None or not equal(old[0], inputs)
-            item_revision = 1 if old is None else old[1] + int(changed)
-            items[row.key] = (inputs, item_revision)
-        previous.current = (dataset_revision, items, render_inputs)
-        return dataset_revision, [items[key][1] for key in keys]
-
-    revision, item_revisions = use_memo(snapshot, [signature, render_inputs, header, footer, empty])
+    dataset = use_memo(
+        prepare,
+        [
+            _Identity(source),
+            render_inputs,
+            _Identity(header),
+            _Identity(footer),
+            _Identity(empty),
+            estimated_row_extent,
+        ],
+    )
+    rows, keys = dataset.rows, dataset.keys
+    revision, item_revisions = dataset.revision, dataset.item_revisions
     window, set_window = use_state((0, 800.0))
     center, viewport = window
     visible = max(1, int(viewport / max(1, estimated_row_extent)) + 1)
@@ -174,12 +232,13 @@ def _NativeList(
     def scroll(info: Dict[str, Any]) -> Any:
         start = int(info.get("first", center))
         extent = float(info.get("extent", viewport))
-        if start != center or extent != viewport:
+        if start < first + 8 and first > 0 or start + visible > last - 8 and last < len(rows) or extent != viewport:
             set_window((start, extent))
         if on_end_reached is not None:
             remaining = info.get("range", 0) - info.get("x" if horizontal else "y", 0) - info.get("extent", 0)
             if (
-                remaining <= (on_end_reached_threshold or 0.5) * info.get("extent", 0)
+                remaining
+                <= (0.5 if on_end_reached_threshold is None else on_end_reached_threshold) * info.get("extent", 0)
                 and end_revision.current != revision
             ):
                 end_revision.current = revision
@@ -195,7 +254,7 @@ def _NativeList(
                 [
                     {"key": rows[i].key, "index": rows[i].index, "item": rows[i].item}
                     for i in range(max(0, start), min(len(rows), end + 1))
-                    if rows[i] in source and rows[i].item_count
+                    if id(rows[i]) in dataset.source_ids and rows[i].item_count
                 ],
             )
         return on_scroll(info) if on_scroll is not None else None
@@ -203,12 +262,10 @@ def _NativeList(
     def scroll_to_index(index: int, animated: bool) -> None:
         if index < 0:
             raise IndexError("List item index must be nonnegative")
-        candidates = [
-            i for i, row in enumerate(rows) if row in source and row.index <= index < row.index + row.item_count
-        ]
-        if not candidates:
+        native_index = dataset.public_indices.get(index)
+        if native_index is None:
             raise IndexError("List has no item at that index")
-        dispatch(internal_ref, "scroll_to_index", {"index": candidates[-1], "animated": animated})
+        dispatch(internal_ref, "scroll_to_index", {"index": native_index, "animated": animated})
 
     use_imperative_handle(
         controller_ref,
@@ -228,7 +285,7 @@ def _NativeList(
         "revision": revision,
         "item_revisions": item_revisions,
         "count": len(rows),
-        "row_heights": [r.extent or estimated_row_extent for r in rows],
+        "row_heights": dataset.heights,
         "horizontal": horizontal,
         "on_bind_row": bind,
         "on_scroll": scroll,
@@ -251,9 +308,11 @@ def _NativeList(
     return Element("VirtualList", props, children)
 
 
+@component
 def FlatList(
     *,
-    data: Optional[List[Any]] = None,
+    data: Optional[Sequence[Any]] = None,
+    data_revision: int = 0,
     render_item: Optional[Callable[[Any, int], Element]] = None,
     key_extractor: Optional[Callable[[Any, int], str]] = None,
     item_height: Optional[float] = None,
@@ -295,7 +354,9 @@ def FlatList(
     ``ref.current.scroll_to_end()``.
 
     Args:
-        data: List of arbitrary item values.
+        data: Sequence of arbitrary item values. Replace the sequence when it changes.
+        data_revision: Increment after changing a sequence in place. Unchanged
+            sequence identity and revision reuse the indexed dataset.
         render_item: ``render_item(item, index) -> Element``. Defaults
             to wrapping each item in a [`Text`][pythonnative.Text].
         key_extractor: Function returning a stable key per item
@@ -349,65 +410,84 @@ def FlatList(
         )
         ```
     """
-    items_list = list(data or [])
     sep = float(separator_height or 0.0)
 
-    def _row_key(item: Any, index: int) -> str:
-        if key_extractor is not None:
-            return str(key_extractor(item, index))
-        return f"__pn_row_{index}__"
+    def prepare_rows() -> List[_RowSpec]:
+        items_list = list(data or [])
 
-    def _row_extent(item: Any, index: int) -> Optional[float]:
-        if get_item_height is not None:
-            try:
-                return float(get_item_height(item, index)) + sep
-            except Exception:
-                return None
-        if item_height is not None:
-            return float(item_height) + sep
-        return None
+        def _row_key(item: Any, index: int) -> str:
+            if key_extractor is not None:
+                return str(key_extractor(item, index))
+            return f"__pn_row_{index}__"
 
-    def _make_row(item: Any, index: int) -> Callable[[], Element]:
-        def _make() -> Element:
-            el = render_item(item, index) if render_item else Text(str(item))
-            if sep > 0:
-                pad_style: Dict[str, Any] = {"padding_end" if horizontal else "padding_bottom": sep}
-                return View(el, style=pad_style)
-            return el
+        def _row_extent(item: Any, index: int) -> Optional[float]:
+            if get_item_height is not None:
+                try:
+                    return float(get_item_height(item, index)) + sep
+                except Exception:
+                    return None
+            if item_height is not None:
+                return float(item_height) + sep
+            return None
 
-        return _make
-
-    rows: List[_RowSpec] = []
-    if num_columns > 1 and not horizontal:
-        for start in range(0, len(items_list), num_columns):
-            chunk = items_list[start : start + num_columns]
-
-            def _make_group(group: List[Any] = chunk, base: int = start) -> Element:
-                cells = [
-                    View(
-                        render_item(it, base + j) if render_item else Text(str(it)),
-                        style={"flex": 1},
-                        key=_row_key(it, base + j),
-                    )
-                    for j, it in enumerate(group)
-                ]
-                row = Row(*cells)
+        def _make_row(item: Any, index: int) -> Callable[[], Element]:
+            def _make() -> Element:
+                el = render_item(item, index) if render_item else Text(str(item))
                 if sep > 0:
-                    return View(row, style={"padding_bottom": sep})
-                return row
+                    pad_style: Dict[str, Any] = {"padding_end" if horizontal else "padding_bottom": sep}
+                    return View(el, style=pad_style)
+                return el
 
-            group_key = "__pn_grp_" + "|".join(_row_key(it, start + j) for j, it in enumerate(chunk))
-            extent = (float(item_height) + sep) if item_height is not None else None
-            rows.append(_RowSpec(group_key, _make_group, extent, item=chunk, index=start, item_count=len(chunk)))
-    else:
-        for i, item in enumerate(items_list):
-            rows.append(_RowSpec(_row_key(item, i), _make_row(item, i), _row_extent(item, i), item=item, index=i))
+            return _make
+
+        rows: List[_RowSpec] = []
+        if num_columns > 1 and not horizontal:
+            for start in range(0, len(items_list), num_columns):
+                chunk = items_list[start : start + num_columns]
+
+                def _make_group(group: List[Any] = chunk, base: int = start) -> Element:
+                    cells = [
+                        View(
+                            render_item(it, base + j) if render_item else Text(str(it)),
+                            style={"flex": 1},
+                            key=_row_key(it, base + j),
+                        )
+                        for j, it in enumerate(group)
+                    ]
+                    row = Row(*cells)
+                    if sep > 0:
+                        return View(row, style={"padding_bottom": sep})
+                    return row
+
+                group_key = "__pn_grp_" + "|".join(_row_key(it, start + j) for j, it in enumerate(chunk))
+                extent = (float(item_height) + sep) if item_height is not None else None
+                rows.append(_RowSpec(group_key, _make_group, extent, item=chunk, index=start, item_count=len(chunk)))
+        else:
+            for i, item in enumerate(items_list):
+                rows.append(_RowSpec(_row_key(item, i), _make_row(item, i), _row_extent(item, i), item=item, index=i))
+
+        return rows
+
+    rows = use_memo(
+        prepare_rows,
+        [
+            _Identity(data),
+            data_revision,
+            render_item,
+            key_extractor,
+            item_height,
+            get_item_height,
+            separator_height,
+            horizontal,
+            num_columns,
+        ],
+    )
 
     estimated = estimated_item_height if estimated_item_height is not None else (item_height or _DEFAULT_ROW_EXTENT)
 
     return _NativeList(
         rows=rows,
-        render_inputs=(render_item, separator_height, horizontal, num_columns),
+        render_inputs=(render_item, separator_height, horizontal, num_columns, data_revision),
         on_end_reached=on_end_reached,
         on_end_reached_threshold=on_end_reached_threshold,
         on_viewable_items_changed=on_viewable_items_changed,
@@ -425,9 +505,11 @@ def FlatList(
     ).with_key(key)
 
 
+@component
 def SectionList(
     *,
-    sections: Optional[List[Dict[str, Any]]] = None,
+    sections: Optional[Sequence[Dict[str, Any]]] = None,
+    data_revision: int = 0,
     render_item: Optional[Callable[[Any, int, int], Element]] = None,
     render_section_header: Optional[Callable[[Dict[str, Any], int], Element]] = None,
     key_extractor: Optional[Callable[[Any, int], str]] = None,
@@ -455,6 +537,7 @@ def SectionList(
     may have different (and variable) heights.
 
     Args:
+        data_revision: Increment after changing sections in place to rebuild the indexed dataset.
         sections: Each section is ``{"title": ..., "data": [...]}``.
         render_item: ``render_item(item, item_index, section_index) ->
             Element``.
@@ -486,67 +569,86 @@ def SectionList(
     Returns:
         A virtualized list element (a function component instance).
     """
-    sections_list = list(sections or [])
     sep = float(separator_height or 0.0)
 
-    def _header_el(section: Dict[str, Any], s_idx: int) -> Element:
-        if render_section_header is not None:
-            return render_section_header(section, s_idx)
-        return Text(str(section.get("title", "")), style={"bold": True, "padding": 8})
+    def prepare_rows() -> List[_RowSpec]:
+        sections_list = list(sections or [])
 
-    def _item_el(item: Any, i_idx: int, s_idx: int) -> Element:
-        if render_item is not None:
-            return render_item(item, i_idx, s_idx)
-        return Text(str(item))
+        def _header_el(section: Dict[str, Any], s_idx: int) -> Element:
+            if render_section_header is not None:
+                return render_section_header(section, s_idx)
+            return Text(str(section.get("title", "")), style={"bold": True, "padding": 8})
 
-    rows: List[_RowSpec] = []
-    flat_index = 0
-    for s_idx, section in enumerate(sections_list):
+        def _item_el(item: Any, i_idx: int, s_idx: int) -> Element:
+            if render_item is not None:
+                return render_item(item, i_idx, s_idx)
+            return Text(str(item))
 
-        def _make_header(sec: Dict[str, Any] = section, si: int = s_idx) -> Element:
-            return _header_el(sec, si)
+        rows: List[_RowSpec] = []
+        flat_index = 0
+        for s_idx, section in enumerate(sections_list):
 
-        rows.append(
-            _RowSpec(
-                f"__pn_sec_{s_idx}__",
-                _make_header,
-                float(section_header_height) if section_header_height is not None else None,
-                item=section,
-                index=flat_index,
-                item_count=0,
+            def _make_header(sec: Dict[str, Any] = section, si: int = s_idx) -> Element:
+                return _header_el(sec, si)
+
+            rows.append(
+                _RowSpec(
+                    f"__pn_sec_{s_idx}__",
+                    _make_header,
+                    float(section_header_height) if section_header_height is not None else None,
+                    item=section,
+                    index=flat_index,
+                    item_count=0,
+                )
             )
-        )
-        for i_idx, item in enumerate(section.get("data", []) or []):
-            if key_extractor is not None:
-                try:
-                    row_key = f"s{s_idx}:" + str(key_extractor(item, i_idx))
-                except Exception:
+            for i_idx, item in enumerate(section.get("data", []) or []):
+                if key_extractor is not None:
+                    try:
+                        row_key = f"s{s_idx}:" + str(key_extractor(item, i_idx))
+                    except Exception:
+                        row_key = f"__pn_row_{s_idx}_{i_idx}__"
+                else:
                     row_key = f"__pn_row_{s_idx}_{i_idx}__"
-            else:
-                row_key = f"__pn_row_{s_idx}_{i_idx}__"
 
-            def _make_item(it: Any = item, ii: int = i_idx, si: int = s_idx) -> Element:
-                el = _item_el(it, ii, si)
-                if sep > 0:
-                    return View(el, style={"padding_bottom": sep})
-                return el
+                def _make_item(it: Any = item, ii: int = i_idx, si: int = s_idx) -> Element:
+                    el = _item_el(it, ii, si)
+                    if sep > 0:
+                        return View(el, style={"padding_bottom": sep})
+                    return el
 
-            extent: Optional[float] = None
-            if get_item_height is not None:
-                try:
-                    extent = float(get_item_height(item, i_idx, s_idx)) + sep
-                except Exception:
-                    extent = None
-            elif item_height is not None:
-                extent = float(item_height) + sep
-            rows.append(_RowSpec(row_key, _make_item, extent, item=item, index=flat_index))
-            flat_index += 1
+                extent: Optional[float] = None
+                if get_item_height is not None:
+                    try:
+                        extent = float(get_item_height(item, i_idx, s_idx)) + sep
+                    except Exception:
+                        extent = None
+                elif item_height is not None:
+                    extent = float(item_height) + sep
+                rows.append(_RowSpec(row_key, _make_item, extent, item=item, index=flat_index))
+                flat_index += 1
+
+        return rows
+
+    rows = use_memo(
+        prepare_rows,
+        [
+            _Identity(sections),
+            data_revision,
+            render_item,
+            render_section_header,
+            key_extractor,
+            item_height,
+            get_item_height,
+            separator_height,
+            section_header_height,
+        ],
+    )
 
     estimated = estimated_item_height if estimated_item_height is not None else (item_height or _DEFAULT_ROW_EXTENT)
 
     return _NativeList(
         rows=rows,
-        render_inputs=(render_item, render_section_header, separator_height),
+        render_inputs=(render_item, render_section_header, separator_height, data_revision),
         on_end_reached=on_end_reached,
         on_end_reached_threshold=on_end_reached_threshold,
         on_scroll=on_scroll,

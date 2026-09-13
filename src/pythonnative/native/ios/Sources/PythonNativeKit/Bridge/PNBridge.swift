@@ -3,7 +3,7 @@ import UIKit
 
 /// The version of the wire protocol compiled into this library. Python
 /// refuses to start when `pythonnative.bridge.PROTOCOL_VERSION` differs.
-public let PNProtocolVersion: Int32 = 2
+public let PNProtocolVersion: Int32 = 3
 
 /// The C signature Python registers through `pn_bridge_set_callback`.
 ///
@@ -222,7 +222,7 @@ public func pn_bridge_call(
     let envelope = PNJSON.decodeObject(argsJSON.map { String(cString: $0) })
     if String(cString: module) == "Runtime" {
         return PNBridge.duplicate(PNJSON.encode(["ok": true, "value": [
-            "protocol": 2, "yoga": "3.2.1", "schema": PNContracts.fingerprint,
+            "protocol": 3, "yoga": "3.2.1", "schema": PNContracts.fingerprint,
             "animation_graph": true, "logical_lists": true, "native_layout": true]]))
     }
     if String(cString: module) == "Layout" {

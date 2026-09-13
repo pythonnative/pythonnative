@@ -81,6 +81,7 @@ from .components import (
     Fragment,
     Image,
     ImageBackground,
+    ImageLoadEvent,
     KeyboardAvoidingView,
     ListController,
     Modal,
@@ -103,6 +104,7 @@ from .components import (
     TextInput,
     TouchableOpacity,
     View,
+    WebNavigationEvent,
     WebView,
 )
 from .diagnostics import HookOrderError
@@ -136,6 +138,7 @@ from .hooks import (
     use_window_dimensions,
 )
 from .hosts import create_screen
+from .mutations import UNSET, UnsetType
 from .native_modules import (
     AppState,
     Battery,
@@ -223,6 +226,8 @@ from .style import (
 from .suspense import Resource, lazy, start_resource
 
 __all__ = [
+    "UNSET",
+    "UnsetType",
     # Components
     "ActivityIndicator",
     "Button",
@@ -234,6 +239,8 @@ __all__ = [
     "Fragment",
     "Image",
     "ImageBackground",
+    "ImageLoadEvent",
+    "WebNavigationEvent",
     "KeyboardAvoidingView",
     "ListController",
     "Modal",

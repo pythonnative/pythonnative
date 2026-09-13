@@ -2,9 +2,39 @@ import XCTest
 @testable import PythonNativeKit
 
 final class PNManagerTests: XCTestCase {
+    func testBoxedIntegerColorsRemainDistinctFromBooleans() {
+        XCTAssertEqual(PNColor.parse(PNValues.encode(Int64(0))).map(PNColor.hexString), "#00000000")
+        XCTAssertEqual(PNColor.parse(PNValues.encode(Int64(1))).map(PNColor.hexString), "#00000001")
+        XCTAssertNil(PNColor.parse(PNValues.encode(true)))
+    }
     override func tearDown() {
         PNViewRegistry.shared.removeAll()
         super.tearDown()
+    }
+
+    func testTypedSliderStepsAndResetsColors() {
+        let manager = PNSliderManager()
+        let slider = manager.createView(tag: 70, props: ["value": 0.63, "min_value": 0, "max_value": 1,
+            "step": 0.2, "minimum_track_color": "#ff0000", "thumb_color": "#00ff00"]) as! UISlider
+        XCTAssertNotNil(slider.minimumTrackTintColor)
+        slider.sendActions(for: .valueChanged)
+        XCTAssertEqual(slider.value, 0.6, accuracy: 0.001)
+        manager.update(view: slider, changed: ["minimum_track_color": NSNull(), "thumb_color": NSNull()])
+        XCTAssertNil(slider.minimumTrackTintColor)
+        XCTAssertNil(slider.thumbTintColor)
+    }
+
+    func testImageDecoderBoundsBitmapAllocation() {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 2000, height: 1000))
+        let data = renderer.pngData { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 2000, height: 1000))
+        }
+        let image = PNImageManager.decode(data, targetSize: CGSize(width: 50, height: 50))
+        XCTAssertNotNil(image)
+        XCTAssertLessThanOrEqual(image!.size.width, 150)
+        XCTAssertLessThanOrEqual(image!.size.height, 75)
+        XCTAssertNil(PNImageManager.decode(Data([1, 2, 3]), targetSize: .zero))
     }
 
     func testViewManagerAppliesCommonProps() {
@@ -28,7 +58,8 @@ final class PNManagerTests: XCTestCase {
         manager.update(view: view, changed: ["opacity": 1, "background_color": NSNull(), "display": "none"])
         XCTAssertEqual(view.alpha, 1, accuracy: 0.001)
         XCTAssertTrue(view.isHidden)
-        XCTAssertNil(PNViewState.existing(for: view)?.props["background_color"])
+        XCTAssertTrue(PNViewState.existing(for: view)?.props["background_color"] is NSNull)
+        XCTAssertNil(view.backgroundColor)
         XCTAssertEqual(PNProps.double(PNViewState.existing(for: view)?.props["opacity"]), 1)
     }
 

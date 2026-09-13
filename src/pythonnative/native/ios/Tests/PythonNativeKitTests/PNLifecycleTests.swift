@@ -8,7 +8,7 @@ final class PNLifecycleTests: XCTestCase {
     private let application = UUID().uuidString
     private func apply(_ ops: [[Any]]) {
         revision += 1
-        let json = PNJSON.encode(["version": 2, "application": application, "surface": 1, "revision": revision, "ops": ops])
+        let json = PNJSON.encode(["version": 3, "application": application, "surface": 1, "revision": revision, "ops": ops])
         let result = PNJSON.decodeObject(PNCommit.apply(json))
         XCTAssertEqual(result["ok"] as? Bool, true, String(describing: result))
     }
@@ -61,7 +61,7 @@ final class PNLifecycleTests: XCTestCase {
         input.becomeFirstResponder()
         input.setMarkedText("composing", selectedRange: NSRange(location: 2, length: 0))
         XCTAssertNotNil(input.markedTextRange)
-        apply([["u", 811, ["value": "controlled", "_pn_edit_revision": 100]]])
+        apply([["u", 811, ["value": "controlled", "_pn_edit_revision": 100], []]])
         XCTAssertNotEqual(input.text, "controlled")
         input.unmarkText()
         PNTextInputManager.scheduleCompositionFlush(input)
@@ -69,7 +69,7 @@ final class PNLifecycleTests: XCTestCase {
         XCTAssertEqual(input.text, "controlled", "after composition flush")
         input.selectedRange = NSRange(location: 1, length: 3)
         XCTAssertEqual(input.text, "controlled", "after selection change")
-        apply([["u", 811, ["multiline": false]]])
+        apply([["u", 811, ["multiline": false], []]])
         let replacement = try XCTUnwrap(PNViewRegistry.shared.view(for: 811) as? UITextField)
         XCTAssertEqual(replacement.text, "controlled", "after physical replacement")
         XCTAssertTrue(replacement.isFirstResponder)
@@ -77,4 +77,36 @@ final class PNLifecycleTests: XCTestCase {
         XCTAssertEqual(replacement.offset(from: replacement.beginningOfDocument, to: range.start), 1)
         XCTAssertEqual(replacement.offset(from: replacement.beginningOfDocument, to: range.end), 4)
     }
+    func testNativeHeaderSlotsAndModalPresentationKeepScreenOwnership() throws {
+        apply([["c", 821, "ScreenStack", ["flex": 1]],
+               ["c", 822, "Screen", ["title": "Inbox", "flex": 1]],
+               ["c", 823, "View", ["_pn_header_slot": "right", "width": 80, "height": 44]],
+               ["c", 824, "Button", ["title": "Compose"]], ["i", 823, 824, 0],
+               ["i", 822, 823, 0], ["i", 821, 822, 0]])
+        let stack = try XCTUnwrap(PNViewRegistry.shared.view(for: 821))
+        let root = UIViewController()
+        root.view = stack
+        window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = root
+        window.makeKeyAndVisible()
+        settle()
+        let navigation = try XCTUnwrap(root.children.first as? UINavigationController)
+        XCTAssertTrue(navigation.topViewController?.navigationItem.rightBarButtonItem?.customView === PNViewRegistry.shared.view(for: 823))
+        apply([["c", 825, "Screen", ["title": "Compose", "presentation": "modal", "gesture_enabled": false, "animation": "none", "flex": 1]],
+               ["i", 821, 825, 1]])
+        settle()
+        let modal = try XCTUnwrap(navigation.presentedViewController as? UINavigationController)
+        XCTAssertEqual(modal.topViewController?.title, "Compose")
+        XCTAssertTrue(modal.isModalInPresentation)
+        XCTAssertEqual(navigation.viewControllers.count, 1)
+        XCTAssertTrue(PNViewRegistry.shared.view(for: 825)?.window === window)
+        apply([["d", 825]])
+        settle()
+        XCTAssertNil(navigation.presentedViewController)
+        XCTAssertTrue(PNViewRegistry.shared.view(for: 822)?.window === window)
+        apply([["d", 824], ["d", 823]])
+        settle()
+        XCTAssertNil(navigation.topViewController?.navigationItem.rightBarButtonItem)
+    }
+
 }

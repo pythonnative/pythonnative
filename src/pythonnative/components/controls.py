@@ -17,6 +17,9 @@ def Switch(
     *,
     value: bool = False,
     on_change: Optional[Callable[[bool], Any]] = None,
+    disabled: bool = False,
+    on_tint_color: Optional[Color] = None,
+    thumb_color: Optional[Color] = None,
     accessibility_label: Optional[str] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
@@ -26,6 +29,9 @@ def Switch(
     Args:
         value: Current on/off state.
         on_change: Callback invoked with the new boolean state.
+        disabled: Prevent changes while keeping the switch visible.
+        on_tint_color: Track color when the switch is on.
+        thumb_color: Thumb color, or the platform default.
         accessibility_label: Label exposed to assistive technology (and
             UI test drivers) for the switch.
         style: Style dict (or list of dicts).
@@ -40,6 +46,9 @@ def Switch(
         key=key,
         value=value,
         on_change=on_change,
+        disabled=disabled,
+        on_tint_color=on_tint_color,
+        thumb_color=thumb_color,
         accessibility_label=accessibility_label,
     )
 
@@ -50,6 +59,13 @@ def Slider(
     min_value: float = 0.0,
     max_value: float = 1.0,
     on_change: Optional[Callable[[float], Any]] = None,
+    disabled: bool = False,
+    step: float = 0.0,
+    minimum_track_color: Optional[Color] = None,
+    maximum_track_color: Optional[Color] = None,
+    thumb_color: Optional[Color] = None,
+    on_sliding_start: Optional[Callable[[float], Any]] = None,
+    on_sliding_complete: Optional[Callable[[float], Any]] = None,
     accessibility_label: Optional[str] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
@@ -62,6 +78,13 @@ def Slider(
         max_value: Upper bound.
         on_change: Callback invoked with the new value as the user
             drags.
+        disabled: Prevent dragging the slider.
+        step: Snap values to this increment, or zero for continuous movement.
+        minimum_track_color: Filled track color.
+        maximum_track_color: Unfilled track color.
+        thumb_color: Thumb color, or the platform default.
+        on_sliding_start: Callback when the user starts dragging.
+        on_sliding_complete: Callback when the user finishes dragging.
         accessibility_label: Label exposed to assistive technology (and
             UI test drivers) for the slider.
         style: Style dict (or list of dicts).
@@ -78,6 +101,13 @@ def Slider(
         min_value=min_value,
         max_value=max_value,
         on_change=on_change,
+        disabled=disabled,
+        step=step,
+        minimum_track_color=minimum_track_color,
+        maximum_track_color=maximum_track_color,
+        thumb_color=thumb_color,
+        on_sliding_start=on_sliding_start,
+        on_sliding_complete=on_sliding_complete,
         accessibility_label=accessibility_label,
     )
 

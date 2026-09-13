@@ -33,6 +33,24 @@ class ScreenManager : ViewManager() {
             (parent.manager as? ScreenStackManager)?.refresh(parent.view)
         }
     }
+    @Suppress("UNCHECKED_CAST")
+    private fun headers(view: View): MutableMap<String, View> =
+        stateOf(view).getOrPut("header_slots") { mutableMapOf<String, View>() } as MutableMap<String, View>
+    override fun insertChild(parent: View, child: View, index: Int) {
+        val side = propsOf(child).optString("_pn_header_slot", "")
+        if (side.isNotEmpty()) headers(parent)[side] = child else super.insertChild(parent, child, index)
+        refreshParent(parent)
+    }
+    override fun removeChild(parent: View, child: View) {
+        headers(parent).entries.removeAll { it.value === child }
+        super.removeChild(parent, child)
+        refreshParent(parent)
+    }
+    private fun refreshParent(view: View) {
+        PNBridge.registry.tagOf(view)?.let { NativeLayout.parent(it) }?.let { PNBridge.registry.get(it) }?.let {
+            (it.manager as? ScreenStackManager)?.refresh(it.view)
+        }
+    }
     override fun setFrame(view: View, x: Double, y: Double, width: Double, height: Double) {}
 }
 
@@ -54,6 +72,8 @@ class ScreenStackManager : ComponentManager() {
         val fragments = HashMap<Long, LogicalScreenFragment>()
         var scheduled = false
         var owner: FragmentManager? = null
+        private val headerViews = ArrayList<View>()
+        private val defaultTitleColor = android.widget.TextView(context).currentTextColor
         init {
             orientation = VERTICAL
             addView(toolbar, LayoutParams(LayoutParams.MATCH_PARENT, (56 * PNBridge.density()).toInt()))
@@ -92,10 +112,32 @@ class ScreenStackManager : ComponentManager() {
                 }
                 transaction.commitNow()
                 val current = screens.lastOrNull()?.let { PNBridge.registry.get(it) }
-                toolbar.title = current?.props?.optString("title", "") ?: ""
-                toolbar.visibility = if (current?.props?.optBoolean("header_shown", true) == false) View.GONE else View.VISIBLE
-                PNColor.parse(current?.props?.opt("header_tint_color"))?.let { toolbar.setTitleTextColor(it) }
-                toolbar.navigationIcon = if (screens.size > 1) context.getDrawable(android.R.drawable.ic_media_previous) else null
+                val props = current?.props ?: JSONObject()
+                toolbar.title = props.optString("title", "")
+                toolbar.visibility = if (props.optBoolean("header_shown", true)) View.VISIBLE else View.GONE
+                toolbar.setBackgroundColor(PNColor.parse(props.optJSONObject("header_style")?.opt("background_color")) ?: android.graphics.Color.TRANSPARENT)
+                val titleStyle = props.optJSONObject("header_title_style") ?: JSONObject()
+                toolbar.setTitleTextColor(PNColor.parse(titleStyle.opt("color")) ?: defaultTitleColor)
+                for (index in 0 until toolbar.childCount) {
+                    (toolbar.getChildAt(index) as? android.widget.TextView)?.let { title ->
+                        title.textSize = titleStyle.optDouble("font_size", 20.0).toFloat()
+                        title.setTypeface(android.graphics.Typeface.DEFAULT, if (titleStyle.optBoolean("bold", false)) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+                    }
+                }
+                for (view in headerViews) toolbar.removeView(view)
+                headerViews.clear()
+                @Suppress("UNCHECKED_CAST")
+                val slots = current?.state?.get("header_slots") as? Map<String, View> ?: emptyMap()
+                for ((side, view) in slots) {
+                    (view.parent as? ViewGroup)?.removeView(view)
+                    val gravity = if (side == "left") android.view.Gravity.START else android.view.Gravity.END
+                    toolbar.addView(view, Toolbar.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, (44 * PNBridge.density()).toInt(), gravity or android.view.Gravity.CENTER_VERTICAL))
+                    headerViews.add(view)
+                }
+                toolbar.navigationIcon = if (screens.size > 1 && props.optBoolean("header_back_visible", true) && "left" !in slots) context.getDrawable(android.R.drawable.ic_media_previous)?.mutate() else null
+                PNColor.parse(props.opt("header_tint_color"))?.let { toolbar.navigationIcon?.setTint(it) }
+                toolbar.navigationContentDescription = "Back"
+                NativeLayout.containerDidLayout()
             }
         }
     }

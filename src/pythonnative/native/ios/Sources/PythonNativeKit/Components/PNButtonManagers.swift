@@ -49,9 +49,11 @@ public final class PNButtonManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! ButtonProps(props)
+
         guard let button = view as? UIButton else { return }
-        if PNProps.has(props, "title") {
-            button.setTitle(PNProps.string(PNProps.value(props, "title")) ?? "", for: .normal)
+        if typed.has_title {
+            button.setTitle(typed.title ?? "", for: .normal)
         }
         if initial || PNTextManager.fontKeys.contains(where: { PNProps.has(props, $0) }) {
             button.titleLabel?.font = PNTextManager.font(from: PNViewState.existing(for: view)?.props ?? props, base: nil)
@@ -59,15 +61,15 @@ public final class PNButtonManager: PNComponentManager {
         }
         if let color = PNColor.parse(PNProps.value(props, "background_color")) {
             button.backgroundColor = color
-            if !PNProps.has(props, "color") {
+            if !typed.has_color {
                 button.setTitleColor(.white, for: .normal)
             }
         }
         if let color = PNColor.parse(PNProps.value(props, "color")) {
             button.setTitleColor(color, for: .normal)
         }
-        if PNProps.has(props, "disabled") {
-            button.isEnabled = !(PNProps.bool(PNProps.value(props, "disabled")) ?? false)
+        if typed.has_disabled {
+            button.isEnabled = !(typed.disabled ?? false)
         }
         PNViewStyler.applyDecoration(button, props)
     }
@@ -100,22 +102,24 @@ public final class PNCheckboxManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! CheckboxProps(props)
+
         guard let button = view as? UIButton, let state = PNViewState.existing(for: button) else { return }
         if initial {
             let ink = PNColor.parse("#111111") ?? .label
             button.setTitleColor(ink, for: .normal)
             button.tintColor = ink
         }
-        if PNProps.has(props, "value") {
-            state.extras["value"] = PNProps.bool(PNProps.value(props, "value")) ?? false
+        if typed.has_value {
+            state.extras["value"] = typed.value ?? false
         }
-        if PNProps.has(props, "label") {
-            let label = PNProps.string(PNProps.value(props, "label")) ?? ""
+        if typed.has_label {
+            let label = typed.label ?? ""
             button.setTitle(label, for: .normal)
             button.accessibilityLabel = label
         }
-        if PNProps.has(props, "disabled") {
-            button.isEnabled = !(PNProps.bool(PNProps.value(props, "disabled")) ?? false)
+        if typed.has_disabled {
+            button.isEnabled = !(typed.disabled ?? false)
         }
         updateImage(button)
         PNViewStyler.applyAccessibility(button, props)
@@ -167,9 +171,11 @@ public final class PNPickerManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! PickerProps(props)
+
         guard let button = view as? UIButton else { return }
         button.setTitle(PNPickerManager.title(for: mergedProps(button)), for: .normal)
-        if PNProps.has(props, "disabled") { button.isEnabled = !(PNProps.bool(PNProps.value(props, "disabled")) ?? false) }
+        if typed.has_disabled { button.isEnabled = !(typed.disabled ?? false) }
         PNViewStyler.applyAccessibility(button, props)
     }
 

@@ -65,7 +65,15 @@ class FakePage:
             from pythonnative.bridge.commits import CommitState
 
             self.commit = getattr(self, "commit", CommitState()).prepare(message[2]).publish()
-            return self.commit.acknowledgement()
+            reply = self.commit.acknowledgement()
+            if "layout" in message[2]:
+                reply["layout"] = {
+                    "application": self.commit.application,
+                    "surface": self.commit.surface,
+                    "revision": self.commit.revision,
+                    "frames": [],
+                }
+            return reply
         if kind == "measure":
             return list(self.measure_size)
         if kind == "command":
@@ -168,7 +176,7 @@ def _install_app(monkeypatch: pytest.MonkeyPatch, name: str, root: Any) -> str:
 
 
 def test_apply_waits_for_revision_acknowledgement(web: Any) -> None:
-    envelope = {"version": 2, "application": "test", "surface": 1, "revision": 1, "ops": [["c", 1, "View", {}]]}
+    envelope = {"version": 3, "application": "test", "surface": 1, "revision": 1, "ops": [["c", 1, "View", {}]]}
     result = json.loads(web.transport.apply(codec.dumps(envelope)))
     assert result == {"ok": True, "application": "test", "surface": 1, "revision": 1}
     assert web.page.sent[-1][0] == "apply"
@@ -385,7 +393,10 @@ def test_screen_mounts_through_the_page(web: Any, monkeypatch: pytest.MonkeyPatc
     assert "Text" in created.values() and "Button" in created.values()
     assert ("Host", "attach_root", {"screen": 1, "tag": root_tag}) in web.page.calls
     # Children get frames (the root fills the viewport), and the Text was measured by the page.
-    assert any(module == "Layout" and method == "compute" for module, method, _ in web.page.calls)
+    assert any(
+        message[0] == "apply" and message[2].get("layout", {}).get("roots") == [root_tag] for message in web.page.sent
+    )
+    assert not any(module == "Layout" for module, _, _ in web.page.calls)
     assert not any(m[0] == "measure" for m in web.page.sent)
     assert platform_metrics.get_window_dimensions() == (390.0, 800.0)
 

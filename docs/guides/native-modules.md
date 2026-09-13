@@ -18,11 +18,11 @@ one up:
    plain function when the answer is already on the device and returns
    on the calling thread: `Clipboard`, `Linking`, `Haptics` /
    `Vibration`, `Battery`, `NetInfo.fetch`, `SecureStore`, `AppState`,
-   `FileSystem`, `Permissions.check`, `Biometrics.is_available`. It is
+   `FileSystem`, `Biometrics.is_available`. It is
    a coroutine when the OS has to prompt the user, drive hardware, or
    hand off to another process: `Camera.take_photo` /
    `pick_from_gallery`, `Location.get_current`, `Share.share`,
-   `Permissions.request`, `Biometrics.authenticate`, `Notifications.*`,
+   `Permissions.check` / `request`, `Biometrics.authenticate`, `Notifications.*`,
    `Alert.confirm` / `choose`, and all of `AsyncStorage`. Inside a
    component, drive coroutines with an `async def`
    [`use_effect`][pythonnative.use_effect] callback,
@@ -257,7 +257,7 @@ that have a runtime prompt: `"camera"`, `"microphone"`,
 `"granted"`, `"denied"`, `"blocked"`, `"undetermined"`.
 
 ```python
-if pn.Permissions.check("camera") != "granted":
+if await pn.Permissions.check("camera") != "granted":
     status = await pn.Permissions.request("camera")
     if status == "blocked":
         pn.Linking.open_settings()  # user must enable it in Settings
@@ -512,3 +512,11 @@ listeners without a device.
 - See how device APIs interact with focus: [Lifecycle](../concepts/lifecycle.md).
 - Wrap a custom widget instead of an API: [Custom native components](custom-native-components.md).
 - Wire protocol and plugin layout: [The native bridge](../concepts/bridge.md).
+
+## Implementing an extension
+
+Declare a Python protocol and generate its Python, Swift, and Kotlin interfaces.
+The generated adapters validate arguments and results, preserve nested records,
+and connect coroutine cancellation to the native operation. See
+[generated native contracts](native-contracts.md) and the separately packaged
+[Inbox extension](https://github.com/pythonnative/pythonnative/tree/main/examples/inbox-extension).

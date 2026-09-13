@@ -184,10 +184,8 @@ def test_flatlist_small_list_mounts_every_row() -> None:
         render_item=lambda item, _i: Text(item["name"]),
         key_extractor=lambda item, _i: str(item["id"]),
     )
-    rows = el.props["rows"]
-    assert [r.key for r in rows] == ["0", "1", "2"]
-
     root, _rec, _backend = _mount(el)
+    assert root.props["keys"] == ["0", "1", "2"]
     assert root.type_name == "VirtualList"
     texts = [v.props["text"] for v in root.find_all("Text")]
     assert texts == ["Item 0", "Item 1", "Item 2"]
@@ -201,11 +199,9 @@ def test_flatlist_windows_large_lists() -> None:
         render_item=lambda item, _i: Text(f"row-{item}"),
         key_extractor=lambda item, _i: str(item),
     )
-    rows = el.props["rows"]
-    assert len(rows) == 1000
-    assert rows[0].extent == 44.0
-
     root, _rec, _backend = _mount(el)
+    assert root.props["count"] == 1000
+    assert root.props["row_heights"][0] == 44.0
     mounted = root.find_all("Text")
     # Only the initial window (plus overscan) is mounted, not all 1000.
     assert 0 < len(mounted) < 200
@@ -243,8 +239,8 @@ def test_flatlist_separator_adds_to_row_extent() -> None:
         item_height=20,
         separator_height=4,
     )
-    assert [r.extent for r in el.props["rows"]] == [24.0, 24.0, 24.0]
-    assert el.props["estimated_row_extent"] == 24.0
+    root, _rec, _backend = _mount(el)
+    assert root.props["row_heights"] == [24.0, 24.0, 24.0]
 
 
 def test_flatlist_with_refresh_control() -> None:
@@ -294,9 +290,8 @@ def test_section_list_flattens_headers_and_items() -> None:
     ]
     el = SectionList(sections=sections)
     # 2 headers + 3 items = 5 rows.
-    assert len(el.props["rows"]) == 5
-
     root, _rec, _backend = _mount(el)
+    assert root.props["count"] == 5
     texts = [v.props["text"] for v in root.find_all("Text")]
     assert texts == ["A", "a1", "a2", "B", "b1"]
 
@@ -307,12 +302,10 @@ def test_section_list_header_and_item_extents() -> None:
         {"title": "Y", "data": list(range(50))},
     ]
     el = SectionList(sections=sections, item_height=30, section_header_height=40)
-    rows = el.props["rows"]
-    # 2 headers + 100 items.
-    assert len(rows) == 102
-    assert rows[0].extent == 40.0  # header
-    assert rows[1].extent == 30.0  # item
-
-    # Large flattened list still windows.
     root, _rec, _backend = _mount(el)
+    # 2 headers + 100 items.
+    assert root.props["count"] == 102
+    assert root.props["row_heights"][0] == 40.0  # header
+    assert root.props["row_heights"][1] == 30.0  # item
+    # Large flattened list still windows.
     assert 0 < len(root.find_all("Text")) < 102

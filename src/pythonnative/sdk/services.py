@@ -89,7 +89,7 @@ class NetInfoService(Protocol):
 
 
 class PermissionsService(Protocol):
-    def check(self, permission: str) -> str: ...
+    async def check(self, permission: str) -> str: ...
 
     async def request(self, permission: str) -> str: ...
 
@@ -127,18 +127,20 @@ class BiometricsService(Protocol):
 def install_services() -> None:
     """Register the canonical interfaces without constructing service objects."""
     register_schema(ModuleSchema.from_protocol("Device", DeviceService))
-    register_schema(ModuleSchema.from_protocol("AppState", AppStateService))
+    register_schema(ModuleSchema.from_protocol("AppState", AppStateService, events={"change": str}))
     register_schema(ModuleSchema.from_protocol("Storage", StorageService))
     register_schema(ModuleSchema.from_protocol("SecureStore", SecureStoreService))
     register_schema(ModuleSchema.from_protocol("Clipboard", ClipboardService))
     register_schema(ModuleSchema.from_protocol("Alert", AlertService))
     register_schema(ModuleSchema.from_protocol("Share", ShareService))
-    register_schema(ModuleSchema.from_protocol("Linking", LinkingService))
+    register_schema(ModuleSchema.from_protocol("Linking", LinkingService, events={"url": str}))
     register_schema(ModuleSchema.from_protocol("Haptics", HapticsService))
     register_schema(ModuleSchema.from_protocol("Battery", BatteryService))
     register_schema(ModuleSchema.from_protocol("NetInfo", NetInfoService))
     register_schema(ModuleSchema.from_protocol("Permissions", PermissionsService))
-    register_schema(ModuleSchema.from_protocol("Notifications", NotificationsService))
+    notifications = ModuleSchema.from_protocol("Notifications", NotificationsService)
+    notifications.methods["get_device_token"]["platforms"] = ["ios"]
+    register_schema(notifications)
     register_schema(ModuleSchema.from_protocol("Camera", CameraService))
     register_schema(ModuleSchema.from_protocol("Location", LocationService))
     register_schema(ModuleSchema.from_protocol("Biometrics", BiometricsService))

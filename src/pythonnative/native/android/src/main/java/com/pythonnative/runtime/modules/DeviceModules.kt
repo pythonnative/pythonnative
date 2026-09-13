@@ -1,5 +1,6 @@
 package com.pythonnative.runtime.modules
 
+import com.pythonnative.generated.*
 import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -12,39 +13,20 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.Settings
 import com.pythonnative.runtime.PNBridge
-import com.pythonnative.runtime.bridge.JsonUtil
 import com.pythonnative.runtime.bridge.PNLog
-import com.pythonnative.runtime.bridge.str
-import com.pythonnative.runtime.bridge.value
-import org.json.JSONArray
-import org.json.JSONObject
 import java.util.Locale
 
 /** `Device.info()`: static facts about the OS, hardware, and app directories. */
-class DeviceModule : NativeModule {
-    override val name = "Device"
-
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        when (method) {
-            "info" -> {
-                val ctx = PNBridge.context()
-                val locale = Locale.getDefault()
-                promise.resolve(
-                    mapOf(
-                        "os" to "android",
-                        "os_version" to Build.VERSION.RELEASE,
-                        "sdk_int" to Build.VERSION.SDK_INT,
-                        "model" to Build.MODEL,
-                        "manufacturer" to Build.MANUFACTURER,
-                        "app_dir" to ctx.filesDir.absolutePath,
-                        "cache_dir" to ctx.cacheDir.absolutePath,
-                        "locale" to locale.toLanguageTag(),
-                        "density" to PNBridge.density().toDouble(),
-                    ),
-                )
-            }
-            else -> promise.rejectUnknownMethod(method)
-        }
+class DeviceModule : DeviceImplementation {
+    override fun info(): Map<String, PNJSONValue> {
+        val ctx = PNBridge.context()
+        return mapOf(
+            "os" to "android", "os_version" to Build.VERSION.RELEASE,
+            "sdk_int" to Build.VERSION.SDK_INT, "model" to Build.MODEL,
+            "manufacturer" to Build.MANUFACTURER, "app_dir" to ctx.filesDir.absolutePath,
+            "cache_dir" to ctx.cacheDir.absolutePath, "locale" to Locale.getDefault().toLanguageTag(),
+            "density" to PNBridge.density().toDouble()
+        ).mapValues { PNJSONValue(it.value) }
     }
 }
 
@@ -55,139 +37,98 @@ class DeviceModule : NativeModule {
  * button takes positive, the first `cancel` negative, the first
  * `destructive` neutral, and leftovers spill into free slots.
  */
-class AlertModule : NativeModule {
-    override val name = "Alert"
-
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        when (method) {
-            "present" -> present(args, promise, fireAndForget = false)
-            "show" -> present(args, promise, fireAndForget = true)
-            else -> promise.rejectUnknownMethod(method)
-        }
+class AlertModule : AlertImplementation {
+    override fun show(title: String, message: String?, buttons: List<Map<String, PNJSONValue>>, style: String) {
+        dialog(title, message, buttons) { }
     }
 
-    /**
-     * Build and show the dialog. `present` resolves with the tapped button
-     * index (or -1 on dismiss); `show` resolves immediately so the Python
-     * side's synchronous `call("show")` returns before the dialog closes.
-     */
-    private fun present(args: JSONObject, promise: Promise, fireAndForget: Boolean) {
-        val activity = PNBridge.activity()
-        if (activity == null) {
-            if (fireAndForget) promise.resolve(null) else promise.reject("no activity", "no_activity")
-            return
-        }
-        if (fireAndForget) promise.resolve(null)
-        val builder = AlertDialog.Builder(activity)
-        builder.setTitle(args.str("title") ?: "")
-        args.str("message")?.let { builder.setMessage(it) }
-        val buttons = args.value("buttons") as? JSONArray
-        val specs = ArrayList<JSONObject>()
-        if (buttons != null) for (i in 0 until buttons.length()) buttons.optJSONObject(i)?.let { specs.add(it) }
-        if (specs.isEmpty()) specs.add(JSONObject().put("label", "OK").put("style", "default"))
+    override fun present(title: String, message: String?, buttons: List<Map<String, PNJSONValue>>, style: String, completion: (Result<Long>) -> Unit): (() -> Unit)? =
+        dialog(title, message, buttons) { completion(Result.success(it)) }
 
-        val slotFor = HashMap<Int, String>()
-        val free = arrayListOf("positive", "negative", "neutral")
-        specs.forEachIndexed { i, spec ->
-            val preferred = when (spec.str("style") ?: "default") {
-                "cancel" -> "negative"
-                "destructive" -> "neutral"
-                else -> "positive"
-            }
-            if (free.remove(preferred)) slotFor[i] = preferred
-        }
-        specs.forEachIndexed { i, _ ->
-            if (!slotFor.containsKey(i) && free.isNotEmpty()) slotFor[i] = free.removeAt(0)
-        }
+    private fun dialog(title: String, message: String?, buttons: List<Map<String, PNJSONValue>>, done: (Long) -> Unit): (() -> Unit)? {
+        val activity = PNBridge.activity() ?: run { done(-1); return null }
+        val builder = AlertDialog.Builder(activity).setTitle(title).setMessage(message)
+        val specs = buttons.ifEmpty { listOf(mapOf("label" to PNJSONValue("OK"))) }
         var delivered = false
-        fun deliver(index: Int) {
-            if (delivered) return
-            delivered = true
-            if (!fireAndForget) promise.resolve(index)
-        }
-        specs.forEachIndexed { i, spec ->
-            val label = spec.str("label") ?: "OK"
-            when (slotFor[i]) {
-                "positive" -> builder.setPositiveButton(label) { _, _ -> deliver(i) }
-                "negative" -> builder.setNegativeButton(label) { _, _ -> deliver(i) }
-                "neutral" -> builder.setNeutralButton(label) { _, _ -> deliver(i) }
+        fun deliver(index: Long) { if (!delivered) { delivered = true; done(index) } }
+        if (specs.size > 3) {
+            // Android's three action slots must never silently hide extra choices.
+            builder.setItems(specs.map { it["label"]?.value as? String ?: "OK" }.toTypedArray()) { _, index -> deliver(index.toLong()) }
+        } else {
+            val free = arrayListOf("positive", "negative", "neutral")
+            val slots = HashMap<Int, String>()
+            specs.forEachIndexed { index, spec ->
+                val preferred = when (spec["style"]?.value) { "cancel" -> "negative"; "destructive" -> "neutral"; else -> "positive" }
+                if (free.remove(preferred)) slots[index] = preferred
+            }
+            specs.forEachIndexed { index, spec ->
+                val slot = slots[index] ?: free.removeAt(0)
+                val label = spec["label"]?.value as? String ?: "OK"
+                when (slot) {
+                    "positive" -> builder.setPositiveButton(label) { _, _ -> deliver(index.toLong()) }
+                    "negative" -> builder.setNegativeButton(label) { _, _ -> deliver(index.toLong()) }
+                    else -> builder.setNeutralButton(label) { _, _ -> deliver(index.toLong()) }
+                }
             }
         }
         builder.setOnCancelListener { deliver(-1) }
         builder.setOnDismissListener { deliver(-1) }
-        builder.show()
+        val dialog = builder.show()
+        return { delivered = true; dialog.dismiss() }
     }
 }
 
-/** `Clipboard.set_string(value)` / `get_string()`. */
-class ClipboardModule : NativeModule {
-    override val name = "Clipboard"
-
+/** `Clipboard.set_string(text)` / `get_string()`. */
+class ClipboardModule : ClipboardImplementation {
     private fun manager(): ClipboardManager? =
         PNBridge.context().getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        when (method) {
-            "set_string" -> {
-                manager()?.setPrimaryClip(ClipData.newPlainText("pythonnative", args.str("value") ?: ""))
-                promise.resolve(null)
-            }
-            "get_string" -> {
-                val clip = manager()?.primaryClip
-                val text = if (clip != null && clip.itemCount > 0) clip.getItemAt(0).text?.toString() else null
-                promise.resolve(text ?: "")
-            }
-            "has_string" -> {
-                val clip = manager()?.primaryClip
-                promise.resolve(clip != null && clip.itemCount > 0 && !clip.getItemAt(0).text.isNullOrEmpty())
-            }
-            else -> promise.rejectUnknownMethod(method)
-        }
+    override fun set_string(text: String) {
+        manager()?.setPrimaryClip(ClipData.newPlainText("pythonnative", text))
+    }
+    override fun get_string(): String {
+        val clip = manager()?.primaryClip
+        return if (clip != null && clip.itemCount > 0) clip.getItemAt(0).coerceToText(PNBridge.context()).toString() else ""
     }
 }
 
 /** `Share.share({message, url, title})`: an `ACTION_SEND` chooser resolving `true` when it returns. */
-class ShareModule : NativeModule {
-    override val name = "Share"
-    private var pending: Promise? = null
+class ShareModule : ShareImplementation {
+    private var pending: ((Result<Boolean>) -> Unit)? = null
     private var pendingCode = 0
 
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        when (method) {
-            "share" -> share(args, promise)
-            else -> promise.rejectUnknownMethod(method)
-        }
-    }
-
-    private fun share(args: JSONObject, promise: Promise) {
-        val activity = PNBridge.activity() ?: return promise.reject("no activity", "no_activity")
-        val message = args.str("message")
-        val url = args.str("url")
+    override fun share(message: String?, url: String?, title: String?, completion: (Result<Boolean>) -> Unit): (() -> Unit)? {
+        val activity = PNBridge.activity() ?: run { completion(Result.failure(IllegalStateException("No activity"))); return null }
         val body = listOfNotNull(message, url).joinToString("\n")
-        if (body.isEmpty()) return promise.resolve(false)
-        val intent = Intent(Intent.ACTION_SEND)
-        intent.type = "text/plain"
-        intent.putExtra(Intent.EXTRA_TEXT, body)
-        args.str("title")?.let { intent.putExtra(Intent.EXTRA_SUBJECT, it) }
+        if (body.isEmpty()) { completion(Result.success(false)); return null }
+        if (pending != null) { completion(Result.failure(IllegalStateException("A share is already open"))); return null }
+        val intent = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, body)
+        title?.let { intent.putExtra(Intent.EXTRA_SUBJECT, it) }
+        val code = RequestCodes.next()
+        pending = completion
+        pendingCode = code
         try {
-            pending?.resolve(true)
-            pending = promise
-            pendingCode = RequestCodes.next()
             @Suppress("DEPRECATION")
-            activity.startActivityForResult(Intent.createChooser(intent, args.str("title")), pendingCode)
-        } catch (e: Exception) {
+            activity.startActivityForResult(Intent.createChooser(intent, title), code)
+        } catch (error: Exception) {
             pending = null
-            promise.resolve(false)
+            completion(Result.failure(error))
+            return null
+        }
+        return {
+            if (pendingCode == code) {
+                pending = null
+                @Suppress("DEPRECATION")
+                activity.finishActivity(code)
+            }
         }
     }
 
-    /** Resolve the pending share when the chooser activity returns. */
     fun onActivityResult(requestCode: Int): Boolean {
-        if (requestCode != pendingCode || pending == null) return false
-        val p = pending
+        if (requestCode != pendingCode) return false
+        val completion = pending ?: return false
         pending = null
-        // The chooser gives no success signal; returning to the app counts as shared.
-        p?.resolve(true)
+        // ACTION_SEND has no trustworthy delivery status; this reports chooser return.
+        completion(Result.success(true))
         return true
     }
 }
@@ -197,20 +138,14 @@ class ShareModule : NativeModule {
  * plus `url` events for deep links, buffered until a `PythonHost` is
  * installed.
  */
-class LinkingModule : NativeModule {
-    override val name = "Linking"
+class LinkingModule : LinkingImplementation {
+    val name = "Linking"
     private val buffered = ArrayList<String>()
     private var initialUrl: String? = null
 
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        when (method) {
-            "open_url" -> promise.resolve(openUrl(args.str("url") ?: ""))
-            "can_open_url" -> promise.resolve(canOpen(args.str("url") ?: ""))
-            "open_settings" -> promise.resolve(openSettings())
-            "get_initial_url" -> promise.resolve(initialUrl)
-            else -> promise.rejectUnknownMethod(method)
-        }
-    }
+    override fun open_url(url: String): Boolean = openUrl(url)
+    override fun can_open_url(url: String): Boolean = canOpen(url)
+    override fun open_settings(): Boolean = openSettings()
 
     /** Record a deep link and emit it once Python can receive it. */
     fun onDeepLink(url: String) {
@@ -222,7 +157,7 @@ class LinkingModule : NativeModule {
     private fun flush() {
         val urls = ArrayList(buffered)
         buffered.clear()
-        for (url in urls) ModuleEvents.emit(name, "url", JSONObject().put("url", url))
+        for (url in urls) LinkingEvents.url(url)
     }
 
     private fun openUrl(url: String): Boolean {
@@ -263,20 +198,13 @@ class LinkingModule : NativeModule {
 }
 
 /** `Haptics`: `impact(style)`, `notification(type)`, `selection()`, `vibrate(duration_ms)`, `cancel()`. */
-class HapticsModule : NativeModule {
-    override val name = "Haptics"
+class HapticsModule : HapticsImplementation {
 
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        when (method) {
-            "impact" -> buzz(IMPACT_MS[args.str("style") ?: "medium"] ?: 20L)
-            "notification" -> buzz(NOTIFICATION_MS[args.str("type") ?: args.str("type_") ?: "success"] ?: 30L)
-            "selection" -> buzz(10L)
-            "vibrate" -> buzz(JsonUtil.toLong(args.opt("duration_ms"), 400L))
-            "cancel" -> vibrator()?.cancel()
-            else -> return promise.rejectUnknownMethod(method)
-        }
-        promise.resolve(null)
-    }
+    override fun impact(style: String) = buzz(IMPACT_MS[style] ?: 20L)
+    override fun notification(type: String) = buzz(NOTIFICATION_MS[type] ?: 30L)
+    override fun selection() = buzz(10L)
+    override fun vibrate(duration_ms: Long) { if (duration_ms > 0) buzz(duration_ms) }
+    override fun cancel() { vibrator()?.cancel() }
 
     private fun vibrator(): Vibrator? {
         val ctx = PNBridge.context()

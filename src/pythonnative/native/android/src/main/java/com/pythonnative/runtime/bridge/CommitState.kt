@@ -21,6 +21,8 @@ class CommitState {
 
     fun layout(frames: JSONArray): JSONObject = JSONObject().put("application", application)
         .put("surface", surface).put("revision", revision).put("frames", frames)
+        .put("metrics", JSONObject().put("layout_ns", com.pythonnative.runtime.layout.NativeLayout.layoutNanos)
+            .put("visited", com.pythonnative.runtime.layout.NativeLayout.visitedNodes))
 
     fun apply(json: String, applier: TransactionApplier): String {
         try {
@@ -28,7 +30,7 @@ class CommitState {
             val app = envelope.getString("application")
             val target = envelope.getInt("surface")
             val next = envelope.getInt("revision")
-            require(envelope.getInt("version") == 2 && app.isNotEmpty() && target > 0) { "invalid v2 envelope" }
+            require(envelope.getInt("version") == 3 && app.isNotEmpty() && target > 0) { "invalid v3 envelope" }
             val replacing = app != application
             require(next == (if (replacing) 1 else revision + 1)) { "stale revision" }
             require(replacing || (!failed && target == surface)) { "failed or foreign surface" }
@@ -42,7 +44,7 @@ class CommitState {
             for (i in 0 until raw.length()) {
                 val parts = raw.getJSONArray(i)
                 val code = parts.getString(0)
-                require(parts.length() == mapOf("c" to 4, "u" to 3, "i" to 4, "d" to 2, "f" to 6)[code]) { "invalid operation" }
+                require(parts.length() == mapOf("c" to 4, "u" to 4, "i" to 4, "d" to 2, "f" to 6)[code]) { "invalid operation" }
                 val tag = parts.getLong(1)
                 require(tag > 0 && parts.getDouble(1) == tag.toDouble()) { "invalid tag" }
                 if (code == "c") {
@@ -57,6 +59,8 @@ class CommitState {
                         "u" -> {
                             val props = parts.getJSONObject(2)
                             val type = names[tag]
+                            val removed = parts.getJSONArray(3).let { list -> (0 until list.length()).map { list.getString(it) } }
+                            require(type != null && com.pythonnative.generated.PNContracts.validateRemoval(type, props, removed)) { "invalid removal" }
                             require(type == null || com.pythonnative.generated.PNContracts.validate(type, props, true)) { "invalid typed update" }
                         }
                         "i" -> {
@@ -87,6 +91,13 @@ class CommitState {
                 }
                 ops.add(PNTransaction.decodeOp(parts))
             }
+            val layoutRequest = envelope.optJSONObject("layout")
+            require(!envelope.has("layout") || layoutRequest != null) { "invalid layout request" }
+            if (layoutRequest != null) {
+                val roots = layoutRequest.getJSONArray("roots")
+                require((0 until roots.length()).all { roots.getLong(it) in tags }) { "invalid layout roots" }
+                for (dimension in listOf("width", "height")) require(layoutRequest.getDouble(dimension).let { it.isFinite() && it > 0 }) { "invalid layout size" }
+            }
             val mutationStarted = System.nanoTime()
             try {
                 if (replacing) {
@@ -107,10 +118,13 @@ class CommitState {
             parents = links
             types = names
             childCounts = counts
-            failed = false
-            return JSONObject().put("ok", true).put("application", app)
+            val reply = JSONObject().put("ok", true).put("application", app)
                 .put("surface", target).put("revision", next)
-                .put("metrics", JSONObject().put("mutation_ns", System.nanoTime() - mutationStarted)).toString()
+                .put("metrics", JSONObject().put("mutation_ns", System.nanoTime() - mutationStarted))
+            failed = true
+            if (layoutRequest != null) reply.put("layout", layout(com.pythonnative.runtime.layout.NativeLayout.compute(layoutRequest)))
+            failed = false
+            return reply.toString()
         } catch (error: Exception) {
             return JSONObject().put("ok", false).put("error", error.message).put("failed", failed).toString()
         }

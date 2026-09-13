@@ -359,6 +359,14 @@ Navigation changes are cached on the native host before lifecycle state-saving
 callbacks. Back requests return to Python asynchronously so `before_remove`
 listeners and back handlers can decide whether to remove a route.
 
+Header factories (`header_left` and `header_right`) render ordinary Python
+components within their route's providers and navigation context. Their native
+views are installed in UIKit navigation items or the Android toolbar.
+On iOS, `presentation="modal"` starts a native sheet containing its own stack;
+subsequent cards push within that sheet. Android presents these routes through
+its full-screen fragment stack. `gesture_enabled=False` prevents interactive
+iOS dismissal, and rejected native back requests restore the existing route.
+
 ## Testing
 
 Use `render`, `press`, and `back` to exercise complete navigation flows in one

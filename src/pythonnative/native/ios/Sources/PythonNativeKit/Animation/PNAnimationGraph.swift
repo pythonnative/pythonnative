@@ -8,6 +8,11 @@ enum PNAnimationGraph {
     static var previous: [Int64: Double] = [:]
     static var outputs: [Int64: Any] = [:]
     static var drivers: [Int64: PNGraphDriver] = [:]
+    private static var membership: [Int64: Set<Int64>] = [:]
+    private static var applied: [String: (ObjectIdentifier, NSObject)] = [:]
+    static var evaluatedNodes = 0
+    static var evaluatedGraphs = 0
+    static var frameCount = 0
 
     static func number(_ value: Any?) -> Double { (value as? NSNumber)?.doubleValue ?? 0 }
     static func identity(_ value: Any?) -> Int64 { (value as? NSNumber)?.int64Value ?? 0 }
@@ -30,8 +35,9 @@ enum PNAnimationGraph {
     }
     static func set(_ id: Int64, _ value: Double) {
         guard value.isFinite else { return }
+        guard values[id] != value else { return }
         values[id] = value
-        evaluate()
+        evaluate(changed: [id])
     }
     static func event(_ tag: Int64, _ name: String, _ args: [Any?]) {
         guard let view = PNViewRegistry.shared.view(for: tag), let props = PNViewState.existing(for: view)?.props,
@@ -43,10 +49,17 @@ enum PNAnimationGraph {
             fields = events[payload["state"] as? String ?? ""]
         } else { fields = (props["_pn_animated_events"] as? [String: [String: Any]])?[name] }
         guard let fields = fields else { return }
-        for (field, node) in fields { if let value = payload[field] as? NSNumber { values[identity(node)] = value.doubleValue } }
-        evaluate()
+        var changed: Set<Int64> = []
+        for (field, node) in fields {
+            if let value = payload[field] as? NSNumber, value.doubleValue.isFinite {
+                let id = identity(node)
+                if values[id] != value.doubleValue { values[id] = value.doubleValue; changed.insert(id) }
+            }
+        }
+        evaluate(changed: changed)
     }
     static func forget(_ tag: Int64) {
+        applied = applied.filter { !$0.key.hasPrefix("\(tag):") }
         for (id, var graph) in graphs {
             graph.bindings.removeAll { identity($0[0]) == tag }
             if graph.bindings.isEmpty { graphs.removeValue(forKey: id) } else { graphs[id] = graph }
@@ -54,6 +67,10 @@ enum PNAnimationGraph {
         collect()
     }
     static func collect() {
+        membership.removeAll(keepingCapacity: true)
+        for (graphID, graph) in graphs {
+            for node in graph.nodes { membership[identity(node["id"]), default: []].insert(graphID) }
+        }
         let live = Set(graphs.values.flatMap { $0.nodes.map { identity($0["id"]) } })
         values = values.filter { live.contains($0.key) }
         previous = previous.filter { live.contains($0.key) }
@@ -63,15 +80,24 @@ enum PNAnimationGraph {
             drivers.removeValue(forKey: id)
             PNAnimator.reportCompletion(id: id, finished: false)
         }
+        PNGraphClock.shared.stopIfIdle()
     }
     static func input(_ value: [String: Any]) -> Double {
         value["node"] == nil ? number(value["constant"]) : values[identity(value["node"])] ?? 0
     }
-    static func evaluate() {
-        for graph in graphs.values {
+    static func evaluate(changed: Set<Int64>? = nil) {
+        let affected = changed.map { Set($0.flatMap { membership[$0] ?? [] }) } ?? Set(graphs.keys)
+        for graphID in affected {
+            guard let graph = graphs[graphID] else { continue }
+            evaluatedGraphs += 1
+            var dirty = changed ?? Set(graph.nodes.map { identity($0["id"]) })
             for node in graph.nodes {
                 let id = identity(node["id"])
-                let inputs = (node["inputs"] as? [[String: Any]] ?? []).map(input)
+                let rawInputs = node["inputs"] as? [[String: Any]] ?? []
+                guard dirty.contains(id) || rawInputs.contains(where: { dirty.contains(identity($0["node"])) }) else { continue }
+                dirty.insert(id)
+                evaluatedNodes += 1
+                let inputs = rawInputs.map(input)
                 let a = inputs.first ?? 0, b = inputs.count > 1 ? inputs[1] : 0
                 var value: Double = 0
                 switch node["kind"] as? String {
@@ -93,7 +119,11 @@ enum PNAnimationGraph {
             }
             for binding in graph.bindings {
                 guard binding.count == 3, let record = PNViewRegistry.shared.resolve(identity(binding[0])), let prop = binding[1] as? String else { continue }
-                record.manager.setAnimatedProperty(view: record.view, prop: prop, value: outputs[identity(binding[2])])
+                guard let value = outputs[identity(binding[2])] as? NSObject else { continue }
+                let key = "\(record.tag):\(prop)", viewID = ObjectIdentifier(record.view)
+                if let old = applied[key], old.0 == viewID && old.1.isEqual(value) { continue }
+                applied[key] = (viewID, value)
+                record.manager.setAnimatedProperty(view: record.view, prop: prop, value: value)
             }
         }
     }
@@ -125,33 +155,69 @@ enum PNAnimationGraph {
     static func cancel(_ id: Int64) -> Double? {
         guard let driver = drivers.removeValue(forKey: id) else { return nil }
         driver.stop()
+        PNGraphClock.shared.stopIfIdle()
         return values[driver.node]
+    }
+}
+
+/// All graph drivers share one display link and publish one evaluation per frame.
+final class PNGraphClock: NSObject {
+    static let shared = PNGraphClock()
+    private var link: CADisplayLink?
+    private var previousTime = 0.0
+    var running: Bool { link != nil }
+
+    func start() {
+        guard link == nil else { return }
+        previousTime = 0
+        let display = CADisplayLink(target: self, selector: #selector(tick(_:)))
+        link = display
+        display.add(to: .main, forMode: .common)
+    }
+    func stopIfIdle() {
+        if PNAnimationGraph.drivers.values.allSatisfy({ !$0.active }) {
+            link?.invalidate(); link = nil; previousTime = 0
+        }
+    }
+    @objc private func tick(_ display: CADisplayLink) {
+        let dt = previousTime == 0 ? display.duration : min(0.064, display.timestamp - previousTime)
+        previousTime = display.timestamp
+        advance(dt)
+    }
+    func advance(_ dt: Double) {
+        var changed: Set<Int64> = [], completed: [Int64] = []
+        PNAnimationGraph.frameCount += 1
+        for driver in Array(PNAnimationGraph.drivers.values) where driver.active {
+            let before = PNAnimationGraph.values[driver.node]
+            if driver.advance(dt) { completed.append(driver.id) }
+            if before != PNAnimationGraph.values[driver.node] { changed.insert(driver.node) }
+        }
+        PNAnimationGraph.evaluate(changed: changed)
+        for id in completed {
+            PNAnimationGraph.drivers.removeValue(forKey: id)
+            PNAnimator.reportCompletion(id: id, finished: true)
+        }
+        stopIfIdle()
     }
 }
 
 final class PNGraphDriver: NSObject {
     let id: Int64, node: Int64
     let spec: [String: Any]
-    var link: CADisplayLink?
-    var elapsed = 0.0, previousTime = 0.0
+    var active = false
+    var elapsed = 0.0
     var current: Double, velocity: Double
     init(id: Int64, node: Int64, spec: [String: Any]) {
         self.id = id; self.node = node; self.spec = spec
         current = PNAnimationGraph.number(spec["from"])
         velocity = PNAnimationGraph.number(spec["velocity"] ?? spec["initial_velocity"])
     }
-    func start() {
-        let display = CADisplayLink(target: self, selector: #selector(tick(_:)))
-        link = display
-        display.add(to: .main, forMode: .common)
-    }
-    func stop() { link?.invalidate(); link = nil }
-    @objc func tick(_ display: CADisplayLink) {
-        let dt = previousTime == 0 ? display.duration : min(0.064, display.timestamp - previousTime)
-        previousTime = display.timestamp
+    func start() { active = true; PNGraphClock.shared.start() }
+    func stop() { active = false }
+    func advance(_ dt: Double) -> Bool {
         elapsed += dt
         let delay = PNAnimationGraph.number(spec["delay_ms"]) / 1000
-        guard elapsed >= delay else { return }
+        guard elapsed >= delay else { return false }
         let target = PNAnimationGraph.number(spec["to"])
         var done = false
         switch spec["kind"] as? String {
@@ -181,11 +247,9 @@ final class PNGraphDriver: NSObject {
             done = t >= 1
         }
         if UIAccessibility.isReduceMotionEnabled { current = target; done = true }
-        PNAnimationGraph.set(node, current)
-        if done {
-            stop(); PNAnimationGraph.drivers.removeValue(forKey: id)
-            PNAnimator.reportCompletion(id: id, finished: true)
-        }
+        PNAnimationGraph.values[node] = current.isFinite ? current : 0
+        if done { stop() }
+        return done
     }
     static func bezier(_ t: Double, _ p1: CGPoint, _ p2: CGPoint) -> Double {
         func coordinate(_ u: Double, _ a: Double, _ b: Double) -> Double { 3 * (1-u) * (1-u) * u * a + 3 * (1-u) * u * u * b + u * u * u }

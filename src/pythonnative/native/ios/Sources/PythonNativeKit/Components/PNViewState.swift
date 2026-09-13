@@ -11,7 +11,7 @@ public final class PNViewState {
     public let tag: Int64
     /// Element type name.
     public let typeName: String
-    /// Every prop the view has received so far (updates merge; `null` removes).
+    /// Current logical props; explicit null is retained and removed keys are absent.
     public var props: [String: Any] = [:]
     /// Free-form storage for manager-specific values (suppress flags, delegates, ...).
     public var extras: [String: Any] = [:]

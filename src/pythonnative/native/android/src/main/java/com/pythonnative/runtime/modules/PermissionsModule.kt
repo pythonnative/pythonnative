@@ -5,8 +5,7 @@ import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.pythonnative.runtime.PNBridge
-import com.pythonnative.runtime.bridge.str
-import org.json.JSONObject
+import com.pythonnative.generated.PermissionsImplementation
 
 /**
  * `Permissions.check(permission)` (sync) and `request(permission)`
@@ -19,22 +18,18 @@ import org.json.JSONObject
  * the call reaches this module, so an unknown name here is a bug rather
  * than user input, and is rejected rather than answered.
  */
-class PermissionsModule : NativeModule {
-    override val name = "Permissions"
+class PermissionsModule : PermissionsImplementation {
     private val pending = HashMap<Int, Pair<String, (String) -> Unit>>()
 
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        val permission = args.str("permission") ?: ""
-        if (method == "check" || method == "request") {
-            if (!MANIFEST.containsKey(permission)) {
-                return promise.reject("unknown permission '$permission'", "bad_args")
-            }
-        }
-        when (method) {
-            "check" -> promise.resolve(check(permission))
-            "request" -> request(permission) { promise.resolve(it) }
-            else -> promise.rejectUnknownMethod(method)
-        }
+    override fun check(permission: String, completion: (Result<String>) -> Unit): (() -> Unit)? {
+        require(MANIFEST.containsKey(permission)) { "Unknown permission: $permission" }
+        completion(Result.success(check(permission)))
+        return null
+    }
+
+    override fun request(permission: String, completion: (Result<String>) -> Unit): (() -> Unit)? {
+        require(MANIFEST.containsKey(permission)) { "Unknown permission: $permission" }
+        return requestStatus(permission) { completion(Result.success(it)) }
     }
 
     /** Current status of `permission` without prompting. */
@@ -57,10 +52,10 @@ class PermissionsModule : NativeModule {
     }
 
     /** Prompt for `permission` if needed and report the resulting status to `onDone`. */
-    fun request(permission: String, onDone: (String) -> Unit) {
-        val manifest = MANIFEST[permission] ?: return onDone(UNDETERMINED)
-        if (check(permission) == GRANTED) return onDone(GRANTED)
-        val activity = PNBridge.activity() ?: return onDone(check(permission))
+    fun requestStatus(permission: String, onDone: (String) -> Unit): (() -> Unit)? {
+        val manifest = MANIFEST[permission] ?: run { onDone(UNDETERMINED); return null }
+        if (check(permission) == GRANTED) { onDone(GRANTED); return null }
+        val activity = PNBridge.activity() ?: run { onDone(check(permission)); return null }
         val target = if (permission == "photo_library" && Build.VERSION.SDK_INT < 33) "android.permission.READ_EXTERNAL_STORAGE" else manifest
         val code = RequestCodes.next()
         pending[code] = target to onDone
@@ -69,7 +64,9 @@ class PermissionsModule : NativeModule {
         } catch (e: Exception) {
             pending.remove(code)
             onDone(check(permission))
+            return null
         }
+        return { pending.remove(code); Unit }
     }
 
     /** Route `Activity.onRequestPermissionsResult`; `true` when a pending request matched. */

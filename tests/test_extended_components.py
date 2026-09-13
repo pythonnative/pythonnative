@@ -258,9 +258,8 @@ def test_flatlist_grid_chunks_into_rows() -> None:
         render_item=lambda item, _i: Text(str(item)),
     )
     # 3 virtual rows: [0,1], [2,3], [4]
-    assert len(el.props["rows"]) == 3
-
     root, _rec, _backend = _mount(el)
+    assert root.props["count"] == 3
     rows = root.find_all("Row")
     assert len(rows) == 3
     assert len(rows[0].children) == 2

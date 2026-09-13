@@ -16,7 +16,7 @@ open class PNComponentManager {
         let view = makeView(props: props)
         view.translatesAutoresizingMaskIntoConstraints = true
         let state = PNViewState.attach(view, tag: tag, typeName: String(describing: type(of: self)))
-        state.props = PNComponentManager.stripNulls(props)
+        state.props = props
         apply(view: view, props: props, initial: true)
         if let gestures = PNProps.value(props, "gestures") {
             PNGestureCoordinator.shared.wire(view: view, specs: gestures)
@@ -36,11 +36,7 @@ open class PNComponentManager {
     open func update(view: UIView, changed: [String: Any]) {
         if let state = PNViewState.existing(for: view) {
             for (key, value) in changed {
-                if value is NSNull {
-                    state.props.removeValue(forKey: key)
-                } else {
-                    state.props[key] = value
-                }
+                state.props[key] = value
             }
         }
         apply(view: view, props: changed, initial: false)
@@ -182,5 +178,20 @@ open class PNComponentManager {
 
     static func stripNulls(_ props: [String: Any]) -> [String: Any] {
         props.filter { !($0.value is NSNull) }
+    }
+}
+
+/// Typed native implementations consume generated props rather than decoding
+/// wire dictionaries themselves. Shared styling still operates on resolved keys.
+open class PNTypedComponentManager<Props: PNViewProps>: PNComponentManager where Props: PNNativeProps {
+    public init(_ props: Props.Type) { super.init() }
+
+    public final override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let decoded = try! Props(props, partial: true)
+        applyTyped(view: view, props: decoded, initial: initial)
+    }
+
+    open func applyTyped(view: UIView, props: Props, initial: Bool) {
+        PNViewStyler.applyCommon(view, props.values)
     }
 }

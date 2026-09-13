@@ -14,7 +14,7 @@ from typing import Any
 
 from ..profiling import count, profiled
 
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3
 
 
 class CommitError(RuntimeError):
@@ -97,7 +97,7 @@ class CommitState:
     def prepare(self, envelope: Any) -> CommitState:
         """Validate without mutating this state and return the candidate state."""
         if not isinstance(envelope, dict) or envelope.get("version") != PROTOCOL_VERSION:
-            raise CommitError("Expected a protocol v2 commit envelope; rebuild the native client")
+            raise CommitError("Expected a protocol v3 commit envelope; rebuild the native client")
         application, surface, revision = (envelope.get(k) for k in ("application", "surface", "revision"))
         if not isinstance(application, str) or not application or type(surface) is not int or surface <= 0:
             raise CommitError("Invalid application or surface identity")
@@ -132,7 +132,7 @@ class CommitState:
         if not isinstance(op, list) or len(op) < 2:
             raise ValueError("Expected an operation array")
         code, tag = op[:2]
-        lengths = {"c": 4, "u": 3, "i": 4, "d": 2, "f": 6}
+        lengths = {"c": 4, "u": 4, "i": 4, "d": 2, "f": 6}
         if code not in lengths or len(op) != lengths[code] or type(tag) is not int or tag <= 0:
             raise ValueError("Invalid opcode, arity, or tag")
         if code == "c":
@@ -146,11 +146,17 @@ class CommitState:
             if not isinstance(op[2], dict):
                 raise ValueError("Update requires a property mapping")
             self._validate_props(view.type_name, op[2], True)
-            for name, value in op[2].items():
-                if value is None:
-                    view.props.pop(name, None)
-                else:
-                    view.props[name] = value
+            removed = op[3]
+            if not isinstance(removed, list) or any(not isinstance(name, str) for name in removed):
+                raise ValueError("Removed properties must be a list of names")
+            if len(set(removed)) != len(removed) or set(removed) & op[2].keys():
+                raise ValueError("A property can't be both set and removed")
+            from ..mutations import UNSET
+
+            self._validate_props(view.type_name, {name: UNSET for name in removed}, True)
+            view.props.update(op[2])
+            for name in removed:
+                view.props.pop(name, None)
         elif code == "i":
             child_tag, index = op[2:]
             if type(child_tag) is not int or type(index) is not int or index < 0:

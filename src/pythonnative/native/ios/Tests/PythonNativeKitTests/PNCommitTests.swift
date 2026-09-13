@@ -6,14 +6,14 @@ final class PNCommitTests: XCTestCase {
 
     private func commit(_ operations: [[Any]], revision: Int = 1) -> [String: Any] {
         PNJSON.decodeObject(PNCommit.apply(PNJSON.encode([
-            "version": 2, "application": app, "surface": 1,
+            "version": 3, "application": app, "surface": 1,
             "revision": revision, "ops": operations,
         ])))
     }
 
     override func tearDown() {
         _ = PNCommit.apply(PNJSON.encode([
-            "version": 2, "application": UUID().uuidString, "surface": 1,
+            "version": 3, "application": UUID().uuidString, "surface": 1,
             "revision": 1, "ops": [],
         ]))
         super.tearDown()
@@ -28,7 +28,7 @@ final class PNCommitTests: XCTestCase {
     }
 
     func testTypedUpdatesValidateTagsCreatedInTheSameCommit() {
-        let result = commit([["c", 9201, "TextInput", ["value": "valid"]], ["u", 9201, ["value": 12]]])
+        let result = commit([["c", 9201, "TextInput", ["value": "valid"]], ["u", 9201, ["value": 12], []]])
         XCTAssertEqual(result["ok"] as? Bool, false)
         XCTAssertNil(PNViewRegistry.shared.view(for: 9201))
     }
@@ -83,4 +83,36 @@ final class PNCommitTests: XCTestCase {
         XCTAssertEqual(commit([["d", 9301]], revision: 2)["ok"] as? Bool, true)
         XCTAssertNil(PNViewRegistry.shared.view(for: 9301))
     }
+    func testCommitIncludesLayoutAndPaintDoesNotTraverseUnchangedGeometry() {
+        let operations: [[Any]] = [["c", 9800, "View", ["flex": 1]],
+                                  ["c", 9801, "Text", ["text": "Measured", "font_size": 20]], ["i", 9800, 9801, 0]]
+        let request: [String: Any] = ["roots": [9800], "width": 320, "height": 640]
+        let reply = PNJSON.decodeObject(PNCommit.apply(PNJSON.encode([
+            "version": 3, "application": app, "surface": 1, "revision": 1, "ops": operations, "layout": request,
+        ])))
+        XCTAssertEqual(reply["ok"] as? Bool, true)
+        let layout = reply["layout"] as? [String: Any]
+        XCTAssertEqual(layout?["revision"] as? Int, 1)
+        XCTAssertGreaterThan((layout?["frames"] as? [[Double]])?.count ?? 0, 0)
+        XCTAssertGreaterThan(PNViewRegistry.shared.view(for: 9801)?.frame.height ?? 0, 0)
+        XCTAssertEqual(commit([["u", 9801, ["color": "#ff0000"], []]], revision: 2)["ok"] as? Bool, true)
+        XCTAssertTrue(PNLayout.compute(request).isEmpty)
+        XCTAssertEqual(PNLayout.metrics["visited"] as? Int, 0)
+        XCTAssertEqual(commit([["u", 9801, ["font_size": 40], []]], revision: 3)["ok"] as? Bool, true)
+        XCTAssertFalse(PNLayout.compute(request).isEmpty)
+    }
+
+    func testConflictingRemovalAndNullForNonnullablePropRejectBeforeMutation() {
+        XCTAssertEqual(commit([["c", 9900, "Text", ["text": "Before"]]])["ok"] as? Bool, true)
+        let invalid: [[[Any]]] = [
+            [["u", 9900, ["text": "After"], ["text"]]],
+            [["u", 9900, [:], ["color", "color"]]],
+            [["u", 9900, ["text": NSNull()], []]],
+        ]
+        for operations in invalid {
+            XCTAssertEqual(commit(operations, revision: 2)["ok"] as? Bool, false)
+            XCTAssertEqual((PNViewRegistry.shared.view(for: 9900) as? UILabel)?.text, "Before")
+        }
+    }
+
 }

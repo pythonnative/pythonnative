@@ -431,6 +431,10 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         ops = self._ops
         created = self._created
         if ops:
+            prepare_layout = getattr(self.backend, "prepare_layout", None)
+            if prepare_layout is not None:
+                roots = [node.tag for node in self._native_roots(self.root)] if self.root is not None else []
+                prepare_layout(roots, *self._viewport_size)
             self.backend.apply_mutations(ops)
             self._native_committed = True
             self._ops = []
@@ -817,17 +821,6 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             self._destroy_tree(old)
             return new_node
         if old.is_native:
-            from ..equality import equal
-            from ..sdk.schema import COMPONENTS
-
-            schema = COMPONENTS.get(new_el.type)
-            if schema is not None and any(
-                field.get("native", {}).get("recreate") and not equal(old.element.props.get(key), new_el.props.get(key))
-                for key, field in schema.props.items()
-            ):
-                new_node = self._create_tree(new_el)
-                self._destroy_tree(old)
-                return new_node
             return self._reconcile_native(old, new_el)
         if old.is_component:
             return self._reconcile_component(old, new_el)
@@ -1144,7 +1137,11 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         """Strip reconciler-owned keys, then split event callables from native props."""
         if not props:
             return {}, {}
-        stripped = {key: value for key, value in props.items() if key not in _RECONCILER_OWNED_PROPS}
+        from ..mutations import UNSET
+
+        stripped = {
+            key: value for key, value in props.items() if key not in _RECONCILER_OWNED_PROPS and value is not UNSET
+        }
         clean, events = extract_events(stripped)
         from ..animated import AnimatedEvent
 
@@ -1159,13 +1156,17 @@ class Reconciler(BoundaryMixin, LayoutMixin):
 
     @staticmethod
     def _diff_props(old: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
-        """Return only the props that changed between two clean prop dicts (removed props map to ``None``)."""
+        """Return only the props that changed between two clean prop dicts (removed props map to ``UNSET``)."""
+        from ..mutations import UNSET
+
         changed: Dict[str, Any] = {}
         for key, new_val in new.items():
             if key not in old:
                 changed[key] = new_val
                 continue
             old_val = old[key]
+            if old_val is new_val:
+                continue
             try:
                 if callable(new_val) or callable(old_val):
                     if old_val is not new_val:
@@ -1176,7 +1177,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 changed[key] = new_val
         for key in old:
             if key not in new:
-                changed[key] = None
+                changed[key] = UNSET
         return changed
 
     @staticmethod

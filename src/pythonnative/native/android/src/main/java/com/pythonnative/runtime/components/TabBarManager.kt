@@ -1,5 +1,7 @@
 package com.pythonnative.runtime.components
 
+import com.pythonnative.generated.*
+
 import android.content.Context
 import android.content.res.ColorStateList
 import android.view.View
@@ -39,10 +41,12 @@ class TabBarManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        val typed = TabBarProps(props)
+
         val bnv = view as BottomNavigationView
         val merged = propsOf(bnv)
-        if (props.has("items")) setMenu(bnv, merged.value("items") as? JSONArray)
-        if (props.has("active_tab") || props.has("active_index") || props.has("items")) {
+        if (typed.has_items) setMenu(bnv, merged.value("items") as? JSONArray)
+        if (typed.has_active_tab || props.has("active_index") || typed.has_items) {
             setActive(bnv, merged)
         }
         val active = PNColor.parse(props.value("active_tint_color") ?: props.value("tint_color"))

@@ -70,6 +70,7 @@ Example:
 """
 
 from ..element import Element
+from ..mutations import UNSET, UnsetType
 from ..native_modules.registry import (
     NativeModule,
     NativeModuleError,
@@ -109,6 +110,8 @@ from .codegen import generate
 from .schema import ComponentSchema, ModuleSchema, NativeField, register_schema
 
 __all__ = [
+    "UNSET",
+    "UnsetType",
     "ComponentSchema",
     "ModuleSchema",
     "NativeField",

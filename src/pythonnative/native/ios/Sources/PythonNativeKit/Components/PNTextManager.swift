@@ -2,7 +2,8 @@ import UIKit
 
 /// `Text`: a `UILabel` with rich spans, text transforms, shadows, and the
 /// full font prop set.
-public final class PNTextManager: PNComponentManager {
+public final class PNTextManager: PNTypedComponentManager<TextProps> {
+    public init() { super.init(TextProps.self) }
     static let textShadowKeys = ["text_shadow_color", "text_shadow_offset", "text_shadow_radius"]
     static let attributedKeys = ["letter_spacing", "line_height", "text_decoration"] + textShadowKeys
     static let fontKeys = ["font_size", "font_weight", "font_family", "italic", "bold", "font_style"]
@@ -16,45 +17,39 @@ public final class PNTextManager: PNComponentManager {
         return label
     }
 
-    public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+    public override func applyTyped(view: UIView, props: TextProps, initial: Bool) {
+        let changed = props.values
         guard let label = view as? UILabel else { return }
         let merged = mergedProps(label)
         let hasSpans = !((PNProps.value(merged, "spans") as? [Any]) ?? []).isEmpty
-        let textChanged = PNProps.has(props, "text") || PNProps.has(props, "text_transform")
+        let textChanged = PNProps.has(changed, "text") || PNProps.has(changed, "text_transform")
         if textChanged, !hasSpans {
             label.text = PNTextManager.transform(PNProps.string(PNProps.value(merged, "text")), mode: PNProps.string(PNProps.value(merged, "text_transform")))
         }
-        if initial || PNTextManager.fontKeys.contains(where: { PNProps.has(props, $0) }) {
+        if initial || PNTextManager.fontKeys.contains(where: { PNProps.has(changed, $0) }) {
             label.font = PNTextManager.font(from: merged, base: label.font)
         }
-        if let color = PNColor.parse(PNProps.value(props, "color")) {
-            label.textColor = color
-        }
-        if let color = PNColor.parse(PNProps.value(props, "background_color")) {
-            label.backgroundColor = color
-        }
-        if PNProps.has(props, "max_lines") || PNProps.has(props, "number_of_lines") {
-            let lines = PNProps.int(PNProps.value(props, "max_lines")) ?? PNProps.int(PNProps.value(props, "number_of_lines")) ?? 0
+        if props.has_color { label.textColor = PNColor.parse(props.color) ?? .label }
+        if props.has_background_color { label.backgroundColor = PNColor.parse(props.background_color) }
+        if props.has_max_lines {
+            let lines = props.max_lines.map(Int.init) ?? 0
             label.numberOfLines = max(0, lines)
         }
-        if PNProps.has(props, "text_align") {
-            label.textAlignment = PNTextManager.alignment(PNProps.string(PNProps.value(props, "text_align")))
-        }
-        if PNProps.has(props, "selectable") {
-            label.isUserInteractionEnabled = PNProps.bool(PNProps.value(props, "selectable")) ?? false
+        if PNProps.has(changed, "text_align") {
+            label.textAlignment = PNTextManager.alignment(props.text_align?.rawValue)
         }
         if hasSpans {
-            if PNTextManager.spanRebuildKeys.contains(where: { PNProps.has(props, $0) }) {
+            if PNTextManager.spanRebuildKeys.contains(where: { PNProps.has(changed, $0) }) {
                 applySpans(label, merged)
             }
-        } else if PNProps.has(props, "spans") {
+        } else if PNProps.has(changed, "spans") {
             label.text = PNTextManager.transform(PNProps.string(PNProps.value(merged, "text")), mode: PNProps.string(PNProps.value(merged, "text_transform")))
-        } else if PNTextManager.attributedKeys.contains(where: { PNProps.has(props, $0) })
+        } else if PNTextManager.attributedKeys.contains(where: { PNProps.has(changed, $0) })
             || (textChanged && PNTextManager.attributedKeys.contains { PNProps.value(merged, $0) != nil })
         {
             applyAttributed(label, merged)
         }
-        PNViewStyler.applyDecoration(label, props)
+        PNViewStyler.applyDecoration(label, changed)
     }
 
     // MARK: - Fonts

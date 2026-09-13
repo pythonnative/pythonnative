@@ -6,33 +6,26 @@ import UIKit
 /// The scene delegate calls `AppStateModule.dispatch(_:)`; the module
 /// emits `change` with the state string (`"active"`, `"inactive"`,
 /// `"background"`) as the payload, which is what the Python facade reads.
-public final class AppStateModule: PNNativeModule {
+public final class AppStateModule: AppStateImplementation {
     public static let name = "AppState"
     public private(set) static var current = "active"
 
     public init() {}
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        switch method {
-        case "current_state":
-            promise.resolve(AppStateModule.current)
-        default:
-            promise.reject("AppState has no method '\(method)'", code: "unknown_method")
-        }
-    }
+    public func current_state() -> String { Self.current }
 
     /// Record and publish a lifecycle transition.
     public static func dispatch(_ state: String) {
         guard ["active", "inactive", "background"].contains(state), state != current else { return }
         current = state
         PNBridge.shared.whenCallbackRegistered {
-            PNBridge.shared.callPython(kind: "module", tag: 0, name: name, payload: PNJSON.encode(["event": "change", "payload": state]))
+            AppStateEvents.change(state)
         }
     }
 }
 
 /// `Battery`: level / state getters plus `change` events while monitoring.
-public final class BatteryModule: PNNativeModule {
+public final class BatteryModule: BatteryImplementation {
     public static let name = "Battery"
     private static var observers: [NSObjectProtocol] = []
 
@@ -40,16 +33,8 @@ public final class BatteryModule: PNNativeModule {
         BatteryModule.startMonitoring()
     }
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        switch method {
-        case "get_level":
-            promise.resolve(Double(UIDevice.current.batteryLevel))
-        case "get_state":
-            promise.resolve(BatteryModule.stateName())
-        default:
-            promise.reject("Battery has no method '\(method)'", code: "unknown_method")
-        }
-    }
+    public func get_level() -> Double { Double(UIDevice.current.batteryLevel) }
+    public func get_state() -> String { Self.stateName() }
 
     /// Enable battery monitoring and forward UIDevice notifications.
     public static func startMonitoring() {
@@ -82,7 +67,7 @@ public final class BatteryModule: PNNativeModule {
 }
 
 /// `NetInfo`: connectivity snapshots from `NWPathMonitor`.
-public final class NetInfoModule: PNNativeModule {
+public final class NetInfoModule: NetInfoImplementation {
     public static let name = "NetInfo"
 
     private let monitor = NWPathMonitor()
@@ -105,15 +90,10 @@ public final class NetInfoModule: PNNativeModule {
         monitor.cancel()
     }
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        switch method {
-        case "fetch":
-            let snapshot = NetInfoModule.snapshot(monitor.currentPath)
-            last = snapshot
-            promise.resolve(snapshot)
-        default:
-            promise.reject("NetInfo has no method '\(method)'", code: "unknown_method")
-        }
+    public func fetch() throws -> [String: PNJSONValue]? {
+        let current = Self.snapshot(monitor.currentPath)
+        last = current
+        return try current.mapValues { try PNValues.decode(PNJSONValue.self, $0) }
     }
 
     static func snapshot(_ path: NWPath) -> [String: Any] {
@@ -138,36 +118,26 @@ public final class NetInfoModule: PNNativeModule {
 ///
 /// `deliver(url:)` buffers until Python's callback is registered so a
 /// cold-start deep link reaches `Linking.get_initial_url()`.
-public final class LinkingModule: PNNativeModule {
+public final class LinkingModule: LinkingImplementation {
     public static let name = "Linking"
 
     public init() {}
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        switch method {
-        case "open_url":
-            guard let url = PNProps.string(args["url"]).flatMap({ URL(string: $0) }) else { return promise.resolve(false) }
-            let app = UIApplication.shared
-            guard app.canOpenURL(url) || url.scheme?.hasPrefix("http") == true else { return promise.resolve(false) }
-            app.open(url, options: [:]) { _ in }
-            promise.resolve(true)
-        case "can_open_url":
-            guard let url = PNProps.string(args["url"]).flatMap({ URL(string: $0) }) else { return promise.resolve(false) }
-            promise.resolve(UIApplication.shared.canOpenURL(url))
-        case "open_settings":
-            guard let url = URL(string: UIApplication.openSettingsURLString) else { return promise.resolve(false) }
-            UIApplication.shared.open(url, options: [:]) { _ in }
-            promise.resolve(true)
-        default:
-            promise.reject("Linking has no method '\(method)'", code: "unknown_method")
-        }
+    public func open_url(url: String) -> Bool {
+        guard let parsed = URL(string: url), UIApplication.shared.canOpenURL(parsed) || parsed.scheme?.hasPrefix("http") == true else { return false }
+        UIApplication.shared.open(parsed, options: [:]) { _ in }
+        return true
     }
+    public func can_open_url(url: String) -> Bool {
+        URL(string: url).map { UIApplication.shared.canOpenURL($0) } ?? false
+    }
+    public func open_settings() -> Bool { open_url(url: UIApplication.openSettingsURLString) }
 
     /// Forward an inbound URL as a `url` event (payload: the URL string).
     public static func deliver(url: String) {
         PNBridge.shared.whenCallbackRegistered {
             PNMain.run {
-                PNBridge.shared.callPython(kind: "module", tag: 0, name: name, payload: PNJSON.encode(["event": "url", "payload": url]))
+                LinkingEvents.url(url)
             }
         }
     }

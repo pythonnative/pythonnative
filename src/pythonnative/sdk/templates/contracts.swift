@@ -19,10 +19,6 @@ public enum PNContracts {
         for (key, value) in props {
             guard let field = fields[key] else { return false }
             if let platforms = (field["native"] as? [String: Any])?["platforms"] as? [String], !platforms.contains("ios") { return false }
-            if value is NSNull && partial {
-                if (schema["required"] as? [String] ?? []).contains(key) { return false }
-                continue
-            }
             if !matches(value, field) { return false }
         }
         return true
@@ -33,18 +29,26 @@ public enum PNContracts {
         return changed.keys.contains { ((fields[$0]?["native"] as? [String: Any])?["invalidates_layout"] as? Bool) ?? true }
     }
 
-    public static func requiresRecreation(_ name: String, _ changed: [String: Any]) -> Bool {
-        let fields = components[name]?["props"] as? [String: [String: Any]] ?? [:]
-        let defaults = components[name]?["defaults"] as? [String: Any] ?? [:]
-        return changed.contains { key, value in
-            ((fields[key]?["native"] as? [String: Any])?["recreate"] as? Bool ?? false)
-                || (value is NSNull && (defaults[key] == nil || defaults[key] is NSNull))
+    public static func validateRemoval(_ name: String, _ changed: [String: Any], _ removed: [String]) -> Bool {
+        guard let schema = components[name], let fields = schema["props"] as? [String: [String: Any]] else { return false }
+        let required = Set(schema["required"] as? [String] ?? [])
+        return Set(removed).count == removed.count && removed.allSatisfy {
+            fields[$0] != nil && !required.contains($0) && changed[$0] == nil
         }
     }
 
-    public static func normalize(_ name: String, _ changed: [String: Any]) -> [String: Any] {
+    public static func requiresRecreation(_ name: String, _ changed: [String: Any], removed: [String] = []) -> Bool {
+        let fields = components[name]?["props"] as? [String: [String: Any]] ?? [:]
+        return Set(changed.keys).union(removed).contains {
+            ((fields[$0]?["native"] as? [String: Any])?["recreate"] as? Bool) ?? false
+        }
+    }
+
+    public static func normalize(_ name: String, _ changed: [String: Any], removed: [String] = []) -> [String: Any] {
         let defaults = components[name]?["defaults"] as? [String: Any] ?? [:]
-        return changed.reduce(into: [:]) { result, item in result[item.key] = item.value is NSNull ? (defaults[item.key] ?? NSNull()) : item.value }
+        var result = changed
+        for key in removed { result[key] = defaults[key] ?? NSNull() }
+        return result
     }
 
     public static func validateCommand(_ name: String, _ method: String, _ args: [String: Any]) -> Bool {
@@ -83,6 +87,9 @@ public enum PNContracts {
         case "number": return (value as? NSNumber).map { CFGetTypeID($0) != CFBooleanGetTypeID() && $0.doubleValue.isFinite } ?? false
         case "array":
             guard let array = value as? [Any] else { return false }
+            if let prefix = schema["prefixItems"] as? [[String: Any]] {
+                return array.count == prefix.count && zip(array, prefix).allSatisfy { matches($0, $1) }
+            }
             return array.allSatisfy { matches($0, schema["items"] as? [String: Any] ?? [:]) }
         case "object":
             guard let object = value as? [String: Any] else { return false }

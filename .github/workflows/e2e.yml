@@ -134,6 +134,8 @@ jobs:
     # alerts present twice, pickers reopen after selecting. This suite
     # ran green on the macos-15 image for months.
     runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     # Budget for the worst case: ~8 min build/boot plus two full suite
     # attempts (run-e2e.sh retries the whole suite once after a driver
     # flake). The test step gets its own, shorter timeout so a hung

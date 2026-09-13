@@ -66,7 +66,7 @@ object ViewStyler {
         if (props.has("display")) {
             view.visibility = if (props.str("display") == "none") View.GONE else View.VISIBLE
         }
-        props.num("opacity")?.let { view.alpha = it.toFloat() }
+        if (props.has("opacity")) view.alpha = (props.num("opacity") ?: 1.0).toFloat()
         if (props.has("z_index")) {
             val z = props.num("z_index")
             view.z = if (z != null) px(z) else 0f
@@ -162,18 +162,15 @@ object ViewStyler {
     // ------------------------------------------------------------------
 
     private fun applyShadow(view: View, props: JSONObject) {
-        var elevation = props.num("elevation")
-        if (elevation == null && props.has("shadow_radius")) elevation = props.num("shadow_radius")
-        if (elevation == null && (props.value("shadow_color") != null || props.value("shadow_opacity") != null)) {
-            // Shadow requested without an explicit size: Material card-like default.
-            elevation = 4.0
-        }
-        if (elevation == null) return
+        val keys = listOf("elevation", "shadow_radius", "shadow_color", "shadow_opacity", "shadow_offset")
+        if (keys.none { props.has(it) }) return
+        val merged = record(view)?.props ?: props
+        val elevation = merged.num("elevation") ?: merged.num("shadow_radius")
+            ?: if (keys.any { merged.value(it) != null }) 4.0 else 0.0
         view.elevation = px(elevation)
-        val color = props.value("shadow_color") ?: return
         if (Build.VERSION.SDK_INT < 28) return
-        var argb = PNColor.parse(color) ?: return
-        props.num("shadow_opacity")?.let { argb = PNColor.withAlpha(argb, it) }
+        var argb = PNColor.parse(merged.value("shadow_color")) ?: android.graphics.Color.BLACK
+        merged.num("shadow_opacity")?.let { argb = PNColor.withAlpha(argb, it) }
         view.outlineAmbientShadowColor = argb
         view.outlineSpotShadowColor = argb
     }

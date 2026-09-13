@@ -110,3 +110,48 @@ def test_public_indices_exclude_global_and_section_headers() -> None:
     with pytest.raises(IndexError):
         reference.current.scroll_to_index(3)
     result.unmount()
+
+
+def test_viewport_changes_reuse_dataset_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    import pythonnative.components.lists as lists
+
+    original = lists._prepare_snapshot
+    prepared = []
+
+    def prepare(*args: Any, **kwargs: Any) -> Any:
+        prepared.append(len(args[0]))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(lists, "_prepare_snapshot", prepare)
+    result = render(pn.FlatList(data=range(100_000), item_height=44), viewport=None, settle_first=False)
+    view = result.get_by_type("VirtualList")
+    keys, heights = view.props["keys"], view.props["row_heights"]
+    for first in range(50, 500, 25):
+        result.fire(view, "on_scroll", {"first": first, "last": first + 18, "extent": 800, "y": first * 44})
+        assert view.props["keys"] is keys
+        assert view.props["row_heights"] is heights
+        assert len(result.get_all_by_type("Text")) <= 56
+    assert prepared == [100_000]
+    result.unmount()
+
+
+def test_parent_updates_reuse_indexed_sequence_and_revision_refreshes_in_place_edits() -> None:
+    calls = []
+    data = [{"id": index, "title": str(index)} for index in range(10_000)]
+
+    def key(item: Any, index: int) -> str:
+        calls.append(index)
+        return str(item["id"])
+
+    def row(item: Any, _: int) -> pn.Element:
+        return pn.Text(item["title"])
+
+    result = render(pn.FlatList(data=data, key_extractor=key, render_item=row), viewport=None)
+    assert len(calls) == len(data)
+    result.rerender(pn.FlatList(data=data, key_extractor=key, render_item=row))
+    assert len(calls) == len(data)
+    data[0]["title"] = "Edited in place"
+    result.rerender(pn.FlatList(data=data, data_revision=1, key_extractor=key, render_item=row))
+    assert result.get_by_text("Edited in place")
+    assert len(calls) == 2 * len(data)
+    result.unmount()

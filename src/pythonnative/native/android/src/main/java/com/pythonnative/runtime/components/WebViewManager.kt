@@ -1,5 +1,9 @@
 package com.pythonnative.runtime.components
 
+import com.pythonnative.generated.PNComponentEvents
+import com.pythonnative.generated.PNWebNavigationEvent
+import com.pythonnative.generated.*
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
@@ -34,6 +38,8 @@ class WebViewManager : ComponentManager() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        val typed = WebViewProps(props)
+
         val wv = view as WebView
         val merged = propsOf(wv)
         val events = merged.value("_pn_events") as? JSONArray
@@ -45,15 +51,15 @@ class WebViewManager : ComponentManager() {
         if (props.has("dom_storage_enabled")) wv.settings.domStorageEnabled = JsonUtil.truthy(props.value("dom_storage_enabled"))
         if (props.has("user_agent")) wv.settings.userAgentString = props.str("user_agent")
 
-        val html = props.str("html")
-        val url = props.str("url") ?: sourceUrl(props.value("source"))
+        val html = typed.html
+        val url = typed.url ?: sourceUrl(props.value("source"))
         // `html` takes precedence over `url` when both are present.
         if (!html.isNullOrEmpty()) {
             wv.loadDataWithBaseURL(props.str("base_url"), html, "text/html", "utf-8", null)
         } else if (!url.isNullOrEmpty()) {
             wv.loadUrl(url)
         }
-        if (props.has("scroll_enabled")) applyScrollEnabled(wv, props.value("scroll_enabled"))
+        if (typed.has_scroll_enabled) applyScrollEnabled(wv, props.value("scroll_enabled"))
         ViewStyler.apply(wv, props)
     }
 
@@ -72,14 +78,19 @@ class WebViewManager : ComponentManager() {
         }
     }
 
+    private fun navigationState(view: WebView, url: String?, loading: Boolean) {
+        PNComponentEvents.WebView.on_navigation_state_change(view, PNWebNavigationEvent(url ?: "", loading, view.canGoBack(), view.canGoForward(), view.title ?: ""))
+    }
+
     private fun client(wv: WebView): WebViewClient = object : WebViewClient() {
         override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
-            fire(wv, "on_navigation_state_change", url ?: "")
+            navigationState(wv, url, true)
             fire(wv, "on_load_start", url ?: "")
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
             fire(wv, "on_load", url ?: "")
+            navigationState(wv, url, false)
             if (hasEvent(wv, "on_message")) {
                 val shim = "(function(){window.pythonnative=window.pythonnative||{};" +
                     "window.pythonnative.postMessage=function(m){" +

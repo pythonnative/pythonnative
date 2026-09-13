@@ -413,8 +413,8 @@ def test_flat_list_with_keys() -> None:
         render_item=lambda item, i: Text(item["name"]),
         key_extractor=lambda item, i: item["id"],
     )
-    rows = el.props["rows"]
-    assert [r.key for r in rows] == ["x", "y"]
+    root, _rec, _backend = _mount(el)
+    assert root.props["keys"] == ["x", "y"]
 
 
 def test_flat_list_empty() -> None:

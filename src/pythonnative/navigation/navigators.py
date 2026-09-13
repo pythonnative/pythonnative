@@ -201,38 +201,13 @@ def _use_focus_events(core: NavigatorCore, state: NavigationState, parent_focuse
     use_effect(emit_state, [state])
 
 
-def _use_host_options(core: NavigatorCore, state: NavigationState) -> None:
-    """Push the active route's header options to the native host (root stacks only)."""
-    options = core.options_for(state.current) if core.is_native_root else None
-    signature = _options_signature(options)
-
-    def apply() -> None:
-        if options is None or core.host is None:
-            return
-        try:
-            core.host.set_screen_options(options)
-        except Exception:
-            pass
-
-    use_effect(apply, [signature, state.current.key])
-
-
-def _options_signature(options: Optional[Dict[str, Any]]) -> Any:
-    if options is None:
-        return None
-    out = []
-    for key in sorted(options):
-        value = options[key]
-        out.append((key, value if isinstance(value, (str, int, float, bool, type(None))) else id(value)))
-    return tuple(out)
-
-
 def _screen_element(
     core: NavigatorCore,
     route: Route,
     *,
     active: bool,
     parent_focused: bool,
+    header_options: Optional[Dict[str, Any]] = None,
 ) -> Element:
     """Render ``route``'s component under its navigation and focus providers."""
     screen = core.screens.get(route.name)
@@ -243,7 +218,36 @@ def _screen_element(
     else:
         body = screen.component()
     handle = core.handle_for(route)
-    return NavigationContext.Provider(handle, FocusContext.Provider(parent_focused and active, body), key=route.key)
+    children = [body]
+    if header_options is not None:
+        for side in ("left", "right"):
+            value = header_options.get(f"header_{side}")
+            if value is not None:
+                children.append(_NativeHeaderSlot(value=value, side=side).with_key(f"header-{side}"))
+    return NavigationContext.Provider(
+        handle, FocusContext.Provider(parent_focused and active, *children), key=route.key
+    )
+
+
+@component
+def _NativeHeaderSlot(*, value: Any, side: str) -> Element:
+    body = value() if callable(value) and not isinstance(value, Element) else value
+    return Element("View", {"_pn_header_slot": side, "height": 44, "justify_content": "center"}, [body])
+
+
+def _native_screen(core: NavigatorCore, route: Route, active: bool, parent_focused: bool) -> Element:
+    options = core.options_for(route)
+    return Element(
+        "Screen",
+        {
+            "flex": 1,
+            "active": active,
+            "route_key": route.key,
+            **{key: value for key, value in options.items() if key not in {"header_left", "header_right"}},
+        },
+        [_screen_element(core, route, active=active, parent_focused=parent_focused, header_options=options)],
+        key=route.key,
+    )
 
 
 def _hidden_style(active: bool) -> Dict[str, Any]:
@@ -331,15 +335,7 @@ def _StackNavigatorImpl(*, screens: Tuple[ScreenDef, ...], initial_route: Option
         return Element(
             "ScreenStack",
             {"flex": 1, "on_native_back": native_back, "ref": stack_ref},
-            [
-                Element(
-                    "Screen",
-                    {"flex": 1, "active": route is current, "route_key": route.key, **core.options_for(route)},
-                    [_screen_element(core, route, active=route is current, parent_focused=parent_focused)],
-                    key=route.key,
-                )
-                for route in state.routes
-            ],
+            [_native_screen(core, route, route is current, parent_focused) for route in state.routes],
         )
 
     layers: List[Element] = []

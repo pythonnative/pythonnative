@@ -1,5 +1,7 @@
 package com.pythonnative.runtime.components
 
+import com.pythonnative.generated.*
+
 import android.app.Activity
 import android.content.Context
 import android.view.View
@@ -26,17 +28,19 @@ class StatusBarManager : ComponentManager() {
     override fun measure(view: View, maxWidth: Double, maxHeight: Double): FloatArray = floatArrayOf(0f, 0f)
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        val typed = StatusBarProps(props)
+
         val activity = PNBridge.activity() ?: (view.context as? Activity) ?: return
         val window = activity.window ?: return
         try {
             PNColor.parse(props.value("background_color"))?.let { window.statusBarColor = it }
             val controller: WindowInsetsControllerCompat = WindowCompat.getInsetsController(window, window.decorView)
-            props.str("bar_style")?.let { style ->
+            typed.bar_style?.rawValue?.let { style ->
                 // "dark" / "default" mean dark icons (light backgrounds); "light" means light icons.
                 controller.isAppearanceLightStatusBars = style == "dark" || style == "default" || style == "dark_content"
             }
-            if (props.has("hidden")) {
-                if (JsonUtil.truthy(props.value("hidden"))) {
+            if (typed.has_hidden) {
+                if ((typed.hidden ?: false)) {
                     controller.hide(WindowInsetsCompat.Type.statusBars())
                 } else {
                     controller.show(WindowInsetsCompat.Type.statusBars())

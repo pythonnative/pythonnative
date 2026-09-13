@@ -28,7 +28,7 @@ object PNBridge {
     const val TAG = "PythonNative"
 
     /** Protocol version compiled into this library. */
-    const val PROTOCOL_VERSION = 2
+    const val PROTOCOL_VERSION = 3
 
     private val pythonQueue = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "PythonNative-events").apply { isDaemon = true }
@@ -180,7 +180,7 @@ object PNBridge {
             return ModuleEnvelope.ok(null)
         }
         if (module == "Runtime") return JSONObject().put("ok", true).put("value", JSONObject()
-            .put("protocol", 2).put("yoga", "3.2.1").put("schema", com.pythonnative.generated.PNContracts.fingerprint)
+            .put("protocol", 3).put("yoga", "3.2.1").put("schema", com.pythonnative.generated.PNContracts.fingerprint)
             .put("animation_graph", true).put("logical_lists", true).put("native_layout", true)).toString()
         if (module == "Layout") {
             val started = System.nanoTime()

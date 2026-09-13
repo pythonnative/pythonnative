@@ -1,5 +1,6 @@
 package com.pythonnative.runtime.modules
 
+import com.pythonnative.generated.*
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -19,17 +20,12 @@ import org.json.JSONObject
  * (`unknown|unplugged|charging|full`), plus `change` events from the
  * sticky `ACTION_BATTERY_CHANGED` broadcast.
  */
-class BatteryModule : NativeModule {
-    override val name = "Battery"
+class BatteryModule : BatteryImplementation {
+    val name = "Battery"
     private var receiver: BroadcastReceiver? = null
 
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        when (method) {
-            "get_level" -> promise.resolve(level())
-            "get_state" -> promise.resolve(state())
-            else -> promise.rejectUnknownMethod(method)
-        }
-    }
+    override fun get_level(): Double = level()
+    override fun get_state(): String = state()
 
     private fun manager(): BatteryManager? =
         PNBridge.context().getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
@@ -84,16 +80,14 @@ class BatteryModule : NativeModule {
  * `NetInfo.fetch()` → `{is_connected, type, is_internet_reachable}`;
  * a default `NetworkCallback` emits `change` events on the main thread.
  */
-class NetInfoModule : NativeModule {
-    override val name = "NetInfo"
+class NetInfoModule : NetInfoImplementation {
+    val name = "NetInfo"
     private var callback: ConnectivityManager.NetworkCallback? = null
     private var last: JSONObject? = null
 
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        when (method) {
-            "fetch" -> promise.resolve(snapshot())
-            else -> promise.rejectUnknownMethod(method)
-        }
+    override fun fetch(): Map<String, PNJSONValue> {
+        val current = snapshot()
+        return current.keys().asSequence().associateWith { PNJSONValue(current.get(it)) }
     }
 
     private fun manager(): ConnectivityManager? =
@@ -159,20 +153,15 @@ class NetInfoModule : NativeModule {
 }
 
 /** `AppState.current_state()` plus `change` events (`active|inactive|background`). */
-class AppStateModule : NativeModule {
-    override val name = "AppState"
+class AppStateModule : AppStateImplementation {
+    val name = "AppState"
     private var state = "active"
 
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        when (method) {
-            "current_state" -> promise.resolve(state)
-            else -> promise.rejectUnknownMethod(method)
-        }
-    }
+    override fun current_state(): String = state
 
     fun transition(next: String) {
         if (state == next) return
         state = next
-        ModuleEvents.emit(name, "change", JSONObject().put("state", next))
+        AppStateEvents.change(next)
     }
 }

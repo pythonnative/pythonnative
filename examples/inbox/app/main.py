@@ -3,7 +3,7 @@
 import asyncio
 from dataclasses import replace
 
-from inbox_extension import InboxBadge
+from inbox_extension import InboxBadge, InboxBatch, InboxRecord, InboxTools
 
 import pythonnative as pn
 from pythonnative.hooks import Context
@@ -45,6 +45,14 @@ def IssueRow(issue: Issue) -> pn.Element:
     )
 
 
+def issue_key(issue: Issue, index: int) -> int:
+    return issue.id
+
+
+def render_issue(issue: Issue, index: int) -> pn.Element:
+    return IssueRow(issue)
+
+
 @pn.component
 def Inbox() -> pn.Element:
     repository, snapshot = use_repository()
@@ -53,13 +61,47 @@ def Inbox() -> pn.Element:
     only_open, set_only_open = pn.use_state(False)
     status, set_status = pn.use_state("")
 
-    async def extension_ready() -> None:
-        from pythonnative.native_modules.registry import native_module
-
+    def subscribe_extension():
         if pn.Platform.OS in {"ios", "android"}:
-            set_status(await native_module("InboxTools").call_async("ready"))
 
-    pn.use_effect(extension_ready, [])
+            def prepared(batch: InboxBatch) -> None:
+                set_status(batch.message)
+
+            return InboxTools.on_prepared(prepared)
+
+    pn.use_effect(subscribe_extension, [])
+
+    async def prepare_extension() -> None:
+        if pn.Platform.OS in {"ios", "android"}:
+            # Replacing the snapshot or leaving this screen cancels the native
+            # work through the generated adapter's cancellation callback.
+            records = [
+                InboxRecord(str(row.id), row.title, ("closed" if row.closed else "open",)) for row in snapshot.issues
+            ]
+            batch = await InboxTools.prepare(records=records)
+            assert all(isinstance(row, InboxRecord) for row in batch.records)
+            set_status(batch.message)
+
+    pn.use_effect(prepare_extension, [snapshot.revision])
+
+    async def cancel_preparation(count: int) -> None:
+        assert count == len(snapshot.issues)
+        delivered = []
+        unsubscribe = InboxTools.on_prepared(delivered.append)
+        work = asyncio.create_task(InboxTools.prepare(records=[InboxRecord("cancel-check", "Cancelled")], delay_ms=100))
+        try:
+            await asyncio.sleep(0)
+            work.cancel()
+            try:
+                await work
+            except asyncio.CancelledError:
+                pass
+            await asyncio.sleep(0.2)
+            cancelled_event = any(row.identifier == "cancel-check" for batch in delivered for row in batch.records)
+            set_status("Cancellation failed" if cancelled_event else "Preparation cancelled")
+        finally:
+            work.cancel()
+            unsubscribe()
 
     async def filter_issues() -> list[Issue]:
         # Real cooperative async work with cancellation while typing.
@@ -91,11 +133,11 @@ def Inbox() -> pn.Element:
         ),
         pn.Text(snapshot.error or f"{len(query.data or [])} issues", style={"padding": 12}),
         pn.Text(status) if status else None,
-        InboxBadge(count=len(snapshot.issues)) if status else None,
+        InboxBadge(count=len(snapshot.issues), on_press=cancel_preparation, style={"margin": 8}) if status else None,
         pn.FlatList(
             data=query.data or [],
-            key_extractor=lambda issue, _: issue.id,
-            render_item=lambda issue, _: IssueRow(issue),
+            key_extractor=issue_key,
+            render_item=render_issue,
             estimated_item_height=130,
             refresh_control=pn.RefreshControl(refreshing=snapshot.loading, on_refresh=repository.load),
             list_empty=pn.Text("Loading..." if snapshot.loading or query.loading else "No matching issues"),

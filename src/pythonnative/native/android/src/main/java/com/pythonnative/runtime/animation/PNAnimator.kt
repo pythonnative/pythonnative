@@ -66,7 +66,7 @@ object PNAnimator {
     fun setProperty(view: View, prop: String, value: Any?) {
         if (JsonUtil.isNull(value)) return
         if (prop.startsWith("_pn_graph:")) {
-            AnimationGraph.set(prop.substringAfter(":").toLong(), JsonUtil.toDouble(value))
+            AnimationGraph.setFrame(prop.substringAfter(":").toLong(), JsonUtil.toDouble(value))
             return
         }
         try {
@@ -223,7 +223,7 @@ object PNAnimator {
     /** A `FloatPropertyCompat` for physics animations; `null` for unsupported props. */
     private fun floatProperty(prop: String): FloatPropertyCompat<View>? = if (prop.startsWith("_pn_graph:")) object : FloatPropertyCompat<View>(prop) {
         override fun getValue(view: View): Float = AnimationGraph.value(prop.substringAfter(":").toLong()).toFloat()
-        override fun setValue(view: View, value: Float) { AnimationGraph.set(prop.substringAfter(":").toLong(), value.toDouble()) }
+        override fun setValue(view: View, value: Float) { AnimationGraph.setFrame(prop.substringAfter(":").toLong(), value.toDouble()) }
     } else when (prop) {
         "opacity" -> DynamicAnimation.ALPHA
         "translate_x" -> DynamicAnimation.TRANSLATION_X

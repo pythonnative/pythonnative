@@ -1,5 +1,7 @@
 package com.pythonnative.runtime.components
 
+import com.pythonnative.generated.*
+
 import android.app.Dialog
 import android.content.Context
 import android.graphics.drawable.ColorDrawable
@@ -27,16 +29,18 @@ class ModalManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        val typed = ModalProps(props)
+
         val state = stateOf(view)
         // Only react when `visible` itself changed; a re-render while the
         // dialog is open must not tear it down.
-        if (props.has("visible")) {
-            val visible = JsonUtil.truthy(props.value("visible"))
+        if (typed.has_visible) {
+            val visible = (typed.visible ?: false)
             if (visible && state["dialog"] == null) present(view)
             else if (!visible && state["dialog"] != null) dismiss(view, fromUser = false)
         }
         val dialog = state["dialog"] as? Dialog
-        if (dialog != null && props.has("dismiss_on_backdrop")) {
+        if (dialog != null && typed.has_dismiss_on_backdrop) {
             dialog.setCanceledOnTouchOutside(props.value("dismiss_on_backdrop") != false)
         }
     }
