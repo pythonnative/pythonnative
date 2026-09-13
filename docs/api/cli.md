@@ -6,6 +6,22 @@ the documented behavior never drifts from the code.
 
 ## Subcommands
 
+- `pn codegen`: generate native contract files and print each generated file's
+  path. Flag: `--output` to choose the output directory (default `generated`).
+  Repeat `--module` to import extension schema modules before generation; each
+  module must be importable by the Python interpreter running `pn`.
+
+  For example, generate contracts into an explicit temporary directory:
+
+  ```bash
+  uv run pn codegen --output /tmp/pythonnative-contracts
+  ```
+  This command generates contract files only. Native compilation and app
+  rebuilding happen as part of the build workflow. See
+  [Native contracts](../guides/native-contracts.md) for the extension workflow
+  and [Generated source and vendored dependencies](https://github.com/pythonnative/pythonnative/blob/main/CONTRIBUTING.md#generated-source-and-vendored-dependencies)
+  for repository contributor guidance.
+
 - `pn init [name]`: scaffold a new project (creates `app/`,
   `pythonnative.toml`, `.gitignore`). With a name it creates `./<name>/`
   and scaffolds into it; the name must match `^[a-z][a-z0-9_-]*$`.
