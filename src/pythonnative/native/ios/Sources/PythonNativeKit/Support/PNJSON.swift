@@ -66,6 +66,11 @@ public enum PNJSON {
         switch value {
         case is NSNull:
             return value
+        case let number as NSNumber:
+            // Foundation also casts numeric 0/1 to Bool. Preserve the boxed
+            // number's actual type before trying Swift scalar casts so typed
+            // event indices and nested record fields don't become booleans.
+            return number.doubleValue.isFinite ? number : NSNull()
         case let bool as Bool:
             return bool
         case let double as Double:
@@ -78,8 +83,6 @@ public enum PNJSON {
             return int
         case let int64 as Int64:
             return int64
-        case let number as NSNumber:
-            return number
         case let string as String:
             return string
         case let url as URL:

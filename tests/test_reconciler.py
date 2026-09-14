@@ -6,6 +6,7 @@ import pytest
 
 from pythonnative.component import component
 from pythonnative.element import ERROR_BOUNDARY, Element
+from pythonnative.mutations import UNSET
 from pythonnative.reconciler import Reconciler
 from pythonnative.testing import FakeBackend as MockBackend
 from pythonnative.testing import FakeView as MockView
@@ -225,11 +226,11 @@ def test_event_registry_cleared_on_destroy() -> None:
 
 
 # ======================================================================
-# Tests: removed props signalled as None
+# Tests: removed props signaled as UNSET
 # ======================================================================
 
 
-def test_reconcile_removed_prop_becomes_none() -> None:
+def test_reconcile_removed_prop_becomes_absent() -> None:
     backend = MockBackend()
     rec = Reconciler(backend)
     el1 = Element("Text", {"text": "hi", "color": "#FF0000"}, [])
@@ -242,7 +243,8 @@ def test_reconcile_removed_prop_becomes_none() -> None:
     update_ops = [op for op in backend.ops if op[0] == "update"]
     assert len(update_ops) == 1
     assert "color" in update_ops[0][3]
-    assert root.props.get("color") is None
+    assert backend.last_update_changes["color"] is UNSET
+    assert "color" not in root.props
 
 
 # ======================================================================

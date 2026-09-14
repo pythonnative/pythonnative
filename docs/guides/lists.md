@@ -35,6 +35,19 @@ def Big():
 The list never holds 10,000 native views; only the window around the
 viewport ever exists.
 
+## Data snapshots
+
+Lists accept a `Sequence` and cache keys and row metadata separately from the
+scrolling window. Keep `render_item`, `key_extractor`, and height callbacks
+stable when the parent rerenders, using module-level functions or
+`use_callback`. Scrolling then does work proportional to the mounted window.
+
+Prefer replacing data with a new sequence. If you mutate a sequence in place,
+increment `data_revision` when passing it to `FlatList` or `SectionList`.
+The revision invalidates the cached snapshot. Native prefetch requests mount
+nearby rows, and keyed anchoring preserves the visible row as measurements or
+data updates change extents above it.
+
 ## Row heights
 
 Three ways to tell the list how tall rows are, in order of preference:

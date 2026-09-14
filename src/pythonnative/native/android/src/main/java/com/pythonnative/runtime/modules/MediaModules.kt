@@ -1,5 +1,7 @@
 package com.pythonnative.runtime.modules
 
+import com.pythonnative.generated.*
+
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
@@ -17,8 +19,6 @@ import androidx.fragment.app.FragmentActivity
 import com.pythonnative.runtime.PNBridge
 import com.pythonnative.runtime.bridge.MainThread
 import com.pythonnative.runtime.bridge.PNLog
-import com.pythonnative.runtime.bridge.str
-import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 
@@ -28,64 +28,50 @@ import java.io.FileOutputStream
  * URI string, or a JPEG written to the cache dir for thumbnails) or
  * `null` when cancelled.
  */
-class CameraModule : NativeModule {
-    override val name = "Camera"
-    private val pending = HashMap<Int, Promise>()
+class CameraModule : CameraImplementation {
+    private data class Pending(val quality: Int, val done: (Result<String?>) -> Unit)
+    private val pending = HashMap<Int, Pending>()
 
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        when (method) {
-            "take_photo" -> launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE), promise)
-            "pick_from_gallery" -> launch(Intent(Intent.ACTION_PICK).apply { type = "image/*" }, promise)
-            else -> promise.rejectUnknownMethod(method)
-        }
-    }
+    override fun take_photo(quality: Double, allow_editing: Boolean, completion: (Result<String?>) -> Unit): (() -> Unit)? =
+        launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE), quality, allow_editing, completion)
+    override fun pick_from_gallery(quality: Double, allow_editing: Boolean, completion: (Result<String?>) -> Unit): (() -> Unit)? =
+        launch(Intent(Intent.ACTION_PICK).apply { type = "image/*" }, quality, allow_editing, completion)
 
-    private fun launch(intent: Intent, promise: Promise) {
-        val activity = PNBridge.activity() ?: return promise.resolve(null)
+    private fun launch(intent: Intent, quality: Double, editing: Boolean, completion: (Result<String?>) -> Unit): (() -> Unit)? {
+        if (editing) { completion(Result.failure(UnsupportedOperationException("Camera editing requires a provider plugin on Android"))); return null }
+        val activity = PNBridge.activity() ?: run { completion(Result.success(null)); return null }
         val code = RequestCodes.next()
-        pending[code] = promise
-        promise.onCancel {
+        pending[code] = Pending((quality.coerceIn(0.0, 1.0) * 100).toInt(), completion)
+        try {
+            @Suppress("DEPRECATION")
+            activity.startActivityForResult(intent, code)
+        } catch (error: Exception) {
+            pending.remove(code)
+            completion(Result.failure(error))
+            return null
+        }
+        return {
             pending.remove(code)
             @Suppress("DEPRECATION")
             activity.finishActivity(code)
         }
-        try {
-            @Suppress("DEPRECATION")
-            activity.startActivityForResult(intent, code)
-        } catch (e: Exception) {
-            pending.remove(code)
-            PNLog.swallowed("Camera.launch", e)
-            promise.resolve(null)
-        }
     }
 
-    /** Route `Activity.onActivityResult`; `true` when a pending picker matched. */
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
-        val promise = pending.remove(requestCode) ?: return false
-        var path: String? = null
-        if (resultCode == Activity.RESULT_OK && data != null) {
+        val request = pending.remove(requestCode) ?: return false
+        if (resultCode != Activity.RESULT_OK || data == null) { request.done(Result.success(null)); return true }
+        try {
             val uri = data.data
-            if (uri != null) {
-                path = uri.toString()
-            } else {
-                @Suppress("DEPRECATION")
-                val thumb = data.extras?.get("data") as? Bitmap
-                if (thumb != null) path = writeBitmapToCache(thumb)
-            }
-        }
-        promise.resolve(path)
+            @Suppress("DEPRECATION")
+            val thumb = data.extras?.get("data") as? Bitmap
+            val path = if (uri != null) uri.toString() else if (thumb != null) {
+                val target = File.createTempFile("pn-camera-", ".jpg", PNBridge.context().cacheDir)
+                FileOutputStream(target).use { check(thumb.compress(Bitmap.CompressFormat.JPEG, request.quality, it)) }
+                target.absolutePath
+            } else null
+            request.done(Result.success(path))
+        } catch (error: Exception) { request.done(Result.failure(error)) }
         return true
-    }
-
-    private fun writeBitmapToCache(bitmap: Bitmap): String? {
-        return try {
-            val target = File(PNBridge.context().cacheDir, "pn-camera-${System.currentTimeMillis()}.jpg")
-            FileOutputStream(target).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
-            target.absolutePath
-        } catch (e: Exception) {
-            PNLog.swallowed("Camera.writeBitmapToCache", e)
-            null
-        }
     }
 }
 
@@ -94,122 +80,85 @@ class CameraModule : NativeModule {
  * otherwise a single `network`/`gps` update with a 15 s timeout.
  * Resolves to `{latitude, longitude}` or `null`.
  */
-class LocationModule : NativeModule {
-    override val name = "Location"
-
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        when (method) {
-            "get_current" -> getCurrent(args, promise)
-            else -> promise.rejectUnknownMethod(method)
-        }
-    }
-
+class LocationModule : LocationImplementation {
     @SuppressLint("MissingPermission")
-    private fun getCurrent(args: JSONObject, promise: Promise) {
-        val ctx = PNBridge.context()
-        val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return promise.resolve(null)
+    override fun get_current(accuracy: PNLocationGetCurrentAccuracy, timeout: Double, completion: (Result<Map<String, Double>?>) -> Unit): (() -> Unit)? {
+        val lm = PNBridge.context().getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            ?: run { completion(Result.success(null)); return null }
         try {
             for (provider in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)) {
                 val last = lm.getLastKnownLocation(provider) ?: continue
-                if (System.currentTimeMillis() - last.time < 60_000) return promise.resolve(coords(last))
+                if (System.currentTimeMillis() - last.time < 60_000) { completion(Result.success(coords(last))); return null }
             }
-        } catch (e: SecurityException) {
-            return promise.resolve(null)
-        } catch (e: Exception) {
-            PNLog.swallowed("Location.lastKnown", e)
-        }
+        } catch (_: SecurityException) { completion(Result.success(null)); return null }
+        catch (error: Exception) { PNLog.swallowed("Location.lastKnown", error) }
         var settled = false
-        var timeout: Runnable? = null
+        var timer: Runnable? = null
         val listener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
                 if (settled) return
                 settled = true
-                timeout?.let { MainThread.remove(it) }
+                timer?.let { MainThread.remove(it) }
                 lm.removeUpdates(this)
-                promise.resolve(coords(location))
+                completion(Result.success(coords(location)))
             }
-
             @Deprecated("Deprecated in Java")
             override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
             override fun onProviderEnabled(provider: String) {}
             override fun onProviderDisabled(provider: String) {}
         }
-        promise.onCancel {
+        val cancel = {
             settled = true
-            timeout?.let { MainThread.remove(it) }
+            timer?.let { MainThread.remove(it) }
             lm.removeUpdates(listener)
         }
         try {
             val provider = when {
-                args.optString("accuracy") in listOf("high", "best") && lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+                accuracy.rawValue == "high" && lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
                 lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
                 lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
-                else -> return promise.resolve(null)
+                else -> { completion(Result.success(null)); return null }
             }
+            timer = Runnable { if (!settled) { cancel(); completion(Result.success(null)) } }
             lm.requestLocationUpdates(provider, 1000L, 0f, listener)
-            timeout = Runnable {
-                if (settled) return@Runnable
-                settled = true
-                lm.removeUpdates(listener)
-                promise.resolve(null)
-            }
-            MainThread.postDelayed(timeout!!, (args.optDouble("timeout", 15.0).coerceAtLeast(1.0) * 1000).toLong())
-        } catch (e: Exception) {
-            PNLog.swallowed("Location.requestUpdates", e)
-            promise.resolve(null)
+            MainThread.postDelayed(timer!!, (timeout.coerceIn(1.0, 86400.0) * 1000).toLong())
+        } catch (error: Exception) {
+            cancel()
+            completion(Result.failure(error))
+            return null
         }
+        return cancel
     }
 
-    private fun coords(location: Location): Map<String, Any?> = mapOf(
-        "latitude" to location.latitude,
-        "longitude" to location.longitude,
-        "accuracy" to location.accuracy.toDouble(),
-        "altitude" to if (location.hasAltitude()) location.altitude else null,
-        "timestamp" to location.time / 1000.0,
-    )
+    private fun coords(location: Location): Map<String, Double> = buildMap {
+        put("latitude", location.latitude); put("longitude", location.longitude)
+        put("accuracy", location.accuracy.toDouble()); put("timestamp", location.time / 1000.0)
+        if (location.hasAltitude()) put("altitude", location.altitude)
+        if (location.hasSpeed()) put("speed", location.speed.toDouble())
+        if (location.hasBearing()) put("heading", location.bearing.toDouble())
+    }
 }
 
 /** `Biometrics.is_available()` (sync bool) and `authenticate(reason)` (async bool via `BiometricPrompt`). */
-class BiometricsModule : NativeModule {
-    override val name = "Biometrics"
+class BiometricsModule : BiometricsImplementation {
+    override fun is_available(): Boolean = try {
+        BiometricManager.from(PNBridge.context()).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
+    } catch (_: Exception) { false }
 
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        when (method) {
-            "is_available" -> promise.resolve(isAvailable())
-            "authenticate" -> authenticate(args.str("reason") ?: "Authenticate", promise)
-            else -> promise.rejectUnknownMethod(method)
-        }
-    }
-
-    private fun isAvailable(): Boolean {
+    override fun authenticate(reason: String, completion: (Result<Boolean>) -> Unit): (() -> Unit)? {
+        val activity = PNBridge.activity() as? FragmentActivity ?: run { completion(Result.success(false)); return null }
+        if (!is_available()) { completion(Result.success(false)); return null }
         return try {
-            val manager = BiometricManager.from(PNBridge.context())
-            manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    private fun authenticate(reason: String, promise: Promise) {
-        val activity = PNBridge.activity() as? FragmentActivity ?: return promise.resolve(false)
-        if (!isAvailable()) return promise.resolve(false)
-        try {
-            val executor = ContextCompat.getMainExecutor(activity)
-            val prompt = BiometricPrompt(activity, executor, object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) = promise.resolve(true)
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) = promise.resolve(false)
+            val prompt = BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) = completion(Result.success(true))
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) = completion(Result.success(false))
                 override fun onAuthenticationFailed() {}
             })
-            val info = BiometricPrompt.PromptInfo.Builder()
-                .setTitle(reason)
-                .setNegativeButtonText("Cancel")
-                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
-                .build()
-            promise.onCancel { prompt.cancelAuthentication() }
+            val info = BiometricPrompt.PromptInfo.Builder().setTitle(reason).setNegativeButtonText("Cancel")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK).build()
             prompt.authenticate(info)
-        } catch (e: Exception) {
-            PNLog.swallowed("Biometrics.authenticate", e)
-            promise.resolve(false)
-        }
+            val cancel: () -> Unit = { prompt.cancelAuthentication() }
+            cancel
+        } catch (error: Exception) { completion(Result.failure(error)); null }
     }
 }

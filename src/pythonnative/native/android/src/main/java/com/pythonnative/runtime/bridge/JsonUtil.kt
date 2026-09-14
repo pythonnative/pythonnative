@@ -6,9 +6,8 @@ import org.json.JSONObject
 /**
  * Helpers for the JSON shapes the bridge exchanges with Python.
  *
- * Python normalizes values before encoding: `math.inf` arrives as the
- * string `"inf"`, removed props arrive as JSON `null`, and tuples and
- * frozensets arrive as arrays. These helpers hide those conventions.
+ * Protocol 3 carries finite JSON values. Removals are separate from nulls;
+ * physical setters receive resolved defaults or null for a platform reset.
  */
 object JsonUtil {
     /** Whether `value` is absent or an explicit JSON null. */
@@ -106,7 +105,7 @@ object JsonUtil {
     /** Wrap a Kotlin value into something `org.json` can hold (maps, lists, nulls). */
     fun wrap(value: Any?): Any {
         return when (value) {
-            null -> JSONObject.NULL
+            null, JSONObject.NULL -> JSONObject.NULL
             is JSONObject, is JSONArray, is String, is Boolean -> value
             is Float -> if (value.isFinite()) value.toDouble() else JSONObject.NULL
             is Double -> if (value.isFinite()) value else JSONObject.NULL

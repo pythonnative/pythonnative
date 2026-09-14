@@ -1,5 +1,6 @@
 package com.pythonnative.runtime.animation
 
+import android.view.Choreographer
 import com.pythonnative.runtime.PNBridge
 import org.json.JSONArray
 import org.json.JSONObject
@@ -12,6 +13,35 @@ object AnimationGraph {
     private val values = HashMap<Long, Double>()
     private val previous = HashMap<Long, Double>()
     private val output = HashMap<Long, Any>()
+    private val membership = HashMap<Long, MutableSet<Long>>()
+    private val pending = HashSet<Long>()
+    private var scheduled = false
+    private val applied = HashMap<Pair<Long, String>, Pair<Int, Any>>()
+    var evaluatedNodes = 0; private set
+    var evaluatedGraphs = 0; private set
+    var frameCount = 0; private set
+    private val frameCallback = Choreographer.FrameCallback {
+        scheduled = false
+        flushFrame()
+    }
+
+    fun flushFrame() {
+        if (pending.isEmpty()) return
+        val changed = pending.toSet()
+        pending.clear()
+        frameCount++
+        evaluate(changed)
+    }
+
+    fun setFrame(id: Long, value: Double) {
+        if (!value.isFinite() || values[id] == value) return
+        values[id] = value
+        pending.add(id)
+        if (!scheduled) {
+            scheduled = true
+            Choreographer.getInstance().postFrameCallback(frameCallback)
+        }
+    }
 
     fun install(spec: JSONObject) {
         val id = spec.getLong("id")
@@ -31,7 +61,7 @@ object AnimationGraph {
         evaluate()
     }
     fun value(id: Long): Double = values[id] ?: 0.0
-    fun set(id: Long, value: Double) { if (value.isFinite()) { values[id] = value; evaluate() } }
+    fun set(id: Long, value: Double) { if (value.isFinite() && values[id] != value) { values[id] = value; evaluate(setOf(id)) } }
     fun event(tag: Long, name: String, args: JSONArray) {
         val payload = args.optJSONObject(0) ?: return
         val props = PNBridge.registry.get(tag)?.props ?: return
@@ -40,10 +70,15 @@ object AnimationGraph {
             props.optJSONArray("gestures")?.optJSONObject(index)?.optJSONObject("animated_events")?.optJSONObject(payload.optString("state"))
         } else props.optJSONObject("_pn_animated_events")?.optJSONObject(name)
         if (fields == null) return
-        for (field in fields.keys()) if (payload.opt(field) is Number) values[fields.getLong(field)] = payload.getDouble(field)
-        evaluate()
+        val changed = HashSet<Long>()
+        for (field in fields.keys()) if (payload.opt(field) is Number) {
+            val id = fields.getLong(field); val value = payload.getDouble(field)
+            if (value.isFinite() && values[id] != value) { values[id] = value; changed.add(id) }
+        }
+        evaluate(changed)
     }
     fun forget(tag: Long) {
+        applied.keys.removeAll { it.first == tag }
         for ((id, graph) in graphs.toMap()) {
             val kept = JSONArray()
             for (i in 0 until graph.bindings.length()) if (graph.bindings.getJSONArray(i).getLong(0) != tag) kept.put(graph.bindings.getJSONArray(i))
@@ -52,15 +87,29 @@ object AnimationGraph {
         collect()
     }
     private fun collect() {
+        membership.clear()
+        for ((graphID, graph) in graphs) for (node in graph.nodes) membership.getOrPut(node.getLong("id")) { HashSet() }.add(graphID)
         val live = graphs.values.flatMap { it.nodes }.map { it.getLong("id") }.toSet()
         values.keys.retainAll(live); previous.keys.retainAll(live); output.keys.retainAll(live)
+        pending.retainAll(live)
+        if (pending.isEmpty() && scheduled) {
+            Choreographer.getInstance().removeFrameCallback(frameCallback)
+            scheduled = false
+        }
     }
     private fun input(node: JSONObject): Double = if (node.has("node")) values[node.getLong("node")] ?: 0.0 else node.optDouble("constant", 0.0)
-    private fun evaluate() {
-        for (graph in graphs.values) {
+    private fun evaluate(changed: Set<Long>? = null) {
+        val affected = changed?.flatMap { membership[it] ?: emptySet() }?.toSet() ?: graphs.keys
+        for (graphID in affected) {
+            val graph = graphs[graphID] ?: continue
+            evaluatedGraphs++
+            val dirty = changed?.toMutableSet() ?: graph.nodes.map { it.getLong("id") }.toMutableSet()
             for (node in graph.nodes) {
                 val id = node.getLong("id")
                 val raw = node.optJSONArray("inputs") ?: JSONArray()
+                if (id !in dirty && (0 until raw.length()).none { raw.getJSONObject(it).optLong("node") in dirty }) continue
+                dirty.add(id)
+                evaluatedNodes++
                 val inputs = (0 until raw.length()).map { input(raw.getJSONObject(it)) }
                 val a = inputs.getOrElse(0) { 0.0 }; val b = inputs.getOrElse(1) { 0.0 }
                 val value = when (node.getString("kind")) {
@@ -82,7 +131,12 @@ object AnimationGraph {
             for (i in 0 until graph.bindings.length()) {
                 val binding = graph.bindings.getJSONArray(i)
                 val record = PNBridge.registry.get(binding.getLong(0)) ?: continue
-                record.manager.setAnimatedProperty(record.view, binding.getString(1), output[binding.getLong(2)])
+                val value = output[binding.getLong(2)] ?: continue
+                val key = record.tag to binding.getString(1)
+                val state = System.identityHashCode(record.view) to value
+                if (applied[key] == state) continue
+                applied[key] = state
+                record.manager.setAnimatedProperty(record.view, key.second, value)
             }
         }
     }

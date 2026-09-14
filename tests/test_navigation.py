@@ -1209,3 +1209,28 @@ def test_navigation_exports_from_package() -> None:
         assert name in pn.__all__, name
     assert pn.use_navigation is use_navigation
     assert pn.NavigationContext is NavigationContext if hasattr(pn, "NavigationContext") else True
+
+
+def test_native_header_slots_keep_route_context_and_update_without_serializing_elements() -> None:
+    stack = create_stack_navigator()
+    handles: dict[str, Any] = {}
+
+    @component
+    def Header() -> pn.Element:
+        navigation = pn.use_navigation()
+        return pn.Button("Open detail", on_press=lambda: navigation.navigate("Detail"))
+
+    result = render(
+        stack.Navigator(
+            stack.Screen("Home", _capturing_screen("home", handles), header_right=Header),
+            stack.Screen("Detail", _capturing_screen("detail", handles)),
+        ),
+        host=FakeHost(),
+    )
+    screens = [view for view in result.views() if view.type_name == "Screen"]
+    assert "header_right" not in screens[0].props
+    slots = [view for view in result.views() if view.props.get("_pn_header_slot") == "right"]
+    assert len(slots) == 1
+    result.press(result.get_by_text("Open detail"))
+    assert result.get_by_text("detail")
+    result.unmount()

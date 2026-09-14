@@ -24,21 +24,23 @@ public final class PNScrollViewManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! ScrollViewProps(props)
+
         guard let scroll = view as? UIScrollView else { return }
         PNViewStyler.applyCommon(scroll, props)
-        if PNProps.has(props, "refresh_control") {
+        if typed.has_refresh_control {
             applyRefresh(scroll, PNProps.value(props, "refresh_control"))
         }
-        if PNProps.has(props, "shows_scroll_indicator") {
-            let visible = PNProps.bool(PNProps.value(props, "shows_scroll_indicator")) ?? true
+        if typed.has_shows_scroll_indicator {
+            let visible = typed.shows_scroll_indicator ?? true
             scroll.showsVerticalScrollIndicator = visible
             scroll.showsHorizontalScrollIndicator = visible
         }
-        if PNProps.has(props, "paging_enabled") {
-            scroll.isPagingEnabled = PNProps.bool(PNProps.value(props, "paging_enabled")) ?? false
+        if typed.has_paging_enabled {
+            scroll.isPagingEnabled = typed.paging_enabled ?? false
         }
-        if PNProps.has(props, "bounces") {
-            scroll.bounces = PNProps.bool(PNProps.value(props, "bounces")) ?? true
+        if typed.has_bounces {
+            scroll.bounces = typed.bounces ?? true
         }
         if PNProps.has(props, "scroll_enabled") {
             scroll.isScrollEnabled = PNProps.bool(PNProps.value(props, "scroll_enabled")) ?? true
@@ -48,7 +50,7 @@ public final class PNScrollViewManager: PNComponentManager {
             scroll.alwaysBounceHorizontal = horizontal
             scroll.alwaysBounceVertical = !horizontal && scroll.refreshControl != nil
         }
-        if let mode = PNProps.string(PNProps.value(props, "keyboard_dismiss_mode")) {
+        if let mode = typed.keyboard_dismiss_mode?.rawValue {
             switch mode {
             case "on_drag": scroll.keyboardDismissMode = .onDrag
             case "interactive": scroll.keyboardDismissMode = .interactive

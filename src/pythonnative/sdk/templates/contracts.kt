@@ -19,10 +19,6 @@ object PNContracts {
             val field = fields.optJSONObject(key) ?: return false
             val platforms = field.optJSONObject("native")?.optJSONArray("platforms")
             if (platforms != null && (0 until platforms.length()).none { platforms.getString(it) == "android" }) return false
-            if (partial && props.isNull(key)) {
-                if ((0 until required.length()).any { required.getString(it) == key }) return false
-                continue
-            }
             if (!matches(props.get(key), field)) return false
         }
         return true
@@ -33,20 +29,26 @@ object PNContracts {
         return changed.keys().asSequence().any { fields.optJSONObject(it)?.optJSONObject("native")?.optBoolean("invalidates_layout", true) ?: true }
     }
 
-    fun requiresRecreation(name: String, changed: JSONObject): Boolean {
-        val schema = components.optJSONObject(name) ?: return true
+    fun validateRemoval(name: String, changed: JSONObject, removed: List<String>): Boolean {
+        val schema = components.optJSONObject(name) ?: return false
         val fields = schema.getJSONObject("props")
-        val defaults = schema.optJSONObject("defaults") ?: JSONObject()
-        return changed.keys().asSequence().any { key ->
-            fields.optJSONObject(key)?.optJSONObject("native")?.optBoolean("recreate", false) == true ||
-                (changed.isNull(key) && defaults.isNull(key))
+        val required = schema.optJSONArray("required") ?: JSONArray()
+        return removed.toSet().size == removed.size && removed.all { key ->
+            fields.has(key) && !changed.has(key) && (0 until required.length()).none { required.getString(it) == key }
         }
     }
 
-    fun normalize(name: String, changed: JSONObject): JSONObject {
+    fun requiresRecreation(name: String, changed: JSONObject, removed: List<String> = emptyList()): Boolean {
+        val fields = components.optJSONObject(name)?.optJSONObject("props") ?: return true
+        return (changed.keys().asSequence().toSet() + removed).any { key ->
+            fields.optJSONObject(key)?.optJSONObject("native")?.optBoolean("recreate", false) == true
+        }
+    }
+
+    fun normalize(name: String, changed: JSONObject, removed: List<String> = emptyList()): JSONObject {
         val defaults = components.optJSONObject(name)?.optJSONObject("defaults") ?: JSONObject()
-        val result = JSONObject()
-        for (key in changed.keys()) result.put(key, if (changed.isNull(key)) defaults.opt(key) ?: JSONObject.NULL else changed.get(key))
+        val result = JSONObject(changed.toString())
+        for (key in removed) result.put(key, defaults.opt(key) ?: JSONObject.NULL)
         return result
     }
 
@@ -74,7 +76,9 @@ object PNContracts {
             "boolean" -> value is Boolean
             "integer" -> value is Number && value.toDouble().isFinite() && kotlin.math.abs(value.toDouble()) <= 9007199254740991.0 && value.toDouble() == value.toLong().toDouble()
             "number" -> value is Number && value.toDouble().isFinite()
-            "array" -> value is JSONArray && (0 until value.length()).all { matches(value.get(it), schema.optJSONObject("items") ?: JSONObject()) }
+            "array" -> value is JSONArray && (schema.optJSONArray("prefixItems")?.let { prefix ->
+                value.length() == prefix.length() && (0 until value.length()).all { matches(value.get(it), prefix.getJSONObject(it)) }
+            } ?: (0 until value.length()).all { matches(value.get(it), schema.optJSONObject("items") ?: JSONObject()) })
             "object" -> {
                 if (value !is JSONObject) false else {
                     val fields = schema.optJSONObject("properties") ?: JSONObject()

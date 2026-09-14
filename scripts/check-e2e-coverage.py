@@ -48,6 +48,10 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # Type-only re-exports: statically checkable, no UI surface.
     # --------------------------------------------------------------
     "Element",
+    "UnsetType",  # sentinel type; UNSET is exercised by the custom_component flow
+    "ImageLoadEvent",  # typed callback record; real Image flow exercises delivery
+    "WebNavigationEvent",  # typed callback record; WebView flow exercises navigation
+    "UNSET",  # custom_component flow removes font_size from a live native Text
     "AccessibilityState",
     "AlignContent",
     "AlignItems",

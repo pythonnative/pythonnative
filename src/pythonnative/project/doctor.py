@@ -9,6 +9,7 @@ their versions.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -122,7 +123,28 @@ def check_common(config: Optional[AppConfig] = None) -> List[CheckResult]:
                     f"{config.python_version})",
                 )
             )
+        from . import lockfile
+        from .artifacts import ArtifactError, privacy_manifest
+        from .deps import DependencyError
+
+        if config.ios.privacy_manifest:
+            try:
+                privacy_manifest(config.resolve_path(config.ios.privacy_manifest))
+                results.append(CheckResult("iOS app privacy manifest", OK, config.ios.privacy_manifest))
+            except ArtifactError as exc:
+                results.append(CheckResult("iOS app privacy manifest", ERROR, str(exc)))
         if config.requirements:
+            try:
+                frozen = lockfile.read(config)
+                results.append(
+                    CheckResult(
+                        "Frozen release dependencies",
+                        OK if frozen else WARN,
+                        "pn.lock found" if frozen else "Run 'pn deps --lock' before release builds.",
+                    )
+                )
+            except (DependencyError, ValueError) as exc:
+                results.append(CheckResult("Frozen release dependencies", ERROR, str(exc)))
             count = len(config.requirements)
             results.append(
                 CheckResult(
@@ -158,13 +180,41 @@ def check_android(config: Optional[AppConfig]) -> List[CheckResult]:
     adb = _which_version("adb", ["--version"])
     results.append(CheckResult("adb (Android platform-tools)", OK if adb else WARN, adb or "not found on PATH"))
 
-    java_home = shutil.which("java")
     import os
 
-    if os.environ.get("JAVA_HOME") or java_home:
-        results.append(CheckResult("Java (JDK 17 recommended)", OK, os.environ.get("JAVA_HOME") or java_home or ""))
-    else:
-        results.append(CheckResult("Java (JDK 17 recommended)", WARN, "JAVA_HOME not set and 'java' not on PATH"))
+    java = _which_version("java", ["-version"])
+    match = re.search(r'version "(\d+)', java or "")
+    major = int(match.group(1)) if match else None
+    results.append(
+        CheckResult(
+            "Java (JDK 17-23)",
+            OK if major is not None and 17 <= major <= 23 else ERROR,
+            java if major is not None and 17 <= major <= 23 else "Install JDK 17 or 21 and select it with JAVA_HOME.",
+        )
+    )
+    sdk = Path(
+        os.environ.get("ANDROID_HOME")
+        or os.environ.get("ANDROID_SDK_ROOT")
+        or (Path.home() / "Library/Android/sdk" if sys.platform == "darwin" else Path.home() / "Android/Sdk")
+    )
+    required = config.android.compile_sdk if config is not None else 36
+    for name, path, package in (
+        (
+            f"Android SDK {required}",
+            sdk / "platforms" / f"android-{required}" / "android.jar",
+            f"platforms;android-{required}",
+        ),
+        ("Android NDK 28.2", sdk / "ndk/28.2.13676358/source.properties", "ndk;28.2.13676358"),
+    ):
+        results.append(
+            CheckResult(
+                name,
+                OK if path.is_file() else ERROR,
+                str(path) if path.is_file() else f'Install with sdkmanager "{package}". SDK: {sdk}',
+            )
+        )
+    if config is not None and config.android.target_sdk < 36:
+        results.append(CheckResult("Android release target", WARN, "Release builds require target_sdk >= 36."))
 
     if config is not None:
         signing = config.android.signing
@@ -203,7 +253,15 @@ def check_ios(config: Optional[AppConfig]) -> List[CheckResult]:
         return results
 
     xcodebuild = _which_version("xcodebuild", ["-version"])
-    results.append(CheckResult("Xcode (xcodebuild)", OK if xcodebuild else ERROR, xcodebuild or "not found on PATH"))
+    version = re.search(r"Xcode (\d+)", xcodebuild or "")
+    modern = version is not None and int(version.group(1)) >= 26
+    results.append(
+        CheckResult(
+            "Xcode 26 or later",
+            OK if modern else ERROR,
+            xcodebuild if modern else "Install Xcode 26 or later and select it with xcode-select.",
+        )
+    )
     simctl = shutil.which("xcrun")
     results.append(CheckResult("xcrun simctl (Simulators)", OK if simctl else WARN, simctl or "not found on PATH"))
 

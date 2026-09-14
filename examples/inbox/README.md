@@ -3,7 +3,8 @@
 This reference app combines one shared repository, 2,000 immutable issue records,
 variable-height native list rows, deferred search, a detail form, optimistic
 persistence with rollback, and native stack navigation. Its separately packaged
-extension exercises generated props and synchronous and asynchronous module adapters.
+extension exercises generated props, nested records, typed events, cancellable
+asynchronous methods, bundled resources, and exact SwiftPM and Maven dependencies.
 
 Build the extension wheel from the repository root:
 

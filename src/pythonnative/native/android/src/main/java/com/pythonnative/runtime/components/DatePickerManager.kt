@@ -1,5 +1,7 @@
 package com.pythonnative.runtime.components
 
+import com.pythonnative.generated.*
+
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
@@ -31,9 +33,11 @@ class DatePickerManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        val typed = DatePickerProps(props)
+
         val btn = view as Button
-        if (props.has("disabled")) btn.isEnabled = props.value("disabled") != true
-        if (props.has("value") || props.has("mode") || initial) refreshLabel(btn)
+        if (typed.has_disabled) btn.isEnabled = props.value("disabled") != true
+        if (typed.has_value || typed.has_mode || initial) refreshLabel(btn)
         ViewStyler.applyAccessibility(btn, props)
     }
 

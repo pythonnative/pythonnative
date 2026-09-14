@@ -9,7 +9,9 @@ export function matches(value, schema) {
     case "boolean": case "event": return typeof value === "boolean";
     case "integer": return Number.isSafeInteger(value);
     case "number": return typeof value === "number" && Number.isFinite(value);
-    case "array": return Array.isArray(value) && value.every(item => matches(item, schema.items || {}));
+    case "array": return Array.isArray(value) && (schema.prefixItems
+      ? value.length === schema.prefixItems.length && value.every((item, index) => matches(item, schema.prefixItems[index]))
+      : value.every(item => matches(item, schema.items || {})));
     case "object": {
       if (!value || typeof value !== "object" || Array.isArray(value)) return false;
       if ((schema.required || []).some(key => !Object.hasOwn(value, key))) return false;
@@ -28,18 +30,24 @@ export function validateProps(spec, name, props, partial = false) {
   return Object.entries(props).every(([key, value]) => {
     if (!Object.hasOwn(schema.props, key)) return false;
     if (schema.props[key].native?.platforms && !schema.props[key].native.platforms.includes("web")) return false;
-    if (partial && value === null) return !schema.required.includes(key);
     return matches(value, schema.props[key]);
   });
 }
-export function normalize(spec, name, changed) {
-  const defaults = spec.components[name]?.defaults || {};
-  return Object.fromEntries(Object.entries(changed).map(([key, value]) => [key, value === null ? defaults[key] ?? null : value]));
-}
-export function requiresRecreation(spec, name, changed) {
+export function validateRemoval(spec, name, changed, removed) {
   const schema = spec.components[name];
-  return Object.entries(changed).some(([key, value]) => schema?.props[key]?.native?.recreate ||
-    (value === null && schema?.defaults[key] == null));
+  return !!schema && Array.isArray(removed) && new Set(removed).size === removed.length &&
+    removed.every(key => typeof key === "string" && Object.hasOwn(schema.props, key) &&
+      !schema.required.includes(key) && !Object.hasOwn(changed, key));
+}
+export function normalize(spec, name, changed, removed = []) {
+  const defaults = spec.components[name]?.defaults || {};
+  const result = {...changed};
+  for (const key of removed) result[key] = defaults[key] ?? null;
+  return result;
+}
+export function requiresRecreation(spec, name, changed, removed = []) {
+  const schema = spec.components[name];
+  return [...Object.keys(changed), ...removed].some(key => schema?.props[key]?.native?.recreate);
 }
 export function validateCommand(spec, name, command, args) {
   const contract = spec.components[name]?.commands[command];

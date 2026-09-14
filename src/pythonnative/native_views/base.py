@@ -75,7 +75,7 @@ class ViewHandler:
         Args:
             native_view: The platform-native view to mutate.
             changed_props: Props whose values changed (a value of
-                `None` indicates the prop was removed).
+                `UNSET` indicates the prop was removed; `None` is explicit null).
 
         Raises:
             NotImplementedError: Subclasses must override.

@@ -29,8 +29,23 @@ object BuiltinModules {
     val biometrics = BiometricsModule()
 
     private val all: List<NativeModule> = listOf(
-        host, device, alert, storage, secureStore, clipboard, share, linking, haptics,
-        battery, netInfo, appState, permissions, notifications, camera, location, biometrics,
+        host,
+        com.pythonnative.generated.DeviceModuleAdapter(device),
+        com.pythonnative.generated.AlertModuleAdapter(alert),
+        com.pythonnative.generated.StorageModuleAdapter(storage),
+        com.pythonnative.generated.SecureStoreModuleAdapter(secureStore),
+        com.pythonnative.generated.ClipboardModuleAdapter(clipboard),
+        com.pythonnative.generated.ShareModuleAdapter(share),
+        com.pythonnative.generated.LinkingModuleAdapter(linking),
+        com.pythonnative.generated.HapticsModuleAdapter(haptics),
+        com.pythonnative.generated.BatteryModuleAdapter(battery),
+        com.pythonnative.generated.NetInfoModuleAdapter(netInfo),
+        com.pythonnative.generated.AppStateModuleAdapter(appState),
+        com.pythonnative.generated.PermissionsModuleAdapter(permissions),
+        com.pythonnative.generated.NotificationsModuleAdapter(notifications),
+        com.pythonnative.generated.CameraModuleAdapter(camera),
+        com.pythonnative.generated.LocationModuleAdapter(location),
+        com.pythonnative.generated.BiometricsModuleAdapter(biometrics),
     )
 
     fun register(registry: PNRegistry) {

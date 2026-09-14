@@ -119,6 +119,7 @@ def native_component(
     name: str,
     *,
     props: Optional[type] = None,
+    platforms: tuple[str, ...] = ("ios", "android"),
 ) -> Callable[[Type[H]], Type[H]]:
     """Decorator that registers a test [`ViewHandler`][pythonnative.sdk.ViewHandler] under ``name``.
 
@@ -135,6 +136,7 @@ def native_component(
             [`element_factory`][pythonnative.sdk.element_factory] helper
             uses this type to validate kwargs and produce frozen prop
             instances.
+        platforms: Platforms with an actual renderer for this component.
 
     Returns:
         A decorator that, when applied to a
@@ -149,7 +151,7 @@ def native_component(
     def decorator(handler_cls: Type[H]) -> Type[H]:
         if not isinstance(handler_cls, type) or not issubclass(handler_cls, ViewHandler):
             raise TypeError(f"@native_component({name!r}) must decorate a ViewHandler subclass; got {handler_cls!r}")
-        register_component(name=name, props=props, handler=handler_cls())
+        register_component(name=name, props=props, handler=handler_cls(), platforms=platforms)
         return handler_cls
 
     return decorator
@@ -160,6 +162,7 @@ def register_component(
     name: str,
     props: Optional[type] = None,
     handler: Optional[ViewHandler] = None,
+    platforms: tuple[str, ...] = ("ios", "android"),
 ) -> None:
     """Register a custom native component imperatively.
 
@@ -175,6 +178,8 @@ def register_component(
         props: Optional dataclass type describing the typed props.
         handler: Optional [`ViewHandler`][pythonnative.sdk.ViewHandler]
             instance used off device.
+        platforms: Platforms with an actual renderer. Browser placeholders
+            don't count as native support.
 
     Raises:
         TypeError: If ``handler`` is not a ``ViewHandler`` instance, or
@@ -186,9 +191,19 @@ def register_component(
         raise TypeError(f"register_component({name!r}): handler must be a ViewHandler instance")
 
     if props is not None:
-        from .schema import ComponentSchema, register_schema
+        from dataclasses import replace
+        from typing import get_type_hints
 
-        register_schema(ComponentSchema.from_dataclass(name, props))
+        from ..style import Style, StyleProp
+        from .schema import COMPONENTS, RUNTIME_PROPS, ComponentSchema, register_schema, type_schema
+
+        schema = ComponentSchema.from_dataclass(name, props, platforms=platforms)
+        common = COMPONENTS.get("View")
+        style_keys = get_type_hints(Style)
+        styles = {key: value for key, value in (common.props.items() if common else ()) if key in style_keys}
+        wire = styles | schema.props | RUNTIME_PROPS
+        wire["style"] = {**type_schema(StyleProp), "native": {"python_only": True}}
+        register_schema(replace(schema, props=wire))
     existing = _REGISTRY.get(name)
     if existing is None:
         _REGISTRY[name] = (props, handler)
@@ -351,6 +366,9 @@ def element_factory(name: str) -> Callable[..., Element]:
         )
 
     def factory(*children: Element, key: Optional[str] = None, props: Any = None, **kwargs: Any) -> Element:
+        from ..mutations import UNSET
+
+        explicit_style = kwargs.pop("style", UNSET)
         props_type = get_props_type(name)
         if props is not None:
             if kwargs:
@@ -364,10 +382,12 @@ def element_factory(name: str) -> Callable[..., Element]:
             props_dict = _props_to_dict(instance)
         else:
             props_dict = dict(kwargs)
+        if explicit_style is not UNSET:
+            props_dict["style"] = explicit_style
         if props_type is not None:
-            from .schema import ComponentSchema
+            from .schema import COMPONENTS
 
-            ComponentSchema.from_dataclass(name, props_type).validate(props_dict)
+            COMPONENTS[name].validate(props_dict)
         # Style props pass through resolve_style at the boundary so list
         # forms / None get flattened identically to built-in factories.
         from ..style import resolve_style as _resolve
@@ -381,10 +401,17 @@ def element_factory(name: str) -> Callable[..., Element]:
 
     props_type = get_props_type(name)
     if props_type is not None:
-        factory.__signature__ = inspect.signature(props_type)
-        from .schema import ComponentSchema, register_schema
+        signature = inspect.signature(props_type)
+        if "style" not in signature.parameters:
+            from ..style import StyleProp
 
-        register_schema(ComponentSchema.from_dataclass(name, props_type))
+            signature = signature.replace(
+                parameters=[
+                    *signature.parameters.values(),
+                    inspect.Parameter("style", inspect.Parameter.KEYWORD_ONLY, default=None, annotation=StyleProp),
+                ]
+            )
+        factory.__signature__ = signature
     factory.__name__ = name
     factory.__doc__ = f"Construct an Element of type {name!r}."
     return factory

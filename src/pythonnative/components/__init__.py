@@ -60,6 +60,7 @@ from .lists import (  # noqa: F401
     _RowSpec,
 )
 from .media import Image, ImageBackground, WebView
+from .media_events import ImageLoadEvent, WebNavigationEvent
 from .overlays import Modal, Portal
 from .pressable import Pressable, TouchableOpacity, _StatefulPressable  # noqa: F401
 from .structural import ErrorBoundary, Fragment, Suspense
@@ -76,6 +77,8 @@ __all__ = [
     "Fragment",
     "Image",
     "ImageBackground",
+    "ImageLoadEvent",
+    "WebNavigationEvent",
     "KeyboardAvoidingView",
     "ListController",
     "Modal",

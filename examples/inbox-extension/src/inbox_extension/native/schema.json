@@ -1,10 +1,2298 @@
 {
-  "protocol": 2,
+  "protocol": 3,
   "yoga": "3.2.1",
   "components": {
     "InboxBadge": {
       "name": "InboxBadge",
       "props": {
+        "width": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "height": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "min_width": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "max_width": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "min_height": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "max_height": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "aspect_ratio": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "flex": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "flex_grow": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "flex_shrink": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "flex_basis": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "flex_direction": {
+          "enum": [
+            "row",
+            "column",
+            "row_reverse",
+            "column_reverse"
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "flex_wrap": {
+          "enum": [
+            "nowrap",
+            "wrap",
+            "wrap_reverse"
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "justify_content": {
+          "enum": [
+            "flex_start",
+            "center",
+            "flex_end",
+            "space_between",
+            "space_around",
+            "space_evenly",
+            "start",
+            "leading",
+            "top",
+            "end",
+            "trailing",
+            "bottom"
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "align_items": {
+          "enum": [
+            "stretch",
+            "flex_start",
+            "center",
+            "flex_end",
+            "baseline",
+            "auto",
+            "start",
+            "leading",
+            "top",
+            "end",
+            "trailing",
+            "bottom",
+            "fill"
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "align_self": {
+          "enum": [
+            "stretch",
+            "flex_start",
+            "center",
+            "flex_end",
+            "baseline",
+            "auto",
+            "start",
+            "leading",
+            "top",
+            "end",
+            "trailing",
+            "bottom",
+            "fill"
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "align_content": {
+          "enum": [
+            "flex_start",
+            "center",
+            "flex_end",
+            "stretch",
+            "space_between",
+            "space_around",
+            "space_evenly"
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "direction": {
+          "enum": [
+            "ltr",
+            "rtl"
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "display": {
+          "enum": [
+            "flex",
+            "none"
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "position": {
+          "enum": [
+            "relative",
+            "absolute"
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "top": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "right": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "bottom": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "left": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "padding": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "top": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "right": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "bottom": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "left": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "horizontal": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "vertical": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "all": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:EdgeInsets",
+              "python_kind": "typeddict"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "padding_top": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "padding_bottom": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "padding_left": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "padding_right": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "padding_start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "padding_end": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "padding_horizontal": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "padding_vertical": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "margin": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "enum": [
+                "auto"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "top": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "right": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "bottom": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "left": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "horizontal": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "vertical": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "all": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:EdgeInsets",
+              "python_kind": "typeddict"
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "margin_top": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "enum": [
+                "auto"
+              ]
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "margin_bottom": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "enum": [
+                "auto"
+              ]
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "margin_left": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "enum": [
+                "auto"
+              ]
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "margin_right": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "enum": [
+                "auto"
+              ]
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "margin_start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "enum": [
+                "auto"
+              ]
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "margin_end": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "enum": [
+                "auto"
+              ]
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "margin_horizontal": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "enum": [
+                "auto"
+              ]
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "margin_vertical": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "enum": [
+                "auto"
+              ]
+            }
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "spacing": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "gap": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "row_gap": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "column_gap": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "overflow": {
+          "enum": [
+            "visible",
+            "hidden",
+            "scroll"
+          ],
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "background_color": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": true,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "color": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": true,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_color": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "placeholder_color": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "tint_color": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_width": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_radius": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_top_left_radius": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_top_right_radius": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_bottom_left_radius": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_bottom_right_radius": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_top_width": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_right_width": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_bottom_width": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_left_width": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_top_color": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_right_color": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_bottom_color": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_left_color": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "font_size": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "font_family": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "font_weight": {
+          "enum": [
+            "normal",
+            "bold",
+            "100",
+            "200",
+            "300",
+            "400",
+            "500",
+            "600",
+            "700",
+            "800",
+            "900"
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "bold": {
+          "type": "boolean",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "italic": {
+          "type": "boolean",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "text_align": {
+          "enum": [
+            "left",
+            "center",
+            "right",
+            "justify",
+            "start",
+            "end"
+          ],
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "text_decoration": {
+          "enum": [
+            "none",
+            "underline",
+            "line_through"
+          ],
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "text_transform": {
+          "enum": [
+            "none",
+            "uppercase",
+            "lowercase",
+            "capitalize"
+          ],
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "line_height": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "letter_spacing": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "max_lines": {
+          "type": "integer",
+          "native": {
+            "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "text_shadow_color": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "text_shadow_offset": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "width": {
+                  "type": "number"
+                },
+                "height": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "height",
+                "width"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:ShadowOffset",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "python_container": "tuple"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          ],
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "text_shadow_radius": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "shadow_color": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "shadow_offset": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "width": {
+                  "type": "number"
+                },
+                "height": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "height",
+                "width"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:ShadowOffset",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "python_container": "tuple"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          ],
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "shadow_opacity": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "shadow_radius": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "elevation": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "opacity": {
+          "type": "number",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": true,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "transform": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "rotate": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "rotate"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:TransformRotate",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "scale": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "scale"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:TransformScale",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "scale_x": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "scale_x"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:TransformScaleX",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "scale_y": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "scale_y"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:TransformScaleY",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "translate_x": {
+                  "type": "number"
+                },
+                "translate_y": {
+                  "type": "number"
+                }
+              },
+              "required": [],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:TransformTranslate",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "json"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "rotate": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "rotate"
+                    ],
+                    "defaults": {},
+                    "additionalProperties": false,
+                    "python_type": "pythonnative.style:TransformRotate",
+                    "python_kind": "typeddict"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "scale": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "scale"
+                    ],
+                    "defaults": {},
+                    "additionalProperties": false,
+                    "python_type": "pythonnative.style:TransformScale",
+                    "python_kind": "typeddict"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "scale_x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "scale_x"
+                    ],
+                    "defaults": {},
+                    "additionalProperties": false,
+                    "python_type": "pythonnative.style:TransformScaleX",
+                    "python_kind": "typeddict"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "scale_y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "scale_y"
+                    ],
+                    "defaults": {},
+                    "additionalProperties": false,
+                    "python_type": "pythonnative.style:TransformScaleY",
+                    "python_kind": "typeddict"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "translate_x": {
+                        "type": "number"
+                      },
+                      "translate_y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [],
+                    "defaults": {},
+                    "additionalProperties": false,
+                    "python_type": "pythonnative.style:TransformTranslate",
+                    "python_kind": "typeddict"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "json"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "z_index": {
+          "type": "integer",
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "pointer_events": {
+          "enum": [
+            "auto",
+            "none",
+            "box_none",
+            "box_only"
+          ],
+          "native": {
+            "invalidates_layout": false,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
         "count": {
           "type": "integer",
           "native": {
@@ -16,45 +2304,2688 @@
               "android",
               "web"
             ],
-            "description": ""
+            "description": "",
+            "python_only": false
+          }
+        },
+        "on_press": {
+          "anyOf": [
+            {
+              "type": "event",
+              "arguments": [
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_pn_events": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "_pn_animated_events": {
+          "type": "object"
+        },
+        "_pn_list_key": {
+          "type": "string"
+        },
+        "_pn_header_slot": {
+          "enum": [
+            "left",
+            "right"
+          ]
+        },
+        "_pn_edit_revision": {
+          "type": "integer"
+        },
+        "gestures": {
+          "type": "array"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "width": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "height": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "min_width": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "max_width": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "min_height": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "max_height": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "aspect_ratio": {
+                  "type": "number"
+                },
+                "flex": {
+                  "type": "number"
+                },
+                "flex_grow": {
+                  "type": "number"
+                },
+                "flex_shrink": {
+                  "type": "number"
+                },
+                "flex_basis": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "flex_direction": {
+                  "enum": [
+                    "row",
+                    "column",
+                    "row_reverse",
+                    "column_reverse"
+                  ]
+                },
+                "flex_wrap": {
+                  "enum": [
+                    "nowrap",
+                    "wrap",
+                    "wrap_reverse"
+                  ]
+                },
+                "justify_content": {
+                  "enum": [
+                    "flex_start",
+                    "center",
+                    "flex_end",
+                    "space_between",
+                    "space_around",
+                    "space_evenly",
+                    "start",
+                    "leading",
+                    "top",
+                    "end",
+                    "trailing",
+                    "bottom"
+                  ]
+                },
+                "align_items": {
+                  "enum": [
+                    "stretch",
+                    "flex_start",
+                    "center",
+                    "flex_end",
+                    "baseline",
+                    "auto",
+                    "start",
+                    "leading",
+                    "top",
+                    "end",
+                    "trailing",
+                    "bottom",
+                    "fill"
+                  ]
+                },
+                "align_self": {
+                  "enum": [
+                    "stretch",
+                    "flex_start",
+                    "center",
+                    "flex_end",
+                    "baseline",
+                    "auto",
+                    "start",
+                    "leading",
+                    "top",
+                    "end",
+                    "trailing",
+                    "bottom",
+                    "fill"
+                  ]
+                },
+                "align_content": {
+                  "enum": [
+                    "flex_start",
+                    "center",
+                    "flex_end",
+                    "stretch",
+                    "space_between",
+                    "space_around",
+                    "space_evenly"
+                  ]
+                },
+                "direction": {
+                  "enum": [
+                    "ltr",
+                    "rtl"
+                  ]
+                },
+                "display": {
+                  "enum": [
+                    "flex",
+                    "none"
+                  ]
+                },
+                "position": {
+                  "enum": [
+                    "relative",
+                    "absolute"
+                  ]
+                },
+                "top": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "right": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "bottom": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "left": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "start": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "end": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "padding": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "top": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "right": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "bottom": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "left": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "horizontal": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "vertical": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "all": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:EdgeInsets",
+                      "python_kind": "typeddict"
+                    }
+                  ]
+                },
+                "padding_top": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "padding_bottom": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "padding_left": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "padding_right": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "padding_start": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "padding_end": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "padding_horizontal": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "padding_vertical": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "margin": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "enum": [
+                        "auto"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "top": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "right": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "bottom": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "left": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "horizontal": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "vertical": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "all": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:EdgeInsets",
+                      "python_kind": "typeddict"
+                    }
+                  ]
+                },
+                "margin_top": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "enum": [
+                        "auto"
+                      ]
+                    }
+                  ]
+                },
+                "margin_bottom": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "enum": [
+                        "auto"
+                      ]
+                    }
+                  ]
+                },
+                "margin_left": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "enum": [
+                        "auto"
+                      ]
+                    }
+                  ]
+                },
+                "margin_right": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "enum": [
+                        "auto"
+                      ]
+                    }
+                  ]
+                },
+                "margin_start": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "enum": [
+                        "auto"
+                      ]
+                    }
+                  ]
+                },
+                "margin_end": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "enum": [
+                        "auto"
+                      ]
+                    }
+                  ]
+                },
+                "margin_horizontal": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "enum": [
+                        "auto"
+                      ]
+                    }
+                  ]
+                },
+                "margin_vertical": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "enum": [
+                        "auto"
+                      ]
+                    }
+                  ]
+                },
+                "spacing": {
+                  "type": "number"
+                },
+                "gap": {
+                  "type": "number"
+                },
+                "row_gap": {
+                  "type": "number"
+                },
+                "column_gap": {
+                  "type": "number"
+                },
+                "overflow": {
+                  "enum": [
+                    "visible",
+                    "hidden",
+                    "scroll"
+                  ]
+                },
+                "background_color": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": "string"
+                },
+                "border_color": {
+                  "type": "string"
+                },
+                "placeholder_color": {
+                  "type": "string"
+                },
+                "tint_color": {
+                  "type": "string"
+                },
+                "border_width": {
+                  "type": "number"
+                },
+                "border_radius": {
+                  "type": "number"
+                },
+                "border_top_left_radius": {
+                  "type": "number"
+                },
+                "border_top_right_radius": {
+                  "type": "number"
+                },
+                "border_bottom_left_radius": {
+                  "type": "number"
+                },
+                "border_bottom_right_radius": {
+                  "type": "number"
+                },
+                "border_top_width": {
+                  "type": "number"
+                },
+                "border_right_width": {
+                  "type": "number"
+                },
+                "border_bottom_width": {
+                  "type": "number"
+                },
+                "border_left_width": {
+                  "type": "number"
+                },
+                "border_top_color": {
+                  "type": "string"
+                },
+                "border_right_color": {
+                  "type": "string"
+                },
+                "border_bottom_color": {
+                  "type": "string"
+                },
+                "border_left_color": {
+                  "type": "string"
+                },
+                "font_size": {
+                  "type": "number"
+                },
+                "font_family": {
+                  "type": "string"
+                },
+                "font_weight": {
+                  "enum": [
+                    "normal",
+                    "bold",
+                    "100",
+                    "200",
+                    "300",
+                    "400",
+                    "500",
+                    "600",
+                    "700",
+                    "800",
+                    "900"
+                  ]
+                },
+                "bold": {
+                  "type": "boolean"
+                },
+                "italic": {
+                  "type": "boolean"
+                },
+                "text_align": {
+                  "enum": [
+                    "left",
+                    "center",
+                    "right",
+                    "justify",
+                    "start",
+                    "end"
+                  ]
+                },
+                "text_decoration": {
+                  "enum": [
+                    "none",
+                    "underline",
+                    "line_through"
+                  ]
+                },
+                "text_transform": {
+                  "enum": [
+                    "none",
+                    "uppercase",
+                    "lowercase",
+                    "capitalize"
+                  ]
+                },
+                "line_height": {
+                  "type": "number"
+                },
+                "letter_spacing": {
+                  "type": "number"
+                },
+                "max_lines": {
+                  "type": "integer"
+                },
+                "text_shadow_color": {
+                  "type": "string"
+                },
+                "text_shadow_offset": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "width": {
+                          "type": "number"
+                        },
+                        "height": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "height",
+                        "width"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:ShadowOffset",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ],
+                      "python_container": "tuple"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  ]
+                },
+                "text_shadow_radius": {
+                  "type": "number"
+                },
+                "shadow_color": {
+                  "type": "string"
+                },
+                "shadow_offset": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "width": {
+                          "type": "number"
+                        },
+                        "height": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "height",
+                        "width"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:ShadowOffset",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ],
+                      "python_container": "tuple"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  ]
+                },
+                "shadow_opacity": {
+                  "type": "number"
+                },
+                "shadow_radius": {
+                  "type": "number"
+                },
+                "elevation": {
+                  "type": "number"
+                },
+                "opacity": {
+                  "type": "number"
+                },
+                "transform": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "rotate": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "rotate"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:TransformRotate",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "scale": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "scale"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:TransformScale",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "scale_x": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "scale_x"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:TransformScaleX",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "scale_y": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "scale_y"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:TransformScaleY",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "translate_x": {
+                          "type": "number"
+                        },
+                        "translate_y": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:TransformTranslate",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "json"
+                      }
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "rotate": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "rotate"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformRotate",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "scale": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "scale"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformScale",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "scale_x": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "scale_x"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformScaleX",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "scale_y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "scale_y"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformScaleY",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "translate_x": {
+                                "type": "number"
+                              },
+                              "translate_y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformTranslate",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "json"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "z_index": {
+                  "type": "integer"
+                },
+                "pointer_events": {
+                  "enum": [
+                    "auto",
+                    "none",
+                    "box_none",
+                    "box_only"
+                  ]
+                }
+              },
+              "required": [],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:Style",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "json"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "width": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "height": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "min_width": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "max_width": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "min_height": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "max_height": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "aspect_ratio": {
+                        "type": "number"
+                      },
+                      "flex": {
+                        "type": "number"
+                      },
+                      "flex_grow": {
+                        "type": "number"
+                      },
+                      "flex_shrink": {
+                        "type": "number"
+                      },
+                      "flex_basis": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "flex_direction": {
+                        "enum": [
+                          "row",
+                          "column",
+                          "row_reverse",
+                          "column_reverse"
+                        ]
+                      },
+                      "flex_wrap": {
+                        "enum": [
+                          "nowrap",
+                          "wrap",
+                          "wrap_reverse"
+                        ]
+                      },
+                      "justify_content": {
+                        "enum": [
+                          "flex_start",
+                          "center",
+                          "flex_end",
+                          "space_between",
+                          "space_around",
+                          "space_evenly",
+                          "start",
+                          "leading",
+                          "top",
+                          "end",
+                          "trailing",
+                          "bottom"
+                        ]
+                      },
+                      "align_items": {
+                        "enum": [
+                          "stretch",
+                          "flex_start",
+                          "center",
+                          "flex_end",
+                          "baseline",
+                          "auto",
+                          "start",
+                          "leading",
+                          "top",
+                          "end",
+                          "trailing",
+                          "bottom",
+                          "fill"
+                        ]
+                      },
+                      "align_self": {
+                        "enum": [
+                          "stretch",
+                          "flex_start",
+                          "center",
+                          "flex_end",
+                          "baseline",
+                          "auto",
+                          "start",
+                          "leading",
+                          "top",
+                          "end",
+                          "trailing",
+                          "bottom",
+                          "fill"
+                        ]
+                      },
+                      "align_content": {
+                        "enum": [
+                          "flex_start",
+                          "center",
+                          "flex_end",
+                          "stretch",
+                          "space_between",
+                          "space_around",
+                          "space_evenly"
+                        ]
+                      },
+                      "direction": {
+                        "enum": [
+                          "ltr",
+                          "rtl"
+                        ]
+                      },
+                      "display": {
+                        "enum": [
+                          "flex",
+                          "none"
+                        ]
+                      },
+                      "position": {
+                        "enum": [
+                          "relative",
+                          "absolute"
+                        ]
+                      },
+                      "top": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "right": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "bottom": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "left": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "start": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "end": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "padding": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "top": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "right": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "bottom": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "left": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "horizontal": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "vertical": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "all": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:EdgeInsets",
+                            "python_kind": "typeddict"
+                          }
+                        ]
+                      },
+                      "padding_top": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "padding_bottom": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "padding_left": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "padding_right": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "padding_start": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "padding_end": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "padding_horizontal": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "padding_vertical": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "margin": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "enum": [
+                              "auto"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "top": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "right": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "bottom": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "left": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "horizontal": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "vertical": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "all": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:EdgeInsets",
+                            "python_kind": "typeddict"
+                          }
+                        ]
+                      },
+                      "margin_top": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "enum": [
+                              "auto"
+                            ]
+                          }
+                        ]
+                      },
+                      "margin_bottom": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "enum": [
+                              "auto"
+                            ]
+                          }
+                        ]
+                      },
+                      "margin_left": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "enum": [
+                              "auto"
+                            ]
+                          }
+                        ]
+                      },
+                      "margin_right": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "enum": [
+                              "auto"
+                            ]
+                          }
+                        ]
+                      },
+                      "margin_start": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "enum": [
+                              "auto"
+                            ]
+                          }
+                        ]
+                      },
+                      "margin_end": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "enum": [
+                              "auto"
+                            ]
+                          }
+                        ]
+                      },
+                      "margin_horizontal": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "enum": [
+                              "auto"
+                            ]
+                          }
+                        ]
+                      },
+                      "margin_vertical": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "enum": [
+                              "auto"
+                            ]
+                          }
+                        ]
+                      },
+                      "spacing": {
+                        "type": "number"
+                      },
+                      "gap": {
+                        "type": "number"
+                      },
+                      "row_gap": {
+                        "type": "number"
+                      },
+                      "column_gap": {
+                        "type": "number"
+                      },
+                      "overflow": {
+                        "enum": [
+                          "visible",
+                          "hidden",
+                          "scroll"
+                        ]
+                      },
+                      "background_color": {
+                        "type": "string"
+                      },
+                      "color": {
+                        "type": "string"
+                      },
+                      "border_color": {
+                        "type": "string"
+                      },
+                      "placeholder_color": {
+                        "type": "string"
+                      },
+                      "tint_color": {
+                        "type": "string"
+                      },
+                      "border_width": {
+                        "type": "number"
+                      },
+                      "border_radius": {
+                        "type": "number"
+                      },
+                      "border_top_left_radius": {
+                        "type": "number"
+                      },
+                      "border_top_right_radius": {
+                        "type": "number"
+                      },
+                      "border_bottom_left_radius": {
+                        "type": "number"
+                      },
+                      "border_bottom_right_radius": {
+                        "type": "number"
+                      },
+                      "border_top_width": {
+                        "type": "number"
+                      },
+                      "border_right_width": {
+                        "type": "number"
+                      },
+                      "border_bottom_width": {
+                        "type": "number"
+                      },
+                      "border_left_width": {
+                        "type": "number"
+                      },
+                      "border_top_color": {
+                        "type": "string"
+                      },
+                      "border_right_color": {
+                        "type": "string"
+                      },
+                      "border_bottom_color": {
+                        "type": "string"
+                      },
+                      "border_left_color": {
+                        "type": "string"
+                      },
+                      "font_size": {
+                        "type": "number"
+                      },
+                      "font_family": {
+                        "type": "string"
+                      },
+                      "font_weight": {
+                        "enum": [
+                          "normal",
+                          "bold",
+                          "100",
+                          "200",
+                          "300",
+                          "400",
+                          "500",
+                          "600",
+                          "700",
+                          "800",
+                          "900"
+                        ]
+                      },
+                      "bold": {
+                        "type": "boolean"
+                      },
+                      "italic": {
+                        "type": "boolean"
+                      },
+                      "text_align": {
+                        "enum": [
+                          "left",
+                          "center",
+                          "right",
+                          "justify",
+                          "start",
+                          "end"
+                        ]
+                      },
+                      "text_decoration": {
+                        "enum": [
+                          "none",
+                          "underline",
+                          "line_through"
+                        ]
+                      },
+                      "text_transform": {
+                        "enum": [
+                          "none",
+                          "uppercase",
+                          "lowercase",
+                          "capitalize"
+                        ]
+                      },
+                      "line_height": {
+                        "type": "number"
+                      },
+                      "letter_spacing": {
+                        "type": "number"
+                      },
+                      "max_lines": {
+                        "type": "integer"
+                      },
+                      "text_shadow_color": {
+                        "type": "string"
+                      },
+                      "text_shadow_offset": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "width": {
+                                "type": "number"
+                              },
+                              "height": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "height",
+                              "width"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:ShadowOffset",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "array",
+                            "prefixItems": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ],
+                            "python_container": "tuple"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          }
+                        ]
+                      },
+                      "text_shadow_radius": {
+                        "type": "number"
+                      },
+                      "shadow_color": {
+                        "type": "string"
+                      },
+                      "shadow_offset": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "width": {
+                                "type": "number"
+                              },
+                              "height": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "height",
+                              "width"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:ShadowOffset",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "array",
+                            "prefixItems": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ],
+                            "python_container": "tuple"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          }
+                        ]
+                      },
+                      "shadow_opacity": {
+                        "type": "number"
+                      },
+                      "shadow_radius": {
+                        "type": "number"
+                      },
+                      "elevation": {
+                        "type": "number"
+                      },
+                      "opacity": {
+                        "type": "number"
+                      },
+                      "transform": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "rotate": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "rotate"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformRotate",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "scale": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "scale"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformScale",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "scale_x": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "scale_x"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformScaleX",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "scale_y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "scale_y"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformScaleY",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "translate_x": {
+                                "type": "number"
+                              },
+                              "translate_y": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformTranslate",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "json"
+                            }
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "rotate": {
+                                      "anyOf": [
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "rotate"
+                                  ],
+                                  "defaults": {},
+                                  "additionalProperties": false,
+                                  "python_type": "pythonnative.style:TransformRotate",
+                                  "python_kind": "typeddict"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "scale": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "scale"
+                                  ],
+                                  "defaults": {},
+                                  "additionalProperties": false,
+                                  "python_type": "pythonnative.style:TransformScale",
+                                  "python_kind": "typeddict"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "scale_x": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "scale_x"
+                                  ],
+                                  "defaults": {},
+                                  "additionalProperties": false,
+                                  "python_type": "pythonnative.style:TransformScaleX",
+                                  "python_kind": "typeddict"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "scale_y": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "scale_y"
+                                  ],
+                                  "defaults": {},
+                                  "additionalProperties": false,
+                                  "python_type": "pythonnative.style:TransformScaleY",
+                                  "python_kind": "typeddict"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "translate_x": {
+                                      "type": "number"
+                                    },
+                                    "translate_y": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [],
+                                  "defaults": {},
+                                  "additionalProperties": false,
+                                  "python_type": "pythonnative.style:TransformTranslate",
+                                  "python_kind": "typeddict"
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "json"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "z_index": {
+                        "type": "integer"
+                      },
+                      "pointer_events": {
+                        "enum": [
+                          "auto",
+                          "none",
+                          "box_none",
+                          "box_only"
+                        ]
+                      }
+                    },
+                    "required": [],
+                    "defaults": {},
+                    "additionalProperties": false,
+                    "python_type": "pythonnative.style:Style",
+                    "python_kind": "typeddict"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "json"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "native": {
+            "python_only": true
           }
         }
       },
       "required": [],
       "defaults": {
-        "count": 0
+        "count": 0,
+        "on_press": null
       },
       "measurement": "intrinsic",
-      "commands": {}
+      "commands": {},
+      "platforms": [
+        "ios",
+        "android"
+      ]
     }
   },
   "modules": {
     "InboxTools": {
       "name": "InboxTools",
       "methods": {
-        "format_count": {
+        "prepare": {
           "arguments": {
-            "count": {
+            "records": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "python_container": "tuple"
+                  },
+                  "note": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "identifier",
+                  "title"
+                ],
+                "defaults": {
+                  "labels": [],
+                  "note": null
+                },
+                "additionalProperties": false,
+                "python_type": "inbox_extension:InboxRecord",
+                "python_kind": "dataclass"
+              }
+            },
+            "limit": {
+              "type": "integer"
+            },
+            "delay_ms": {
               "type": "integer"
             }
           },
           "result": {
-            "type": "string"
-          },
-          "async": false,
-          "required": [
-            "count"
-          ],
-          "defaults": {}
-        },
-        "ready": {
-          "arguments": {},
-          "result": {
-            "type": "string"
+            "type": "object",
+            "properties": {
+              "records": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "identifier": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "python_container": "tuple"
+                    },
+                    "note": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "identifier",
+                    "title"
+                  ],
+                  "defaults": {
+                    "labels": [],
+                    "note": null
+                  },
+                  "additionalProperties": false,
+                  "python_type": "inbox_extension:InboxRecord",
+                  "python_kind": "dataclass"
+                }
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message",
+              "records"
+            ],
+            "defaults": {},
+            "additionalProperties": false,
+            "python_type": "inbox_extension:InboxBatch",
+            "python_kind": "dataclass"
           },
           "async": true,
-          "required": [],
-          "defaults": {}
+          "required": [
+            "records"
+          ],
+          "defaults": {
+            "limit": 10,
+            "delay_ms": 50
+          }
+        }
+      },
+      "events": {
+        "prepared": {
+          "type": "object",
+          "properties": {
+            "records": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "python_container": "tuple"
+                  },
+                  "note": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "identifier",
+                  "title"
+                ],
+                "defaults": {
+                  "labels": [],
+                  "note": null
+                },
+                "additionalProperties": false,
+                "python_type": "inbox_extension:InboxRecord",
+                "python_kind": "dataclass"
+              }
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "message",
+            "records"
+          ],
+          "defaults": {},
+          "additionalProperties": false,
+          "python_type": "inbox_extension:InboxBatch",
+          "python_kind": "dataclass"
         }
       }
     }

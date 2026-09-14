@@ -23,4 +23,19 @@ final class PNAnimationGraphTests: XCTestCase {
         XCTAssertNil(PNAnimationGraph.drivers[9501])
         XCTAssertNil(PNAnimationGraph.values[101])
     }
+    func testValueUpdateEvaluatesOnlyItsDependentGraph() {
+        defer { PNAnimationGraph.forget(9401); PNAnimationGraph.forget(9402) }
+        for (tag, node) in [(Int64(9401), Int64(110)), (Int64(9402), Int64(210))] {
+            PNAnimationGraph.install(["id": node, "nodes": [
+                ["id": node, "kind": "value", "value": 0.0],
+                ["id": node + 1, "kind": "multiply", "inputs": [["node": node], ["constant": 3.0]]],
+            ], "bindings": [[tag, "opacity", node + 1]]])
+        }
+        let before = PNAnimationGraph.evaluatedGraphs
+        PNAnimationGraph.set(110, 0.2)
+        XCTAssertEqual(PNAnimationGraph.evaluatedGraphs - before, 1)
+        XCTAssertEqual(PNAnimationGraph.values[111] ?? -1, 0.6, accuracy: 0.0001)
+        XCTAssertEqual(PNAnimationGraph.values[211], 0)
+    }
+
 }

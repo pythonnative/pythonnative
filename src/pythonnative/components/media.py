@@ -7,6 +7,7 @@ from ..hooks import Ref
 from ..style import AccessibilityState, Color, ScaleType, StyleProp, resolve_style
 from ._base import _make_element
 from .layout import View
+from .media_events import ImageLoadEvent, WebNavigationEvent
 
 
 def Image(
@@ -15,7 +16,7 @@ def Image(
     scale_type: Optional[ScaleType] = None,
     tint_color: Optional[Color] = None,
     placeholder_color: Optional[Color] = None,
-    on_load: Optional[Callable[[], Any]] = None,
+    on_load: Optional[Callable[[ImageLoadEvent], Any]] = None,
     on_error: Optional[Callable[[str], Any]] = None,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
@@ -33,7 +34,7 @@ def Image(
     ``transform``, plus the common layout props.
 
     Network images (``http://`` / ``https://``) go through the shared
-    image pipeline (`pythonnative.images`): downloads happen on a
+    native image pipeline: downloads happen on a
     background thread, bytes are cached in memory and on disk keyed by
     URL, concurrent requests for the same URL share one download, and
     large bitmaps are downsampled to the view size when decoded.
@@ -47,7 +48,7 @@ def Image(
         placeholder_color: Background color shown while a remote image
             is loading (and left in place if it fails).
         on_load: Callback invoked once the image has been decoded and
-            displayed.
+            displayed, with its logical width and height.
         on_error: Callback invoked with an error message when a remote
             image fails to download or decode.
         style: Style dict (or list of dicts).
@@ -160,8 +161,10 @@ def WebView(
     url: str = "",
     html: Optional[str] = None,
     on_load: Optional[Callable[[str], Any]] = None,
+    on_load_start: Optional[Callable[[str], Any]] = None,
+    on_error: Optional[Callable[[str], Any]] = None,
     on_message: Optional[Callable[[str], Any]] = None,
-    on_navigation_state_change: Optional[Callable[[str], Any]] = None,
+    on_navigation_state_change: Optional[Callable[[WebNavigationEvent], Any]] = None,
     inject_javascript: Optional[str] = None,
     scroll_enabled: bool = True,
     style: StyleProp = None,
@@ -174,11 +177,13 @@ def WebView(
         html: Inline HTML markup to render instead of loading a URL.
         on_load: Callback invoked with the final URL once a page
             finishes loading.
+        on_load_start: Callback invoked with the URL when loading starts.
+        on_error: Callback invoked with a top-level load error message.
         on_message: Callback invoked with the string payload whenever
             page JavaScript calls
             ``window.pythonnative.postMessage(...)``.
-        on_navigation_state_change: Callback invoked with the URL each
-            time the top-level document begins navigating.
+        on_navigation_state_change: Callback invoked with a typed navigation
+            state when the top-level document starts or finishes loading.
         inject_javascript: JavaScript evaluated after each page load
             (useful for installing the ``postMessage`` bridge or
             tweaking the DOM).
@@ -197,6 +202,8 @@ def WebView(
         url=url or None,
         html=html,
         on_load=on_load,
+        on_load_start=on_load_start,
+        on_error=on_error,
         on_message=on_message,
         on_navigation_state_change=on_navigation_state_change,
         inject_javascript=inject_javascript,

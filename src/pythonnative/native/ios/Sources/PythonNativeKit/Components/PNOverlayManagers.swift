@@ -217,10 +217,12 @@ public final class PNStatusBarManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        if let hidden = PNProps.bool(PNProps.value(props, "hidden")) {
+        let typed = try! StatusBarProps(props)
+
+        if let hidden = typed.hidden {
             PNStatusBarState.hidden = hidden
         }
-        if let style = PNProps.string(PNProps.value(props, "bar_style")) {
+        if let style = typed.bar_style?.rawValue {
             switch style {
             case "light", "light_content": PNStatusBarState.style = .lightContent
             case "dark", "dark_content": PNStatusBarState.style = .darkContent

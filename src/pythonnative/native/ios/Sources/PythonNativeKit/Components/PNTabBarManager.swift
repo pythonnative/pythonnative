@@ -32,10 +32,12 @@ public final class PNTabBarManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! TabBarProps(props)
+
         guard let bar = view as? UITabBar else { return }
         let merged = mergedProps(bar)
         let items = PNTabBarManager.items(merged)
-        if PNProps.has(props, "items") {
+        if typed.has_items {
             bar.setItems(items.enumerated().map { index, item in
                 let title = PNProps.string(item["title"]) ?? PNProps.string(item["name"]) ?? ""
                 let icon = PNTabBarManager.icon(item["icon"])
@@ -44,7 +46,7 @@ public final class PNTabBarManager: PNComponentManager {
                 return barItem
             }, animated: false)
         }
-        if PNProps.has(props, "active_tab") || PNProps.has(props, "active_index") || PNProps.has(props, "items") {
+        if typed.has_active_tab || PNProps.has(props, "active_index") || typed.has_items {
             let activeName = PNProps.string(PNProps.value(merged, "active_tab"))
             var index = PNProps.int(PNProps.value(merged, "active_index"))
             if index == nil, let activeName = activeName {

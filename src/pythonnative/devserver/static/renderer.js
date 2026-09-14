@@ -1,5 +1,5 @@
 import specification from "./schema.js";
-import {validateProps, normalize, requiresRecreation, validateCommand} from "./contracts.js";
+import {validateRemoval, validateProps, normalize, requiresRecreation, validateCommand} from "./contracts.js";
 import { AnimationGraph } from "./animation_graph.js";
 import {computeLayout, disposeLayout} from "./layout.js";
 // The DOM "native runtime" for the browser preview.
@@ -1783,7 +1783,7 @@ export class Renderer {
   apply(envelope) {
     const {version, application, surface, revision, ops} = envelope || {};
     const fail = (error) => ({ok: false, application, surface, revision, error, failed: !!this.failed});
-    if (version !== 2 || typeof application !== "string" || !application || !Number.isSafeInteger(surface) || surface < 1 || !Array.isArray(ops)) return fail("invalid v2 commit");
+    if (version !== 3 || typeof application !== "string" || !application || !Number.isSafeInteger(surface) || surface < 1 || !Array.isArray(ops)) return fail("invalid v3 commit");
     const replacing = this.application !== application;
     if (revision !== (replacing ? 1 : this.revision + 1)) return fail("stale revision");
     if (!replacing && surface !== this.surface) return fail("wrong surface");
@@ -1801,7 +1801,7 @@ export class Renderer {
     const parentOf = tag => edited.has(tag) ? edited.get(tag).parentTag : get(tag)?.parent?.tag;
     try {
       for (const op of ops) {
-        if (!Array.isArray(op) || op.length !== {c:4,u:3,i:4,d:2,f:6}[op[0]] || !Number.isSafeInteger(op[1]) || op[1] <= 0) return fail("invalid operation");
+        if (!Array.isArray(op) || op.length !== {c:4,u:4,i:4,d:2,f:6}[op[0]] || !Number.isSafeInteger(op[1]) || op[1] <= 0) return fail("invalid operation");
         const [code, tag] = op;
         if (code === "c") {
           if (get(tag) || !this.managers[op[2]] || !validateProps(specification, op[2], op[3])) return fail("invalid create");
@@ -1810,7 +1810,7 @@ export class Renderer {
         } else {
           const view = get(tag);
           if (!view) return fail("unknown tag");
-          if (code === "u" && !validateProps(specification, view.type, op[2], true)) return fail("invalid properties");
+          if (code === "u" && (!validateProps(specification, view.type, op[2], true) || !validateRemoval(specification, view.type, op[2], op[3]))) return fail("invalid properties");
           if (code === "i") {
             if (!get(op[2]) || !Number.isSafeInteger(op[3]) || op[3] < 0) return fail("invalid insertion");
             for (let ancestor = tag; ancestor; ancestor = parentOf(ancestor)) if (ancestor === op[2]) return fail("cycle");
@@ -1831,6 +1831,11 @@ export class Renderer {
         }
       }
     } catch (error) { return fail(String(error)); }
+    if (Object.hasOwn(envelope, "layout")) {
+      if (!envelope.layout || typeof envelope.layout !== "object" || Array.isArray(envelope.layout)) return fail("invalid layout request");
+      const {roots, width, height} = envelope.layout;
+      if (!Array.isArray(roots) || roots.some(tag => !get(tag)) || !Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) return fail("invalid layout request");
+    }
     const mutationStarted = performance.now();
     try {
       if (replacing && this.application) this.reset();
@@ -1838,7 +1843,9 @@ export class Renderer {
       for (const view of this.dirtyContainers) if (this.views.has(view.tag)) view.manager.childrenChanged(view);
       this.dirtyContainers.clear();
       this.failed = false; this.application = application; this.surface = surface; this.revision = revision;
-      return {ok: true, application, surface, revision, metrics:{mutation_ns: Math.round((performance.now() - mutationStarted)*1e6)}};
+      return {ok: true, application, surface, revision,
+        ...(envelope.layout ? {layout: this.computeLayout(envelope.layout)} : {}),
+        metrics:{mutation_ns: Math.round((performance.now() - mutationStarted)*1e6)}};
     } catch (error) { this.reset(); this.failed = true; return fail(String(error)); }
   }
 
@@ -1874,15 +1881,13 @@ export class Renderer {
         return;
       }
       case "u": {
-        const [, tag, changed] = op;
+        const [, tag, changed, removed] = op;
         const view = this.views.get(tag);
         if (!view || !changed) return;
-        const normalized = normalize(specification, view.type, changed);
-        for (const [key, value] of Object.entries(normalized)) {
-          if (value === null || value === undefined) delete view.props[key];
-          else view.props[key] = value;
-        }
-        if (requiresRecreation(specification, view.type, changed)) {
+        const normalized = normalize(specification, view.type, changed, removed);
+        Object.assign(view.props, changed);
+        for (const key of removed) delete view.props[key];
+        if (requiresRecreation(specification, view.type, changed, removed)) {
           const old = view.el, focused = document.activeElement === old;
           const selection = [old.selectionStart, old.selectionEnd];
           const scroll = [old.scrollLeft, old.scrollTop];
@@ -1902,7 +1907,7 @@ export class Renderer {
           if (focused) view.el.focus();
           if (selection[0] != null && view.el.setSelectionRange) view.el.setSelectionRange(...selection);
         } else view.manager.update(view, normalized);
-        if ("gestures" in changed) {
+        if ("gestures" in changed || removed.includes("gestures")) {
           if (Array.isArray(view.props.gestures) && view.props.gestures.length) installGestureSource(view);
           else this.ctx.gesture(tag, "clear", {});
         }

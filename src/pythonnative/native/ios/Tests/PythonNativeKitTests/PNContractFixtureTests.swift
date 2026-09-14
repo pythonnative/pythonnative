@@ -2,6 +2,21 @@ import XCTest
 @testable import PythonNativeKit
 
 final class PNContractFixtureTests: XCTestCase {
+    func testGeneratedRecordsPreserveNullPresenceAndEscapedDefaults() throws {
+        for optional in [nil, NSNull(), "value"] as [Any?] {
+            var note: [String: Any] = ["required": NSNull()]
+            if let optional = optional { note["optional"] = optional }
+            let decoded = try PNValues.decode(PNNativeFixtureDefault.self, ["note": note])
+            let encoded = try XCTUnwrap(PNValues.encode(decoded) as? [String: Any])
+            let returned = try XCTUnwrap(encoded["note"] as? [String: Any])
+            XCTAssertTrue(returned["required"] is NSNull)
+            XCTAssertEqual(returned.keys.contains("optional"), optional != nil)
+            XCTAssertEqual(PNJSON.encode(returned), PNJSON.encode(note))
+            XCTAssertTrue(encoded["nullable"] is NSNull)
+            XCTAssertEqual(encoded["label"] as? String, "$total \"quoted\" \\path\n\u{0}\u{8}")
+        }
+    }
+
     func testPortableFixtures() throws {
         #if SWIFT_PACKAGE
         let bundle = Bundle.module

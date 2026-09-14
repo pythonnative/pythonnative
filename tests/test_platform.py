@@ -32,6 +32,22 @@ def test_get_platform_exported_from_package() -> None:
     assert pn.get_platform() == pn.Platform.OS
 
 
+def test_supports_uses_platform_and_member_contracts() -> None:
+    _set_platform_for_test("ios")
+    assert Platform.supports("Text", "font_size")
+    assert Platform.supports("Notifications", "get_device_token")
+    assert not Platform.supports("Text", "accessibility_live_region")
+    assert not Platform.supports("UninstalledExtension")
+    assert not Platform.supports("Text", "imaginary_property")
+    _set_platform_for_test("android")
+    assert not Platform.supports("Notifications", "get_device_token")
+    assert Platform.supports("Text", "accessibility_live_region")
+    _set_platform_for_test("web")
+    assert Platform.supports("Text", "font_size")
+    _set_platform_for_test("test")
+    assert not Platform.supports("Text")
+
+
 def test_version_string_present() -> None:
     assert isinstance(Platform.Version, str)
     assert len(Platform.Version) > 0

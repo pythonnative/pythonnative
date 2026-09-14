@@ -36,20 +36,22 @@ public final class PNWebViewManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! WebViewProps(props)
+
         guard let webView = view as? WKWebView else { return }
-        if PNProps.has(props, "inject_javascript"),
+        if typed.has_inject_javascript,
            let delegate = PNViewState.existing(for: webView)?.retained.compactMap({ $0 as? PNWebViewDelegate }).first
         {
-            delegate.injectJavaScript = PNProps.string(PNProps.value(props, "inject_javascript"))
+            delegate.injectJavaScript = typed.inject_javascript
         }
-        if let html = PNProps.string(PNProps.value(props, "html")), !html.isEmpty {
+        if let html = typed.html, !html.isEmpty {
             let base = PNProps.string(PNProps.value(mergedProps(webView), "base_url")).flatMap { URL(string: $0) }
             webView.loadHTMLString(html, baseURL: base)
-        } else if let url = PNProps.string(PNProps.value(props, "url")), !url.isEmpty, let target = URL(string: url) {
+        } else if let url = typed.url, !url.isEmpty, let target = URL(string: url) {
             webView.load(URLRequest(url: target))
         }
-        if PNProps.has(props, "scroll_enabled") {
-            webView.scrollView.isScrollEnabled = PNProps.bool(PNProps.value(props, "scroll_enabled")) ?? true
+        if typed.has_scroll_enabled {
+            webView.scrollView.isScrollEnabled = typed.scroll_enabled ?? true
         }
         if PNProps.has(props, "allows_back_forward_gestures") {
             webView.allowsBackForwardNavigationGestures = PNProps.bool(PNProps.value(props, "allows_back_forward_gestures")) ?? false
@@ -95,12 +97,12 @@ final class PNWebViewDelegate: NSObject, WKNavigationDelegate, WKScriptMessageHa
             webView.evaluateJavaScript(js) { _, _ in }
         }
         PNEvents.emit(webView, "on_load", [currentURL()])
-        PNEvents.emitIfWired(webView, "on_navigation_state_change", [["url": currentURL(), "loading": false, "can_go_back": webView.canGoBack, "can_go_forward": webView.canGoForward, "title": webView.title ?? ""]])
+        PNComponentEvents.WebView.on_navigation_state_change(webView, PNWebNavigationEvent(url: currentURL(), loading: false, can_go_back: webView.canGoBack, can_go_forward: webView.canGoForward, title: webView.title ?? ""))
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         PNEvents.emitIfWired(webView, "on_load_start", [currentURL()])
-        PNEvents.emitIfWired(webView, "on_navigation_state_change", [["url": currentURL(), "loading": true, "can_go_back": webView.canGoBack, "can_go_forward": webView.canGoForward, "title": webView.title ?? ""]])
+        PNComponentEvents.WebView.on_navigation_state_change(webView, PNWebNavigationEvent(url: currentURL(), loading: true, can_go_back: webView.canGoBack, can_go_forward: webView.canGoForward, title: webView.title ?? ""))
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

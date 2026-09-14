@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 from ..layout import LAYOUT_STYLE_KEYS
 from ..style import Style
-from .schema import COMPONENTS, ComponentSchema, NativeField, register_schema, type_schema
+from .schema import COMPONENTS, RUNTIME_PROPS, ComponentSchema, NativeField, register_schema, type_schema
 
 # These types own native child layout or physical child presentation.
 CONTAINERS = frozenset(
@@ -21,6 +21,8 @@ def install(factories: dict[str, Any]) -> None:
     """Compile ordinary Python annotations into the shared native contract."""
     style_fields = {name: type_schema(annotation) for name, annotation in typing.get_type_hints(Style).items()}
     for name, factory in factories.items():
+        if name in {"ErrorBoundary", "Fragment", "Suspense", "FlatList", "SectionList"}:
+            continue
         if not inspect.isfunction(factory) or not name[:1].isupper() or name.startswith("_"):
             continue
         signature = inspect.signature(factory)
@@ -38,7 +40,10 @@ def install(factories: dict[str, Any]) -> None:
             )
         props_type = dataclasses.make_dataclass(f"{name}Props", fields, frozen=True, kw_only=True)
         schema = ComponentSchema.from_dataclass(
-            name, props_type, measurement="container" if name in CONTAINERS else "intrinsic"
+            name,
+            props_type,
+            measurement="container" if name in CONTAINERS else "intrinsic",
+            platforms=("ios", "android", "web"),
         )
         wire = dict(style_fields) | schema.props
         # Some controls supply their role internally rather than exposing an
@@ -49,6 +54,8 @@ def install(factories: dict[str, Any]) -> None:
             wire[key] = dict(wire[key])
             wire[key]["native"] = dataclasses.asdict(
                 NativeField(
+                    python_only=key == "ref",
+                    platforms=("android", "web") if key == "accessibility_live_region" else ("ios", "android", "web"),
                     invalidates_layout=key in LAYOUT_STYLE_KEYS
                     or key
                     in {
@@ -64,10 +71,11 @@ def install(factories: dict[str, Any]) -> None:
                         "italic",
                         "letter_spacing",
                         "line_height",
-                        "number_of_lines",
+                        "max_lines",
+                        "text_transform",
                         "multiline",
                     },
-                    recreate=key in {"multiline"},
+                    recreate=key == "multiline" or (name == "ProgressBar" and key == "indeterminate"),
                     animated=key
                     in {
                         "opacity",
@@ -114,7 +122,7 @@ def install(factories: dict[str, Any]) -> None:
             "active_tab": {"type": "string"},
             "on_tab_select": {"type": "event", "arguments": [{"type": "string"}]},
         },
-        "ScreenStack": {"on_native_back": {"type": "event"}},
+        "ScreenStack": {"on_native_back": {"type": "event", "arguments": [{"type": "integer"}]}},
         "VirtualList": {
             "keys": {"type": "array"},
             "revision": {"type": "integer"},
@@ -132,18 +140,14 @@ def install(factories: dict[str, Any]) -> None:
     for name, extra in extras.items():
         register_schema(ComponentSchema(name, base.props | extra, measurement="container"))
 
-    # Reserved fields travel through the same validation path as public fields.
-    runtime: dict[str, Any] = {
-        "_pn_events": {"type": "array", "items": {"type": "string"}},
-        "_pn_animated_events": {"type": "object"},
-        "_pn_list_key": {"type": "string"},
-        "_pn_edit_revision": {"type": "integer"},
-        "gestures": {"type": "array"},
-    }
     from ..navigation.screen import ScreenOptions
 
     COMPONENTS["Screen"].props.update(
-        {name: type_schema(value) for name, value in typing.get_type_hints(ScreenOptions).items()}
+        {
+            name: type_schema(value)
+            for name, value in typing.get_type_hints(ScreenOptions).items()
+            if name not in {"header_left", "header_right"}
+        }
     )
     refresh = COMPONENTS["RefreshControl"].props
     for name in ("ScrollView", "VirtualList"):
@@ -155,7 +159,7 @@ def install(factories: dict[str, Any]) -> None:
     from .commands import commands
 
     for name, schema in list(COMPONENTS.items()):
-        register_schema(dataclasses.replace(schema, props=schema.props | runtime, commands=commands(name)))
+        register_schema(dataclasses.replace(schema, props=schema.props | RUNTIME_PROPS, commands=commands(name)))
     from .services import install_services
 
     install_services()

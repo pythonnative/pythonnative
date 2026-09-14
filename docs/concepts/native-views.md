@@ -30,7 +30,7 @@ the render loop.
 | Op | Meaning |
 |---|---|
 | `CreateOp(tag, type_name, props)` | Create a native view for `tag`. Props are already *clean*: callables have been routed to the event registry. |
-| `UpdateOp(tag, changed_props)` | Apply only the props that changed (removed props arrive as `None`). |
+| `UpdateOp(tag, changed_props)` | Apply only the props that changed (`UNSET` removes a prop; `None` is explicit null). |
 | `InsertOp(parent_tag, child_tag, index)` | Place the child at `index` (move-aware: an attached child is repositioned, not duplicated). |
 | `DestroyOp(tag)` | Release the native view (detaching it from its parent) and drop the tag record. |
 | `SetFrameOp(tag, x, y, w, h)` | Apply a frame from headless layout or an explicit frame operation. Bridge renderers compute ordinary layout beside their widgets. |

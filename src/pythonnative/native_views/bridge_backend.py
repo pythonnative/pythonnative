@@ -1,6 +1,6 @@
 """Revisioned native view backend.
 
-Each commit is validated, sent as a protocol-2 envelope, and acknowledged before
+Each commit is validated, sent as a protocol-3 envelope, and acknowledged before
 Python updates its native tag index. Rejected commits poison the surface until
 it is remounted. Native events carry application, revision, sequence, and text
 edit identities. NativeViewRef holds a live native tag rather than a UI object.
@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from ..bridge import codec, get_transport
 from ..bridge.commits import PROTOCOL_VERSION, CommitError, CommitState
-from ..mutations import CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
+from ..mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
 
 __all__ = ["BridgeBackend", "NativeViewRef"]
 
@@ -60,6 +60,7 @@ class BridgeBackend:
         self._handlers: Dict[str, Any] = {}
         self._layout_request: Any = None
         self._layout_required = True
+        self._pending_layout_request: dict[str, Any] | None = None
 
     @property
     def transport(self) -> Any:
@@ -72,6 +73,13 @@ class BridgeBackend:
     def native_layout(self) -> bool:
         """Whether layout runs beside the renderer's native widgets."""
         return self.transport.name in {"ios", "android", "web"}
+
+    def prepare_layout(self, roots: list[int], width: float, height: float) -> None:
+        """Include geometry in the next native commit when a viewport is known."""
+        if self.native_layout and roots and width > 0 and height > 0:
+            self._pending_layout_request = {"roots": roots, "width": width, "height": height}
+        else:
+            self._pending_layout_request = None
 
     def compute_layout(self, roots: list[int], width: float, height: float) -> None:
         """Compute native Yoga layout in one request, returning changed frames."""
@@ -106,7 +114,7 @@ class BridgeBackend:
         metrics = payload.get("metrics", {})
         if isinstance(metrics, dict):
             duration = metrics.get("layout_ns")
-            visited = metrics.get("views", 0)
+            visited = metrics.get("visited", metrics.get("views", 0))
             if type(duration) is int and duration >= 0 and type(visited) is int and visited >= 0:
                 native_sample("layout", duration, views=visited, changed_frames=len(frames))
         if self.on_layout is not None:
@@ -160,7 +168,7 @@ class BridgeBackend:
             return
         if self._failed:
             raise CommitError("Native surface failed; remount the application with a new backend")
-        payload, sidecar = codec.encode_transaction(ops)
+        payload, sidecar = codec.encode_transaction(ops, self._types)
         wire_ops = codec.loads(payload)
         for op in wire_ops:
             if op[0] == "u" and self._types.get(op[1]) == "TextInput" and "value" in op[2]:
@@ -172,6 +180,8 @@ class BridgeBackend:
             "revision": self._commit.revision + 1,
             "ops": wire_ops,
         }
+        if self._pending_layout_request is not None:
+            envelope["layout"] = self._pending_layout_request
         from ..profiling import count
 
         count("bridge.commits")
@@ -217,17 +227,21 @@ class BridgeBackend:
             self._python_props.setdefault(tag, {}).update(props)
         for op in ops:
             if isinstance(op, UpdateOp):
-                # A prop that changed from a callable to None arrives
-                # as None in the wire dict; drop the stale sidecar copy.
+                # Omission clears the sidecar; an explicit null stays a value.
                 bucket = self._python_props.get(op.tag)
                 if bucket:
                     for key, value in op.changed_props.items():
-                        if value is None:
+                        if value is UNSET:
                             bucket.pop(key, None)
                     if not bucket:
                         self._python_props.pop(op.tag, None)
         for tag in destroyed:
             self._forget(tag)
+        if "layout" in envelope:
+            layout = envelope["layout"]
+            self.accept_layout(ack.get("layout"))
+            self._layout_request = (tuple(layout["roots"]), layout["width"], layout["height"])
+            self._layout_required = False
 
     def accept_event(self, tag: int, name: str, envelope: Any) -> bool:
         """Reject events from destroyed views, earlier applications, and replayed input."""
@@ -249,8 +263,14 @@ class BridgeBackend:
         contract = COMPONENTS.get(self._types[tag])
         if contract is not None:
             try:
-                contract.validate_event(name, arguments)
-            except TypeError:
+                envelope["args"] = contract.decode_event(name, arguments)
+            except TypeError as error:
+                from ..diagnostics import warn_once
+
+                warn_once(
+                    f"Rejected native event for {self._types[tag]} #{tag}: {error}",
+                    key=f"native-contract:{self._types[tag]}:{name}",
+                )
                 return False
         self._event_sequences[key] = sequence
         if name == "on_change" and self._types.get(tag) == "TextInput":

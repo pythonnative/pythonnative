@@ -2,6 +2,8 @@ package com.pythonnative.runtime.components
 
 import com.pythonnative.runtime.PNBridge
 
+import com.pythonnative.generated.*
+
 import android.content.Context
 import android.os.Build
 import android.text.Editable
@@ -61,11 +63,13 @@ class TextInputManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        val typed = TextInputProps(props)
+
         val et = view as EditText
         val state = stateOf(et)
         val merged = propsOf(et)
-        if (props.has("value")) {
-            val incoming = props.str("value") ?: ""
+        if (typed.has_value) {
+            val incoming = typed.value ?: ""
             val acknowledged = props.optLong("_pn_edit_revision", 0)
             val edited = (state["edit_revision"] as? Number)?.toLong() ?: 0L
             if (acknowledged >= edited && android.view.inputmethod.BaseInputConnection.getComposingSpanStart(et.text) >= 0) {
@@ -88,9 +92,9 @@ class TextInputManager : ComponentManager() {
                 }
             }
         }
-        if (props.has("placeholder")) et.hint = props.str("placeholder") ?: ""
+        if (typed.has_placeholder) et.hint = typed.placeholder ?: ""
         PNColor.parse(props.value("placeholder_color"))?.let { et.setHintTextColor(it) }
-        props.num("font_size")?.let { et.textSize = it.toFloat() }
+        typed.font_size?.let { et.textSize = it.toFloat() }
         PNColor.parse(props.value("color"))?.let { et.setTextColor(it) }
         if (listOf("font_family", "font_weight", "italic", "bold").any { props.has(it) }) {
             TextStyle.applyTypeface(et, merged)
@@ -98,12 +102,12 @@ class TextInputManager : ComponentManager() {
         if (listOf("multiline", "secure", "secure_text_entry", "keyboard_type", "auto_capitalize", "auto_correct").any { props.has(it) }) {
             applyInputType(et, merged)
         }
-        if (props.has("max_length")) {
+        if (typed.has_max_length) {
             val limit = props.num("max_length")
             et.filters = if (limit != null) arrayOf<InputFilter>(InputFilter.LengthFilter(limit.toInt())) else arrayOf()
         }
-        if (JsonUtil.truthy(props.value("auto_focus"))) et.requestFocus()
-        if (props.has("editable")) {
+        if ((typed.auto_focus ?: false)) et.requestFocus()
+        if (typed.has_editable) {
             // Only present when False (read-only); removal restores editing.
             val editable = props.value("editable") != false
             et.isFocusable = editable
@@ -112,11 +116,11 @@ class TextInputManager : ComponentManager() {
             et.isLongClickable = editable
         }
         PNColor.parse(props.value("selection_color"))?.let { et.highlightColor = it }
-        props.str("text_content_type")?.let { applyAutofill(et, it) }
-        if (props.has("clear_button")) applyClearButton(et, JsonUtil.truthy(props.value("clear_button")))
-        props.str("return_key_type")?.let { et.imeOptions = imeAction(it) }
-        if (props.has("text_align")) {
-            et.gravity = when (props.str("text_align")) {
+        typed.text_content_type?.let { applyAutofill(et, it) }
+        if (typed.has_clear_button) applyClearButton(et, (typed.clear_button ?: false))
+        typed.return_key_type?.rawValue?.let { et.imeOptions = imeAction(it) }
+        if (typed.has_text_align) {
+            et.gravity = when (typed.text_align?.rawValue) {
                 "center" -> android.view.Gravity.CENTER_HORIZONTAL or (et.gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK)
                 "right", "end" -> android.view.Gravity.END or (et.gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK)
                 else -> android.view.Gravity.START or (et.gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK)

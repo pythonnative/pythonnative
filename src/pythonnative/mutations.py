@@ -29,9 +29,12 @@ Op ordering rules (the reconciler guarantees these):
 """
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Dict, Tuple, Union
 
 __all__ = [
+    "UNSET",
+    "UnsetType",
     "CreateOp",
     "UpdateOp",
     "InsertOp",
@@ -39,6 +42,19 @@ __all__ = [
     "SetFrameOp",
     "Mutation",
 ]
+
+
+class UnsetType(Enum):
+    """The explicit absence of a native property, distinct from null."""
+
+    VALUE = 0
+
+    def __repr__(self) -> str:
+        return "UNSET"
+
+
+UNSET = UnsetType.VALUE
+"""Remove a property and restore its native default on the next commit."""
 
 
 @dataclass(frozen=True)
@@ -62,13 +78,13 @@ class CreateOp:
 class UpdateOp:
     """Apply ``changed_props`` to the view registered under ``tag``.
 
-    Removed props are signaled with a value of ``None``, matching the
-    pre-existing handler contract.
+    Removed props are signaled with ``UNSET``. ``None`` sets a nullable
+    property to an explicit native null value.
 
     Attributes:
         tag: Unique integer identity of the target view.
         changed_props: Mapping of modified prop names to their new values.
-            Removed props appear with a value of ``None``.
+            Removed props appear with the ``UNSET`` sentinel.
     """
 
     tag: int

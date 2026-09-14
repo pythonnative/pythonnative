@@ -9,6 +9,7 @@ final class PNLayoutNode {
     var children: [Int64] = []
     var parent: Int64?
     var frame: [Double] = []
+    var constraints: [Float] = []
     init(_ tag: Int64) {
         self.tag = tag
         node = YGNodeNew()!
@@ -79,8 +80,8 @@ enum PNLayout {
                 let entry = PNLayoutNode(tag)
                 nodes[tag] = entry
                 update(entry, props)
-            case let .update(tag, changed):
-                if let entry = nodes[tag] { update(entry, changed) }
+            case let .update(tag, changed, removed):
+                if let entry = nodes[tag] { update(entry, changed, removed: removed) }
             case let .insert(parent, child, index):
                 guard let p = nodes[parent], let c = nodes[child] else { continue }
                 if let old = c.parent, let previous = nodes[old] {
@@ -91,7 +92,7 @@ enum PNLayout {
                 c.parent = parent
                 // Detached surfaces keep logical ownership but supply their own viewport.
                 let type = PNViewRegistry.shared.resolve(parent)?.typeName ?? ""
-                if !["VirtualList", "Modal", "ScreenStack"].contains(type) {
+                if !["VirtualList", "Modal", "ScreenStack"].contains(type), c.props["_pn_header_slot"] == nil {
                     YGNodeSetMeasureFunc(p.node, nil)
                     YGNodeInsertChild(p.node, c.node, min(index, Int(YGNodeGetChildCount(p.node))))
                     detachedRoots.remove(child)
@@ -108,13 +109,14 @@ enum PNLayout {
         }
     }
 
-    private static func update(_ entry: PNLayoutNode, _ changed: [String: Any]) {
+    private static func update(_ entry: PNLayoutNode, _ changed: [String: Any], removed: [String] = []) {
         for (key, value) in changed {
             if value is NSNull { entry.props.removeValue(forKey: key) }
             else { entry.props[key] = value }
         }
+        for key in removed { entry.props.removeValue(forKey: key) }
         let type = PNViewRegistry.shared.resolve(entry.tag)?.typeName ?? ""
-        guard PNContracts.invalidatesLayout(type, changed) || entry.frame.isEmpty else { return }
+        guard PNContracts.invalidatesLayout(type, changed) || !removed.isEmpty || entry.frame.isEmpty else { return }
         let fresh = YGNodeNew()!
         for (key, value) in entry.props {
             if let edges = value as? [String: Any], key == "margin" || key == "padding" {
@@ -137,16 +139,25 @@ enum PNLayout {
         }
     }
 
+    private static func calculate(_ entry: PNLayoutNode, _ width: Float, _ height: Float) {
+        let next = [width, height]
+        let same = entry.constraints.count == 2 && zip(entry.constraints, next).allSatisfy { $0 == $1 || ($0.isNaN && $1.isNaN) }
+        guard !same || YGNodeIsDirty(entry.node) else { return }
+        YGNodeCalculateLayout(entry.node, width, height, YGDirection(rawValue: 1)!)
+        entry.constraints = next
+    }
+
     static func compute(_ request: [String: Any]) -> [[Double]] {
         let started = DispatchTime.now().uptimeNanoseconds
-        defer { metrics = ["layout_ns": DispatchTime.now().uptimeNanoseconds - started, "views": nodes.count] }
+        var visited = 0
+        defer { metrics = ["layout_ns": DispatchTime.now().uptimeNanoseconds - started, "views": nodes.count, "visited": visited] }
         viewport = request
         let width = (request["width"] as? NSNumber)?.floatValue ?? 0
         let height = (request["height"] as? NSNumber)?.floatValue ?? 0
         guard width > 0, height > 0 else { return [] }
         let roots = (request["roots"] as? [Any] ?? []).compactMap { ($0 as? NSNumber)?.int64Value }
         for tag in roots {
-            if let entry = nodes[tag] { YGNodeCalculateLayout(entry.node, width, height, YGDirection(rawValue: 1)!) }
+            if let entry = nodes[tag] { calculate(entry, width, height) }
         }
         // A portal is absent from the screen tree, but remains a Yoga parent
         // so absolute insets and sibling layout resolve against its viewport.
@@ -157,7 +168,7 @@ enum PNLayout {
             let portalHeight = size.height > 0 ? Float(size.height) : height
             YGNodeStyleSetWidth(entry.node, portalWidth)
             YGNodeStyleSetHeight(entry.node, portalHeight)
-            YGNodeCalculateLayout(entry.node, portalWidth, portalHeight, YGDirection(rawValue: 1)!)
+            calculate(entry, portalWidth, portalHeight)
         }
         // Every detached root is laid out in its native container's available space.
         for tag in detachedRoots {
@@ -166,22 +177,37 @@ enum PNLayout {
             let screen = PNViewRegistry.shared.resolve(entry.tag)
             let size = (screen?.typeName == "Screen" ? screen?.view.bounds.size : parent?.view.bounds.size)
                 ?? CGSize(width: CGFloat(width), height: CGFloat(height))
+            if entry.props["_pn_header_slot"] != nil {
+                calculate(entry, Float.nan, 44)
+                continue
+            }
             let isList = parent?.typeName == "VirtualList"
             let horizontal = parent.flatMap { PNViewState.existing(for: $0.view)?.props["horizontal"] as? Bool } ?? false
-            YGNodeCalculateLayout(entry.node, isList && horizontal ? Float.nan : Float(size.width > 0 ? size.width : CGFloat(width)),
-                                  isList && !horizontal ? Float.nan : Float(size.height > 0 ? size.height : CGFloat(height)), YGDirection(rawValue: 1)!)
+            calculate(entry, isList && horizontal ? Float.nan : Float(size.width > 0 ? size.width : CGFloat(width)),
+                      isList && !horizontal ? Float.nan : Float(size.height > 0 ? size.height : CGFloat(height)))
         }
         var frames: [[Double]] = []
-        for entry in nodes.values {
+        let rootTags = Set(roots)
+        func collect(_ entry: PNLayoutNode) {
+            guard YGNodeGetHasNewLayout(entry.node) else { return }
+            visited += 1
+            YGNodeSetHasNewLayout(entry.node, false)
             let frame = [Double(YGNodeLayoutGetLeft(entry.node)), Double(YGNodeLayoutGetTop(entry.node)),
                          Double(YGNodeLayoutGetWidth(entry.node)), Double(YGNodeLayoutGetHeight(entry.node))]
-            if frame == entry.frame { continue }
-            entry.frame = frame
-            if !roots.contains(entry.tag), let record = PNViewRegistry.shared.resolve(entry.tag) {
-                record.manager.setFrame(view: record.view, x: frame[0], y: frame[1], w: frame[2], h: frame[3])
+            if frame != entry.frame {
+                entry.frame = frame
+                if !rootTags.contains(entry.tag), let record = PNViewRegistry.shared.resolve(entry.tag) {
+                    record.manager.setFrame(view: record.view, x: frame[0], y: frame[1], w: frame[2], h: frame[3])
+                }
+                PNVirtualListManager.measured(entry.tag, CGSize(width: frame[2], height: frame[3]))
+                frames.append([Double(entry.tag)] + frame)
             }
-            PNVirtualListManager.measured(entry.tag, CGSize(width: frame[2], height: frame[3]))
-            frames.append([Double(entry.tag)] + frame)
+            for tag in entry.children {
+                if let child = nodes[tag], YGNodeGetParent(child.node) == entry.node { collect(child) }
+            }
+        }
+        for tag in rootTags.union(portals).union(detachedRoots) {
+            if let entry = nodes[tag] { collect(entry) }
         }
         return frames
     }
@@ -189,7 +215,6 @@ enum PNLayout {
     static func invalidate(_ tag: Int64) {
         guard let node = nodes[tag], YGNodeHasMeasureFunc(node.node) else { return }
         YGNodeMarkDirty(node.node)
-        let frames = compute(viewport)
-        if !frames.isEmpty { PNBridge.shared.callPython(kind: "layout", tag: 0, name: "", payload: PNJSON.encode(frames)) }
+        containerDidLayout()
     }
 }

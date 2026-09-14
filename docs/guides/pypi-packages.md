@@ -17,8 +17,9 @@ List pip requirements in `[requirements].packages` in
 packages = ["httpx>=0.27", "numpy", "pillow~=11.0"]
 ```
 
-Without a lock, `pn run` and `pn build` resolve that list for each target
-the build needs. With a lock, they install the recorded wheels and verify
+Without a lock, development builds resolve that list for each target they need.
+Release builds with requirements require a current `pn.lock` covering every
+selected target and fail before staging when the lock is absent or stale. With a lock, they install the recorded wheels and verify
 their hashes. Both paths bundle the resulting packages into the app. Nothing from your host environment leaks in: a package that's
 importable on your Mac but has no wheel for the device is a build
 error, not a runtime `ImportError`.

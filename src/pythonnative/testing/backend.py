@@ -181,7 +181,13 @@ class FakeBackend:
 
         if isinstance(op, UpdateOp):
             view = self._require(op.tag, "update")
-            view.props.update(op.changed_props)
+            from ..mutations import UNSET
+
+            for key, value in op.changed_props.items():
+                if value is UNSET:
+                    view.props.pop(key, None)
+                else:
+                    view.props[key] = value
             self.last_update_changes = dict(op.changed_props)
             return ("update", view.type_name, view.id, tuple(sorted(op.changed_props)))
 

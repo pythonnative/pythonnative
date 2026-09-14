@@ -24,7 +24,7 @@ from pythonnative.bridge.fake import FakeTransport
 from pythonnative.component import component
 from pythonnative.element import Element
 from pythonnative.hooks import use_state
-from pythonnative.mutations import CreateOp, DestroyOp, InsertOp, Mutation, SetFrameOp, UpdateOp
+from pythonnative.mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, SetFrameOp, UpdateOp
 from pythonnative.native_modules import registry as modules
 from pythonnative.native_views import get_registry, set_registry
 from pythonnative.native_views.bridge_backend import BridgeBackend, NativeViewRef
@@ -83,7 +83,7 @@ def test_to_jsonable_rejects_callables() -> None:
 
 def test_split_props_keeps_callables_python_side() -> None:
     fn = lambda i: i  # noqa: E731
-    wire, python = codec.split_props({"count": 3, "on_bind_row": fn, "obj": object()})
+    wire, python = codec.split_props({"count": 3, "on_bind_row": fn, "obj": object()}, frozenset({"obj"}))
     assert wire == {"count": 3}
     assert python["on_bind_row"] is fn
     assert "obj" in python
@@ -94,7 +94,7 @@ def test_encode_transaction_shapes() -> None:
     ops: List[Mutation] = [
         CreateOp(1, "Column", {"flex": 1, "_pn_events": frozenset({"on_press"})}),
         CreateOp(2, "VirtualList", {"count": 2, "on_bind_row": render}),
-        UpdateOp(1, {"flex": None, "padding": 4}),
+        UpdateOp(1, {"flex": UNSET, "padding": 4}),
         InsertOp(1, 2, 0),
         SetFrameOp(2, 0, 0, 100.5, math.nan),
         DestroyOp(2),
@@ -104,7 +104,7 @@ def test_encode_transaction_shapes() -> None:
     assert decoded == [
         ["c", 1, "Column", {"flex": 1, "_pn_events": ["on_press"]}],
         ["c", 2, "VirtualList", {"count": 2}],
-        ["u", 1, {"flex": None, "padding": 4}],
+        ["u", 1, {"padding": 4}, ["flex"]],
         ["i", 1, 2, 0],
         ["f", 2, 0.0, 0.0, 100.5, 0.0],
         ["d", 2],
@@ -206,7 +206,7 @@ def test_backend_applies_transaction_and_tracks_tags(backend: BridgeBackend, tra
     assert isinstance(ref, NativeViewRef) and ref.tag == 2 and ref.type_name == "Text"
     assert backend.live_view_count() == 2
 
-    backend.apply_mutations([UpdateOp(2, {"text": None, "color": "#fff"}), DestroyOp(2)])
+    backend.apply_mutations([UpdateOp(2, {"text": UNSET, "color": "#fff"}), DestroyOp(2)])
     assert 2 not in transport.views
     assert backend.resolve_view(2) is None
     assert backend.live_view_count() == 1
@@ -238,7 +238,7 @@ def test_backend_holds_callable_props_in_sidecar(backend: BridgeBackend, transpo
     backend.apply_mutations([CreateOp(5, "VirtualList", {"count": 3, "on_bind_row": render})])
     assert transport.views[5].props == {"count": 3}
     assert backend.python_props(5)["on_bind_row"] is render
-    backend.apply_mutations([UpdateOp(5, {"on_bind_row": None})])
+    backend.apply_mutations([UpdateOp(5, {"on_bind_row": UNSET})])
     assert backend.python_props(5) == {}
     assert transport.views[5].props == {"count": 3}
 

@@ -2,132 +2,25 @@
 
 from __future__ import annotations
 
-import collections.abc
 import dataclasses
-import enum
 import hashlib
 import inspect
 import json
-import math
-import types
 import typing
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
+from .types import NativeField, decode_value, encode_value, type_schema, validate  # noqa: F401
 
-@dataclass(frozen=True)
-class NativeField:
-    """Native behavior attached to an annotated dataclass field.
-
-    Use ``Annotated[T, NativeField(...)]`` for native-specific metadata.
-    """
-
-    invalidates_layout: bool = False
-    recreate: bool = False
-    animated: bool = False
-    platforms: tuple[str, ...] = ("ios", "android", "web")
-    description: str = ""
-
-
-def type_schema(annotation: Any) -> dict[str, Any]:
-    """Convert a Python annotation into a portable JSON type description."""
-    origin, args = typing.get_origin(annotation), typing.get_args(annotation)
-    if origin is typing.Annotated:
-        result = type_schema(args[0])
-        for metadata in args[1:]:
-            if isinstance(metadata, NativeField):
-                result["native"] = dataclasses.asdict(metadata)
-        return result
-    if origin in (typing.Union, types.UnionType):
-        return {"anyOf": [type_schema(arg) for arg in args]}
-    if origin is typing.Literal:
-        return {"enum": list(args)}
-    if annotation is type(None):
-        return {"type": "null"}
-    if annotation in (str, bool, int, float):
-        return {"type": {str: "string", bool: "boolean", int: "integer", float: "number"}[annotation]}
-    if origin in (list, tuple, set, collections.abc.Sequence):
-        return {"type": "array", "items": type_schema(args[0]) if args else {}}
-    if origin in (dict, collections.abc.Mapping) or annotation is dict:
-        return {"type": "object", "additionalProperties": type_schema(args[-1]) if args else {}}
-    if origin in (typing.Callable, collections.abc.Callable):
-        return {
-            "type": "event",
-            "arguments": [type_schema(arg) for arg in args[0]] if args and args[0] is not Ellipsis else None,
-        }
-    if inspect.isclass(annotation) and issubclass(annotation, enum.Enum):
-        return {"enum": [value.value for value in annotation]}
-    if dataclasses.is_dataclass(annotation) or typing.is_typeddict(annotation):
-        hints = typing.get_type_hints(annotation, include_extras=True)
-        required = (
-            list(annotation.__required_keys__)
-            if typing.is_typeddict(annotation)
-            else [
-                f.name
-                for f in dataclasses.fields(annotation)
-                if f.default is dataclasses.MISSING and f.default_factory is dataclasses.MISSING
-            ]
-        )
-        return {
-            "type": "object",
-            "properties": {name: type_schema(value) for name, value in hints.items()},
-            "required": sorted(required),
-            "additionalProperties": False,
-        }
-    if origin in (typing.Required, typing.NotRequired):
-        return type_schema(args[0])
-    return {}
-
-
-def validate(value: Any, schema: Mapping[str, Any], path: str = "value") -> None:
-    """Validate wire values without coercion or ambiguous boolean comparisons."""
-    if "anyOf" in schema:
-        for alternative in schema["anyOf"]:
-            try:
-                validate(value, alternative, path)
-                return
-            except TypeError:
-                pass
-        raise TypeError(f"{path} does not match its annotation")
-    if "enum" in schema:
-        candidate = value.value if isinstance(value, enum.Enum) else value
-        if not any(
-            (type(candidate) is type(item) or type(candidate) in (int, float) and type(item) in (int, float))
-            and candidate == item
-            for item in schema["enum"]
-        ):
-            raise TypeError(f"{path} must be one of {schema['enum']!r}")
-    kind = schema.get("type")
-    checks = {
-        "null": lambda: value is None,
-        "string": lambda: isinstance(value, str),
-        "boolean": lambda: type(value) is bool,
-        "integer": lambda: type(value) in (int, float)
-        and math.isfinite(value)
-        and value == int(value)
-        and abs(value) <= 2**53 - 1,
-        "number": lambda: type(value) in (int, float) and math.isfinite(value),
-        "array": lambda: isinstance(value, (list, tuple, set)),
-        "object": lambda: isinstance(value, Mapping) or dataclasses.is_dataclass(value),
-        "event": lambda: callable(value) or type(value) is bool,
-    }
-    if kind in checks and not checks[kind]():
-        raise TypeError(f"{path} must be {kind}, received {type(value).__name__}")
-    if kind == "array":
-        for index, item in enumerate(value):
-            validate(item, schema.get("items", {}), f"{path}[{index}]")
-    if kind == "object":
-        values = dataclasses.asdict(value) if dataclasses.is_dataclass(value) and not isinstance(value, type) else value
-        missing = set(schema.get("required", ())) - values.keys()
-        if missing:
-            raise TypeError(f"{path} requires {', '.join(sorted(missing))}")
-        for name, item in values.items():
-            if not isinstance(name, str):
-                raise TypeError(f"{path} requires string keys")
-            nested = schema.get("properties", {}).get(name, schema.get("additionalProperties", {}))
-            if nested is False:
-                raise TypeError(f"Unknown {path}.{name}")
-            validate(item, nested if isinstance(nested, Mapping) else {}, f"{path}.{name}")
+# Runtime metadata crosses the bridge for built-in and third-party views alike.
+RUNTIME_PROPS: dict[str, dict[str, Any]] = {
+    "_pn_events": {"type": "array", "items": {"type": "string"}},
+    "_pn_animated_events": {"type": "object"},
+    "_pn_list_key": {"type": "string"},
+    "_pn_header_slot": {"enum": ["left", "right"]},
+    "_pn_edit_revision": {"type": "integer"},
+    "gestures": {"type": "array"},
+}
 
 
 @dataclass(frozen=True)
@@ -140,27 +33,36 @@ class ComponentSchema:
     defaults: dict[str, Any] = field(default_factory=dict)
     measurement: str = "intrinsic"
     commands: dict[str, Any] = field(default_factory=dict)
+    platforms: tuple[str, ...] = ("ios", "android", "web")
 
     @classmethod
-    def from_dataclass(cls, name: str, props: type, *, measurement: str = "intrinsic") -> ComponentSchema:
+    def from_dataclass(
+        cls,
+        name: str,
+        props: type,
+        *,
+        measurement: str = "intrinsic",
+        platforms: tuple[str, ...] = ("ios", "android"),
+    ) -> ComponentSchema:
         """Describe a native widget with a frozen Python props dataclass."""
         if not dataclasses.is_dataclass(props):
             raise TypeError("Native props must be a dataclass")
-        hints = typing.get_type_hints(props, include_extras=True)
-        required, defaults = [], {}
-        for item in dataclasses.fields(props):
-            if item.default is not dataclasses.MISSING:
-                defaults[item.name] = item.default
-            elif item.default_factory is not dataclasses.MISSING:
-                defaults[item.name] = item.default_factory()
-            else:
-                required.append(item.name)
+        if not platforms or set(platforms) - {"ios", "android", "web"}:
+            raise TypeError("Native component platforms must name ios, android, or web")
+        record = type_schema(props)
         return cls(
-            name, {key: type_schema(value) for key, value in hints.items()}, tuple(required), defaults, measurement
+            name,
+            record["properties"],
+            tuple(record["required"]),
+            record["defaults"],
+            measurement,
+            platforms=platforms,
         )
 
     def validate(self, props: Mapping[str, Any], *, partial: bool = False, platform: str | None = None) -> None:
         """Validate a construction or a partial update against this contract."""
+        if platform is not None and platform not in self.platforms:
+            raise TypeError(f"{self.name} isn't supported on {platform}")
         if not partial:
             missing = set(self.required) - props.keys()
             if missing:
@@ -171,7 +73,9 @@ class ComponentSchema:
             platforms = self.props[key].get("native", {}).get("platforms")
             if platform is not None and platforms is not None and platform not in platforms:
                 raise TypeError(f"{self.name}.{key} isn't supported on {platform}")
-            if partial and value is None:
+            from ..mutations import UNSET
+
+            if partial and value is UNSET:
                 if key in self.required:
                     raise TypeError(f"Cannot remove required {self.name}.{key}")
                 continue
@@ -195,6 +99,25 @@ class ComponentSchema:
             for index, (value, field) in enumerate(zip(arguments, expected)):
                 validate(value, field, f"{self.name}.{name}[{index}]")
 
+    def decode_event(self, name: str, arguments: list[Any]) -> list[Any]:
+        """Reconstruct declared payload records after validating an event."""
+        self.validate_event(name, arguments)
+        if name.startswith("gesture:"):
+            return arguments
+        schema = self.props.get(name, {})
+        if name == "on_refresh":
+            schema = self.props.get("refresh_control", {}).get("properties", {}).get(name, {})
+        event = next(item for item in schema.get("anyOf", [schema]) if item.get("type") == "event")
+        expected = event.get("arguments")
+        return (
+            arguments
+            if expected is None
+            else [
+                decode_value(value, field, f"{self.name}.{name}[{index}]")
+                for index, (value, field) in enumerate(zip(arguments, expected))
+            ]
+        )
+
 
 @dataclass(frozen=True)
 class ModuleSchema:
@@ -202,9 +125,10 @@ class ModuleSchema:
 
     name: str
     methods: dict[str, dict[str, Any]]
+    events: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
-    def from_protocol(cls, name: str, protocol: type) -> ModuleSchema:
+    def from_protocol(cls, name: str, protocol: type, *, events: Mapping[str, Any] | None = None) -> ModuleSchema:
         """Read annotated methods from a Python protocol or interface class."""
         methods = {}
         for method_name, method in inspect.getmembers(protocol, inspect.isfunction):
@@ -212,6 +136,12 @@ class ModuleSchema:
                 continue
             hints = typing.get_type_hints(method, include_extras=True)
             signature = inspect.signature(method)
+            if any(
+                param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD, param.POSITIONAL_ONLY)
+                for key, param in signature.parameters.items()
+                if key != "self"
+            ):
+                raise TypeError(f"Native method {name}.{method_name} requires named arguments")
             methods[method_name] = {
                 "arguments": {key: type_schema(hints.get(key, Any)) for key in signature.parameters if key != "self"},
                 "result": type_schema(hints.get("return", Any)),
@@ -222,12 +152,15 @@ class ModuleSchema:
                     if key != "self" and param.default is inspect.Parameter.empty
                 ],
                 "defaults": {
-                    key: param.default
+                    key: encode_value(param.default)
                     for key, param in signature.parameters.items()
                     if key != "self" and param.default is not inspect.Parameter.empty
                 },
             }
-        return cls(name, methods)
+        event_types = {event: type_schema(annotation) for event, annotation in (events or {}).items()}
+        if any(not event.isidentifier() for event in event_types):
+            raise TypeError("Native event names must be identifiers")
+        return cls(name, methods, event_types)
 
     def validate_call(self, method: str, arguments: Mapping[str, Any]) -> dict[str, Any]:
         """Validate and normalize a method invocation before crossing a bridge."""
@@ -244,7 +177,17 @@ class ModuleSchema:
             },
             f"{self.name}.{method}",
         )
-        return {**contract.get("defaults", {}), **arguments}
+        values = {**contract.get("defaults", {}), **arguments}
+        return {
+            key: decode_value(value, contract["arguments"][key], f"{self.name}.{method}.{key}")
+            for key, value in values.items()
+        }
+
+    def decode_event(self, event: str, payload: Any) -> Any:
+        """Validate and restore the declared Python payload of a module event."""
+        if event not in self.events:
+            raise TypeError(f"Unknown native event {self.name}.{event}")
+        return decode_value(payload, self.events[event], f"{self.name}.{event}")
 
     def validate_result(self, method: str, result: Any) -> Any:
         """Reject a native result that doesn't satisfy its declared return type."""
@@ -252,7 +195,7 @@ class ModuleSchema:
         if contract is None:
             raise TypeError(f"Unknown command {self.name}.{method}")
         validate(result, contract["result"], f"{self.name}.{method} result")
-        return result
+        return decode_value(result, contract["result"], f"{self.name}.{method} result")
 
 
 COMPONENTS: dict[str, ComponentSchema] = {}
@@ -270,7 +213,7 @@ def register_schema(schema: ComponentSchema | ModuleSchema) -> None:
 def manifest() -> dict[str, Any]:
     """Return deterministic native metadata for code generation and tooling."""
     return {
-        "protocol": 2,
+        "protocol": 3,
         "yoga": "3.2.1",
         "components": {name: dataclasses.asdict(value) for name, value in sorted(COMPONENTS.items())},
         "modules": {name: dataclasses.asdict(value) for name, value in sorted(MODULES.items())},
@@ -284,8 +227,8 @@ def fingerprint() -> str:
 
 def load_manifest(document: Mapping[str, Any]) -> None:
     """Load declarative extension contracts without importing target binaries."""
-    if document.get("protocol") != 2 or document.get("yoga") != "3.2.1":
-        raise ValueError("Native contracts require protocol 2 and Yoga 3.2.1")
+    if document.get("protocol") != 3 or document.get("yoga") != "3.2.1":
+        raise ValueError("Native contracts require protocol 3 and Yoga 3.2.1")
     pending = []
     for group, constructor, registered in (
         ("components", ComponentSchema, COMPONENTS),

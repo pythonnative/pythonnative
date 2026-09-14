@@ -56,25 +56,35 @@ public final class HostModule: PNNativeModule {
     }
 
     static func applyOptions(_ options: [String: Any], to controller: UIViewController) {
-        if let title = PNProps.string(options["title"]) {
-            controller.title = title
-        }
-        if let hidden = PNProps.bool(options["header_shown"]) {
-            controller.navigationController?.setNavigationBarHidden(!hidden, animated: false)
-        }
-        if let hidesBack = PNProps.bool(options["hide_back_button"]) {
-            controller.navigationItem.hidesBackButton = hidesBack
-        }
-        if let color = PNColor.parse(options["header_tint_color"]) {
-            controller.navigationController?.navigationBar.tintColor = color
-        }
-        if let color = PNColor.parse(options["header_background_color"]) {
-            let appearance = UINavigationBarAppearance()
+        controller.title = PNProps.string(options["title"]) ?? ""
+        let item = controller.navigationItem
+        let navigation = controller.navigationController
+        navigation?.setNavigationBarHidden(!(PNProps.bool(options["header_shown"]) ?? true), animated: false)
+        item.hidesBackButton = !(PNProps.bool(options["header_back_visible"]) ?? true)
+        item.backButtonTitle = PNProps.string(options["header_back_title"])
+        let large = PNProps.bool(options["header_large_title"]) ?? false
+        navigation?.navigationBar.prefersLargeTitles = large
+        item.largeTitleDisplayMode = large ? .always : .never
+        navigation?.interactivePopGestureRecognizer?.isEnabled = PNProps.bool(options["gesture_enabled"]) ?? true
+        controller.isModalInPresentation = !(PNProps.bool(options["gesture_enabled"]) ?? true)
+        navigation?.navigationBar.tintColor = PNColor.parse(options["header_tint_color"])
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithDefaultBackground()
+        let barStyle = PNProps.dict(options["header_style"]) ?? [:]
+        if let color = PNColor.parse(barStyle["background_color"]) {
             appearance.configureWithOpaqueBackground()
             appearance.backgroundColor = color
-            controller.navigationItem.standardAppearance = appearance
-            controller.navigationItem.scrollEdgeAppearance = appearance
         }
+        let titleStyle = PNProps.dict(options["header_title_style"]) ?? [:]
+        var attributes: [NSAttributedString.Key: Any] = [:]
+        if let color = PNColor.parse(titleStyle["color"]) { attributes[.foregroundColor] = color }
+        if titleStyle["font_size"] != nil || titleStyle["bold"] != nil || titleStyle["font_weight"] != nil {
+            attributes[.font] = PNTextManager.font(from: titleStyle, base: nil)
+        }
+        appearance.titleTextAttributes = attributes
+        appearance.largeTitleTextAttributes = attributes
+        item.standardAppearance = appearance
+        item.scrollEdgeAppearance = appearance
+        item.compactAppearance = appearance
     }
-
 }

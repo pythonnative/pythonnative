@@ -30,8 +30,9 @@ abstract class ComponentManager {
 
     /**
      * Apply `props` to `view`. `initial` is `true` for the create op;
-     * on updates `props` holds only the changed keys (JSON null means
-     * removed). The merged props are always available via [propsOf].
+     * on updates `props` holds changed values and normalized defaults for
+     * removed keys. The logical props, retaining explicit null but no removed
+     * keys, are available via [propsOf].
      */
     open fun applyProps(view: View, props: JSONObject, initial: Boolean) {
         ViewStyler.apply(view, props)
@@ -205,4 +206,16 @@ object PNEvents {
     /** Dispatch `name` for `tag` with an already built argument array. */
     fun fireTag(tag: Long, name: String, args: JSONArray): String? =
         PNBridge.callPython("event", tag, name, args.toString())
+}
+
+/** Typed managers consume the same generated contracts as extension managers. */
+abstract class TypedComponentManager<P: com.pythonnative.generated.PNViewProps>(
+    private val decode: (org.json.JSONObject, Boolean) -> P
+): ComponentManager() {
+    final override fun applyProps(view: android.view.View, props: org.json.JSONObject, initial: Boolean) {
+        applyTyped(view, decode(props, true), initial)
+    }
+    open fun applyTyped(view: android.view.View, props: P, initial: Boolean) {
+        ViewStyler.apply(view, props.values)
+    }
 }

@@ -1,5 +1,7 @@
 package com.pythonnative.runtime.components
 
+import com.pythonnative.generated.*
+
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
@@ -23,6 +25,7 @@ class VirtualListManager : ComponentManager() {
         val roots = HashMap<String, View>()
         val heights = HashMap<String, Double>()
         val holders = HashMap<String, Holder>()
+        var itemsByKey = emptyMap<String, Item>()
         var horizontal = false
         val manager = LinearLayoutManager(context)
         val rows = object : ListAdapter<Item, Holder>(object : DiffUtil.ItemCallback<Item>() {
@@ -46,6 +49,8 @@ class VirtualListManager : ComponentManager() {
         }
         init {
             addView(recycler, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            manager.initialPrefetchItemCount = 12
+            manager.isItemPrefetchEnabled = true
             recycler.layoutManager = manager
             recycler.adapter = rows
             recycler.itemAnimator = null
@@ -78,26 +83,31 @@ class VirtualListManager : ComponentManager() {
     }
     override fun createView(context: Context, tag: Long, props: JSONObject): View = ListView(context)
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        val typed = VirtualListProps(props)
+
         ViewStyler.apply(view, props)
         val list = view as ListView
         val all = PNBridge.registry.recordFor(view)?.props ?: props
         list.horizontal = all.optBoolean("horizontal", false)
         list.manager.orientation = if (list.horizontal) RecyclerView.HORIZONTAL else RecyclerView.VERTICAL
         list.recycler.isVerticalScrollBarEnabled = all.optBoolean("shows_scroll_indicator", true)
+        list.recycler.isHorizontalScrollBarEnabled = list.recycler.isVerticalScrollBarEnabled
         val refresh = all.optJSONObject("refresh_control")
         list.isEnabled = refresh != null && !list.horizontal
         list.isRefreshing = refresh?.optBoolean("refreshing", false) == true
         refresh?.optString("tint_color")?.takeIf { it.isNotEmpty() }?.let { color -> PNColor.parse(color)?.let { list.setColorSchemeColors(it) } }
-        if (initial || props.has("keys") || props.has("revision") || props.has("row_heights")) {
+        if (initial || typed.has_keys || typed.has_revision || typed.has_row_heights) {
             val keys = all.optJSONArray("keys")
             val heights = all.optJSONArray("row_heights")
             val items = (0 until (keys?.length() ?: 0)).map { Item(keys!!.getString(it), all.optJSONArray("item_revisions")?.optInt(it) ?: 0, heights?.optDouble(it, 44.0) ?: 44.0) }
+            val indices = items.mapIndexed { index, item -> item.key to index }.toMap()
             val first = list.manager.findFirstVisibleItemPosition()
             val anchor = list.rows.currentList.getOrNull(first)?.key
             val anchorView = list.manager.findViewByPosition(first)
             val offset = (if (list.horizontal) anchorView?.left else anchorView?.top) ?: 0
             list.rows.submitList(items) {
-                val position = items.indexOfFirst { it.key == anchor }
+                list.itemsByKey = items.associateBy { it.key }
+                val position = indices[anchor] ?: -1
                 if (position >= 0) list.manager.scrollToPositionWithOffset(position, offset)
             }
             list.heights.keys.retainAll(items.map { it.key }.toSet())
@@ -112,10 +122,10 @@ class VirtualListManager : ComponentManager() {
             val extent = if (list.horizontal) width else height
             if (extent > 0 && list.heights[key] != extent) {
                 list.heights[key] = extent
-                list.holders[key]?.let { holder -> list.rows.currentList.find { it.key == key }?.let { list.attach(holder, it) } }
+                list.holders[key]?.let { holder -> list.itemsByKey[key]?.let { list.attach(holder, it) } }
             }
         }
-        list.holders[key]?.let { holder -> list.rows.currentList.find { it.key == key }?.let { list.attach(holder, it) } }
+        list.holders[key]?.let { holder -> list.itemsByKey[key]?.let { list.attach(holder, it) } }
     }
     override fun removeChild(parent: View, child: View) {
         val list = parent as ListView

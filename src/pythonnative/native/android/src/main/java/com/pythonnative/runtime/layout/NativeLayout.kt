@@ -13,6 +13,13 @@ object NativeLayout {
         var parent: Long? = null
         var attached = false
         var frame = floatArrayOf()
+        var constraints = floatArrayOf()
+        fun calculate(width: Float, height: Float) {
+            val next = floatArrayOf(width, height)
+            if (next.contentEquals(constraints) && !yoga.isDirty(yoga.ptr)) return
+            yoga.calculate(yoga.ptr, width, height)
+            constraints = next
+        }
     }
     private val nodes = HashMap<Long, Entry>()
     private val portals = HashSet<Long>()
@@ -21,6 +28,8 @@ object NativeLayout {
     private val detached = setOf("VirtualList", "Modal", "ScreenStack")
     private val containers = detached + setOf("View", "Row", "Column", "ScrollView", "Screen", "Portal")
     private var scheduled = false
+    var visitedNodes = 0; private set
+    var layoutNanos = 0L; private set
 
     fun containerDidLayout() {
         if (scheduled) return
@@ -54,7 +63,7 @@ object NativeLayout {
                 if (op.typeName == "Portal") portals.add(op.tag)
                 update(entry, op.props)
             }
-            is Op.Update -> nodes[op.tag]?.let { update(it, op.changed) }
+            is Op.Update -> nodes[op.tag]?.let { update(it, op.changed, op.removed) }
             is Op.Insert -> {
                 val parent = nodes[op.parent] ?: continue
                 val child = nodes[op.child] ?: continue
@@ -64,7 +73,7 @@ object NativeLayout {
                 } }
                 child.parent = op.parent
                 parent.children.add(op.index.coerceAtMost(parent.children.size), op.child)
-                child.attached = PNBridge.registry.get(op.parent)?.typeName !in detached
+                child.attached = PNBridge.registry.get(op.parent)?.typeName !in detached && !child.props.has("_pn_header_slot")
                 if (child.attached) {
                     detachedRoots.remove(op.child)
                     parent.yoga.insert(parent.yoga.ptr, child.yoga.ptr, op.index)
@@ -83,13 +92,14 @@ object NativeLayout {
         }
     }
 
-    private fun update(entry: Entry, changed: JSONObject) {
+    private fun update(entry: Entry, changed: JSONObject, removed: List<String> = emptyList()) {
         for (key in changed.keys()) {
             if (changed.isNull(key)) entry.props.remove(key) else entry.props.put(key, changed.get(key))
         }
+        for (key in removed) entry.props.remove(key)
         val yoga = entry.yoga
         val type = PNBridge.registry.get(yoga.tag)?.typeName
-        if (type != null && entry.frame.isNotEmpty() && !com.pythonnative.generated.PNContracts.invalidatesLayout(type, changed)) return
+        if (removed.isEmpty() && type != null && entry.frame.isNotEmpty() && !com.pythonnative.generated.PNContracts.invalidatesLayout(type, changed)) return
         yoga.resetStyle(yoga.ptr)
         for (key in entry.props.keys()) {
             val value = entry.props.get(key)
@@ -102,13 +112,15 @@ object NativeLayout {
     }
 
     fun compute(request: JSONObject): JSONArray {
+        val started = System.nanoTime()
+        visitedNodes = 0
         viewport = request
         val width = request.optDouble("width").toFloat()
         val height = request.optDouble("height").toFloat()
         if (!width.isFinite() || !height.isFinite() || width <= 0 || height <= 0) return JSONArray()
         val roots = request.optJSONArray("roots") ?: JSONArray()
         val rootTags = (0 until roots.length()).map { roots.getLong(it) }.toSet()
-        for (tag in rootTags) nodes[tag]?.yoga?.let { it.calculate(it.ptr, width, height) }
+        for (tag in rootTags) nodes[tag]?.calculate(width, height)
         // Portals have no on-screen parent. Their own Yoga node supplies the
         // viewport for all children, including absolute insets and sibling layout.
         for (tag in portals) {
@@ -120,7 +132,7 @@ object NativeLayout {
             val portalHeight = if (containerHeight > 0) containerHeight else height
             entry.yoga.style(entry.yoga.ptr, "width", portalWidth.toString())
             entry.yoga.style(entry.yoga.ptr, "height", portalHeight.toString())
-            entry.yoga.calculate(entry.yoga.ptr, portalWidth, portalHeight)
+            entry.calculate(portalWidth, portalHeight)
         }
         for (tag in detachedRoots) {
             val entry = nodes[tag] ?: continue
@@ -129,23 +141,34 @@ object NativeLayout {
             val container = if (record?.typeName == "Screen") record.view else parent?.view
             val availableWidth = (container?.width ?: 0) / PNBridge.density()
             val availableHeight = (container?.height ?: 0) / PNBridge.density()
+            if (entry.props.has("_pn_header_slot")) {
+                entry.calculate(Float.NaN, 44f)
+                continue
+            }
             val isList = parent?.typeName == "VirtualList"
             val horizontal = parent?.props?.optBoolean("horizontal", false) ?: false
-            entry.yoga.calculate(entry.yoga.ptr, if (isList && horizontal) Float.NaN else if (availableWidth > 0) availableWidth else width,
+            entry.calculate(if (isList && horizontal) Float.NaN else if (availableWidth > 0) availableWidth else width,
                 if (isList && !horizontal) Float.NaN else if (availableHeight > 0) availableHeight else height)
         }
         val frames = JSONArray()
-        for ((tag, entry) in nodes) {
+        fun collect(tag: Long) {
+            val entry = nodes[tag] ?: return
+            if (!entry.yoga.takeNewLayout(entry.yoga.ptr)) return
+            visitedNodes += 1
             val frame = entry.yoga.frame(entry.yoga.ptr)
-            if (frame.contentEquals(entry.frame)) continue
-            entry.frame = frame
-            if (tag !in rootTags) PNBridge.registry.get(tag)?.let { record ->
-                record.frame = frame.map { it.toDouble() }.toDoubleArray()
-                record.manager.setFrame(record.view, frame[0].toDouble(), frame[1].toDouble(), frame[2].toDouble(), frame[3].toDouble())
+            if (!frame.contentEquals(entry.frame)) {
+                entry.frame = frame
+                if (tag !in rootTags) PNBridge.registry.get(tag)?.let { record ->
+                    record.frame = frame.map { it.toDouble() }.toDoubleArray()
+                    record.manager.setFrame(record.view, frame[0].toDouble(), frame[1].toDouble(), frame[2].toDouble(), frame[3].toDouble())
+                }
+                com.pythonnative.runtime.components.VirtualListManager.measured(tag, frame[2].toDouble(), frame[3].toDouble())
+                frames.put(JSONArray().put(tag).put(frame[0]).put(frame[1]).put(frame[2]).put(frame[3]))
             }
-            com.pythonnative.runtime.components.VirtualListManager.measured(tag, frame[2].toDouble(), frame[3].toDouble())
-            frames.put(JSONArray().put(tag).put(frame[0]).put(frame[1]).put(frame[2]).put(frame[3]))
+            for (child in entry.children) if (nodes[child]?.attached == true) collect(child)
         }
+        for (tag in rootTags + portals + detachedRoots) collect(tag)
+        layoutNanos = System.nanoTime() - started
         return frames
     }
 
@@ -153,6 +176,6 @@ object NativeLayout {
         val entry = nodes[tag] ?: return
         if (entry.children.isNotEmpty()) return
         entry.yoga.measureLeaf(entry.yoga.ptr, true)
-        PNBridge.callPython("layout", 0, "", compute(viewport).toString())
+        containerDidLayout()
     }
 }

@@ -17,7 +17,7 @@ class PNTransactionTest {
         val json = """
             [
               ["c", 1, "View", {"background_color": "#fff"}],
-              ["u", 1, {"opacity": 0.5, "background_color": null}],
+              ["u", 1, {"opacity": 0.5}, ["background_color"]],
               ["i", 1, 2, 0],
               ["f", 2, 10, 20.5, 100, 40],
               ["d", 2]
@@ -31,7 +31,7 @@ class PNTransactionTest {
         assertEquals("#fff", create.props.getString("background_color"))
         val update = ops[1] as Op.Update
         assertEquals(0.5, update.changed.getDouble("opacity"), 1e-9)
-        assertTrue(update.changed.isNull("background_color"))
+        assertEquals(listOf("background_color"), update.removed)
         assertEquals(Op.Insert(1, 2, 0), ops[2])
         assertEquals(Op.Frame(2, 10.0, 20.5, 100.0, 40.0), ops[3])
         assertEquals(Op.Destroy(2), ops[4])

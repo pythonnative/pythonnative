@@ -32,8 +32,8 @@ enum PNCommit {
             PNJSON.encode(["ok": false, "application": app, "surface": target,
                            "revision": next, "error": message, "failed": false])
         }
-        guard envelope["version"] as? Int == 2, !app.isEmpty, target > 0,
-              let raw = envelope["ops"] as? [[Any]] else { return error("invalid v2 envelope") }
+        guard envelope["version"] as? Int == 3, !app.isEmpty, target > 0,
+              let raw = envelope["ops"] as? [[Any]] else { return error("invalid v3 envelope") }
         let replacing = app != application
         guard next == (replacing ? 1 : revision + 1), replacing || (!failed && target == surface)
         else { return error("stale revision or failed surface") }
@@ -45,7 +45,7 @@ enum PNCommit {
         do {
             for (index, parts) in raw.enumerated() {
                 guard let code = parts.first as? String,
-                      parts.count == ["c": 4, "u": 3, "i": 4, "d": 2, "f": 6][code],
+                      parts.count == ["c": 4, "u": 4, "i": 4, "d": 2, "f": 6][code],
                       let number = parts[1] as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(), number.doubleValue > 0,
                       number.doubleValue <= 9_007_199_254_740_991,
                       number.doubleValue.rounded() == number.doubleValue else {
@@ -62,8 +62,8 @@ enum PNCommit {
                 } else {
                     guard tags.contains(tag) else { return error("unknown tag") }
                     if code == "u" {
-                        guard let props = parts[2] as? [String: Any] else { return error("invalid props") }
-                        if let type = names[tag], !PNContracts.validate(type, props, partial: true) { return error("invalid typed update") }
+                        guard let props = parts[2] as? [String: Any], let removed = parts[3] as? [String] else { return error("invalid props") }
+                        if let type = names[tag], (!PNContracts.validate(type, props, partial: true) || !PNContracts.validateRemoval(type, props, removed)) { return error("invalid typed update") }
                     }
                     if code == "i" {
                         guard let child = parts[2] as? Int64, tags.contains(child),
@@ -97,6 +97,13 @@ enum PNCommit {
                 decoded.append(try PNTransaction.decodeOp(parts, index: index))
             }
         } catch { return PNJSON.encode(["ok": false, "error": String(describing: error), "failed": false]) }
+        let layoutRequest = envelope["layout"] as? [String: Any]
+        if envelope["layout"] != nil && layoutRequest == nil { return error("invalid layout request") }
+        if let request = layoutRequest {
+            guard let roots = request["roots"] as? [Int64], roots.allSatisfy({ tags.contains($0) }),
+                  let width = request["width"] as? Double, width.isFinite, width > 0,
+                  let height = request["height"] as? Double, height.isFinite, height > 0 else { return error("invalid layout request") }
+        }
         let mutationStarted = DispatchTime.now().uptimeNanoseconds
         do {
             if replacing {
@@ -118,7 +125,9 @@ enum PNCommit {
         parents = links
         childCounts = counts
         failed = false
-        return PNJSON.encode(["ok": true, "application": app, "surface": target, "revision": next,
-                              "metrics": ["mutation_ns": DispatchTime.now().uptimeNanoseconds - mutationStarted]])
+        var reply: [String: Any] = ["ok": true, "application": app, "surface": target, "revision": next,
+                              "metrics": ["mutation_ns": DispatchTime.now().uptimeNanoseconds - mutationStarted]]
+        if let request = layoutRequest { reply["layout"] = layout(PNLayout.compute(request)) }
+        return PNJSON.encode(reply)
     }
 }

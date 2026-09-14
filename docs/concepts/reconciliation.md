@@ -26,7 +26,7 @@ tree:
 
 - If their `type` matches, **update**: emit an
   [`UpdateOp`][pythonnative.mutations.UpdateOp] carrying only the
-  props that changed (removed props arrive as `None`).
+  props that changed (removed props arrive as `UNSET`; `None` is explicit null).
 - If their `type` differs, **replace**: emit destroy ops for the old
   subtree, create ops for the new one, and recurse into its children.
 - For container elements, match children by `key` first and by
