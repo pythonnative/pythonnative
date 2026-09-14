@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.44.0 (2026-09-14)
+
+### Features
+
+- Overhaul native contracts, rendering, and extension builds
+  ([#101](https://github.com/pythonnative/pythonnative/pull/101),
+  [`9cb4ebb`](https://github.com/pythonnative/pythonnative/commit/9cb4ebb165bd66f15a5a4deaf7c9d49460c7e78d))
+
+
 ## v0.43.1 (2026-09-12)
 
 ### Bug Fixes
