@@ -3582,7 +3582,7 @@ tree:</p>
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
   &lt;/span&gt;" href="../../api/mutations/#pythonnative.mutations.UpdateOp"><code>UpdateOp</code></a> carrying only the
-  props that changed (removed props arrive as <code>None</code>).</li>
+  props that changed (removed props arrive as <code>UNSET</code>; <code>None</code> is explicit null).</li>
 <li>If their <code>type</code> differs, <strong>replace</strong>: emit destroy ops for the old
   subtree, create ops for the new one, and recurse into its children.</li>
 <li>For container elements, match children by <code>key</code> first and by

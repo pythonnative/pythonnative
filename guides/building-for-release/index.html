@@ -1649,6 +1649,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#frozen-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frozen dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#android" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1659,6 +1670,17 @@
   
     <nav class="md-nav" aria-label="Android">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolchain-and-packaged-binaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toolchain and packaged binaries
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#signing" class="md-nav__link">
@@ -1687,6 +1709,17 @@
   
     <nav class="md-nav" aria-label="iOS">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#privacy-manifests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Privacy manifests
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#bytecode-only-bundles" class="md-nav__link">
@@ -3393,6 +3426,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#frozen-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frozen dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#android" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3403,6 +3447,17 @@
   
     <nav class="md-nav" aria-label="Android">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolchain-and-packaged-binaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toolchain and packaged binaries
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#signing" class="md-nav__link">
@@ -3431,6 +3486,17 @@
   
     <nav class="md-nav" aria-label="iOS">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#privacy-manifests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Privacy manifests
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#bytecode-only-bundles" class="md-nav__link">
@@ -3567,37 +3633,61 @@ first to confirm the toolchain is ready.</p>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>pn<span class="w"> </span>doctor<span class="w"> </span>ios
 </span></code></pre></div>
 <p><code>pn doctor</code> validates <code>pythonnative.toml</code> and checks the platform
-toolchain: for Android, <code>adb</code>, a JDK, and whether release signing is
-configured; for iOS, macOS, Xcode, <code>simctl</code>, and a development team. It
+toolchain: Android needs JDK 17 through 23, the configured SDK (36 by
+default), NDK 28.2.13676358, and <code>adb</code>. iOS needs macOS, Xcode 26 or
+later, and <code>simctl</code>. The doctor also reports signing, lockfile, and
+privacy-manifest configuration. It
 exits non-zero on anything that will block a build, so you can gate CI
 on it.</p>
 <hr />
+<h2 id="frozen-dependencies">Frozen dependencies<a class="headerlink" href="#frozen-dependencies" title="Permanent link">&para;</a></h2>
+<p>Release builds with Python dependencies require a current <code>pn.lock</code> covering
+all build targets. Resolve and review the lock before building:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pn<span class="w"> </span>deps<span class="w"> </span>android<span class="w"> </span>--lock
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>pn<span class="w"> </span>deps<span class="w"> </span>ios<span class="w"> </span>--lock
+</span></code></pre></div>
+<p>Commit the lock with your application. Changing requirements or replacing a
+local wheel requires refreshing it. Releases reject missing or stale locks;
+development builds can still resolve unlocked requirements. Native extension
+manifests pin SwiftPM and Maven dependencies to exact versions.</p>
 <h2 id="android">Android<a class="headerlink" href="#android" title="Permanent link">&para;</a></h2>
 <p><code>pn build android</code> runs <code>assembleRelease</code> and <code>bundleRelease</code>, producing
 both an APK and a Play-ready AAB. Artifacts are reported at the end of
 the build and live under the staged project:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>build/android/android_template/app/build/outputs/apk/release/app-release.apk
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>build/android/android_template/app/build/outputs/bundle/release/app-release.aab
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>build/android/android_template/app/build/outputs/apk/release/app-release.apk
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>build/android/android_template/app/build/outputs/bundle/release/app-release.aab
 </span></code></pre></div>
+<h3 id="toolchain-and-packaged-binaries">Toolchain and packaged binaries<a class="headerlink" href="#toolchain-and-packaged-binaries" title="Permanent link">&para;</a></h3>
+<p>The template uses compile/target SDK 36, Gradle 8.13, Android Gradle Plugin
+8.11.1, Kotlin 2.2.21, and NDK 28.2.13676358. Release builds reject a target
+SDK below 36. These are PythonNative's supported build defaults, independent
+of store submission deadlines.</p>
+<p>After Gradle builds, PythonNative inspects the APK and AAB. Every packaged
+64-bit ELF library must have 16 KB aligned LOAD segments, including Python
+extensions inside Chaquopy assets. Uncompressed APK libraries must also be
+ZIP aligned, and the AAB must request compatible generated APK alignment.
+An error names the offending dependency. Rebuild or replace that dependency;
+upgrading your app's NDK can't repair a prebuilt wheel. See Android's
+<a href="https://developer.android.com/guide/practices/page-sizes">16 KB page-size guidance</a>.</p>
 <h3 id="signing">Signing<a class="headerlink" href="#signing" title="Permanent link">&para;</a></h3>
 <p>Without signing configured, Gradle emits an <strong>unsigned</strong> release APK
 (<code>app-release-unsigned.apk</code>), fine for inspection, not for the store.
 To produce signed artifacts, create a keystore once:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>keytool<span class="w"> </span>-genkeypair<span class="w"> </span>-v<span class="w"> </span>-keystore<span class="w"> </span>release.keystore<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>-alias<span class="w"> </span>myapp<span class="w"> </span>-keyalg<span class="w"> </span>RSA<span class="w"> </span>-keysize<span class="w"> </span><span class="m">2048</span><span class="w"> </span>-validity<span class="w"> </span><span class="m">10000</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>keytool<span class="w"> </span>-genkeypair<span class="w"> </span>-v<span class="w"> </span>-keystore<span class="w"> </span>release.keystore<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>-alias<span class="w"> </span>myapp<span class="w"> </span>-keyalg<span class="w"> </span>RSA<span class="w"> </span>-keysize<span class="w"> </span><span class="m">2048</span><span class="w"> </span>-validity<span class="w"> </span><span class="m">10000</span>
 </span></code></pre></div>
 <p>…then point <code>pythonnative.toml</code> at it:</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">[android.signing]</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">keystore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"release.keystore"</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">key_alias</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myapp"</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># store_password_env / key_password_env default to</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># PN_ANDROID_KEYSTORE_PASSWORD / PN_ANDROID_KEY_PASSWORD</span>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">[android.signing]</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">keystore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"release.keystore"</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">key_alias</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myapp"</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># store_password_env / key_password_env default to</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># PN_ANDROID_KEYSTORE_PASSWORD / PN_ANDROID_KEY_PASSWORD</span>
 </span></code></pre></div>
 <p>Passwords are <strong>never</strong> stored in the config, only the names of the
 environment variables that hold them. Provide the secrets at build time:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PN_ANDROID_KEYSTORE_PASSWORD</span><span class="o">=</span>…
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PN_ANDROID_KEY_PASSWORD</span><span class="o">=</span>…
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>pn<span class="w"> </span>build<span class="w"> </span>android
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PN_ANDROID_KEYSTORE_PASSWORD</span><span class="o">=</span>…
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PN_ANDROID_KEY_PASSWORD</span><span class="o">=</span>…
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>pn<span class="w"> </span>build<span class="w"> </span>android
 </span></code></pre></div>
 <p>When signing is configured, <code>pn</code> injects a Gradle <code>signingConfig</code> into
 the release build so the resulting APK/AAB are signed and upload-ready.</p>
@@ -3612,16 +3702,29 @@ a CI secret/file and inject the passwords via environment variables.</p>
 signed <code>.ipa</code> with <code>xcodebuild -exportArchive</code>. The Python framework,
 standard library, and app code are installed and signed during the
 Xcode build itself, so the archive needs no post-processing. Outputs:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>build/ios/export/*.ipa
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>build/ios/ios_template.xcarchive
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>build/ios/export/*.ipa
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>build/ios/ios_template.xcarchive
 </span></code></pre></div>
 <p>To send the build straight to App Store Connect instead of exporting a
 local <code>.ipa</code>, set <code>export_method = "app-store"</code> and pass <code>--upload</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>pn<span class="w"> </span>build<span class="w"> </span>ios<span class="w"> </span>--upload
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>pn<span class="w"> </span>build<span class="w"> </span>ios<span class="w"> </span>--upload
 </span></code></pre></div>
 <p>The upload uses the App Store Connect credentials Xcode has stored; in
 CI, provide an ASC API key through Xcode's standard mechanisms or
 upload the exported <code>.ipa</code> with <code>xcrun altool</code>/Transporter instead.</p>
+<h3 id="privacy-manifests">Privacy manifests<a class="headerlink" href="#privacy-manifests" title="Permanent link">&para;</a></h3>
+<p>The template includes an app <code>PrivacyInfo.xcprivacy</code>. Supply your app's own
+manifest with a path relative to the project:</p>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">[ios]</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">privacy_manifest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"assets/PrivacyInfo.xcprivacy"</span>
+</span></code></pre></div>
+<p>PythonNativeKit ships its own resource-bundle manifest for preferences and
+cache-file timestamps. Archive validation checks that the app and runtime
+manifests are present and structurally valid before export or upload. It also
+parses manifests supplied by bundled dependencies. This check doesn't infer
+your application's data collection, tracking, or required-reason API usage.
+Declare those from your actual behavior using Apple's
+<a href="https://developer.apple.com/documentation/bundleresources/privacy-manifest-files">privacy-manifest documentation</a>.</p>
 <h3 id="bytecode-only-bundles">Bytecode-only bundles<a class="headerlink" href="#bytecode-only-bundles" title="Permanent link">&para;</a></h3>
 <p>Release builds byte-compile your <code>app/</code> sources and every bundled
 package to <code>.pyc</code> and drop the <code>.py</code> files, which shrinks the bundle
@@ -3633,12 +3736,12 @@ sources instead. Debug builds (<code>pn run</code>, <code>pn build --debug</code
 dev client can tell which sources the app already has.</p>
 <h3 id="signing_1">Signing<a class="headerlink" href="#signing_1" title="Permanent link">&para;</a></h3>
 <p>Set your Apple Developer Team ID and an export method:</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">[ios]</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">development_team</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ABCDE12345"</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">[ios.signing]</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">export_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app-store"</span><span class="w">          </span><span class="c1"># development | ad-hoc | app-store | enterprise</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">provisioning_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"My App Distribution"</span>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">[ios]</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">development_team</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ABCDE12345"</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="k">[ios.signing]</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">export_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app-store"</span><span class="w">          </span><span class="c1"># development | ad-hoc | app-store | enterprise</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">provisioning_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"My App Distribution"</span>
 </span></code></pre></div>
 <p><code>development_team</code> drives signing during <code>archive</code>; <code>export_method</code> and
 the optional <code>provisioning_profile</code> are written into the
@@ -3662,9 +3765,9 @@ per target.</p>
 <h2 id="app-icon-and-splash">App icon and splash<a class="headerlink" href="#app-icon-and-splash" title="Permanent link">&para;</a></h2>
 <p>Provide a single high-resolution source image and PythonNative renders
 every per-platform, per-density variant at build time:</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">[assets]</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">icon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"assets/icon.png"</span><span class="w">      </span><span class="c1"># 1024x1024 PNG</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">splash</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"assets/splash.png"</span>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">[assets]</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">icon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"assets/icon.png"</span><span class="w">      </span><span class="c1"># 1024x1024 PNG</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">splash</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"assets/splash.png"</span>
 </span></code></pre></div>
 <ul>
 <li><strong>iOS</strong>: a universal <code>AppIcon.appiconset</code> (Xcode resizes the rest)
@@ -3674,7 +3777,7 @@ every per-platform, per-density variant at build time:</p>
 </ul>
 <p>Image processing needs <a href="https://python-pillow.org/">Pillow</a>, an optional
 dependency:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'pythonnative[build]'</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'pythonnative[build]'</span>
 </span></code></pre></div>
 <p>If Pillow isn't installed the build still succeeds; it just keeps the
 template's default assets. <code>pn doctor</code> reports whether Pillow is
@@ -3683,20 +3786,20 @@ available.</p>
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Permanent link">&para;</a></h2>
 <p>Two fields in <code>[app]</code> drive the store-visible version and the internal
 build number:</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">[app]</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.2.0"</span><span class="w">     </span><span class="c1"># CFBundleShortVersionString / versionName</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">build</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">7</span><span class="w">             </span><span class="c1"># CFBundleVersion / versionCode (bump every upload)</span>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">[app]</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.2.0"</span><span class="w">     </span><span class="c1"># CFBundleShortVersionString / versionName</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">build</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">7</span><span class="w">             </span><span class="c1"># CFBundleVersion / versionCode (bump every upload)</span>
 </span></code></pre></div>
 <p>Both stores reject a new upload that reuses an existing build number, so
 increment <code>build</code> for each submission.</p>
 <hr />
 <h2 id="continuous-integration">Continuous integration<a class="headerlink" href="#continuous-integration" title="Permanent link">&para;</a></h2>
 <p>A typical release job:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'pythonnative[build]'</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>pn<span class="w"> </span>doctor<span class="w"> </span>android<span class="w">            </span><span class="c1"># fail fast on a misconfigured runner</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PN_ANDROID_KEYSTORE_PASSWORD</span><span class="o">=</span><span class="nv">$KEYSTORE_PW</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PN_ANDROID_KEY_PASSWORD</span><span class="o">=</span><span class="nv">$KEY_PW</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>pn<span class="w"> </span>build<span class="w"> </span>android
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'pythonnative[build]'</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>pn<span class="w"> </span>doctor<span class="w"> </span>android<span class="w">            </span><span class="c1"># fail fast on a misconfigured runner</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PN_ANDROID_KEYSTORE_PASSWORD</span><span class="o">=</span><span class="nv">$KEYSTORE_PW</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PN_ANDROID_KEY_PASSWORD</span><span class="o">=</span><span class="nv">$KEY_PW</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>pn<span class="w"> </span>build<span class="w"> </span>android
 </span></code></pre></div>
 <p><code>pn app-id android</code> / <code>pn app-id ios</code> print the resolved id, which is
 handy for downstream steps (uploaders, smoke tests) that need it without
@@ -3705,8 +3808,8 @@ re-parsing the config.</p>
 <h2 id="prepare-without-building">Prepare without building<a class="headerlink" href="#prepare-without-building" title="Permanent link">&para;</a></h2>
 <p>To hand off to Android Studio or Xcode instead of building from the CLI,
 stage and configure the native project without compiling:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--prepare-only
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--prepare-only
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--prepare-only
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--prepare-only
 </span></code></pre></div>
 <p>This writes a fully configured project (identity, permissions, icons,
 relocated Android package) under <code>build/</code>, which you can open and build

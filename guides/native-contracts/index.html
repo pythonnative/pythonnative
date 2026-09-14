@@ -1345,10 +1345,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#define-the-interface" class="md-nav__link">
+  <a href="#declare-python-values" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Define the interface
+        Declare Python values
       
     </span>
   </a>
@@ -1356,10 +1356,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#package-the-native-implementation" class="md-nav__link">
+  <a href="#implement-the-native-side" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Package the native implementation
+        Implement the native side
       
     </span>
   </a>
@@ -1367,10 +1367,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#runtime-enforcement" class="md-nav__link">
+  <a href="#package-sources-resources-and-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Runtime enforcement
+        Package sources, resources, and dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#missing-values-nulls-and-resets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing values, nulls, and resets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify contracts
       
     </span>
   </a>
@@ -3282,10 +3304,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#define-the-interface" class="md-nav__link">
+  <a href="#declare-python-values" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Define the interface
+        Declare Python values
       
     </span>
   </a>
@@ -3293,10 +3315,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#package-the-native-implementation" class="md-nav__link">
+  <a href="#implement-the-native-side" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Package the native implementation
+        Implement the native side
       
     </span>
   </a>
@@ -3304,10 +3326,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#runtime-enforcement" class="md-nav__link">
+  <a href="#package-sources-resources-and-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Runtime enforcement
+        Package sources, resources, and dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#missing-values-nulls-and-resets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing values, nulls, and resets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify contracts
       
     </span>
   </a>
@@ -3348,104 +3392,169 @@
 
 
 <h1 id="generated-native-contracts">Generated native contracts<a class="headerlink" href="#generated-native-contracts" title="Permanent link">&para;</a></h1>
-<p>Declare an extension's interface in Python, generate its native adapters, and
-implement the platform behavior in Swift and Kotlin. The complete working
-example is the separately packaged <code>examples/inbox-extension</code>, consumed by
-<code>examples/inbox</code>. Its badge uses generated props, and its module has synchronous
-and asynchronous methods.</p>
-<h2 id="define-the-interface">Define the interface<a class="headerlink" href="#define-the-interface" title="Permanent link">&para;</a></h2>
+<p>Python declarations define the native interface. The same compiler generates
+Swift and Kotlin props, records, event emitters, and service adapters for
+built-ins and extensions. The separately packaged <code>examples/inbox-extension</code>
+contains a complete implementation; <code>examples/inbox</code> consumes its wheel.</p>
+<h2 id="declare-python-values">Declare Python values<a class="headerlink" href="#declare-python-values" title="Permanent link">&para;</a></h2>
+<p>Use ordinary dataclasses, enums, <code>TypedDict</code>, <code>Literal</code>, optional values, and
+nested collections. Record defaults survive decoding, and results and events
+arrive as the original Python record classes. Unsupported annotations fail
+during declaration. Explicit <code>Any</code> means a portable JSON value, not an arbitrary
+Python object.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Protocol</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Protocol</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.sdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">element_factory</span><span class="p">,</span> <span class="n">register_component</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.sdk.schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModuleSchema</span><span class="p">,</span> <span class="n">NativeField</span><span class="p">,</span> <span class="n">register_schema</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">BadgeProps</span><span class="p">:</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">count</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">NativeField</span><span class="p">(</span><span class="n">invalidates_layout</span><span class="o">=</span><span class="kc">True</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">0</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="k">class</span><span class="w"> </span><span class="nc">ToolsProtocol</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">format_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">count</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">ready</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="n">register_component</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Badge"</span><span class="p">,</span> <span class="n">props</span><span class="o">=</span><span class="n">BadgeProps</span><span class="p">)</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="n">register_schema</span><span class="p">(</span><span class="n">ModuleSchema</span><span class="o">.</span><span class="n">from_protocol</span><span class="p">(</span><span class="s2">"Tools"</span><span class="p">,</span> <span class="n">ToolsProtocol</span><span class="p">))</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="n">Badge</span> <span class="o">=</span> <span class="n">element_factory</span><span class="p">(</span><span class="s2">"Badge"</span><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">Record</span><span class="p">:</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">identifier</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">labels</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="k">class</span><span class="w"> </span><span class="nc">BadgeProps</span><span class="p">:</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="n">count</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">NativeField</span><span class="p">(</span><span class="n">invalidates_layout</span><span class="o">=</span><span class="kc">True</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">0</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">on_press</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="k">class</span><span class="w"> </span><span class="nc">ToolsProtocol</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">records</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Record</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Record</span><span class="p">]:</span> <span class="o">...</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="n">register_component</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Badge"</span><span class="p">,</span> <span class="n">props</span><span class="o">=</span><span class="n">BadgeProps</span><span class="p">)</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="n">register_schema</span><span class="p">(</span><span class="n">ModuleSchema</span><span class="o">.</span><span class="n">from_protocol</span><span class="p">(</span><span class="s2">"Tools"</span><span class="p">,</span> <span class="n">ToolsProtocol</span><span class="p">,</span> <span class="n">events</span><span class="o">=</span><span class="p">{</span><span class="s2">"prepared"</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Record</span><span class="p">]}))</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="n">Badge</span> <span class="o">=</span> <span class="n">element_factory</span><span class="p">(</span><span class="s2">"Badge"</span><span class="p">)</span>
 </span></code></pre></div>
-<p>From an environment where that module is importable, run:</p>
+<p>Generate from an importable declaration module:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pn<span class="w"> </span>codegen<span class="w"> </span>--module<span class="w"> </span>my_package.contracts<span class="w"> </span>--output<span class="w"> </span>generated
 </span></code></pre></div>
-<p>Generation produces the schema, Swift and Kotlin props and module adapters,
-Python facades, browser metadata, and Markdown reference material. Generated
-contracts are deterministic. Built-in generated files are checked against the
-Python definitions in the test suite.</p>
-<p>A component field can describe layout invalidation, recreation, animation
-support, and supported platforms with <code>NativeField</code>. A recreation field changes
-the native widget while preserving its owning component's Python state. Typed
-props reject invalid values before native mutation. Treat the generated schema
-as an interface, and keep it in source control.</p>
-<h2 id="package-the-native-implementation">Package the native implementation<a class="headerlink" href="#package-the-native-implementation" title="Permanent link">&para;</a></h2>
-<p>Set <code>contracts</code> in the plugin's <code>pn_plugin.json</code> to its schema file:</p>
+<p>Generation writes the schema, <code>NativeValues</code>, <code>NativeProps</code>, <code>NativeModules</code>,
+Python facades, browser metadata, and a property reference. Generated Python
+methods preserve defaults and keyword arguments. Generated <code>on_prepared</code>
+subscriptions accept typed callbacks and return an unsubscribe function.</p>
+<p>Native mappings require string keys. Integers must fit JavaScript's exact
+integer range, numbers must be finite, and booleans don't count as numbers.
+Record field names must be Python identifiers; use a mapping for other JSON
+keys. Records reject missing required fields and unknown fields. Recursive type
+cycles aren't supported. Values marked <code>NativeField(python_only=True)</code> remain
+in Python; other unserializable values raise an error.</p>
+<p>Custom components accept <code>style=</code> through <code>element_factory</code>, even when the
+props dataclass doesn't declare a style field. Shared style fields are included
+in the generated native contract. Declare <code>platforms=("ios",)</code> on
+<code>register_component</code> or <code>native_component</code> for an iOS-only renderer; custom
+components default to iOS and Android support. A browser placeholder doesn't
+make <code>Platform.supports</code> return true.</p>
+<h2 id="implement-the-native-side">Implement the native side<a class="headerlink" href="#implement-the-native-side" title="Permanent link">&para;</a></h2>
+<p>Use <code>PNTypedComponentManager&lt;BadgeProps&gt;</code> on iOS and
+<code>TypedComponentManager&lt;BadgeProps&gt;</code> on Android. The <code>applyTyped</code> method receives
+checked props. <code>has_count</code> distinguishes a changed property from one absent in
+a partial update. Common view props live in <code>PNViewProps</code>; they aren't repeated
+in every generated component. Use <code>PNComponentEvents.Badge.on_press</code> to emit
+the declared payload.</p>
+<p>For iOS controls, attach <code>PNActionTarget</code> in <code>createView</code> after calling
+<code>super.createView</code>. The view's state then retains the target for its lifetime.
+<code>makeView</code> runs before that state exists.</p>
+<p>Nullable record fields encode explicit null. A nonrequired nullable <code>TypedDict</code>
+field uses <code>PNPresence&lt;T?&gt;</code> in Swift and Kotlin so absence stays distinct from
+a present null; use <code>.present(nil)</code> in Swift or <code>PNPresence.Present(null)</code> in
+Kotlin for the latter.</p>
+<p>Implement <code>ToolsImplementation</code>, then register a <code>ToolsModuleAdapter</code> in the
+plugin. Swift's asynchronous implementation receives a completion callback;
+Kotlin receives a <code>Result</code> callback. Both return an optional cancellation
+function. The generated adapter registers it with the native promise. Cancelling
+the Python task releases the native work, removes its waiter, and discards late
+settlements. Emit module events through the generated <code>ToolsEvents</code> helper.</p>
+<p>The Inbox extension demonstrates nested records, tuple defaults, a cancellable
+delayed operation, typed module and component events, packaged resources,
+and a real SwiftPM and Maven dependency. Its generation script filters the
+manifest to its own components and services. Build discovery merges those
+contracts with the built-ins without importing target binaries on the host.</p>
+<h2 id="package-sources-resources-and-dependencies">Package sources, resources, and dependencies<a class="headerlink" href="#package-sources-resources-and-dependencies" title="Permanent link">&para;</a></h2>
+<p>Include <code>pn_plugin.json</code> and its referenced files in the wheel:</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">"contracts"</span><span class="p">:</span><span class="w"> </span><span class="s2">"schema.json"</span><span class="p">,</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">"ios"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">"entry"</span><span class="p">:</span><span class="w"> </span><span class="s2">"BadgePlugin"</span><span class="p">,</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">"resources"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"ios/resources/**"</span><span class="p">]</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="p">},</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">"android"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">"entry"</span><span class="p">:</span><span class="w"> </span><span class="s2">"com.example.badge.BadgePlugin"</span><span class="p">,</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">"resources"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"android/res/**"</span><span class="p">,</span><span class="w"> </span><span class="s2">"android/assets/**"</span><span class="p">]</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="p">}</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"BadgeExtension"</span><span class="p">,</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">"contracts"</span><span class="p">:</span><span class="w"> </span><span class="s2">"schema.json"</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">"ios"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">"entry"</span><span class="p">:</span><span class="w"> </span><span class="s2">"BadgePlugin"</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nt">"resources"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"ios/resources/*.json"</span><span class="p">],</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">"dependencies"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">      </span><span class="p">{</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">        </span><span class="nt">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/apple/swift-collections.git"</span><span class="p">,</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">        </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.1.4"</span><span class="p">,</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">        </span><span class="nt">"products"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"DequeModule"</span><span class="p">]</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="p">}</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">    </span><span class="p">]</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">  </span><span class="nt">"android"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">    </span><span class="nt">"entry"</span><span class="p">:</span><span class="w"> </span><span class="s2">"com.example.badge.BadgePlugin"</span><span class="p">,</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">    </span><span class="nt">"resources"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"android/res/**/*.xml"</span><span class="p">],</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">    </span><span class="nt">"assets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"android/assets/*.json"</span><span class="p">],</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="nt">"dependencies"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"androidx.collection:collection-ktx:1.4.5"</span><span class="p">]</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>The schema should contain the extension's own components and modules. The
-<code>examples/inbox-extension/generate_contracts.py</code> script demonstrates extracting those definitions.
-Builders merge plugin contracts with the built-ins, regenerate native bindings,
-and bundle the matching schema into embedded Python. Startup rejects a client
-whose protocol, Yoga version, or schema fingerprint doesn't match.</p>
-<p>Swift implementations use the generated service protocol and module adapter;
-Kotlin implementations use the generated service interface and adapter.
-Register those adapters and component managers through the plugin registry.
-Use the generated props type in each widget manager instead of repeating prop
-names and defaults by hand. The generated adapter handles argument decoding,
-method dispatch, and result delivery.</p>
-<p>For a hand-written asynchronous module, register a cancellation callback with
-Swift <code>PNPromise.onCancel</code> or Kotlin <code>Promise.onCancel</code>. Python task cancellation
-notifies the native promise; the implementation releases any underlying request
-or subscription. Late results are ignored after cancellation.</p>
-<p>Plugin sources and resources must stay inside the plugin directory. Android
-resources preserve their <code>res</code> or <code>assets</code> layout. iOS resources become SwiftPM
-processed resources. Removing a plugin removes its staged sources and resources
-on the next preparation. Target wheel discovery reads archives without importing
-mobile binary extensions into the desktop build process.</p>
-<p>Rebuild after changing a contract or native implementation. Fast Refresh applies
-to Python application behavior; it can't change a compiled native interface.</p>
-<h2 id="runtime-enforcement">Runtime enforcement<a class="headerlink" href="#runtime-enforcement" title="Permanent link">&para;</a></h2>
-<p>Built-in widgets and services use these contracts too. Unknown props, methods,
-events, and arguments fail validation. Nested dataclasses and <code>TypedDict</code> values
-validate required fields and reject unknown fields. Wire integers must be exact
-numbers within JavaScript's safe integer range; booleans don't count as numbers.
-Methods declare both their arguments and their return types. Python validates
-native results before exposing them to application code.</p>
-<p>A <code>null</code> update removes a prop. The renderer restores its declared default, or
-recreates the physical widget to restore a platform default. Creation-only
-changes, including <code>TextInput.multiline</code>, preserve the logical tag, component
-state, child ownership, focus, and selection where the platform permits it.
-Refs keep addressing that logical tag. <code>NativeField.platforms</code> limits where a
-field can be used; unsupported fields are rejected by the target renderer.</p>
-<p>Regenerate the repository's built-in bindings with:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/generate-native-contracts.py
+<p>Swift dependencies require HTTPS URLs, exact versions, and product names.
+Maven coordinates require an exact version; ranges, dynamic versions, and
+snapshots are rejected. Conflicting declarations fail preparation. These pins
+cover direct native dependencies; Python's <code>pn.lock</code> records Python wheels.</p>
+<p>Android resources retain their <code>res</code> structure. Assets are namespaced by plugin
+name, such as <code>InboxExtension/inbox_labels.json</code>. Resource paths must stay
+inside the plugin.</p>
+<p>Swift plugin resources retain their manifest-relative paths inside
+<code>Bundle.module</code>, under <code>PluginResources/&lt;plugin name&gt;/</code>. This keeps two plugins
+with the same resource filename separate. For example, the Inbox extension
+loads <code>PluginResources/InboxExtension/ios/resources/inbox_labels.json</code>.
+Android assets similarly live under the plugin name in the app assets.
+Removing a plugin removes its staged files and dependency declarations.
+Resolved wheel hashes invalidate cached metadata even when the wheel's filename
+hasn't changed.</p>
+<h2 id="missing-values-nulls-and-resets">Missing values, nulls, and resets<a class="headerlink" href="#missing-values-nulls-and-resets" title="Permanent link">&para;</a></h2>
+<p>Protocol 3 separates setting a value from removing a property:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># Explicit null is a value when the declared type permits it.</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">nullable</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">Element</span><span class="p">(</span><span class="s2">"Picker"</span><span class="p">,</span> <span class="p">{</span><span class="s2">"value"</span><span class="p">:</span> <span class="kc">None</span><span class="p">})</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># Omission or UNSET removes a previously supplied property.</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">reset</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">Element</span><span class="p">(</span><span class="s2">"Text"</span><span class="p">,</span> <span class="p">{</span><span class="s2">"text"</span><span class="p">:</span> <span class="s2">"Default size"</span><span class="p">,</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">UNSET</span><span class="p">})</span>
 </span></code></pre></div>
-<p>The shared fixtures run in Python, Swift, Kotlin, and JavaScript. The actual
-browser renderer runs in Chrome with Yoga WebAssembly:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/run-browser-tests.py
+<p>Generated component facades use <code>UNSET</code> for omitted arguments. Built-in
+convenience factories continue to omit optional keyword arguments whose value
+is <code>None</code>; their omission still produces an explicit removal in the next
+transaction. Native state retains the distinction between a null and a missing
+property. Physical setters restore a declared default or the platform default.
+A reset doesn't recreate the logical tag. Only fields marked <code>recreate</code>, such
+as <code>TextInput.multiline</code> and <code>ProgressBar.indeterminate</code>, replace the physical
+widget, retaining logical ownership and supported focus/selection state.</p>
+<p><code>NativeField</code> also declares layout invalidation, animation, and platform support.
+<code>Platform.supports("Image", "source")</code> or
+<code>Platform.supports("Notifications", "get_device_token")</code> inspects the compiled
+contract. This checks declared support; a permission grant or attached piece of
+hardware is a separate runtime condition. Android remote push needs a provider
+extension and reports an unsupported operation instead of a successful empty
+token.</p>
+<p><code>Permissions.check()</code> is now a coroutine, matching asynchronous platform
+settings APIs: use <code>await pn.Permissions.check("camera")</code>. Android camera
+editing (<code>allow_editing=True</code>) raises an unsupported-operation error; use
+a provider plugin if your application needs an Android image editor.</p>
+<p>Protocol 2 clients aren't supported. Rebuild the app after changing declarations,
+native sources, or native dependencies. Startup checks the exact contract
+fingerprint and Yoga version before mounting. Fast Refresh handles Python
+application changes within that compiled interface.</p>
+<h2 id="verify-contracts">Verify contracts<a class="headerlink" href="#verify-contracts" title="Permanent link">&para;</a></h2>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/generate-native-contracts.py
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/test_codegen.py<span class="w"> </span>tests/test_native_values.py
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/run-browser-tests.py
 </span></code></pre></div>
-<p>Native service adapters are named <code>NameModuleAdapter</code>, which keeps the generated
-base class distinct from a platform's <code>NameModule</code> implementation.</p>
+<p>Native tests exercise generated adapters alongside actual UIKit and Android
+controls. The Inbox Maestro flows build the extension wheel, drive native
+navigation and input, verify native cancellation without a late event, save
+data, restart the process, and verify persistence.</p>
 
 
 

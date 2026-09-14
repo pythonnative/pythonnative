@@ -3526,8 +3526,9 @@ before you build.</p>
 <div class="language-toml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">[requirements]</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">packages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"httpx&gt;=0.27"</span><span class="p">,</span><span class="w"> </span><span class="s2">"numpy"</span><span class="p">,</span><span class="w"> </span><span class="s2">"pillow~=11.0"</span><span class="p">]</span>
 </span></code></pre></div>
-<p>Without a lock, <code>pn run</code> and <code>pn build</code> resolve that list for each target
-the build needs. With a lock, they install the recorded wheels and verify
+<p>Without a lock, development builds resolve that list for each target they need.
+Release builds with requirements require a current <code>pn.lock</code> covering every
+selected target and fail before staging when the lock is absent or stale. With a lock, they install the recorded wheels and verify
 their hashes. Both paths bundle the resulting packages into the app. Nothing from your host environment leaks in: a package that's
 importable on your Mac but has no wheel for the device is a build
 error, not a runtime <code>ImportError</code>.</p>

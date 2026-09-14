@@ -1542,6 +1542,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#implementing-an-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementing an extension
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3700,6 +3711,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#implementing-an-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementing an extension
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3751,11 +3773,11 @@ one up:</p>
    plain function when the answer is already on the device and returns
    on the calling thread: <code>Clipboard</code>, <code>Linking</code>, <code>Haptics</code> /
    <code>Vibration</code>, <code>Battery</code>, <code>NetInfo.fetch</code>, <code>SecureStore</code>, <code>AppState</code>,
-   <code>FileSystem</code>, <code>Permissions.check</code>, <code>Biometrics.is_available</code>. It is
+   <code>FileSystem</code>, <code>Biometrics.is_available</code>. It is
    a coroutine when the OS has to prompt the user, drive hardware, or
    hand off to another process: <code>Camera.take_photo</code> /
    <code>pick_from_gallery</code>, <code>Location.get_current</code>, <code>Share.share</code>,
-   <code>Permissions.request</code>, <code>Biometrics.authenticate</code>, <code>Notifications.*</code>,
+   <code>Permissions.check</code> / <code>request</code>, <code>Biometrics.authenticate</code>, <code>Notifications.*</code>,
    <code>Alert.confirm</code> / <code>choose</code>, and all of <code>AsyncStorage</code>. Inside a
    component, drive coroutines with an <code>async def</code>
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a> callback,
@@ -3948,7 +3970,7 @@ that have a runtime prompt: <code>"camera"</code>, <code>"microphone"</code>,
 <code>"photo_library"</code>, <code>"location_when_in_use"</code>, <code>"contacts"</code>,
 <code>"notifications"</code> (any other name raises <code>ValueError</code>). Statuses:
 <code>"granted"</code>, <code>"denied"</code>, <code>"blocked"</code>, <code>"undetermined"</code>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">if</span> <span class="n">pn</span><span class="o">.</span><span class="n">Permissions</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="s2">"camera"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"granted"</span><span class="p">:</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">if</span> <span class="k">await</span> <span class="n">pn</span><span class="o">.</span><span class="n">Permissions</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="s2">"camera"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"granted"</span><span class="p">:</span>
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="n">status</span> <span class="o">=</span> <span class="k">await</span> <span class="n">pn</span><span class="o">.</span><span class="n">Permissions</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"camera"</span><span class="p">)</span>
 </span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="k">if</span> <span class="n">status</span> <span class="o">==</span> <span class="s2">"blocked"</span><span class="p">:</span>
 </span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Linking</span><span class="o">.</span><span class="n">open_settings</span><span class="p">()</span>  <span class="c1"># user must enable it in Settings</span>
@@ -4148,6 +4170,12 @@ listeners without a device.</p>
 <li>Wrap a custom widget instead of an API: <a href="../custom-native-components/">Custom native components</a>.</li>
 <li>Wire protocol and plugin layout: <a href="../../concepts/bridge/">The native bridge</a>.</li>
 </ul>
+<h2 id="implementing-an-extension">Implementing an extension<a class="headerlink" href="#implementing-an-extension" title="Permanent link">&para;</a></h2>
+<p>Declare a Python protocol and generate its Python, Swift, and Kotlin interfaces.
+The generated adapters validate arguments and results, preserve nested records,
+and connect coroutine cancellation to the native operation. See
+<a href="../native-contracts/">generated native contracts</a> and the separately packaged
+<a href="https://github.com/pythonnative/pythonnative/tree/main/examples/inbox-extension">Inbox extension</a>.</p>
 
 
 

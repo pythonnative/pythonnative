@@ -3516,7 +3516,7 @@ the render loop.</p>
 </tr>
 <tr>
 <td><code>UpdateOp(tag, changed_props)</code></td>
-<td>Apply only the props that changed (removed props arrive as <code>None</code>).</td>
+<td>Apply only the props that changed (<code>UNSET</code> removes a prop; <code>None</code> is explicit null).</td>
 </tr>
 <tr>
 <td><code>InsertOp(parent_tag, child_tag, index)</code></td>
