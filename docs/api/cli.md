@@ -12,7 +12,7 @@ the documented behavior never drifts from the code.
   Without one it uses the current directory, whatever it's called.
   The app id derived under `com.example` is validated before any files
   are changed, including when `--force` is present. Names that derive a
-  Java or Kotlin reserved package segment, such as `class` or `cla-ss`,
+  Java reserved package segment, such as `class` or `cla-ss`,
   are rejected with a valid suggested command such as `pn init class_app`.
   Flag: `--force` to overwrite existing files or scaffold into a
   non-empty directory. See [Configuration](../guides/configuration.md).

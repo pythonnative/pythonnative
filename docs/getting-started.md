@@ -30,8 +30,8 @@ config stay identical. Run `pn init` without a name to scaffold into the
 current directory instead, named after it; that name is used as-is.
 The CLI derives `app.id` from that name under `com.example`, lowercasing it
 and removing punctuation other than underscores. It validates the result
-before it creates or changes any files. A name that becomes a Java or Kotlin
-reserved package segment, such as `class` or `cla-ss`, is rejected with a
+before it creates or changes any files. A name that becomes a Java reserved
+package segment, such as `class` or `cla-ss`, is rejected with a
 usable alternative such as `pn init class_app`. `--force` doesn't bypass this
 validation.
 
