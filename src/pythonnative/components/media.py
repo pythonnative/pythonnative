@@ -1,7 +1,8 @@
 """Media factories: ``Image``, ``ImageBackground``, and ``WebView``."""
 
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Callable, Literal, Optional, Union
 
+from ..assets import Asset
 from ..element import Element
 from ..hooks import Ref
 from ..style import AccessibilityState, Color, ScaleType, StyleProp, resolve_style
@@ -9,13 +10,26 @@ from ._base import _make_element
 from .layout import View
 from .media_events import ImageLoadEvent, WebNavigationEvent
 
+ImageSource = Union[str, Asset]
+"""What ``Image.source`` accepts: a URL, ``data:`` URI, file path, or bundled [`Asset`][pythonnative.Asset]."""
+
+
+def _source_uri(source: Optional[ImageSource]) -> Optional[str]:
+    if source is None:
+        return None
+    if isinstance(source, Asset):
+        return source.uri
+    return str(source) or None
+
 
 def Image(
-    source: str = "",
+    source: ImageSource = "",
     *,
+    default_source: Optional[ImageSource] = None,
     scale_type: Optional[ScaleType] = None,
     tint_color: Optional[Color] = None,
     placeholder_color: Optional[Color] = None,
+    blur_radius: Optional[float] = None,
     on_load: Optional[Callable[[ImageLoadEvent], Any]] = None,
     on_error: Optional[Callable[[str], Any]] = None,
     style: StyleProp = None,
@@ -28,10 +42,15 @@ def Image(
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
-    """Display an image from a resource path or URL.
+    """Display a bundled, local, or remote image.
 
     Style properties: ``background_color``, ``border_*``, ``opacity``,
     ``transform``, plus the common layout props.
+
+    Bundled images live under ``app/assets/`` and are referenced with
+    [`pn.asset`][pythonnative.asset]; density variants (``logo@2x.png``,
+    ``logo@3x.png``) are picked for the device automatically and the
+    image measures at its logical (``1x``) size.
 
     Network images (``http://`` / ``https://``) go through the shared
     native image pipeline: downloads happen on a
@@ -40,13 +59,19 @@ def Image(
     large bitmaps are downsampled to the view size when decoded.
 
     Args:
-        source: Image resource name or URL.
+        source: A bundled [`Asset`][pythonnative.Asset], an ``http(s)``
+            URL, a ``data:`` URI, or an absolute file path.
+        default_source: A bundled or local image shown until ``source``
+            has loaded (and left in place if it fails). Must not be a
+            network URL.
         scale_type: Fit mode: ``"cover"``, ``"contain"``, ``"stretch"``,
             ``"center"``.
         tint_color: Color overlay applied to template images
             (monochrome icons).
         placeholder_color: Background color shown while a remote image
             is loading (and left in place if it fails).
+        blur_radius: Gaussian blur radius in logical points applied to
+            the decoded image.
         on_load: Callback invoked once the image has been decoded and
             displayed, with its logical width and height.
         on_error: Callback invoked with an error message when a remote
@@ -71,15 +96,20 @@ def Image(
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Image"``.
     """
+    default_uri = _source_uri(default_source)
+    if default_uri is not None and default_uri.startswith(("http://", "https://")):
+        raise ValueError("Image(default_source=...) must be a bundled asset or local image, not a URL")
     return _make_element(
         "Image",
         style=style,
         ref=ref,
         key=key,
-        source=source or None,
+        source=_source_uri(source),
+        default_source=default_uri,
         scale_type=scale_type,
         tint_color=tint_color,
         placeholder_color=placeholder_color,
+        blur_radius=blur_radius,
         on_load=on_load,
         on_error=on_error,
         accessibility_label=accessibility_label,
@@ -94,7 +124,7 @@ def Image(
 
 def ImageBackground(
     *children: Element,
-    source: str = "",
+    source: ImageSource = "",
     scale_type: Optional[ScaleType] = None,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
@@ -114,7 +144,8 @@ def ImageBackground(
 
     Args:
         *children: Foreground content drawn over the image.
-        source: Image resource name or URL.
+        source: A bundled [`Asset`][pythonnative.Asset], URL, ``data:``
+            URI, or file path (see [`Image`][pythonnative.Image]).
         scale_type: Background fit mode (``"cover"`` is the most common
             for backgrounds).
         style: Style dict for the container (size, padding, alignment).

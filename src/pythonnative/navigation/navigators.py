@@ -30,6 +30,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple
 from ..component import component
 from ..element import Element, Node
 from ..hooks import use_back_handler, use_context, use_effect, use_memo, use_ref, use_state
+from ..icons import tab_icon_spec
 from .container import ContainerContext
 from .handle import FocusContext, Navigation, NavigationContext, NavigatorCore
 from .host import HostContext
@@ -465,7 +466,7 @@ def _TabNavigatorImpl(*, screens: Tuple[ScreenDef, ...], initial_route: Optional
         }
         icon = options.get("tab_bar_icon")
         if icon is not None:
-            item["icon"] = icon
+            item["icon"] = tab_icon_spec(icon)
         badge = options.get("tab_bar_badge")
         if badge is not None:
             item["badge"] = str(badge)
@@ -523,7 +524,7 @@ def create_tab_navigator() -> TabNavigator:
         Tab = pn.create_tab_navigator()
 
         Tab.Navigator(
-            Tab.Screen("Home", HomeScreen, title="Home", tab_bar_icon="house.fill"),
+            Tab.Screen("Home", HomeScreen, title="Home", tab_bar_icon="house"),
             Tab.Screen("Settings", SettingsScreen, title="Settings"),
         )
         ```

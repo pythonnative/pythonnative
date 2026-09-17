@@ -88,6 +88,7 @@ Unsolicited pull requests for issues that are already assigned or already have a
 - Prefer explicit, descriptive names; keep platform abstractions clean.
 - Python never imports platform code. Everything that touches `UIView` or `android.view.View` lives in Swift (`PythonNativeKit`) or Kotlin (the `pythonnative` Gradle module) and is reached through `pythonnative.bridge`; see `docs/concepts/bridge.md` for the protocol. Bump `PROTOCOL_VERSION` on both sides when the wire format changes.
 - Add/extend tests under `tests/` for new behavior. Native changes get XCTest / JUnit coverage next to the code they touch.
+- Design large changes in an RFC first. Anything that adds or removes public API, changes the Python-to-native wire contract, changes a convention apps depend on, or spans Python, Swift, Kotlin, and the browser preview gets a document under `rfcs/` (see [`rfcs/README.md`](https://github.com/pythonnative/pythonnative/blob/main/rfcs/README.md)). The RFC lands with the implementation and records what shipped, including removals.
 - Commit source, reviewed generated contracts, dependency locks, and vendored dependencies as described in [Generated source and vendored dependencies](#generated-source-and-vendored-dependencies). Don't commit local build outputs or caches.
 - Docstrings: Google style throughout. Ruff is configured with the Google
   convention (`pydocstyle.convention = "google"`) and enforces the `D` rule

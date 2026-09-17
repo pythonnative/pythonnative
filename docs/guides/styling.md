@@ -164,7 +164,7 @@ pn.Button("Tap", style={"background_color": "#FF1E88E5", "color": "#FFFFFF"})
 | `color` | hex string | `#RRGGBB` or `#AARRGGBB` |
 | `bold` | bool | Shorthand for `font_weight: "bold"` |
 | `font_weight` | `"normal"`, `"bold"`, `"100"`–`"900"` | |
-| `font_family` | string | System font name |
+| `font_family` | string | System font name or the family of a font under `app/assets/` (see [Assets](assets.md#fonts)) |
 | `italic` | bool | |
 | `text_align` | `"left"`, `"center"`, `"right"`, `"justify"` | |
 | `letter_spacing` | number | Tracking in points |

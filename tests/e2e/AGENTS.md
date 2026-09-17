@@ -29,6 +29,7 @@ examples/e2e-suite/
 │       ├── layout/            # Layout demos
 │       ├── styling/           # Styling demos
 │       ├── animations/        # Animated.* demos
+│       ├── assets/            # Bundled image, font, and Images module demos
 │       ├── alerts/            # Alert.show / Alert.confirm demos
 │       ├── storage/           # AsyncStorage demos
 │       ├── runtime/           # run_async demo
@@ -72,7 +73,7 @@ scripts/
 ./scripts/run-e2e.sh ios components
 ```
 
-Available category suites: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `gestures`, `misc`. The components category also has `components-a` / `components-b` halves: CI's Android shards use them because a GitHub-hosted emulator session degrades and drops offline before all 28 component flows finish in one run (`components.yaml` just chains the two halves).
+Available category suites: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `gestures`, `assets`, `misc`. The components category also has `components-a` / `components-b` halves: CI's Android shards use them because a GitHub-hosted emulator session degrades and drops offline before all 28 component flows finish in one run (`components.yaml` just chains the two halves).
 
 You can also run a single flow directly. Useful when iterating on one demo:
 

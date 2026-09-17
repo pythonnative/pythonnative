@@ -37,11 +37,11 @@ Tab = pn.create_tab_navigator()
 def MainTabs() -> pn.Element:
     """Tabbed root screen: Home, Layout, List, Settings.
 
-    Each tab opts into a native system icon via ``tab_bar_icon``: an
-    SF Symbol on iOS and an ``android.R.drawable.*`` resource on
-    Android. The framework renders text-only if a name doesn't
-    resolve on a given platform, so adding a new tab is safe even
-    before its icons are picked.
+    Each tab names a bundled vector icon via ``tab_bar_icon``. The
+    names are the same ones ``pn.Icon`` accepts, so the tab bar looks
+    identical on iOS and Android and there is nothing to configure per
+    platform. Pass ``pn.asset("images/x.png")`` instead to use a custom
+    bitmap.
     """
     return Tab.Navigator(
         Tab.Screen(
@@ -49,7 +49,7 @@ def MainTabs() -> pn.Element:
             component=HomeScreen,
             options={
                 "title": "Home",
-                "tab_bar_icon": {"ios": "house.fill", "android": "ic_menu_compass"},
+                "tab_bar_icon": "house",
             },
         ),
         Tab.Screen(
@@ -57,7 +57,7 @@ def MainTabs() -> pn.Element:
             component=LayoutScreen,
             options={
                 "title": "Layout",
-                "tab_bar_icon": {"ios": "square.grid.2x2.fill", "android": "ic_menu_gallery"},
+                "tab_bar_icon": "layout-grid",
             },
         ),
         Tab.Screen(
@@ -65,7 +65,7 @@ def MainTabs() -> pn.Element:
             component=ListScreen,
             options={
                 "title": "List",
-                "tab_bar_icon": {"ios": "list.bullet", "android": "ic_menu_sort_by_size"},
+                "tab_bar_icon": "list",
             },
         ),
         Tab.Screen(
@@ -73,7 +73,7 @@ def MainTabs() -> pn.Element:
             component=SettingsScreen,
             options={
                 "title": "Settings",
-                "tab_bar_icon": {"ios": "gearshape.fill", "android": "ic_menu_preferences"},
+                "tab_bar_icon": "settings",
             },
         ),
     )

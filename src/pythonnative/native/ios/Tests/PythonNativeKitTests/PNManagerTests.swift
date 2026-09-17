@@ -25,15 +25,25 @@ final class PNManagerTests: XCTestCase {
     }
 
     func testImageDecoderBoundsBitmapAllocation() {
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 2000, height: 1000))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 2000, height: 1000), format: format)
         let data = renderer.pngData { context in
             UIColor.red.setFill()
             context.fill(CGRect(x: 0, y: 0, width: 2000, height: 1000))
         }
         let image = PNImageManager.decode(data, targetSize: CGSize(width: 50, height: 50))
         XCTAssertNotNil(image)
-        XCTAssertLessThanOrEqual(image!.size.width, 150)
-        XCTAssertLessThanOrEqual(image!.size.height, 75)
+        // The bitmap is downsampled to bound memory...
+        XCTAssertLessThanOrEqual(image!.cgImage!.width, 150)
+        XCTAssertLessThanOrEqual(image!.cgImage!.height, 75)
+        // ...while the logical size still reports the source dimensions so
+        // intrinsic layout doesn't depend on the decode pass.
+        XCTAssertEqual(image!.size.width, 2000, accuracy: 1)
+        XCTAssertEqual(image!.size.height, 1000, accuracy: 1)
+        // Density variants divide the logical size by their scale.
+        let dense = PNImageManager.decode(data, targetSize: .zero, assetScale: 2)
+        XCTAssertEqual(dense!.size.width, 1000, accuracy: 1)
         XCTAssertNil(PNImageManager.decode(Data([1, 2, 3]), targetSize: .zero))
     }
 

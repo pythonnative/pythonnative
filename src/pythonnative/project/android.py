@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List, Optional
 
+from ..assets import ASSETS_DIR, write_manifest
 from . import icons
 from .config import AppConfig
 
@@ -481,7 +482,10 @@ def stage_python_sources(
 
     app_src = config.project_root / "app"
     if app_src.is_dir():
-        shutil.copytree(app_src, python_root / "app", dirs_exist_ok=True)
+        # Runtime assets don't belong in Chaquopy's Python source tree
+        # (it's extracted and byte-compiled); they ship as Android assets.
+        shutil.copytree(app_src, python_root / "app", dirs_exist_ok=True, ignore=_ignore_top_level_assets(app_src))
+        stage_assets(project_dir, config)
 
     if dev_lib_root and dev_lib_root.is_dir():
         shutil.copytree(
@@ -496,6 +500,36 @@ def stage_python_sources(
 
 LIB_IGNORE = shutil.ignore_patterns("templates", "native", "*.so", "__pycache__", "*.pyc", "*.pyo")
 """Ignore rules for bundling the ``pythonnative`` package (skips templates)."""
+
+
+def _ignore_top_level_assets(app_src: Path) -> Callable[[str, List[str]], List[str]]:
+    """A ``copytree`` ignore hook that skips ``app/assets/`` at the source root only."""
+    root = str(app_src)
+
+    def ignore(directory: str, names: List[str]) -> List[str]:
+        return [ASSETS_DIR] if directory == root and ASSETS_DIR in names else []
+
+    return ignore
+
+
+def stage_assets(project_dir: Path, config: AppConfig) -> Path:
+    """Copy ``app/assets/`` into the APK's assets as ``app/assets/`` and write the manifest.
+
+    The native runtime opens them through ``AssetManager`` under the same
+    relative paths the iOS bundle uses, so ``asset://images/logo.png``
+    resolves identically on both platforms.
+
+    Returns:
+        The staged assets directory (``app/src/main/assets/app/assets``).
+    """
+    destination = project_dir / "app" / "src" / "main" / "assets" / "app" / ASSETS_DIR
+    if destination.exists():
+        shutil.rmtree(destination)
+    source = config.project_root / "app" / ASSETS_DIR
+    if source.is_dir():
+        shutil.copytree(source, destination, ignore=shutil.ignore_patterns("__pycache__", ".*"))
+    write_manifest(destination)
+    return destination
 
 
 # ======================================================================

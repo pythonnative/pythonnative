@@ -299,6 +299,134 @@ class FallbackBiometrics:
         return False
 
 
+# ======================================================================
+# Assets and images
+# ======================================================================
+
+
+class FallbackAssets:
+    """Read bundled assets from the checked-out ``app/assets/`` directory."""
+
+    def __init__(self) -> None:
+        self.overlay: Optional[str] = None
+        self.manifest: Any = None
+
+    def configure(self, overlay: Optional[str], manifest: Any) -> None:
+        self.overlay = overlay
+        self.manifest = manifest
+
+    def _find(self, path: str) -> Optional[str]:
+        from ..assets import assets_roots, normalize_path
+
+        rel = normalize_path(path)
+        roots = [self.overlay] if self.overlay else []
+        roots += [str(root) for root in assets_roots()]
+        for root in roots:
+            candidate = os.path.join(root, *rel.split("/"))
+            if os.path.isfile(candidate):
+                return candidate
+        return None
+
+    def read(self, path: str) -> Optional[str]:
+        import base64
+
+        found = self._find(path)
+        if found is None:
+            raise FileNotFoundError(f"asset not found: {path}")
+        with open(found, "rb") as handle:
+            return base64.b64encode(handle.read()).decode("ascii")
+
+    def exists(self, path: str) -> bool:
+        return self._find(path) is not None
+
+
+class FallbackImages:
+    """Header-only image measurement for PNG, JPEG, GIF, WebP, and BMP."""
+
+    def _bytes(self, uri: str) -> tuple[bytes, float]:
+        import base64
+
+        from ..assets import ASSET_SCHEME, Asset, split_variant
+
+        if uri.startswith(ASSET_SCHEME):
+            asset = Asset(uri)
+            _, scale = split_variant(asset.path)
+            return asset.read_bytes(), scale
+        if uri.startswith("data:"):
+            _, _, payload = uri.partition(",")
+            return base64.b64decode(payload), 1.0
+        if uri.startswith(("http://", "https://")):
+            import urllib.request
+
+            with urllib.request.urlopen(uri, timeout=10) as response:  # noqa: S310 - caller-supplied URL
+                return response.read(), 1.0
+        path = uri[len("file://") :] if uri.startswith("file://") else uri
+        with open(path, "rb") as handle:
+            return handle.read(), 1.0
+
+    def get_size(self, uri: str) -> Dict[str, float]:
+        data, scale = self._bytes(uri)
+        size = image_dimensions(data)
+        if size is None:
+            raise ValueError("unsupported or corrupt image")
+        return {"width": size[0] / scale, "height": size[1] / scale}
+
+    def prefetch(self, uri: str) -> bool:
+        try:
+            self._bytes(uri)
+        except Exception:
+            return False
+        return True
+
+    def clear_cache(self) -> None:
+        return None
+
+
+def image_dimensions(data: bytes) -> Optional[tuple[int, int]]:
+    """Return ``(width, height)`` in pixels from an image file header, or ``None``."""
+    import struct
+
+    if data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) >= 24:
+        width, height = struct.unpack(">II", data[16:24])
+        return width, height
+    if data[:6] in (b"GIF87a", b"GIF89a") and len(data) >= 10:
+        width, height = struct.unpack("<HH", data[6:10])
+        return width, height
+    if data[:2] == b"BM" and len(data) >= 26:
+        width, height = struct.unpack("<ii", data[18:26])
+        return abs(width), abs(height)
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP" and len(data) >= 30:
+        chunk = data[12:16]
+        if chunk == b"VP8 " and len(data) >= 30:
+            width, height = struct.unpack("<HH", data[26:30])
+            return width & 0x3FFF, height & 0x3FFF
+        if chunk == b"VP8L" and len(data) >= 25:
+            bits = struct.unpack("<I", data[21:25])[0]
+            return (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
+        if chunk == b"VP8X" and len(data) >= 30:
+            width = int.from_bytes(data[24:27], "little") + 1
+            height = int.from_bytes(data[27:30], "little") + 1
+            return width, height
+        return None
+    if data[:2] == b"\xff\xd8":
+        offset = 2
+        while offset + 9 <= len(data):
+            if data[offset] != 0xFF:
+                offset += 1
+                continue
+            marker = data[offset + 1]
+            if marker in (0xD8, 0x01) or 0xD0 <= marker <= 0xD7:
+                offset += 2
+                continue
+            length = struct.unpack(">H", data[offset + 2 : offset + 4])[0]
+            if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+                height, width = struct.unpack(">HH", data[offset + 5 : offset + 9])
+                return width, height
+            offset += 2 + length
+        return None
+    return None
+
+
 _DEFAULTS: Dict[str, Callable[[], Any]] = {
     "Device": FallbackDevice,
     "AppState": FallbackAppState,
@@ -316,6 +444,8 @@ _DEFAULTS: Dict[str, Callable[[], Any]] = {
     "Camera": FallbackCamera,
     "Location": FallbackLocation,
     "Biometrics": FallbackBiometrics,
+    "Assets": FallbackAssets,
+    "Images": FallbackImages,
 }
 
 

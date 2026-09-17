@@ -229,6 +229,29 @@ public final class ActivityIndicatorProps: PNViewProps, PNNativeProps {
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
 
+public final class BlurViewProps: PNViewProps, PNNativeProps {
+    public init(_ values: [String: Any], partial: Bool = true) throws {
+        guard PNContracts.validate("BlurView", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("BlurView props") }
+        super.init(values)
+    }
+    public var has_flex: Bool { values["flex"] != nil }
+    public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
+    public var has_background_color: Bool { values["background_color"] != nil }
+    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_color: Bool { values["color"] != nil }
+    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
+    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_tint_color: Bool { values["tint_color"] != nil }
+    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_blur_type: Bool { values["blur_type"] != nil }
+    public var `blur_type`: PNBlurViewBlurType? { guard let value = values["blur_type"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNBlurViewBlurType.self, value) }
+    public var has_intensity: Bool { values["intensity"] != nil }
+    public var `intensity`: Double? { guard let value = values["intensity"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
+    public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
+    public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+}
+
 public final class ButtonProps: PNViewProps, PNNativeProps {
     public init(_ values: [String: Any], partial: Bool = true) throws {
         guard PNContracts.validate("Button", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Button props") }
@@ -348,8 +371,12 @@ public final class ImageProps: PNViewProps, PNNativeProps {
     public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_source: Bool { values["source"] != nil }
     public var `source`: String? { guard let value = values["source"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_default_source: Bool { values["default_source"] != nil }
+    public var `default_source`: String? { guard let value = values["default_source"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_scale_type: Bool { values["scale_type"] != nil }
     public var `scale_type`: PNImageScaleType? { guard let value = values["scale_type"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNImageScaleType.self, value) }
+    public var has_blur_radius: Bool { values["blur_radius"] != nil }
+    public var `blur_radius`: Double? { guard let value = values["blur_radius"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_on_load: Bool { values["on_load"] != nil }
     public var `on_load`: Bool? { guard let value = values["on_load"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_error: Bool { values["on_error"] != nil }
@@ -400,6 +427,33 @@ public final class KeyboardAvoidingViewProps: PNViewProps, PNNativeProps {
     public var `behavior`: PNKeyboardAvoidingViewBehavior? { guard let value = values["behavior"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNKeyboardAvoidingViewBehavior.self, value) }
     public var has_keyboard_vertical_offset: Bool { values["keyboard_vertical_offset"] != nil }
     public var `keyboard_vertical_offset`: Double? { guard let value = values["keyboard_vertical_offset"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
+    public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
+    public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+}
+
+public final class LinearGradientProps: PNViewProps, PNNativeProps {
+    public init(_ values: [String: Any], partial: Bool = true) throws {
+        guard PNContracts.validate("LinearGradient", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("LinearGradient props") }
+        super.init(values)
+    }
+    public var has_flex: Bool { values["flex"] != nil }
+    public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
+    public var has_background_color: Bool { values["background_color"] != nil }
+    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_color: Bool { values["color"] != nil }
+    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
+    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_tint_color: Bool { values["tint_color"] != nil }
+    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_colors: Bool { values["colors"] != nil }
+    public var `colors`: [String]? { guard let value = values["colors"], !(value is NSNull) else { return nil }; return try! PNValues.decode([String].self, value) }
+    public var has_locations: Bool { values["locations"] != nil }
+    public var `locations`: [Double]? { guard let value = values["locations"], !(value is NSNull) else { return nil }; return try! PNValues.decode([Double].self, value) }
+    public var has_start_point: Bool { values["start_point"] != nil }
+    public var `start_point`: PNPNViewTextShadowOffset1? { guard let value = values["start_point"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNPNViewTextShadowOffset1.self, value) }
+    public var has_end_point: Bool { values["end_point"] != nil }
+    public var `end_point`: PNPNViewTextShadowOffset1? { guard let value = values["end_point"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNPNViewTextShadowOffset1.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
@@ -649,8 +703,6 @@ public final class ScreenProps: PNViewProps, PNNativeProps {
     public var `gesture_enabled`: Bool? { guard let value = values["gesture_enabled"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_animation: Bool { values["animation"] != nil }
     public var `animation`: PNScreenAnimation? { guard let value = values["animation"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNScreenAnimation.self, value) }
-    public var has_tab_bar_icon: Bool { values["tab_bar_icon"] != nil }
-    public var `tab_bar_icon`: PNScreenTabBarIcon? { guard let value = values["tab_bar_icon"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNScreenTabBarIcon.self, value) }
     public var has_tab_bar_badge: Bool { values["tab_bar_badge"] != nil }
     public var `tab_bar_badge`: PNScreenTabBarBadge? { guard let value = values["tab_bar_badge"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNScreenTabBarBadge.self, value) }
     public var has_tab_bar_label: Bool { values["tab_bar_label"] != nil }
@@ -825,6 +877,43 @@ public final class StatusBarProps: PNViewProps, PNNativeProps {
     public var `bar_style`: PNStatusBarBarStyle? { guard let value = values["bar_style"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNStatusBarBarStyle.self, value) }
     public var has_hidden: Bool { values["hidden"] != nil }
     public var `hidden`: Bool? { guard let value = values["hidden"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
+    public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+}
+
+public final class SvgProps: PNViewProps, PNNativeProps {
+    public init(_ values: [String: Any], partial: Bool = true) throws {
+        guard PNContracts.validate("Svg", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Svg props") }
+        super.init(values)
+    }
+    public var has_flex: Bool { values["flex"] != nil }
+    public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
+    public var has_background_color: Bool { values["background_color"] != nil }
+    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_color: Bool { values["color"] != nil }
+    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
+    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_tint_color: Bool { values["tint_color"] != nil }
+    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_shapes: Bool { values["shapes"] != nil }
+    public var `shapes`: [PNSvgShape]? { guard let value = values["shapes"], !(value is NSNull) else { return nil }; return try! PNValues.decode([PNSvgShape].self, value) }
+    public var has_view_box: Bool { values["view_box"] != nil }
+    public var `view_box`: String? { guard let value = values["view_box"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_preserve_aspect_ratio: Bool { values["preserve_aspect_ratio"] != nil }
+    public var `preserve_aspect_ratio`: PNSvgPreserveAspectRatio? { guard let value = values["preserve_aspect_ratio"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNSvgPreserveAspectRatio.self, value) }
+    public var has_fill: Bool { values["fill"] != nil }
+    public var `fill`: String? { guard let value = values["fill"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_stroke: Bool { values["stroke"] != nil }
+    public var `stroke`: String? { guard let value = values["stroke"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_stroke_width: Bool { values["stroke_width"] != nil }
+    public var `stroke_width`: Double? { guard let value = values["stroke_width"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
+    public var has_stroke_linecap: Bool { values["stroke_linecap"] != nil }
+    public var `stroke_linecap`: PNPNSvgShapeStrokeLinecap? { guard let value = values["stroke_linecap"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNPNSvgShapeStrokeLinecap.self, value) }
+    public var has_stroke_linejoin: Bool { values["stroke_linejoin"] != nil }
+    public var `stroke_linejoin`: PNPNSvgShapeStrokeLinejoin? { guard let value = values["stroke_linejoin"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNPNSvgShapeStrokeLinejoin.self, value) }
+    public var has_fill_rule: Bool { values["fill_rule"] != nil }
+    public var `fill_rule`: PNPNSvgShapeFillRule? { guard let value = values["fill_rule"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNPNSvgShapeFillRule.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
@@ -1091,6 +1180,9 @@ public enum PNComponentEvents {
     public enum ActivityIndicator {
         @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
     }
+    public enum BlurView {
+        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+    }
     public enum Button {
         @discardableResult public static func `on_press`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_press", []) }
         @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
@@ -1115,6 +1207,9 @@ public enum PNComponentEvents {
         @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
     }
     public enum KeyboardAvoidingView {
+        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+    }
+    public enum LinearGradient {
         @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
     }
     public enum Modal {
@@ -1175,6 +1270,9 @@ public enum PNComponentEvents {
         @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
     }
     public enum StatusBar {
+        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+    }
+    public enum Svg {
         @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
     }
     public enum Switch {

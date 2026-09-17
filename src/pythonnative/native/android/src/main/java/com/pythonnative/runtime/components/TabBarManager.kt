@@ -4,9 +4,14 @@ import com.pythonnative.generated.*
 
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.RectF
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.view.View
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigation.NavigationBarView
+import com.pythonnative.runtime.assets.PNAssets
 import com.pythonnative.runtime.bridge.JsonUtil
 import com.pythonnative.runtime.bridge.PNLog
 import com.pythonnative.runtime.bridge.str
@@ -80,8 +85,7 @@ class TabBarManager : ComponentManager() {
                 val item = items.optJSONObject(i) ?: continue
                 val title = item.str("title") ?: item.str("name") ?: ""
                 val menuItem = menu.add(0, i, i, title)
-                val icon = resolveIcon(bnv.context, item.value("icon"))
-                if (icon != 0) menuItem.setIcon(icon)
+                icon(bnv.context, item.value("icon"))?.let { menuItem.icon = it }
                 item.str("badge")?.let { badge ->
                     val b = bnv.getOrCreateBadge(i)
                     badge.toIntOrNull()?.let { b.number = it }
@@ -94,18 +98,39 @@ class TabBarManager : ComponentManager() {
         }
     }
 
-    /** Resolve an icon spec (`"ic_menu_home"` or `{"android": ...}`) to a drawable id. */
-    private fun resolveIcon(context: Context, icon: Any?): Int {
-        val name = when (icon) {
-            is String -> icon
-            is JSONObject -> icon.str("android")
-            else -> null
-        } ?: return 0
-        return try {
-            val field = android.R.drawable::class.java.getField(name)
-            field.getInt(null)
-        } catch (e: Exception) {
-            context.resources.getIdentifier(name, "drawable", context.packageName)
+    companion object {
+        /** The size tab bar icons are rasterized at, in dp. */
+        const val ICON_SIZE_DP = 24f
+
+        /**
+         * Resolve an icon spec to a tintable drawable.
+         *
+         * `{"shapes": [...], "view_box": "..."}` is drawn with the SVG
+         * renderer (Lucide icons resolved by Python); `{"uri": "asset://..."}`
+         * decodes a bundled image. Anything else yields no icon.
+         */
+        fun icon(context: Context, spec: Any?): Drawable? {
+            val dict = spec as? JSONObject ?: return null
+            val density = context.resources.displayMetrics.density
+            val raw = dict.optJSONArray("shapes")
+            if (raw != null && raw.length() > 0) {
+                val shapes = (0 until raw.length()).mapNotNull { index ->
+                    runCatching { PNSvgShape.decode(raw.get(index)) }.getOrNull()
+                }
+                val viewBox = SvgView.parseViewBox(dict.str("view_box")) ?: RectF(0f, 0f, 24f, 24f)
+                val paint = SvgPaint(fill = "none", stroke = "currentColor", strokeWidth = 2f, lineCap = "round", lineJoin = "round")
+                // Drawn white so the tab bar's icon tint list recolors it.
+                val bitmap = SvgRenderer.bitmap(shapes, viewBox, ICON_SIZE_DP, paint, Color.WHITE, density)
+                return BitmapDrawable(context.resources, bitmap)
+            }
+            val uri = dict.str("uri")
+            if (!uri.isNullOrEmpty() && PNAssets.isAssetUri(uri)) {
+                val resolved = PNAssets.resolve(uri) ?: return null
+                val px = (ICON_SIZE_DP * density).toInt()
+                val bitmap = ImageLoader.decodeStream({ resolved.open() }, px, px, resolved.scale) ?: return null
+                return BitmapDrawable(context.resources, bitmap)
+            }
+            return null
         }
     }
 

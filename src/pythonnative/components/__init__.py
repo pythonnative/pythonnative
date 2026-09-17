@@ -38,6 +38,7 @@ from .controls import (
     StatusBar,
     Switch,
 )
+from .graphics import BlurType, BlurView, LinearGradient, PreserveAspectRatio, Svg
 from .layout import (  # noqa: F401
     _SAFE_AREA_EDGES,
     Column,
@@ -59,7 +60,7 @@ from .lists import (  # noqa: F401
     _NativeList,
     _RowSpec,
 )
-from .media import Image, ImageBackground, WebView
+from .media import Image, ImageBackground, ImageSource, WebView
 from .media_events import ImageLoadEvent, WebNavigationEvent
 from .overlays import Modal, Portal
 from .pressable import Pressable, TouchableOpacity, _StatefulPressable  # noqa: F401
@@ -68,6 +69,8 @@ from .text import Button, Text, TextInput
 
 __all__ = [
     "ActivityIndicator",
+    "BlurType",
+    "BlurView",
     "Button",
     "Checkbox",
     "Column",
@@ -78,12 +81,15 @@ __all__ = [
     "Image",
     "ImageBackground",
     "ImageLoadEvent",
+    "ImageSource",
     "WebNavigationEvent",
     "KeyboardAvoidingView",
+    "LinearGradient",
     "ListController",
     "Modal",
     "Picker",
     "Portal",
+    "PreserveAspectRatio",
     "Pressable",
     "ProgressBar",
     "RefreshControl",
@@ -96,6 +102,7 @@ __all__ = [
     "Spacer",
     "StatusBar",
     "Suspense",
+    "Svg",
     "Switch",
     "Text",
     "TextInput",

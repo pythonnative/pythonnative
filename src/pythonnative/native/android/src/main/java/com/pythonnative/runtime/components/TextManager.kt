@@ -7,17 +7,19 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.TextPaint
 import android.text.TextUtils
 import android.text.style.AbsoluteSizeSpan
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
+import android.text.style.MetricAffectingSpan
 import android.text.style.StrikethroughSpan
 import android.text.style.StyleSpan
-import android.text.style.TypefaceSpan
 import android.text.style.UnderlineSpan
 import android.view.Gravity
 import android.view.View
 import android.widget.TextView
+import com.pythonnative.runtime.assets.PNAssets
 import com.pythonnative.runtime.bridge.JsonUtil
 import com.pythonnative.runtime.bridge.PNLog
 import com.pythonnative.runtime.bridge.num
@@ -103,8 +105,12 @@ object TextStyle {
                 val weight = span.value("font_weight")
                 if (!bold && weight != null) bold = isBold(weight)
                 val italic = JsonUtil.truthy(span.value("italic"))
-                if (bold || italic) set(StyleSpan(typefaceStyle(if (bold) "bold" else null, italic)))
-                span.str("font_family")?.takeIf { it.isNotEmpty() }?.let { set(TypefaceSpan(it)) }
+                val family = span.str("font_family")?.takeIf { it.isNotEmpty() }
+                if (family != null) {
+                    set(PNTypefaceSpan(typeface(family, weight ?: if (bold) "bold" else null, italic)))
+                } else if (bold || italic) {
+                    set(StyleSpan(typefaceStyle(if (bold) "bold" else null, italic)))
+                }
                 when (span.str("text_decoration")) {
                     "underline" -> set(UnderlineSpan())
                     "line_through" -> set(StrikethroughSpan())
@@ -116,17 +122,68 @@ object TextStyle {
         return builder
     }
 
+    /** `weight` (a name or number) as a 100-900 numeric weight. */
+    fun numericWeight(weight: Any?): Int = when (weight) {
+        is Number -> weight.toInt().coerceIn(100, 900)
+        is String -> weight.toIntOrNull()?.coerceIn(100, 900) ?: when (weight.lowercase()) {
+            "thin", "ultralight", "ultra_light" -> 100
+            "extralight", "extra_light" -> 200
+            "light" -> 300
+            "medium" -> 500
+            "semibold", "semi_bold" -> 600
+            "bold" -> 700
+            "extrabold", "extra_bold", "heavy" -> 800
+            "black" -> 900
+            else -> 400
+        }
+        else -> 400
+    }
+
+    /**
+     * The typeface for `family`/`weight`/`italic`: a bundled face from
+     * `app/assets/` when the family is bundled, otherwise a system family.
+     */
+    fun typeface(family: String?, weight: Any?, italic: Boolean): Typeface {
+        val style = typefaceStyle(weight, italic)
+        if (family.isNullOrEmpty()) return Typeface.defaultFromStyle(style)
+        val bundled = PNAssets.typeface(family, numericWeight(weight), italic)
+        if (bundled != null) {
+            // Synthesize bold/italic only when the closest face lacks them.
+            val face = PNAssets.fontFace(family, numericWeight(weight), italic)
+            val needBold = isBold(weight) && (face == null || face.weight < 600)
+            val needItalic = italic && (face == null || !face.italic)
+            val synth = when {
+                needBold && needItalic -> Typeface.BOLD_ITALIC
+                needBold -> Typeface.BOLD
+                needItalic -> Typeface.ITALIC
+                else -> Typeface.NORMAL
+            }
+            return if (synth == Typeface.NORMAL) bundled else Typeface.create(bundled, synth)
+        }
+        return Typeface.create(family, style)
+    }
+
     /** Apply font props (`font_family`, `font_weight`, `bold`, `italic`) from merged props. */
     fun applyTypeface(tv: TextView, merged: JSONObject) {
         val family = merged.str("font_family")
         val weight = merged.value("font_weight") ?: if (JsonUtil.truthy(merged.value("bold"))) "bold" else null
         val italic = JsonUtil.truthy(merged.value("italic"))
-        val style = typefaceStyle(weight, italic)
-        if (!family.isNullOrEmpty()) {
-            tv.setTypeface(Typeface.create(family, style))
-        } else {
-            tv.setTypeface(Typeface.DEFAULT, style)
-        }
+        tv.typeface = typeface(family, weight, italic)
+    }
+}
+
+/** Span applying a concrete `Typeface` (API 24 compatible; `TypefaceSpan(Typeface)` needs 28). */
+class PNTypefaceSpan(private val typeface: Typeface) : MetricAffectingSpan() {
+    override fun updateDrawState(paint: TextPaint) = apply(paint)
+    override fun updateMeasureState(paint: TextPaint) = apply(paint)
+
+    private fun apply(paint: TextPaint) {
+        val old = paint.typeface
+        val oldStyle = old?.style ?: 0
+        val fake = oldStyle and typeface.style.inv()
+        if (fake and Typeface.BOLD != 0) paint.isFakeBoldText = true
+        if (fake and Typeface.ITALIC != 0) paint.textSkewX = -0.25f
+        paint.typeface = typeface
     }
 }
 

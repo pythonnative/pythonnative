@@ -1,0 +1,6 @@
+# Assets category suite: bundled images, fonts, and the Images module.
+appId: ${APP_ID}
+---
+- runFlow: ../flows/assets/bundled_image.yaml
+- runFlow: ../flows/assets/custom_font.yaml
+- runFlow: ../flows/assets/image_size.yaml

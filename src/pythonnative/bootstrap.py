@@ -83,6 +83,11 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
 
             client = devclient.start_if_configured()
             status_["dev_server"] = client.url if client is not None else None
+            # An overlay from the last session may already hold assets the
+            # bundle doesn't; point the native resolver at it right away.
+            from .assets import configure_native
+
+            configure_native()
     except Exception as exc:
         status_["error"] = f"{type(exc).__name__}: {exc}"
         print(f"[pn.bootstrap] start failed: {exc!r}", file=sys.stderr)

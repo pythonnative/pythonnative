@@ -66,12 +66,14 @@ Example:
 
 __version__ = "0.44.0"
 
-from . import appearance, diagnostics, gestures, runtime, sdk
+from . import appearance, diagnostics, gestures, icons, runtime, sdk, svg
 from .alerts import Alert
 from .animated import Animated, AnimatedValue, use_animated_value
+from .assets import Asset, asset
 from .component import Component, component, memo
 from .components import (
     ActivityIndicator,
+    BlurView,
     Button,
     Checkbox,
     Column,
@@ -82,7 +84,9 @@ from .components import (
     Image,
     ImageBackground,
     ImageLoadEvent,
+    ImageSource,
     KeyboardAvoidingView,
+    LinearGradient,
     ListController,
     Modal,
     Picker,
@@ -99,6 +103,7 @@ from .components import (
     Spacer,
     StatusBar,
     Suspense,
+    Svg,
     Switch,
     Text,
     TextInput,
@@ -138,6 +143,7 @@ from .hooks import (
     use_window_dimensions,
 )
 from .hosts import create_screen
+from .icons import Icon, IconName
 from .mutations import UNSET, UnsetType
 from .native_modules import (
     AppState,
@@ -147,6 +153,8 @@ from .native_modules import (
     Clipboard,
     FileSystem,
     Haptics,
+    Images,
+    ImageSize,
     Linking,
     Location,
     NetInfo,
@@ -230,6 +238,7 @@ __all__ = [
     "UnsetType",
     # Components
     "ActivityIndicator",
+    "BlurView",
     "Button",
     "Checkbox",
     "Column",
@@ -237,11 +246,15 @@ __all__ = [
     "ErrorBoundary",
     "FlatList",
     "Fragment",
+    "Icon",
+    "IconName",
     "Image",
     "ImageBackground",
     "ImageLoadEvent",
+    "ImageSource",
     "WebNavigationEvent",
     "KeyboardAvoidingView",
+    "LinearGradient",
     "ListController",
     "Modal",
     "Picker",
@@ -258,12 +271,18 @@ __all__ = [
     "Spacer",
     "StatusBar",
     "Suspense",
+    "Svg",
     "Switch",
     "Text",
     "TextInput",
     "TouchableOpacity",
     "View",
     "WebView",
+    # Assets and graphics
+    "Asset",
+    "asset",
+    "icons",
+    "svg",
     # Core
     "Component",
     "Element",
@@ -356,7 +375,6 @@ __all__ = [
     "use_theme",
     # Appearance
     "appearance",
-    # Image pipeline
     # Animation
     "Animated",
     "AnimatedValue",
@@ -373,6 +391,8 @@ __all__ = [
     "Clipboard",
     "FileSystem",
     "Haptics",
+    "ImageSize",
+    "Images",
     "Linking",
     "Location",
     "NetInfo",

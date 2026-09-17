@@ -109,13 +109,16 @@ hidden, so switching back is instant and keeps state.
 Tab = pn.create_tab_navigator()
 
 Tab.Navigator(
-    Tab.Screen("Home", HomeScreen, title="Home", tab_bar_icon={"ios": "house.fill", "android": "ic_menu_compass"}),
+    Tab.Screen("Home", HomeScreen, title="Home", tab_bar_icon="house"),
     Tab.Screen("Inbox", InboxScreen, tab_bar_label="Inbox", tab_bar_badge=3),
     Tab.Screen("Settings", SettingsScreen, lazy=False),
     Tab.Screen("Camera", CameraScreen, unmount_on_blur=True),
 )
 ```
 
+- `tab_bar_icon` takes a Lucide icon name (the same names as
+  [`Icon`][pythonnative.Icon]) or a bundled image via `pn.asset(...)`.
+  Both render identically on iOS and Android and tint with the tab bar.
 - `lazy` (default `True`) mounts a tab the first time it's focused.
   `lazy=False` mounts it with the navigator.
 - `unmount_on_blur=True` tears a tab down when it loses focus, for

@@ -27,6 +27,8 @@ object BuiltinModules {
     val camera = CameraModule()
     val location = LocationModule()
     val biometrics = BiometricsModule()
+    val assets = AssetsModule()
+    val images = ImagesModule()
 
     private val all: List<NativeModule> = listOf(
         host,
@@ -46,6 +48,8 @@ object BuiltinModules {
         com.pythonnative.generated.CameraModuleAdapter(camera),
         com.pythonnative.generated.LocationModuleAdapter(location),
         com.pythonnative.generated.BiometricsModuleAdapter(biometrics),
+        com.pythonnative.generated.AssetsModuleAdapter(assets),
+        com.pythonnative.generated.ImagesModuleAdapter(images),
     )
 
     fun register(registry: PNRegistry) {
@@ -54,6 +58,7 @@ object BuiltinModules {
 
     /** Called from `PNBridge.setContext`; starts the observers that need a context. */
     fun onContextAttached(activity: Activity) {
+        com.pythonnative.runtime.assets.PNAssets.attach(activity)
         battery.attach(activity)
         netInfo.attach(activity)
         activity.intent?.dataString?.let { linking.onDeepLink(it) }

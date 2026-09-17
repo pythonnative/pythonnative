@@ -52,7 +52,7 @@ jobs:
           - name: nav-gestures-layout-styling
             suites: navigation gestures layout styling
           - name: anim-misc
-            suites: animations misc
+            suites: animations assets misc
           - name: inbox
             suites: inbox
 
@@ -167,7 +167,7 @@ jobs:
           - name: nav-gestures-layout-styling
             suites: navigation gestures layout styling
           - name: anim-misc
-            suites: animations misc
+            suites: animations assets misc
           - name: inbox
             suites: inbox
 

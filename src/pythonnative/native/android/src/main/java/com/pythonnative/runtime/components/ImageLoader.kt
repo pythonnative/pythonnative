@@ -6,10 +6,14 @@ import android.graphics.BitmapFactory
 import android.util.LruCache
 import android.util.Base64
 import android.net.Uri
-import java.io.ByteArrayOutputStream
+import com.pythonnative.runtime.assets.PNAssets
 import com.pythonnative.runtime.bridge.MainThread
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -18,6 +22,7 @@ import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * Image fetching and decoding for the `Image` manager.
@@ -55,8 +60,8 @@ object ImageLoader {
     }
 
     /** Load `url` (http/https) into a bitmap sized for `targetW` x `targetH` pixels. */
-    fun loadRemote(context: Context, url: String, targetW: Int, targetH: Int, callback: Callback): () -> Unit {
-        val key = "$url@$targetW:$targetH"
+    fun loadRemote(context: Context, url: String, targetW: Int, targetH: Int, callback: Callback, blur: Float = 0f): () -> Unit {
+        val key = "$url@$targetW:$targetH:$blur"
         memory.get(key)?.let { callback.onResult(it, null); return {} }
         val id = identifiers.incrementAndGet()
         val request: Request
@@ -77,7 +82,7 @@ object ImageLoader {
                         val file = cachedFile(cacheDir, url)
                         if (!file.exists() || file.length() == 0L) download(url, file, request)
                         if (!request.cancelled.get()) {
-                            bitmap = decodeDownsampled(file.absolutePath, targetW, targetH)
+                            bitmap = decodeDownsampled(file.absolutePath, targetW, targetH, blur = blur)
                             if (bitmap == null) { file.delete(); error = "decode failed" }
                             else memory.put(key, bitmap)
                             trimDisk(cacheDir)
@@ -111,17 +116,29 @@ object ImageLoader {
     }
 
     /** Decode a local file on a background thread; cancellation suppresses delivery. */
-    fun loadFile(path: String, targetW: Int, targetH: Int, callback: Callback): () -> Unit {
+    fun loadFile(path: String, targetW: Int, targetH: Int, callback: Callback, blur: Float = 0f): () -> Unit {
         val cancelled = AtomicBoolean(false)
         val future = executor.submit {
-            val bitmap = runCatching { decodeDownsampled(path, targetW, targetH) }.getOrNull()
+            val bitmap = runCatching { decodeDownsampled(path, targetW, targetH, blur = blur) }.getOrNull()
             MainThread.post { if (!cancelled.get()) callback.onResult(bitmap, if (bitmap == null) "decode failed" else null) }
         }
         return { cancelled.set(true); future.cancel(true); Unit }
     }
 
+    /** Decode a bundled asset (APK or dev overlay) off the UI thread, honoring its density variant. */
+    fun loadAsset(resolved: PNAssets.Resolved, targetW: Int, targetH: Int, callback: Callback, blur: Float = 0f): () -> Unit {
+        val cancelled = AtomicBoolean(false)
+        val future = executor.submit {
+            val result = runCatching {
+                requireNotNull(decodeStream({ resolved.open() }, targetW, targetH, resolved.scale, blur)) { "Image decode failed" }
+            }
+            MainThread.post { if (!cancelled.get()) callback.onResult(result.getOrNull(), result.exceptionOrNull()?.message) }
+        }
+        return { cancelled.set(true); future.cancel(true); Unit }
+    }
+
     /** Decode content URIs and base64 data off the UI thread, with bounded input. */
-    fun loadData(context: Context, source: String, targetW: Int, targetH: Int, callback: Callback): () -> Unit {
+    fun loadData(context: Context, source: String, targetW: Int, targetH: Int, callback: Callback, blur: Float = 0f): () -> Unit {
         val cancelled = AtomicBoolean(false)
         val future = executor.submit {
             val result = runCatching {
@@ -144,15 +161,48 @@ object ImageLoader {
                         output.toByteArray()
                     }
                 }
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-                val options = BitmapFactory.Options().apply { inSampleSize = sampleSize(bounds, targetW, targetH) }
-                requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)) { "Image decode failed" }
+                requireNotNull(decodeStream({ ByteArrayInputStream(bytes) }, targetW, targetH, 1f, blur)) { "Image decode failed" }
             }
             MainThread.post { if (!cancelled.get()) callback.onResult(result.getOrNull(), result.exceptionOrNull()?.message) }
         }
         return { cancelled.set(true); future.cancel(true); Unit }
     }
+
+    /** Pixel dimensions of an image without decoding it; null when unreadable. */
+    fun pixelSize(open: () -> InputStream): Pair<Int, Int>? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        runCatching { open().use { BitmapFactory.decodeStream(it, null, bounds) } }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        return Pair(bounds.outWidth, bounds.outHeight)
+    }
+
+    /** Download `url` into the disk cache without decoding it. */
+    fun prefetch(context: Context, url: String, callback: (String?) -> Unit): () -> Unit {
+        val request = Request()
+        request.future = executor.submit {
+            var error: String? = null
+            try {
+                val file = cachedFile(File(context.cacheDir, "pn_images"), url)
+                if (!file.exists() || file.length() == 0L) download(url, file, request)
+            } catch (failure: Exception) { error = failure.message ?: "prefetch failed" }
+            if (!request.cancelled.get()) MainThread.post { callback(error) }
+        }
+        return {
+            request.cancelled.set(true)
+            request.future?.cancel(true)
+            request.connection?.disconnect()
+        }
+    }
+
+    /** Drop the memory cache and the disk cache. */
+    fun clearCache(context: Context) {
+        memory.evictAll()
+        executor.submit { File(context.cacheDir, "pn_images").deleteRecursively() }
+    }
+
+    /** The disk cache file for `url` if it has been downloaded. */
+    fun cached(context: Context, url: String): File? =
+        cachedFile(File(context.cacheDir, "pn_images"), url).takeIf { it.exists() && it.length() > 0 }
 
     private fun trimDisk(directory: File) {
         val files = directory.listFiles()?.filter { !it.name.endsWith(".part") }?.sortedBy { it.lastModified() } ?: return
@@ -165,12 +215,36 @@ object ImageLoader {
     }
 
     /** Decode `path` with `inSampleSize` chosen so the result still covers the target. */
-    fun decodeDownsampled(path: String, targetW: Int, targetH: Int): Bitmap? {
+    fun decodeDownsampled(path: String, targetW: Int, targetH: Int, scale: Float = 1f, blur: Float = 0f): Bitmap? =
+        decodeStream({ FileInputStream(path) }, targetW, targetH, scale, blur)
+
+    /**
+     * Decode a reopenable stream, downsampled to cover `targetW` x `targetH`
+     * pixels. The bitmap's density is set so its logical size stays the
+     * source pixel size divided by `scale` (the `@2x` density of an asset
+     * variant) regardless of how far the decode downsampled it, so
+     * intrinsic layout doesn't depend on the target. `blur` is a radius in
+     * logical pixels applied after decoding.
+     */
+    fun decodeStream(open: () -> InputStream, targetW: Int, targetH: Int, scale: Float = 1f, blur: Float = 0f): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(path, bounds)
+        open().use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        val opts = BitmapFactory.Options().apply { inSampleSize = sampleSize(bounds, targetW, targetH) }
-        return BitmapFactory.decodeFile(path, opts)
+        val opts = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize(bounds, targetW, targetH)
+            inScaled = false
+            inMutable = blur > 0f
+        }
+        val bitmap = open().use { BitmapFactory.decodeStream(it, null, opts) } ?: return null
+        val effective = max(0.01f, scale)
+        bitmap.density = max(1, (160f * effective * bitmap.width / bounds.outWidth).roundToInt())
+        if (blur > 0f) {
+            // The radius is in logical pixels; convert to this bitmap's pixels.
+            val radius = (blur * bitmap.width / (bounds.outWidth / effective)).roundToInt().coerceIn(1, 64)
+            BoxBlur.apply(bitmap, radius)
+            BoxBlur.apply(bitmap, radius)
+        }
+        return bitmap
     }
 
     private fun sampleSize(bounds: BitmapFactory.Options, targetW: Int, targetH: Int): Int {

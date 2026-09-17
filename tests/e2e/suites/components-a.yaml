@@ -14,6 +14,8 @@ appId: ${APP_ID}
 - runFlow: ../flows/components/button.yaml
 - runFlow: ../flows/components/text_input.yaml
 - runFlow: ../flows/components/image.yaml
+- runFlow: ../flows/components/icon.yaml
+- runFlow: ../flows/components/svg.yaml
 - runFlow: ../flows/components/switch.yaml
 - runFlow: ../flows/components/slider.yaml
 - runFlow: ../flows/components/progress_bar.yaml

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Literal, Mapping, Optional, TypedDict, Union, Unpack
 
+from ..assets import Asset
 from ..element import Element
+from ..icons import IconName
 
 __all__ = ["HeaderSlot", "ScreenDef", "ScreenOptions", "Unpack"]
 
@@ -52,11 +54,11 @@ class ScreenOptions(TypedDict, total=False):
             ``"default"``, ``"none"``, ``"fade"``, ``"slide_from_right"``,
             ``"slide_from_bottom"``. Only ``"none"`` versus animated is
             distinguished on iOS and Android today.
-        tab_bar_icon: Native system icon identifier for tab items. A
-            string is used on every platform; a dict like
-            ``{"ios": "house.fill", "android": "ic_menu_home"}`` selects
-            per platform (SF Symbols on iOS, ``android.R.drawable.<name>``
-            on Android).
+        tab_bar_icon: Icon for the tab item: a bundled icon name from
+            ``pythonnative.icons`` (``"house"``,
+            ``"settings"``) drawn as a vector on every platform, or a
+            [`pn.asset`][pythonnative.asset] pointing at a PNG that's
+            drawn as a template image.
         tab_bar_badge: Badge text or count shown on the tab item.
         tab_bar_label: Label used for the tab item when it should differ
             from ``title``.
@@ -81,7 +83,7 @@ class ScreenOptions(TypedDict, total=False):
     presentation: Literal["card", "modal"]
     gesture_enabled: bool
     animation: Literal["default", "none", "fade", "slide_from_right", "slide_from_bottom"]
-    tab_bar_icon: Union[str, Dict[str, str]]
+    tab_bar_icon: Union[IconName, Asset]
     tab_bar_badge: Union[str, int]
     tab_bar_label: str
     lazy: bool

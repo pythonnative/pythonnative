@@ -42,6 +42,7 @@ from importlib import resources
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Union
 
+from .. import assets
 from . import android as android_config
 from . import artifacts, deps, runtime_assets
 from . import ios as ios_config
@@ -496,7 +497,11 @@ class Builder:
         app_src = self.config.project_root / "app"
         if not app_src.is_dir():
             raise BuildError(f"No app/ directory found at {app_src}; nothing to bundle.")
-        shutil.copytree(app_src, app_dir)
+        shutil.copytree(app_src, app_dir, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".*"))
+        # ``app/`` is a folder reference in the Xcode project, so
+        # ``app/assets/`` lands in the bundle as is; the manifest lets the
+        # runtime resolve density variants and register fonts.
+        assets.write_manifest(app_dir / assets.ASSETS_DIR, log=self.log)
 
         slices: List[Path] = []
         for target in deps.ios_targets(self.config, sdks=sdks):

@@ -1,0 +1,27 @@
+# Tests Images.get_size and Images.prefetch resolve for a bundled asset.
+#
+# Demo screen: examples/e2e-suite/app/screens/assets/image_size.py
+# Source under test: src/pythonnative/native_modules/images.py :: Images
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Assets
+      DEMO_TITLE: Images module
+- extendedWaitUntil:
+    visible: "Size: 48 x 48"
+    timeout: 10000
+- extendedWaitUntil:
+    visible: "Prefetched: yes"
+    timeout: 10000
+- tapOn: "Clear image cache"
+- scrollUntilVisible:
+    element:
+      text: "Back to list"
+    direction: DOWN
+    timeout: 20000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Assets

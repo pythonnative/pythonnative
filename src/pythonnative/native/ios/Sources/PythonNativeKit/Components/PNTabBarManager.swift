@@ -83,16 +83,27 @@ public final class PNTabBarManager: PNComponentManager {
         ((PNProps.value(props, "items") as? [Any]) ?? []).compactMap { $0 as? [String: Any] }
     }
 
-    /// Resolve an icon spec (SF Symbol name or `{"ios": name}`) to an image.
+    /// The size tab bar icons are rasterized at, in points.
+    static let iconSize = CGSize(width: 25, height: 25)
+
+    /// Resolve an icon spec to a template image.
+    ///
+    /// `{"shapes": [...], "view_box": "..."}` is drawn with the SVG
+    /// renderer (Lucide icons resolved by Python); `{"uri": "asset://..."}`
+    /// loads a bundled image. Anything else yields no icon.
     static func icon(_ spec: Any?) -> UIImage? {
-        var name: String?
-        if let text = spec as? String {
-            name = text
-        } else if let dict = spec as? [String: Any] {
-            name = PNProps.string(dict["ios"])
+        guard let dict = spec as? [String: Any] else { return nil }
+        if let raw = dict["shapes"] as? [Any], !raw.isEmpty {
+            let shapes = raw.compactMap { try? PNValues.decode(PNSvgShape.self, $0) }
+            let viewBox = PNSvgView.parseViewBox(PNProps.string(dict["view_box"])) ?? CGRect(x: 0, y: 0, width: 24, height: 24)
+            let paint = PNSvgPaint(fill: "none", stroke: "currentColor", strokeWidth: 2, lineCap: "round", lineJoin: "round")
+            return PNSvgRenderer.image(shapes, viewBox: viewBox, size: iconSize, root: paint)
         }
-        guard let name = name, !name.isEmpty else { return nil }
-        return UIImage(systemName: name) ?? UIImage(named: name)
+        if let uri = PNProps.string(dict["uri"]), !uri.isEmpty,
+           let image = PNImageManager.loadLocal(uri, targetSize: iconSize) {
+            return image.withRenderingMode(.alwaysTemplate)
+        }
+        return nil
     }
 }
 

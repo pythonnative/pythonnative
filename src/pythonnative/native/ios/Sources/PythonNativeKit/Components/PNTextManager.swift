@@ -66,11 +66,38 @@ public final class PNTextManager: PNTypedComponentManager<TextProps> {
     }
 
     static func font(size: CGFloat, weight: Any?, family: String?, italic: Bool) -> UIFont {
-        if let family = family, !family.isEmpty, let named = UIFont(name: family, size: size) {
-            return UIFontMetrics(forTextStyle: .body).scaledFont(for: italic ? italicized(named, size: size) : named)
+        if let family = family, !family.isEmpty {
+            // Bundled fonts (app/assets/fonts) are matched by family, weight,
+            // and style from the manifest; the face already carries the
+            // weight and slant, so no synthetic bold or italic is applied.
+            if let name = PNAssets.shared.fontName(family: family, weight: numericWeight(weight), italic: italic),
+               let bundled = UIFont(name: name, size: size) {
+                return UIFontMetrics(forTextStyle: .body).scaledFont(for: bundled)
+            }
+            if let named = UIFont(name: family, size: size) {
+                return UIFontMetrics(forTextStyle: .body).scaledFont(for: italic ? italicized(named, size: size) : named)
+            }
         }
         let font = UIFont.systemFont(ofSize: size, weight: fontWeight(weight))
         return UIFontMetrics(forTextStyle: .body).scaledFont(for: italic ? italicized(font, size: size) : font)
+    }
+
+    /// A CSS-style weight (100 to 900) from a `font_weight` value.
+    static func numericWeight(_ value: Any?) -> Int {
+        if let name = value as? String {
+            switch name.lowercased() {
+            case "ultralight", "thin": return name.lowercased() == "thin" ? 200 : 100
+            case "light": return 300
+            case "normal", "regular": return 400
+            case "medium": return 500
+            case "semibold": return 600
+            case "bold": return 700
+            case "heavy": return 800
+            case "black": return 900
+            default: return Int(Double(name) ?? 400)
+            }
+        }
+        return Int(PNProps.double(value) ?? 400)
     }
 
     static func italicized(_ font: UIFont, size: CGFloat) -> UIFont {
