@@ -471,16 +471,52 @@ def _bundled_roots(*, exclude: Optional[str]) -> List[Path]:
 
 
 def font_faces() -> Tuple[FontFace, ...]:
-    """The font faces available from every readable assets root."""
+    """The font faces bundled with the app.
+
+    Readable roots (the dev overlay, a checkout, the iOS bundle) are
+    scanned directly. On Android the bundled ``app/assets/`` lives inside
+    the APK rather than on disk, so its faces come from the manifest the
+    build wrote, read through the native ``Assets`` module.
+    """
     faces: List[FontFace] = []
     seen = set()
+
+    def add(face: FontFace) -> None:
+        key = (face.family.lower(), face.weight, face.italic)
+        if key not in seen:
+            seen.add(key)
+            faces.append(face)
+
     for root in assets_roots():
         for face in scan(root).fonts:
-            key = (face.family.lower(), face.weight, face.italic)
-            if key not in seen:
-                seen.add(key)
-                faces.append(face)
+            add(face)
+    if not _bundled_roots(exclude=None):
+        for face in _native_manifest().fonts:
+            add(face)
     return tuple(faces)
+
+
+def _native_manifest() -> AssetManifest:
+    """The bundled manifest as the native runtime sees it, or an empty one.
+
+    Used when the bundle isn't a directory Python can list (Android).
+    """
+    from ..bridge import has_transport
+
+    if not has_transport():
+        return AssetManifest()
+    from ..native_modules.registry import NativeModuleError, native_module
+
+    try:
+        encoded = native_module("Assets").call("read", path=MANIFEST_NAME)
+    except NativeModuleError:
+        return AssetManifest()
+    if not encoded:
+        return AssetManifest()
+    try:
+        return AssetManifest.from_dict(json.loads(base64.b64decode(encoded)))
+    except (ValueError, KeyError, TypeError):
+        return AssetManifest()
 
 
 # ----------------------------------------------------------------------

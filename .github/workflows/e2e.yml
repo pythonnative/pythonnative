@@ -26,19 +26,19 @@ jobs:
     needs: coverage
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # GitHub-hosted Android emulators grow unstable after ~15 minutes of
-    # sustained Maestro driving and start reporting "device offline" /
-    # "device not found" mid-run (the emulator VM, not the app, dies).
-    # The full suite reliably crosses that threshold around the ~35th
-    # flow. Sharding the run into a few balanced groups, each on its
-    # own freshly booted emulator, keeps every session well under the
+    # GitHub-hosted Android emulators grow unstable after roughly ten
+    # minutes of sustained Maestro driving and start reporting "device
+    # offline" / "device not found" mid-run (the emulator VM, not the
+    # app, dies). Sharding the run into a few balanced groups, each on
+    # its own freshly booted emulator, keeps every session under the
     # limit, and parallelizes the Android pass as a bonus. Groups are
-    # sized so none exceeds ~15 flows; ``components`` (28 flows after
-    # the gesture/animated additions) crossed the ceiling at ~flow 26,
-    # so it runs as two halves, and ``hooks`` (22 flows after the async
-    # hook additions) now takes ~10 minutes of driving on its own, so
-    # it gets a dedicated emulator. ``fail-fast: false`` so one shard's
-    # failure still lets the others report.
+    # sized so none exceeds ~12 heavy flows: ``components`` (35 flows
+    # after the graphics additions) dropped offline at ~11.5 minutes
+    # when split in two, so it runs as three parts; ``hooks`` (23 quick
+    # flows, ~10 minutes of driving) gets a dedicated emulator; the
+    # remaining categories are grouped to similar totals.
+    # ``fail-fast: false`` so one shard's failure still lets the others
+    # report.
     strategy:
       fail-fast: false
       matrix:
@@ -47,6 +47,8 @@ jobs:
             suites: components-a
           - name: components-b
             suites: components-b
+          - name: components-c
+            suites: components-c
           - name: hooks
             suites: hooks
           - name: nav-gestures-layout-styling
@@ -162,6 +164,8 @@ jobs:
             suites: components-a
           - name: components-b
             suites: components-b
+          - name: components-c
+            suites: components-c
           - name: hooks
             suites: hooks
           - name: nav-gestures-layout-styling

@@ -100,12 +100,12 @@ for suite in "${SUITES[@]}"; do
         MAESTRO_TARGETS+=("tests/e2e/ios.yaml")
       fi
       ;;
-    components|components-a|components-b|hooks|navigation|layout|styling|animations|gestures|assets|misc)
+    components|components-a|components-b|components-c|hooks|navigation|layout|styling|animations|gestures|assets|misc)
       MAESTRO_TARGETS+=("tests/e2e/suites/${suite}.yaml")
       ;;
     *)
       echo "Error: unknown suite '$suite'" >&2
-      echo "Available suites: full, components, components-a, components-b, hooks, navigation, layout, styling, animations, gestures, assets, misc" >&2
+      echo "Available suites: full, components, components-a, components-b, components-c, hooks, navigation, layout, styling, animations, gestures, assets, misc" >&2
       exit 2
       ;;
   esac
