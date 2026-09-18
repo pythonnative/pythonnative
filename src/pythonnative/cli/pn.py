@@ -56,7 +56,7 @@ from ..project import devices as devices_mod
 from ..project import doctor as doctor_mod
 from ..project import fingerprint as fingerprint_mod
 from ..project.android import collect_logcat_filters
-from ..project.config import CONFIG_FILENAME, AppConfig, ConfigError, render_default_toml
+from ..project.config import CONFIG_FILENAME, AppConfig, ConfigError, _validate_app_id, render_default_toml
 
 DEFAULT_DEV_PORT = 8765
 """Port `pn start` listens on unless `--port` says otherwise."""
@@ -168,9 +168,9 @@ def _app_id_from_name(name: str) -> str:
     when ``pn init`` is given none. A typed name cannot reach it, because
     ``_NAME_RE`` already guarantees a leading letter.
 
-    The result always satisfies ``_APP_ID_SEGMENT`` but is not guaranteed
-    to pass ``config._validate_app_id``, which also rejects reserved
-    words: ``class`` is a legal project name and passes through here.
+    The result always satisfies ``_APP_ID_SEGMENT``. ``init_project``
+    validates it against the full configuration rules before writing any
+    files, because those rules also reject reserved words such as ``class``.
 
     Args:
         name: A project name, either typed or taken from the directory.
@@ -211,6 +211,11 @@ def init_project(args: argparse.Namespace) -> None:
     ``./<name>`` is always refused, since ``--force`` can't turn it into a
     directory, and ``--force`` lifts neither of the rules above.
 
+    The derived ``com.example`` app id must also pass the configuration's
+    package-identifier rules. Validation happens before any file is created or
+    changed, and ``--force`` doesn't bypass it. A no-name invocation reports
+    when the current directory name produced an invalid id.
+
     Args:
         args: Parsed namespace with ``name`` (optional) and ``force``.
     """
@@ -240,6 +245,21 @@ def init_project(args: argparse.Namespace) -> None:
     cwd = Path.cwd()
     target = cwd / name if name else cwd
     project_name: str = name or cwd.name
+    app_id = _app_id_from_name(project_name)
+
+    # Validate the exact id that will be written before inspecting overwrite
+    # targets or mutating the filesystem. This is the same validator every
+    # later command applies when it loads pythonnative.toml.
+    try:
+        _validate_app_id(app_id)
+    except ConfigError as exc:
+        suggestion = f"{_sanitize_name(project_name)}_app"
+        source = "current directory name" if name is None else "project name"
+        print(
+            f"Invalid generated app id {app_id!r}: {source} {project_name!r} produces {exc} "
+            f"Try: pn init {suggestion}"
+        )
+        sys.exit(1)
 
     # A lexically clean name can still resolve elsewhere, and ``exists()`` and
     # ``is_dir()`` below follow symlinks. Check containment rather than just
@@ -278,7 +298,7 @@ def init_project(args: argparse.Namespace) -> None:
         main_py.write_text(_MAIN_TEMPLATE, encoding="utf-8")
 
     config_path.write_text(
-        render_default_toml(name=project_name, app_id=_app_id_from_name(project_name)),
+        render_default_toml(name=project_name, app_id=app_id),
         encoding="utf-8",
     )
     if force or not gitignore_path.exists():

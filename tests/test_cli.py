@@ -12,6 +12,8 @@ from typing import Callable, Dict, List, Optional
 import pytest
 
 import pythonnative.cli.pn as pn_cli
+from pythonnative.project import config as config_mod
+from pythonnative.project.config import AppConfig
 from pythonnative.project.devices import Device
 from pythonnative.project.doctor import CheckResult
 
@@ -269,6 +271,119 @@ def test_cli_init_force_does_not_lift_name_validation(tmp_path: Path, name: str)
     assert result.returncode != 0
     assert "Invalid project name" in result.stdout
     assert os.listdir(str(tmp_path)) == []
+
+
+def test_cli_init_reserved_keyword_coverage_is_complete() -> None:
+    assert len(config_mod._JAVA_KEYWORDS) == 53
+
+
+@pytest.mark.parametrize("name", sorted(config_mod._JAVA_KEYWORDS))
+def test_cli_init_rejects_reserved_derived_app_ids_before_creating_target(tmp_path: Path, name: str) -> None:
+    result = run_pn(["init", name], str(tmp_path))
+
+    assert result.returncode != 0
+    assert f"com.example.{name}" in result.stdout
+    assert "reserved word" in result.stdout
+    assert f"Try: pn init {name}_app" in result.stdout
+    assert os.listdir(str(tmp_path)) == []
+
+
+def test_cli_init_rejects_normalized_reserved_id_before_creating_target(tmp_path: Path) -> None:
+    result = run_pn(["init", "cla-ss"], str(tmp_path))
+
+    assert result.returncode != 0
+    assert "com.example.class" in result.stdout
+    assert "Try: pn init cla-ss_app" in result.stdout
+    assert not (tmp_path / "cla-ss").exists()
+
+
+@pytest.mark.parametrize("name", ["class", "cla-ss"])
+def test_cli_init_rejects_invalid_derived_id_without_changing_empty_target(tmp_path: Path, name: str) -> None:
+    target = tmp_path / name
+    target.mkdir()
+
+    result = run_pn(["init", name], str(tmp_path))
+
+    assert result.returncode != 0
+    assert "com.example.class" in result.stdout
+    assert "reserved word" in result.stdout
+    assert os.listdir(target) == []
+
+
+def test_cli_init_force_cannot_overwrite_scaffold_for_invalid_derived_id(tmp_path: Path) -> None:
+    target = tmp_path / "class"
+    app_dir = target / "app"
+    app_dir.mkdir(parents=True)
+    existing = {
+        app_dir / "main.py": "# existing app\n",
+        target / "pythonnative.toml": "# existing config\n",
+        target / ".gitignore": "# existing ignores\n",
+    }
+    for path, content in existing.items():
+        path.write_text(content, encoding="utf-8")
+
+    result = run_pn(["init", "class", "--force"], str(tmp_path))
+
+    assert result.returncode != 0
+    assert "com.example.class" in result.stdout
+    assert "reserved word" in result.stdout
+    assert {path: path.read_text(encoding="utf-8") for path in existing} == existing
+    assert sorted(str(path.relative_to(target)) for path in target.rglob("*")) == [
+        ".gitignore",
+        "app",
+        "app/main.py",
+        "pythonnative.toml",
+    ]
+
+
+@pytest.mark.parametrize("dirname", ["Class", "CLASS", "cl.ass"])
+def test_cli_init_without_name_rejects_reserved_derived_app_id_before_writes(tmp_path: Path, dirname: str) -> None:
+    project_dir = tmp_path / dirname
+    project_dir.mkdir()
+
+    result = run_pn(["init"], str(project_dir))
+
+    assert result.returncode != 0
+    assert "com.example.class" in result.stdout
+    assert "reserved word" in result.stdout
+    assert "current directory name" in result.stdout
+    assert os.listdir(project_dir) == []
+
+
+@pytest.mark.parametrize("dirname", ["Class", "CLASS", "cl.ass"])
+def test_cli_init_without_name_force_preserves_existing_scaffold(tmp_path: Path, dirname: str) -> None:
+    project_dir = tmp_path / dirname
+    app_dir = project_dir / "app"
+    app_dir.mkdir(parents=True)
+    existing = {
+        app_dir / "main.py": "# existing app\n",
+        project_dir / "pythonnative.toml": "# existing config\n",
+        project_dir / ".gitignore": "# existing ignores\n",
+    }
+    for path, content in existing.items():
+        path.write_text(content, encoding="utf-8")
+
+    result = run_pn(["init", "--force"], str(project_dir))
+
+    assert result.returncode != 0
+    assert "com.example.class" in result.stdout
+    assert "current directory name" in result.stdout
+    assert {path: path.read_text(encoding="utf-8") for path in existing} == existing
+
+
+@pytest.mark.parametrize("name", ["class_app", "cla_ss"])
+def test_cli_init_accepts_keyword_substrings_and_writes_loadable_config(tmp_path: Path, name: str) -> None:
+    result = run_pn(["init", name], str(tmp_path))
+
+    assert result.returncode == 0, result.stdout
+    project_dir = tmp_path / name
+    config = AppConfig.load(project_dir)
+    assert config.name == name
+    assert config.app_id == f"com.example.{name}"
+    for platform in ("android", "ios"):
+        app_id_result = run_pn(["app-id", platform], str(project_dir))
+        assert app_id_result.returncode == 0, app_id_result.stderr
+        assert app_id_result.stdout.strip() == f"com.example.{name}"
 
 
 def test_cli_init_suggestion_is_itself_a_legal_name() -> None:
