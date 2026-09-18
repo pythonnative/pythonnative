@@ -892,6 +892,8 @@
       
         
       
+        
+      
     
     
     
@@ -1094,6 +1096,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assets, Fonts, Icons & SVG
   
 
     
@@ -1955,6 +1985,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2298,6 +2332,62 @@
     
   
     Images
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../graphics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Graphics
   
 
     
@@ -8190,6 +8280,9 @@ loop. It exposes:</p>
 <li><code>GET /static/&lt;name&gt;</code>: preview assets (JS, CSS).</li>
 <li><code>GET /manifest</code>: <code>{"version", "entry", "files": {path: sha256}}</code>.</li>
 <li><code>GET /file/&lt;path&gt;</code>: raw bytes of one synced source file.</li>
+<li><code>GET /assets/&lt;path&gt;</code>: a file under <code>app/assets/</code>; <code>/assets/pn_assets.json</code>
+  is the asset manifest and <code>/assets/fonts.css</code> declares the bundled
+  fonts for the browser preview.</li>
 <li><code>GET /status</code>: server, project, and connected-peer information.</li>
 <li><code>WS /ws?role=client</code>: the dev-client protocol (see below).</li>
 <li><code>WS /ws?role=preview</code>: the browser preview's bridge channel; the

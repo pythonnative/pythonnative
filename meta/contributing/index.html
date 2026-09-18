@@ -892,6 +892,8 @@
       
         
       
+        
+      
     
     
     
@@ -1094,6 +1096,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assets, Fonts, Icons & SVG
   
 
     
@@ -1953,6 +1983,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2295,6 +2329,62 @@
     
   
     Images
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/graphics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Graphics
   
 
     
@@ -3782,6 +3872,7 @@ way:</p>
 <li>Prefer explicit, descriptive names; keep platform abstractions clean.</li>
 <li>Python never imports platform code. Everything that touches <code>UIView</code> or <code>android.view.View</code> lives in Swift (<code>PythonNativeKit</code>) or Kotlin (the <code>pythonnative</code> Gradle module) and is reached through <code>pythonnative.bridge</code>; see <code>docs/concepts/bridge.md</code> for the protocol. Bump <code>PROTOCOL_VERSION</code> on both sides when the wire format changes.</li>
 <li>Add/extend tests under <code>tests/</code> for new behavior. Native changes get XCTest / JUnit coverage next to the code they touch.</li>
+<li>Design large changes in an RFC first. Anything that adds or removes public API, changes the Python-to-native wire contract, changes a convention apps depend on, or spans Python, Swift, Kotlin, and the browser preview gets a document under <code>rfcs/</code> (see <a href="https://github.com/pythonnative/pythonnative/blob/main/rfcs/README.md"><code>rfcs/README.md</code></a>). The RFC lands with the implementation and records what shipped, including removals.</li>
 <li>Commit source, reviewed generated contracts, dependency locks, and vendored dependencies as described in <a href="#generated-source-and-vendored-dependencies">Generated source and vendored dependencies</a>. Don't commit local build outputs or caches.</li>
 <li>Docstrings: Google style throughout. Ruff is configured with the Google
   convention (<code>pydocstyle.convention = "google"</code>) and enforces the <code>D</code> rule
