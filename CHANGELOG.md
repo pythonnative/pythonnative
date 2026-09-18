@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.45.0 (2026-09-18)
+
+### Features
+
+- Add asset pipeline, fonts, icons, svg, and effects
+  ([#103](https://github.com/pythonnative/pythonnative/pull/103),
+  [`ef02cac`](https://github.com/pythonnative/pythonnative/commit/ef02cac218b314a466b31b60b88ffbe89bc54093))
+
+
 ## v0.44.0 (2026-09-14)
 
 ### Features

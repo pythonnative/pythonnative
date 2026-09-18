@@ -64,7 +64,7 @@ Example:
     ```
 """
 
-__version__ = "0.44.0"
+__version__ = "0.45.0"
 
 from . import appearance, diagnostics, gestures, icons, runtime, sdk, svg
 from .alerts import Alert
