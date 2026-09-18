@@ -9,11 +9,24 @@ from typing import Any, Callable
 
 from ..layout import LAYOUT_STYLE_KEYS
 from ..style import Style
+from ..svg import SvgShape
 from .schema import COMPONENTS, RUNTIME_PROPS, ComponentSchema, NativeField, register_schema, type_schema
 
 # These types own native child layout or physical child presentation.
 CONTAINERS = frozenset(
-    {"View", "Column", "Row", "ScrollView", "Screen", "ScreenStack", "Modal", "Portal", "VirtualList"}
+    {
+        "View",
+        "Column",
+        "Row",
+        "ScrollView",
+        "Screen",
+        "ScreenStack",
+        "Modal",
+        "Portal",
+        "VirtualList",
+        "LinearGradient",
+        "BlurView",
+    }
 )
 
 
@@ -74,6 +87,7 @@ def install(factories: dict[str, Any]) -> None:
                         "max_lines",
                         "text_transform",
                         "multiline",
+                        "view_box",
                     },
                     recreate=key == "multiline" or (name == "ProgressBar" and key == "indeterminate"),
                     animated=key
@@ -112,7 +126,15 @@ def install(factories: dict[str, Any]) -> None:
                     "properties": {
                         "name": {"type": "string"},
                         "title": {"type": "string"},
-                        "icon": {"type": "string"},
+                        "icon": {
+                            "type": "object",
+                            "properties": {
+                                "shapes": {"type": "array", "items": type_schema(SvgShape)},
+                                "view_box": {"type": "string"},
+                                "uri": {"type": "string"},
+                            },
+                            "additionalProperties": False,
+                        },
                         "badge": {"type": "string"},
                     },
                     "required": ["name", "title"],
@@ -146,7 +168,9 @@ def install(factories: dict[str, Any]) -> None:
         {
             name: type_schema(value)
             for name, value in typing.get_type_hints(ScreenOptions).items()
-            if name not in {"header_left", "header_right"}
+            # Header slots are rendered by Python; tab icons travel on
+            # ``TabBar.items`` after ``tab_icon_spec`` resolves them.
+            if name not in {"header_left", "header_right", "tab_bar_icon"}
         }
     )
     refresh = COMPONENTS["RefreshControl"].props

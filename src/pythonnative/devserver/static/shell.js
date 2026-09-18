@@ -5,6 +5,7 @@ import { Bridge } from "./bridge.js";
 import { Renderer } from "./renderer.js";
 import { PreviewHost } from "./host.js";
 import { color as parseColor } from "./colors.js";
+import { assets } from "./assets.js";
 
 const DEVICES = [
   { id: "iphone-15", name: "iPhone 15", width: 393, height: 852, bottom: 34, notch: true },
@@ -223,6 +224,7 @@ class Shell {
         document.title = `${this.project || "PythonNative"} preview`;
         this.entry = payload.entry || null;
         this.renderer.reset();
+        await assets.ready;
         await this.host.start(this.entry);
         this.logLine("ok", `mounted ${this.entry}`);
         break;
@@ -254,6 +256,10 @@ class Shell {
         }
         break;
       }
+      case "assets":
+        await assets.refresh();
+        this.logLine("ok", "assets refreshed");
+        break;
       case "superseded":
         this.bridge.close();
         this.setConnected(false);

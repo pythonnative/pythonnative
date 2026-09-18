@@ -36,17 +36,23 @@ from app.screens.animations.parallel_animation import ParallelAnimationDemo
 from app.screens.animations.sequence_animation import SequenceAnimationDemo
 from app.screens.animations.spring_animation import SpringAnimationDemo
 from app.screens.animations.timing_animation import TimingAnimationDemo
+from app.screens.assets.bundled_image import BundledImageDemo
+from app.screens.assets.custom_font import CustomFontDemo
+from app.screens.assets.image_size import ImageSizeDemo
 from app.screens.components.activity_indicator import ActivityIndicatorDemo
+from app.screens.components.blur_view import BlurViewDemo
 from app.screens.components.button import ButtonDemo
 from app.screens.components.checkbox import CheckboxDemo
 from app.screens.components.date_picker import DatePickerDemo
 from app.screens.components.error_boundary import ErrorBoundaryDemo
 from app.screens.components.flat_list import FlatListDemo
 from app.screens.components.fragment import FragmentDemo
+from app.screens.components.icon import IconDemo
 from app.screens.components.image import ImageDemo
 from app.screens.components.image_background import ImageBackgroundDemo
 from app.screens.components.keyboard_avoiding_view import KeyboardAvoidingViewDemo
 from app.screens.components.lazy_component import LazyDemo
+from app.screens.components.linear_gradient import LinearGradientDemo
 from app.screens.components.modal import ModalDemo
 from app.screens.components.picker import PickerDemo
 from app.screens.components.portal import PortalDemo
@@ -61,6 +67,7 @@ from app.screens.components.slider import SliderDemo
 from app.screens.components.spacer import SpacerDemo
 from app.screens.components.status_bar import StatusBarDemo
 from app.screens.components.suspense import SuspenseDemo
+from app.screens.components.svg import SvgDemo
 from app.screens.components.switch import SwitchDemo
 from app.screens.components.text import TextDemo
 from app.screens.components.text_input import TextInputDemo
@@ -151,6 +158,10 @@ DEMOS: List[DemoEntry] = [
     DemoEntry("button", "Components", "Button", "Button", ButtonDemo),
     DemoEntry("text_input", "Components", "TextInput", "TextInput", TextInputDemo),
     DemoEntry("image", "Components", "Image", "Image", ImageDemo),
+    DemoEntry("icon", "Components", "Icon", "Icon", IconDemo),
+    DemoEntry("svg", "Components", "Svg", "Svg", SvgDemo),
+    DemoEntry("linear_gradient", "Components", "LinearGradient", "LinearGradient", LinearGradientDemo),
+    DemoEntry("blur_view", "Components", "BlurView", "BlurView", BlurViewDemo),
     DemoEntry("switch", "Components", "Switch", "Switch", SwitchDemo),
     DemoEntry("slider", "Components", "Slider", "Slider", SliderDemo),
     DemoEntry("progress_bar", "Components", "ProgressBar", "ProgressBar", ProgressBarDemo),
@@ -420,6 +431,12 @@ DEMOS: List[DemoEntry] = [
     # Alerts, storage, runtime, platform, packages, SDK
     # ------------------------------------------------------------------
     DemoEntry("simple_alert", "Alerts", "Alert.show", "Alert", SimpleAlertDemo),
+    # ------------------------------------------------------------------
+    # Assets
+    # ------------------------------------------------------------------
+    DemoEntry("bundled_image", "Assets", "Bundled image", "Asset", BundledImageDemo),
+    DemoEntry("custom_font", "Assets", "Custom font", "asset", CustomFontDemo),
+    DemoEntry("image_size", "Assets", "Images module", "Images", ImageSizeDemo),
     DemoEntry(
         "confirm_alert",
         "Alerts",

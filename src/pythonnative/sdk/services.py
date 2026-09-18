@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional, Protocol
 
+from ..assets import AssetManifest
+from ..native_modules.images import ImageSize
 from .schema import ModuleSchema, register_schema
 
 
@@ -124,6 +126,26 @@ class BiometricsService(Protocol):
     async def authenticate(self, reason: str = "Authenticate") -> bool: ...
 
 
+class AssetsService(Protocol):
+    """Bundled-asset access: the dev overlay manifest, raw reads, existence checks."""
+
+    def configure(self, overlay: Optional[str], manifest: AssetManifest) -> None: ...
+
+    def read(self, path: str) -> Optional[str]: ...
+
+    def exists(self, path: str) -> bool: ...
+
+
+class ImagesService(Protocol):
+    """Image pipeline helpers that don't belong on the ``Image`` element."""
+
+    async def get_size(self, uri: str) -> ImageSize: ...
+
+    async def prefetch(self, uri: str) -> bool: ...
+
+    def clear_cache(self) -> None: ...
+
+
 def install_services() -> None:
     """Register the canonical interfaces without constructing service objects."""
     register_schema(ModuleSchema.from_protocol("Device", DeviceService))
@@ -144,3 +166,5 @@ def install_services() -> None:
     register_schema(ModuleSchema.from_protocol("Camera", CameraService))
     register_schema(ModuleSchema.from_protocol("Location", LocationService))
     register_schema(ModuleSchema.from_protocol("Biometrics", BiometricsService))
+    register_schema(ModuleSchema.from_protocol("Assets", AssetsService))
+    register_schema(ModuleSchema.from_protocol("Images", ImagesService))

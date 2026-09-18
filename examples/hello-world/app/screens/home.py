@@ -28,6 +28,7 @@ local_styles = pn.StyleSheet.create(
         align_items="center",
     ),
     button_row=pn.style(spacing=8, align_items="center"),
+    title_row=pn.style(spacing=10, align_items="center"),
 )
 
 
@@ -86,7 +87,13 @@ def HomeScreen() -> pn.Element:
 
     return pn.ScrollView(
         pn.Column(
-            pn.Text("Hello from PythonNative Demo!", style=styles["title"]),
+            pn.Row(
+                # Vector icons ship with the framework and draw identically
+                # on every platform; ``color`` defaults to the label color.
+                pn.Icon("sparkles", size=28, color="#F59E0B"),
+                pn.Text("Hello from PythonNative Demo!", style=styles["title"]),
+                style=local_styles["title_row"],
+            ),
             pn.Text(
                 "Run `pn start`, edit this text, and save. Every connected target "
                 "(browser preview, simulators, devices) updates without a rebuild, "

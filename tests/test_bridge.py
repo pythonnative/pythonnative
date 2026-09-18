@@ -292,7 +292,8 @@ def test_reconciler_commits_through_bridge(transport: FakeTransport) -> None:
     ],
 )
 def test_builtin_factory_defaults_cross_the_bridge(name: str, backend: BridgeBackend, transport: FakeTransport) -> None:
-    element = getattr(pn, name)()
+    required = {"LinearGradient": {"colors": ["#000", "#fff"]}}
+    element = getattr(pn, name)(**required.get(name, {}))
     assert isinstance(element.type, str)
     backend.apply_mutations([CreateOp(1, element.type, dict(element.props))])
     assert transport.views[1].type_name == element.type

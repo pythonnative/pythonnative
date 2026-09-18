@@ -1,11 +1,25 @@
+import CoreImage
 import CryptoKit
 import ImageIO
 import UIKit
 
-/// `Image`: a `UIImageView` loading from http(s) URLs (with memory and
-/// disk caching), local file paths, bundle asset names, and base64 data URIs.
+/// `Image`: a `UIImageView` loading bundled assets (`asset://`), http(s)
+/// URLs (with memory and disk caching), local file paths, and base64
+/// data URIs. `default_source` shows a bundled or local image until the
+/// primary source arrives; `blur_radius` blurs the decoded bitmap.
 public final class PNImageManager: PNTypedComponentManager<ImageProps> {
-    public init() { super.init(ImageProps.self) }
+    private var assetsObserver: NSObjectProtocol?
+
+    public init() {
+        super.init(ImageProps.self)
+        assetsObserver = NotificationCenter.default.addObserver(forName: PNAssets.didChange, object: nil, queue: .main) { [weak self] _ in
+            self?.reloadAssetImages()
+        }
+    }
+
+    deinit {
+        if let observer = assetsObserver { NotificationCenter.default.removeObserver(observer) }
+    }
 
     public override func makeView(props: [String: Any]) -> UIView {
         let view = UIImageView(frame: .zero)
@@ -25,19 +39,36 @@ public final class PNImageManager: PNTypedComponentManager<ImageProps> {
         if props.has_placeholder_color {
             imageView.backgroundColor = props.placeholder_color.flatMap { PNColor.parse(PNValues.encode($0)) }
         }
-        if props.has_source {
+        if props.has_source || props.has_default_source || props.has_blur_radius {
+            let merged = mergedProps(imageView)
             (PNViewState.existing(for: imageView)?.extras.removeValue(forKey: "cancel_image") as? (() -> Void))?()
-            if let source = props.source, !source.isEmpty { load(imageView, source: source) }
-            else {
+            let source = PNProps.string(PNProps.value(merged, "source")) ?? ""
+            let fallback = PNProps.string(PNProps.value(merged, "default_source")) ?? ""
+            if !source.isEmpty {
+                load(imageView, source: source, fallback: fallback.isEmpty ? nil : fallback)
+            } else {
                 PNViewState.existing(for: imageView)?.extras.removeValue(forKey: "pending_source")
                 PNViewState.existing(for: imageView)?.extras.removeValue(forKey: "image_request")
                 imageView.image = nil
+                if !fallback.isEmpty { load(imageView, source: fallback, fallback: nil, silent: true) }
             }
         }
         if props.has_scale_type {
             imageView.contentMode = Self.contentMode(props.scale_type.map { PNValues.encode($0) as? String ?? "contain" } ?? "contain")
         }
         PNViewStyler.applyCommon(imageView, props.values)
+    }
+
+    /// Re-run the loader for every live image that shows a bundled asset.
+    private func reloadAssetImages() {
+        for record in PNViewRegistry.shared.records(ofType: "Image") {
+            guard let imageView = record.view as? UIImageView else { continue }
+            let props = record.manager.mergedProps(imageView)
+            let source = PNProps.string(PNProps.value(props, "source")) ?? ""
+            let fallback = PNProps.string(PNProps.value(props, "default_source")) ?? ""
+            guard PNAssets.isAssetURI(source) || PNAssets.isAssetURI(fallback) else { continue }
+            record.manager.update(view: imageView, changed: ["source": source.isEmpty ? NSNull() : source])
+        }
     }
 
     public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize {
@@ -62,68 +93,79 @@ public final class PNImageManager: PNTypedComponentManager<ImageProps> {
 
     // MARK: - Loading
 
-    private func load(_ imageView: UIImageView, source: String) {
+    /// Start loading `source` into `imageView`. A local `fallback` is shown
+    /// first (and kept if `source` fails). `silent` suppresses the load
+    /// events, used when only the fallback is displayed.
+    private func load(_ imageView: UIImageView, source: String, fallback: String?, silent: Bool = false) {
         guard let state = PNViewState.existing(for: imageView) else { return }
         let request = UUID()
         state.extras["image_request"] = request
         state.extras["pending_source"] = source
-        if source.hasPrefix("http://") || source.hasPrefix("https://") {
-            let size = imageView.bounds.size
-            state.extras["cancel_image"] = PNImageLoader.shared.fetch(source) { [weak imageView] result in
+        let blur = CGFloat(PNProps.double(PNProps.value(mergedProps(imageView), "blur_radius")) ?? 0)
+        let size = imageView.bounds.size
+        if let fallback = fallback, !Self.isRemote(fallback), let placeholder = Self.loadLocal(fallback, targetSize: size, blur: blur) {
+            setImage(imageView, placeholder)
+        }
+        let finish: (Result<UIImage, Error>) -> Void = { [weak imageView] result in
+            guard let imageView = imageView,
+                  PNViewState.existing(for: imageView)?.extras["image_request"] as? UUID == request else { return }
+            switch result {
+            case .success(let image):
+                self.setImage(imageView, image)
+                if !silent {
+                    PNComponentEvents.Image.on_load(imageView, PNImageLoadEvent(width: Double(image.size.width), height: Double(image.size.height)))
+                }
+            case .failure(let error):
+                if !silent { PNComponentEvents.Image.on_error(imageView, error.localizedDescription) }
+            }
+        }
+        if Self.isRemote(source) {
+            state.extras["cancel_image"] = PNImageLoader.shared.fetch(source) { result in
                 DispatchQueue.global(qos: .userInitiated).async {
                     let decoded = result.flatMap { data -> Result<UIImage, Error> in
-                        guard let image = PNImageManager.decode(data, targetSize: size) else { return .failure(PNImageLoader.LoadError.decode) }
+                        guard let image = PNImageManager.decode(data, targetSize: size, blur: blur) else { return .failure(PNImageLoader.LoadError.decode) }
                         return .success(image)
                     }
-                    DispatchQueue.main.async {
-                        guard let imageView = imageView,
-                              PNViewState.existing(for: imageView)?.extras["image_request"] as? UUID == request else { return }
-                        switch decoded {
-                        case .success(let image):
-                            self.setImage(imageView, image)
-                            PNComponentEvents.Image.on_load(imageView, PNImageLoadEvent(width: Double(image.size.width), height: Double(image.size.height)))
-                        case .failure(let error): PNComponentEvents.Image.on_error(imageView, error.localizedDescription)
-                        }
-                    }
+                    DispatchQueue.main.async { finish(decoded) }
                 }
             }
-        } else if !source.hasPrefix("data:"), let image = UIImage(named: source) {
-            setImage(imageView, image)
-            PNComponentEvents.Image.on_load(imageView, PNImageLoadEvent(width: Double(image.size.width), height: Double(image.size.height)))
-        } else {
-            let size = imageView.bounds.size
-            let work = DispatchWorkItem { [weak imageView] in
-                let result: Result<UIImage, Error> = Result {
-                    let data: Data
-                    if source.hasPrefix("data:") {
-                        guard source.utf8.count <= 90 * 1024 * 1024, let comma = source.firstIndex(of: ","),
-                              let decoded = Data(base64Encoded: String(source[source.index(after: comma)...])) else {
-                            throw PNImageLoader.LoadError.decode
-                        }
-                        data = decoded
-                    } else {
-                        let path = source.hasPrefix("file://") ? (URL(string: source)?.path ?? source) : source
-                        data = try Data(contentsOf: URL(fileURLWithPath: path), options: [.mappedIfSafe])
-                    }
-                    guard data.count <= 64 * 1024 * 1024, let image = Self.decode(data, targetSize: size) else {
-                        throw PNImageLoader.LoadError.decode
-                    }
-                    return image
-                }
-                DispatchQueue.main.async {
-                    guard let imageView = imageView,
-                          PNViewState.existing(for: imageView)?.extras["image_request"] as? UUID == request else { return }
-                    switch result {
-                    case .success(let image):
-                        self.setImage(imageView, image)
-                        PNComponentEvents.Image.on_load(imageView, PNImageLoadEvent(width: Double(image.size.width), height: Double(image.size.height)))
-                    case .failure(let error): PNComponentEvents.Image.on_error(imageView, error.localizedDescription)
-                    }
-                }
-            }
-            state.extras["cancel_image"] = { work.cancel() }
-            DispatchQueue.global(qos: .userInitiated).async(execute: work)
+            return
         }
+        let work = DispatchWorkItem {
+            let result: Result<UIImage, Error> = Result {
+                guard let image = Self.loadLocal(source, targetSize: size, blur: blur) else { throw PNImageLoader.LoadError.decode }
+                return image
+            }
+            DispatchQueue.main.async { finish(result) }
+        }
+        state.extras["cancel_image"] = { work.cancel() }
+        DispatchQueue.global(qos: .userInitiated).async(execute: work)
+    }
+
+    static func isRemote(_ source: String) -> Bool {
+        source.hasPrefix("http://") || source.hasPrefix("https://")
+    }
+
+    /// Decode a bundled asset, data URI, or file path synchronously (call off the main thread).
+    static func loadLocal(_ source: String, targetSize: CGSize, blur: CGFloat = 0) -> UIImage? {
+        var scale: CGFloat = 1
+        let data: Data
+        if PNAssets.isAssetURI(source) {
+            guard let resolved = PNAssets.shared.resolve(source),
+                  let bytes = try? Data(contentsOf: resolved.url, options: [.mappedIfSafe]) else { return nil }
+            scale = resolved.scale
+            data = bytes
+        } else if source.hasPrefix("data:") {
+            guard source.utf8.count <= 90 * 1024 * 1024, let comma = source.firstIndex(of: ","),
+                  let decoded = Data(base64Encoded: String(source[source.index(after: comma)...])) else { return nil }
+            data = decoded
+        } else {
+            let path = source.hasPrefix("file://") ? (URL(string: source)?.path ?? source) : source
+            guard let bytes = try? Data(contentsOf: URL(fileURLWithPath: path), options: [.mappedIfSafe]) else { return nil }
+            data = bytes
+        }
+        guard data.count <= 64 * 1024 * 1024 else { return nil }
+        return decode(data, targetSize: targetSize, assetScale: scale, blur: blur)
     }
 
     private func setImage(_ imageView: UIImageView, _ image: UIImage) {
@@ -133,15 +175,42 @@ public final class PNImageManager: PNTypedComponentManager<ImageProps> {
     }
 
     /// Decode with ImageIO before allocating a full bitmap; cap either edge at 4096 pixels.
-    static func decode(_ data: Data, targetSize: CGSize) -> UIImage? {
+    ///
+    /// `assetScale` is the density the file was drawn for: the result's
+    /// point size is the pixel size divided by it, even when the bitmap
+    /// was downsampled to fit the view.
+    static func decode(_ data: Data, targetSize: CGSize, assetScale: CGFloat = 1, blur: CGFloat = 0) -> UIImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let maximum = targetSize.width > 0 && targetSize.height > 0 ? max(targetSize.width, targetSize.height) * 3 : 2048
         let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceThumbnailMaxPixelSize: min(4096, maximum)]
-        guard let bitmap = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        return UIImage(cgImage: bitmap)
+        guard var bitmap = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        var scale: CGFloat = max(0.01, assetScale)
+        if let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+           let width = properties[kCGImagePropertyPixelWidth] as? CGFloat, width > 0 {
+            // Keep the logical size stable when the thumbnail was downsampled.
+            let orientation = (properties[kCGImagePropertyOrientation] as? UInt32) ?? 1
+            let rotated = orientation >= 5
+            let height = (properties[kCGImagePropertyPixelHeight] as? CGFloat) ?? width
+            let sourceWidth = rotated ? height : width
+            scale = CGFloat(bitmap.width) / max(1, sourceWidth / max(0.01, assetScale))
+        }
+        if blur > 0, let blurred = blurred(bitmap, radius: blur * scale) { bitmap = blurred }
+        return UIImage(cgImage: bitmap, scale: scale, orientation: .up)
+    }
+
+    private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+
+    static func blurred(_ image: CGImage, radius: CGFloat) -> CGImage? {
+        let input = CIImage(cgImage: image)
+        guard let filter = CIFilter(name: "CIGaussianBlur") else { return nil }
+        // Clamp first so the blur samples edge pixels instead of transparency.
+        filter.setValue(input.clampedToExtent(), forKey: kCIInputImageKey)
+        filter.setValue(radius, forKey: kCIInputRadiusKey)
+        guard let output = filter.outputImage?.cropped(to: input.extent) else { return nil }
+        return ciContext.createCGImage(output, from: input.extent)
     }
 
     public override func teardown(view: UIView) {

@@ -1,0 +1,23 @@
+# Tests BlurView hosts children over a gradient for light, dark, and partial intensity.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/blur_view.py
+# Source under test: src/pythonnative/components/graphics.py :: BlurView
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: BlurView
+- assertVisible: "light"
+- assertVisible: "dark"
+- assertVisible: "intensity 40"
+- scrollUntilVisible:
+    element:
+      text: "Back to list"
+    direction: DOWN
+    timeout: 20000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

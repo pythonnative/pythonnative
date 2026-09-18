@@ -645,6 +645,18 @@ public enum PNActivityIndicatorSize: String, Codable {
     case `large` = "large"
 }
 
+public enum PNBlurViewBlurType: String, Codable {
+    case `light` = "light"
+    case `dark` = "dark"
+    case `regular` = "regular"
+    case `prominent` = "prominent"
+    case `extra_light` = "extra_light"
+    case `system_thin_material` = "system_thin_material"
+    case `system_material` = "system_material"
+    case `system_thick_material` = "system_thick_material"
+    case `system_chrome_material` = "system_chrome_material"
+}
+
 public enum PNDatePickerMode: String, Codable {
     case `date` = "date"
     case `time` = "time"
@@ -715,24 +727,6 @@ public enum PNScreenAnimation: String, Codable {
     case `fade` = "fade"
     case `slide_from_right` = "slide_from_right"
     case `slide_from_bottom` = "slide_from_bottom"
-}
-
-public enum PNScreenTabBarIcon: Codable {
-    case option0(String)
-    case option1([String: String])
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let value = try? container.decode(String.self) { self = .option0(value); return }
-        if let value = try? container.decode([String: String].self) { self = .option1(value); return }
-        throw NativeDecodeError.invalid("PNScreenTabBarIcon")
-    }
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .option0(let value): try container.encode(value)
-        case .option1(let value): try container.encode(value)
-        }
-    }
 }
 
 public enum PNScreenTabBarBadge: Codable {
@@ -1587,12 +1581,189 @@ public enum PNStatusBarBarStyle: String, Codable {
     case `default` = "default"
 }
 
+public enum PNPNSvgShapeKind: String, Codable {
+    case `path` = "path"
+    case `circle` = "circle"
+    case `ellipse` = "ellipse"
+    case `rect` = "rect"
+    case `line` = "line"
+    case `polyline` = "polyline"
+    case `polygon` = "polygon"
+}
+
+public enum PNPNSvgShapeFillRule: String, Codable {
+    case `nonzero` = "nonzero"
+    case `evenodd` = "evenodd"
+}
+
+public enum PNPNSvgShapeStrokeLinecap: String, Codable {
+    case `butt` = "butt"
+    case `round` = "round"
+    case `square` = "square"
+}
+
+public enum PNPNSvgShapeStrokeLinejoin: String, Codable {
+    case `miter` = "miter"
+    case `round` = "round"
+    case `bevel` = "bevel"
+}
+
+public struct PNSvgShape: Codable {
+    public let `kind`: PNPNSvgShapeKind
+    public let `d`: String?
+    public let `cx`: Double?
+    public let `cy`: Double?
+    public let `r`: Double?
+    public let `rx`: Double?
+    public let `ry`: Double?
+    public let `x`: Double?
+    public let `y`: Double?
+    public let `width`: Double?
+    public let `height`: Double?
+    public let `x1`: Double?
+    public let `y1`: Double?
+    public let `x2`: Double?
+    public let `y2`: Double?
+    public let `points`: String?
+    public let `fill`: String?
+    public let `fill_opacity`: Double?
+    public let `fill_rule`: PNPNSvgShapeFillRule?
+    public let `stroke`: String?
+    public let `stroke_width`: Double?
+    public let `stroke_opacity`: Double?
+    public let `stroke_linecap`: PNPNSvgShapeStrokeLinecap?
+    public let `stroke_linejoin`: PNPNSvgShapeStrokeLinejoin?
+    public let `stroke_dasharray`: [Double]?
+    public let `opacity`: Double?
+    public let `transform`: String?
+    public init(`kind`: PNPNSvgShapeKind, `d`: String?, `cx`: Double?, `cy`: Double?, `r`: Double?, `rx`: Double?, `ry`: Double?, `x`: Double?, `y`: Double?, `width`: Double?, `height`: Double?, `x1`: Double?, `y1`: Double?, `x2`: Double?, `y2`: Double?, `points`: String?, `fill`: String?, `fill_opacity`: Double?, `fill_rule`: PNPNSvgShapeFillRule?, `stroke`: String?, `stroke_width`: Double?, `stroke_opacity`: Double?, `stroke_linecap`: PNPNSvgShapeStrokeLinecap?, `stroke_linejoin`: PNPNSvgShapeStrokeLinejoin?, `stroke_dasharray`: [Double]?, `opacity`: Double?, `transform`: String?) {
+        self.`kind` = `kind`
+        self.`d` = `d`
+        self.`cx` = `cx`
+        self.`cy` = `cy`
+        self.`r` = `r`
+        self.`rx` = `rx`
+        self.`ry` = `ry`
+        self.`x` = `x`
+        self.`y` = `y`
+        self.`width` = `width`
+        self.`height` = `height`
+        self.`x1` = `x1`
+        self.`y1` = `y1`
+        self.`x2` = `x2`
+        self.`y2` = `y2`
+        self.`points` = `points`
+        self.`fill` = `fill`
+        self.`fill_opacity` = `fill_opacity`
+        self.`fill_rule` = `fill_rule`
+        self.`stroke` = `stroke`
+        self.`stroke_width` = `stroke_width`
+        self.`stroke_opacity` = `stroke_opacity`
+        self.`stroke_linecap` = `stroke_linecap`
+        self.`stroke_linejoin` = `stroke_linejoin`
+        self.`stroke_dasharray` = `stroke_dasharray`
+        self.`opacity` = `opacity`
+        self.`transform` = `transform`
+    }
+    private enum CodingKeys: String, CodingKey { case `kind`; case `d`; case `cx`; case `cy`; case `r`; case `rx`; case `ry`; case `x`; case `y`; case `width`; case `height`; case `x1`; case `y1`; case `x2`; case `y2`; case `points`; case `fill`; case `fill_opacity`; case `fill_rule`; case `stroke`; case `stroke_width`; case `stroke_opacity`; case `stroke_linecap`; case `stroke_linejoin`; case `stroke_dasharray`; case `opacity`; case `transform` }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.`kind` = try container.decode(PNPNSvgShapeKind.self, forKey: .`kind`)
+        self.`d` = container.contains(.`d`) ? (try container.decode(String?.self, forKey: .`d`)) : (try PNValues.decode(String?.self, PNValues.defaultValue("null")))
+        self.`cx` = container.contains(.`cx`) ? (try container.decode(Double?.self, forKey: .`cx`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`cy` = container.contains(.`cy`) ? (try container.decode(Double?.self, forKey: .`cy`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`r` = container.contains(.`r`) ? (try container.decode(Double?.self, forKey: .`r`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`rx` = container.contains(.`rx`) ? (try container.decode(Double?.self, forKey: .`rx`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`ry` = container.contains(.`ry`) ? (try container.decode(Double?.self, forKey: .`ry`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`x` = container.contains(.`x`) ? (try container.decode(Double?.self, forKey: .`x`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`y` = container.contains(.`y`) ? (try container.decode(Double?.self, forKey: .`y`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`width` = container.contains(.`width`) ? (try container.decode(Double?.self, forKey: .`width`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`height` = container.contains(.`height`) ? (try container.decode(Double?.self, forKey: .`height`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`x1` = container.contains(.`x1`) ? (try container.decode(Double?.self, forKey: .`x1`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`y1` = container.contains(.`y1`) ? (try container.decode(Double?.self, forKey: .`y1`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`x2` = container.contains(.`x2`) ? (try container.decode(Double?.self, forKey: .`x2`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`y2` = container.contains(.`y2`) ? (try container.decode(Double?.self, forKey: .`y2`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`points` = container.contains(.`points`) ? (try container.decode(String?.self, forKey: .`points`)) : (try PNValues.decode(String?.self, PNValues.defaultValue("null")))
+        self.`fill` = container.contains(.`fill`) ? (try container.decode(String?.self, forKey: .`fill`)) : (try PNValues.decode(String?.self, PNValues.defaultValue("null")))
+        self.`fill_opacity` = container.contains(.`fill_opacity`) ? (try container.decode(Double?.self, forKey: .`fill_opacity`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`fill_rule` = container.contains(.`fill_rule`) ? (try container.decode(PNPNSvgShapeFillRule?.self, forKey: .`fill_rule`)) : (try PNValues.decode(PNPNSvgShapeFillRule?.self, PNValues.defaultValue("null")))
+        self.`stroke` = container.contains(.`stroke`) ? (try container.decode(String?.self, forKey: .`stroke`)) : (try PNValues.decode(String?.self, PNValues.defaultValue("null")))
+        self.`stroke_width` = container.contains(.`stroke_width`) ? (try container.decode(Double?.self, forKey: .`stroke_width`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`stroke_opacity` = container.contains(.`stroke_opacity`) ? (try container.decode(Double?.self, forKey: .`stroke_opacity`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`stroke_linecap` = container.contains(.`stroke_linecap`) ? (try container.decode(PNPNSvgShapeStrokeLinecap?.self, forKey: .`stroke_linecap`)) : (try PNValues.decode(PNPNSvgShapeStrokeLinecap?.self, PNValues.defaultValue("null")))
+        self.`stroke_linejoin` = container.contains(.`stroke_linejoin`) ? (try container.decode(PNPNSvgShapeStrokeLinejoin?.self, forKey: .`stroke_linejoin`)) : (try PNValues.decode(PNPNSvgShapeStrokeLinejoin?.self, PNValues.defaultValue("null")))
+        self.`stroke_dasharray` = container.contains(.`stroke_dasharray`) ? (try container.decode([Double]?.self, forKey: .`stroke_dasharray`)) : (try PNValues.decode([Double]?.self, PNValues.defaultValue("null")))
+        self.`opacity` = container.contains(.`opacity`) ? (try container.decode(Double?.self, forKey: .`opacity`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
+        self.`transform` = container.contains(.`transform`) ? (try container.decode(String?.self, forKey: .`transform`)) : (try PNValues.decode(String?.self, PNValues.defaultValue("null")))
+    }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(`kind`, forKey: .`kind`)
+        try container.encode(`d`, forKey: .`d`)
+        try container.encode(`cx`, forKey: .`cx`)
+        try container.encode(`cy`, forKey: .`cy`)
+        try container.encode(`r`, forKey: .`r`)
+        try container.encode(`rx`, forKey: .`rx`)
+        try container.encode(`ry`, forKey: .`ry`)
+        try container.encode(`x`, forKey: .`x`)
+        try container.encode(`y`, forKey: .`y`)
+        try container.encode(`width`, forKey: .`width`)
+        try container.encode(`height`, forKey: .`height`)
+        try container.encode(`x1`, forKey: .`x1`)
+        try container.encode(`y1`, forKey: .`y1`)
+        try container.encode(`x2`, forKey: .`x2`)
+        try container.encode(`y2`, forKey: .`y2`)
+        try container.encode(`points`, forKey: .`points`)
+        try container.encode(`fill`, forKey: .`fill`)
+        try container.encode(`fill_opacity`, forKey: .`fill_opacity`)
+        try container.encode(`fill_rule`, forKey: .`fill_rule`)
+        try container.encode(`stroke`, forKey: .`stroke`)
+        try container.encode(`stroke_width`, forKey: .`stroke_width`)
+        try container.encode(`stroke_opacity`, forKey: .`stroke_opacity`)
+        try container.encode(`stroke_linecap`, forKey: .`stroke_linecap`)
+        try container.encode(`stroke_linejoin`, forKey: .`stroke_linejoin`)
+        try container.encode(`stroke_dasharray`, forKey: .`stroke_dasharray`)
+        try container.encode(`opacity`, forKey: .`opacity`)
+        try container.encode(`transform`, forKey: .`transform`)
+    }
+}
+
+public enum PNSvgPreserveAspectRatio: String, Codable {
+    case `meet` = "meet"
+    case `slice` = "slice"
+    case `none` = "none"
+}
+
+public struct PNPNTabBarItemsItemIcon: Codable {
+    public let `shapes`: [PNSvgShape]?
+    public let `view_box`: String?
+    public let `uri`: String?
+    public init(`shapes`: [PNSvgShape]?, `view_box`: String?, `uri`: String?) {
+        self.`shapes` = `shapes`
+        self.`view_box` = `view_box`
+        self.`uri` = `uri`
+    }
+    private enum CodingKeys: String, CodingKey { case `shapes`; case `view_box`; case `uri` }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.`shapes` = try container.decodeIfPresent([PNSvgShape].self, forKey: .`shapes`)
+        self.`view_box` = try container.decodeIfPresent(String.self, forKey: .`view_box`)
+        self.`uri` = try container.decodeIfPresent(String.self, forKey: .`uri`)
+    }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(`shapes`, forKey: .`shapes`)
+        try container.encodeIfPresent(`view_box`, forKey: .`view_box`)
+        try container.encodeIfPresent(`uri`, forKey: .`uri`)
+    }
+}
+
 public struct PNTabBarItemsItem: Codable {
     public let `name`: String
     public let `title`: String
-    public let `icon`: String?
+    public let `icon`: PNPNTabBarItemsItemIcon?
     public let `badge`: String?
-    public init(`name`: String, `title`: String, `icon`: String?, `badge`: String?) {
+    public init(`name`: String, `title`: String, `icon`: PNPNTabBarItemsItemIcon?, `badge`: String?) {
         self.`name` = `name`
         self.`title` = `title`
         self.`icon` = `icon`
@@ -1603,7 +1774,7 @@ public struct PNTabBarItemsItem: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.`name` = try container.decode(String.self, forKey: .`name`)
         self.`title` = try container.decode(String.self, forKey: .`title`)
-        self.`icon` = try container.decodeIfPresent(String.self, forKey: .`icon`)
+        self.`icon` = try container.decodeIfPresent(PNPNTabBarItemsItemIcon.self, forKey: .`icon`)
         self.`badge` = try container.decodeIfPresent(String.self, forKey: .`badge`)
     }
     public func encode(to encoder: Encoder) throws {
@@ -1669,6 +1840,82 @@ public struct PNWebNavigationEvent: Codable {
         try container.encode(`can_go_back`, forKey: .`can_go_back`)
         try container.encode(`can_go_forward`, forKey: .`can_go_forward`)
         try container.encode(`title`, forKey: .`title`)
+    }
+}
+
+public struct PNFontFace: Codable {
+    public let `family`: String
+    public let `weight`: Int64
+    public let `italic`: Bool
+    public let `postscript_name`: String
+    public let `path`: String
+    public init(`family`: String, `weight`: Int64, `italic`: Bool, `postscript_name`: String, `path`: String) {
+        self.`family` = `family`
+        self.`weight` = `weight`
+        self.`italic` = `italic`
+        self.`postscript_name` = `postscript_name`
+        self.`path` = `path`
+    }
+    private enum CodingKeys: String, CodingKey { case `family`; case `weight`; case `italic`; case `postscript_name`; case `path` }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.`family` = try container.decode(String.self, forKey: .`family`)
+        self.`weight` = try container.decode(Int64.self, forKey: .`weight`)
+        self.`italic` = try container.decode(Bool.self, forKey: .`italic`)
+        self.`postscript_name` = try container.decode(String.self, forKey: .`postscript_name`)
+        self.`path` = try container.decode(String.self, forKey: .`path`)
+    }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(`family`, forKey: .`family`)
+        try container.encode(`weight`, forKey: .`weight`)
+        try container.encode(`italic`, forKey: .`italic`)
+        try container.encode(`postscript_name`, forKey: .`postscript_name`)
+        try container.encode(`path`, forKey: .`path`)
+    }
+}
+
+public struct PNAssetManifest: Codable {
+    public let `files`: [String]
+    public let `variants`: [String: [String: String]]
+    public let `fonts`: [PNFontFace]
+    public init(`files`: [String], `variants`: [String: [String: String]], `fonts`: [PNFontFace]) {
+        self.`files` = `files`
+        self.`variants` = `variants`
+        self.`fonts` = `fonts`
+    }
+    private enum CodingKeys: String, CodingKey { case `files`; case `variants`; case `fonts` }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.`files` = container.contains(.`files`) ? (try container.decode([String].self, forKey: .`files`)) : (try PNValues.decode([String].self, PNValues.defaultValue("[]")))
+        self.`variants` = container.contains(.`variants`) ? (try container.decode([String: [String: String]].self, forKey: .`variants`)) : (try PNValues.decode([String: [String: String]].self, PNValues.defaultValue("{}")))
+        self.`fonts` = container.contains(.`fonts`) ? (try container.decode([PNFontFace].self, forKey: .`fonts`)) : (try PNValues.decode([PNFontFace].self, PNValues.defaultValue("[]")))
+    }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(`files`, forKey: .`files`)
+        try container.encode(`variants`, forKey: .`variants`)
+        try container.encode(`fonts`, forKey: .`fonts`)
+    }
+}
+
+public struct PNImageSize: Codable {
+    public let `width`: Double
+    public let `height`: Double
+    public init(`width`: Double, `height`: Double) {
+        self.`width` = `width`
+        self.`height` = `height`
+    }
+    private enum CodingKeys: String, CodingKey { case `width`; case `height` }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.`width` = try container.decode(Double.self, forKey: .`width`)
+        self.`height` = try container.decode(Double.self, forKey: .`height`)
+    }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(`width`, forKey: .`width`)
+        try container.encode(`height`, forKey: .`height`)
     }
 }
 

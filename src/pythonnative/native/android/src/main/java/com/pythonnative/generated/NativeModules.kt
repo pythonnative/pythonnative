@@ -63,6 +63,37 @@ object AppStateEvents {
     fun `change`(payload: String) = com.pythonnative.runtime.modules.ModuleEvents.emit("AppState", "change", PNValues.encode(payload))
 }
 
+interface AssetsImplementation {
+    fun `configure`(`overlay`: String?, `manifest`: PNAssetManifest): Unit
+    fun `exists`(`path`: String): Boolean
+    fun `read`(`path`: String): String?
+}
+
+class AssetsModuleAdapter(private val implementation: AssetsImplementation): NativeModule {
+    override val name = "Assets"
+    override fun call(method: String, args: JSONObject, promise: Promise) {
+        try {
+            require(PNContracts.validateModule(name, method, args)) { "Invalid native arguments" }
+            when (method) {
+                "configure" -> {
+                    val `overlay` = if (PNValues.isNull((args.opt("overlay")))) null else PNValues.string((args.opt("overlay")))
+                    val `manifest` = PNAssetManifest.decode((args.opt("manifest")))
+                    implementation.`configure`(`overlay`, `manifest`); promise.resolve(null)
+                }
+                "exists" -> {
+                    val `path` = PNValues.string((args.opt("path")))
+                    promise.resolve(PNValues.encode(implementation.`exists`(`path`)))
+                }
+                "read" -> {
+                    val `path` = PNValues.string((args.opt("path")))
+                    promise.resolve(PNValues.encode(implementation.`read`(`path`)))
+                }
+                else -> promise.rejectUnknownMethod(method)
+            }
+        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+    }
+}
+
 interface BatteryImplementation {
     fun `get_level`(): Double
     fun `get_state`(): String
@@ -226,6 +257,45 @@ class HapticsModuleAdapter(private val implementation: HapticsImplementation): N
                 "vibrate" -> {
                     val `duration_ms` = PNValues.integer((if (args.has("duration_ms")) args.opt("duration_ms") else PNValues.defaultValue("400")))
                     implementation.`vibrate`(`duration_ms`); promise.resolve(null)
+                }
+                else -> promise.rejectUnknownMethod(method)
+            }
+        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+    }
+}
+
+interface ImagesImplementation {
+    fun `clear_cache`(): Unit
+    fun `get_size`(`uri`: String, completion: (Result<PNImageSize>) -> Unit): (() -> Unit)?
+    fun `prefetch`(`uri`: String, completion: (Result<Boolean>) -> Unit): (() -> Unit)?
+}
+
+class ImagesModuleAdapter(private val implementation: ImagesImplementation): NativeModule {
+    override val name = "Images"
+    override fun call(method: String, args: JSONObject, promise: Promise) {
+        try {
+            require(PNContracts.validateModule(name, method, args)) { "Invalid native arguments" }
+            when (method) {
+                "clear_cache" -> {
+                    implementation.`clear_cache`(); promise.resolve(null)
+                }
+                "get_size" -> {
+                    val `uri` = PNValues.string((args.opt("uri")))
+                    val cancellation = implementation.`get_size`(`uri`) { result ->
+                        try {
+                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
+                        } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
+                    }
+                    if (cancellation != null) promise.onCancel(cancellation)
+                }
+                "prefetch" -> {
+                    val `uri` = PNValues.string((args.opt("uri")))
+                    val cancellation = implementation.`prefetch`(`uri`) { result ->
+                        try {
+                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
+                        } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
+                    }
+                    if (cancellation != null) promise.onCancel(cancellation)
                 }
                 else -> promise.rejectUnknownMethod(method)
             }

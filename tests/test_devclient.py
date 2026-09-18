@@ -96,7 +96,9 @@ def test_client_syncs_the_tree_into_the_overlay_and_reports_state(
     overlay = tmp_path / "overlay"
     states: List[str] = []
     reloads: List[List[str]] = []
-    monkeypatch.setattr(devclient.DevClient, "_schedule_reload", lambda self, modules, version: reloads.append(modules))
+    monkeypatch.setattr(
+        devclient.DevClient, "_schedule_reload", lambda self, modules, version, **kw: reloads.append(modules)
+    )
     client = devclient.DevClient(
         server.info.url("127.0.0.1"), str(overlay), entry_module="app.main", forward_logs=False, log=lambda _: None
     )
@@ -146,7 +148,9 @@ def test_first_hello_seeds_the_overlay_from_the_bundled_sources(
     monkeypatch.setattr(sys, "path", [p for p in sys.path if p != str(overlay)])
     assert (overlay / "app").is_dir() and not any((overlay / "app").iterdir())
     reloads: List[List[str]] = []
-    monkeypatch.setattr(devclient.DevClient, "_schedule_reload", lambda self, modules, version: reloads.append(modules))
+    monkeypatch.setattr(
+        devclient.DevClient, "_schedule_reload", lambda self, modules, version, **kw: reloads.append(modules)
+    )
     client = devclient.DevClient(
         server.info.url("127.0.0.1"), str(overlay), entry_module="app.main", forward_logs=False, log=lambda _: None
     )
@@ -190,7 +194,9 @@ def test_updates_are_applied_and_reloads_scheduled(
 ) -> None:
     overlay = tmp_path / "overlay"
     reloads: List[List[str]] = []
-    monkeypatch.setattr(devclient.DevClient, "_schedule_reload", lambda self, modules, version: reloads.append(modules))
+    monkeypatch.setattr(
+        devclient.DevClient, "_schedule_reload", lambda self, modules, version, **kw: reloads.append(modules)
+    )
     client = devclient.DevClient(server.info.url("127.0.0.1"), str(overlay), forward_logs=False, log=lambda _: None)
     client.start()
     try:

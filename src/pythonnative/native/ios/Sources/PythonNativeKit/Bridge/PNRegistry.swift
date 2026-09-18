@@ -99,6 +99,9 @@ enum PNBuiltins {
         registry.registerComponent("Button") { PNButtonManager() }
         registry.registerComponent("TextInput") { PNTextInputManager() }
         registry.registerComponent("Image") { PNImageManager() }
+        registry.registerComponent("Svg") { PNSvgManager() }
+        registry.registerComponent("LinearGradient") { PNLinearGradientManager() }
+        registry.registerComponent("BlurView") { PNBlurViewManager() }
         registry.registerComponent("Switch") { PNSwitchManager() }
         registry.registerComponent("ProgressBar") { PNProgressBarManager() }
         registry.registerComponent("ActivityIndicator") { PNActivityIndicatorManager() }
@@ -136,5 +139,7 @@ enum PNBuiltins {
         registry.registerModule(CameraModuleAdapter<CameraModule>.self)
         registry.registerModule(LocationModuleAdapter<LocationModule>.self)
         registry.registerModule(BiometricsModuleAdapter<BiometricsModule>.self)
+        registry.registerModule(AssetsModuleAdapter<AssetsModule>.self)
+        registry.registerModule(ImagesModuleAdapter<ImagesModule>.self)
     }
 }

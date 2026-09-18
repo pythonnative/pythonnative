@@ -227,6 +227,26 @@ class ActivityIndicatorProps(values: JSONObject, partial: Boolean = true): PNVie
     val `accessibility_role`: String? get() = if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role"))
 }
 
+class BlurViewProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
+    init { require(PNContracts.validate("BlurView", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid BlurView props" } }
+    val has_flex: Boolean get() = values.has("flex")
+    val `flex`: Double? get() = if (PNValues.isNull(values.opt("flex"))) null else PNValues.number(values.get("flex"))
+    val has_background_color: Boolean get() = values.has("background_color")
+    val `background_color`: String? get() = if (PNValues.isNull(values.opt("background_color"))) null else PNValues.string(values.get("background_color"))
+    val has_color: Boolean get() = values.has("color")
+    val `color`: String? get() = if (PNValues.isNull(values.opt("color"))) null else PNValues.string(values.get("color"))
+    val has_placeholder_color: Boolean get() = values.has("placeholder_color")
+    val `placeholder_color`: String? get() = if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.string(values.get("placeholder_color"))
+    val has_tint_color: Boolean get() = values.has("tint_color")
+    val `tint_color`: String? get() = if (PNValues.isNull(values.opt("tint_color"))) null else PNValues.string(values.get("tint_color"))
+    val has_blur_type: Boolean get() = values.has("blur_type")
+    val `blur_type`: PNBlurViewBlurType? get() = if (PNValues.isNull(values.opt("blur_type"))) null else PNBlurViewBlurType.decode(values.get("blur_type"))
+    val has_intensity: Boolean get() = values.has("intensity")
+    val `intensity`: Double? get() = if (PNValues.isNull(values.opt("intensity"))) null else PNValues.number(values.get("intensity"))
+    val has_accessibility_role: Boolean get() = values.has("accessibility_role")
+    val `accessibility_role`: String? get() = if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role"))
+}
+
 class ButtonProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     init { require(PNContracts.validate("Button", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Button props" } }
     val has_flex: Boolean get() = values.has("flex")
@@ -331,8 +351,12 @@ class ImageProps(values: JSONObject, partial: Boolean = true): PNViewProps(value
     val `tint_color`: String? get() = if (PNValues.isNull(values.opt("tint_color"))) null else if (PNValues.isNull(values.get("tint_color"))) null else PNValues.string(values.get("tint_color"))
     val has_source: Boolean get() = values.has("source")
     val `source`: String? get() = if (PNValues.isNull(values.opt("source"))) null else PNValues.string(values.get("source"))
+    val has_default_source: Boolean get() = values.has("default_source")
+    val `default_source`: String? get() = if (PNValues.isNull(values.opt("default_source"))) null else if (PNValues.isNull(values.get("default_source"))) null else PNValues.string(values.get("default_source"))
     val has_scale_type: Boolean get() = values.has("scale_type")
     val `scale_type`: PNImageScaleType? get() = if (PNValues.isNull(values.opt("scale_type"))) null else if (PNValues.isNull(values.get("scale_type"))) null else PNImageScaleType.decode(values.get("scale_type"))
+    val has_blur_radius: Boolean get() = values.has("blur_radius")
+    val `blur_radius`: Double? get() = if (PNValues.isNull(values.opt("blur_radius"))) null else if (PNValues.isNull(values.get("blur_radius"))) null else PNValues.number(values.get("blur_radius"))
     val has_on_load: Boolean get() = values.has("on_load")
     val `on_load`: Boolean? get() = if (PNValues.isNull(values.opt("on_load"))) null else if (PNValues.isNull(values.get("on_load"))) null else PNValues.boolean(values.get("on_load"))
     val has_on_error: Boolean get() = values.has("on_error")
@@ -377,6 +401,30 @@ class KeyboardAvoidingViewProps(values: JSONObject, partial: Boolean = true): PN
     val `behavior`: PNKeyboardAvoidingViewBehavior? get() = if (PNValues.isNull(values.opt("behavior"))) null else PNKeyboardAvoidingViewBehavior.decode(values.get("behavior"))
     val has_keyboard_vertical_offset: Boolean get() = values.has("keyboard_vertical_offset")
     val `keyboard_vertical_offset`: Double? get() = if (PNValues.isNull(values.opt("keyboard_vertical_offset"))) null else PNValues.number(values.get("keyboard_vertical_offset"))
+    val has_accessibility_role: Boolean get() = values.has("accessibility_role")
+    val `accessibility_role`: String? get() = if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role"))
+}
+
+class LinearGradientProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
+    init { require(PNContracts.validate("LinearGradient", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid LinearGradient props" } }
+    val has_flex: Boolean get() = values.has("flex")
+    val `flex`: Double? get() = if (PNValues.isNull(values.opt("flex"))) null else PNValues.number(values.get("flex"))
+    val has_background_color: Boolean get() = values.has("background_color")
+    val `background_color`: String? get() = if (PNValues.isNull(values.opt("background_color"))) null else PNValues.string(values.get("background_color"))
+    val has_color: Boolean get() = values.has("color")
+    val `color`: String? get() = if (PNValues.isNull(values.opt("color"))) null else PNValues.string(values.get("color"))
+    val has_placeholder_color: Boolean get() = values.has("placeholder_color")
+    val `placeholder_color`: String? get() = if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.string(values.get("placeholder_color"))
+    val has_tint_color: Boolean get() = values.has("tint_color")
+    val `tint_color`: String? get() = if (PNValues.isNull(values.opt("tint_color"))) null else PNValues.string(values.get("tint_color"))
+    val has_colors: Boolean get() = values.has("colors")
+    val `colors`: List<String>? get() = if (PNValues.isNull(values.opt("colors"))) null else PNValues.array(values.get("colors")).map { item -> PNValues.string(item) }
+    val has_locations: Boolean get() = values.has("locations")
+    val `locations`: List<Double>? get() = if (PNValues.isNull(values.opt("locations"))) null else if (PNValues.isNull(values.get("locations"))) null else PNValues.array(values.get("locations")).map { item -> PNValues.number(item) }
+    val has_start_point: Boolean get() = values.has("start_point")
+    val `start_point`: PNPNViewTextShadowOffset1? get() = if (PNValues.isNull(values.opt("start_point"))) null else PNPNViewTextShadowOffset1.decode(values.get("start_point"))
+    val has_end_point: Boolean get() = values.has("end_point")
+    val `end_point`: PNPNViewTextShadowOffset1? get() = if (PNValues.isNull(values.opt("end_point"))) null else PNPNViewTextShadowOffset1.decode(values.get("end_point"))
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
     val `accessibility_role`: String? get() = if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role"))
 }
@@ -599,8 +647,6 @@ class ScreenProps(values: JSONObject, partial: Boolean = true): PNViewProps(valu
     val `gesture_enabled`: Boolean? get() = if (PNValues.isNull(values.opt("gesture_enabled"))) null else PNValues.boolean(values.get("gesture_enabled"))
     val has_animation: Boolean get() = values.has("animation")
     val `animation`: PNScreenAnimation? get() = if (PNValues.isNull(values.opt("animation"))) null else PNScreenAnimation.decode(values.get("animation"))
-    val has_tab_bar_icon: Boolean get() = values.has("tab_bar_icon")
-    val `tab_bar_icon`: PNScreenTabBarIcon? get() = if (PNValues.isNull(values.opt("tab_bar_icon"))) null else PNScreenTabBarIcon.decode(values.get("tab_bar_icon"))
     val has_tab_bar_badge: Boolean get() = values.has("tab_bar_badge")
     val `tab_bar_badge`: PNScreenTabBarBadge? get() = if (PNValues.isNull(values.opt("tab_bar_badge"))) null else PNScreenTabBarBadge.decode(values.get("tab_bar_badge"))
     val has_tab_bar_label: Boolean get() = values.has("tab_bar_label")
@@ -759,6 +805,40 @@ class StatusBarProps(values: JSONObject, partial: Boolean = true): PNViewProps(v
     val `hidden`: Boolean? get() = if (PNValues.isNull(values.opt("hidden"))) null else if (PNValues.isNull(values.get("hidden"))) null else PNValues.boolean(values.get("hidden"))
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
     val `accessibility_role`: String? get() = if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role"))
+}
+
+class SvgProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
+    init { require(PNContracts.validate("Svg", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Svg props" } }
+    val has_flex: Boolean get() = values.has("flex")
+    val `flex`: Double? get() = if (PNValues.isNull(values.opt("flex"))) null else PNValues.number(values.get("flex"))
+    val has_background_color: Boolean get() = values.has("background_color")
+    val `background_color`: String? get() = if (PNValues.isNull(values.opt("background_color"))) null else PNValues.string(values.get("background_color"))
+    val has_color: Boolean get() = values.has("color")
+    val `color`: String? get() = if (PNValues.isNull(values.opt("color"))) null else PNValues.string(values.get("color"))
+    val has_placeholder_color: Boolean get() = values.has("placeholder_color")
+    val `placeholder_color`: String? get() = if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.string(values.get("placeholder_color"))
+    val has_tint_color: Boolean get() = values.has("tint_color")
+    val `tint_color`: String? get() = if (PNValues.isNull(values.opt("tint_color"))) null else PNValues.string(values.get("tint_color"))
+    val has_shapes: Boolean get() = values.has("shapes")
+    val `shapes`: List<PNSvgShape>? get() = if (PNValues.isNull(values.opt("shapes"))) null else if (PNValues.isNull(values.get("shapes"))) null else PNValues.array(values.get("shapes")).map { item -> PNSvgShape.decode(item) }
+    val has_view_box: Boolean get() = values.has("view_box")
+    val `view_box`: String? get() = if (PNValues.isNull(values.opt("view_box"))) null else if (PNValues.isNull(values.get("view_box"))) null else PNValues.string(values.get("view_box"))
+    val has_preserve_aspect_ratio: Boolean get() = values.has("preserve_aspect_ratio")
+    val `preserve_aspect_ratio`: PNSvgPreserveAspectRatio? get() = if (PNValues.isNull(values.opt("preserve_aspect_ratio"))) null else PNSvgPreserveAspectRatio.decode(values.get("preserve_aspect_ratio"))
+    val has_fill: Boolean get() = values.has("fill")
+    val `fill`: String? get() = if (PNValues.isNull(values.opt("fill"))) null else if (PNValues.isNull(values.get("fill"))) null else PNValues.string(values.get("fill"))
+    val has_stroke: Boolean get() = values.has("stroke")
+    val `stroke`: String? get() = if (PNValues.isNull(values.opt("stroke"))) null else if (PNValues.isNull(values.get("stroke"))) null else PNValues.string(values.get("stroke"))
+    val has_stroke_width: Boolean get() = values.has("stroke_width")
+    val `stroke_width`: Double? get() = if (PNValues.isNull(values.opt("stroke_width"))) null else if (PNValues.isNull(values.get("stroke_width"))) null else PNValues.number(values.get("stroke_width"))
+    val has_stroke_linecap: Boolean get() = values.has("stroke_linecap")
+    val `stroke_linecap`: PNPNSvgShapeStrokeLinecap? get() = if (PNValues.isNull(values.opt("stroke_linecap"))) null else if (PNValues.isNull(values.get("stroke_linecap"))) null else PNPNSvgShapeStrokeLinecap.decode(values.get("stroke_linecap"))
+    val has_stroke_linejoin: Boolean get() = values.has("stroke_linejoin")
+    val `stroke_linejoin`: PNPNSvgShapeStrokeLinejoin? get() = if (PNValues.isNull(values.opt("stroke_linejoin"))) null else if (PNValues.isNull(values.get("stroke_linejoin"))) null else PNPNSvgShapeStrokeLinejoin.decode(values.get("stroke_linejoin"))
+    val has_fill_rule: Boolean get() = values.has("fill_rule")
+    val `fill_rule`: PNPNSvgShapeFillRule? get() = if (PNValues.isNull(values.opt("fill_rule"))) null else if (PNValues.isNull(values.get("fill_rule"))) null else PNPNSvgShapeFillRule.decode(values.get("fill_rule"))
+    val has_accessibility_role: Boolean get() = values.has("accessibility_role")
+    val `accessibility_role`: String? get() = if (PNValues.isNull(values.opt("accessibility_role"))) null else if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role"))
 }
 
 class SwitchProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
@@ -999,6 +1079,9 @@ object PNComponentEvents {
     object ActivityIndicator {
         fun `on_layout`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "on_layout", *arguments)
     }
+    object BlurView {
+        fun `on_layout`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "on_layout", *arguments)
+    }
     object Button {
         fun `on_press`(view: android.view.View): Boolean = PNEvents.fire(view, "on_press")
         fun `on_layout`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "on_layout", *arguments)
@@ -1023,6 +1106,9 @@ object PNComponentEvents {
         fun `on_layout`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "on_layout", *arguments)
     }
     object KeyboardAvoidingView {
+        fun `on_layout`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "on_layout", *arguments)
+    }
+    object LinearGradient {
         fun `on_layout`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "on_layout", *arguments)
     }
     object Modal {
@@ -1083,6 +1169,9 @@ object PNComponentEvents {
         fun `on_layout`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "on_layout", *arguments)
     }
     object StatusBar {
+        fun `on_layout`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "on_layout", *arguments)
+    }
+    object Svg {
         fun `on_layout`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "on_layout", *arguments)
     }
     object Switch {

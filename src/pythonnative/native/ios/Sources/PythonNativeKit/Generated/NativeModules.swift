@@ -65,6 +65,38 @@ public enum AppStateEvents {
     public static func `change`(_ payload: String) { PNModuleEvents.emit(module: "AppState", event: "change", payload: PNValues.encode(payload)) }
 }
 
+public protocol AssetsImplementation {
+    init()
+    func `configure`(`overlay`: String?, `manifest`: PNAssetManifest) throws -> Void
+    func `exists`(`path`: String) throws -> Bool
+    func `read`(`path`: String) throws -> String?
+}
+
+public final class AssetsModuleAdapter<Implementation: AssetsImplementation>: PNNativeModule {
+    public static var name: String { "Assets" }
+    private let implementation: Implementation
+    public init() { implementation = Implementation() }
+    public init(implementation: Implementation) { self.implementation = implementation }
+    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
+        do {
+            guard PNContracts.validateModule("Assets", method, args) else { throw NativeDecodeError.invalid("Assets.\(method)") }
+            switch method {
+            case "configure":
+                let `overlay` = try PNValues.decode(String?.self, args["overlay"])
+                let `manifest` = try PNValues.decode(PNAssetManifest.self, args["manifest"])
+                try implementation.`configure`(`overlay`: `overlay`, `manifest`: `manifest`); promise.resolve(nil)
+            case "exists":
+                let `path` = try PNValues.decode(String.self, args["path"])
+                promise.resolve(try PNValues.checkedEncode(implementation.`exists`(`path`: `path`)))
+            case "read":
+                let `path` = try PNValues.decode(String.self, args["path"])
+                promise.resolve(try PNValues.checkedEncode(implementation.`read`(`path`: `path`)))
+            default: promise.reject("Unknown method", code: "unknown_method")
+            }
+        } catch { promise.reject(error) }
+    }
+}
+
 public protocol BatteryImplementation {
     init()
     func `get_level`() throws -> Double
@@ -242,6 +274,48 @@ public final class HapticsModuleAdapter<Implementation: HapticsImplementation>: 
             case "vibrate":
                 let `duration_ms` = try PNValues.decode(Int64.self, args["duration_ms"] ?? PNValues.defaultValue("400"))
                 try implementation.`vibrate`(`duration_ms`: `duration_ms`); promise.resolve(nil)
+            default: promise.reject("Unknown method", code: "unknown_method")
+            }
+        } catch { promise.reject(error) }
+    }
+}
+
+public protocol ImagesImplementation {
+    init()
+    func `clear_cache`() throws -> Void
+    func `get_size`(`uri`: String, completion: @escaping (Result<PNImageSize, Error>) -> Void) -> (() -> Void)?
+    func `prefetch`(`uri`: String, completion: @escaping (Result<Bool, Error>) -> Void) -> (() -> Void)?
+}
+
+public final class ImagesModuleAdapter<Implementation: ImagesImplementation>: PNNativeModule {
+    public static var name: String { "Images" }
+    private let implementation: Implementation
+    public init() { implementation = Implementation() }
+    public init(implementation: Implementation) { self.implementation = implementation }
+    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
+        do {
+            guard PNContracts.validateModule("Images", method, args) else { throw NativeDecodeError.invalid("Images.\(method)") }
+            switch method {
+            case "clear_cache":
+                try implementation.`clear_cache`(); promise.resolve(nil)
+            case "get_size":
+                let `uri` = try PNValues.decode(String.self, args["uri"])
+                let cancellation = implementation.`get_size`(`uri`: `uri`) { result in
+                    switch result {
+                    case .success(let value): do { promise.resolve(try PNValues.checkedEncode(value)) } catch { promise.reject(error) }
+                    case .failure(let error): promise.reject(error)
+                    }
+                }
+                if let cancellation = cancellation { promise.onCancel(cancellation) }
+            case "prefetch":
+                let `uri` = try PNValues.decode(String.self, args["uri"])
+                let cancellation = implementation.`prefetch`(`uri`: `uri`) { result in
+                    switch result {
+                    case .success(let value): do { promise.resolve(try PNValues.checkedEncode(value)) } catch { promise.reject(error) }
+                    case .failure(let error): promise.reject(error)
+                    }
+                }
+                if let cancellation = cancellation { promise.onCancel(cancellation) }
             default: promise.reject("Unknown method", code: "unknown_method")
             }
         } catch { promise.reject(error) }

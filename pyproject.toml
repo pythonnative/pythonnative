@@ -97,6 +97,7 @@ pythonnative = [
   "py.typed",
   "templates/**", "native/**", "sdk/templates/**",
   "devserver/static/**",
+  "icons/_lucide.json", "icons/LICENSE-lucide.txt",
 ]
 
 [tool.setuptools.exclude-package-data]

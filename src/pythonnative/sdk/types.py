@@ -72,7 +72,18 @@ def type_schema(annotation: Any, *, _parents: tuple[type, ...] = ()) -> dict[str
     if origin in (typing.Required, typing.NotRequired):
         return type_schema(args[0], _parents=_parents)
     if origin in (typing.Union, types.UnionType):
-        return {"anyOf": [type_schema(arg, _parents=_parents) for arg in args]}
+        alternatives: list[dict[str, Any]] = []
+        for arg in args:
+            candidate = type_schema(arg, _parents=_parents)
+            # Wire-scalar records (see ``__native_schema__``) can collapse a
+            # union like ``str | Asset`` into one alternative.
+            if candidate not in alternatives:
+                alternatives.append(candidate)
+        return alternatives[0] if len(alternatives) == 1 else {"anyOf": alternatives}
+    if inspect.isclass(annotation) and callable(getattr(annotation, "__native_schema__", None)):
+        # A Python value type whose wire form is simpler than its fields
+        # (``Asset`` travels as its ``asset://`` URI string).
+        return dict(annotation.__native_schema__())
     if origin is typing.Literal:
         values = [encode_value(arg) for arg in args]
         if not all(value is None or type(value) in (str, int, bool, float) for value in values):
@@ -159,6 +170,8 @@ def encode_value(value: Any, schema: Mapping[str, Any] | None = None, path: str 
         validate(value, schema, path)
     if isinstance(value, enum.Enum):
         return encode_value(value.value, path=path)
+    if callable(getattr(value, "__native_value__", None)) and not isinstance(value, type):
+        return encode_value(value.__native_value__(), path=path)
     if value is None or type(value) in (str, bool, int):
         if type(value) is int and abs(value) > 2**53 - 1:
             raise TypeError(f"{path} exceeds the portable integer range")
@@ -229,6 +242,8 @@ def validate(value: Any, schema: Mapping[str, Any], path: str = "value") -> None
     """Validate declared values without coercion or ambiguous comparisons."""
     if schema.get("native", {}).get("python_only"):
         return
+    if callable(getattr(value, "__native_value__", None)) and not isinstance(value, type):
+        value = value.__native_value__()
     if "anyOf" in schema:
         for alternative in schema["anyOf"]:
             try:

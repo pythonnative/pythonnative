@@ -16,6 +16,7 @@ import {computeLayout, disposeLayout} from "./layout.js";
 // validate the wire interface before a manager changes a widget.
 
 import { color as parseColor, isColorProp } from "./colors.js";
+import { assets } from "./assets.js";
 
 const INF = 1e6;
 const isFiniteConstraint = (v) => typeof v === "number" && v > 0 && v < INF / 2;
@@ -618,24 +619,50 @@ class ImageManager extends ViewManager {
     view.img = img;
     view.tint = tint;
     view.natural = null;
+    view.assetScale = 1;
     img.addEventListener("load", () => {
-      view.natural = [img.naturalWidth, img.naturalHeight];
+      const scale = view.assetScale || 1;
+      view.natural = [img.naturalWidth / scale, img.naturalHeight / scale];
       view.measureCache = null;
-      view.ctx.emit(view.tag, "on_load", [{ width: img.naturalWidth, height: img.naturalHeight }]);
+      view.ctx.emit(view.tag, "on_load", [{ width: view.natural[0], height: view.natural[1] }]);
     });
-    img.addEventListener("error", () => view.ctx.emit(view.tag, "on_error", [`failed to load ${img.src}`]));
+    img.addEventListener("error", () => {
+      const fallback = imageSource(view.props.default_source);
+      if (fallback && view.img.src !== new URL(fallback, location.href).href) {
+        view.assetScale = assetScaleOf(view.props.default_source);
+        view.img.src = fallback;
+        return;
+      }
+      view.ctx.emit(view.tag, "on_error", [`failed to load ${img.src}`]);
+    });
+    view.unsubscribeAssets = assets.onChange(() => {
+      if (assets.isAssetUri(view.props.source) || assets.isAssetUri(view.props.default_source)) {
+        this.update(view, { source: view.props.source });
+      }
+    });
     this.update(view, props);
   }
   update(view, changed) {
     const props = view.props;
     const scheme = view.ctx.scheme();
     const has = (k) => k in changed;
-    if (has("source")) {
+    if (has("source") || has("default_source")) {
       const src = imageSource(props.source);
+      const fallback = imageSource(props.default_source);
       view.natural = null;
-      if (src) view.img.src = src;
-      else view.img.removeAttribute("src");
-      view.tint.style.maskImage = view.tint.style.webkitMaskImage = src ? `url("${src}")` : "";
+      if (src) {
+        view.assetScale = assetScaleOf(props.source);
+        // Show the local placeholder immediately for remote sources.
+        if (fallback && /^https?:/.test(String(props.source))) view.img.src = fallback;
+        view.img.src = src;
+      } else if (fallback) {
+        view.assetScale = assetScaleOf(props.default_source);
+        view.img.src = fallback;
+      } else {
+        view.img.removeAttribute("src");
+      }
+      const maskSrc = src || fallback;
+      view.tint.style.maskImage = view.tint.style.webkitMaskImage = maskSrc ? `url("${maskSrc}")` : "";
     }
     if (has("scale_type") || has("resize_mode")) {
       const mode = props.scale_type ?? props.resize_mode;
@@ -648,7 +675,15 @@ class ImageManager extends ViewManager {
       view.tint.style.backgroundColor = tint ?? "";
       view.img.style.visibility = tint ? "hidden" : "";
     }
+    if (has("blur_radius")) {
+      const radius = Number(props.blur_radius) || 0;
+      view.img.style.filter = radius > 0 ? `blur(${px(radius)})` : "";
+      view.el.style.overflow = radius > 0 ? "hidden" : "";
+    }
     applyStyle(view, props, changed, scheme, { leaf: true });
+  }
+  destroy(view) {
+    if (view.unsubscribeAssets) view.unsubscribeAssets();
   }
   measure(view, maxW, maxH) {
     if (!view.natural) return [0, 0];
@@ -670,10 +705,17 @@ function imageSource(source) {
   if (typeof source === "object") source = source.uri ?? source.url ?? source.src ?? "";
   const text = String(source);
   if (!text) return "";
-  if (/^(https?:|data:|blob:|\/)/.test(text)) return text;
+  if (assets.isAssetUri(text)) return assets.resolve(text) || "";
+  if (/^(https?:|data:|blob:)/.test(text)) return text;
   if (text.startsWith("file://")) return `/file/${encodeURI(text.slice("file://".length).replace(/^\/+/, ""))}`;
-  // Bundle-relative name: serve it out of the project through the dev server.
-  return `/file/${encodeURI(text.replace(/^\.?\//, ""))}`;
+  // An absolute path on the machine running the preview.
+  return `/file/${encodeURI(text.replace(/^\/+/, ""))}`;
+}
+
+/** The density of the variant a bundled image resolves to (1 for anything else). */
+function assetScaleOf(source) {
+  const path = assets.pathOf(source);
+  return path == null ? 1 : assets.scaleOf(path);
 }
 
 class SwitchManager extends ViewManager {
@@ -1190,7 +1232,7 @@ class TabBarManager extends ViewManager {
       if (!active && inactive) button.style.color = inactive;
       const icon = document.createElement("span");
       icon.className = "pn-tab-icon";
-      icon.textContent = tabIcon(item.icon);
+      icon.appendChild(tabIcon(item.icon));
       const label = document.createElement("span");
       label.textContent = String(item.title ?? name);
       button.appendChild(icon);
@@ -1215,35 +1257,233 @@ class TabBarManager extends ViewManager {
   }
 }
 
-const TAB_ICONS = {
-  house: "⌂",
-  home: "⌂",
-  gear: "⚙",
-  settings: "⚙",
-  person: "☺",
-  profile: "☺",
-  star: "★",
-  heart: "♥",
-  magnifyingglass: "⌕",
-  search: "⌕",
-  bell: "🔔",
-  list: "☰",
-  plus: "＋",
-  camera: "📷",
-  map: "🗺",
-  cart: "🛒",
-  chat: "💬",
-  message: "💬",
+/**
+ * Build the icon node for a tab item: an inline SVG for a bundled icon
+ * spec (`{shapes, view_box}`), a tinted mask for an asset (`{uri}`), or a
+ * dot when the tab has no icon.
+ */
+function tabIcon(icon) {
+  if (icon && typeof icon === "object" && Array.isArray(icon.shapes)) {
+    const svg = buildSvg(icon.shapes, {
+      view_box: icon.view_box || "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      stroke_width: 2,
+      stroke_linecap: "round",
+      stroke_linejoin: "round",
+    });
+    svg.setAttribute("width", "24");
+    svg.setAttribute("height", "24");
+    return svg;
+  }
+  if (icon && typeof icon === "object" && icon.uri) {
+    const mask = document.createElement("span");
+    mask.className = "pn-tab-icon-mask";
+    const url = imageSource(icon.uri);
+    mask.style.maskImage = mask.style.webkitMaskImage = url ? `url("${url}")` : "";
+    return mask;
+  }
+  const dot = document.createElement("span");
+  dot.textContent = "●";
+  return dot;
+}
+
+// ---------------------------------------------------------------------------
+// Svg, LinearGradient, BlurView
+// ---------------------------------------------------------------------------
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+const SVG_PAINT = {
+  fill: "fill",
+  fill_opacity: "fill-opacity",
+  fill_rule: "fill-rule",
+  stroke: "stroke",
+  stroke_width: "stroke-width",
+  stroke_opacity: "stroke-opacity",
+  stroke_linecap: "stroke-linecap",
+  stroke_linejoin: "stroke-linejoin",
+  opacity: "opacity",
+  transform: "transform",
+};
+const SVG_GEOMETRY = {
+  path: ["d"],
+  circle: ["cx", "cy", "r"],
+  ellipse: ["cx", "cy", "rx", "ry"],
+  rect: ["x", "y", "width", "height", "rx", "ry"],
+  line: ["x1", "y1", "x2", "y2"],
+  polyline: ["points"],
+  polygon: ["points"],
 };
 
-function tabIcon(icon) {
-  if (icon && typeof icon === "object") icon = icon.web ?? icon.ios ?? icon.android ?? "";
-  const name = String(icon || "").toLowerCase().replace(/\.fill$/, "").replace(/\.circle$/, "");
-  if (!name) return "●";
-  for (const [key, glyph] of Object.entries(TAB_ICONS)) {
-    if (name.includes(key)) return glyph;
+function svgPaintValue(key, value, scheme) {
+  if (value == null) return null;
+  if (key === "fill" || key === "stroke") {
+    if (value === "none" || value === "currentColor") return value;
+    return parseColor(value, scheme) ?? String(value);
   }
-  return "●";
+  return String(value);
+}
+
+/** Build an `<svg>` element from flattened shape records and root paint. */
+function buildSvg(shapes, root, scheme = "light") {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("xmlns", SVG_NS);
+  svg.setAttribute("viewBox", String(root.view_box || "0 0 24 24"));
+  const par = root.preserve_aspect_ratio;
+  svg.setAttribute("preserveAspectRatio", par === "slice" ? "xMidYMid slice" : par === "none" ? "none" : "xMidYMid meet");
+  const rootFill = root.fill == null ? null : svgPaintValue("fill", root.fill, scheme);
+  svg.setAttribute("fill", rootFill ?? "#000");
+  for (const key of ["stroke", "stroke_width", "stroke_linecap", "stroke_linejoin", "fill_rule"]) {
+    const value = svgPaintValue(key, root[key], scheme);
+    if (value != null) svg.setAttribute(SVG_PAINT[key], value);
+  }
+  for (const shape of shapes || []) {
+    const kind = String(shape.kind || "path");
+    if (!(kind in SVG_GEOMETRY)) continue;
+    const node = document.createElementNS(SVG_NS, kind);
+    for (const attr of SVG_GEOMETRY[kind]) if (shape[attr] != null) node.setAttribute(attr, String(shape[attr]));
+    for (const [key, attr] of Object.entries(SVG_PAINT)) {
+      const value = svgPaintValue(key, shape[key], scheme);
+      if (value != null) node.setAttribute(attr, value);
+    }
+    if (Array.isArray(shape.stroke_dasharray) && shape.stroke_dasharray.length) {
+      node.setAttribute("stroke-dasharray", shape.stroke_dasharray.join(" "));
+    }
+    svg.appendChild(node);
+  }
+  return svg;
+}
+
+function viewBoxSize(text) {
+  const parts = String(text || "").trim().split(/[\s,]+/).map(Number);
+  if (parts.length === 4 && parts.every(Number.isFinite) && parts[2] > 0 && parts[3] > 0) return [parts[2], parts[3]];
+  return [24, 24];
+}
+
+class SvgManager extends ViewManager {
+  create(view, props) {
+    const el = document.createElement("div");
+    el.className = "pn-view pn-svg";
+    view.el = el;
+    this.update(view, props);
+  }
+  update(view, changed) {
+    const props = view.props;
+    const scheme = view.ctx.scheme();
+    const paintKeys = ["shapes", "view_box", "preserve_aspect_ratio", "fill", "stroke", "stroke_width", "stroke_linecap", "stroke_linejoin", "fill_rule", "color"];
+    if (paintKeys.some((k) => k in changed) || !view.svg) {
+      view.el.textContent = "";
+      view.svg = buildSvg(props.shapes, props, scheme);
+      view.svg.setAttribute("width", "100%");
+      view.svg.setAttribute("height", "100%");
+      view.el.appendChild(view.svg);
+      view.measureCache = null;
+    }
+    if ("color" in changed) view.el.style.color = parseColor(props.color, scheme) ?? "";
+    applyStyle(view, props, changed, scheme, { leaf: true });
+  }
+  refreshColors(view) {
+    this.update(view, { shapes: view.props.shapes });
+  }
+  measure(view, maxW, maxH) {
+    let [w, h] = viewBoxSize(view.props.view_box);
+    if (isFiniteConstraint(maxW) && w > maxW) {
+      h = (h * maxW) / w;
+      w = maxW;
+    }
+    if (isFiniteConstraint(maxH) && h > maxH) {
+      w = (w * maxH) / h;
+      h = maxH;
+    }
+    return [w, h];
+  }
+}
+
+class LinearGradientManager extends ViewManager {
+  create(view, props) {
+    const el = document.createElement("div");
+    el.className = "pn-view pn-gradient";
+    view.el = el;
+    this.update(view, props);
+  }
+  update(view, changed) {
+    const props = view.props;
+    const scheme = view.ctx.scheme();
+    if (["colors", "locations", "start_point", "end_point"].some((k) => k in changed) || !view.gradientApplied) {
+      view.gradientApplied = true;
+      view.el.style.backgroundImage = gradientCSS(props, scheme);
+    }
+    applyStyle(view, props, changed, scheme);
+    // `background_color` would paint over the gradient; keep the image on top.
+    if ("background_color" in changed) view.el.style.backgroundImage = gradientCSS(props, scheme);
+  }
+  refreshColors(view) {
+    view.el.style.backgroundImage = gradientCSS(view.props, view.ctx.scheme());
+  }
+}
+
+function gradientCSS(props, scheme) {
+  const colors = Array.isArray(props.colors) ? props.colors.map((c) => parseColor(c, scheme) ?? "transparent") : [];
+  if (colors.length < 2) return "";
+  const start = Array.isArray(props.start_point) ? props.start_point : [0, 0];
+  const end = Array.isArray(props.end_point) ? props.end_point : [0, 1];
+  const dx = Number(end[0]) - Number(start[0]);
+  const dy = Number(end[1]) - Number(start[1]);
+  // CSS angles run clockwise from "to top"; (0,0)->(0,1) is 180deg.
+  const angle = (Math.atan2(dx, -dy) * 180) / Math.PI;
+  const locations = Array.isArray(props.locations) && props.locations.length === colors.length ? props.locations : null;
+  const stops = colors.map((c, i) => (locations ? `${c} ${Math.round(Number(locations[i]) * 10000) / 100}%` : c));
+  return `linear-gradient(${Math.round(angle * 100) / 100}deg, ${stops.join(", ")})`;
+}
+
+const LIGHT_TINT = "255, 255, 255";
+const DARK_TINT = "28, 28, 30";
+
+/** Tint color and opacity for each blur type; `null` follows the color scheme. */
+function blurTint(type, scheme) {
+  const dark = scheme === "dark";
+  switch (type) {
+    case "light":
+      return [LIGHT_TINT, 0.55];
+    case "extra_light":
+      return [LIGHT_TINT, 0.75];
+    case "dark":
+      return [DARK_TINT, 0.6];
+    case "prominent":
+    case "system_thick_material":
+      return dark ? [DARK_TINT, 0.75] : [LIGHT_TINT, 0.8];
+    case "system_thin_material":
+      return dark ? [DARK_TINT, 0.4] : [LIGHT_TINT, 0.45];
+    default:
+      return dark ? [DARK_TINT, 0.55] : [LIGHT_TINT, 0.6];
+  }
+}
+
+class BlurViewManager extends ViewManager {
+  create(view, props) {
+    const el = document.createElement("div");
+    el.className = "pn-view pn-blur";
+    view.el = el;
+    this.update(view, props);
+  }
+  update(view, changed) {
+    const props = view.props;
+    const scheme = view.ctx.scheme();
+    if ("blur_type" in changed || "intensity" in changed || !view.blurApplied) {
+      view.blurApplied = true;
+      const intensity = Math.max(0, Math.min(100, props.intensity == null ? 100 : Number(props.intensity))) / 100;
+      const type = String(props.blur_type || "regular");
+      const radius = 20 * intensity;
+      view.el.style.backdropFilter = view.el.style.webkitBackdropFilter = radius > 0 ? `blur(${px(radius)}) saturate(1.5)` : "";
+      const [rgb, alpha] = blurTint(type, scheme);
+      view.el.style.backgroundColor = `rgba(${rgb}, ${Math.round(alpha * intensity * 1000) / 1000})`;
+    }
+    applyStyle(view, props, changed, scheme);
+    if ("background_color" in changed && props.background_color == null) this.update(view, { blur_type: props.blur_type });
+  }
+  refreshColors(view) {
+    this.update(view, { blur_type: view.props.blur_type });
+  }
 }
 
 class ModalManager extends ViewManager {
@@ -1508,6 +1748,9 @@ const MANAGERS = {
   Button: ButtonManager,
   TextInput: TextInputManager,
   Image: ImageManager,
+  Svg: SvgManager,
+  LinearGradient: LinearGradientManager,
+  BlurView: BlurViewManager,
   Switch: SwitchManager,
   Slider: SliderManager,
   ActivityIndicator: ActivityIndicatorManager,

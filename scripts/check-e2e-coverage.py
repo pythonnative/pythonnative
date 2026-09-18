@@ -50,6 +50,9 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "Element",
     "UnsetType",  # sentinel type; UNSET is exercised by the custom_component flow
     "ImageLoadEvent",  # typed callback record; real Image flow exercises delivery
+    "ImageSize",  # typed record returned by Images.get_size; asserted in the image_size demo
+    "ImageSource",  # type alias (str | Asset) for Image sources
+    "IconName",  # Literal of icon names; the Icon demo exercises the lookup
     "WebNavigationEvent",  # typed callback record; WebView flow exercises navigation
     "UNSET",  # custom_component flow removes font_size from a live native Text
     "AccessibilityState",
@@ -162,6 +165,8 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "run_blocking",  # blocking script/test helper; can't run inside the app's live loop
     "start_resource",  # non-hook Resource constructor; driven by the lazy demo and unit tests
     "sdk",  # module re-export; custom_component demo covers it
+    "icons",  # module re-export; the Icon demo drives icon_names / is_icon_name
+    "svg",  # module re-export; the Svg demo drives svg.load and the shape classes
     "appearance",  # module re-export; use_color_scheme demo drives set_color_scheme
     "ViewHandler",  # ABC; subclassed by built-in handlers
     "element_factory",  # tested via unit tests; needs registered handlers

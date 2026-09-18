@@ -607,6 +607,23 @@ enum class PNActivityIndicatorSize(val rawValue: String) : PNNativeValue {
     }
 }
 
+enum class PNBlurViewBlurType(val rawValue: String) : PNNativeValue {
+    `light`("light"),
+    `dark`("dark"),
+    `regular`("regular"),
+    `prominent`("prominent"),
+    `extra_light`("extra_light"),
+    `system_thin_material`("system_thin_material"),
+    `system_material`("system_material"),
+    `system_thick_material`("system_thick_material"),
+    `system_chrome_material`("system_chrome_material");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNBlurViewBlurType = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNBlurViewBlurType")
+    }
+}
+
 enum class PNDatePickerMode(val rawValue: String) : PNNativeValue {
     `date`("date"),
     `time`("time"),
@@ -712,18 +729,6 @@ enum class PNScreenAnimation(val rawValue: String) : PNNativeValue {
     companion object {
         fun decode(value: Any?): PNScreenAnimation = entries.firstOrNull { it.rawValue == value }
             ?: throw IllegalArgumentException("Invalid PNScreenAnimation")
-    }
-}
-
-sealed class PNScreenTabBarIcon : PNNativeValue {
-    data class Option0(val value: String) : PNScreenTabBarIcon() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option1(val value: Map<String, String>) : PNScreenTabBarIcon() { override fun nativeValue(): Any = PNValues.encode(value) }
-    companion object {
-        fun decode(value: Any?): PNScreenTabBarIcon {
-            try { return Option0(PNValues.string(value)) } catch (_: Exception) { }
-            try { return Option1(PNValues.objectValue(value).let { objectValue -> objectValue.keys().asSequence().associateWith { key -> PNValues.string(objectValue.get(key)) } }) } catch (_: Exception) { }
-            throw IllegalArgumentException("Invalid PNScreenTabBarIcon")
-        }
     }
 }
 
@@ -1199,10 +1204,152 @@ enum class PNStatusBarBarStyle(val rawValue: String) : PNNativeValue {
     }
 }
 
+enum class PNPNSvgShapeKind(val rawValue: String) : PNNativeValue {
+    `path`("path"),
+    `circle`("circle"),
+    `ellipse`("ellipse"),
+    `rect`("rect"),
+    `line`("line"),
+    `polyline`("polyline"),
+    `polygon`("polygon");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNPNSvgShapeKind = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNPNSvgShapeKind")
+    }
+}
+
+enum class PNPNSvgShapeFillRule(val rawValue: String) : PNNativeValue {
+    `nonzero`("nonzero"),
+    `evenodd`("evenodd");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNPNSvgShapeFillRule = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNPNSvgShapeFillRule")
+    }
+}
+
+enum class PNPNSvgShapeStrokeLinecap(val rawValue: String) : PNNativeValue {
+    `butt`("butt"),
+    `round`("round"),
+    `square`("square");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNPNSvgShapeStrokeLinecap = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNPNSvgShapeStrokeLinecap")
+    }
+}
+
+enum class PNPNSvgShapeStrokeLinejoin(val rawValue: String) : PNNativeValue {
+    `miter`("miter"),
+    `round`("round"),
+    `bevel`("bevel");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNPNSvgShapeStrokeLinejoin = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNPNSvgShapeStrokeLinejoin")
+    }
+}
+
+data class PNSvgShape(
+    val `kind`: PNPNSvgShapeKind,
+    val `d`: String?,
+    val `cx`: Double?,
+    val `cy`: Double?,
+    val `r`: Double?,
+    val `rx`: Double?,
+    val `ry`: Double?,
+    val `x`: Double?,
+    val `y`: Double?,
+    val `width`: Double?,
+    val `height`: Double?,
+    val `x1`: Double?,
+    val `y1`: Double?,
+    val `x2`: Double?,
+    val `y2`: Double?,
+    val `points`: String?,
+    val `fill`: String?,
+    val `fill_opacity`: Double?,
+    val `fill_rule`: PNPNSvgShapeFillRule?,
+    val `stroke`: String?,
+    val `stroke_width`: Double?,
+    val `stroke_opacity`: Double?,
+    val `stroke_linecap`: PNPNSvgShapeStrokeLinecap?,
+    val `stroke_linejoin`: PNPNSvgShapeStrokeLinejoin?,
+    val `stroke_dasharray`: List<Double>?,
+    val `opacity`: Double?,
+    val `transform`: String?
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("kind", PNValues.encode(`kind`))
+        result.put("d", PNValues.encode(`d`))
+        result.put("cx", PNValues.encode(`cx`))
+        result.put("cy", PNValues.encode(`cy`))
+        result.put("r", PNValues.encode(`r`))
+        result.put("rx", PNValues.encode(`rx`))
+        result.put("ry", PNValues.encode(`ry`))
+        result.put("x", PNValues.encode(`x`))
+        result.put("y", PNValues.encode(`y`))
+        result.put("width", PNValues.encode(`width`))
+        result.put("height", PNValues.encode(`height`))
+        result.put("x1", PNValues.encode(`x1`))
+        result.put("y1", PNValues.encode(`y1`))
+        result.put("x2", PNValues.encode(`x2`))
+        result.put("y2", PNValues.encode(`y2`))
+        result.put("points", PNValues.encode(`points`))
+        result.put("fill", PNValues.encode(`fill`))
+        result.put("fill_opacity", PNValues.encode(`fill_opacity`))
+        result.put("fill_rule", PNValues.encode(`fill_rule`))
+        result.put("stroke", PNValues.encode(`stroke`))
+        result.put("stroke_width", PNValues.encode(`stroke_width`))
+        result.put("stroke_opacity", PNValues.encode(`stroke_opacity`))
+        result.put("stroke_linecap", PNValues.encode(`stroke_linecap`))
+        result.put("stroke_linejoin", PNValues.encode(`stroke_linejoin`))
+        result.put("stroke_dasharray", PNValues.encode(`stroke_dasharray`))
+        result.put("opacity", PNValues.encode(`opacity`))
+        result.put("transform", PNValues.encode(`transform`))
+    }
+    companion object {
+        fun decode(value: Any?): PNSvgShape {
+            val objectValue = PNValues.objectValue(value)
+            return PNSvgShape(PNPNSvgShapeKind.decode((objectValue.get("kind"))), if (PNValues.isNull((if (objectValue.has("d")) objectValue.get("d") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("d")) objectValue.get("d") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("cx")) objectValue.get("cx") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("cx")) objectValue.get("cx") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("cy")) objectValue.get("cy") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("cy")) objectValue.get("cy") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("r")) objectValue.get("r") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("r")) objectValue.get("r") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("rx")) objectValue.get("rx") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("rx")) objectValue.get("rx") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("ry")) objectValue.get("ry") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("ry")) objectValue.get("ry") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("x")) objectValue.get("x") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("x")) objectValue.get("x") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("y")) objectValue.get("y") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("y")) objectValue.get("y") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("width")) objectValue.get("width") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("width")) objectValue.get("width") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("height")) objectValue.get("height") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("height")) objectValue.get("height") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("x1")) objectValue.get("x1") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("x1")) objectValue.get("x1") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("y1")) objectValue.get("y1") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("y1")) objectValue.get("y1") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("x2")) objectValue.get("x2") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("x2")) objectValue.get("x2") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("y2")) objectValue.get("y2") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("y2")) objectValue.get("y2") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("points")) objectValue.get("points") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("points")) objectValue.get("points") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("fill")) objectValue.get("fill") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("fill")) objectValue.get("fill") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("fill_opacity")) objectValue.get("fill_opacity") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("fill_opacity")) objectValue.get("fill_opacity") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("fill_rule")) objectValue.get("fill_rule") else PNValues.defaultValue("null")))) null else PNPNSvgShapeFillRule.decode((if (objectValue.has("fill_rule")) objectValue.get("fill_rule") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke")) objectValue.get("stroke") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("stroke")) objectValue.get("stroke") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_width")) objectValue.get("stroke_width") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("stroke_width")) objectValue.get("stroke_width") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_opacity")) objectValue.get("stroke_opacity") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("stroke_opacity")) objectValue.get("stroke_opacity") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_linecap")) objectValue.get("stroke_linecap") else PNValues.defaultValue("null")))) null else PNPNSvgShapeStrokeLinecap.decode((if (objectValue.has("stroke_linecap")) objectValue.get("stroke_linecap") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_linejoin")) objectValue.get("stroke_linejoin") else PNValues.defaultValue("null")))) null else PNPNSvgShapeStrokeLinejoin.decode((if (objectValue.has("stroke_linejoin")) objectValue.get("stroke_linejoin") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_dasharray")) objectValue.get("stroke_dasharray") else PNValues.defaultValue("null")))) null else PNValues.array((if (objectValue.has("stroke_dasharray")) objectValue.get("stroke_dasharray") else PNValues.defaultValue("null"))).map { item -> PNValues.number(item) }, if (PNValues.isNull((if (objectValue.has("opacity")) objectValue.get("opacity") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("opacity")) objectValue.get("opacity") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("transform")) objectValue.get("transform") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("transform")) objectValue.get("transform") else PNValues.defaultValue("null"))))
+        }
+    }
+}
+
+enum class PNSvgPreserveAspectRatio(val rawValue: String) : PNNativeValue {
+    `meet`("meet"),
+    `slice`("slice"),
+    `none`("none");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNSvgPreserveAspectRatio = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNSvgPreserveAspectRatio")
+    }
+}
+
+data class PNPNTabBarItemsItemIcon(
+    val `shapes`: List<PNSvgShape>?,
+    val `view_box`: String?,
+    val `uri`: String?
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        if (`shapes` != null) result.put("shapes", PNValues.encode(`shapes`))
+        if (`view_box` != null) result.put("view_box", PNValues.encode(`view_box`))
+        if (`uri` != null) result.put("uri", PNValues.encode(`uri`))
+    }
+    companion object {
+        fun decode(value: Any?): PNPNTabBarItemsItemIcon {
+            val objectValue = PNValues.objectValue(value)
+            return PNPNTabBarItemsItemIcon(if (PNValues.isNull(objectValue.opt("shapes"))) null else PNValues.array((objectValue.opt("shapes"))).map { item -> PNSvgShape.decode(item) }, if (PNValues.isNull(objectValue.opt("view_box"))) null else PNValues.string((objectValue.opt("view_box"))), if (PNValues.isNull(objectValue.opt("uri"))) null else PNValues.string((objectValue.opt("uri"))))
+        }
+    }
+}
+
 data class PNTabBarItemsItem(
     val `name`: String,
     val `title`: String,
-    val `icon`: String?,
+    val `icon`: PNPNTabBarItemsItemIcon?,
     val `badge`: String?
 ) : PNNativeValue {
     override fun nativeValue(): Any = JSONObject().also { result ->
@@ -1214,7 +1361,7 @@ data class PNTabBarItemsItem(
     companion object {
         fun decode(value: Any?): PNTabBarItemsItem {
             val objectValue = PNValues.objectValue(value)
-            return PNTabBarItemsItem(PNValues.string((objectValue.get("name"))), PNValues.string((objectValue.get("title"))), if (PNValues.isNull(objectValue.opt("icon"))) null else PNValues.string((objectValue.opt("icon"))), if (PNValues.isNull(objectValue.opt("badge"))) null else PNValues.string((objectValue.opt("badge"))))
+            return PNTabBarItemsItem(PNValues.string((objectValue.get("name"))), PNValues.string((objectValue.get("title"))), if (PNValues.isNull(objectValue.opt("icon"))) null else PNPNTabBarItemsItemIcon.decode((objectValue.opt("icon"))), if (PNValues.isNull(objectValue.opt("badge"))) null else PNValues.string((objectValue.opt("badge"))))
         }
     }
 }
@@ -1277,6 +1424,62 @@ data class PNWebNavigationEvent(
         fun decode(value: Any?): PNWebNavigationEvent {
             val objectValue = PNValues.objectValue(value)
             return PNWebNavigationEvent(PNValues.string((objectValue.get("url"))), PNValues.boolean((objectValue.get("loading"))), PNValues.boolean((objectValue.get("can_go_back"))), PNValues.boolean((objectValue.get("can_go_forward"))), PNValues.string((if (objectValue.has("title")) objectValue.get("title") else PNValues.defaultValue("\"\""))))
+        }
+    }
+}
+
+data class PNFontFace(
+    val `family`: String,
+    val `weight`: Long,
+    val `italic`: Boolean,
+    val `postscript_name`: String,
+    val `path`: String
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("family", PNValues.encode(`family`))
+        result.put("weight", PNValues.encode(`weight`))
+        result.put("italic", PNValues.encode(`italic`))
+        result.put("postscript_name", PNValues.encode(`postscript_name`))
+        result.put("path", PNValues.encode(`path`))
+    }
+    companion object {
+        fun decode(value: Any?): PNFontFace {
+            val objectValue = PNValues.objectValue(value)
+            return PNFontFace(PNValues.string((objectValue.get("family"))), PNValues.integer((objectValue.get("weight"))), PNValues.boolean((objectValue.get("italic"))), PNValues.string((objectValue.get("postscript_name"))), PNValues.string((objectValue.get("path"))))
+        }
+    }
+}
+
+data class PNAssetManifest(
+    val `files`: List<String>,
+    val `variants`: Map<String, Map<String, String>>,
+    val `fonts`: List<PNFontFace>
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("files", PNValues.encode(`files`))
+        result.put("variants", PNValues.encode(`variants`))
+        result.put("fonts", PNValues.encode(`fonts`))
+    }
+    companion object {
+        fun decode(value: Any?): PNAssetManifest {
+            val objectValue = PNValues.objectValue(value)
+            return PNAssetManifest(PNValues.array((if (objectValue.has("files")) objectValue.get("files") else PNValues.defaultValue("[]"))).map { item -> PNValues.string(item) }, PNValues.objectValue((if (objectValue.has("variants")) objectValue.get("variants") else PNValues.defaultValue("{}"))).let { objectValue -> objectValue.keys().asSequence().associateWith { key -> PNValues.objectValue(objectValue.get(key)).let { objectValue -> objectValue.keys().asSequence().associateWith { key -> PNValues.string(objectValue.get(key)) } } } }, PNValues.array((if (objectValue.has("fonts")) objectValue.get("fonts") else PNValues.defaultValue("[]"))).map { item -> PNFontFace.decode(item) })
+        }
+    }
+}
+
+data class PNImageSize(
+    val `width`: Double,
+    val `height`: Double
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("width", PNValues.encode(`width`))
+        result.put("height", PNValues.encode(`height`))
+    }
+    companion object {
+        fun decode(value: Any?): PNImageSize {
+            val objectValue = PNValues.objectValue(value)
+            return PNImageSize(PNValues.number((objectValue.get("width"))), PNValues.number((objectValue.get("height"))))
         }
     }
 }

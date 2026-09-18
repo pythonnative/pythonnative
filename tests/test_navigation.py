@@ -689,16 +689,19 @@ def test_tab_renders_tab_bar_items_with_icons_and_badges() -> None:
     Tab = create_tab_navigator()
     result = render(
         Tab.Navigator(
-            Tab.Screen("Home", _screen("HOME"), title="Home", tab_bar_icon="house.fill"),
+            Tab.Screen("Home", _screen("HOME"), title="Home", tab_bar_icon="house"),
             Tab.Screen("Alerts", _screen("ALERTS"), tab_bar_label="Inbox", tab_bar_badge=3),
+            Tab.Screen("Me", _screen("ME"), tab_bar_icon=pn.asset("icons/me.png")),
         )
     )
     bar = result.get_by_type("TabBar")
     assert bar.props["active_tab"] == "Home"
-    assert bar.props["items"] == [
-        {"name": "Home", "title": "Home", "icon": "house.fill"},
-        {"name": "Alerts", "title": "Inbox", "badge": "3"},
-    ]
+    items = bar.props["items"]
+    assert items[0]["name"] == "Home" and items[0]["title"] == "Home"
+    assert items[0]["icon"]["view_box"] == "0 0 24 24"
+    assert items[0]["icon"]["shapes"] and all(shape["kind"] == "path" for shape in items[0]["icon"]["shapes"])
+    assert items[1] == {"name": "Alerts", "title": "Inbox", "badge": "3"}
+    assert items[2]["icon"] == {"uri": "asset://icons/me.png"}
     assert result.get_by_text("HOME")
     assert result.query_by_text("ALERTS", hidden=True) is None  # lazy: not mounted yet
 

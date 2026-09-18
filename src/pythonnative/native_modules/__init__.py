@@ -53,6 +53,8 @@ System integration:
 
 - [`FileSystem`][pythonnative.native_modules.FileSystem]: app-scoped
   file I/O.
+- [`Images`][pythonnative.native_modules.Images]: measure, prefetch,
+  and clear cached images (bundled, local, or remote).
 - [`Notifications`][pythonnative.native_modules.Notifications]: local
   push notifications.
 - [`Clipboard`][pythonnative.native_modules.Clipboard]: pasteboard
@@ -81,6 +83,7 @@ from .camera import Camera
 from .clipboard import Clipboard
 from .file_system import FileSystem
 from .haptics import Haptics, Vibration
+from .images import Images, ImageSize
 from .linking import Linking
 from .location import Location
 from .net_info import NetInfo, use_net_info
@@ -106,6 +109,8 @@ __all__ = [
     "Clipboard",
     "FileSystem",
     "Haptics",
+    "ImageSize",
+    "Images",
     "Linking",
     "Location",
     "NativeModule",
