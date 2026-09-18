@@ -16,17 +16,68 @@ import com.pythonnative.runtime.PNBridge
 import com.pythonnative.runtime.bridge.PNLog
 import java.util.Locale
 
-/** `Device.info()`: static facts about the OS, hardware, and app directories. */
+/**
+ * `Device.info()`: the `DeviceInfo` record keys (`platform`, `os_version`,
+ * `model`, `manufacturer`, `is_simulator`, `is_tablet`, `app_name`,
+ * `app_version`, `build_number`, `bundle_id`, `scale`, `font_scale`,
+ * `locale`) plus `app_dir`, which `FileSystem.app_dir()` reads.
+ */
 class DeviceModule : DeviceImplementation {
     override fun info(): Map<String, PNJSONValue> {
         val ctx = PNBridge.context()
+        val configuration = ctx.resources.configuration
+        val packageInfo = try { ctx.packageManager.getPackageInfo(ctx.packageName, 0) } catch (_: Exception) { null }
+        val appName = try { ctx.applicationInfo.loadLabel(ctx.packageManager).toString() } catch (_: Exception) { ctx.packageName }
+        val buildNumber = when {
+            packageInfo == null -> "0"
+            Build.VERSION.SDK_INT >= 28 -> packageInfo.longVersionCode.toString()
+            else -> @Suppress("DEPRECATION") packageInfo.versionCode.toString()
+        }
         return mapOf(
-            "os" to "android", "os_version" to Build.VERSION.RELEASE,
-            "sdk_int" to Build.VERSION.SDK_INT, "model" to Build.MODEL,
-            "manufacturer" to Build.MANUFACTURER, "app_dir" to ctx.filesDir.absolutePath,
-            "cache_dir" to ctx.cacheDir.absolutePath, "locale" to Locale.getDefault().toLanguageTag(),
-            "density" to PNBridge.density().toDouble()
+            "platform" to "android",
+            "os_version" to (Build.VERSION.RELEASE ?: ""),
+            "model" to (Build.MODEL ?: ""),
+            "manufacturer" to (Build.MANUFACTURER ?: ""),
+            "is_simulator" to isEmulator(),
+            "is_tablet" to isTablet(configuration.smallestScreenWidthDp),
+            "app_name" to appName,
+            "app_version" to (packageInfo?.versionName ?: ""),
+            "build_number" to buildNumber,
+            "bundle_id" to ctx.packageName,
+            "scale" to PNBridge.density().toDouble(),
+            "font_scale" to configuration.fontScale.toDouble(),
+            "locale" to Locale.getDefault().toLanguageTag(),
+            "app_dir" to ctx.filesDir.absolutePath,
         ).mapValues { PNJSONValue(it.value) }
+    }
+
+    companion object {
+        /** Android's tablet breakpoint: a smallest width of 600dp or more. */
+        const val TABLET_MIN_SMALLEST_WIDTH_DP = 600
+
+        fun isTablet(smallestScreenWidthDp: Int): Boolean = smallestScreenWidthDp >= TABLET_MIN_SMALLEST_WIDTH_DP
+
+        /** Heuristic emulator detection over the usual `Build` markers. */
+        fun isEmulator(
+            fingerprint: String? = Build.FINGERPRINT,
+            model: String? = Build.MODEL,
+            product: String? = Build.PRODUCT,
+            hardware: String? = Build.HARDWARE,
+            brand: String? = Build.BRAND,
+            device: String? = Build.DEVICE,
+            manufacturer: String? = Build.MANUFACTURER,
+        ): Boolean {
+            val fp = fingerprint ?: ""
+            val m = model ?: ""
+            val p = product ?: ""
+            val h = hardware ?: ""
+            return fp.startsWith("generic") || fp.startsWith("unknown") || fp.contains("emulator", ignoreCase = true) ||
+                m.contains("google_sdk") || m.contains("Emulator") || m.contains("Android SDK built for") || m.contains("sdk_gphone") ||
+                p.contains("sdk") || p.contains("emulator") || p.contains("simulator") ||
+                h.contains("goldfish") || h.contains("ranchu") || h.contains("cutf") ||
+                (brand ?: "").startsWith("generic") && (device ?: "").startsWith("generic") ||
+                (manufacturer ?: "").contains("Genymotion")
+        }
     }
 }
 

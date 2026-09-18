@@ -63,6 +63,13 @@ Unsolicited pull requests for issues that are already assigned or already have a
 
 - `src/pythonnative/`: installable library and CLI
   - Core Python modules, UI components, and utilities
+  - `components/`: element factories and the typed event records (`components/events.py`)
+  - `handles.py`: typed imperative handles published on `ref.current`
+  - `journal.py`: the undo journal a failed render pass rolls back through
+  - `native_views/`: the thin backend accessor (`get_backend` / `set_backend`) and the bridge backend that serializes commits
+  - `native_modules/`: device module facades and their Python fallbacks
+  - `navigation/`: navigators, container, hooks, linking, theme, and the navigation ref
+  - `testing/`: the headless testing library and the shipped pytest plugin (`testing/pytest_plugin.py`)
   - `bridge/`: JSON codec and per-platform transports into the native rendering core
   - `cli/`: `pn` command
   - `project/`: config loading, template configuration, native plugin staging, and the builder behind `pn`
@@ -198,16 +205,18 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `element`: Element descriptor class (`element.py`)
   - `events`: tag-based event routing between native views and Python callbacks (`events.py`)
   - `gestures`: gesture descriptors and the pure-Python recognition arbiter (`gestures.py`)
+  - `handles`: typed imperative handles published on refs (`handles.py`)
   - `hooks`: hooks and contexts (`hooks.py`)
   - `hosts`: screen hosts, lifecycle forwarding, and render scheduling (`hosts/`)
   - `devserver`: dev server, file watcher, and WebSocket implementation (`devserver/`)
   - `devclient`: on-device dev client that syncs sources and Fast Refreshes (`devclient.py`)
   - `hot_reload`: module reloader and Fast Refresh (`hot_reload.py`)
+  - `journal`: render undo journal (`journal.py`)
   - `layout`: Yoga layout integration and the host binding (`layout.py`, `native/yoga/`)
   - `mutations`: batched mutation ops between reconciler and native backends (`mutations.py`)
   - `native_modules`: native module registry, Python facades, and Python fallbacks (`native_modules/`)
-  - `native_views`: view registry protocol and bridge backend (`native_views/`)
-  - `navigation`: navigation state, container, navigators, hooks, and linking (`navigation/`)
+  - `native_views`: view backend accessor and bridge backend (`native_views/`)
+  - `navigation`: navigation state, container, navigators, hooks, linking, theme, and ref (`navigation/`)
   - `net`: awaitable HTTP client (`net.py`)
   - `package`: `src/pythonnative/__init__.py` exports and package boundary
   - `platform`: `Platform.OS`/`Platform.select` and version detection (`platform.py`)
@@ -220,7 +229,7 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `storage`: AsyncStorage key/value persistence and `use_persisted_state` (`storage.py`)
   - `scheduler`: render batching and transition queues (`scheduler.py`)
   - `style`: StyleSheet and theming (`style.py`)
-  - `testing`: public test utilities (`testing/`)
+  - `testing`: public test utilities and the pytest plugin (`testing/`)
   - `utils`: shared utilities (`utils.py`)
 
 - Other scopes:
@@ -328,7 +337,7 @@ Co-authored-by: Name <email>
 - PR title: Conventional Commits format (CI-enforced by `pr-lint.yml`).
 - Tests: added/updated; `uv run pytest` passes.
 - Lint/format: `uv run ruff check .` and `uv run black --check src examples tests` pass.
-- Docs: update `README.md` if behavior changes.
+- Docs: update `README.md` and the affected pages under `docs/` if behavior changes; `uv run --group docs mkdocs build --strict` must pass.
 - Templates: update `src/pythonnative/templates/` if generator output changes.
 - Generated contracts and example schemas are regenerated and reviewed when changed; vendored dependencies retain their licenses and provenance.
 - No local build outputs, caches, credentials, or machine-specific files are committed.
@@ -431,10 +440,14 @@ For tight iteration, run a single category instead of the full pass:
 
 ```bash
 uv run ./scripts/run-e2e.sh android hooks
-uv run ./scripts/run-e2e.sh ios components
+uv run ./scripts/run-e2e.sh ios navigation
 ```
 
-Available categories: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `misc`.
+Each category is one file under `tests/e2e/suites/` (`hooks.yaml`, `navigation.yaml`, `gestures.yaml`, and so on; large areas are split into lettered parts such as `components-a.yaml`). List the directory for the current set:
+
+```bash
+ls tests/e2e/suites
+```
 
 A coverage checker, `scripts/check-e2e-coverage.py`, gates CI: every name in `pythonnative.__all__` must be covered by a demo + flow, or listed in `INTENTIONAL_EXEMPTIONS` with a justification.
 
@@ -443,7 +456,7 @@ When you add a new public symbol you must also:
 1. Add a demo screen under `examples/e2e-suite/app/screens/<category>/`.
 2. Append a `DemoEntry` in `examples/e2e-suite/app/registry.py`.
 3. Add a Maestro flow at `tests/e2e/flows/<category>/<name>.yaml`.
-4. Append the flow to the top-level `tests/e2e/android.yaml`, `tests/e2e/ios.yaml`, and the matching `tests/e2e/suites/<category>.yaml`.
+4. Append the flow to the top-level `tests/e2e/android.yaml`, `tests/e2e/ios.yaml`, and the matching `tests/e2e/suites/<category>.yaml` (or the lettered part it belongs to).
 5. Confirm `uv run python scripts/check-e2e-coverage.py` exits 0.
 
 `tests/e2e/AGENTS.md` is the deeper reference (label conventions, failure triage, naming rules); AI agents should read it before touching the suite. The `e2e.yml` workflow runs the suite automatically on pushes to `main` and PRs.

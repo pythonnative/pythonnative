@@ -49,9 +49,10 @@ Why use `pn.style()` over a raw dict?
   this dict is meant to flow into the `style` prop.
 
 Because `Style` is `total=False`, every key is optional; you only
-include the props you care about. Plain dicts continue to work
-everywhere (they're widened to the same `StyleProp` type) and
-existing code does not need to change.
+include the props you care about. `pn.style()` is typed with
+`Unpack[Style]`, so `pn.style(colour="red")` is a type error, not a
+silent no-op. Plain dicts continue to work at runtime (a `Style` is a
+`TypedDict`), and in dev mode the factories warn once per unknown key.
 
 ### `StyleProp` for component authors
 
@@ -59,7 +60,7 @@ The argument type accepted by every built-in factory is
 [`pn.StyleProp`][pythonnative.style.StyleProp]:
 
 ```python
-StyleProp = Style | dict[str, Any] | list[Style | dict | None] | None
+StyleProp = Style | Sequence[Style | None] | None
 ```
 
 Use it in your own components when you want to forward styles
@@ -154,6 +155,16 @@ pn.Text("Hello", style={"color": "#FF3366"})
 pn.Button("Tap", style={"background_color": "#FF1E88E5", "color": "#FFFFFF"})
 ```
 
+Every color key is typed as [`Color`][pythonnative.Color]: a string, or
+a [`DynamicColor`][pythonnative.DynamicColor] dictionary with a `light`
+and a `dark` entry. iOS, Android, and the browser preview all resolve
+the pair against the current color scheme when the style is applied and
+switch when the appearance changes, without a re-render:
+
+```python
+pn.View(style=pn.style(background_color={"light": "#FFFFFF", "dark": "#000000"}))
+```
+
 ## Text styling
 
 `Text` accepts the full typography surface inside `style`:
@@ -238,21 +249,29 @@ inline.
 ### Pressed-state styles
 
 [`Pressable`][pythonnative.Pressable]'s `style` prop also accepts a
-callable receiving a state dict, mirroring React Native's
-function-style prop. It's called with `{"pressed": bool}` and
-re-applied as the press state changes:
+callable, mirroring React Native's function-style prop. It receives a
+[`PressState`][pythonnative.PressState] (a frozen dataclass with
+`pressed: bool`) and is re-applied as the press state changes; a
+single callable child receives the same state:
 
 ```python
 pn.Pressable(
-    pn.Text("Save"),
+    lambda state: pn.Text("Saving" if state.pressed else "Save"),
     on_press=save,
-    style=lambda state: {
-        "padding": 12,
-        "border_radius": 8,
-        "background_color": "#1D4ED8" if state["pressed"] else "#3B82F6",
-    },
+    disabled=not valid,
+    android_ripple=pn.Ripple(color="#33000000"),
+    style=lambda state: pn.style(
+        padding=12,
+        border_radius=8,
+        background_color="#1D4ED8" if state.pressed else "#3B82F6",
+    ),
 )
 ```
+
+`disabled=True` suppresses every press callback and sets the disabled
+accessibility state. [`Ripple`][pythonnative.Ripple] draws Android's
+material ripple while pressed and is ignored on iOS and in the browser,
+where `pressed_opacity` or the callable style provides the feedback.
 
 ## Borders, shadows, and shape
 
@@ -266,11 +285,12 @@ Every element accepts these visual props in `style`:
 | `border_color` | hex string |
 | `border_left_width`, `border_top_width`, `border_right_width`, `border_bottom_width` | number (per side) |
 | `border_left_color`, `border_top_color`, `border_right_color`, `border_bottom_color` | hex string (per side) |
-| `shadow_color` | hex string |
-| `shadow_offset` | `{"width": x, "height": y}` |
-| `shadow_opacity` | 0.0 – 1.0 |
-| `shadow_radius` | number (blur radius) |
-| `elevation` | number (Android Material shadow shorthand) |
+| `border_style` | `"solid"` (default), `"dashed"`, or `"dotted"`, drawn the same way on every renderer |
+| `shadow_color` | hex string (iOS and browser) |
+| `shadow_offset` | `{"width": x, "height": y}` or `(x, y)` (iOS and browser) |
+| `shadow_opacity` | 0.0 – 1.0 (iOS and browser) |
+| `shadow_radius` | number (blur radius; iOS and browser) |
+| `elevation` | number (Android Material shadow) |
 | `opacity` | 0.0 – 1.0 |
 | `tint_color` | hex string (Image only) |
 
@@ -306,10 +326,11 @@ pn.View(
 )
 ```
 
-On Android, `shadow_color` and `shadow_opacity` apply on API 28+;
-older versions fall back to the elevation shadow's default color.
-When `shadow_radius` is set without `elevation`, the elevation is
-derived from it so shadows show up without extra Android-only props.
+Shadows follow React Native's platform split: the `shadow_*` keys draw
+on iOS and in the browser preview, `elevation` draws Android's material
+shadow, and each platform ignores the other's keys (Android no longer
+silently accepts `shadow_offset`). A card that looks right everywhere
+sets both:
 
 ```python
 pn.View(
@@ -331,21 +352,31 @@ pn.View(
 
 ## Transforms
 
-`transform` is either a 6-element CGAffineTransform-style array or a
-shorthand mapping:
+`transform` ([`TransformSpec`][pythonnative.TransformSpec]) is a single
+operation or an ordered list of operations, each a one-key mapping:
 
 ```python
 pn.View(
     pn.Text("Tilted"),
     style={
-        "transform": {"rotate": 15, "scale": 1.1, "translate_x": 10},
+        "transform": [{"rotate": 15}, {"scale": 1.1}, {"translate_x": 10}],
     },
+)
+
+pn.View(
+    card,
+    style={"transform": [{"perspective": 800}, {"rotate_y": "35deg"}]},
 )
 ```
 
-Supported keys: `rotate` (degrees), `scale`, `scale_x`, `scale_y`,
-`translate_x`, `translate_y`. For animated transforms, see
-[Animations](animations.md).
+Supported operations on every renderer: `rotate` (degrees, or a string
+with a `deg` or `rad` suffix), `rotate_x`, `rotate_y`, `rotate_z`,
+`scale`, `scale_x`, `scale_y`, `translate_x`, `translate_y`, `skew_x`,
+`skew_y`, and `perspective` (the distance for the 3D rotations that
+follow it in the list). iOS composes the list into a `CATransform3D`;
+Android applies skew through the animation matrix on API 29 and later
+and ignores it below that with a one-time log. For animated transforms,
+see [Animations](animations.md).
 
 ## Flex layout
 
@@ -403,6 +434,10 @@ All components accept these in `style`:
 - `position`: `"relative"` (default) or `"absolute"`.
 - `top`, `right`, `bottom`, `left`: edge offsets when
   `position: "absolute"` (number or percentage string).
+- `inset`, `inset_horizontal`, `inset_vertical`: shorthands for all
+  four edges, the horizontal pair, or the vertical pair, mirroring the
+  padding vocabulary; explicit edge keys win. `pn.style(position="absolute", inset=0)`
+  is the same overlay as `StyleSheet.absolute_fill()`.
 - `z_index`: stacking order among siblings. Higher values render on
   top regardless of declaration order; siblings without one keep
   document order. Essential for absolutely positioned overlays like
@@ -593,15 +628,19 @@ pn.Pressable(
 ### `on_layout`
 
 The `on_layout` prop reports the element's computed frame after each
-layout pass in which it changed. The payload carries `x`, `y`,
-`width`, and `height` in the parent's coordinate space:
+layout pass in which it changed. The callback receives a
+[`LayoutEvent`][pythonnative.LayoutEvent] with `x`, `y`, `width`, and
+`height` in the parent's coordinate space:
 
 ```python
-def handle_layout(frame):
-    set_width(frame["width"])
+def handle_layout(frame: pn.LayoutEvent):
+    set_width(frame.width)
 
 pn.View(content, on_layout=handle_layout)
 ```
+
+The same frame is available without a callback as `ref.current.frame`
+on the element's [handle](../api/handles.md).
 
 The callback runs post-commit, so setting state inside it is safe and
 schedules a normal re-render. Use it for measure-then-position
@@ -668,11 +707,11 @@ BRAND = pn.DEFAULT_DARK_THEME.replace(primary_color="#FF2D55", border_radius=12)
 @pn.component
 def DarkPage():
     return pn.ThemeContext.Provider(
-        BRAND,
         pn.Column(
             ThemedText(text="Always dark!"),
             style={"spacing": 8},
         ),
+        value=BRAND,
     )
 ```
 
@@ -691,17 +730,34 @@ Every `Theme` has these fields:
 
 ## ScrollView
 
-Wrap content in a [`ScrollView`][pythonnative.ScrollView]:
+Wrap content in a [`ScrollView`][pythonnative.ScrollView]. Style the
+frame with `style` and the scrollable content with
+`content_container_style`; the children are wrapped in one inner
+`View` carrying that style, so padding, gap, and alignment work on
+every renderer:
 
 ```python
 pn.ScrollView(
-    pn.Column(
-        pn.Text("Item 1"),
-        pn.Text("Item 2"),
-        style={"spacing": 8},
-    )
+    pn.Text("Item 1"),
+    pn.Text("Item 2"),
+    horizontal=False,
+    content_container_style=pn.style(padding=16, gap=8),
+    content_inset=pn.EdgeInsets(bottom=80),   # keep the last row clear of a footer
+    style=pn.style(flex=1),
 )
 ```
+
+`horizontal=True` scrolls along the x axis. `scroll_enabled=False`
+freezes user scrolling while imperative scrolling through the
+[`ScrollViewHandle`][pythonnative.ScrollViewHandle] still works;
+`snap_to_interval` and `snap_to_alignment` build carousels;
+`keyboard_should_persist_taps` decides whether a tap inside the scroll
+view dismisses the keyboard (`"never"`, `"always"`, or `"handled"`);
+and `deceleration_rate` (`"normal"`, `"fast"`, or a float) tunes the
+fling. `on_scroll`, `on_scroll_begin_drag`, `on_scroll_end_drag`, and
+`on_momentum_scroll_end` each receive a
+[`ScrollEvent`][pythonnative.ScrollEvent]; `scroll_event_throttle` (in
+milliseconds) caps how often `on_scroll` fires.
 
 ## Next steps
 

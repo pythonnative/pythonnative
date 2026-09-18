@@ -35,6 +35,7 @@ from pythonnative.native_modules import app_state, battery, linking, net_info
 from pythonnative.native_modules import registry as module_registry
 from pythonnative.reconciler import Reconciler
 from pythonnative.testing import FakeBackend as MockBackend
+from pythonnative.testing import settle
 
 
 @pytest.fixture(autouse=True)
@@ -83,10 +84,12 @@ def test_app_state_listener_notified_on_dispatch() -> None:
     seen: List[str] = []
     unsubscribe = AppState.add_listener(seen.append)
     app_state.dispatch_app_state("background")
+    settle()
     assert seen == ["background"]
     assert AppState.current_state() == "background"
     unsubscribe()
     app_state.dispatch_app_state("active")
+    settle()
     assert seen == ["background"]  # unsubscribed, no new event
 
 
@@ -94,7 +97,9 @@ def test_app_state_ignores_invalid_and_duplicate() -> None:
     seen: List[str] = []
     AppState.add_listener(seen.append)
     app_state.dispatch_app_state("active")  # same as current -> ignored
+    settle()
     app_state.dispatch_app_state("bogus")  # invalid -> ignored
+    settle()
     assert seen == []
 
 
@@ -114,6 +119,7 @@ def test_use_app_state_returns_current_and_rerenders() -> None:
     assert rendered[0] == "active"
 
     app_state.dispatch_app_state("background")
+    settle()
     assert len(rendered) > before
     assert rendered[-1] == "background"
 
@@ -133,6 +139,7 @@ def test_net_info_listener_notified() -> None:
     seen: List[Dict[str, object]] = []
     NetInfo.add_listener(seen.append)
     net_info.dispatch_net_info({"is_connected": False, "type": "none", "is_internet_reachable": False})
+    settle()
     assert seen[0]["is_connected"] is False
     assert NetInfo.fetch()["type"] == "none"
 
@@ -152,6 +159,7 @@ def test_use_net_info_rerenders_on_change() -> None:
     before = len(rendered)
 
     net_info.dispatch_net_info({"is_connected": False, "type": "cellular", "is_internet_reachable": True})
+    settle()
     assert len(rendered) > before
     assert rendered[-1]["type"] == "cellular"
 
@@ -170,6 +178,7 @@ def test_battery_listener_dispatch() -> None:
     seen: List[Dict[str, object]] = []
     Battery.add_listener(seen.append)
     battery.dispatch_battery(0.5, "charging")
+    settle()
     assert seen[0] == {"level": 0.5, "state": "charging"}
 
 
@@ -181,9 +190,32 @@ def test_battery_listener_dispatch() -> None:
 def test_secure_store_roundtrip_fallback() -> None:
     assert SecureStore.set_item("token", "abc123") is None
     assert SecureStore.get_item("token") == "abc123"
-    assert SecureStore.delete_item("token") is True
+    assert SecureStore.delete_item("token") is None
     assert SecureStore.get_item("token") is None
-    assert SecureStore.delete_item("token") is False
+    SecureStore.delete_item("token")  # deleting an absent key isn't an error
+
+
+def test_secure_store_raises_when_native_reports_failure() -> None:
+    class Refusing:
+        def set_item(self, key: str, value: str) -> bool:
+            return False
+
+        def get_item(self, key: str) -> None:
+            return None
+
+        def delete_item(self, key: str) -> bool:
+            return False
+
+    module_registry.register_python_module("SecureStore", Refusing())
+    try:
+        with pytest.raises(module_registry.NativeModuleError) as set_info:
+            SecureStore.set_item("token", "abc")
+        assert set_info.value.code == "write_failed"
+        with pytest.raises(module_registry.NativeModuleError) as delete_info:
+            SecureStore.delete_item("token")
+        assert delete_info.value.code == "delete_failed"
+    finally:
+        module_registry.unregister_python_module("SecureStore")
 
 
 # ======================================================================
@@ -252,10 +284,13 @@ def test_linking_dispatch_url_notifies_listeners() -> None:
     unsubscribe = Linking.add_listener(received.append)
     try:
         linking.dispatch_url("myapp://one")
+        settle()
         linking.dispatch_url("myapp://two")
+        settle()
     finally:
         unsubscribe()
     linking.dispatch_url("myapp://after-unsubscribe")
+    settle()
     assert received == ["myapp://one", "myapp://two"]
     # The first dispatched URL doubles as the cold-start initial URL.
     assert Linking.get_initial_url() == "myapp://one"
@@ -273,6 +308,7 @@ def test_linking_listener_errors_do_not_break_dispatch() -> None:
     unsub_ok = Linking.add_listener(received.append)
     try:
         linking.dispatch_url("myapp://x")
+        settle()
     finally:
         unsub_bad()
         unsub_ok()
@@ -346,11 +382,15 @@ def test_native_module_events_reach_facade_listeners() -> None:
     NetInfo.add_listener(seen_net.append)
 
     module_registry.dispatch_module_message("AppState", {"event": "change", "payload": "background"})
+    settle()
     module_registry.dispatch_module_message("Linking", {"event": "url", "payload": "myapp://deep"})
+    settle()
     module_registry.dispatch_module_message("Battery", {"event": "change", "payload": {"level": 0.25, "state": "full"}})
+    settle()
     module_registry.dispatch_module_message(
         "NetInfo", {"event": "change", "payload": {"is_connected": False, "type": "none"}}
     )
+    settle()
 
     assert seen_states == ["background"]
     assert AppState.current_state() == "background"

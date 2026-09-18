@@ -2,8 +2,12 @@
 
 The container wires the root navigator to the outside world: deep links
 (via [`LinkingConfig`][pythonnative.LinkingConfig]), a caller-supplied
-initial state, and ``on_state_change`` / ``on_ready`` callbacks. Every
-app with navigation renders exactly one container at the top.
+initial state, ``on_state_change`` / ``on_ready`` callbacks, a
+[`NavigationRef`][pythonnative.NavigationRef] for navigating from
+outside the tree, and the
+[`NavigationTheme`][pythonnative.NavigationTheme] every navigator below
+draws with. Every app with navigation renders exactly one container at
+the top.
 """
 
 from __future__ import annotations
@@ -13,8 +17,11 @@ from typing import Any, Callable, Mapping, Optional, Union
 from ..component import component
 from ..element import Element, Node
 from ..hooks import Context, create_context, use_effect, use_memo, use_ref
+from .handle import provide
 from .linking import LinkingConfig
+from .ref import NavigationRef
 from .state import NavigationState
+from .theme import NavigationTheme, NavigationThemeContext
 
 __all__ = ["ContainerContext", "NavigationContainer"]
 
@@ -24,23 +31,27 @@ StateLike = Union[NavigationState, Mapping[str, Any]]
 class ContainerConfig:
     """What a root navigator reads from its enclosing container."""
 
-    __slots__ = ("initial_state", "on_state_change", "on_ready", "_root", "_ready")
+    __slots__ = ("initial_state", "on_state_change", "on_ready", "ref", "_root", "_ready")
 
     def __init__(
         self,
         initial_state: Optional[NavigationState],
         on_state_change: Optional[Callable[[NavigationState], None]],
         on_ready: Optional[Callable[[], None]],
+        ref: Optional[NavigationRef] = None,
     ) -> None:
         self.initial_state = initial_state
         self.on_state_change = on_state_change
         self.on_ready = on_ready
+        self.ref = ref
         self._root: Any = None
         self._ready = False
 
     def attach_root(self, core: Any) -> Callable[[], None]:
-        """Register the root navigator core; returns a detach callable."""
+        """Register the root navigator core and bind the ``NavigationRef``; returns a detach callable."""
         self._root = core
+        if self.ref is not None:
+            self.ref.current = core.container_handle()
         if not self._ready:
             self._ready = True
             if self.on_ready is not None:
@@ -49,6 +60,8 @@ class ContainerConfig:
         def detach() -> None:
             if self._root is core:
                 self._root = None
+                if self.ref is not None:
+                    self.ref.current = None
 
         return detach
 
@@ -80,6 +93,8 @@ def NavigationContainer(
     initial_state: Optional[StateLike] = None,
     on_state_change: Optional[Callable[[NavigationState], None]] = None,
     on_ready: Optional[Callable[[], None]] = None,
+    ref: Optional[NavigationRef] = None,
+    theme: Optional[NavigationTheme] = None,
 ) -> Element:
     """Root of a navigator tree.
 
@@ -97,10 +112,17 @@ def NavigationContainer(
         on_state_change: Called with the root navigator's state after
             every change. Persist ``state.to_dict()`` to restore later.
         on_ready: Called once the root navigator has mounted.
+        ref: A [`NavigationRef`][pythonnative.NavigationRef] from
+            [`create_navigation_ref`][pythonnative.create_navigation_ref];
+            bound to the root navigator while the container is mounted.
+        theme: The [`NavigationTheme`][pythonnative.NavigationTheme]
+            navigators draw with. ``None`` follows the color scheme
+            (light or dark preset).
 
     Example:
         ```python
         Stack = pn.create_stack_navigator()
+        nav_ref = pn.create_navigation_ref()
 
         @pn.component
         def App():
@@ -110,6 +132,8 @@ def NavigationContainer(
                     Stack.Screen("Detail", DetailScreen, options={"title": "Detail"}),
                 ),
                 linking=linking,
+                ref=nav_ref,
+                theme=pn.DARK_NAVIGATION_THEME,
             )
         ```
     """
@@ -123,11 +147,18 @@ def NavigationContainer(
             url = Linking.get_initial_url()
             if url:
                 seed = linking.state_from_url(url)
-        return ContainerConfig(seed, on_state_change, on_ready)
+        return ContainerConfig(seed, on_state_change, on_ready, ref)
 
     config = use_memo(build, [])
     config.on_state_change = on_state_change
     config.on_ready = on_ready
+    if config.ref is not ref:
+        # The ref changed between renders: move the binding over.
+        if config.ref is not None:
+            config.ref.current = None
+        config.ref = ref
+        if ref is not None and config._root is not None:
+            ref.current = config._root.container_handle()
 
     initial_url: Any = use_ref(None)
 
@@ -151,4 +182,4 @@ def NavigationContainer(
 
     use_effect(subscribe, [linking])
 
-    return ContainerContext.Provider(config, *children)
+    return provide(ContainerContext, config, provide(NavigationThemeContext, theme, *children))

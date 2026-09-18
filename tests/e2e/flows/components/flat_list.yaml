@@ -1,16 +1,9 @@
-# Tests FlatList virtualizes rows; scrolling reveals later rows.
-# With a fixed item_height the demo takes the native virtualization
-# path (RecyclerView / UICollectionView with keyed logical rows), so
-# this flow exercises native cell recycling end to end.
+# Tests FlatList renders and scrolls vertically and horizontally, and that
+# the inverted variant honors initial_scroll_index (rows separated by an
+# item_separator element in every mode).
 #
 # Demo screen: examples/e2e-suite/app/screens/components/flat_list.py
-# Source under test: src/pythonnative/components/lists.py :: FlatList, _NativeList
-#
-# The demo sizes the FlatList (~400 dp) so it overlaps the vertical
-# center of the screen on both the iOS and Android CI emulators,
-# letting us use Maestro's standard ``scrollUntilVisible`` (which
-# swipes from the screen center). See ``components/scroll_view.yaml``
-# for the full rationale.
+# Source under test: src/pythonnative/components/lists.py :: FlatList
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -18,6 +11,7 @@ appId: ${APP_ID}
     env:
       CATEGORY: Components
       DEMO_TITLE: FlatList
+- assertVisible: "Mode: vertical"
 - assertVisible: "FlatRow 1"
 # Target the *last* row. Virtualized rows exist in the accessibility
 # tree only while on screen, and one Maestro fling can travel several
@@ -37,6 +31,7 @@ appId: ${APP_ID}
 # Horizontal rows are wider than vertical row heights. Use a faster native
 # fling and allow the greater travel distance to the same final row.
 - tapOn: "Show horizontal list"
+- assertVisible: "Mode: horizontal"
 - assertVisible: "FlatRow 1"
 - scrollUntilVisible:
     element: "FlatRow 40"
@@ -47,6 +42,13 @@ appId: ${APP_ID}
     visibilityPercentage: 100
     centerElement: false
 - assertVisible: "FlatRow 40"
+# Inverted list opening at initial_scroll_index=20: row 21 is on screen
+# without any scrolling, row 1 (now at the bottom edge of the content) is not.
+- tapOn: "Show inverted list"
+- assertVisible: "Mode: inverted"
+- extendedWaitUntil:
+    visible: "FlatRow 21"
+    timeout: 10000
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

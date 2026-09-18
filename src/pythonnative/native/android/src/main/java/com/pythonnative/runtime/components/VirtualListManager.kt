@@ -58,13 +58,32 @@ class VirtualListManager : ComponentManager() {
             setOnRefreshListener { fire(this, "on_refresh") }
             recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
                 override fun onScrolled(view: RecyclerView, dx: Int, dy: Int) {
-                    fire(this@ListView, "on_scroll", JSONObject().put("x", recycler.computeHorizontalScrollOffset() / PNBridge.density())
-                        .put("y", recycler.computeVerticalScrollOffset() / PNBridge.density())
-                        .put("extent", (if (horizontal) width else height) / PNBridge.density())
-                        .put("range", (if (horizontal) recycler.computeHorizontalScrollRange() else recycler.computeVerticalScrollRange()) / PNBridge.density())
-                        .put("first", manager.findFirstVisibleItemPosition()).put("last", manager.findLastVisibleItemPosition()))
+                    // Like ScrollView: only cross the bridge when the app wired on_scroll.
+                    if (!hasEvent(this@ListView, "on_scroll")) return
+                    fire(this@ListView, "on_scroll", scrollPayload())
                 }
             })
+        }
+        /**
+         * The `ScrollEvent` fields in dp plus the list-window fields the
+         * Python `FlatList` layer reads (`first`/`last` visible positions,
+         * `extent` and `range` along the scroll axis).
+         */
+        fun scrollPayload(): JSONObject {
+            val density = PNBridge.density()
+            val extent = (if (horizontal) width else height) / density
+            val range = (if (horizontal) recycler.computeHorizontalScrollRange() else recycler.computeVerticalScrollRange()) / density
+            return JSONObject()
+                .put("x", recycler.computeHorizontalScrollOffset() / density)
+                .put("y", recycler.computeVerticalScrollOffset() / density)
+                .put("content_width", if (horizontal) range else width / density)
+                .put("content_height", if (horizontal) height / density else range)
+                .put("viewport_width", width / density)
+                .put("viewport_height", height / density)
+                .put("extent", extent)
+                .put("range", range)
+                .put("first", manager.findFirstVisibleItemPosition())
+                .put("last", manager.findLastVisibleItemPosition())
         }
         fun attach(holder: Holder, item: Item) {
             val size = ((heights[item.key] ?: item.estimate) * PNBridge.density()).roundToInt().coerceAtLeast(1)

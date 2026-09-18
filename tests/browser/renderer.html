@@ -1,5 +1,6 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>PythonNative renderer acceptance</title></head>
+<html><head><meta charset="utf-8"><title>PythonNative renderer acceptance</title>
+<link rel="stylesheet" href="../../src/pythonnative/devserver/static/preview.css"></head>
 <body><pre id="result" data-status="running">Starting renderer...</pre>
 <script>
 window.addEventListener("error", e => { document.getElementById("result").dataset.status = "failed"; document.getElementById("result").textContent = e.message; });

@@ -33,7 +33,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 
 from ..element import Element
-from ..style import Color, StyleProp
+from ..style import Color, Style, StyleProp
 from ._names import ICON_NAMES, LUCIDE_VERSION, IconName
 
 if TYPE_CHECKING:
@@ -155,12 +155,12 @@ def Icon(
         ```
     """
     from ..components.graphics import Svg
-    from ..style import resolve_style
+    from ..style import StyleSheet
 
     # Icon records are already flattened wire dicts; ``Svg`` passes them through.
     shapes = cast("List[SvgShape]", list(icon_shapes(name)))
-    merged = {"width": size, "height": size}
-    merged.update(resolve_style(style))
+    merged: Style = {"width": size, "height": size}
+    merged.update(StyleSheet.flatten(style))
     return Svg(
         shapes=shapes,
         view_box=ICON_VIEW_BOX,

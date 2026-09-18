@@ -1,16 +1,25 @@
 // The page's `Host` module and screen stack, plus the other native
 // modules the browser can honor (Alert, Clipboard, Linking, Share,
-// Haptics, NetInfo, AppState, Device).
+// Haptics, NetInfo, AppState, Device, Keyboard, AccessibilityInfo,
+// Localization).
 //
 // A "screen" here is what PNViewController is on iOS: it owns one
 // Python screen id, sends host lifecycle events (`create`, `start`,
 // `layout`, `resume`, `pause`, `stop`, `destroy`), and hosts the root
 // view Python attaches with `Host.attach_root`. Screens stack inside the
 // phone frame with a slide transition; a header with a back button
-// stands in for UINavigationBar.
+// stands in for UINavigationBar and reads the same option names
+// `HostModule.applyOptions` does on iOS.
+
+import { screenTransition } from "./renderer.js";
 
 const STATUS_BAR = 47;
 const HEADER = 44;
+const TRANSITION_MS = 280;
+const TEXT_CONTROL = "input, textarea, select, [contenteditable]";
+
+/** The frame's font scale: the browser renders at the user's default text size. */
+const FONT_SCALE = 1.0;
 
 export class Screen {
   constructor(host, id, path, argsJson, options) {
@@ -19,6 +28,9 @@ export class Screen {
     this.path = path;
     this.argsJson = argsJson;
     this.options = { header_shown: true, ...(options || {}) };
+    // A native stack at the root draws its own navigation bar (as on iOS,
+    // where the stack hides the host's bar), so the host header yields.
+    this.stackOwnsHeader = false;
     this.root = null;
     this.created = false;
     this.lastLayout = "";
@@ -42,25 +54,54 @@ export class Screen {
     this.el.appendChild(this.content);
   }
 
+  /** Apply `ScreenOptions` the way the native hosts read them (`HostModule.applyOptions`). */
   applyOptions(options) {
     Object.assign(this.options, options || {});
     const o = this.options;
     this.title.textContent = o.title == null ? "" : String(o.title);
-    this.header.style.display = o.header_shown === false ? "none" : "";
-    this.back.style.visibility = this.host.stack.indexOf(this) > 0 && !o.hide_back_button ? "" : "hidden";
+    this.header.style.display = o.header_shown === false || this.stackOwnsHeader ? "none" : "";
+    const backVisible = o.header_back_visible !== false;
+    this.back.style.visibility = this.host.stack.indexOf(this) > 0 && backVisible ? "" : "hidden";
+    this.back.textContent = o.header_back_title == null || o.header_back_title === "" ? "Back" : String(o.header_back_title);
     const tint = this.host.color(o.header_tint_color);
     this.back.style.color = tint ?? "";
-    const bg = this.host.color(o.header_background_color);
+    const barStyle = o.header_style && typeof o.header_style === "object" ? o.header_style : {};
+    const bg = this.host.color(barStyle.background_color);
     this.header.style.background = bg ?? "";
+    const titleStyle = o.header_title_style && typeof o.header_title_style === "object" ? o.header_title_style : {};
+    this.title.style.color = this.host.color(titleStyle.color) ?? "";
+    this.title.style.fontSize = titleStyle.font_size != null ? `${Number(titleStyle.font_size)}px` : "";
+    this.title.style.fontWeight = titleStyle.bold === false ? "400" : titleStyle.font_weight != null ? String(titleStyle.font_weight) : "";
+    this.header.classList.toggle("pn-large-title", !!o.header_large_title);
+    this.el.classList.toggle("pn-screen-transparent", o.presentation === "transparent_modal");
     this.layout();
+  }
+
+  /** The enter/leave transition class for this screen's `animation` / `presentation` options. */
+  transition() {
+    return screenTransition(this.options);
   }
 
   /** Top offset of the content area (status bar + header when shown). */
   contentTop() {
     const bar = this.host.statusBarHidden ? 0 : STATUS_BAR;
-    return bar + (this.options.header_shown === false ? 0 : HEADER);
+    return bar + (this.options.header_shown === false || this.stackOwnsHeader ? 0 : HEADER);
   }
 
+  /** Hide the host header while a root-level native stack draws its own bar. */
+  syncNativeStack() {
+    const owns = !!this.content.querySelector(".pn-stack:not(.pn-stack .pn-stack)");
+    if (owns === this.stackOwnsHeader) return;
+    this.stackOwnsHeader = owns;
+    this.header.style.display = this.options.header_shown === false || owns ? "none" : "";
+    this.layout();
+  }
+
+  /**
+   * The `layout` payload: window size and insets plus `scale`,
+   * `font_scale`, and the device frame as `screen_width` / `screen_height`
+   * (what `Dimensions.get("screen")` and `PixelRatio` read).
+   */
   viewport() {
     const { width, height, bottomInset } = this.host.frameMetrics();
     const top = this.contentTop();
@@ -70,6 +111,10 @@ export class Screen {
       insets: { top: 0, left: 0, bottom: bottomInset, right: 0 },
       keyboard_height: 0,
       color_scheme: this.host.scheme(),
+      scale: window.devicePixelRatio || 1,
+      font_scale: FONT_SCALE,
+      screen_width: width,
+      screen_height: height,
     };
   }
 
@@ -89,11 +134,29 @@ export class Screen {
     this.root = view;
     this.content.appendChild(view.el);
     view.el.classList.add("pn-root");
+    this.syncNativeStack();
   }
 
   detachRoot(view) {
     if (this.root === view) this.root = null;
     if (view.el.parentNode === this.content) this.content.removeChild(view.el);
+    this.syncNativeStack();
+  }
+}
+
+/**
+ * A script result as a string, the way the native `WebViews` modules report
+ * it: strings as-is, `null` and `undefined` as `""`, and everything else in
+ * its JSON spelling.
+ */
+export function scriptResult(value) {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value) ?? "";
+  } catch {
+    return String(value);
   }
 }
 
@@ -111,9 +174,25 @@ export class PreviewHost {
     this.statusBarHidden = false;
     this.appState = "active";
     this.entry = null;
+    this.keyboardVisible = false;
+    this.liveRegion = null;
     this.installVisibilityTracking();
     this.installNetworkTracking();
+    this.installKeyboardTracking();
+    this.installAccessibilityTracking();
+    this.installLocaleTracking();
   }
+
+  /** A native stack mounted or unmounted; re-check which screens it gives a navigation bar. */
+  nativeStackChanged() {
+    if (this.stackSyncQueued) return;
+    this.stackSyncQueued = true;
+    queueMicrotask(() => {
+      this.stackSyncQueued = false;
+      for (const screen of this.stack) screen.syncNativeStack();
+    });
+  }
+
 
   // -- lifecycle ---------------------------------------------------------
 
@@ -141,17 +220,19 @@ export class PreviewHost {
     if (previous) this.hostEvent(previous.id, "pause", "{}");
     this.stack.push(screen);
     this.screensEl.appendChild(screen.el);
-    if (animated) screen.el.classList.add("pn-enter");
     screen.applyOptions({});
+    const enter = animated ? screen.transition() : null;
+    if (enter) screen.el.classList.add(enter);
     const payload = { path: path || null, args: argsJson ?? null, ...screen.viewport() };
     const reply = await this.bridge.request("host", screen.id, "create", JSON.stringify(payload));
     screen.created = true;
     screen.lastLayout = JSON.stringify(screen.viewport());
     this.attachFromReply(screen, reply);
     this.hostEvent(screen.id, "start", "{}");
-    if (animated) {
-      requestAnimationFrame(() => screen.el.classList.remove("pn-enter"));
-      if (previous) previous.el.classList.add("pn-under");
+    if (enter) {
+      requestAnimationFrame(() => screen.el.classList.remove(enter));
+      // Cards push the screen beneath aside; modals slide over it.
+      if (previous && enter === "pn-screen-right") previous.el.classList.add("pn-under");
     }
     this.hostEvent(screen.id, "resume", JSON.stringify(screen.viewport()));
     if (previous) this.hostEvent(previous.id, "stop", "{}");
@@ -178,12 +259,13 @@ export class PreviewHost {
     const revealed = this.top();
     for (const screen of removed) {
       this.hostEvent(screen.id, "pause", "{}");
-      screen.el.classList.add("pn-enter");
+      const leave = screen.transition();
+      if (leave) screen.el.classList.add(leave);
       setTimeout(() => {
         screen.el.remove();
         this.hostEvent(screen.id, "stop", "{}");
         this.hostEvent(screen.id, "destroy", "{}");
-      }, 280);
+      }, leave ? TRANSITION_MS : 0);
     }
     revealed.el.classList.remove("pn-under");
     revealed.applyOptions({});
@@ -358,9 +440,6 @@ export class PreviewHost {
             return host.clipboardText || "";
           }
         },
-        has_string() {
-          return !!host.clipboardText;
-        },
       },
       Linking: {
         open_url({ url }) {
@@ -372,9 +451,6 @@ export class PreviewHost {
         },
         can_open_url({ url }) {
           return /^(https?|mailto|tel|sms):/i.test(String(url || ""));
-        },
-        get_initial_url() {
-          return null;
         },
         open_settings() {
           host.log("info", "Linking.open_settings() has no browser equivalent");
@@ -425,25 +501,74 @@ export class PreviewHost {
         },
       },
       Device: {
+        /** Exactly the `DeviceInfo` keys; the frame stands in for the hardware. */
         info() {
           const [browser, version] = browserFamily(navigator.userAgent);
+          const { width } = host.frameMetrics();
+          const project = host.projectName ? host.projectName() : "";
           return {
             platform: "web",
-            os: browser,
-            os_version: version,
-            model: `${browser} on ${navigator.platform || "web"}`,
-            app_dir: "~/.pythonnative_data",
-            cache_dir: "~/.pythonnative_data/cache",
-            temp_dir: "~/.pythonnative_data/tmp",
-            locale: (navigator.language || "en-US").replace("-", "_"),
+            os_version: `${browser} ${version}`,
+            model: host.deviceName ? host.deviceName() : "Browser",
+            manufacturer: "Browser",
+            is_simulator: true,
+            is_tablet: width >= 600,
+            app_name: project,
             app_version: "0.0.0",
             build_number: "0",
-            bundle_id: "com.pythonnative.preview",
-            screen_width: host.frameMetrics().width,
-            screen_height: host.frameMetrics().height,
+            bundle_id: project,
             scale: window.devicePixelRatio || 1,
-            user_agent: navigator.userAgent,
+            font_scale: FONT_SCALE,
+            locale: navigator.language || "en-US",
           };
+        },
+      },
+      Keyboard: {
+        dismiss() {
+          const active = document.activeElement;
+          if (active && active.matches?.(TEXT_CONTROL)) active.blur();
+          return null;
+        },
+        is_visible() {
+          return host.keyboardIsVisible();
+        },
+      },
+      AccessibilityInfo: {
+        // No browser API reports an assistive technology; answer `false`.
+        is_screen_reader_enabled() {
+          return false;
+        },
+        is_reduce_motion_enabled() {
+          return host.reduceMotion();
+        },
+        announce({ message }) {
+          host.announce(message == null ? "" : String(message));
+          return null;
+        },
+        set_accessibility_focus({ tag }) {
+          const view = host.renderer.views.get(Number(tag));
+          if (!view) throw new Error(`set_accessibility_focus: no view with tag ${tag}`);
+          const el = view.el;
+          if (!el.hasAttribute("tabindex") && el.tabIndex < 0) el.tabIndex = -1;
+          el.focus({ preventScroll: false });
+          return null;
+        },
+      },
+      Localization: {
+        get_locales() {
+          return host.locales();
+        },
+        get_timezone() {
+          return host.timezone();
+        },
+      },
+      WebViews: {
+        // Inline `html` pages are same-origin and answer; a cross-origin
+        // URL can't be scripted from the preview, so eval throws.
+        eval_js({ tag, script }) {
+          const view = host.renderer.views.get(Number(tag));
+          if (!view || view.type !== "WebView") throw new Error(`eval_js: no WebView with tag ${tag}`);
+          return scriptResult(view.iframe.contentWindow.eval(String(script ?? "")));
         },
       },
     };
@@ -480,6 +605,87 @@ export class PreviewHost {
       this.appState = next;
       this.moduleEvent("AppState", "change", next);
     });
+  }
+
+  /**
+   * `Keyboard.change`: a focused text control stands for the on-screen
+   * keyboard. The browser has no keyboard height, so `height` is `0` and
+   * `duration_ms` is `0`; `visible` flips with focus.
+   */
+  installKeyboardTracking() {
+    const update = () => {
+      const visible = this.keyboardIsVisible();
+      if (visible === this.keyboardVisible) return;
+      this.keyboardVisible = visible;
+      this.moduleEvent("Keyboard", "change", { height: 0, visible, duration_ms: 0 });
+    };
+    document.addEventListener("focusin", update);
+    document.addEventListener("focusout", () => setTimeout(update, 0));
+  }
+
+  /** Whether a text control inside the app (screens or overlays) has focus right now. */
+  keyboardIsVisible() {
+    const active = document.activeElement;
+    const inApp = !!active && (this.screensEl.contains(active) || this.overlaysEl.contains(active));
+    return inApp && !!active.matches?.(TEXT_CONTROL);
+  }
+
+  reduceMotion() {
+    try {
+      return !!matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /** `AccessibilityInfo.change` follows the reduce-motion media query; the screen reader flag is always `false`. */
+  installAccessibilityTracking() {
+    let query = null;
+    try {
+      query = matchMedia("(prefers-reduced-motion: reduce)");
+    } catch (err) {
+      return;
+    }
+    const emit = () => this.moduleEvent("AccessibilityInfo", "change", { screen_reader: false, reduce_motion: !!query.matches });
+    if (query.addEventListener) query.addEventListener("change", emit);
+    else if (query.addListener) query.addListener(emit);
+  }
+
+  /** `announce`: write into a visually hidden `aria-live` region outside the frame. */
+  announce(message) {
+    if (!this.liveRegion) {
+      const region = document.createElement("div");
+      region.className = "pn-live-region";
+      region.setAttribute("aria-live", "polite");
+      region.setAttribute("aria-atomic", "true");
+      document.body.appendChild(region);
+      this.liveRegion = region;
+    }
+    // Clearing first makes a repeated announcement audible again.
+    this.liveRegion.textContent = "";
+    setTimeout(() => { this.liveRegion.textContent = message; }, 0);
+    this.log("info", `AccessibilityInfo.announce(${JSON.stringify(message)})`);
+  }
+
+  /** `Locale` records from `navigator.languages`. */
+  locales() {
+    const tags = Array.isArray(navigator.languages) && navigator.languages.length ? navigator.languages : [navigator.language || "en-US"];
+    return tags.map(localeRecord);
+  }
+
+  timezone() {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    } catch (err) {
+      return "UTC";
+    }
+  }
+
+  /** `Localization.change` carries `{locales, timezone}`; the browser only signals language changes. */
+  installLocaleTracking() {
+    window.addEventListener("languagechange", () =>
+      this.moduleEvent("Localization", "change", { locales: this.locales(), timezone: this.timezone() }),
+    );
   }
 
   /** Present an iOS-style alert or action sheet; resolves with the chosen index (-1 on dismiss). */
@@ -533,6 +739,28 @@ export class PreviewHost {
 
 function nullish(value) {
   return value === undefined ? null : value;
+}
+
+const RTL_LANGUAGES = new Set(["ar", "he", "fa", "ur", "ps", "sd", "ug", "yi", "dv", "ku", "ckb"]);
+
+/** `{language_tag, language_code, region_code, is_rtl}` for one BCP 47 tag. */
+export function localeRecord(tag) {
+  const text = String(tag || "en-US");
+  let language = text.split(/[-_]/)[0].toLowerCase();
+  let region = null;
+  let rtl = RTL_LANGUAGES.has(language);
+  try {
+    const locale = new Intl.Locale(text);
+    language = locale.language || language;
+    region = locale.region || null;
+    const direction = locale.getTextInfo?.()?.direction ?? locale.textInfo?.direction;
+    if (direction) rtl = direction === "rtl";
+  } catch (err) {
+    const parts = text.split(/[-_]/);
+    region = parts.find((part, index) => index > 0 && /^[A-Za-z]{2}$|^\d{3}$/.test(part)) || null;
+    if (region) region = region.toUpperCase();
+  }
+  return { language_tag: text, language_code: language, region_code: region, is_rtl: rtl };
 }
 
 /** `["Chrome", "144.0"]`-style browser name and version from a user agent string. */

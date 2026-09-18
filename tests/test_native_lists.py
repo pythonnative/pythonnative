@@ -20,8 +20,8 @@ def test_rows_inherit_provider_and_keep_state_by_key() -> None:
 
     def tree(data: list[dict[str, str]]) -> pn.Element:
         return theme.Provider(
-            "inherited",
             pn.FlatList(data=data, key_extractor=lambda item, _: item["id"], render_item=lambda item, _: Row(item)),
+            value="inherited",
         )
 
     result = render(tree([{"id": "a", "label": "A"}, {"id": "b", "label": "B"}]))

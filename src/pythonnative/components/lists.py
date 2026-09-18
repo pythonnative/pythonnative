@@ -1,14 +1,44 @@
 """Keyed virtualized lists with one logical component tree."""
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union, cast
 
 from ..component import component, memo
 from ..element import Element
-from ..hooks import Ref, use_imperative_handle, use_memo, use_ref, use_state
-from ..style import StyleProp, resolve_style
+from ..hooks import Ref, use_effect, use_imperative_handle, use_memo, use_ref, use_state
+from ..style import Style, StyleProp, StyleSheet, resolve_style
+from .events import ScrollEvent
 from .layout import Row, View
 from .text import Text
+
+ItemSeparator = Union[Callable[[], Element], Element, None]
+"""``item_separator`` value: an element (reused for every gap) or a zero-argument factory."""
+
+
+def _separator_element(separator: ItemSeparator) -> Optional[Element]:
+    if separator is None:
+        return None
+    return separator() if callable(separator) else separator
+
+
+def _inverted_transform(horizontal: bool) -> Dict[str, Any]:
+    """The mirror transform applied to an inverted list and each of its rows."""
+    return {"scale_x": -1} if horizontal else {"scale_y": -1}
+
+
+def _scroll_event(info: Dict[str, Any], horizontal: bool) -> ScrollEvent:
+    """Turn the native list scroll payload into the public ``ScrollEvent``."""
+    extent = float(info.get("extent", 0.0) or 0.0)
+    content = float(info.get("range", 0.0) or 0.0)
+    return ScrollEvent(
+        x=float(info.get("x", 0.0) or 0.0),
+        y=float(info.get("y", 0.0) or 0.0),
+        content_width=content if horizontal else 0.0,
+        content_height=0.0 if horizontal else content,
+        viewport_width=extent if horizontal else 0.0,
+        viewport_height=0.0 if horizontal else extent,
+    )
+
 
 _DEFAULT_ROW_EXTENT = 44.0
 
@@ -84,7 +114,7 @@ def _prepare_snapshot(
 class _RowSpec:
     """One virtualized row: a stable key, a lazy renderer, and an extent hint."""
 
-    __slots__ = ("key", "make", "extent", "item", "index", "item_count")
+    __slots__ = ("key", "make", "extent", "item", "index", "item_count", "section")
 
     def __init__(
         self,
@@ -94,6 +124,7 @@ class _RowSpec:
         item: Any = None,
         index: int = 0,
         item_count: int = 1,
+        section: Optional[int] = None,
     ) -> None:
         self.key = key
         self.make = make
@@ -101,6 +132,7 @@ class _RowSpec:
         self.item = item
         self.index = index
         self.item_count = item_count
+        self.section = section
 
 
 class ListController:
@@ -110,7 +142,9 @@ class ListController:
     [`SectionList`][pythonnative.SectionList] install a
     ``ListController`` on ``ref.current`` (via
     [`use_imperative_handle`][pythonnative.use_imperative_handle])
-    after mount and clear it back to ``None`` on unmount.
+    after mount and clear it back to ``None`` on unmount. Commands go
+    through the inner ``VirtualList``'s
+    [`ViewHandle`][pythonnative.ViewHandle].
 
     Example:
         ```python
@@ -165,11 +199,14 @@ def _NativeList(
     on_end_reached: Optional[Callable[[], Any]] = None,
     on_end_reached_threshold: Optional[float] = None,
     on_viewable_items_changed: Optional[Callable[[List[Dict[str, Any]]], None]] = None,
-    on_scroll: Optional[Callable[[Dict[str, float]], None]] = None,
+    on_scroll: Optional[Callable[[ScrollEvent], Any]] = None,
+    on_first_visible: Optional[Callable[[Optional[_RowSpec]], None]] = None,
     shows_scroll_indicator: Optional[bool] = None,
     list_style: Optional[Dict[str, Any]] = None,
     controller_ref: Optional[Ref] = None,
     horizontal: bool = False,
+    inverted: bool = False,
+    initial_index: Optional[int] = None,
     estimated_row_extent: float = 44,
     header: Optional[Element] = None,
     footer: Optional[Element] = None,
@@ -182,16 +219,6 @@ def _NativeList(
     Keys own hooks. Native container identities never enter the component
     tree. Every data snapshot has a revision, including same-length edits.
     """
-    from ..hooks import current_hook_state
-
-    owner = current_hook_state().owner
-
-    def dispatch(ref: Any, name: str, args: Dict[str, Any]) -> Any:
-        tag = getattr(ref, "_pn_tag", None)
-        if tag is not None and owner is not None:
-            return getattr(owner, "backend").command(tag, name, args)
-        return None
-
     source = rows if rows is not None else ()
     previous: Any = use_ref(None)
 
@@ -220,6 +247,11 @@ def _NativeList(
     internal_ref: Ref = use_ref()
     end_revision = use_ref(-1)
 
+    def dispatch(name: str, args: Dict[str, Any]) -> Any:
+        # ``internal_ref.current`` is the VirtualList's ViewHandle once mounted.
+        handle = internal_ref.current
+        return handle.command(name, **args) if handle is not None else None
+
     def bind(info: Dict[str, Any]) -> None:
         if info.get("revision") != revision:
             return
@@ -246,18 +278,20 @@ def _NativeList(
 
                 invoke(on_end_reached)
         if on_viewable_items_changed is not None:
-            start, end = int(info.get("first", 0)), int(info.get("last", -1))
+            start_index, end_index = int(info.get("first", 0)), int(info.get("last", -1))
             from ..runtime import invoke
 
             invoke(
                 on_viewable_items_changed,
                 [
                     {"key": rows[i].key, "index": rows[i].index, "item": rows[i].item}
-                    for i in range(max(0, start), min(len(rows), end + 1))
+                    for i in range(max(0, start_index), min(len(rows), end_index + 1))
                     if id(rows[i]) in dataset.source_ids and rows[i].item_count
                 ],
             )
-        return on_scroll(info) if on_scroll is not None else None
+        if on_first_visible is not None:
+            on_first_visible(rows[start] if 0 <= start < len(rows) else None)
+        return on_scroll(_scroll_event(info, horizontal)) if on_scroll is not None else None
 
     def scroll_to_index(index: int, animated: bool) -> None:
         if index < 0:
@@ -265,19 +299,25 @@ def _NativeList(
         native_index = dataset.public_indices.get(index)
         if native_index is None:
             raise IndexError("List has no item at that index")
-        dispatch(internal_ref, "scroll_to_index", {"index": native_index, "animated": animated})
+        dispatch("scroll_to_index", {"index": native_index, "animated": animated})
 
     use_imperative_handle(
         controller_ref,
         lambda: ListController(
             lambda offset, animated: dispatch(
-                internal_ref, "scroll_to_offset", {"x" if horizontal else "y": offset, "animated": animated}
+                "scroll_to_offset", {"x" if horizontal else "y": offset, "animated": animated}
             ),
             scroll_to_index,
-            lambda animated: dispatch(internal_ref, "scroll_to_end", {"animated": animated}),
+            lambda animated: dispatch("scroll_to_end", {"animated": animated}),
         ),
         [horizontal, revision],
     )
+
+    def scroll_to_initial() -> None:
+        if initial_index is not None and dataset.public_indices.get(initial_index) is not None:
+            scroll_to_index(initial_index, False)
+
+    use_effect(scroll_to_initial, [])
     props = {
         "flex_grow": 1,
         **(list_style or {}),
@@ -292,17 +332,21 @@ def _NativeList(
         "shows_scroll_indicator": shows_scroll_indicator is not False,
         "ref": internal_ref,
     }
+    if inverted:
+        props["transform"] = [*(props.get("transform") or []), _inverted_transform(horizontal)]
     if refresh_control is not None:
         props["refresh_control"] = dict(refresh_control.props)
     children = []
     for index in range(first, last):
         row = rows[index]
-        style = dict(content_container_style or {})
+        style: Dict[str, Any] = dict(content_container_style or {})
         if row.extent is not None:
             style["width" if horizontal else "height"] = row.extent
         if not horizontal:
             style["width"] = "100%"
-        child = View(_ListRow(row, item_revisions[index]), style=style, key=row.key)
+        if inverted:
+            style["transform"] = [*(style.get("transform") or []), _inverted_transform(horizontal)]
+        child = View(_ListRow(row, item_revisions[index]), style=cast(Style, style), key=row.key)
         child = Element(child.type, {**child.props, "_pn_list_key": row.key}, child.children, child.key)
         children.append(child)
     return Element("VirtualList", props, children)
@@ -319,16 +363,19 @@ def FlatList(
     get_item_height: Optional[Callable[[Any, int], float]] = None,
     estimated_item_height: Optional[float] = None,
     separator_height: float = 0,
+    item_separator: ItemSeparator = None,
     refresh_control: Optional[Element] = None,
     horizontal: bool = False,
+    inverted: bool = False,
     num_columns: int = 1,
+    initial_scroll_index: Optional[int] = None,
     list_header: Optional[Element] = None,
     list_footer: Optional[Element] = None,
     list_empty: Optional[Element] = None,
     on_end_reached: Optional[Callable[[], Any]] = None,
     on_end_reached_threshold: float = 0.5,
     on_viewable_items_changed: Optional[Callable[[List[Dict[str, Any]]], None]] = None,
-    on_scroll: Optional[Callable[[Dict[str, float]], None]] = None,
+    on_scroll: Optional[Callable[[ScrollEvent], Any]] = None,
     shows_scroll_indicator: bool = True,
     content_container_style: StyleProp = None,
     style: StyleProp = None,
@@ -367,10 +414,19 @@ def FlatList(
         estimated_item_height: Starting extent estimate for rows whose
             true size isn't known yet (default 44).
         separator_height: Gap below each row, in points.
+        item_separator: An element, or a zero-argument function
+            returning one, rendered after every row except the last
+            (React Native's ``ItemSeparatorComponent``).
         refresh_control: Optional [`RefreshControl`][pythonnative.RefreshControl]
             element for pull-to-refresh.
         horizontal: Scroll horizontally (extents become widths).
+        inverted: Render the list bottom-up (or right-to-left when
+            ``horizontal``), so new rows appended to ``data`` appear at
+            the visible end, as in a chat transcript. Implemented with
+            a mirror transform on the list and on each row.
         num_columns: Render items in a grid of this many columns.
+        initial_scroll_index: Item index scrolled to, without
+            animation, once the list mounts.
         list_header: Element rendered once before all rows.
         list_footer: Element rendered once after all rows.
         list_empty: Element rendered when ``data`` is empty.
@@ -382,8 +438,8 @@ def FlatList(
         on_viewable_items_changed: Called with a list of
             ``{"index", "key", "item"}`` dicts whenever the set of
             visible rows changes.
-        on_scroll: Called with the raw scroll payload
-            (``{"x": …, "y": …}``).
+        on_scroll: Called with a [`ScrollEvent`][pythonnative.ScrollEvent]
+            as the list scrolls.
         shows_scroll_indicator: When ``False``, hides the scroll bar.
         content_container_style: Style applied to the inner content
             wrapper.
@@ -414,6 +470,7 @@ def FlatList(
 
     def prepare_rows() -> List[_RowSpec]:
         items_list = list(data or [])
+        count = len(items_list)
 
         def _row_key(item: Any, index: int) -> str:
             if key_extractor is not None:
@@ -430,19 +487,25 @@ def FlatList(
                 return float(item_height) + sep
             return None
 
+        def _decorate(el: Element, is_last: bool) -> Element:
+            separator = None if is_last else _separator_element(item_separator)
+            if separator is not None:
+                el = View(el, separator, style={"flex_direction": "row" if horizontal else "column"})
+            if sep > 0:
+                pad_style: Style = {"padding_end": sep} if horizontal else {"padding_bottom": sep}
+                return View(el, style=pad_style)
+            return el
+
         def _make_row(item: Any, index: int) -> Callable[[], Element]:
             def _make() -> Element:
                 el = render_item(item, index) if render_item else Text(str(item))
-                if sep > 0:
-                    pad_style: Dict[str, Any] = {"padding_end" if horizontal else "padding_bottom": sep}
-                    return View(el, style=pad_style)
-                return el
+                return _decorate(el, index == count - 1)
 
             return _make
 
         rows: List[_RowSpec] = []
         if num_columns > 1 and not horizontal:
-            for start in range(0, len(items_list), num_columns):
+            for start in range(0, count, num_columns):
                 chunk = items_list[start : start + num_columns]
 
                 def _make_group(group: List[Any] = chunk, base: int = start) -> Element:
@@ -454,10 +517,7 @@ def FlatList(
                         )
                         for j, it in enumerate(group)
                     ]
-                    row = Row(*cells)
-                    if sep > 0:
-                        return View(row, style={"padding_bottom": sep})
-                    return row
+                    return _decorate(Row(*cells), base + len(group) >= count)
 
                 group_key = "__pn_grp_" + "|".join(_row_key(it, start + j) for j, it in enumerate(chunk))
                 extent = (float(item_height) + sep) if item_height is not None else None
@@ -478,6 +538,7 @@ def FlatList(
             item_height,
             get_item_height,
             separator_height,
+            _Identity(item_separator),
             horizontal,
             num_columns,
         ],
@@ -487,7 +548,7 @@ def FlatList(
 
     return _NativeList(
         rows=rows,
-        render_inputs=(render_item, separator_height, horizontal, num_columns, data_revision),
+        render_inputs=(render_item, separator_height, item_separator, horizontal, num_columns, data_revision),
         on_end_reached=on_end_reached,
         on_end_reached_threshold=on_end_reached_threshold,
         on_viewable_items_changed=on_viewable_items_changed,
@@ -496,6 +557,8 @@ def FlatList(
         list_style=resolve_style(style) or None,
         controller_ref=ref,
         horizontal=horizontal,
+        inverted=inverted,
+        initial_index=initial_scroll_index,
         estimated_row_extent=float(estimated) + sep,
         header=list_header,
         footer=list_footer,
@@ -503,6 +566,13 @@ def FlatList(
         refresh_control=refresh_control,
         content_container_style=resolve_style(content_container_style) or None,
     ).with_key(key)
+
+
+_SECTION_HEADER_PREFIX = "__pn_sec_"
+
+
+def _default_section_header(section: Dict[str, Any], _index: int) -> Element:
+    return Text(str(section.get("title", "")), style={"bold": True, "padding": 8})
 
 
 @component
@@ -518,13 +588,17 @@ def SectionList(
     estimated_item_height: Optional[float] = None,
     section_header_height: Optional[float] = None,
     separator_height: float = 0,
+    item_separator: ItemSeparator = None,
+    sticky_section_headers: bool = False,
+    inverted: bool = False,
     refresh_control: Optional[Element] = None,
     list_header: Optional[Element] = None,
     list_footer: Optional[Element] = None,
     list_empty: Optional[Element] = None,
     on_end_reached: Optional[Callable[[], Any]] = None,
     on_end_reached_threshold: float = 0.5,
-    on_scroll: Optional[Callable[[Dict[str, float]], None]] = None,
+    on_viewable_items_changed: Optional[Callable[[List[Dict[str, Any]]], None]] = None,
+    on_scroll: Optional[Callable[[ScrollEvent], Any]] = None,
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
@@ -552,6 +626,15 @@ def SectionList(
         estimated_item_height: Starting estimate for unmeasured rows.
         section_header_height: Header extent in points, when known.
         separator_height: Gap below each item, in points.
+        item_separator: An element, or a zero-argument function
+            returning one, rendered between the items of each section.
+        sticky_section_headers: Keep the current section's header
+            pinned at the top of the list while its items scroll by.
+            Rendered by Python as an absolutely positioned overlay
+            (through ``render_section_header``) and hidden while the
+            real header is itself at the top.
+        inverted: Render the list bottom-up (see
+            [`FlatList`][pythonnative.FlatList]).
         refresh_control: Optional [`RefreshControl`][pythonnative.RefreshControl] element.
         list_header: Element rendered once before everything.
         list_footer: Element rendered once after everything.
@@ -559,7 +642,11 @@ def SectionList(
         on_end_reached: Called near the end of the content.
         on_end_reached_threshold: Distance from the end, in viewport
             multiples, at which ``on_end_reached`` fires.
-        on_scroll: Called with the raw scroll payload.
+        on_viewable_items_changed: Called with a list of
+            ``{"index", "key", "item"}`` dicts (items only, with flat
+            indices) whenever the set of visible rows changes.
+        on_scroll: Called with a [`ScrollEvent`][pythonnative.ScrollEvent]
+            as the list scrolls.
         style: Style for the outer scroll container.
         ref: Optional [`Ref`][pythonnative.Ref]; receives a
             [`ListController`][pythonnative.ListController] on
@@ -570,14 +657,11 @@ def SectionList(
         A virtualized list element (a function component instance).
     """
     sep = float(separator_height or 0.0)
+    header_renderer = render_section_header or _default_section_header
+    top_row, set_top_row = use_state(cast(Optional[int], None))
 
     def prepare_rows() -> List[_RowSpec]:
         sections_list = list(sections or [])
-
-        def _header_el(section: Dict[str, Any], s_idx: int) -> Element:
-            if render_section_header is not None:
-                return render_section_header(section, s_idx)
-            return Text(str(section.get("title", "")), style={"bold": True, "padding": 8})
 
         def _item_el(item: Any, i_idx: int, s_idx: int) -> Element:
             if render_item is not None:
@@ -589,19 +673,21 @@ def SectionList(
         for s_idx, section in enumerate(sections_list):
 
             def _make_header(sec: Dict[str, Any] = section, si: int = s_idx) -> Element:
-                return _header_el(sec, si)
+                return header_renderer(sec, si)
 
             rows.append(
                 _RowSpec(
-                    f"__pn_sec_{s_idx}__",
+                    f"{_SECTION_HEADER_PREFIX}{s_idx}__",
                     _make_header,
                     float(section_header_height) if section_header_height is not None else None,
                     item=section,
                     index=flat_index,
                     item_count=0,
+                    section=s_idx,
                 )
             )
-            for i_idx, item in enumerate(section.get("data", []) or []):
+            items = list(section.get("data", []) or [])
+            for i_idx, item in enumerate(items):
                 if key_extractor is not None:
                     try:
                         row_key = f"s{s_idx}:" + str(key_extractor(item, i_idx))
@@ -610,8 +696,13 @@ def SectionList(
                 else:
                     row_key = f"__pn_row_{s_idx}_{i_idx}__"
 
-                def _make_item(it: Any = item, ii: int = i_idx, si: int = s_idx) -> Element:
+                def _make_item(
+                    it: Any = item, ii: int = i_idx, si: int = s_idx, is_last: bool = i_idx == len(items) - 1
+                ) -> Element:
                     el = _item_el(it, ii, si)
+                    separator = None if is_last else _separator_element(item_separator)
+                    if separator is not None:
+                        el = View(el, separator)
                     if sep > 0:
                         return View(el, style={"padding_bottom": sep})
                     return el
@@ -624,7 +715,7 @@ def SectionList(
                         extent = None
                 elif item_height is not None:
                     extent = float(item_height) + sep
-                rows.append(_RowSpec(row_key, _make_item, extent, item=item, index=flat_index))
+                rows.append(_RowSpec(row_key, _make_item, extent, item=item, index=flat_index, section=s_idx))
                 flat_index += 1
 
         return rows
@@ -640,23 +731,52 @@ def SectionList(
             item_height,
             get_item_height,
             separator_height,
+            _Identity(item_separator),
             section_header_height,
         ],
     )
 
     estimated = estimated_item_height if estimated_item_height is not None else (item_height or _DEFAULT_ROW_EXTENT)
 
-    return _NativeList(
+    def track_top(row: Optional[_RowSpec]) -> None:
+        # The overlay shows the section whose item sits at the top; it
+        # hides while a real header (or the list header) is up there.
+        wanted = None
+        if row is not None and row.section is not None and not row.key.startswith(_SECTION_HEADER_PREFIX):
+            wanted = row.section
+        if wanted != top_row:
+            set_top_row(wanted)
+
+    native = _NativeList(
         rows=rows,
-        render_inputs=(render_item, render_section_header, separator_height, data_revision),
+        render_inputs=(render_item, render_section_header, separator_height, item_separator, data_revision),
         on_end_reached=on_end_reached,
         on_end_reached_threshold=on_end_reached_threshold,
+        on_viewable_items_changed=on_viewable_items_changed,
         on_scroll=on_scroll,
-        list_style=resolve_style(style) or None,
+        on_first_visible=track_top if sticky_section_headers else None,
+        list_style=None if sticky_section_headers else (resolve_style(style) or None),
         controller_ref=ref,
+        inverted=inverted,
         estimated_row_extent=float(estimated) + sep,
         header=list_header,
         footer=list_footer,
         empty=list_empty,
         refresh_control=refresh_control,
-    ).with_key(key)
+    )
+    if not sticky_section_headers:
+        return native.with_key(key)
+    sections_list = list(sections or [])
+    overlay = None
+    if top_row is not None and 0 <= top_row < len(sections_list):
+        overlay = View(
+            header_renderer(sections_list[top_row], top_row),
+            style={"position": "absolute", "top": 0, "left": 0, "right": 0},
+            key=f"__pn_sticky_{top_row}__",
+        )
+    return View(
+        native,
+        overlay,
+        style={"flex_grow": 1, **StyleSheet.flatten(style)},
+        key=key,
+    )

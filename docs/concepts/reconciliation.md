@@ -46,15 +46,20 @@ Native scrolling and supported animation drivers run independently; see
 Rendering records changes in an undo journal and stages native operations,
 callbacks, refs, and effects. A render that fails restores the committed tree
 without publishing those changes. At the end of the pass, staged mutations are
-applied through a single
-[`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]
-call. The renderer validates the versioned transaction before applying it
+applied through a single `apply_mutations` call on the view backend (see
+[Native views](../api/native_views.md)). The renderer validates the
+versioned transaction before applying it
 and acknowledges the committed revision. Layout then runs beside the native
 widgets and returns changed frames. Headless backends instead use the host
 Yoga binding and receive `SetFrameOp` mutations.
 
-`flush_dirty` combines work from several dirty components into a batch.
-See [Commits](bridge.md#commits) for validation and failure handling.
+`flush_dirty` combines work from several dirty components into a batch, and
+state setters schedule that flush rather than rendering inline, so every
+setter call in one callback lands in one pass. Layout and passive effects
+that raise are routed to the nearest error boundary, and a flush that
+re-schedules itself more than fifty times raises
+`RuntimeError("Too many re-renders")` through the same path. See
+[Commits](bridge.md#commits) for validation and failure handling.
 
 Callable props never enter the transaction at all. They're registered
 in the [`EventRegistry`][pythonnative.events.EventRegistry] keyed by
@@ -138,7 +143,7 @@ ThemeContext = pn.create_context({"primary": "#000"})
 
 @pn.component
 def Screen():
-    return ThemeContext.Provider({"primary": "#222"}, Header())
+    return ThemeContext.Provider(Header(), value={"primary": "#222"})
 
 @pn.component
 def Header():
@@ -175,8 +180,10 @@ through `set_state` is wasteful. Two ways to bypass:
   when the platform can run the animation natively, no Python code
   runs per frame at all. See the
   [Animations guide](../guides/animations.md).
-- Use [`use_ref`][pythonnative.use_ref] to hold a reference to a
-  native view and mutate it directly from inside an effect callback.
+- Use [`use_ref`][pythonnative.use_ref] to receive a typed
+  [handle](../api/handles.md) for a mounted view and drive it
+  imperatively (`scroll_to`, `focus`, a custom component's `command`)
+  from inside an effect callback.
 
 Reach for these only when profiling tells you that re-rendering is the
 bottleneck.
@@ -184,7 +191,7 @@ bottleneck.
 ## Next steps
 
 - Browse the algorithm in code: [Reconciler API](../api/reconciler.md).
-- Understand handlers underneath the diff: [Native views](native-views.md).
+- Understand the backend underneath the diff: [Native views](native-views.md).
 - See how mounting interacts with hooks: [Lifecycle](lifecycle.md).
 
 ## Elements and update priority

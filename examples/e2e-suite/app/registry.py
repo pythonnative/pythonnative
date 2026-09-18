@@ -30,6 +30,8 @@ import pythonnative as pn
 from app.screens.alerts.confirm_alert import ConfirmAlertDemo
 from app.screens.alerts.simple_alert import SimpleAlertDemo
 from app.screens.animations.collapsing_header import CollapsingHeaderDemo
+from app.screens.animations.decay_animation import DecayAnimationDemo
+from app.screens.animations.easing import EasingDemo
 from app.screens.animations.interpolate_animation import InterpolateAnimationDemo
 from app.screens.animations.loop_stagger import LoopStaggerDemo
 from app.screens.animations.parallel_animation import ParallelAnimationDemo
@@ -39,6 +41,7 @@ from app.screens.animations.timing_animation import TimingAnimationDemo
 from app.screens.assets.bundled_image import BundledImageDemo
 from app.screens.assets.custom_font import CustomFontDemo
 from app.screens.assets.image_size import ImageSizeDemo
+from app.screens.components.accessibility_props import AccessibilityPropsDemo
 from app.screens.components.activity_indicator import ActivityIndicatorDemo
 from app.screens.components.blur_view import BlurViewDemo
 from app.screens.components.button import ButtonDemo
@@ -61,6 +64,7 @@ from app.screens.components.progress_bar import ProgressBarDemo
 from app.screens.components.refresh_control import RefreshControlDemo
 from app.screens.components.safe_area_view import SafeAreaViewDemo
 from app.screens.components.scroll_view import ScrollViewDemo
+from app.screens.components.scroll_view_handle import ScrollViewHandleDemo
 from app.screens.components.section_list import SectionListDemo
 from app.screens.components.segmented_control import SegmentedControlDemo
 from app.screens.components.slider import SliderDemo
@@ -71,11 +75,20 @@ from app.screens.components.svg import SvgDemo
 from app.screens.components.switch import SwitchDemo
 from app.screens.components.text import TextDemo
 from app.screens.components.text_input import TextInputDemo
+from app.screens.components.text_input_handle import TextInputHandleDemo
 from app.screens.components.touchable_opacity import TouchableOpacityDemo
 from app.screens.components.view_column_row import ViewColumnRowDemo
 from app.screens.components.web_view import WebViewDemo
+from app.screens.components.web_view_handle import WebViewHandleDemo
+from app.screens.device.accessibility_info import AccessibilityInfoDemo
+from app.screens.device.device_info import DeviceInfoDemo
+from app.screens.device.dimensions import DimensionsDemo
+from app.screens.device.keyboard import KeyboardDemo
+from app.screens.device.localization import LocalizationDemo
+from app.screens.device.pixel_ratio import PixelRatioDemo
 from app.screens.gestures.gesture_composition import GestureCompositionDemo
 from app.screens.gestures.gestures import GesturesDemo
+from app.screens.gestures.pan_gesture import PanGestureDemo
 from app.screens.hooks.async_effect import AsyncEffectDemo
 from app.screens.hooks.batch_updates_demo import BatchUpdatesDemo
 from app.screens.hooks.memo_demo import MemoDemo
@@ -88,13 +101,16 @@ from app.screens.hooks.use_deferred_value import UseDeferredValueDemo
 from app.screens.hooks.use_effect import UseEffectDemo
 from app.screens.hooks.use_imperative_handle import UseImperativeHandleDemo
 from app.screens.hooks.use_layout_effect import UseLayoutEffectDemo
+from app.screens.hooks.use_locales import UseLocalesDemo
 from app.screens.hooks.use_memo import UseMemoDemo
 from app.screens.hooks.use_mutation import UseMutationDemo
 from app.screens.hooks.use_persisted_state import UsePersistedStateDemo
 from app.screens.hooks.use_query import UseQueryDemo
+from app.screens.hooks.use_reduce_motion import UseReduceMotionDemo
 from app.screens.hooks.use_reducer import UseReducerDemo
 from app.screens.hooks.use_ref import UseRefDemo
 from app.screens.hooks.use_resource import UseResourceDemo
+from app.screens.hooks.use_screen_reader_enabled import UseScreenReaderEnabledDemo
 from app.screens.hooks.use_state import UseStateDemo
 from app.screens.hooks.use_theme import UseThemeDemo
 from app.screens.hooks.use_transition import UseTransitionDemo
@@ -107,14 +123,21 @@ from app.screens.layout.on_layout import OnLayoutDemo
 from app.screens.layout.padding_margin import PaddingMarginDemo
 from app.screens.navigation.drawer_navigator import DrawerNavigatorDemo
 from app.screens.navigation.focus_effect import FocusEffectDemo
+from app.screens.navigation.navigation_ref import NavigationRefDemo
+from app.screens.navigation.navigation_theme import NavigationThemeDemo
 from app.screens.navigation.params_passing import ParamsPassingDemo
+from app.screens.navigation.presentation import PresentationDemo
+from app.screens.navigation.stack_options import StackOptionsDemo
 from app.screens.navigation.tab_navigator import TabNavigatorDemo
+from app.screens.navigation.tab_options import TabOptionsDemo
 from app.screens.packages.pypi_packages import PyPIPackagesDemo
 from app.screens.platform.platform_info import PlatformInfoDemo
 from app.screens.runtime.run_async_demo import RunAsyncDemo
 from app.screens.sdk.custom_component import CustomComponentDemo
+from app.screens.sdk.define_component_demo import DefineComponentDemo
 from app.screens.storage.async_storage_demo import AsyncStorageDemo
 from app.screens.styling.borders_shadows import BordersShadowsDemo
+from app.screens.styling.dynamic_color import DynamicColorDemo
 from app.screens.styling.interaction_props import InteractionPropsDemo
 from app.screens.styling.stylesheet_demo import StyleSheetDemo
 from app.screens.styling.transform import TransformDemo
@@ -157,6 +180,7 @@ DEMOS: List[DemoEntry] = [
     DemoEntry("text", "Components", "Text", "Text", TextDemo),
     DemoEntry("button", "Components", "Button", "Button", ButtonDemo),
     DemoEntry("text_input", "Components", "TextInput", "TextInput", TextInputDemo),
+    DemoEntry("text_input_handle", "Components", "TextInputHandle", "TextInputHandle", TextInputHandleDemo),
     DemoEntry("image", "Components", "Image", "Image", ImageDemo),
     DemoEntry("icon", "Components", "Icon", "Icon", IconDemo),
     DemoEntry("svg", "Components", "Svg", "Svg", SvgDemo),
@@ -180,6 +204,7 @@ DEMOS: List[DemoEntry] = [
         ViewColumnRowDemo,
     ),
     DemoEntry("scroll_view", "Components", "ScrollView", "ScrollView", ScrollViewDemo),
+    DemoEntry("scroll_view_handle", "Components", "ScrollViewHandle", "ScrollViewHandle", ScrollViewHandleDemo),
     DemoEntry("safe_area_view", "Components", "SafeAreaView", "SafeAreaView", SafeAreaViewDemo),
     DemoEntry("modal", "Components", "Modal", "Modal", ModalDemo),
     DemoEntry("pressable", "Components", "Pressable", "Pressable", PressableDemo),
@@ -212,6 +237,7 @@ DEMOS: List[DemoEntry] = [
     DemoEntry("flat_list", "Components", "FlatList", "FlatList", FlatListDemo),
     DemoEntry("section_list", "Components", "SectionList", "SectionList", SectionListDemo),
     DemoEntry("web_view", "Components", "WebView", "WebView", WebViewDemo),
+    DemoEntry("web_view_handle", "Components", "WebViewHandle", "WebViewHandle", WebViewHandleDemo),
     DemoEntry("touchable_opacity", "Components", "TouchableOpacity", "TouchableOpacity", TouchableOpacityDemo),
     DemoEntry("image_background", "Components", "ImageBackground", "ImageBackground", ImageBackgroundDemo),
     DemoEntry("checkbox", "Components", "Checkbox", "Checkbox", CheckboxDemo),
@@ -219,6 +245,13 @@ DEMOS: List[DemoEntry] = [
     DemoEntry("date_picker", "Components", "DatePicker", "DatePicker", DatePickerDemo),
     DemoEntry("suspense", "Components", "Suspense", "Suspense", SuspenseDemo),
     DemoEntry("lazy", "Components", "lazy", "lazy", LazyDemo),
+    DemoEntry(
+        "accessibility_props",
+        "Components",
+        "Accessibility props",
+        "components::accessibility",
+        AccessibilityPropsDemo,
+    ),
     # ------------------------------------------------------------------
     # Hooks
     # ------------------------------------------------------------------
@@ -292,6 +325,15 @@ DEMOS: List[DemoEntry] = [
         UseColorSchemeDemo,
     ),
     DemoEntry("use_theme", "Hooks", "use_theme", "use_theme", UseThemeDemo),
+    DemoEntry("use_locales", "Hooks", "use_locales", "use_locales", UseLocalesDemo),
+    DemoEntry("use_reduce_motion", "Hooks", "use_reduce_motion", "use_reduce_motion", UseReduceMotionDemo),
+    DemoEntry(
+        "use_screen_reader_enabled",
+        "Hooks",
+        "use_screen_reader_enabled",
+        "use_screen_reader_enabled",
+        UseScreenReaderEnabledDemo,
+    ),
     # ------------------------------------------------------------------
     # Navigation
     # ------------------------------------------------------------------
@@ -323,6 +365,11 @@ DEMOS: List[DemoEntry] = [
         "use_focus_effect",
         FocusEffectDemo,
     ),
+    DemoEntry("navigation_theme", "Navigation", "Navigation theme", "use_navigation_theme", NavigationThemeDemo),
+    DemoEntry("navigation_ref", "Navigation", "Navigation ref", "create_navigation_ref", NavigationRefDemo),
+    DemoEntry("stack_options", "Navigation", "Stack options", "navigation::stack_options", StackOptionsDemo),
+    DemoEntry("tab_options", "Navigation", "Tab options", "navigation::tab_options", TabOptionsDemo),
+    DemoEntry("presentation", "Navigation", "Presentation", "navigation::presentation", PresentationDemo),
     # ------------------------------------------------------------------
     # Layout
     # ------------------------------------------------------------------
@@ -363,6 +410,7 @@ DEMOS: List[DemoEntry] = [
     ),
     DemoEntry("transform", "Styling", "Transforms", "styling::transform", TransformDemo),
     DemoEntry("stylesheet", "Styling", "StyleSheet", "StyleSheet", StyleSheetDemo),
+    DemoEntry("dynamic_color", "Styling", "Dynamic color", "styling::dynamic_color", DynamicColorDemo),
     DemoEntry(
         "interaction_props",
         "Styling",
@@ -416,6 +464,8 @@ DEMOS: List[DemoEntry] = [
         "animated::event",
         CollapsingHeaderDemo,
     ),
+    DemoEntry("easing", "Animations", "Easing", "Easing", EasingDemo),
+    DemoEntry("decay_animation", "Animations", "Animated.decay", "animated::decay", DecayAnimationDemo),
     # ------------------------------------------------------------------
     # Gestures
     # ------------------------------------------------------------------
@@ -427,6 +477,7 @@ DEMOS: List[DemoEntry] = [
         "gestures::composition",
         GestureCompositionDemo,
     ),
+    DemoEntry("pan_gesture", "Gestures", "Pan gesture", "gestures::pan", PanGestureDemo),
     # ------------------------------------------------------------------
     # Alerts, storage, runtime, platform, packages, SDK
     # ------------------------------------------------------------------
@@ -453,14 +504,24 @@ DEMOS: List[DemoEntry] = [
     ),
     DemoEntry("run_async", "Runtime", "run_async", "run_async", RunAsyncDemo),
     DemoEntry("platform_info", "Platform", "Platform info", "Platform", PlatformInfoDemo),
+    # ------------------------------------------------------------------
+    # Device environment modules
+    # ------------------------------------------------------------------
+    DemoEntry("keyboard", "Device", "Keyboard", "Keyboard", KeyboardDemo),
+    DemoEntry("dimensions", "Device", "Dimensions", "Dimensions", DimensionsDemo),
+    DemoEntry("pixel_ratio", "Device", "PixelRatio", "PixelRatio", PixelRatioDemo),
+    DemoEntry("device_info", "Device", "Device info", "Device", DeviceInfoDemo),
+    DemoEntry("localization", "Device", "Localization", "Localization", LocalizationDemo),
+    DemoEntry("accessibility_info", "Device", "AccessibilityInfo", "AccessibilityInfo", AccessibilityInfoDemo),
     DemoEntry("pypi_packages", "Packages", "PyPI packages", "packages::requirements", PyPIPackagesDemo),
     DemoEntry(
         "custom_component",
         "SDK",
         "Custom component",
-        "native_component",
+        "sdk::custom_component",
         CustomComponentDemo,
     ),
+    DemoEntry("define_component", "SDK", "define_component", "define_component", DefineComponentDemo),
 ]
 
 CATEGORIES: List[str] = []

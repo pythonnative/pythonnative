@@ -39,31 +39,8 @@ class SafeAreaViewManager : ViewManager() {
 }
 
 /**
- * Vanilla container that publishes the keyboard height (from window
- * insets) as a `Host` module `keyboard` event so the Python-side
- * component can compute its offset.
+ * Vanilla container for `KeyboardAvoidingView`. The offset is computed in
+ * Python from the `Keyboard` module's `change` events (fed by
+ * `PNKeyboard`), so the view itself carries no keyboard logic.
  */
-class KeyboardAvoidingViewManager : ViewManager() {
-    override fun createView(context: Context, tag: Long, props: JSONObject): View {
-        val view = PNFrameLayout(context)
-        ViewCompat.setOnApplyWindowInsetsListener(view) { v, insets ->
-            publishKeyboard(v, insets)
-            insets
-        }
-        view.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
-            ViewCompat.getRootWindowInsets(v)?.let { publishKeyboard(v, it) }
-        }
-        return view
-    }
-
-    private fun publishKeyboard(view: View, insets: WindowInsetsCompat) {
-        val density = PNBridge.density()
-        val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-        val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
-        val height = max(0, ime - bars) / density
-        val last = stateOf(view)["keyboard_height"] as? Double
-        if (last != null && last == height.toDouble()) return
-        stateOf(view)["keyboard_height"] = height.toDouble()
-        ModuleEvents.emit("Host", "keyboard", JSONObject().put("height", height.toDouble()))
-    }
-}
+class KeyboardAvoidingViewManager : ViewManager()

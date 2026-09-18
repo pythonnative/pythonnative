@@ -36,7 +36,7 @@ def test_supports_uses_platform_and_member_contracts() -> None:
     _set_platform_for_test("ios")
     assert Platform.supports("Text", "font_size")
     assert Platform.supports("Notifications", "get_device_token")
-    assert not Platform.supports("Text", "accessibility_live_region")
+    assert Platform.supports("Text", "accessibility_live_region")
     assert not Platform.supports("UninstalledExtension")
     assert not Platform.supports("Text", "imaginary_property")
     _set_platform_for_test("android")

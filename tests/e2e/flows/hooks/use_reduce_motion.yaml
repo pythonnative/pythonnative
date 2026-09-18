@@ -1,0 +1,17 @@
+# Tests use_reduce_motion reports the (off) Reduce Motion setting.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_reduce_motion.py
+# Source under test: src/pythonnative/native_modules/accessibility_info.py :: use_reduce_motion
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_reduce_motion
+- assertVisible: "Reduce motion: no"
+- assertVisible: "Animation duration: 300"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

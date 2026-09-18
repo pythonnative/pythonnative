@@ -4,10 +4,11 @@
 iOS and Android permission models behind two calls, both served by the
 native ``Permissions`` module:
 
-- ``check(permission)``: a coroutine that returns a status without prompting.
-  Some platform settings APIs answer asynchronously.
-- ``request(permission)``: a coroutine that shows the system prompt
-  (if needed) and resolves to the resulting status.
+- ``await check(permission)``: returns a status without prompting. It is
+  ``async`` because some platform settings APIs (notification settings
+  on iOS, for one) answer asynchronously.
+- ``await request(permission)``: shows the system prompt (if needed) and
+  resolves to the resulting status.
 
 Statuses are ``"granted"``, ``"denied"``, ``"blocked"`` (denied with
 "don't ask again" / Settings required), or ``"undetermined"``.
@@ -95,7 +96,10 @@ class Permissions:
 
     @staticmethod
     async def check(permission: PermissionName) -> PermissionStatus:
-        """Return the current status of ``permission`` without prompting."""
+        """Return the current status of ``permission`` without prompting.
+
+        A coroutine, like ``request``: ``await pn.Permissions.check("camera")``.
+        """
         return _coerce(await native_module("Permissions").call_async("check", permission=_validate(permission)))
 
     @staticmethod

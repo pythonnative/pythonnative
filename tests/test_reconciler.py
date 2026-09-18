@@ -541,13 +541,13 @@ def test_provider_child_native_view_swap() -> None:
     backend = MockBackend()
     rec = Reconciler(backend)
 
-    tree1 = Element("View", {}, [ctx.Provider("v1", CompA())])
+    tree1 = Element("View", {}, [ctx.Provider(CompA(), value="v1")])
     root = rec.mount(tree1)
     assert len(root.children) == 1
     assert root.children[0].props["text"] == "A"
     old_child_id = root.children[0].id
 
-    tree2 = Element("View", {}, [ctx.Provider("v2", CompB())])
+    tree2 = Element("View", {}, [ctx.Provider(CompB(), value="v2")])
     rec.reconcile(tree2)
     assert len(root.children) == 1
     assert root.children[0].props["text"] == "B"

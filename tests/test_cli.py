@@ -1310,3 +1310,31 @@ def test_start_help_lists_dev_server_flags(tmp_path: Path) -> None:
     assert "--dev-client" in result.stdout
     assert "--rebuild" in result.stdout
     assert "--hot-reload" not in result.stdout
+
+
+def test_missing_requirements_handle_specifiers_extras_and_local_wheels(tmp_path: Path) -> None:
+    from pythonnative.cli.pn import _missing_requirements, _requirement_distribution
+
+    assert _requirement_distribution("httpx[http2]>=0.27") == "httpx"
+    assert _requirement_distribution("vendor/pn_inbox_extension-0.1.0-py3-none-any.whl") == "pn_inbox_extension"
+    assert _requirement_distribution("  pytest ; python_version >= '3.13'") == "pytest"
+    # Installed distributions aren't reported, whatever the specifier.
+    assert _missing_requirements(["pytest>=1", "black[d]", "ruff ; python_version >= '3.13'"]) == []
+    # Missing entries come back verbatim so the install hint reproduces them.
+    wheel = "vendor/definitely_not_installed_pn-0.1.0-py3-none-any.whl"
+    assert _missing_requirements(["definitely-not-installed-pn>=2", wheel]) == [
+        "definitely-not-installed-pn>=2",
+        wheel,
+    ]
+
+
+def test_missing_requirements_message_names_an_exact_install_command() -> None:
+    import shlex
+    import sys
+
+    from pythonnative.cli.pn import _missing_requirements_message
+
+    message = _missing_requirements_message(["emoji>=2", "vendor/x-1.0-py3-none-any.whl"])
+    assert "emoji, x" in message
+    command = message.strip().splitlines()[-1].strip()
+    assert shlex.split(command) == [sys.executable, "-m", "pip", "install", "emoji>=2", "vendor/x-1.0-py3-none-any.whl"]

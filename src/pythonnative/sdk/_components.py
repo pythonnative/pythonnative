@@ -1,37 +1,34 @@
-"""Custom native-component registration.
+"""Custom native-component definition.
 
-Implements the [`@native_component`][pythonnative.sdk.native_component]
-decorator and supporting helpers that let third-party packages contribute
-new element types to the reconciler.
+Implements [`define_component`][pythonnative.sdk.define_component] and
+the supporting helpers that let third-party packages contribute new
+element types to the reconciler.
 
-On device a custom component is rendered by a Swift
-``PNComponentManager`` and a Kotlin ``ComponentManager`` registered
-under the same type name by the package's native plugin (see
-``docs/guides/custom-components.md``). The Python side only needs to
-know the element name and, optionally, its typed props and a
-[`ViewHandler`][pythonnative.sdk.ViewHandler] that renders a stand-in
-in unit tests (the browser preview draws unknown types as labeled
-placeholders). Registration is therefore a three-part agreement:
+A custom component is rendered by a Swift ``PNComponentManager`` and a
+Kotlin ``ComponentManager`` registered under the same type name by the
+package's native plugin (see ``docs/guides/custom-native-components.md``);
+the browser preview draws unknown types as labeled placeholders. The
+Python side declares the element name and its typed props, which is
+what the contract generator, the commit validator, and the element
+factory all read:
 
 1. A typed, immutable [`Props`][pythonnative.sdk.Props] dataclass
    declaring the component's public surface.
-2. An element factory built with
-   [`element_factory`][pythonnative.sdk.element_factory].
-3. Optionally, a test [`ViewHandler`][pythonnative.sdk.ViewHandler]
-   so the component also renders under the Python test backend.
+2. ``define_component(name, props)``, which registers the props schema
+   and returns a typed element factory
+   ([`element_factory`][pythonnative.sdk.element_factory] builds the same
+   factory for an already-defined name).
 
-The registry is process-wide. The view backend calls
-[`install_into_registry`][pythonnative.sdk.install_into_registry] on
-first use; that helper performs entry-point discovery (importing any
-modules registered under
-[`ENTRY_POINT_GROUP`][pythonnative.sdk.ENTRY_POINT_GROUP]) and copies
-every test handler into the registry.
+Definitions are process-wide. PyPI packages that declare an entry point
+under [`ENTRY_POINT_GROUP`][pythonnative.sdk.ENTRY_POINT_GROUP] are
+imported once, before the first native commit, so their definitions are
+in place without the app importing them explicitly.
 
 Example:
     ```python
     from dataclasses import dataclass
     import pythonnative as pn
-    from pythonnative.sdk import Props, ViewHandler, element_factory, native_component
+    from pythonnative.sdk import Props, define_component
 
 
     @dataclass(frozen=True)
@@ -41,27 +38,18 @@ Example:
         style: pn.StyleProp = None
 
 
-    @native_component("Badge", props=BadgeProps)
-    class BadgePreviewHandler(ViewHandler):
-        def create(self, tag, props):
-            ...  # stand-in used by the Python test backend
-
-        def update(self, view, changed):
-            ...
-
-
-    Badge = element_factory("Badge")
+    Badge = define_component("Badge", BadgeProps)
+    Badge(text="3", color="#0A84FF")
     ```
 """
 
 from dataclasses import dataclass, fields, is_dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, Dict, List, Optional
 
 from ..element import Element
-from ..native_views.base import ViewHandler
 
 ENTRY_POINT_GROUP = "pythonnative.handlers"
-"""Entry-point group used by PyPI packages to register native handlers.
+"""Entry-point group used by PyPI packages to define native components.
 
 Packages declare entries like:
 
@@ -70,10 +58,9 @@ Packages declare entries like:
 my_blur = "my_pkg.blur:register"
 ```
 
-PythonNative imports the referenced module the first time the
-[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry] is
-materialized; the decorators inside that module populate the registry
-during import.
+PythonNative imports the referenced module the first time the view
+backend is created; the ``define_component`` calls inside that module
+register the package's components during import.
 """
 
 
@@ -104,122 +91,64 @@ class Props:
 # Internal registry
 # ---------------------------------------------------------------------- #
 
-# name -> (props_type or None, test handler or None)
-_REGISTRY: Dict[str, Tuple[Optional[type], Optional[ViewHandler]]] = {}
+# name -> props dataclass type
+_REGISTRY: Dict[str, type] = {}
 
-# Caches `_install_into_registry` runs to avoid repeated entry-point
-# discovery once the registry has been populated for a given platform.
+# Caches entry-point discovery so it runs once per process.
 _DISCOVERED: bool = False
 
 
-H = TypeVar("H", bound=ViewHandler)
+def define_component(
+    name: str, props: type, *, platforms: tuple[str, ...] = ("ios", "android")
+) -> Callable[..., Element]:
+    """Declare a custom native component and return its typed element factory.
 
-
-def native_component(
-    name: str,
-    *,
-    props: Optional[type] = None,
-    platforms: tuple[str, ...] = ("ios", "android"),
-) -> Callable[[Type[H]], Type[H]]:
-    """Decorator that registers a test [`ViewHandler`][pythonnative.sdk.ViewHandler] under ``name``.
-
-    The handler class is instantiated immediately and stored in the
-    process-wide registry as the component's off-device renderer. The
-    on-device renderers are the Swift and Kotlin component managers the
-    package's native plugin registers under the same ``name``.
+    Registers ``props`` as the component's schema (so the contract
+    generator emits it, the commit validator checks it, and the factory
+    validates keyword arguments against it) and returns the
+    [`element_factory`][pythonnative.sdk.element_factory] for ``name``.
+    Defining the same ``name`` again replaces the earlier schema.
 
     Args:
-        name: Element type name (e.g., ``"Badge"``). Used by the
-            reconciler and by native component managers at lookup time.
-        props: Optional dataclass type describing the component's
-            typed props. When supplied, the
-            [`element_factory`][pythonnative.sdk.element_factory] helper
-            uses this type to validate kwargs and produce frozen prop
-            instances.
-        platforms: Platforms with an actual renderer for this component.
+        name: Element type name (``"Badge"``). Native component
+            managers register under the same name.
+        props: A ``@dataclass`` type describing the component's props.
+            Every field is a keyword argument of the returned factory;
+            ``style`` is added when the dataclass doesn't declare it.
+        platforms: Platforms with an actual renderer. Browser
+            placeholders don't count as native support.
 
     Returns:
-        A decorator that, when applied to a
-        [`ViewHandler`][pythonnative.sdk.ViewHandler] subclass, registers
-        it and returns the class unchanged.
+        A callable producing [`Element`][pythonnative.Element] instances
+        of type ``name``.
 
     Raises:
-        TypeError: If the decorated object is not a class subclassing
-            ``ViewHandler``.
+        TypeError: If ``props`` is not a dataclass type.
     """
+    if not (isinstance(props, type) and is_dataclass(props)):
+        raise TypeError(f"define_component({name!r}): props must be a @dataclass type, got {props!r}")
+    from dataclasses import replace
+    from typing import get_type_hints
 
-    def decorator(handler_cls: Type[H]) -> Type[H]:
-        if not isinstance(handler_cls, type) or not issubclass(handler_cls, ViewHandler):
-            raise TypeError(f"@native_component({name!r}) must decorate a ViewHandler subclass; got {handler_cls!r}")
-        register_component(name=name, props=props, handler=handler_cls(), platforms=platforms)
-        return handler_cls
+    from ..style import Style, StyleProp
+    from .schema import COMPONENTS, RUNTIME_PROPS, ComponentSchema, register_schema, type_schema
 
-    return decorator
-
-
-def register_component(
-    *,
-    name: str,
-    props: Optional[type] = None,
-    handler: Optional[ViewHandler] = None,
-    platforms: tuple[str, ...] = ("ios", "android"),
-) -> None:
-    """Register a custom native component imperatively.
-
-    Declares ``name`` as an element type so
-    [`element_factory`][pythonnative.sdk.element_factory] can build it.
-    ``handler`` is the optional test renderer; native
-    rendering always comes from the platform component managers.
-    Subsequent calls for the same ``name`` merge: a later ``props`` or
-    ``handler`` replaces the earlier one, ``None`` leaves it alone.
-
-    Args:
-        name: Element type name.
-        props: Optional dataclass type describing the typed props.
-        handler: Optional [`ViewHandler`][pythonnative.sdk.ViewHandler]
-            instance used off device.
-        platforms: Platforms with an actual renderer. Browser placeholders
-            don't count as native support.
-
-    Raises:
-        TypeError: If ``handler`` is not a ``ViewHandler`` instance, or
-            if ``props`` is not a dataclass type.
-    """
-    if props is not None and not (isinstance(props, type) and is_dataclass(props)):
-        raise TypeError(f"register_component({name!r}): props must be a @dataclass type, got {props!r}")
-    if handler is not None and not isinstance(handler, ViewHandler):
-        raise TypeError(f"register_component({name!r}): handler must be a ViewHandler instance")
-
-    if props is not None:
-        from dataclasses import replace
-        from typing import get_type_hints
-
-        from ..style import Style, StyleProp
-        from .schema import COMPONENTS, RUNTIME_PROPS, ComponentSchema, register_schema, type_schema
-
-        schema = ComponentSchema.from_dataclass(name, props, platforms=platforms)
-        common = COMPONENTS.get("View")
-        style_keys = get_type_hints(Style)
-        styles = {key: value for key, value in (common.props.items() if common else ()) if key in style_keys}
-        wire = styles | schema.props | RUNTIME_PROPS
-        wire["style"] = {**type_schema(StyleProp), "native": {"python_only": True}}
-        register_schema(replace(schema, props=wire))
-    existing = _REGISTRY.get(name)
-    if existing is None:
-        _REGISTRY[name] = (props, handler)
-        return
-    existing_props, existing_handler = existing
-    _REGISTRY[name] = (
-        props if props is not None else existing_props,
-        handler if handler is not None else existing_handler,
-    )
+    schema = ComponentSchema.from_dataclass(name, props, platforms=platforms)
+    common = COMPONENTS.get("View")
+    style_keys = get_type_hints(Style)
+    styles = {key: value for key, value in (common.props.items() if common else ()) if key in style_keys}
+    wire = styles | schema.props | RUNTIME_PROPS
+    wire["style"] = {**type_schema(StyleProp), "native": {"python_only": True}}
+    register_schema(replace(schema, props=wire))
+    _REGISTRY[name] = props
+    return element_factory(name)
 
 
 def unregister_component(name: str) -> None:
-    """Remove a previously-registered component (primarily for tests).
+    """Remove a previously defined component (primarily for tests).
 
     Args:
-        name: The element type name to unregister.
+        name: The element type name to forget.
     """
     _REGISTRY.pop(name, None)
     from .schema import COMPONENTS
@@ -228,57 +157,23 @@ def unregister_component(name: str) -> None:
 
 
 def list_components() -> List[str]:
-    """Return the names of every registered custom component.
-
-    Useful for diagnostics and tests.
-
-    Returns:
-        Sorted list of names registered via
-        [`@native_component`][pythonnative.sdk.native_component] or
-        [`register_component`][pythonnative.sdk.register_component].
-    """
+    """Return the names of every defined custom component, sorted."""
     return sorted(_REGISTRY)
 
 
 def get_props_type(name: str) -> Optional[type]:
-    """Return the registered props dataclass for ``name`` (or ``None``)."""
-    entry = _REGISTRY.get(name)
-    return entry[0] if entry is not None else None
+    """Return the props dataclass defined for ``name`` (or ``None``)."""
+    return _REGISTRY.get(name)
 
 
-def get_test_handler(name: str) -> Optional[ViewHandler]:
-    """Return the registered off-device handler for ``name`` (or ``None``)."""
-    entry = _REGISTRY.get(name)
-    return entry[1] if entry is not None else None
-
-
-def install_into_registry(registry: Any) -> None:
-    """Copy registered test handlers into a view registry.
-
-    Called once by the registry on first use. Triggers entry-point
-    discovery on the first call so PyPI-installed components register
-    themselves before the registry snapshot is taken.
-
-    Args:
-        registry: A
-            [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
-            (or duck-compatible object) with a ``register(name, handler)``
-            method.
-    """
-    _discover_entry_points()
-    for name, (_props_type, handler) in _REGISTRY.items():
-        if handler is not None:
-            registry.register(name, handler)
-
-
-def _discover_entry_points() -> None:
+def discover_components() -> None:
     """Import every module registered under ``ENTRY_POINT_GROUP``.
 
     Idempotent and safe to call repeatedly; the actual discovery only
     runs once per process. Exceptions raised by individual entry points
     are swallowed (with the offending name printed to stderr) so a
     single broken plugin never prevents the rest of the process from
-    rendering.
+    rendering. The view backend calls this before its first commit.
     """
     global _DISCOVERED
     if _DISCOVERED:
@@ -296,7 +191,7 @@ def _discover_entry_points() -> None:
             import sys
 
             print(
-                f"[pythonnative.sdk] Failed to load handler entry point {name!r}: {exc!r}",
+                f"[pythonnative.sdk] Failed to load component entry point {name!r}: {exc!r}",
                 file=sys.stderr,
                 flush=True,
             )
@@ -335,23 +230,18 @@ def element_factory(name: str) -> Callable[..., Element]:
     - Children as positional arguments (any number).
     - ``key=`` (optional, keyword-only) for keyed reconciliation.
     - Either ``props=`` (a dataclass instance) or per-field keyword
-      arguments matching the registered props dataclass.
-
-    If no ``props`` dataclass was registered for ``name``, kwargs flow
-    through unmodified, useful when iterating before locking down a
-    prop schema.
+      arguments matching the defined props dataclass.
 
     Args:
-        name: An element type name previously registered via
-            [`@native_component`][pythonnative.sdk.native_component] or
-            [`register_component`][pythonnative.sdk.register_component].
+        name: An element type name previously declared with
+            [`define_component`][pythonnative.sdk.define_component].
 
     Returns:
         A callable producing fresh
         [`Element`][pythonnative.Element] instances of type ``name``.
 
     Raises:
-        KeyError: If ``name`` is not registered.
+        KeyError: If ``name`` is not defined.
 
     Example:
         ```python
@@ -361,9 +251,7 @@ def element_factory(name: str) -> Callable[..., Element]:
         ```
     """
     if name not in _REGISTRY:
-        raise KeyError(
-            f"No component registered under name {name!r}. Use @native_component or register_component first."
-        )
+        raise KeyError(f"No component defined under name {name!r}. Call define_component(name, props) first.")
 
     def factory(*children: Element, key: Optional[str] = None, props: Any = None, **kwargs: Any) -> Element:
         from ..mutations import UNSET
@@ -420,12 +308,10 @@ def element_factory(name: str) -> Callable[..., Element]:
 __all__ = [
     "ENTRY_POINT_GROUP",
     "Props",
+    "define_component",
+    "discover_components",
     "element_factory",
-    "get_test_handler",
     "get_props_type",
-    "install_into_registry",
     "list_components",
-    "native_component",
-    "register_component",
     "unregister_component",
 ]

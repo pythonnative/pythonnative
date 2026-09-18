@@ -2,6 +2,18 @@
 
 Application objects aren't copied. The journal owns framework containers and
 attribute assignments; native mutation and effect publication are separate.
+
+The reconciler installs a [`Journal`][pythonnative.journal.Journal] for the
+duration of one render pass and raises the module-level ``journal_active``
+flag. [`VNode`][pythonnative.reconciler.VNode] and
+[`Ref`][pythonnative.Ref] consult that flag in ``__setattr__`` so attribute
+writes outside a pass cost one global lookup and no call. Inside a pass the
+journal records only the node fields listed in ``STRUCTURAL_FIELDS`` (plus
+``Ref.current``): the tree structure and native identity, the element and
+clean props the next diff compares against, and hook and boundary state.
+The per-pass layout caches (``measure_cache``, ``last_frame``,
+``layout_node``, ``layout_dirty``) are skipped; they are rebuilt by the
+next layout pass and never observed by application code.
 """
 
 from __future__ import annotations
@@ -9,15 +21,42 @@ from __future__ import annotations
 from contextvars import ContextVar
 from typing import Any, Callable
 
+__all__ = ["Journal", "JournalDict", "STRUCTURAL_FIELDS", "journal_active", "record_attribute"]
+
 _current: ContextVar[Journal | None] = ContextVar("pn_render_journal", default=None)
 _missing = object()
+
+journal_active: bool = False
+"""Whether a render journal is recording. Read by ``VNode`` and ``Ref`` before recording."""
+
+STRUCTURAL_FIELDS = frozenset(
+    {
+        "root",
+        "children",
+        "parent",
+        "tag",
+        "native_view",
+        "element",
+        "clean_props",
+        "hook_state",
+        "mounted",
+        "rendered",
+        "hidden_by_suspense",
+        "error",
+        "suspense_showing_fallback",
+        "suspense_hidden",
+        "suspense_hydration",
+        "suspense_waits",
+    }
+)
+"""The ``VNode`` (and reconciler) fields a rollback restores; layout caches are not among them."""
 
 
 class Journal:
     """Record inverse mutations for one uncommitted render pass."""
 
     def __init__(self) -> None:
-        self.undo: list[Callable[[], None]] = []
+        self.undo: list[Callable[[], Any]] = []
         self.seen: set[tuple[int, Any]] = set()
         self.active = True
 
@@ -61,8 +100,32 @@ class Journal:
         self.accept()
 
 
+def install(journal: Journal) -> Any:
+    """Make ``journal`` the recording journal; returns the token for ``uninstall``."""
+    global journal_active
+    token = _current.set(journal)
+    journal_active = True
+    return token
+
+
+def uninstall(token: Any) -> None:
+    """Stop recording and restore the previously installed journal, if any."""
+    global journal_active
+    _current.reset(token)
+    journal_active = _current.get() is not None
+
+
+def current() -> Journal | None:
+    """Return the journal recording the in-flight render pass, or ``None``."""
+    return _current.get()
+
+
 def record_attribute(obj: Any, name: str) -> None:
-    """Record a framework attribute in the active render journal, if any."""
+    """Record a framework attribute in the active render journal, if any.
+
+    Callers check ``journal_active`` first so the common case (no pass in
+    flight) never reaches this function.
+    """
     journal = _current.get()
     if journal is not None:
         journal.attribute(obj, name)

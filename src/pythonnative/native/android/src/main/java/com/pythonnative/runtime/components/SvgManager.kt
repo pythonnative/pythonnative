@@ -198,8 +198,19 @@ object SvgRenderer {
     }
 
     /** Parse a paint value; `"none"` and unparseable colors yield null. */
-    fun resolve(value: String, currentColor: Int): Int? {
-        val trimmed = value.trim()
+    /**
+     * Resolve a paint value: a color string (`none` clears, `currentColor`
+     * inherits), a `{"light","dark"}` dynamic color, or a typed contract
+     * value wrapping either.
+     */
+    fun resolve(value: Any?, currentColor: Int): Int? {
+        val raw = when (value) {
+            null -> return null
+            is com.pythonnative.generated.PNNativeValue -> value.nativeValue()
+            else -> value
+        }
+        if (raw !is String) return PNColor.parse(raw)
+        val trimmed = raw.trim()
         if (trimmed.isEmpty() || trimmed.equals("none", ignoreCase = true)) return null
         if (trimmed.equals("currentColor", ignoreCase = true)) return currentColor
         return PNColor.parse(trimmed)

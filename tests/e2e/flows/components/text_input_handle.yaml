@@ -1,0 +1,39 @@
+# Tests TextInputHandle on ref.current: focus()/blur() drive the real native
+# focus events, get_value() reads the widget's text, and clear() empties it.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/text_input_handle.py
+# Source under test: src/pythonnative/handles.py :: TextInputHandle
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: TextInputHandle
+- assertVisible: "Focused: OFF"
+- assertVisible: "Echo: handle text"
+- tapOn: "Focus input"
+- extendedWaitUntil:
+    visible: "Focused: ON"
+    timeout: 5000
+- assertVisible: "Handle attached: yes"
+- assertVisible: "Last call: focus"
+- tapOn: "Select all text"
+- assertVisible: "Last call: select_all"
+- tapOn: "Read native value"
+- extendedWaitUntil:
+    visible: "Native value: handle text"
+    timeout: 5000
+- tapOn: "Blur input"
+- extendedWaitUntil:
+    visible: "Focused: OFF"
+    timeout: 5000
+- tapOn: "Clear input"
+- assertVisible: "Last call: clear"
+- extendedWaitUntil:
+    visible: "Echo: (empty)"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

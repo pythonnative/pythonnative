@@ -1,4 +1,6 @@
-# Tests Pressable on_press fires and increments the counter.
+# Tests Pressable on_press fires and increments the counter, the PressState
+# render function restores its label after the tap, delay_long_press fires
+# on_long_press, and disabled=True suppresses presses.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/pressable.py
 # Source under test: src/pythonnative/components/pressable.py :: Pressable
@@ -10,10 +12,27 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: Pressable
 - assertVisible: "Presses: 0"
+- assertVisible: "Long presses: 0"
 - tapOn: "Tap me (Pressable)"
 - assertVisible: "Presses: 1"
+# The callable child rendered "Pressing..." while the finger was down and
+# is back to the idle label now.
+- assertVisible: "Tap me (Pressable)"
 - tapOn: "Tap me (Pressable)"
 - assertVisible: "Presses: 2"
+# delay_long_press=300: Maestro's long press comfortably exceeds it.
+- longPressOn: "Tap me (Pressable)"
+- extendedWaitUntil:
+    visible: "Long presses: 1"
+    timeout: 5000
+- tapOn: "Disable pressable"
+- assertVisible: "Disabled: yes"
+- tapOn: "Tap me (Pressable)"
+- assertVisible: "Presses: 2"
+- tapOn: "Enable pressable"
+- assertVisible: "Disabled: no"
+- tapOn: "Tap me (Pressable)"
+- assertVisible: "Presses: 3"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

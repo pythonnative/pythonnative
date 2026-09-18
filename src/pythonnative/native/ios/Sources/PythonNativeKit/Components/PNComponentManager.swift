@@ -187,8 +187,23 @@ open class PNTypedComponentManager<Props: PNViewProps>: PNComponentManager where
     public init(_ props: Props.Type) { super.init() }
 
     public final override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let decoded = try! Props(props, partial: true)
-        applyTyped(view: view, props: decoded, initial: initial)
+        let decoded: Props
+        if let typed = try? Props(props, partial: true) {
+            decoded = typed
+        } else {
+            // The wire path already validated these props in `PNCommit`; a key
+            // the generated contract doesn't carry yet is applied from the raw
+            // dictionary by the manager while the typed view keeps the rest.
+            let known = props.filter { (try? Props([$0.key: $0.value], partial: true)) != nil }
+            decoded = try! Props(known, partial: true)
+        }
+        applyTyped(view: view, props: decoded, raw: props, initial: initial)
+    }
+
+    /// Typed props plus the raw changed dictionary they were decoded from.
+    /// The default forwards to the typed-only overload.
+    open func applyTyped(view: UIView, props: Props, raw: [String: Any], initial: Bool) {
+        applyTyped(view: view, props: props, initial: initial)
     }
 
     open func applyTyped(view: UIView, props: Props, initial: Bool) {

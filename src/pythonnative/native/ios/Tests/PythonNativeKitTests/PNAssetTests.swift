@@ -106,8 +106,8 @@ final class PNSvgTests: XCTestCase {
                        x: Double? = nil, y: Double? = nil, width: Double? = nil, height: Double? = nil,
                        points: String? = nil, fill: String? = nil, stroke: String? = nil, transform: String? = nil) -> PNSvgShape {
         PNSvgShape(kind: kind, d: d, cx: cx, cy: cy, r: r, rx: nil, ry: nil, x: x, y: y, width: width, height: height,
-                   x1: nil, y1: nil, x2: nil, y2: nil, points: points, fill: fill, fill_opacity: nil, fill_rule: nil,
-                   stroke: stroke, stroke_width: nil, stroke_opacity: nil, stroke_linecap: nil, stroke_linejoin: nil,
+                   x1: nil, y1: nil, x2: nil, y2: nil, points: points, fill: fill.map { .option0($0) } ?? .option2(.null), fill_opacity: nil, fill_rule: nil,
+                   stroke: stroke.map { .option0($0) } ?? .option2(.null), stroke_width: nil, stroke_opacity: nil, stroke_linecap: nil, stroke_linejoin: nil,
                    stroke_dasharray: nil, opacity: nil, transform: transform)
     }
 

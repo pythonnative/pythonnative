@@ -3,20 +3,21 @@
 The reconciler doesn't know what a `Text` or a `Button` is. It produces
 a flat list of **mutation ops** (create, update, insert, remove,
 destroy, set-frame) that reference views by integer **tag**, and hands
-the whole list to the
-[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry] in
-a single
-[`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]
-call per commit.
+the whole list to the process-wide **view backend** (from
+[`get_backend`][pythonnative.native_views.get_backend]) in a single
+`apply_mutations` call per commit.
 
-On a device that registry is the
+On a device that backend is the
 [`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]:
-it serializes the batch and sends it across the
-[native bridge](bridge.md) in one call, where a Swift or Kotlin
-**component manager** per element type creates and updates the real
-views. The browser preview is the same path with a WebSocket
-transport: the page applies the transactions with DOM elements. In
-tests the registry dispatches to an in-memory fake.
+it builds the wire transaction once, validates it once, serializes it
+once, and sends it across the [native bridge](bridge.md) in one call,
+where a Swift or Kotlin **component manager** per element type creates
+and updates the real views. The browser preview is the same path with a
+WebSocket transport: the page applies the transactions with DOM
+elements. In tests an in-memory
+[`FakeBackend`][pythonnative.testing.FakeBackend] implements the same
+protocol. Python never holds a native view object and never runs a
+Python "view handler"; production and tests both talk to a backend.
 
 This page describes that boundary, walks through what a component
 manager does, and covers the fake backend used by `pytest`.
@@ -84,24 +85,36 @@ lambda is a fresh object) costs **zero** native calls. The registry
 swaps the Python-side callback and the already-wired native listener
 picks it up on the next dispatch.
 
-## The registry
+## The backend
 
-The [`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
-protocol is what the reconciler talks to. The implementation is chosen
-lazily by [`get_registry`][pythonnative.native_views.get_registry]:
+The backend protocol is what the reconciler talks to: `apply_mutations`,
+`resolve_view`, `measure_intrinsic`, `command`, and the animation hooks
+(`set_animated_property`, `start_animation`, `cancel_animation`). The
+implementation is chosen lazily by
+[`get_backend`][pythonnative.native_views.get_backend]:
 
 - On iOS and Android, a
   [`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]
   forwards every transaction, measurement, command, and animation
-  request to native.
+  request to native. Before its first commit it imports the
+  `pythonnative.handlers` entry points so plugin component schemas are
+  registered.
 - In the browser preview (`pn preview`, with `PN_PLATFORM=web`), the
   same `BridgeBackend` commits through a
   [`WebTransport`][pythonnative.bridge.web.WebTransport] to the page,
   which applies them with DOM elements. See the
   [Browser preview guide](../guides/browser-preview.md).
-- Under `pytest`, the backend is replaced with a fake via
-  [`set_registry`][pythonnative.native_views.set_registry] (or by
-  constructing the `Reconciler` with the fake directly).
+- Under `pytest`, a [`FakeBackend`][pythonnative.testing.FakeBackend] is
+  installed with [`set_backend`][pythonnative.native_views.set_backend]
+  (the shipped pytest plugin and
+  [`render`][pythonnative.testing.render] do this for you), or passed to
+  the `Reconciler` directly.
+- Anywhere else, with no backend installed, `get_backend` raises
+  instead of guessing.
+
+Imperative access to a mounted view goes through the typed
+[handle](../api/handles.md) the reconciler publishes on `ref.current`;
+`ViewHandle.command` forwards to the backend's `command`.
 
 The renderer validates an entire commit before applying it. A rejected
 commit fails the surface, and further incremental updates require a reset
@@ -162,7 +175,9 @@ assert result.backend.ops_of("create")  # every applied op is recorded
 ```
 
 The fake raises on malformed transactions, including unknown tags and
-double destroys, so tests expose invalid mutation sequences. See the
+double destroys, so tests expose invalid mutation sequences. Custom
+components defined with `define_component` render into the fake like
+any element; there is no separate Python stand-in to write. See the
 [Testing guide](../guides/testing.md).
 
 The bridge itself is tested with
@@ -174,23 +189,23 @@ their own XCTest and JUnit suites inside the native libraries.
 ## Custom widgets
 
 Adding a widget means a Swift manager, a Kotlin manager, and a Python
-registration; the [`pythonnative.sdk`](../api/sdk.md) module gives you
-a type-checked entry point for the Python half:
+definition; the [`pythonnative.sdk`](../api/sdk.md) module gives you a
+type-checked entry point for the Python half:
 
-1. Define a frozen [`Props`][pythonnative.sdk._components.Props]
-   dataclass listing the widget's API surface.
+1. Define a frozen [`Props`][pythonnative.sdk.Props] dataclass listing
+   the widget's API surface.
 2. Implement `PNComponentManager` / `ComponentManager` subclasses and
    register them under the element name from a `PNPlugin` entry.
-3. Call [`register_component`][pythonnative.sdk._components.register_component]
-   (or decorate a desktop
-   [`ViewHandler`][pythonnative.native_views.base.ViewHandler] with
-   [`@native_component`][pythonnative.sdk._components.native_component])
-   and hand callers an
-   [`element_factory`][pythonnative.sdk._components.element_factory].
+3. Call [`define_component(name, props)`][pythonnative.sdk.define_component],
+   which registers the props schema for the contract generator and the
+   commit validator and returns the typed element factory.
 
-After registration the reconciler treats the new element like any
-other. `pn build` compiles the plugin's native sources into the app and
-PyPI packages register automatically through entry points. See the
+After that the reconciler treats the new element like any other: it is
+validated, laid out, committed, and refreshed exactly like a built-in.
+Headless tests render it into the `FakeBackend`, and the browser
+preview draws it as a labeled placeholder. `pn build` compiles the
+plugin's native sources into the app and PyPI packages define their
+components automatically through entry points. See the
 [Custom native components guide](../guides/custom-native-components.md)
 for the full walkthrough.
 

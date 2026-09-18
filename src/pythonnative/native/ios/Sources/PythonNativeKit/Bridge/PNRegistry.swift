@@ -141,5 +141,9 @@ enum PNBuiltins {
         registry.registerModule(BiometricsModuleAdapter<BiometricsModule>.self)
         registry.registerModule(AssetsModuleAdapter<AssetsModule>.self)
         registry.registerModule(ImagesModuleAdapter<ImagesModule>.self)
+        registry.registerModule(WebViewsModuleAdapter<WebViewsModule>.self)
+        registry.registerModule(KeyboardModuleAdapter<KeyboardModule>.self)
+        registry.registerModule(AccessibilityInfoModuleAdapter<AccessibilityInfoModule>.self)
+        registry.registerModule(LocalizationModuleAdapter<LocalizationModule>.self)
     }
 }

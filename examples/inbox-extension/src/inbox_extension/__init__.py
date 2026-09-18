@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Annotated, Any, Callable, Protocol
 
-from pythonnative.sdk import element_factory, register_component
+from pythonnative.sdk import define_component
 from pythonnative.sdk.schema import ModuleSchema, NativeField, register_schema
 
 
@@ -37,9 +37,8 @@ class InboxToolsProtocol(Protocol):
     async def prepare(self, records: list[InboxRecord], *, limit: int = 10, delay_ms: int = 50) -> InboxBatch: ...
 
 
-register_component(name="InboxBadge", props=InboxBadgeProps)
+InboxBadge = define_component("InboxBadge", InboxBadgeProps)
 register_schema(ModuleSchema.from_protocol("InboxTools", InboxToolsProtocol, events={"prepared": InboxBatch}))
-InboxBadge = element_factory("InboxBadge")
 
 from .api import InboxTools  # noqa: E402
 

@@ -6,15 +6,19 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.fragment.app.FragmentActivity
 import com.pythonnative.runtime.PNBridge
 import com.pythonnative.runtime.bridge.MainThread
@@ -23,35 +27,75 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * `Camera.take_photo()` / `pick_from_gallery()`: launch the system
- * capture or pick intent and resolve to the resulting path (a content
- * URI string, or a JPEG written to the cache dir for thumbnails) or
- * `null` when cancelled.
+ * `Camera.take_photo()` / `pick_from_gallery()`.
+ *
+ * `take_photo` launches `ACTION_IMAGE_CAPTURE` with `EXTRA_OUTPUT` set to
+ * a `FileProvider` URI (authority `<applicationId>.pythonnative.fileprovider`,
+ * declared by the library manifest over `res/xml/pn_file_paths.xml`) so
+ * the camera writes the full-resolution capture instead of returning a
+ * thumbnail. The result is the JPEG's path inside the app cache
+ * directory (re-encoded at `quality` when it is below 1.0), like iOS.
+ * `pick_from_gallery` copies the chosen content URI into the cache
+ * directory and returns that path. Both resolve `null` on cancel.
+ * `allow_editing` is accepted and ignored: Android has no system crop UI
+ * to hand off to.
  */
 class CameraModule : CameraImplementation {
-    private data class Pending(val quality: Int, val done: (Result<String?>) -> Unit)
+    private class Pending(val quality: Int, val output: File?, val uri: Uri?, val done: (Result<String?>) -> Unit)
     private val pending = HashMap<Int, Pending>()
 
-    override fun take_photo(quality: Double, allow_editing: Boolean, completion: (Result<String?>) -> Unit): (() -> Unit)? =
-        launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE), quality, allow_editing, completion)
-    override fun pick_from_gallery(quality: Double, allow_editing: Boolean, completion: (Result<String?>) -> Unit): (() -> Unit)? =
-        launch(Intent(Intent.ACTION_PICK).apply { type = "image/*" }, quality, allow_editing, completion)
-
-    private fun launch(intent: Intent, quality: Double, editing: Boolean, completion: (Result<String?>) -> Unit): (() -> Unit)? {
-        if (editing) { completion(Result.failure(UnsupportedOperationException("Camera editing requires a provider plugin on Android"))); return null }
+    override fun take_photo(quality: Double, allow_editing: Boolean, completion: (Result<String?>) -> Unit): (() -> Unit)? {
+        noteEditing(allow_editing)
         val activity = PNBridge.activity() ?: run { completion(Result.success(null)); return null }
+        val output: File
+        val uri: Uri
+        try {
+            output = newCaptureFile(activity)
+            uri = FileProvider.getUriForFile(activity, authority(activity), output)
+        } catch (error: Exception) {
+            completion(Result.failure(error))
+            return null
+        }
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            .putExtra(MediaStore.EXTRA_OUTPUT, uri)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        // Some camera apps read EXTRA_OUTPUT from a ClipData; grant every resolver explicitly too.
+        intent.clipData = android.content.ClipData.newRawUri("output", uri)
+        try {
+            for (info in activity.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)) {
+                activity.grantUriPermission(info.activityInfo.packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+        } catch (error: Exception) {
+            PNLog.swallowed("Camera.grant", error)
+        }
+        return launch(activity, intent, quality, output, uri, completion)
+    }
+
+    override fun pick_from_gallery(quality: Double, allow_editing: Boolean, completion: (Result<String?>) -> Unit): (() -> Unit)? {
+        noteEditing(allow_editing)
+        val activity = PNBridge.activity() ?: run { completion(Result.success(null)); return null }
+        return launch(activity, Intent(Intent.ACTION_PICK).apply { type = "image/*" }, quality, null, null, completion)
+    }
+
+    private fun noteEditing(editing: Boolean) {
+        if (editing) PNLog.once("camera-editing", "Camera: allow_editing is not supported on Android and is ignored")
+    }
+
+    private fun launch(activity: Activity, intent: Intent, quality: Double, output: File?, uri: Uri?, completion: (Result<String?>) -> Unit): (() -> Unit)? {
         val code = RequestCodes.next()
-        pending[code] = Pending((quality.coerceIn(0.0, 1.0) * 100).toInt(), completion)
+        pending[code] = Pending((quality.coerceIn(0.0, 1.0) * 100).toInt(), output, uri, completion)
         try {
             @Suppress("DEPRECATION")
             activity.startActivityForResult(intent, code)
         } catch (error: Exception) {
             pending.remove(code)
+            revoke(activity, uri)
+            output?.delete()
             completion(Result.failure(error))
             return null
         }
         return {
-            pending.remove(code)
+            pending.remove(code)?.let { revoke(activity, it.uri); it.output?.delete() }
             @Suppress("DEPRECATION")
             activity.finishActivity(code)
         }
@@ -59,30 +103,113 @@ class CameraModule : CameraImplementation {
 
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
         val request = pending.remove(requestCode) ?: return false
-        if (resultCode != Activity.RESULT_OK || data == null) { request.done(Result.success(null)); return true }
+        val ctx = PNBridge.context()
+        revoke(PNBridge.activity(), request.uri)
+        if (resultCode != Activity.RESULT_OK) {
+            request.output?.delete()
+            request.done(Result.success(null))
+            return true
+        }
         try {
-            val uri = data.data
-            @Suppress("DEPRECATION")
-            val thumb = data.extras?.get("data") as? Bitmap
-            val path = if (uri != null) uri.toString() else if (thumb != null) {
-                val target = File.createTempFile("pn-camera-", ".jpg", PNBridge.context().cacheDir)
-                FileOutputStream(target).use { check(thumb.compress(Bitmap.CompressFormat.JPEG, request.quality, it)) }
-                target.absolutePath
-            } else null
+            val captured = request.output
+            val path = when {
+                captured != null && captured.exists() && captured.length() > 0L -> finishCapture(ctx, captured, request.quality)
+                data?.data != null -> copyToCache(ctx, data.data!!, request.quality)
+                else -> {
+                    // Legacy cameras that ignore EXTRA_OUTPUT still hand back a thumbnail.
+                    @Suppress("DEPRECATION")
+                    val thumb = data?.extras?.get("data") as? Bitmap
+                    captured?.delete()
+                    thumb?.let { writeJpeg(ctx, it, request.quality) }
+                }
+            }
             request.done(Result.success(path))
-        } catch (error: Exception) { request.done(Result.failure(error)) }
+        } catch (error: Exception) {
+            request.output?.delete()
+            request.done(Result.failure(error))
+        }
         return true
+    }
+
+    private fun finishCapture(ctx: Context, file: File, quality: Int): String {
+        if (quality >= 100) return file.absolutePath
+        return try {
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return file.absolutePath
+            val path = writeJpeg(ctx, bitmap, quality)
+            bitmap.recycle()
+            file.delete()
+            path
+        } catch (error: Throwable) {
+            // Out of memory or a decoder failure: the full-resolution file is still a valid answer.
+            PNLog.swallowed("Camera.recompress", error)
+            file.absolutePath
+        }
+    }
+
+    private fun copyToCache(ctx: Context, uri: Uri, quality: Int): String? {
+        val target = newCaptureFile(ctx)
+        ctx.contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(target).use { input.copyTo(it) } }
+            ?: return uri.toString()
+        return finishCapture(ctx, target, quality)
+    }
+
+    private fun writeJpeg(ctx: Context, bitmap: Bitmap, quality: Int): String {
+        val target = newCaptureFile(ctx)
+        FileOutputStream(target).use { check(bitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), it)) }
+        return target.absolutePath
+    }
+
+    private fun revoke(activity: Activity?, uri: Uri?) {
+        if (activity == null || uri == null) return
+        try { activity.revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) } catch (_: Exception) {}
+    }
+
+    companion object {
+        /** Suffix appended to the application id to form the provider authority. */
+        const val AUTHORITY_SUFFIX = ".pythonnative.fileprovider"
+
+        /** The FileProvider authority declared by the library manifest for `ctx`'s app. */
+        fun authority(ctx: Context): String = ctx.packageName + AUTHORITY_SUFFIX
+
+        /** A fresh JPEG file under `<cache>/pn-camera/`. */
+        fun newCaptureFile(ctx: Context): File {
+            val dir = File(ctx.cacheDir, "pn-camera").apply { mkdirs() }
+            return File.createTempFile("pn-camera-", ".jpg", dir)
+        }
     }
 }
 
 /**
- * `Location.get_current()`: the last known fix if fresh enough,
- * otherwise a single `network`/`gps` update with a 15 s timeout.
- * Resolves to `{latitude, longitude}` or `null`.
+ * `Location.get_current()`: requests when-in-use permission inline
+ * (`ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION`, through the
+ * Permissions module's request machinery) and then reads the last known
+ * fix if fresh enough, otherwise a single `network`/`gps` update with a
+ * timeout. Resolves to `{latitude, longitude, ...}`, or `null` only when
+ * the permission was denied, no provider is enabled, or the timeout
+ * elapsed.
  */
 class LocationModule : LocationImplementation {
-    @SuppressLint("MissingPermission")
     override fun get_current(accuracy: PNLocationGetCurrentAccuracy, timeout: Double, completion: (Result<Map<String, Double>?>) -> Unit): (() -> Unit)? {
+        val permissions = BuiltinModules.permissions
+        if (permissions.isGranted(PermissionsModule.FINE_LOCATION) || permissions.isGranted(PermissionsModule.COARSE_LOCATION)) {
+            return read(accuracy, timeout, completion)
+        }
+        var cancelled = false
+        var cancelRead: (() -> Unit)? = null
+        val cancelRequest = permissions.requestManifest(arrayOf(PermissionsModule.FINE_LOCATION, PermissionsModule.COARSE_LOCATION)) { results ->
+            if (cancelled) return@requestManifest
+            val granted = results.any { it == PackageManager.PERMISSION_GRANTED }
+            if (!granted) completion(Result.success(null)) else cancelRead = read(accuracy, timeout, completion)
+        }
+        return {
+            cancelled = true
+            cancelRequest?.invoke()
+            cancelRead?.invoke()
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun read(accuracy: PNLocationGetCurrentAccuracy, timeout: Double, completion: (Result<Map<String, Double>?>) -> Unit): (() -> Unit)? {
         val lm = PNBridge.context().getSystemService(Context.LOCATION_SERVICE) as? LocationManager
             ?: run { completion(Result.success(null)); return null }
         try {

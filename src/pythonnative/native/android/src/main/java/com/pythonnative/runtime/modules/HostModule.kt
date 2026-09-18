@@ -55,6 +55,18 @@ class HostModule : NativeModule {
                 promise.resolve(payload)
             }
             "active_screen" -> promise.resolve(ScreenRegistry.activeId())
+            // Predictive back: `false` when Python has nothing to pop, so the
+            // system plays its back-to-home preview; see PNScreenFragment.
+            "set_back_enabled" -> {
+                val enabled = args.value("enabled") != false
+                val target = screen(args) ?: ScreenRegistry.get(ScreenRegistry.activeId())
+                target?.backEnabled = enabled
+                promise.resolve(null)
+            }
+            "keyboard" -> promise.resolve(
+                JSONObject().put("height", com.pythonnative.runtime.screens.PNKeyboard.heightDp)
+                    .put("visible", com.pythonnative.runtime.screens.PNKeyboard.isVisible),
+            )
             else -> promise.rejectUnknownMethod(method)
         }
     }

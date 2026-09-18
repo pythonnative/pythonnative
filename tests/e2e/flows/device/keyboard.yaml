@@ -1,0 +1,31 @@
+# Tests Keyboard.is_visible / add_listener / dismiss: focusing the field
+# shows the keyboard and dismiss() from Python resigns it (on_blur fires).
+#
+# Demo screen: examples/e2e-suite/app/screens/device/keyboard.py
+# Source under test: src/pythonnative/native_modules/keyboard.py :: Keyboard
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Device
+      DEMO_TITLE: Keyboard
+- assertVisible: "Focused: OFF"
+- assertVisible: "Dismiss calls: 0"
+- tapOn: "Focus me for the keyboard"
+- assertVisible: "Focused: ON"
+# The software keyboard only appears when the simulator isn't using the
+# host's hardware keyboard, so the visibility readout is checked after
+# dismiss (deterministic on both platforms) rather than here.
+- tapOn: "Dismiss keyboard"
+- assertVisible: "Dismiss calls: 1"
+- extendedWaitUntil:
+    visible: "Focused: OFF"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "Keyboard visible: no"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Device

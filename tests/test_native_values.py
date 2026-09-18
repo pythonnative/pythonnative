@@ -99,15 +99,14 @@ def test_sequences_and_dataclass_class_variables_keep_python_semantics() -> None
 
 def test_custom_component_defaults_and_platforms_survive_factory_creation() -> None:
     from pythonnative.platform import _set_platform_for_test
-    from pythonnative.sdk import element_factory, register_component, unregister_component
+    from pythonnative.sdk import define_component, unregister_component
 
     @dataclass(frozen=True)
     class MarkerProps:
         coordinate: Coordinate = field(default_factory=lambda: Coordinate(1, 2))
 
     try:
-        register_component(name="TypedMarkerTest", props=MarkerProps, platforms=("ios",))
-        marker = element_factory("TypedMarkerTest")
+        marker = define_component("TypedMarkerTest", MarkerProps, platforms=("ios",))
         element = marker(style={"padding": 4, "opacity": 0.5})
         assert element.props["coordinate"] == Coordinate(1, 2)
         assert element.props["padding"] == 4

@@ -101,9 +101,11 @@ open class PNViewProps {
     public var has_overflow: Bool { values["overflow"] != nil }
     public var `overflow`: PNViewOverflow? { guard let value = values["overflow"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewOverflow.self, value) }
     public var has_border_color: Bool { values["border_color"] != nil }
-    public var `border_color`: String? { guard let value = values["border_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `border_color`: PNViewBorderColor? { guard let value = values["border_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_border_width: Bool { values["border_width"] != nil }
     public var `border_width`: Double? { guard let value = values["border_width"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
+    public var has_border_style: Bool { values["border_style"] != nil }
+    public var `border_style`: PNViewBorderStyle? { guard let value = values["border_style"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderStyle.self, value) }
     public var has_border_radius: Bool { values["border_radius"] != nil }
     public var `border_radius`: Double? { guard let value = values["border_radius"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_border_top_left_radius: Bool { values["border_top_left_radius"] != nil }
@@ -123,13 +125,13 @@ open class PNViewProps {
     public var has_border_left_width: Bool { values["border_left_width"] != nil }
     public var `border_left_width`: Double? { guard let value = values["border_left_width"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_border_top_color: Bool { values["border_top_color"] != nil }
-    public var `border_top_color`: String? { guard let value = values["border_top_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `border_top_color`: PNViewBorderColor? { guard let value = values["border_top_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_border_right_color: Bool { values["border_right_color"] != nil }
-    public var `border_right_color`: String? { guard let value = values["border_right_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `border_right_color`: PNViewBorderColor? { guard let value = values["border_right_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_border_bottom_color: Bool { values["border_bottom_color"] != nil }
-    public var `border_bottom_color`: String? { guard let value = values["border_bottom_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `border_bottom_color`: PNViewBorderColor? { guard let value = values["border_bottom_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_border_left_color: Bool { values["border_left_color"] != nil }
-    public var `border_left_color`: String? { guard let value = values["border_left_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `border_left_color`: PNViewBorderColor? { guard let value = values["border_left_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_font_size: Bool { values["font_size"] != nil }
     public var `font_size`: Double? { guard let value = values["font_size"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_font_family: Bool { values["font_family"] != nil }
@@ -153,13 +155,13 @@ open class PNViewProps {
     public var has_max_lines: Bool { values["max_lines"] != nil }
     public var `max_lines`: Int64? { guard let value = values["max_lines"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Int64.self, value) }
     public var has_text_shadow_color: Bool { values["text_shadow_color"] != nil }
-    public var `text_shadow_color`: String? { guard let value = values["text_shadow_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `text_shadow_color`: PNViewBorderColor? { guard let value = values["text_shadow_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_text_shadow_offset: Bool { values["text_shadow_offset"] != nil }
     public var `text_shadow_offset`: PNViewTextShadowOffset? { guard let value = values["text_shadow_offset"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewTextShadowOffset.self, value) }
     public var has_text_shadow_radius: Bool { values["text_shadow_radius"] != nil }
     public var `text_shadow_radius`: Double? { guard let value = values["text_shadow_radius"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_shadow_color: Bool { values["shadow_color"] != nil }
-    public var `shadow_color`: String? { guard let value = values["shadow_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `shadow_color`: PNViewBorderColor? { guard let value = values["shadow_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_shadow_offset: Bool { values["shadow_offset"] != nil }
     public var `shadow_offset`: PNViewTextShadowOffset? { guard let value = values["shadow_offset"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewTextShadowOffset.self, value) }
     public var has_shadow_opacity: Bool { values["shadow_opacity"] != nil }
@@ -190,8 +192,16 @@ open class PNViewProps {
     public var `accessible`: Bool? { guard let value = values["accessible"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_accessibility_state: Bool { values["accessibility_state"] != nil }
     public var `accessibility_state`: PNAccessibilityState? { guard let value = values["accessibility_state"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNAccessibilityState.self, value) }
+    public var has_accessibility_value: Bool { values["accessibility_value"] != nil }
+    public var `accessibility_value`: PNViewAccessibilityValue? { guard let value = values["accessibility_value"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewAccessibilityValue.self, value) }
+    public var has_accessibility_actions: Bool { values["accessibility_actions"] != nil }
+    public var `accessibility_actions`: [PNAccessibilityAction]? { guard let value = values["accessibility_actions"], !(value is NSNull) else { return nil }; return try! PNValues.decode([PNAccessibilityAction].self, value) }
+    public var has_on_accessibility_action: Bool { values["on_accessibility_action"] != nil }
+    public var `on_accessibility_action`: Bool? { guard let value = values["on_accessibility_action"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_accessibility_live_region: Bool { values["accessibility_live_region"] != nil }
     public var `accessibility_live_region`: PNViewAccessibilityLiveRegion? { guard let value = values["accessibility_live_region"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewAccessibilityLiveRegion.self, value) }
+    public var has_important_for_accessibility: Bool { values["important_for_accessibility"] != nil }
+    public var `important_for_accessibility`: PNViewImportantForAccessibility? { guard let value = values["important_for_accessibility"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewImportantForAccessibility.self, value) }
     public var has_test_id: Bool { values["test_id"] != nil }
     public var `test_id`: String? { guard let value = values["test_id"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has__pn_events: Bool { values["_pn_events"] != nil }
@@ -214,13 +224,13 @@ public final class ActivityIndicatorProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNActivityIndicatorColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_animating: Bool { values["animating"] != nil }
     public var `animating`: Bool? { guard let value = values["animating"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_size: Bool { values["size"] != nil }
@@ -237,13 +247,13 @@ public final class BlurViewProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_blur_type: Bool { values["blur_type"] != nil }
     public var `blur_type`: PNBlurViewBlurType? { guard let value = values["blur_type"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNBlurViewBlurType.self, value) }
     public var has_intensity: Bool { values["intensity"] != nil }
@@ -260,13 +270,13 @@ public final class ButtonProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_title: Bool { values["title"] != nil }
     public var `title`: String? { guard let value = values["title"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_on_press: Bool { values["on_press"] != nil }
@@ -285,13 +295,13 @@ public final class CheckboxProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNActivityIndicatorColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_value: Bool { values["value"] != nil }
     public var `value`: Bool? { guard let value = values["value"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_change: Bool { values["on_change"] != nil }
@@ -312,13 +322,13 @@ public final class ColumnProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
@@ -331,13 +341,13 @@ public final class DatePickerProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_value: Bool { values["value"] != nil }
     public var `value`: String? { guard let value = values["value"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_mode: Bool { values["mode"] != nil }
@@ -362,13 +372,13 @@ public final class ImageProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNActivityIndicatorColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNActivityIndicatorColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_source: Bool { values["source"] != nil }
     public var `source`: String? { guard let value = values["source"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_default_source: Bool { values["default_source"] != nil }
@@ -377,10 +387,18 @@ public final class ImageProps: PNViewProps, PNNativeProps {
     public var `scale_type`: PNImageScaleType? { guard let value = values["scale_type"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNImageScaleType.self, value) }
     public var has_blur_radius: Bool { values["blur_radius"] != nil }
     public var `blur_radius`: Double? { guard let value = values["blur_radius"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
+    public var has_on_load_start: Bool { values["on_load_start"] != nil }
+    public var `on_load_start`: Bool? { guard let value = values["on_load_start"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_load: Bool { values["on_load"] != nil }
     public var `on_load`: Bool? { guard let value = values["on_load"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_on_load_end: Bool { values["on_load_end"] != nil }
+    public var `on_load_end`: Bool? { guard let value = values["on_load_end"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_error: Bool { values["on_error"] != nil }
     public var `on_error`: Bool? { guard let value = values["on_error"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_fade_duration: Bool { values["fade_duration"] != nil }
+    public var `fade_duration`: Double? { guard let value = values["fade_duration"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
+    public var has_headers: Bool { values["headers"] != nil }
+    public var `headers`: [String: String]? { guard let value = values["headers"], !(value is NSNull) else { return nil }; return try! PNValues.decode([String: String].self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
@@ -393,13 +411,13 @@ public final class ImageBackgroundProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_source: Bool { values["source"] != nil }
     public var `source`: String? { guard let value = values["source"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_scale_type: Bool { values["scale_type"] != nil }
@@ -416,13 +434,13 @@ public final class KeyboardAvoidingViewProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_behavior: Bool { values["behavior"] != nil }
     public var `behavior`: PNKeyboardAvoidingViewBehavior? { guard let value = values["behavior"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNKeyboardAvoidingViewBehavior.self, value) }
     public var has_keyboard_vertical_offset: Bool { values["keyboard_vertical_offset"] != nil }
@@ -439,15 +457,15 @@ public final class LinearGradientProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_colors: Bool { values["colors"] != nil }
-    public var `colors`: [String]? { guard let value = values["colors"], !(value is NSNull) else { return nil }; return try! PNValues.decode([String].self, value) }
+    public var `colors`: [PNViewBorderColor]? { guard let value = values["colors"], !(value is NSNull) else { return nil }; return try! PNValues.decode([PNViewBorderColor].self, value) }
     public var has_locations: Bool { values["locations"] != nil }
     public var `locations`: [Double]? { guard let value = values["locations"], !(value is NSNull) else { return nil }; return try! PNValues.decode([Double].self, value) }
     public var has_start_point: Bool { values["start_point"] != nil }
@@ -466,19 +484,21 @@ public final class ModalProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_visible: Bool { values["visible"] != nil }
     public var `visible`: Bool? { guard let value = values["visible"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_dismiss: Bool { values["on_dismiss"] != nil }
     public var `on_dismiss`: Bool? { guard let value = values["on_dismiss"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_show: Bool { values["on_show"] != nil }
     public var `on_show`: Bool? { guard let value = values["on_show"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_on_request_close: Bool { values["on_request_close"] != nil }
+    public var `on_request_close`: Bool? { guard let value = values["on_request_close"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_title: Bool { values["title"] != nil }
     public var `title`: String? { guard let value = values["title"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_animation_type: Bool { values["animation_type"] != nil }
@@ -489,6 +509,8 @@ public final class ModalProps: PNViewProps, PNNativeProps {
     public var `presentation_style`: PNModalPresentationStyle? { guard let value = values["presentation_style"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNModalPresentationStyle.self, value) }
     public var has_dismiss_on_backdrop: Bool { values["dismiss_on_backdrop"] != nil }
     public var `dismiss_on_backdrop`: Bool? { guard let value = values["dismiss_on_backdrop"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_status_bar_translucent: Bool { values["status_bar_translucent"] != nil }
+    public var `status_bar_translucent`: Bool? { guard let value = values["status_bar_translucent"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
@@ -501,13 +523,13 @@ public final class PickerProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_value: Bool { values["value"] != nil }
     public var `value`: PNJSONValue? { guard let value = values["value"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNJSONValue.self, value) }
     public var has_disabled: Bool { values["disabled"] != nil }
@@ -530,13 +552,13 @@ public final class PortalProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
@@ -549,13 +571,13 @@ public final class PressableProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_on_press: Bool { values["on_press"] != nil }
     public var `on_press`: Bool? { guard let value = values["on_press"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_long_press: Bool { values["on_long_press"] != nil }
@@ -564,8 +586,14 @@ public final class PressableProps: PNViewProps, PNNativeProps {
     public var `on_press_in`: Bool? { guard let value = values["on_press_in"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_press_out: Bool { values["on_press_out"] != nil }
     public var `on_press_out`: Bool? { guard let value = values["on_press_out"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_disabled: Bool { values["disabled"] != nil }
+    public var `disabled`: Bool? { guard let value = values["disabled"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_delay_long_press: Bool { values["delay_long_press"] != nil }
+    public var `delay_long_press`: Double? { guard let value = values["delay_long_press"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_pressed_opacity: Bool { values["pressed_opacity"] != nil }
     public var `pressed_opacity`: Double? { guard let value = values["pressed_opacity"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
+    public var has_android_ripple: Bool { values["android_ripple"] != nil }
+    public var `android_ripple`: PNRipple? { guard let value = values["android_ripple"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNRipple.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
@@ -578,17 +606,17 @@ public final class ProgressBarProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNActivityIndicatorColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_value: Bool { values["value"] != nil }
     public var `value`: Double? { guard let value = values["value"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_track_color: Bool { values["track_color"] != nil }
-    public var `track_color`: String? { guard let value = values["track_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `track_color`: PNActivityIndicatorColor? { guard let value = values["track_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_indeterminate: Bool { values["indeterminate"] != nil }
     public var `indeterminate`: Bool? { guard let value = values["indeterminate"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
@@ -603,13 +631,13 @@ public final class RefreshControlProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNActivityIndicatorColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_refreshing: Bool { values["refreshing"] != nil }
     public var `refreshing`: Bool? { guard let value = values["refreshing"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_refresh: Bool { values["on_refresh"] != nil }
@@ -626,13 +654,13 @@ public final class RowProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
@@ -645,13 +673,13 @@ public final class SafeAreaViewProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_edges: Bool { values["edges"] != nil }
     public var `edges`: [PNSafeAreaViewEdgesItem]? { guard let value = values["edges"], !(value is NSNull) else { return nil }; return try! PNValues.decode([PNSafeAreaViewEdgesItem].self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
@@ -666,13 +694,13 @@ public final class ScreenProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_route_key: Bool { values["route_key"] != nil }
@@ -683,6 +711,8 @@ public final class ScreenProps: PNViewProps, PNNativeProps {
     public var `active`: Bool? { guard let value = values["active"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_options: Bool { values["options"] != nil }
     public var `options`: [String: PNJSONValue]? { guard let value = values["options"], !(value is NSNull) else { return nil }; return try! PNValues.decode([String: PNJSONValue].self, value) }
+    public var has_guarded: Bool { values["guarded"] != nil }
+    public var `guarded`: Bool? { guard let value = values["guarded"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_header_shown: Bool { values["header_shown"] != nil }
     public var `header_shown`: Bool? { guard let value = values["header_shown"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_header_large_title: Bool { values["header_large_title"] != nil }
@@ -721,13 +751,13 @@ public final class ScreenStackProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_on_native_back: Bool { values["on_native_back"] != nil }
@@ -742,29 +772,47 @@ public final class ScrollViewProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
+    public var has_horizontal: Bool { values["horizontal"] != nil }
+    public var `horizontal`: Bool? { guard let value = values["horizontal"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_refresh_control: Bool { values["refresh_control"] != nil }
     public var `refresh_control`: PNScrollViewRefreshControl? { guard let value = values["refresh_control"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNScrollViewRefreshControl.self, value) }
-    public var has_scroll_axis: Bool { values["scroll_axis"] != nil }
-    public var `scroll_axis`: PNScrollViewScrollAxis? { guard let value = values["scroll_axis"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNScrollViewScrollAxis.self, value) }
+    public var has_content_inset: Bool { values["content_inset"] != nil }
+    public var `content_inset`: PNEdgeInsets? { guard let value = values["content_inset"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNEdgeInsets.self, value) }
+    public var has_scroll_enabled: Bool { values["scroll_enabled"] != nil }
+    public var `scroll_enabled`: Bool? { guard let value = values["scroll_enabled"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_scroll_event_throttle: Bool { values["scroll_event_throttle"] != nil }
+    public var `scroll_event_throttle`: Double? { guard let value = values["scroll_event_throttle"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_on_scroll: Bool { values["on_scroll"] != nil }
     public var `on_scroll`: Bool? { guard let value = values["on_scroll"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_on_scroll_begin_drag: Bool { values["on_scroll_begin_drag"] != nil }
+    public var `on_scroll_begin_drag`: Bool? { guard let value = values["on_scroll_begin_drag"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_on_scroll_end_drag: Bool { values["on_scroll_end_drag"] != nil }
+    public var `on_scroll_end_drag`: Bool? { guard let value = values["on_scroll_end_drag"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_on_momentum_scroll_end: Bool { values["on_momentum_scroll_end"] != nil }
+    public var `on_momentum_scroll_end`: Bool? { guard let value = values["on_momentum_scroll_end"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_shows_scroll_indicator: Bool { values["shows_scroll_indicator"] != nil }
     public var `shows_scroll_indicator`: Bool? { guard let value = values["shows_scroll_indicator"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_paging_enabled: Bool { values["paging_enabled"] != nil }
     public var `paging_enabled`: Bool? { guard let value = values["paging_enabled"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_bounces: Bool { values["bounces"] != nil }
     public var `bounces`: Bool? { guard let value = values["bounces"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
-    public var has_content_container_style: Bool { values["content_container_style"] != nil }
-    public var `content_container_style`: PNScrollViewContentContainerStyle? { guard let value = values["content_container_style"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNScrollViewContentContainerStyle.self, value) }
     public var has_keyboard_dismiss_mode: Bool { values["keyboard_dismiss_mode"] != nil }
     public var `keyboard_dismiss_mode`: PNScrollViewKeyboardDismissMode? { guard let value = values["keyboard_dismiss_mode"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNScrollViewKeyboardDismissMode.self, value) }
+    public var has_keyboard_should_persist_taps: Bool { values["keyboard_should_persist_taps"] != nil }
+    public var `keyboard_should_persist_taps`: PNScrollViewKeyboardShouldPersistTaps? { guard let value = values["keyboard_should_persist_taps"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNScrollViewKeyboardShouldPersistTaps.self, value) }
+    public var has_snap_to_interval: Bool { values["snap_to_interval"] != nil }
+    public var `snap_to_interval`: Double? { guard let value = values["snap_to_interval"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
+    public var has_snap_to_alignment: Bool { values["snap_to_alignment"] != nil }
+    public var `snap_to_alignment`: PNScrollViewSnapToAlignment? { guard let value = values["snap_to_alignment"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNScrollViewSnapToAlignment.self, value) }
+    public var has_deceleration_rate: Bool { values["deceleration_rate"] != nil }
+    public var `deceleration_rate`: PNScrollViewDecelerationRate? { guard let value = values["deceleration_rate"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNScrollViewDecelerationRate.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
@@ -777,13 +825,13 @@ public final class SegmentedControlProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNActivityIndicatorColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_segments: Bool { values["segments"] != nil }
     public var `segments`: [String]? { guard let value = values["segments"], !(value is NSNull) else { return nil }; return try! PNValues.decode([String].self, value) }
     public var has_selected_index: Bool { values["selected_index"] != nil }
@@ -804,13 +852,13 @@ public final class SliderProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_value: Bool { values["value"] != nil }
     public var `value`: Double? { guard let value = values["value"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_min_value: Bool { values["min_value"] != nil }
@@ -824,11 +872,11 @@ public final class SliderProps: PNViewProps, PNNativeProps {
     public var has_step: Bool { values["step"] != nil }
     public var `step`: Double? { guard let value = values["step"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_minimum_track_color: Bool { values["minimum_track_color"] != nil }
-    public var `minimum_track_color`: String? { guard let value = values["minimum_track_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `minimum_track_color`: PNActivityIndicatorColor? { guard let value = values["minimum_track_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_maximum_track_color: Bool { values["maximum_track_color"] != nil }
-    public var `maximum_track_color`: String? { guard let value = values["maximum_track_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `maximum_track_color`: PNActivityIndicatorColor? { guard let value = values["maximum_track_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_thumb_color: Bool { values["thumb_color"] != nil }
-    public var `thumb_color`: String? { guard let value = values["thumb_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `thumb_color`: PNActivityIndicatorColor? { guard let value = values["thumb_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_on_sliding_start: Bool { values["on_sliding_start"] != nil }
     public var `on_sliding_start`: Bool? { guard let value = values["on_sliding_start"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_sliding_complete: Bool { values["on_sliding_complete"] != nil }
@@ -845,13 +893,13 @@ public final class SpacerProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_size: Bool { values["size"] != nil }
     public var `size`: Double? { guard let value = values["size"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
@@ -866,17 +914,21 @@ public final class StatusBarProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNActivityIndicatorColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_bar_style: Bool { values["bar_style"] != nil }
     public var `bar_style`: PNStatusBarBarStyle? { guard let value = values["bar_style"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNStatusBarBarStyle.self, value) }
     public var has_hidden: Bool { values["hidden"] != nil }
     public var `hidden`: Bool? { guard let value = values["hidden"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_translucent: Bool { values["translucent"] != nil }
+    public var `translucent`: Bool? { guard let value = values["translucent"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_animated: Bool { values["animated"] != nil }
+    public var `animated`: Bool? { guard let value = values["animated"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
@@ -889,13 +941,13 @@ public final class SvgProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_shapes: Bool { values["shapes"] != nil }
     public var `shapes`: [PNSvgShape]? { guard let value = values["shapes"], !(value is NSNull) else { return nil }; return try! PNValues.decode([PNSvgShape].self, value) }
     public var has_view_box: Bool { values["view_box"] != nil }
@@ -903,9 +955,9 @@ public final class SvgProps: PNViewProps, PNNativeProps {
     public var has_preserve_aspect_ratio: Bool { values["preserve_aspect_ratio"] != nil }
     public var `preserve_aspect_ratio`: PNSvgPreserveAspectRatio? { guard let value = values["preserve_aspect_ratio"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNSvgPreserveAspectRatio.self, value) }
     public var has_fill: Bool { values["fill"] != nil }
-    public var `fill`: String? { guard let value = values["fill"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `fill`: PNActivityIndicatorColor? { guard let value = values["fill"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_stroke: Bool { values["stroke"] != nil }
-    public var `stroke`: String? { guard let value = values["stroke"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `stroke`: PNActivityIndicatorColor? { guard let value = values["stroke"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_stroke_width: Bool { values["stroke_width"] != nil }
     public var `stroke_width`: Double? { guard let value = values["stroke_width"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_stroke_linecap: Bool { values["stroke_linecap"] != nil }
@@ -926,13 +978,13 @@ public final class SwitchProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_value: Bool { values["value"] != nil }
     public var `value`: Bool? { guard let value = values["value"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_change: Bool { values["on_change"] != nil }
@@ -940,9 +992,9 @@ public final class SwitchProps: PNViewProps, PNNativeProps {
     public var has_disabled: Bool { values["disabled"] != nil }
     public var `disabled`: Bool? { guard let value = values["disabled"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_tint_color: Bool { values["on_tint_color"] != nil }
-    public var `on_tint_color`: String? { guard let value = values["on_tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `on_tint_color`: PNActivityIndicatorColor? { guard let value = values["on_tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_thumb_color: Bool { values["thumb_color"] != nil }
-    public var `thumb_color`: String? { guard let value = values["thumb_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `thumb_color`: PNActivityIndicatorColor? { guard let value = values["thumb_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
@@ -955,11 +1007,11 @@ public final class TabBarProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
     public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
@@ -970,6 +1022,12 @@ public final class TabBarProps: PNViewProps, PNNativeProps {
     public var `active_tab`: String? { guard let value = values["active_tab"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_on_tab_select: Bool { values["on_tab_select"] != nil }
     public var `on_tab_select`: Bool? { guard let value = values["on_tab_select"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_inactive_tint_color: Bool { values["inactive_tint_color"] != nil }
+    public var `inactive_tint_color`: String? { guard let value = values["inactive_tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_translucent: Bool { values["translucent"] != nil }
+    public var `translucent`: Bool? { guard let value = values["translucent"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_shows_labels: Bool { values["shows_labels"] != nil }
+    public var `shows_labels`: Bool? { guard let value = values["shows_labels"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
 }
 
 public final class TextProps: PNViewProps, PNNativeProps {
@@ -980,15 +1038,25 @@ public final class TextProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
+    public var has_on_press: Bool { values["on_press"] != nil }
+    public var `on_press`: Bool? { guard let value = values["on_press"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_ellipsize_mode: Bool { values["ellipsize_mode"] != nil }
+    public var `ellipsize_mode`: PNTextEllipsizeMode? { guard let value = values["ellipsize_mode"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNTextEllipsizeMode.self, value) }
+    public var has_selectable: Bool { values["selectable"] != nil }
+    public var `selectable`: Bool? { guard let value = values["selectable"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_allow_font_scaling: Bool { values["allow_font_scaling"] != nil }
+    public var `allow_font_scaling`: Bool? { guard let value = values["allow_font_scaling"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var has_on_span_press: Bool { values["on_span_press"] != nil }
+    public var `on_span_press`: Bool? { guard let value = values["on_span_press"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_text: Bool { values["text"] != nil }
     public var `text`: String? { guard let value = values["text"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_spans: Bool { values["spans"] != nil }
@@ -1003,13 +1071,13 @@ public final class TextInputProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNActivityIndicatorColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_value: Bool { values["value"] != nil }
     public var `value`: String? { guard let value = values["value"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_placeholder: Bool { values["placeholder"] != nil }
@@ -1020,18 +1088,30 @@ public final class TextInputProps: PNViewProps, PNNativeProps {
     public var `on_selection_change`: Bool? { guard let value = values["on_selection_change"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_submit: Bool { values["on_submit"] != nil }
     public var `on_submit`: Bool? { guard let value = values["on_submit"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_on_key_press: Bool { values["on_key_press"] != nil }
+    public var `on_key_press`: Bool? { guard let value = values["on_key_press"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_on_content_size_change: Bool { values["on_content_size_change"] != nil }
+    public var `on_content_size_change`: Bool? { guard let value = values["on_content_size_change"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_selection: Bool { values["selection"] != nil }
+    public var `selection`: PNSelection? { guard let value = values["selection"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNSelection.self, value) }
     public var has_secure: Bool { values["secure"] != nil }
     public var `secure`: Bool? { guard let value = values["secure"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_multiline: Bool { values["multiline"] != nil }
     public var `multiline`: Bool? { guard let value = values["multiline"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_keyboard_type: Bool { values["keyboard_type"] != nil }
     public var `keyboard_type`: PNTextInputKeyboardType? { guard let value = values["keyboard_type"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNTextInputKeyboardType.self, value) }
+    public var has_keyboard_appearance: Bool { values["keyboard_appearance"] != nil }
+    public var `keyboard_appearance`: PNTextInputKeyboardAppearance? { guard let value = values["keyboard_appearance"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNTextInputKeyboardAppearance.self, value) }
     public var has_auto_capitalize: Bool { values["auto_capitalize"] != nil }
     public var `auto_capitalize`: PNTextInputAutoCapitalize? { guard let value = values["auto_capitalize"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNTextInputAutoCapitalize.self, value) }
     public var has_auto_correct: Bool { values["auto_correct"] != nil }
     public var `auto_correct`: Bool? { guard let value = values["auto_correct"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_auto_focus: Bool { values["auto_focus"] != nil }
     public var `auto_focus`: Bool? { guard let value = values["auto_focus"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_select_text_on_focus: Bool { values["select_text_on_focus"] != nil }
+    public var `select_text_on_focus`: Bool? { guard let value = values["select_text_on_focus"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
+    public var has_blur_on_submit: Bool { values["blur_on_submit"] != nil }
+    public var `blur_on_submit`: Bool? { guard let value = values["blur_on_submit"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_return_key_type: Bool { values["return_key_type"] != nil }
     public var `return_key_type`: PNTextInputReturnKeyType? { guard let value = values["return_key_type"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNTextInputReturnKeyType.self, value) }
     public var has_max_length: Bool { values["max_length"] != nil }
@@ -1045,7 +1125,7 @@ public final class TextInputProps: PNViewProps, PNNativeProps {
     public var has_on_blur: Bool { values["on_blur"] != nil }
     public var `on_blur`: Bool? { guard let value = values["on_blur"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_selection_color: Bool { values["selection_color"] != nil }
-    public var `selection_color`: String? { guard let value = values["selection_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `selection_color`: PNActivityIndicatorColor? { guard let value = values["selection_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNActivityIndicatorColor.self, value) }
     public var has_text_content_type: Bool { values["text_content_type"] != nil }
     public var `text_content_type`: String? { guard let value = values["text_content_type"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
@@ -1060,13 +1140,13 @@ public final class TouchableOpacityProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_on_press: Bool { values["on_press"] != nil }
     public var `on_press`: Bool? { guard let value = values["on_press"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }
     public var has_on_long_press: Bool { values["on_long_press"] != nil }
@@ -1087,13 +1167,13 @@ public final class ViewProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
 }
@@ -1106,13 +1186,13 @@ public final class VirtualListProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public var `accessibility_role`: String? { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_keys: Bool { values["keys"] != nil }
@@ -1147,13 +1227,13 @@ public final class WebViewProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public var `flex`: Double? { guard let value = values["flex"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }
     public var has_background_color: Bool { values["background_color"] != nil }
-    public var `background_color`: String? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `background_color`: PNViewBorderColor? { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_color: Bool { values["color"] != nil }
-    public var `color`: String? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `color`: PNViewBorderColor? { guard let value = values["color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public var `placeholder_color`: String? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `placeholder_color`: PNViewBorderColor? { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public var `tint_color`: String? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
+    public var `tint_color`: PNViewBorderColor? { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewBorderColor.self, value) }
     public var has_url: Bool { values["url"] != nil }
     public var `url`: String? { guard let value = values["url"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }
     public var has_html: Bool { values["html"] != nil }
@@ -1178,132 +1258,161 @@ public final class WebViewProps: PNViewProps, PNNativeProps {
 
 public enum PNComponentEvents {
     public enum ActivityIndicator {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum BlurView {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Button {
         @discardableResult public static func `on_press`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_press", []) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Checkbox {
         @discardableResult public static func `on_change`(_ view: UIView, _ argument0: Bool) -> String? { PNEvents.emitIfWired(view, "on_change", [PNValues.encode(argument0)]) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Column {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
     }
     public enum DatePicker {
         @discardableResult public static func `on_change`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_change", [PNValues.encode(argument0)]) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Image {
+        @discardableResult public static func `on_load_start`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_load_start", []) }
         @discardableResult public static func `on_load`(_ view: UIView, _ argument0: PNImageLoadEvent) -> String? { PNEvents.emitIfWired(view, "on_load", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_load_end`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_load_end", []) }
         @discardableResult public static func `on_error`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_error", [PNValues.encode(argument0)]) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum ImageBackground {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum KeyboardAvoidingView {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum LinearGradient {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Modal {
         @discardableResult public static func `on_dismiss`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_dismiss", []) }
         @discardableResult public static func `on_show`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_show", []) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_request_close`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_request_close", []) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Picker {
         @discardableResult public static func `on_change`(_ view: UIView, _ argument0: PNJSONValue) -> String? { PNEvents.emitIfWired(view, "on_change", [PNValues.encode(argument0)]) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Portal {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Pressable {
         @discardableResult public static func `on_press`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_press", []) }
         @discardableResult public static func `on_long_press`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_long_press", []) }
         @discardableResult public static func `on_press_in`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_press_in", []) }
         @discardableResult public static func `on_press_out`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_press_out", []) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
     }
     public enum ProgressBar {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum RefreshControl {
         @discardableResult public static func `on_refresh`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_refresh", []) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Row {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
     }
     public enum SafeAreaView {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Screen {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
     }
     public enum ScreenStack {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_native_back`(_ view: UIView, _ argument0: Int64) -> String? { PNEvents.emitIfWired(view, "on_native_back", [PNValues.encode(argument0)]) }
     }
     public enum ScrollView {
-        @discardableResult public static func `on_scroll`(_ view: UIView, _ argument0: [String: Double]) -> String? { PNEvents.emitIfWired(view, "on_scroll", [PNValues.encode(argument0)]) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_scroll`(_ view: UIView, _ argument0: PNScrollEvent) -> String? { PNEvents.emitIfWired(view, "on_scroll", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_scroll_begin_drag`(_ view: UIView, _ argument0: PNScrollEvent) -> String? { PNEvents.emitIfWired(view, "on_scroll_begin_drag", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_scroll_end_drag`(_ view: UIView, _ argument0: PNScrollEvent) -> String? { PNEvents.emitIfWired(view, "on_scroll_end_drag", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_momentum_scroll_end`(_ view: UIView, _ argument0: PNScrollEvent) -> String? { PNEvents.emitIfWired(view, "on_momentum_scroll_end", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_refresh`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_refresh", []) }
     }
     public enum SegmentedControl {
         @discardableResult public static func `on_change`(_ view: UIView, _ argument0: Int64) -> String? { PNEvents.emitIfWired(view, "on_change", [PNValues.encode(argument0)]) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Slider {
         @discardableResult public static func `on_change`(_ view: UIView, _ argument0: Double) -> String? { PNEvents.emitIfWired(view, "on_change", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_sliding_start`(_ view: UIView, _ argument0: Double) -> String? { PNEvents.emitIfWired(view, "on_sliding_start", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_sliding_complete`(_ view: UIView, _ argument0: Double) -> String? { PNEvents.emitIfWired(view, "on_sliding_complete", [PNValues.encode(argument0)]) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Spacer {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum StatusBar {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Svg {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Switch {
         @discardableResult public static func `on_change`(_ view: UIView, _ argument0: Bool) -> String? { PNEvents.emitIfWired(view, "on_change", [PNValues.encode(argument0)]) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum TabBar {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_tab_select`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_tab_select", [PNValues.encode(argument0)]) }
     }
     public enum Text {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_press`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_press", []) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_span_press`(_ view: UIView, _ argument0: Int64) -> String? { PNEvents.emitIfWired(view, "on_span_press", [PNValues.encode(argument0)]) }
     }
     public enum TextInput {
         @discardableResult public static func `on_change`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_change", [PNValues.encode(argument0)]) }
-        @discardableResult public static func `on_selection_change`(_ view: UIView, _ argument0: [String: Int64]) -> String? { PNEvents.emitIfWired(view, "on_selection_change", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_selection_change`(_ view: UIView, _ argument0: PNSelectionEvent) -> String? { PNEvents.emitIfWired(view, "on_selection_change", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_submit`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_submit", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_key_press`(_ view: UIView, _ argument0: PNKeyPressEvent) -> String? { PNEvents.emitIfWired(view, "on_key_press", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_content_size_change`(_ view: UIView, _ argument0: PNContentSizeEvent) -> String? { PNEvents.emitIfWired(view, "on_content_size_change", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_focus`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_focus", []) }
         @discardableResult public static func `on_blur`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_blur", []) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum TouchableOpacity {
         @discardableResult public static func `on_press`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_press", []) }
         @discardableResult public static func `on_long_press`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_long_press", []) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum View {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
     }
     public enum VirtualList {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_bind_row`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_bind_row", arguments) }
         @discardableResult public static func `on_scroll`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_scroll", arguments) }
         @discardableResult public static func `on_refresh`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_refresh", []) }
@@ -1314,6 +1423,6 @@ public enum PNComponentEvents {
         @discardableResult public static func `on_error`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_error", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_message`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_message", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_navigation_state_change`(_ view: UIView, _ argument0: PNWebNavigationEvent) -> String? { PNEvents.emitIfWired(view, "on_navigation_state_change", [PNValues.encode(argument0)]) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_layout", arguments) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
 }

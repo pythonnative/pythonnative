@@ -168,9 +168,7 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "icons",  # module re-export; the Icon demo drives icon_names / is_icon_name
     "svg",  # module re-export; the Svg demo drives svg.load and the shape classes
     "appearance",  # module re-export; use_color_scheme demo drives set_color_scheme
-    "ViewHandler",  # ABC; subclassed by built-in handlers
-    "element_factory",  # tested via unit tests; needs registered handlers
-    "register_component",  # tested via unit tests; needs handler implementations
+    "element_factory",  # unit-tested; define_component returns one, so the define_component demo renders through it
     "Props",  # tested in custom_component demo and SDK unit tests
     # --------------------------------------------------------------
     # Dev-mode diagnostics: warnings, hook-order checks, and RedBox
@@ -185,6 +183,44 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # already covered elsewhere.
     # --------------------------------------------------------------
     "get_platform",  # thin functional alias of Platform.OS
+    # --------------------------------------------------------------
+    # RFC 0002 type aliases and typed records. Each is a pure type
+    # (Literal alias, TypedDict, frozen dataclass, or constant) with no
+    # behavior of its own; the named demo constructs or receives it.
+    # --------------------------------------------------------------
+    "Deps",  # Sequence alias for use_effect deps; every use_effect demo passes one
+    "ColorScheme",  # Literal alias returned by use_color_scheme; asserted in the use_color_scheme demo
+    "BorderStyle",  # Literal alias; the borders_shadows demo draws solid/dashed/dotted boxes
+    "DynamicColor",  # TypedDict color pair; the dynamic_color demo paints from one and flips the scheme
+    "EasingSpec",  # frozen descriptor built by Easing.*; the easing demo runs every curve
+    "GestureSpec",  # wire dict alias produced by gesture descriptors; the gestures and pan_gesture demos
+    "SwipeDirection",  # Literal alias on GestureEvent.direction; asserted in the gestures demo ("Swipe: left")
+    "LayoutEvent",  # frozen record delivered to on_layout; the on_layout demo reads width/height from it
+    "ScrollEvent",  # frozen record delivered to on_scroll; the scroll_view demo reads x/y from it
+    "SelectionEvent",  # frozen record delivered to on_selection_change; text_input demo shows start:end
+    "KeyPressEvent",  # frozen record delivered to on_key_press; text_input demo shows the key
+    "ContentSizeEvent",  # frozen record delivered to on_content_size_change; text_input demo reads height
+    "ScrollOffset",  # frozen record from ScrollViewHandle.get_scroll_offset; scroll_view_handle demo
+    "PressState",  # frozen record passed to Pressable render/style callables; the pressable demo
+    "Ripple",  # frozen Android ripple config; the pressable demo passes android_ripple
+    "AccessibilityValue",  # TypedDict; the accessibility_props demo passes accessibility_value
+    "AccessibilityAction",  # TypedDict; the accessibility_props demo passes accessibility_actions
+    "AccessibilityEvent",  # frozen record from AccessibilityInfo.add_listener; accessibility_info demo
+    "KeyboardEvent",  # frozen record from Keyboard.add_listener; the keyboard demo mirrors height/visible
+    "DimensionsEvent",  # frozen record from Dimensions.add_listener; the dimensions demo counts them
+    "WindowDimensions",  # NamedTuple from Dimensions.get / use_window_dimensions; both demos print it
+    "DeviceInfo",  # frozen record from Device.info; every field printed by the device_info demo
+    "Locale",  # frozen record from Localization.get_locales / use_locales; both demos print its fields
+    "NavigationColors",  # frozen record on NavigationTheme.colors; the navigation_theme demo prints it
+    "NavigationTheme",  # frozen record read by use_navigation_theme; the navigation_theme demo
+    "DEFAULT_NAVIGATION_THEME",  # preset constant; navigation_theme demo asserts "Matches preset: yes"
+    "DARK_NAVIGATION_THEME",  # preset constant; navigation_theme demo switches the root to it
+    "NavigationRef",  # handle class from create_navigation_ref; driven by the navigation_ref demo
+    "TabBarStyle",  # TypedDict passed as Tab.Navigator(tab_bar_style=); the tab_options demo
+    "ScreenGroup",  # value returned by Navigator.Group(...); the stack_options demo nests one
+    "ANIMATABLE_PROPS",  # frozenset constant; its size is printed by the easing demo
+    "AnimationResult",  # frozen record returned by awaited animations; easing and decay demos read .finished
+    "ViewHandle",  # base handle on ref.current for plain views; the on_layout demo reads .frame
 }
 
 

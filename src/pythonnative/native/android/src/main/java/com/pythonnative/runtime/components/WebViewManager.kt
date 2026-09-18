@@ -136,7 +136,7 @@ class WebViewManager : ComponentManager() {
             "go_back" -> if (wv.canGoBack()) wv.goBack()
             "go_forward" -> if (wv.canGoForward()) wv.goForward()
             "stop_loading" -> wv.stopLoading()
-            "inject_javascript", "eval_js" -> {
+            "inject_javascript" -> {
                 val script = args.str("script") ?: return null
                 wv.evaluateJavascript(script, null)
             }
@@ -155,6 +155,46 @@ class WebViewManager : ComponentManager() {
         (view as? WebView)?.let {
             it.stopLoading()
             it.destroy()
+        }
+    }
+}
+
+/**
+ * `WebViews`: asynchronous questions for a mounted `WebView`. Android
+ * answers `evaluateJavascript` later on the main thread, so the result
+ * settles a promise instead of returning from a synchronous view command.
+ */
+class WebViewsModule : WebViewsImplementation {
+    override fun eval_js(tag: Long, script: String, completion: (Result<String>) -> Unit): (() -> Unit)? {
+        com.pythonnative.runtime.bridge.MainThread.post {
+            val web = com.pythonnative.runtime.PNBridge.registry.get(tag)?.view as? WebView
+            if (web == null) {
+                completion(Result.failure(IllegalArgumentException("no WebView with tag $tag")))
+            } else {
+                web.evaluateJavascript(script) { json -> completion(Result.success(stringify(json))) }
+            }
+        }
+        return null
+    }
+
+    companion object {
+        /**
+         * `evaluateJavascript` reports the result as JSON. Strings come back
+         * unquoted, `null` and `undefined` as `""`, and everything else in
+         * its JSON spelling, matching iOS and the browser.
+         */
+        fun stringify(json: String?): String {
+            if (json == null || json == "null" || json == "undefined") return ""
+            return try {
+                when (val value = org.json.JSONTokener(json).nextValue()) {
+                    is String -> value
+                    JSONObject.NULL -> ""
+                    is Double -> if (value.isFinite() && value == Math.rint(value) && Math.abs(value) < 1e15) value.toLong().toString() else value.toString()
+                    else -> value.toString()
+                }
+            } catch (_: Exception) {
+                json
+            }
         }
     }
 }

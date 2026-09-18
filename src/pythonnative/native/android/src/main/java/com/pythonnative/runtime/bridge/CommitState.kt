@@ -14,10 +14,32 @@ class CommitState {
     private var types = mutableMapOf<Long, String>()
     private var failed = false
 
+    /**
+     * The identity of the commit being applied, while its operations run.
+     * A view that emits during its own creation (an image starting to
+     * load, a text input reporting its selection) belongs to that commit's
+     * revision; stamping it with the previous one would make Python drop
+     * the event as older than the view.
+     */
+    private var applying: Triple<String, Int, Int>? = null
+
+    /** Run `block` with events stamped as belonging to the commit (`app`, `target`, `next`). */
+    internal fun <T> stampedAs(app: String, target: Int, next: Int, block: () -> T): T {
+        applying = Triple(app, target, next)
+        try {
+            return block()
+        } finally {
+            applying = null
+        }
+    }
+
     private var sequence = 0L
-    @Synchronized fun event(args: JSONArray, editRevision: Long = 0): String = JSONObject()
-        .put("application", application).put("surface", surface).put("revision", revision)
-        .put("sequence", ++sequence).put("args", args).put("edit_revision", editRevision).toString()
+    @Synchronized fun event(args: JSONArray, editRevision: Long = 0): String {
+        val (app, target, rev) = applying ?: Triple(application, surface, revision)
+        return JSONObject()
+            .put("application", app).put("surface", target).put("revision", rev)
+            .put("sequence", ++sequence).put("args", args).put("edit_revision", editRevision).toString()
+    }
 
     fun layout(frames: JSONArray): JSONObject = JSONObject().put("application", application)
         .put("surface", surface).put("revision", revision).put("frames", frames)
@@ -104,8 +126,10 @@ class CommitState {
                     for (tag in live) applier.applyOp(Op.Destroy(tag))
                     com.pythonnative.runtime.layout.NativeLayout.reset()
                 }
-                for (op in ops) applier.applyOp(op)
-                com.pythonnative.runtime.layout.NativeLayout.observe(ops)
+                stampedAs(app, target, next) {
+                    for (op in ops) applier.applyOp(op)
+                    com.pythonnative.runtime.layout.NativeLayout.observe(ops)
+                }
             } catch (error: Exception) {
                 failed = true
                 for (tag in tags) runCatching { applier.applyOp(Op.Destroy(tag)) }

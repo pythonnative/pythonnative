@@ -153,19 +153,31 @@ public enum PNSvgRenderer {
             if let dashes = shape.stroke_dasharray, !dashes.isEmpty {
                 context.setLineDash(phase: 0, lengths: dashes.map { CGFloat($0) })
             }
-            let fillSpec = shape.fill ?? root.fill ?? "#000000"
+            let fillSpec = paintString(shape.fill) ?? root.fill ?? "#000000"
             if let fill = paint(fillSpec, currentColor: currentColor) {
                 context.addPath(path)
                 context.setFillColor(fill.withAlphaComponent(fill.cgColor.alpha * CGFloat(shape.fill_opacity ?? 1)).cgColor)
                 let rule = shape.fill_rule?.rawValue ?? root.fillRule
                 context.fillPath(using: rule == "evenodd" ? .evenOdd : .winding)
             }
-            if let strokeSpec = shape.stroke ?? root.stroke, let stroke = paint(strokeSpec, currentColor: currentColor) {
+            if let strokeSpec = paintString(shape.stroke) ?? root.stroke, let stroke = paint(strokeSpec, currentColor: currentColor) {
                 context.addPath(path)
                 context.setStrokeColor(stroke.withAlphaComponent(stroke.cgColor.alpha * CGFloat(shape.stroke_opacity ?? 1)).cgColor)
                 context.strokePath()
             }
             context.restoreGState()
+        }
+    }
+
+    /// The paint string behind a shape color: a plain string as written, a
+    /// `{"light", "dark"}` dynamic color resolved for the current scheme,
+    /// and `nil` for JSON `null` (inherit from the root paint).
+    public static func paintString(_ color: PNActivityIndicatorColor?) -> String? {
+        switch color {
+        case .option0(let text)?: return text
+        case .option1(let dynamic)?: return PNColor.parse(PNValues.encode(dynamic)).map(PNColor.hexString)
+        case .option2(.string(let text))?: return text
+        default: return nil
         }
     }
 

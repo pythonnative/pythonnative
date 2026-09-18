@@ -112,6 +112,7 @@ nav:
     - Component: api/component.md
     - Components: api/components.md
     - Hooks: api/hooks.md
+    - Handles: api/handles.md
     - Animated: api/animated.md
     - Gestures: api/gestures.md
     - Alerts: api/alerts.md

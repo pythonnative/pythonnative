@@ -11,7 +11,8 @@ final class PNContractFixtureTests: XCTestCase {
             let returned = try XCTUnwrap(encoded["note"] as? [String: Any])
             XCTAssertTrue(returned["required"] is NSNull)
             XCTAssertEqual(returned.keys.contains("optional"), optional != nil)
-            XCTAssertEqual(PNJSON.encode(returned), PNJSON.encode(note))
+            // Compare structurally: JSON key order isn't stable across processes.
+            XCTAssertTrue(NSDictionary(dictionary: returned).isEqual(to: note), "\(returned) != \(note)")
             XCTAssertTrue(encoded["nullable"] is NSNull)
             XCTAssertEqual(encoded["label"] as? String, "$total \"quoted\" \\path\n\u{0}\u{8}")
         }

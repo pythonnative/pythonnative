@@ -146,6 +146,7 @@ enum PNAnimationGraph {
     }
     static func start(_ id: Int64, node: Int64, spec: [String: Any]) -> Bool {
         guard values[node] != nil, ["timing", "spring", "decay"].contains(spec["kind"] as? String ?? "") else { return false }
+        if spec["kind"] as? String == "timing", !PNEasing.isValid(spec["easing"]) { return false }
         drivers.removeValue(forKey: id)?.stop()
         let driver = PNGraphDriver(id: id, node: node, spec: spec)
         drivers[id] = driver
@@ -218,7 +219,7 @@ final class PNGraphDriver: NSObject {
         elapsed += dt
         let delay = PNAnimationGraph.number(spec["delay_ms"]) / 1000
         guard elapsed >= delay else { return false }
-        let target = PNAnimationGraph.number(spec["to"])
+        var target = PNAnimationGraph.number(spec["to"])
         var done = false
         switch spec["kind"] as? String {
         case "spring":
@@ -234,14 +235,22 @@ final class PNGraphDriver: NSObject {
             done = abs(velocity) < ((spec["rest_speed_threshold"] as? Double) ?? 0.01) && abs(current - target) < ((spec["rest_displacement_threshold"] as? Double) ?? 0.01)
             if done { current = target }
         case "decay":
-            velocity *= pow(min(0.999999, max(0.001, (spec["deceleration"] as? Double) ?? 0.997)), dt * 1000)
-            current += velocity * dt
-            done = abs(velocity) < ((spec["rest_threshold"] as? Double) ?? 0.1)
+            // React Native's model: velocity in points per millisecond,
+            // `v(t) = v0 * d^t`, shared with `PNDecayDriver`.
+            let from = PNAnimationGraph.number(spec["from"])
+            let v0 = PNAnimationGraph.number(spec["velocity"])
+            let d = PNProps.double(spec["deceleration"]) ?? PNDecayDriver.defaultDeceleration
+            let t = (elapsed - delay) * 1000
+            done = PNDecayDriver.isAtRest(from: from, velocity: v0, deceleration: d, elapsedMs: t)
+            current = done
+                ? PNDecayDriver.finalValue(from: from, velocity: v0, deceleration: d)
+                : PNDecayDriver.position(from: from, velocity: v0, deceleration: d, elapsedMs: t)
+            velocity = PNDecayDriver.velocity(velocity: v0, deceleration: d, elapsedMs: t)
+            target = PNDecayDriver.finalValue(from: from, velocity: v0, deceleration: d)
         default:
             let duration = max(0.001, ((spec["duration_ms"] as? Double) ?? 300) / 1000)
             let t = min(1, max(0, (elapsed - delay) / duration))
-            let curve = PNAnimator.curve(for: spec["easing"]) as? UICubicTimingParameters
-            let eased = curve.map { Self.bezier(t, $0.controlPoint1, $0.controlPoint2) } ?? t
+            let eased = PNEasing.function(spec["easing"]).map { $0(t) } ?? t
             let from = PNAnimationGraph.number(spec["from"])
             current = from + (target - from) * eased
             done = t >= 1

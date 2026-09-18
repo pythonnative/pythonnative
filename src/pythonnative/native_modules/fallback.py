@@ -32,26 +32,102 @@ __all__ = ["default_implementation"]
 # ======================================================================
 
 
+def _host_language_tag() -> str:
+    """Return the host's preferred locale as a BCP 47 tag (``LANG``, else ``en-US``)."""
+    for key in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        value = os.environ.get(key, "")
+        tag = value.split(".")[0].split("@")[0].replace("_", "-")
+        if tag and tag not in ("C", "POSIX"):
+            return tag
+    return "en-US"
+
+
 class FallbackDevice:
-    """Static device information for the host machine."""
+    """Static device information for the host machine.
+
+    Returns the documented ``DeviceInfo`` keys plus ``app_dir`` and
+    ``cache_dir``, which the native modules also return and
+    ``FileSystem`` reads.
+    """
 
     def info(self) -> Dict[str, Any]:
         home = os.path.expanduser("~")
         app_dir = os.path.join(home, ".pythonnative_data")
         return {
             "platform": "test",
-            "os": sys.platform,
             "os_version": _platform.release(),
             "model": _platform.machine(),
-            "app_dir": app_dir,
-            "cache_dir": os.path.join(app_dir, "cache"),
-            "temp_dir": os.path.join(app_dir, "tmp"),
-            "locale": os.environ.get("LANG", "en_US").split(".")[0],
+            "manufacturer": sys.platform,
+            "is_simulator": False,
+            "is_tablet": False,
+            "app_name": "PythonNative",
             "app_version": "0.0.0",
             "build_number": "0",
             "bundle_id": "com.pythonnative.preview",
-            "python_version": _platform.python_version(),
+            "scale": 1.0,
+            "font_scale": 1.0,
+            "locale": _host_language_tag(),
+            "app_dir": app_dir,
+            "cache_dir": os.path.join(app_dir, "cache"),
         }
+
+
+class FallbackAccessibilityInfo:
+    """No screen reader, no reduce motion; announcements and focus are no-ops."""
+
+    def is_screen_reader_enabled(self) -> bool:
+        return False
+
+    def is_reduce_motion_enabled(self) -> bool:
+        return False
+
+    def announce(self, message: str) -> None:
+        del message
+
+    def set_accessibility_focus(self, tag: int) -> None:
+        del tag
+
+
+class FallbackWebViews:
+    """No page runs off device: ``eval_js`` answers the empty string."""
+
+    def eval_js(self, tag: int, script: str) -> str:
+        del tag, script
+        return ""
+
+
+class FallbackKeyboard:
+    """No keyboard off device: ``dismiss`` is a no-op and ``is_visible`` is ``False``."""
+
+    def dismiss(self) -> None:
+        pass
+
+    def is_visible(self) -> bool:
+        return False
+
+
+_RTL_LANGUAGES = frozenset({"ar", "fa", "he", "iw", "ur", "ps", "sd", "ug", "yi", "dv", "ku", "ckb"})
+
+
+class FallbackLocalization:
+    """The host's ``LANG`` as the only locale and ``UTC`` as the time zone."""
+
+    def get_locales(self) -> List[Dict[str, Any]]:
+        tag = _host_language_tag()
+        parts = tag.split("-")
+        language = parts[0].lower()
+        region = next((part.upper() for part in parts[1:] if len(part) == 2 and part.isalpha()), "")
+        return [
+            {
+                "language_tag": tag,
+                "language_code": language,
+                "region_code": region,
+                "is_rtl": language in _RTL_LANGUAGES,
+            }
+        ]
+
+    def get_timezone(self) -> str:
+        return "UTC"
 
 
 class FallbackAppState:
@@ -157,7 +233,8 @@ class FallbackSecureStore:
         return self._store.get(key)
 
     def delete_item(self, key: str) -> bool:
-        return self._store.pop(key, None) is not None
+        self._store.pop(key, None)
+        return True
 
     def clear(self) -> None:
         self._store.clear()
@@ -429,6 +506,9 @@ def image_dimensions(data: bytes) -> Optional[tuple[int, int]]:
 
 _DEFAULTS: Dict[str, Callable[[], Any]] = {
     "Device": FallbackDevice,
+    "AccessibilityInfo": FallbackAccessibilityInfo,
+    "Keyboard": FallbackKeyboard,
+    "Localization": FallbackLocalization,
     "AppState": FallbackAppState,
     "Storage": FallbackStorage,
     "SecureStore": FallbackSecureStore,
@@ -446,6 +526,7 @@ _DEFAULTS: Dict[str, Callable[[], Any]] = {
     "Biometrics": FallbackBiometrics,
     "Assets": FallbackAssets,
     "Images": FallbackImages,
+    "WebViews": FallbackWebViews,
 }
 
 

@@ -48,19 +48,24 @@ def schedule_trigger(trigger: Callable[[], None]) -> None:
 
 @contextmanager
 def batch_updates() -> Generator[None, None, None]:
-    """Coalesce multiple state updates into a single re-render.
+    """Coalesce state updates that span ``await`` boundaries into a single re-render.
 
-    State setters called inside the ``with`` block defer their
-    re-render trigger until the block exits, so any number of
-    ``set_*`` calls produce at most one render pass.
+    Setters already batch automatically: every call made within one
+    callback, effect, or task step lands in the same render pass, which
+    the reconciler schedules on the next turn of the application loop.
+    Use this block when a sequence of updates is interrupted by an
+    ``await`` (a fetch between two setters, say) and should still
+    commit as one pass: triggers fired inside the ``with`` block are
+    deferred until it exits.
 
     Example:
         ```python
         import pythonnative as pn
 
-        with pn.batch_updates():
-            set_count(1)
-            set_name("hello")
+        async def load():
+            with pn.batch_updates():
+                set_loading(False)
+                set_items(await api.list_items())
         ```
     """
     depth = _batch_depth.get()

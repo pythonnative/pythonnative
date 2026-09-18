@@ -1,12 +1,19 @@
 """Graphics factories: ``Svg``, ``LinearGradient``, and ``BlurView``."""
 
-from typing import Any, Literal, Optional, Sequence, Tuple
+from typing import Any, Callable, Literal, Optional, Sequence, Tuple, Union
 
 from ..element import Element
 from ..hooks import Ref
-from ..style import AccessibilityState, Color, StyleProp
+from ..style import (
+    AccessibilityAction,
+    AccessibilityState,
+    AccessibilityValue,
+    Color,
+    ImportantForAccessibility,
+    StyleProp,
+)
 from ..svg import FillRule, LineCap, LineJoin, SvgShape, flatten
-from ._base import _make_element
+from ._base import _accessibility_actions, _accessibility_value, _make_element
 
 PreserveAspectRatio = Literal["meet", "slice", "none"]
 """How an ``Svg`` view box scales into a frame of a different aspect ratio."""
@@ -41,6 +48,10 @@ def Svg(
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
     accessibility_state: Optional[AccessibilityState] = None,
+    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
+    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
+    on_accessibility_action: Optional[Callable[[str], Any]] = None,
+    important_for_accessibility: Optional[ImportantForAccessibility] = None,
     test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
@@ -78,6 +89,14 @@ def Svg(
         accessibility_role: Override the default ``"image"`` role.
         accessible: Override whether the element is exposed to AT.
         accessibility_state: Current widget state for assistive tech.
+        accessibility_value: The widget's current value for assistive
+            tech (a string or an
+            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
+        accessibility_actions: Custom screen-reader actions, each an
+            [`AccessibilityAction`][pythonnative.AccessibilityAction].
+        on_accessibility_action: Callback invoked with the action name.
+        important_for_accessibility: Whether AT sees this view and its
+            subtree.
         test_id: Stable identifier for UI tests.
         ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
@@ -116,6 +135,10 @@ def Svg(
         accessibility_role=accessibility_role,
         accessible=accessible,
         accessibility_state=accessibility_state,
+        accessibility_value=_accessibility_value(accessibility_value),
+        accessibility_actions=_accessibility_actions(accessibility_actions),
+        on_accessibility_action=on_accessibility_action,
+        important_for_accessibility=important_for_accessibility,
         test_id=test_id,
         _defaults={"accessibility_role": "image"},
     )

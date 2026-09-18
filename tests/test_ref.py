@@ -1,4 +1,4 @@
-"""Tests for the reconciler's ``ref`` prop support."""
+"""Tests for the reconciler's ``ref`` prop support and the handles it publishes."""
 
 from __future__ import annotations
 
@@ -6,21 +6,34 @@ from typing import Any, Dict
 
 from pythonnative.component import component
 from pythonnative.element import Element
+from pythonnative.handles import ScrollViewHandle, TextInputHandle, ViewHandle
 from pythonnative.hooks import Ref, use_ref
 from pythonnative.reconciler import Reconciler
 from pythonnative.testing import FakeBackend as MockBackend
-from pythonnative.testing import FakeView as MockView
 
 
-def test_ref_populated_on_mount() -> None:
+def test_ref_populated_with_handle_on_mount() -> None:
     ref: Ref[Any] = Ref()
     el = Element("Text", {"text": "hi", "ref": ref}, [])
     backend = MockBackend()
     Reconciler(backend).mount(el)
-    assert ref.current is not None
-    assert isinstance(ref.current, MockView)
+    assert isinstance(ref.current, ViewHandle)
     assert ref.current.type_name == "Text"
-    assert ref._pn_tag is not None
+    assert ref.current.tag in backend.views
+    assert backend.views[ref.current.tag].type_name == "Text"
+
+
+def test_ref_handle_type_follows_element_type() -> None:
+    field: Ref[Any] = Ref()
+    scroller: Ref[Any] = Ref()
+    backend = MockBackend()
+    Reconciler(backend).mount(
+        Element("Column", {}, [Element("TextInput", {"ref": field}, []), Element("ScrollView", {"ref": scroller}, [])])
+    )
+    assert isinstance(field.current, TextInputHandle)
+    assert isinstance(scroller.current, ScrollViewHandle)
+    field.current.focus()
+    assert backend.commands[-1] == (field.current.tag, "focus", {})
 
 
 def test_ref_not_passed_to_backend() -> None:
@@ -53,11 +66,12 @@ def test_ref_repointed_when_ref_swapped() -> None:
     rec = Reconciler(backend)
     rec.mount(Element("Text", {"text": "a", "ref": old_ref}, []))
     assert old_ref.current is not None
-    first_view = old_ref.current
+    first_tag = old_ref.current.tag
 
     rec.reconcile(Element("Text", {"text": "a", "ref": new_ref}, []))
     assert old_ref.current is None
-    assert new_ref.current is first_view
+    assert isinstance(new_ref.current, ViewHandle)
+    assert new_ref.current.tag == first_tag, "the same native view is described by the new handle"
 
 
 def test_ref_ignored_when_not_a_ref() -> None:
@@ -94,18 +108,38 @@ def test_use_ref_in_component_populated_after_mount() -> None:
 
     Reconciler(MockBackend()).mount(Comp())
     ref = captured["ref"]
-    assert ref.current is not None
-    assert isinstance(ref.current, MockView)
+    assert isinstance(ref.current, ViewHandle)
 
 
-def test_ref_frame_mirrored_after_layout() -> None:
-    """The layout pass mirrors the committed frame onto ``ref._pn_frame``."""
+def test_handle_frame_follows_layout() -> None:
+    """The layout pass writes the committed frame onto ``ref.current.frame``."""
     ref: Ref[Any] = Ref()
     backend = MockBackend()
     rec = Reconciler(backend)
     child = Element("View", {"ref": ref, "height": 40}, [])
     rec.mount(Element("View", {}, [child]))
+    assert ref.current.frame is None, "no viewport yet, so no frame"
     rec.set_viewport_size(200.0, 100.0)
-    assert ref._pn_frame is not None
-    _x, _y, w, h = ref._pn_frame
-    assert (w, h) == (200.0, 40.0)
+    frame = ref.current.frame
+    assert frame is not None
+    assert (frame.width, frame.height) == (200.0, 40.0)
+
+    rec.reconcile(Element("View", {}, [Element("View", {"ref": ref, "height": 70}, [])]))
+    assert ref.current.frame.height == 70.0
+
+
+def test_handle_frame_known_at_mount_when_viewport_set_first() -> None:
+    """Frames computed in the mount commit land on the handle even though the ref attaches afterwards."""
+    ref: Ref[Any] = Ref()
+    rec = Reconciler(MockBackend())
+    rec.set_viewport_size(200.0, 100.0)
+    rec.mount(Element("View", {}, [Element("View", {"ref": ref, "height": 40}, [])]))
+    assert ref.current.frame is not None
+    assert ref.current.frame.height == 40.0
+
+
+def test_ref_has_no_private_tag_or_frame_attributes() -> None:
+    ref: Ref[Any] = Ref()
+    Reconciler(MockBackend()).mount(Element("Text", {"text": "hi", "ref": ref}, []))
+    assert not hasattr(ref, "_pn_tag")
+    assert not hasattr(ref, "_pn_frame")

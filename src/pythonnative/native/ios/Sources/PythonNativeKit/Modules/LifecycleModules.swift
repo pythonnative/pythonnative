@@ -50,7 +50,7 @@ public final class BatteryModule: BatteryImplementation {
 
     /// Emit the current `{"level", "state"}` snapshot.
     public static func dispatch() {
-        PNModuleEvents.emit(module: name, event: "change", payload: [
+        PNModuleEvents.emitTyped(BatteryEvents.change, [
             "level": Double(UIDevice.current.batteryLevel),
             "state": stateName(),
         ])
@@ -80,7 +80,7 @@ public final class NetInfoModule: NetInfoImplementation {
                 guard let self = self else { return }
                 if let last = self.last, NSDictionary(dictionary: last).isEqual(to: snapshot) { return }
                 self.last = snapshot
-                PNModuleEvents.emit(module: NetInfoModule.name, event: "change", payload: snapshot)
+                PNModuleEvents.emitTyped(NetInfoEvents.change, snapshot)
             }
         }
         monitor.start(queue: DispatchQueue(label: "com.pythonnative.netinfo"))

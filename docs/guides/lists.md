@@ -61,7 +61,19 @@ Three ways to tell the list how tall rows are, in order of preference:
   screen. Native containers refine their layout as measurements arrive;
   variable-height rows use the same recycling path as fixed-height rows.
 
-`separator_height=` adds a fixed gap below every row.
+`separator_height=` adds a fixed gap below every row. For a drawn
+divider, pass `item_separator=` an element or a zero-argument function
+returning one; it renders after every row except the last (and, in a
+`SectionList`, only between the items of a section, never after a
+header or a section's last item):
+
+```python
+pn.FlatList(
+    data=items,
+    item_height=44,
+    item_separator=lambda: pn.View(style={"height": 1, "background_color": "#E5E7EB"}),
+)
+```
 
 ## Pull-to-refresh
 
@@ -117,7 +129,10 @@ pn.FlatList(
 ```
 
 `on_viewable_items_changed` reports the set of visible rows whenever
-it changes, as a list of `{"index", "key", "item"}` dicts.
+it changes, as a list of `{"index", "key", "item"}` dicts; on a
+`SectionList` the list covers items only, with flat indices.
+`on_scroll` receives a [`ScrollEvent`][pythonnative.ScrollEvent] as the
+list scrolls.
 
 ## Imperative scrolling
 
@@ -139,7 +154,9 @@ def JumpableList():
 
 The controller exposes `scroll_to_index(i, animated=True)`,
 `scroll_to_offset(points, animated=True)`, and
-`scroll_to_end(animated=True)`.
+`scroll_to_end(animated=True)`. To start at a given row instead, pass
+`initial_scroll_index=`; the list scrolls there without animation once
+it mounts.
 
 ## Grids, headers, and empty states
 
@@ -147,6 +164,24 @@ The controller exposes `scroll_to_index(i, animated=True)`,
 - `horizontal=True` scrolls on the x-axis (extents become widths).
 - `list_header=` / `list_footer=` render once before/after all rows.
 - `list_empty=` renders when `data` is empty.
+
+## Inverted lists
+
+`inverted=True` renders the list bottom-up (or right-to-left when
+`horizontal`), so rows appended to `data` appear at the visible end,
+the chat-transcript layout. It is implemented in Python on top of the
+same `VirtualList` contract: a mirror transform (`scale_y: -1`, or
+`scale_x: -1` for horizontal lists) is applied to the container and to
+each row, so no native change is involved.
+
+```python
+pn.FlatList(
+    data=messages,
+    inverted=True,
+    render_item=lambda m, _: Bubble(message=m),
+    key_extractor=lambda m, _: m["id"],
+)
+```
 
 ## Section lists
 
@@ -172,7 +207,28 @@ pn.SectionList(
 
 Headers and items can have different extents, and variable-height
 rows work exactly as in `FlatList` (exact via `get_item_height`, or
-estimated and measured).
+estimated and measured). `inverted`, `item_separator`, and
+`on_viewable_items_changed` work as on `FlatList`.
+
+`sticky_section_headers=True` keeps the current section's header
+pinned at the top of the list while its items scroll by. Python
+renders the overlay (through `render_section_header`, absolutely
+positioned over the list) from the first visible native row and hides
+it exactly while the real header is itself at the top, so the two
+never show at once:
+
+```python
+pn.SectionList(
+    sections=sections,
+    sticky_section_headers=True,
+    section_header_height=32,
+    render_section_header=lambda s, _: pn.Text(s["title"], style={"background_color": "#FFF"}),
+    render_item=lambda item, _i, _s: pn.Text(item),
+)
+```
+
+Give the header an opaque background so rows don't show through the
+overlay.
 
 ## Performance notes
 

@@ -18,6 +18,15 @@ Recorded op shapes (in ``FakeBackend.ops``):
 - ``("insert_child", parent.id, child.id, index)``
 - ``("destroy", view.id)``
 - ``("set_frame", view.id, x, y, w, h)``
+
+Imperative commands (``FakeBackend.command``) are recorded in
+``FakeBackend.commands`` and answered for the view types that have typed
+handles: ``TextInput`` (``get_value``, ``focus``, ``blur``, ``clear``,
+``select_all``, ``set_selection``), ``ScrollView`` (``scroll_to_offset``,
+``scroll_to_end``, ``get_scroll_offset``), ``WebView`` (``can_go_back``,
+``can_go_forward``, ``get_url``, ``get_title``, ``load_url``, and the
+navigation verbs), and ``VirtualList`` (``scroll_to_index``,
+``scroll_to_end``).
 """
 
 from __future__ import annotations
@@ -26,7 +35,7 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 from ..mutations import CreateOp, DestroyOp, InsertOp, Mutation, SetFrameOp, UpdateOp
 
-__all__ = ["DEFAULT_INTRINSIC", "FakeBackend", "FakeView"]
+__all__ = ["DEFAULT_INTRINSIC", "IMPLICIT_ROLES", "FakeBackend", "FakeView"]
 
 DEFAULT_INTRINSIC: Dict[str, Tuple[float, float]] = {
     "Text": (60.0, 16.0),
@@ -36,6 +45,28 @@ DEFAULT_INTRINSIC: Dict[str, Tuple[float, float]] = {
     "TabBar": (320.0, 49.0),
 }
 """Intrinsic sizes reported for content-sized leaves (what platform measure hooks would return)."""
+
+IMPLICIT_ROLES: Dict[str, str] = {
+    "Button": "button",
+    "Pressable": "button",
+    "Picker": "button",
+    "DatePicker": "button",
+    "Switch": "switch",
+    "Checkbox": "checkbox",
+    "TextInput": "textbox",
+    "Image": "image",
+    "ImageBackground": "image",
+    "Slider": "adjustable",
+    "ProgressBar": "progressbar",
+}
+"""Accessibility role each native type implies when no ``accessibility_role`` prop is set.
+
+``get_by_role`` consults this table after the explicit prop, so
+``pn.Button("Save")`` matches ``get_by_role("button")`` and
+``pn.Switch()`` matches ``get_by_role("switch")``. ``Text`` has no
+implicit role; ``pn.Text("Title", accessibility_role="header")`` matches
+``get_by_role("header")`` through the prop.
+"""
 
 
 class FakeView:
@@ -64,20 +95,80 @@ class FakeView:
         self.destroyed = False
 
     def __repr__(self) -> str:
-        label = self.text
-        suffix = f" {label!r}" if label else ""
+        suffix = ""
+        if self.text:
+            suffix = f" {self.text!r}"
+        elif self.value:
+            suffix = f" value={self.value!r}"
+        elif self.placeholder:
+            suffix = f" placeholder={self.placeholder!r}"
         return f"<{self.type_name} tag={self.tag}{suffix}>"
 
     # -- content --------------------------------------------------------
 
     @property
     def text(self) -> Optional[str]:
-        """Visible text for text-bearing views (``Text.text``, ``Button.title``, ``TextInput.value``)."""
-        for key in ("text", "title", "value", "placeholder"):
+        """Visible static text: ``Text.text`` or ``Button.title``.
+
+        A ``TextInput``'s contents are exposed separately as ``value`` and
+        ``placeholder`` so ``get_by_text`` never matches a form field.
+        """
+        for key in ("text", "title"):
             value = self.props.get(key)
             if isinstance(value, str):
                 return value
         return None
+
+    @property
+    def placeholder(self) -> Optional[str]:
+        """The ``placeholder`` prop of a ``TextInput`` (or ``Picker``), if set."""
+        value = self.props.get("placeholder")
+        return value if isinstance(value, str) else None
+
+    @property
+    def value(self) -> Optional[str]:
+        """The string ``value`` prop (a ``TextInput``'s display value), if set."""
+        value = self.props.get("value")
+        return value if isinstance(value, str) else None
+
+    @property
+    def role(self) -> Optional[str]:
+        """Effective accessibility role: the ``accessibility_role`` prop, else the type's implicit role.
+
+        See [`IMPLICIT_ROLES`][pythonnative.testing.IMPLICIT_ROLES] for
+        the implicit table.
+        """
+        explicit = self.props.get("accessibility_role")
+        if isinstance(explicit, str):
+            return explicit
+        return IMPLICIT_ROLES.get(self.type_name)
+
+    @property
+    def accessible_name(self) -> Optional[str]:
+        """What assistive technology would announce for this view.
+
+        The ``accessibility_label`` prop wins; otherwise the view's own
+        text or title, a ``Checkbox``'s ``label``, and finally the text
+        of descendant views joined with single spaces (so a
+        ``Pressable`` wrapping ``Text("Save")`` is named ``"Save"``).
+        """
+        if self.label is not None:
+            return self.label
+        if self.text is not None:
+            return self.text
+        inline = self.props.get("label")
+        if isinstance(inline, str):
+            return inline
+        parts = [child.text for child in self.walk() if child is not self and child.text]
+        return " ".join(parts) if parts else None
+
+    @property
+    def disabled(self) -> bool:
+        """Whether the view is disabled via the ``disabled`` prop or ``accessibility_state``."""
+        if self.props.get("disabled"):
+            return True
+        state = self.props.get("accessibility_state")
+        return bool(isinstance(state, dict) and state.get("disabled"))
 
     @property
     def hidden(self) -> bool:
@@ -153,6 +244,12 @@ class FakeBackend:
         self.animated: List[Tuple[int, str, Any]] = []
         self.last_create_props: Dict[str, Any] = {}
         self.last_update_changes: Dict[str, Any] = {}
+        self.focused_tag: Optional[int] = None
+        """Tag of the ``TextInput`` that last received ``focus`` (``None`` after ``blur``)."""
+        self.selections: Dict[int, Tuple[int, int]] = {}
+        """``(start, end)`` selection per ``TextInput`` tag, set by ``set_selection`` and ``select_all``."""
+        self.scroll_offsets: Dict[int, Dict[str, float]] = {}
+        """Content offset per ``ScrollView`` tag, updated by ``scroll_to_offset`` and ``scroll_to_end``."""
 
     # ------------------------------------------------------------------
     # Commit channel
@@ -210,6 +307,10 @@ class FakeBackend:
                 view.parent.children.remove(view)
                 view.parent = None
             view.destroyed = True
+            self.selections.pop(op.tag, None)
+            self.scroll_offsets.pop(op.tag, None)
+            if self.focused_tag == op.tag:
+                self.focused_tag = None
             return ("destroy", view.id)
 
         if isinstance(op, SetFrameOp):
@@ -245,15 +346,110 @@ class FakeBackend:
         return self.intrinsic.get(view.type_name, (0.0, 0.0))
 
     def command(self, tag: int, name: str, args: Optional[Dict[str, Any]] = None) -> Any:
-        """Record an imperative view command in ``commands`` and return ``None``."""
-        self.commands.append((tag, name, dict(args or {})))
+        """Record an imperative view command in ``commands`` and answer it for known view types.
+
+        ``TextInput``: ``get_value`` returns the ``value`` prop; ``focus``
+        and ``blur`` track ``focused_tag`` and fire ``on_focus`` /
+        ``on_blur`` when the app wired them; ``clear`` empties the value;
+        ``select_all`` and ``set_selection(start, end)`` record
+        ``selections``. ``ScrollView``: ``scroll_to_offset(x, y)`` and
+        ``scroll_to_end`` update ``scroll_offsets``; ``get_scroll_offset``
+        returns ``{"x": ..., "y": ...}``. ``WebView``: ``can_go_back`` and
+        ``can_go_forward`` are ``False``, ``get_url`` returns the ``url``
+        prop, ``load_url(url)`` replaces it, ``get_title`` is ``None``.
+        ``VirtualList``: ``scroll_to_index`` and ``scroll_to_end`` drive
+        the list request protocol. Anything else returns ``None``.
+        """
+        arguments = dict(args or {})
+        self.commands.append((tag, name, arguments))
         view = self.views.get(tag)
-        if view is not None and view.type_name == "VirtualList":
-            arguments = args or {}
+        if view is None:
+            return None
+        if view.type_name == "VirtualList":
             if name == "scroll_to_index":
                 self.request_list(tag, int(arguments["index"]))
             elif name == "scroll_to_end":
                 self.request_list(tag, max(0, len(view.props["keys"]) - 1))
+            return None
+        if view.type_name == "TextInput":
+            return self._text_input_command(view, name, arguments)
+        if view.type_name == "ScrollView":
+            return self._scroll_view_command(view, name, arguments)
+        if view.type_name == "WebView":
+            return self._web_view_command(view, name, arguments)
+        return None
+
+    def _text_input_command(self, view: FakeView, name: str, arguments: Dict[str, Any]) -> Any:
+        from ..events import dispatch_event
+
+        value = view.value or ""
+        if name == "get_value":
+            return value
+        if name == "focus":
+            previous = self.focused_tag
+            self.focused_tag = view.tag
+            if previous is not None and previous != view.tag and previous in self.views:
+                dispatch_event(previous, "on_blur")
+            if previous != view.tag:
+                dispatch_event(view.tag, "on_focus")
+            return None
+        if name == "blur":
+            if self.focused_tag == view.tag:
+                self.focused_tag = None
+                dispatch_event(view.tag, "on_blur")
+            return None
+        if name == "clear":
+            view.props["value"] = ""
+            self.selections[view.tag] = (0, 0)
+            return None
+        if name == "select_all":
+            self.selections[view.tag] = (0, len(value))
+            return None
+        if name == "set_selection":
+            start = int(arguments.get("start", 0))
+            end = int(arguments.get("end", start))
+            self.selections[view.tag] = (start, end)
+            return None
+        return None
+
+    def _scroll_view_command(self, view: FakeView, name: str, arguments: Dict[str, Any]) -> Any:
+        offset = self.scroll_offsets.setdefault(view.tag, {"x": 0.0, "y": 0.0})
+        if name == "get_scroll_offset":
+            return dict(offset)
+        if name == "scroll_to_offset":
+            if "x" in arguments and arguments["x"] is not None:
+                offset["x"] = float(arguments["x"])
+            if "y" in arguments and arguments["y"] is not None:
+                offset["y"] = float(arguments["y"])
+            return None
+        if name == "scroll_to_end":
+            horizontal = bool(view.props.get("horizontal"))
+            _, _, width, height = view.frame
+            if horizontal:
+                extent = max((c.frame[0] + c.frame[2] for c in view.children), default=0.0)
+                offset["x"] = max(0.0, extent - width)
+            else:
+                extent = max((c.frame[1] + c.frame[3] for c in view.children), default=0.0)
+                offset["y"] = max(0.0, extent - height)
+            return None
+        if name == "scroll_to_top":
+            offset["x"] = 0.0
+            offset["y"] = 0.0
+            return None
+        return None
+
+    def _web_view_command(self, view: FakeView, name: str, arguments: Dict[str, Any]) -> Any:
+        if name in ("can_go_back", "can_go_forward"):
+            return False
+        if name == "get_url":
+            return view.props.get("url")
+        if name == "get_title":
+            return None
+        if name == "load_url":
+            url = arguments.get("url")
+            if isinstance(url, str):
+                view.props["url"] = url
+            return None
         return None
 
     def request_list(self, tag: int, first: int, *, extent: float = 800.0) -> None:

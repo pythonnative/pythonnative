@@ -15,7 +15,11 @@ import com.pythonnative.runtime.bridge.str
 import com.pythonnative.runtime.bridge.value
 import org.json.JSONObject
 
-/** `StatusBar` element: applies bar color, style, and visibility to the host window. */
+/**
+ * `StatusBar` element: applies bar color, style, visibility, and
+ * `translucent` (edge-to-edge content) to the host window. `animated` is
+ * accepted and ignored: Android's bar changes are not animated by apps.
+ */
 class StatusBarManager : ComponentManager() {
     override fun createView(context: Context, tag: Long, props: JSONObject): View {
         val v = View(context)
@@ -46,8 +50,8 @@ class StatusBarManager : ComponentManager() {
                     controller.show(WindowInsetsCompat.Type.statusBars())
                 }
             }
-            if (props.has("translucent")) {
-                WindowCompat.setDecorFitsSystemWindows(window, !JsonUtil.truthy(props.value("translucent")))
+            if (typed.has_translucent) {
+                WindowCompat.setDecorFitsSystemWindows(window, typed.translucent != true)
             }
         } catch (e: Exception) {
             PNLog.once("statusbar", "StatusBar: could not apply props on Android: $e")
