@@ -12,7 +12,9 @@ appId: ${APP_ID}
       CATEGORY: Device
       DEMO_TITLE: AccessibilityInfo
 - assertVisible: "Screen reader: no"
-- assertVisible: "Reduce motion: no"
+# CI's Android emulator runs with animations disabled, which Android
+# reports as Reduce Motion, so either answer is valid here.
+- assertVisible: "Reduce motion: (yes|no)"
 - assertVisible: "Announcements: 0"
 - tapOn: "Announce"
 - assertVisible: "Announcements: 1"

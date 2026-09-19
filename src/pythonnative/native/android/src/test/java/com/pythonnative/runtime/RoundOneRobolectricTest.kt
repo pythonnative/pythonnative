@@ -7,6 +7,7 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.pythonnative.runtime.bridge.Op
@@ -80,6 +81,40 @@ class RoundOneRobolectricTest {
         assertEquals(activity.resources.displayMetrics.density.toDouble(), info["scale"] as Double, 1e-9)
         assertTrue((info["locale"] as String).isNotEmpty())
         assertEquals(activity.filesDir.absolutePath, info["app_dir"])
+    }
+
+    @Test fun keyboardObserverSeesInsetsBeforeTheWindowConsumesThem() {
+        // Under adjustResize the window pads the content for the IME and
+        // consumes the inset on the way down, as this parent does here.
+        val density = activity.resources.displayMetrics.density
+        val content = activity.findViewById<View>(android.R.id.content)
+        val parent = content.parent as View
+        var contentSawInsets = false
+        ViewCompat.setOnApplyWindowInsetsListener(parent) { _, _ -> WindowInsetsCompat.CONSUMED }
+        ViewCompat.setOnApplyWindowInsetsListener(content) { _, insets ->
+            contentSawInsets = true
+            insets
+        }
+        try {
+            PNKeyboard.attach(activity)
+            val shown = WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, (300 * density).toInt()))
+                .setVisible(WindowInsetsCompat.Type.ime(), true)
+                .build()
+            activity.window.decorView.dispatchApplyWindowInsets(shown.toWindowInsets())
+            assertFalse("the parent consumed the insets", contentSawInsets)
+            assertTrue(PNKeyboard.isVisible)
+            assertEquals(300.0, PNKeyboard.heightDp, 0.5)
+        } finally {
+            ViewCompat.setOnApplyWindowInsetsListener(parent, null)
+            ViewCompat.setOnApplyWindowInsetsListener(content, null)
+            PNKeyboard.update(
+                WindowInsetsCompat.Builder()
+                    .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, 0))
+                    .setVisible(WindowInsetsCompat.Type.ime(), false)
+                    .build(),
+            )
+        }
     }
 
     @Test fun keyboardObserverReportsHeightAboveTheNavigationBar() {

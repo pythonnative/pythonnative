@@ -10,26 +10,95 @@ appId: ${APP_ID}
     env:
       CATEGORY: Components
       DEMO_TITLE: TextInputHandle
+# On a short screen (CI's Android emulator is 320x640) the controls, the
+# readouts, and the field don't all fit, and the software keyboard covers
+# the lower half while the field is focused. The controls sit above the
+# readouts and the field sits last, so each step first scrolls its target
+# into view (a no-op when it's showing): up for a control, down for a
+# readout's line, then waits for the readout's value.
 - assertVisible: "Focused: OFF"
-- assertVisible: "Echo: handle text"
+- scrollUntilVisible:
+    element: "Echo: handle text"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- scrollUntilVisible:
+    element: "Focus input"
+    direction: UP
+    timeout: 15000
+    centerElement: false
 - tapOn: "Focus input"
+- scrollUntilVisible:
+    element: "Focused: .*"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
 - extendedWaitUntil:
     visible: "Focused: ON"
     timeout: 5000
 - assertVisible: "Handle attached: yes"
 - assertVisible: "Last call: focus"
+- scrollUntilVisible:
+    element: "Select all text"
+    direction: UP
+    timeout: 15000
+    centerElement: false
 - tapOn: "Select all text"
-- assertVisible: "Last call: select_all"
+- scrollUntilVisible:
+    element: "Last call: .*"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- extendedWaitUntil:
+    visible: "Last call: select_all"
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Read native value"
+    direction: UP
+    timeout: 15000
+    centerElement: false
 - tapOn: "Read native value"
+- scrollUntilVisible:
+    element: "Native value: .*"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
 - extendedWaitUntil:
     visible: "Native value: handle text"
     timeout: 5000
+- scrollUntilVisible:
+    element: "Blur input"
+    direction: UP
+    timeout: 15000
+    centerElement: false
 - tapOn: "Blur input"
+- scrollUntilVisible:
+    element: "Focused: .*"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
 - extendedWaitUntil:
     visible: "Focused: OFF"
     timeout: 5000
+- scrollUntilVisible:
+    element: "Clear input"
+    direction: UP
+    timeout: 15000
+    centerElement: false
 - tapOn: "Clear input"
-- assertVisible: "Last call: clear"
+- scrollUntilVisible:
+    element: "Last call: .*"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- extendedWaitUntil:
+    visible: "Last call: clear"
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Echo: .*"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
 - extendedWaitUntil:
     visible: "Echo: (empty)"
     timeout: 5000

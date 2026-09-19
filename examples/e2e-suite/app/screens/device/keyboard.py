@@ -3,7 +3,7 @@
 Focusing the field brings up the software keyboard; ``Keyboard.add_listener``
 mirrors every [`KeyboardEvent`][pythonnative.KeyboardEvent] into the
 readouts, ``Keyboard.is_visible()`` answers the current state, and the
-"Dismiss keyboard" button (outside the field) calls ``Keyboard.dismiss()``,
+"Dismiss keyboard" button (above the field) calls ``Keyboard.dismiss()``,
 which resigns the focused input so ``on_blur`` fires and the visibility
 readout flips back to "no".
 """
@@ -44,6 +44,9 @@ def KeyboardDemo() -> pn.Element:
         "Keyboard.is_visible, add_listener, and dismiss.",
         section(
             "Keyboard module",
+            # The button sits above the field: the software keyboard covers
+            # the lower half of a short screen while the field is focused.
+            pn.Button("Dismiss keyboard", on_press=dismiss),
             result_text("Focused", "ON" if focused else "OFF"),
             result_text("Keyboard visible", "yes" if visible else "no"),
             result_text("Keyboard events", events),
@@ -64,7 +67,6 @@ def KeyboardDemo() -> pn.Element:
                     font_size=16,
                 ),
             ),
-            pn.Button("Dismiss keyboard", on_press=dismiss),
             hint("Maestro focuses the field, then dismisses the keyboard from Python."),
         ),
     )

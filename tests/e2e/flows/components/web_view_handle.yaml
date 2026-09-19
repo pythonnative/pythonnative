@@ -11,7 +11,6 @@ appId: ${APP_ID}
     env:
       CATEGORY: Components
       DEMO_TITLE: WebViewHandle
-- assertVisible: "WebViewHandle visible marker"
 - assertVisible: "Eval result: (unread)"
 - tapOn: "Evaluate JS"
 - extendedWaitUntil:
@@ -25,6 +24,13 @@ appId: ${APP_ID}
 - assertVisible: "Reloads: 1"
 - tapOn: "Load second page"
 - assertVisible: "Last call: load_url"
+# The WebView section sits below the controls; on a short screen (CI's
+# Android emulator is 320x640) it starts below the fold.
+- scrollUntilVisible:
+    element: "WebViewHandle visible marker"
+    direction: DOWN
+    timeout: 20000
+    centerElement: false
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

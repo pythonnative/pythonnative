@@ -111,7 +111,9 @@ class ScrollViewManager : ComponentManager() {
             sv.setPadding(0, 0, 0, 0)
             return
         }
-        fun side(value: PNViewWidth?, fallback: Double): Double = value?.let { JsonUtil.toDoubleOrNull(PNValues.encode(it)) } ?: fallback
+        // Typed by the shared interface: the generated union's name follows
+        // whichever component first declares it, which a plugin can change.
+        fun side(value: PNNativeValue?, fallback: Double): Double = value?.let { JsonUtil.toDoubleOrNull(PNValues.encode(it)) } ?: fallback
         val all = side(inset.all, 0.0)
         val horizontal = side(inset.horizontal, all)
         val vertical = side(inset.vertical, all)

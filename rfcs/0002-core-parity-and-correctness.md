@@ -728,7 +728,8 @@ path is replaced in the same change.
   `mkdocs build --strict` passes; the removed claims are corrected.
 - `./scripts/check.sh` and `scripts/check-e2e-coverage.py` pass.
 - All 115 Maestro flows pass on an iPhone 15 Pro simulator (iOS 17.0)
-  and an Android 12 (API 31) emulator.
+  and on Android 12 (API 31) emulators, both a 1080 by 2400 phone and
+  the 320 by 640 screen CI uses.
 
 ## Decisions recorded during implementation
 
@@ -924,6 +925,25 @@ Found by the simulator runs:
   backdrop tap is one outside every child on all three renderers; iOS
   and preview overlays ignored backdrop taps before, and Android counted
   taps on plain text inside the modal.
+
+Found by CI, whose Android emulator has a 320 by 640 screen:
+
+- The Android `Keyboard` module never saw the keyboard. It read IME
+  insets on the activity's content view, but under `adjustResize` the
+  window applies the IME inset as padding above that view, which then
+  reads a zero height. It now observes the decor view, which sees the
+  insets first, and hands them on unchanged.
+- A build with a native plugin renamed built-in generated types (such as
+  `PNViewWidth`) and broke the hand-written Kotlin that names them.
+  Codegen decides which View props are shared by comparing every
+  component's schema, and an extension manifest arrives through JSON, so
+  a built-in tuple never equaled the manifest's list. The comparison now
+  uses the JSON form, and the example extension's manifest is
+  regenerated and checked against the built-ins by a test.
+- Several new demos didn't fit a short screen: controls sat under the
+  keyboard or below the fold. Their flows scroll each target into view,
+  and the Android shards were rebalanced to stay under the emulator's
+  stable session length.
 
 Testing library:
 

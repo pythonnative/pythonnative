@@ -1369,7 +1369,30 @@
           }
         },
         "background_color": {
-          "type": "string",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "light": {
+                  "type": "string"
+                },
+                "dark": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dark",
+                "light"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:DynamicColor",
+              "python_kind": "typeddict"
+            }
+          ],
           "native": {
             "invalidates_layout": false,
             "recreate": false,
@@ -1384,7 +1407,30 @@
           }
         },
         "color": {
-          "type": "string",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "light": {
+                  "type": "string"
+                },
+                "dark": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dark",
+                "light"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:DynamicColor",
+              "python_kind": "typeddict"
+            }
+          ],
           "native": {
             "invalidates_layout": false,
             "recreate": false,
@@ -1399,7 +1445,30 @@
           }
         },
         "border_color": {
-          "type": "string",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "light": {
+                  "type": "string"
+                },
+                "dark": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dark",
+                "light"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:DynamicColor",
+              "python_kind": "typeddict"
+            }
+          ],
           "native": {
             "invalidates_layout": false,
             "recreate": false,
@@ -1414,7 +1483,30 @@
           }
         },
         "placeholder_color": {
-          "type": "string",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "light": {
+                  "type": "string"
+                },
+                "dark": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dark",
+                "light"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:DynamicColor",
+              "python_kind": "typeddict"
+            }
+          ],
           "native": {
             "invalidates_layout": false,
             "recreate": false,
@@ -1429,7 +1521,30 @@
           }
         },
         "tint_color": {
-          "type": "string",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "light": {
+                  "type": "string"
+                },
+                "dark": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dark",
+                "light"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:DynamicColor",
+              "python_kind": "typeddict"
+            }
+          ],
           "native": {
             "invalidates_layout": false,
             "recreate": false,
@@ -1447,6 +1562,25 @@
           "type": "number",
           "native": {
             "invalidates_layout": true,
+            "recreate": false,
+            "animated": false,
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "description": "",
+            "python_only": false
+          }
+        },
+        "border_style": {
+          "enum": [
+            "solid",
+            "dashed",
+            "dotted"
+          ],
+          "native": {
+            "invalidates_layout": false,
             "recreate": false,
             "animated": false,
             "platforms": [
@@ -1594,7 +1728,30 @@
           }
         },
         "border_top_color": {
-          "type": "string",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "light": {
+                  "type": "string"
+                },
+                "dark": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dark",
+                "light"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:DynamicColor",
+              "python_kind": "typeddict"
+            }
+          ],
           "native": {
             "invalidates_layout": false,
             "recreate": false,
@@ -1609,7 +1766,30 @@
           }
         },
         "border_right_color": {
-          "type": "string",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "light": {
+                  "type": "string"
+                },
+                "dark": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dark",
+                "light"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:DynamicColor",
+              "python_kind": "typeddict"
+            }
+          ],
           "native": {
             "invalidates_layout": false,
             "recreate": false,
@@ -1624,7 +1804,30 @@
           }
         },
         "border_bottom_color": {
-          "type": "string",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "light": {
+                  "type": "string"
+                },
+                "dark": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dark",
+                "light"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:DynamicColor",
+              "python_kind": "typeddict"
+            }
+          ],
           "native": {
             "invalidates_layout": false,
             "recreate": false,
@@ -1639,7 +1842,30 @@
           }
         },
         "border_left_color": {
-          "type": "string",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "light": {
+                  "type": "string"
+                },
+                "dark": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dark",
+                "light"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:DynamicColor",
+              "python_kind": "typeddict"
+            }
+          ],
           "native": {
             "invalidates_layout": false,
             "recreate": false,
@@ -1847,7 +2073,30 @@
           }
         },
         "text_shadow_color": {
-          "type": "string",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "light": {
+                  "type": "string"
+                },
+                "dark": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dark",
+                "light"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:DynamicColor",
+              "python_kind": "typeddict"
+            }
+          ],
           "native": {
             "invalidates_layout": false,
             "recreate": false,
@@ -1930,7 +2179,30 @@
           }
         },
         "shadow_color": {
-          "type": "string",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "light": {
+                  "type": "string"
+                },
+                "dark": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dark",
+                "light"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:DynamicColor",
+              "python_kind": "typeddict"
+            }
+          ],
           "native": {
             "invalidates_layout": false,
             "recreate": false,
@@ -2084,6 +2356,72 @@
             {
               "type": "object",
               "properties": {
+                "rotate_x": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "rotate_x"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:TransformRotateX",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "rotate_y": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "rotate_y"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:TransformRotateY",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "rotate_z": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "rotate_z"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:TransformRotateZ",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "object",
+              "properties": {
                 "scale": {
                   "type": "number"
                 }
@@ -2144,6 +2482,65 @@
             },
             {
               "type": "object",
+              "properties": {
+                "skew_x": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "skew_x"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:TransformSkewX",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "skew_y": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "skew_y"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:TransformSkewY",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "perspective": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "perspective"
+              ],
+              "defaults": {},
+              "additionalProperties": false,
+              "python_type": "pythonnative.style:TransformPerspective",
+              "python_kind": "typeddict"
+            },
+            {
+              "type": "object",
               "additionalProperties": {
                 "type": "json"
               }
@@ -2172,6 +2569,72 @@
                     "defaults": {},
                     "additionalProperties": false,
                     "python_type": "pythonnative.style:TransformRotate",
+                    "python_kind": "typeddict"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "rotate_x": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "rotate_x"
+                    ],
+                    "defaults": {},
+                    "additionalProperties": false,
+                    "python_type": "pythonnative.style:TransformRotateX",
+                    "python_kind": "typeddict"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "rotate_y": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "rotate_y"
+                    ],
+                    "defaults": {},
+                    "additionalProperties": false,
+                    "python_type": "pythonnative.style:TransformRotateY",
+                    "python_kind": "typeddict"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "rotate_z": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "rotate_z"
+                    ],
+                    "defaults": {},
+                    "additionalProperties": false,
+                    "python_type": "pythonnative.style:TransformRotateZ",
                     "python_kind": "typeddict"
                   },
                   {
@@ -2233,6 +2696,65 @@
                     "defaults": {},
                     "additionalProperties": false,
                     "python_type": "pythonnative.style:TransformTranslate",
+                    "python_kind": "typeddict"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "skew_x": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "skew_x"
+                    ],
+                    "defaults": {},
+                    "additionalProperties": false,
+                    "python_type": "pythonnative.style:TransformSkewX",
+                    "python_kind": "typeddict"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "skew_y": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "skew_y"
+                    ],
+                    "defaults": {},
+                    "additionalProperties": false,
+                    "python_type": "pythonnative.style:TransformSkewY",
+                    "python_kind": "typeddict"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "perspective": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "perspective"
+                    ],
+                    "defaults": {},
+                    "additionalProperties": false,
+                    "python_type": "pythonnative.style:TransformPerspective",
                     "python_kind": "typeddict"
                   },
                   {
@@ -2615,6 +3137,45 @@
                   ]
                 },
                 "end": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "inset": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "inset_horizontal": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "inset_vertical": {
                   "anyOf": [
                     {
                       "type": "integer"
@@ -3128,22 +3689,144 @@
                   ]
                 },
                 "background_color": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "light": {
+                          "type": "string"
+                        },
+                        "dark": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dark",
+                        "light"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:DynamicColor",
+                      "python_kind": "typeddict"
+                    }
+                  ]
                 },
                 "color": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "light": {
+                          "type": "string"
+                        },
+                        "dark": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dark",
+                        "light"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:DynamicColor",
+                      "python_kind": "typeddict"
+                    }
+                  ]
                 },
                 "border_color": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "light": {
+                          "type": "string"
+                        },
+                        "dark": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dark",
+                        "light"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:DynamicColor",
+                      "python_kind": "typeddict"
+                    }
+                  ]
                 },
                 "placeholder_color": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "light": {
+                          "type": "string"
+                        },
+                        "dark": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dark",
+                        "light"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:DynamicColor",
+                      "python_kind": "typeddict"
+                    }
+                  ]
                 },
                 "tint_color": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "light": {
+                          "type": "string"
+                        },
+                        "dark": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dark",
+                        "light"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:DynamicColor",
+                      "python_kind": "typeddict"
+                    }
+                  ]
                 },
                 "border_width": {
                   "type": "number"
+                },
+                "border_style": {
+                  "enum": [
+                    "solid",
+                    "dashed",
+                    "dotted"
+                  ]
                 },
                 "border_radius": {
                   "type": "number"
@@ -3173,16 +3856,108 @@
                   "type": "number"
                 },
                 "border_top_color": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "light": {
+                          "type": "string"
+                        },
+                        "dark": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dark",
+                        "light"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:DynamicColor",
+                      "python_kind": "typeddict"
+                    }
+                  ]
                 },
                 "border_right_color": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "light": {
+                          "type": "string"
+                        },
+                        "dark": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dark",
+                        "light"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:DynamicColor",
+                      "python_kind": "typeddict"
+                    }
+                  ]
                 },
                 "border_bottom_color": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "light": {
+                          "type": "string"
+                        },
+                        "dark": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dark",
+                        "light"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:DynamicColor",
+                      "python_kind": "typeddict"
+                    }
+                  ]
                 },
                 "border_left_color": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "light": {
+                          "type": "string"
+                        },
+                        "dark": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dark",
+                        "light"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:DynamicColor",
+                      "python_kind": "typeddict"
+                    }
+                  ]
                 },
                 "font_size": {
                   "type": "number"
@@ -3246,7 +4021,30 @@
                   "type": "integer"
                 },
                 "text_shadow_color": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "light": {
+                          "type": "string"
+                        },
+                        "dark": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dark",
+                        "light"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:DynamicColor",
+                      "python_kind": "typeddict"
+                    }
+                  ]
                 },
                 "text_shadow_offset": {
                   "anyOf": [
@@ -3293,7 +4091,30 @@
                   "type": "number"
                 },
                 "shadow_color": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "light": {
+                          "type": "string"
+                        },
+                        "dark": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dark",
+                        "light"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:DynamicColor",
+                      "python_kind": "typeddict"
+                    }
+                  ]
                 },
                 "shadow_offset": {
                   "anyOf": [
@@ -3375,6 +4196,72 @@
                     {
                       "type": "object",
                       "properties": {
+                        "rotate_x": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "rotate_x"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:TransformRotateX",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "rotate_y": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "rotate_y"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:TransformRotateY",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "rotate_z": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "rotate_z"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:TransformRotateZ",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
                         "scale": {
                           "type": "number"
                         }
@@ -3435,6 +4322,65 @@
                     },
                     {
                       "type": "object",
+                      "properties": {
+                        "skew_x": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "skew_x"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:TransformSkewX",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "skew_y": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "skew_y"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:TransformSkewY",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "perspective": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "perspective"
+                      ],
+                      "defaults": {},
+                      "additionalProperties": false,
+                      "python_type": "pythonnative.style:TransformPerspective",
+                      "python_kind": "typeddict"
+                    },
+                    {
+                      "type": "object",
                       "additionalProperties": {
                         "type": "json"
                       }
@@ -3463,6 +4409,72 @@
                             "defaults": {},
                             "additionalProperties": false,
                             "python_type": "pythonnative.style:TransformRotate",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "rotate_x": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "rotate_x"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformRotateX",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "rotate_y": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "rotate_y"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformRotateY",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "rotate_z": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "rotate_z"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformRotateZ",
                             "python_kind": "typeddict"
                           },
                           {
@@ -3528,6 +4540,65 @@
                           },
                           {
                             "type": "object",
+                            "properties": {
+                              "skew_x": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "skew_x"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformSkewX",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "skew_y": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "skew_y"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformSkewY",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "perspective": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "perspective"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformPerspective",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
                             "additionalProperties": {
                               "type": "json"
                             }
@@ -3554,12 +4625,6 @@
               "additionalProperties": false,
               "python_type": "pythonnative.style:Style",
               "python_kind": "typeddict"
-            },
-            {
-              "type": "object",
-              "additionalProperties": {
-                "type": "json"
-              }
             },
             {
               "type": "array",
@@ -3831,6 +4896,45 @@
                         ]
                       },
                       "end": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "inset": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "inset_horizontal": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "inset_vertical": {
                         "anyOf": [
                           {
                             "type": "integer"
@@ -4344,22 +5448,144 @@
                         ]
                       },
                       "background_color": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "light": {
+                                "type": "string"
+                              },
+                              "dark": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dark",
+                              "light"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:DynamicColor",
+                            "python_kind": "typeddict"
+                          }
+                        ]
                       },
                       "color": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "light": {
+                                "type": "string"
+                              },
+                              "dark": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dark",
+                              "light"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:DynamicColor",
+                            "python_kind": "typeddict"
+                          }
+                        ]
                       },
                       "border_color": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "light": {
+                                "type": "string"
+                              },
+                              "dark": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dark",
+                              "light"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:DynamicColor",
+                            "python_kind": "typeddict"
+                          }
+                        ]
                       },
                       "placeholder_color": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "light": {
+                                "type": "string"
+                              },
+                              "dark": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dark",
+                              "light"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:DynamicColor",
+                            "python_kind": "typeddict"
+                          }
+                        ]
                       },
                       "tint_color": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "light": {
+                                "type": "string"
+                              },
+                              "dark": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dark",
+                              "light"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:DynamicColor",
+                            "python_kind": "typeddict"
+                          }
+                        ]
                       },
                       "border_width": {
                         "type": "number"
+                      },
+                      "border_style": {
+                        "enum": [
+                          "solid",
+                          "dashed",
+                          "dotted"
+                        ]
                       },
                       "border_radius": {
                         "type": "number"
@@ -4389,16 +5615,108 @@
                         "type": "number"
                       },
                       "border_top_color": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "light": {
+                                "type": "string"
+                              },
+                              "dark": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dark",
+                              "light"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:DynamicColor",
+                            "python_kind": "typeddict"
+                          }
+                        ]
                       },
                       "border_right_color": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "light": {
+                                "type": "string"
+                              },
+                              "dark": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dark",
+                              "light"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:DynamicColor",
+                            "python_kind": "typeddict"
+                          }
+                        ]
                       },
                       "border_bottom_color": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "light": {
+                                "type": "string"
+                              },
+                              "dark": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dark",
+                              "light"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:DynamicColor",
+                            "python_kind": "typeddict"
+                          }
+                        ]
                       },
                       "border_left_color": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "light": {
+                                "type": "string"
+                              },
+                              "dark": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dark",
+                              "light"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:DynamicColor",
+                            "python_kind": "typeddict"
+                          }
+                        ]
                       },
                       "font_size": {
                         "type": "number"
@@ -4462,7 +5780,30 @@
                         "type": "integer"
                       },
                       "text_shadow_color": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "light": {
+                                "type": "string"
+                              },
+                              "dark": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dark",
+                              "light"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:DynamicColor",
+                            "python_kind": "typeddict"
+                          }
+                        ]
                       },
                       "text_shadow_offset": {
                         "anyOf": [
@@ -4509,7 +5850,30 @@
                         "type": "number"
                       },
                       "shadow_color": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "light": {
+                                "type": "string"
+                              },
+                              "dark": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dark",
+                              "light"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:DynamicColor",
+                            "python_kind": "typeddict"
+                          }
+                        ]
                       },
                       "shadow_offset": {
                         "anyOf": [
@@ -4591,6 +5955,72 @@
                           {
                             "type": "object",
                             "properties": {
+                              "rotate_x": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "rotate_x"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformRotateX",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "rotate_y": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "rotate_y"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformRotateY",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "rotate_z": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "rotate_z"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformRotateZ",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
                               "scale": {
                                 "type": "number"
                               }
@@ -4651,6 +6081,65 @@
                           },
                           {
                             "type": "object",
+                            "properties": {
+                              "skew_x": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "skew_x"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformSkewX",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "skew_y": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "skew_y"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformSkewY",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "perspective": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "perspective"
+                            ],
+                            "defaults": {},
+                            "additionalProperties": false,
+                            "python_type": "pythonnative.style:TransformPerspective",
+                            "python_kind": "typeddict"
+                          },
+                          {
+                            "type": "object",
                             "additionalProperties": {
                               "type": "json"
                             }
@@ -4679,6 +6168,72 @@
                                   "defaults": {},
                                   "additionalProperties": false,
                                   "python_type": "pythonnative.style:TransformRotate",
+                                  "python_kind": "typeddict"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "rotate_x": {
+                                      "anyOf": [
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "rotate_x"
+                                  ],
+                                  "defaults": {},
+                                  "additionalProperties": false,
+                                  "python_type": "pythonnative.style:TransformRotateX",
+                                  "python_kind": "typeddict"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "rotate_y": {
+                                      "anyOf": [
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "rotate_y"
+                                  ],
+                                  "defaults": {},
+                                  "additionalProperties": false,
+                                  "python_type": "pythonnative.style:TransformRotateY",
+                                  "python_kind": "typeddict"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "rotate_z": {
+                                      "anyOf": [
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "rotate_z"
+                                  ],
+                                  "defaults": {},
+                                  "additionalProperties": false,
+                                  "python_type": "pythonnative.style:TransformRotateZ",
                                   "python_kind": "typeddict"
                                 },
                                 {
@@ -4744,6 +6299,65 @@
                                 },
                                 {
                                   "type": "object",
+                                  "properties": {
+                                    "skew_x": {
+                                      "anyOf": [
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "skew_x"
+                                  ],
+                                  "defaults": {},
+                                  "additionalProperties": false,
+                                  "python_type": "pythonnative.style:TransformSkewX",
+                                  "python_kind": "typeddict"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "skew_y": {
+                                      "anyOf": [
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "skew_y"
+                                  ],
+                                  "defaults": {},
+                                  "additionalProperties": false,
+                                  "python_type": "pythonnative.style:TransformSkewY",
+                                  "python_kind": "typeddict"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "perspective": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "perspective"
+                                  ],
+                                  "defaults": {},
+                                  "additionalProperties": false,
+                                  "python_type": "pythonnative.style:TransformPerspective",
+                                  "python_kind": "typeddict"
+                                },
+                                {
+                                  "type": "object",
                                   "additionalProperties": {
                                     "type": "json"
                                   }
@@ -4770,12 +6384,6 @@
                     "additionalProperties": false,
                     "python_type": "pythonnative.style:Style",
                     "python_kind": "typeddict"
-                  },
-                  {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "json"
-                    }
                   },
                   {
                     "type": "null"

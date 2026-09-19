@@ -13,7 +13,7 @@ import kotlin.math.max
 /**
  * The shared on-screen keyboard observer.
  *
- * Watches the activity's content view for IME window insets and keeps
+ * Watches the activity's decor view for IME window insets and keeps
  * [heightDp] / [isVisible] current, notifying [addListener] callbacks
  * with `(heightDp, visible, durationMs)` whenever either changes. The
  * duration is the IME inset animation's length when the platform
@@ -47,37 +47,45 @@ object PNKeyboard {
         return { listeners.remove(listener) }
     }
 
-    /** Start observing `activity`'s content view (idempotent per view). */
+    /**
+     * Start observing `activity`'s decor view (idempotent per view).
+     *
+     * The decor view sees the window's insets before any view consumes
+     * them. Under `adjustResize` the window applies the IME inset as
+     * padding above the content view, which then reads a zero keyboard
+     * height, so observing the content view never saw the keyboard. The
+     * listener hands the insets on to the decor view's own handling.
+     */
     fun attach(activity: Activity) {
-        val content = activity.findViewById<View>(android.R.id.content) ?: activity.window?.decorView ?: return
-        if (observed === content) return
+        val root = activity.window?.decorView ?: return
+        if (observed === root) return
         observed?.let { detachView(it) }
-        observed = content
-        ViewCompat.setOnApplyWindowInsetsListener(content) { _, insets ->
+        observed = root
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             update(insets)
-            insets
+            ViewCompat.onApplyWindowInsets(view, insets)
         }
-        ViewCompat.setWindowInsetsAnimationCallback(content, object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+        ViewCompat.setWindowInsetsAnimationCallback(root, object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
             override fun onPrepare(animation: WindowInsetsAnimationCompat) {
                 if (animation.typeMask and WindowInsetsCompat.Type.ime() != 0) pendingDurationMs = animation.durationMillis
             }
             override fun onProgress(insets: WindowInsetsCompat, running: MutableList<WindowInsetsAnimationCompat>): WindowInsetsCompat = insets
             override fun onEnd(animation: WindowInsetsAnimationCompat) {
                 if (animation.typeMask and WindowInsetsCompat.Type.ime() != 0) {
-                    ViewCompat.getRootWindowInsets(content)?.let { update(it) }
+                    ViewCompat.getRootWindowInsets(root)?.let { update(it) }
                     pendingDurationMs = 0L
                 }
             }
         })
-        ViewCompat.getRootWindowInsets(content)?.let { update(it) }
-        content.requestApplyInsets()
+        ViewCompat.getRootWindowInsets(root)?.let { update(it) }
+        root.requestApplyInsets()
     }
 
     /** Stop observing `activity` (called from `Activity.onDestroy`). */
     fun detach(activity: Activity) {
-        val content = observed ?: return
-        if (content.context !== activity && content.rootView !== activity.window?.decorView) return
-        detachView(content)
+        val root = observed ?: return
+        if (root !== activity.window?.decorView) return
+        detachView(root)
         observed = null
     }
 

@@ -1,0 +1,24 @@
+# Hooks category suite, part 1 of two; see hooks.yaml.
+#
+# The hooks category (26 flows) takes a GitHub-hosted Android emulator
+# past its stable session length: the emulator drops offline after
+# roughly ten minutes of sustained Maestro driving. CI therefore runs the
+# category as two parts, each on a freshly booted emulator.
+#
+# Usage:
+#     maestro test tests/e2e/suites/hooks-a.yaml -e APP_ID=com.pythonnative.e2e
+appId: ${APP_ID}
+---
+- runFlow: ../flows/hooks/use_state.yaml
+- runFlow: ../flows/hooks/use_effect.yaml
+- runFlow: ../flows/hooks/use_layout_effect.yaml
+- runFlow: ../flows/hooks/use_reducer.yaml
+- runFlow: ../flows/hooks/use_ref.yaml
+- runFlow: ../flows/hooks/use_imperative_handle.yaml
+- runFlow: ../flows/hooks/use_back_handler.yaml
+- runFlow: ../flows/hooks/use_memo.yaml
+- runFlow: ../flows/hooks/use_callback.yaml
+- runFlow: ../flows/hooks/use_context.yaml
+- runFlow: ../flows/hooks/async_effect.yaml
+- runFlow: ../flows/hooks/standard_asyncio.yaml
+- runFlow: ../flows/hooks/use_resource.yaml

@@ -117,6 +117,21 @@ def StackOptionsDemo() -> pn.Element:
             result_text("Guard", "ON" if guard else "OFF"),
             result_text("Vetoes", vetoes),
             result_text("Last veto", last_veto),
+            # The controls sit above the nested stack: a short screen can't show
+            # the readouts, the stack, and three rows of buttons at once, and the
+            # flow reads the stack's header titles from its top edge.
+            buttons_row(
+                pn.Button("Push Compose", on_press=act("push", "Compose")),
+                pn.Button("Push Preview", on_press=act("push", "Preview")),
+            ),
+            buttons_row(
+                pn.Button("Push Plain", on_press=act("push", "Plain")),
+                pn.Button("Pop to Home", on_press=act("pop_to", "Home")),
+            ),
+            buttons_row(
+                pn.Button("Enable guard", on_press=lambda: set_guard(True)),
+                pn.Button("Disable guard", on_press=lambda: set_guard(False)),
+            ),
             pn.View(
                 _Bus.Provider(
                     _Stack.Navigator(
@@ -135,18 +150,6 @@ def StackOptionsDemo() -> pn.Element:
                     value=bus,
                 ),
                 style=pn.style(height=200, border_radius=8, background_color="#F8FAFC", overflow="hidden"),
-            ),
-            buttons_row(
-                pn.Button("Push Compose", on_press=act("push", "Compose")),
-                pn.Button("Push Preview", on_press=act("push", "Preview")),
-            ),
-            buttons_row(
-                pn.Button("Push Plain", on_press=act("push", "Plain")),
-                pn.Button("Pop to Home", on_press=act("pop_to", "Home")),
-            ),
-            buttons_row(
-                pn.Button("Enable guard", on_press=lambda: set_guard(True)),
-                pn.Button("Disable guard", on_press=lambda: set_guard(False)),
             ),
             hint("Header titles: screen beats group beats navigator. The guard vetoes pop_to."),
         ),
