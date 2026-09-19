@@ -1,0 +1,24 @@
+# Tests DynamicColor pairs repaint when the color scheme flips and the
+# inset shorthand positions an absolute child.
+#
+# Demo screen: examples/e2e-suite/app/screens/styling/dynamic_color.py
+# Source under test: src/pythonnative/style.py :: DynamicColor, inset
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Styling
+      DEMO_TITLE: Dynamic color
+- assertVisible: "Scheme: light"
+- assertVisible: "dynamic-color-box"
+- tapOn: "Use dark scheme"
+- assertVisible: "Scheme: dark"
+- assertVisible: "dynamic-color-box"
+- tapOn: "Use light scheme"
+- assertVisible: "Scheme: light"
+- assertVisible: "inset-child"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Styling

@@ -22,14 +22,20 @@ import org.json.JSONObject
 /**
  * `TabBar` element backed by Material's `BottomNavigationView`.
  *
- * `items` is a list of `{name, title, icon}`; `active_tab` names the
- * selected item (an integer `active_index` is also accepted). Selecting
- * a tab fires `on_tab_select(name)` and `on_select(index)` when wired.
+ * `items` is a list of `{name, title, icon, badge}`; `active_tab` names
+ * the selected item (an integer `active_index` is also accepted).
+ * Selecting a tab fires `on_tab_select(name)` and `on_select(index)`
+ * when wired. `tint_color` / `inactive_tint_color` color the selected and
+ * idle items, `shows_labels` toggles titles, and the background follows
+ * the theme's `colorSurface` (so dark mode is honored) unless
+ * `background_color` is set. `translucent` is accepted and ignored: a
+ * Material bottom bar is opaque.
  */
 class TabBarManager : ComponentManager() {
     override fun createView(context: Context, tag: Long, props: JSONObject): View {
         val bnv = BottomNavigationView(context)
-        bnv.setBackgroundColor(0xFFFFFFFF.toInt())
+        // Theme surface color (light or dark) until a `background_color` prop says otherwise.
+        bnv.setBackgroundColor(PNTheme.surface(context))
         bnv.labelVisibilityMode = NavigationBarView.LABEL_VISIBILITY_LABELED
         bnv.setOnItemSelectedListener { item ->
             if (stateOf(bnv)["suppress"] == true) return@setOnItemSelectedListener true
@@ -54,18 +60,20 @@ class TabBarManager : ComponentManager() {
         if (typed.has_active_tab || props.has("active_index") || typed.has_items) {
             setActive(bnv, merged)
         }
-        val active = PNColor.parse(props.value("active_tint_color") ?: props.value("tint_color"))
-        val inactive = PNColor.parse(props.value("inactive_tint_color"))
-        if (active != null || inactive != null) {
-            val a = active ?: PNColor.parse(merged.value("active_tint_color")) ?: 0xFF1976D2.toInt()
-            val i = inactive ?: PNColor.parse(merged.value("inactive_tint_color")) ?: 0xFF757575.toInt()
+        if (typed.has_tint_color || typed.has_inactive_tint_color || props.has("active_tint_color")) {
+            val mergedTyped = TabBarProps(merged)
+            val a = PNColor.parse(mergedTyped.tint_color) ?: PNColor.parse(merged.value("active_tint_color")) ?: 0xFF1976D2.toInt()
+            val i = PNColor.parse(mergedTyped.inactive_tint_color) ?: 0xFF757575.toInt()
             val list = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()), intArrayOf(a, i))
             bnv.itemIconTintList = list
             bnv.itemTextColor = list
         }
-        PNColor.parse(props.value("background_color"))?.let { bnv.setBackgroundColor(it) }
-        if (props.has("shows_labels")) {
-            bnv.labelVisibilityMode = if (JsonUtil.truthy(props.value("shows_labels"))) {
+        if (typed.has_background_color) {
+            bnv.setBackgroundColor(PNColor.parse(props.value("background_color")) ?: PNTheme.surface(bnv.context))
+        }
+        // `translucent` has no Material equivalent; the bar stays opaque.
+        if (typed.has_shows_labels) {
+            bnv.labelVisibilityMode = if (typed.shows_labels != false) {
                 NavigationBarView.LABEL_VISIBILITY_LABELED
             } else {
                 NavigationBarView.LABEL_VISIBILITY_UNLABELED

@@ -1,0 +1,62 @@
+# Tests navigator screen_options / Group / Screen option layering on a nested
+# stack's header titles, pop_to from deep in the stack, and a before_remove
+# guard that vetoes pop_to while enabled.
+#
+# Demo screen: examples/e2e-suite/app/screens/navigation/stack_options.py
+# Source under test: src/pythonnative/navigation/navigators.py :: StackNavigator, ScreenGroup
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Navigation
+      DEMO_TITLE: Stack options
+- extendedWaitUntil:
+    visible: "Home!"
+    timeout: 30000
+- assertVisible: "Focused route: Home"
+- assertVisible: "Depth: 1"
+# Group options beat the navigator callable.
+- tapOn: "Push Compose"
+- extendedWaitUntil:
+    visible: "Grouped"
+    timeout: 10000
+- assertVisible: "Focused route: Compose"
+# The screen's own title beats the group.
+- tapOn: "Push Preview"
+- extendedWaitUntil:
+    visible: "Preview!"
+    timeout: 10000
+# An ungrouped screen gets the navigator callable's title.
+- tapOn: "Push Plain"
+- extendedWaitUntil:
+    visible: "Nav Plain"
+    timeout: 10000
+- assertVisible: "Depth: 4"
+- tapOn: "Pop to Home"
+- extendedWaitUntil:
+    visible: "Focused route: Home"
+    timeout: 10000
+- assertVisible: "Depth: 1"
+# before_remove veto: the guarded Preview screen refuses to leave.
+- tapOn: "Push Preview"
+- extendedWaitUntil:
+    visible: "Focused route: Preview"
+    timeout: 10000
+- tapOn: "Enable guard"
+- assertVisible: "Guard: ON"
+- tapOn: "Pop to Home"
+- extendedWaitUntil:
+    visible: "Vetoes: 1"
+    timeout: 10000
+- assertVisible: "Last veto: pop_to"
+- assertVisible: "Focused route: Preview"
+- tapOn: "Disable guard"
+- tapOn: "Pop to Home"
+- extendedWaitUntil:
+    visible: "Focused route: Home"
+    timeout: 10000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Navigation

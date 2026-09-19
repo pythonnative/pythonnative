@@ -32,7 +32,9 @@ public final class HostModule: PNNativeModule {
             promise.resolve(controller.viewport())
         case "set_options":
             guard let controller = screen(args, promise) else { return }
-            HostModule.applyOptions(PNProps.dict(args["options"]) ?? [:], to: controller)
+            let options = PNProps.dict(args["options"]) ?? [:]
+            HostModule.applyOptions(options, to: controller)
+            HostModule.applyGestureOptions(options, to: controller)
             promise.resolve(nil)
         case "finish":
             promise.resolve(nil)
@@ -55,6 +57,26 @@ public final class HostModule: PNNativeModule {
         return controller
     }
 
+    /// `gesture_enabled` for a standalone host screen: the interactive pop
+    /// gesture when the screen is a card in a navigation controller, or
+    /// `isModalInPresentation` when it's presented modally. Never both.
+    static func applyGestureOptions(_ options: [String: Any], to controller: UIViewController) {
+        let enabled = PNScreenOptions.gestureEnabled(options)
+        if PNScreenOptions.isModal(options) || (controller.navigationController == nil && controller.presentingViewController != nil) {
+            (controller.navigationController ?? controller).isModalInPresentation = !enabled
+        } else {
+            controller.navigationController?.interactivePopGestureRecognizer?.isEnabled = enabled
+        }
+    }
+
+    /// Header and title options shared by native stack screens and `Host.set_options`.
+    ///
+    /// Bar-level state (hidden, large titles, tint, background) is applied
+    /// to the controller's navigation bar; the item-level appearance is
+    /// applied through `applyItemAppearance` so every screen in a stack
+    /// carries its own header colors. Python always sends
+    /// `header_tint_color`, `header_style.background_color`, and
+    /// `header_title_style.color` from the navigation theme.
     static func applyOptions(_ options: [String: Any], to controller: UIViewController) {
         controller.title = PNProps.string(options["title"]) ?? ""
         let item = controller.navigationItem
@@ -65,9 +87,29 @@ public final class HostModule: PNNativeModule {
         let large = PNProps.bool(options["header_large_title"]) ?? false
         navigation?.navigationBar.prefersLargeTitles = large
         item.largeTitleDisplayMode = large ? .always : .never
-        navigation?.interactivePopGestureRecognizer?.isEnabled = PNProps.bool(options["gesture_enabled"]) ?? true
-        controller.isModalInPresentation = !(PNProps.bool(options["gesture_enabled"]) ?? true)
-        navigation?.navigationBar.tintColor = PNColor.parse(options["header_tint_color"])
+        if let bar = navigation?.navigationBar {
+            bar.tintColor = PNColor.parse(options["header_tint_color"])
+            let barStyle = PNProps.dict(options["header_style"]) ?? [:]
+            bar.barTintColor = PNColor.parse(barStyle["background_color"])
+            let appearance = headerAppearance(options)
+            bar.standardAppearance = appearance
+            bar.scrollEdgeAppearance = appearance
+            bar.compactAppearance = appearance
+        }
+        applyItemAppearance(options, to: controller)
+    }
+
+    /// The per-screen navigation item appearance (background and title colors).
+    static func applyItemAppearance(_ options: [String: Any], to controller: UIViewController) {
+        let appearance = headerAppearance(options)
+        let item = controller.navigationItem
+        item.standardAppearance = appearance
+        item.scrollEdgeAppearance = appearance
+        item.compactAppearance = appearance
+    }
+
+    /// `header_style.background_color` and `header_title_style` as a bar appearance.
+    static func headerAppearance(_ options: [String: Any]) -> UINavigationBarAppearance {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithDefaultBackground()
         let barStyle = PNProps.dict(options["header_style"]) ?? [:]
@@ -83,8 +125,6 @@ public final class HostModule: PNNativeModule {
         }
         appearance.titleTextAttributes = attributes
         appearance.largeTitleTextAttributes = attributes
-        item.standardAppearance = appearance
-        item.scrollEdgeAppearance = appearance
-        item.compactAppearance = appearance
+        return appearance
     }
 }

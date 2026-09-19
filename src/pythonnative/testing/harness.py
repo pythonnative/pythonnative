@@ -14,30 +14,32 @@ def test_counter():
 
 from __future__ import annotations
 
-import re
-from typing import Any, Callable, Dict, Generic, List, Optional, Pattern, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from ..element import Element, Node
 from ..events import dispatch_event, get_event_registry
 from .backend import FakeBackend, FakeView
+from .clock import current_fake_clock
+from .queries import Queries, _live
 
 __all__ = ["FakeHost", "HookResult", "RenderResult", "render", "render_hook", "settle"]
 
 T = TypeVar("T")
-Matcher = Union[str, Pattern[str], Callable[[Optional[str]], bool]]
 Target = Union[FakeView, int]
 
 DEFAULT_VIEWPORT: Tuple[float, float] = (390.0, 844.0)
 
+PRESSABLE_TYPES = frozenset({"Pressable", "Button"})
+"""Native types whose ``disabled`` state also blocks presses on their descendants."""
 
-def _matches(value: Optional[str], matcher: Matcher, *, exact: bool) -> bool:
-    if callable(matcher) and not isinstance(matcher, (str, re.Pattern)):
-        return bool(matcher(value))
-    if value is None:
-        return False
-    if isinstance(matcher, re.Pattern):
-        return matcher.search(value) is not None
-    return value == matcher if exact else matcher in value
+
+def _flush_renders(reconciler: Any) -> bool:
+    """Flush dirty components and queued transitions; return whether anything is still pending."""
+    reconciler.flush_dirty()
+    if reconciler.transitions.pending:
+        reconciler.transitions.flush()
+        return True
+    return reconciler._has_dirty_work()
 
 
 def settle(reconciler: Any = None, timeout: float = 1.0) -> None:
@@ -45,18 +47,21 @@ def settle(reconciler: Any = None, timeout: float = 1.0) -> None:
 
     Use after triggering async work (``use_resource``, ``use_query``,
     transitions, coroutines started by handlers) so assertions see the
-    settled tree.
+    settled tree. Under a [`fake_clock`][pythonnative.testing.fake_clock]
+    only work due at the clock's current time runs; timers wait for
+    ``clock.advance``.
     """
     from .. import runtime
 
     for _ in range(50):
-        idle = runtime.drain(timeout)
-        if reconciler is not None:
-            reconciler.flush_dirty()
-            if reconciler.transitions.pending:
-                reconciler.transitions.flush()
-                continue
-        if idle and (reconciler is None or not reconciler._has_dirty_work()):
+        clock = current_fake_clock()
+        if clock is not None:
+            clock.run_until_idle()
+            idle = True
+        else:
+            idle = runtime.drain(timeout)
+        pending = _flush_renders(reconciler) if reconciler is not None else False
+        if idle and not pending:
             return
 
 
@@ -102,22 +107,28 @@ class FakeHost:
         return None
 
 
-class RenderResult:
+class RenderResult(Queries):
     """Handle to a mounted tree: queries, events, re-render, unmount.
 
-    Query methods come in three flavors, mirroring Testing Library:
+    Query methods come in four flavors, mirroring Testing Library:
     ``get_by_*`` returns exactly one match or raises ``LookupError``
     (with the tree dumped in the message), ``query_by_*`` returns the
-    match or ``None``, ``get_all_by_*`` returns every match. Matchers
-    are exact strings, compiled regexes, or predicates. Views inside a
+    match or ``None``, ``get_all_by_*`` returns every match, and
+    ``find_by_*`` waits for the match with
+    [`wait_for`][pythonnative.testing.wait_for]. Matchers are exact
+    strings, compiled regexes, or predicates. Views inside a
     ``display: "none"`` subtree (inactive tabs, covered stack screens)
-    are skipped unless ``hidden=True`` is passed.
+    are skipped unless ``hidden=True`` is passed. See
+    [`Queries`][pythonnative.testing.queries.Queries] for the full list,
+    including ``get_by_role``, ``get_by_placeholder_text``, and
+    ``get_by_display_value``.
     """
 
     def __init__(self, reconciler: Any, backend: FakeBackend, wrap: Callable[[Node], Element]) -> None:
         self.reconciler = reconciler
         self.backend = backend
         self._wrap = wrap
+        _live.add(self)
 
     # -- tree -----------------------------------------------------------
 
@@ -141,90 +152,73 @@ class RenderResult:
         root = self.root
         return root.dump() if root is not None else "<unmounted>"
 
-    def text(self, *, hidden: bool = False) -> List[str]:
-        """Visible strings in document order."""
-        return [v.text for v in self.views(hidden=hidden) if v.text is not None]
-
-    # -- queries --------------------------------------------------------
-
-    def _all(self, predicate: Callable[[FakeView], bool], hidden: bool = False) -> List[FakeView]:
-        return [v for v in self.views(hidden=hidden) if predicate(v)]
-
-    def _one(self, kind: str, matcher: Any, found: List[FakeView]) -> FakeView:
-        if len(found) == 1:
-            return found[0]
-        detail = "no matches" if not found else f"{len(found)} matches: {found}"
-        raise LookupError(f"get_by_{kind}({matcher!r}): {detail}\n\n{self.dump()}")
-
-    def get_all_by_text(self, matcher: Matcher, *, exact: bool = True, hidden: bool = False) -> List[FakeView]:
-        """Return every view whose visible text matches ``matcher`` (``exact=False`` matches substrings)."""
-        return self._all(lambda v: _matches(v.text, matcher, exact=exact), hidden)
-
-    def get_by_text(self, matcher: Matcher, *, exact: bool = True, hidden: bool = False) -> FakeView:
-        """Return the single view whose visible text matches ``matcher``; raise ``LookupError`` otherwise."""
-        return self._one("text", matcher, self.get_all_by_text(matcher, exact=exact, hidden=hidden))
-
-    def query_by_text(self, matcher: Matcher, *, exact: bool = True, hidden: bool = False) -> Optional[FakeView]:
-        """Return the first view whose visible text matches ``matcher``, or ``None``."""
-        found = self.get_all_by_text(matcher, exact=exact, hidden=hidden)
-        return found[0] if found else None
-
-    def get_all_by_test_id(self, matcher: Matcher, *, hidden: bool = False) -> List[FakeView]:
-        """Return every view whose ``test_id`` prop matches ``matcher``."""
-        return self._all(lambda v: _matches(v.test_id, matcher, exact=True), hidden)
-
-    def get_by_test_id(self, matcher: Matcher, *, hidden: bool = False) -> FakeView:
-        """Return the single view whose ``test_id`` prop matches ``matcher``; raise ``LookupError`` otherwise."""
-        return self._one("test_id", matcher, self.get_all_by_test_id(matcher, hidden=hidden))
-
-    def query_by_test_id(self, matcher: Matcher, *, hidden: bool = False) -> Optional[FakeView]:
-        """Return the first view whose ``test_id`` prop matches ``matcher``, or ``None``."""
-        found = self.get_all_by_test_id(matcher, hidden=hidden)
-        return found[0] if found else None
-
-    def get_all_by_label(self, matcher: Matcher, *, hidden: bool = False) -> List[FakeView]:
-        """Return every view whose ``accessibility_label`` prop matches ``matcher``."""
-        return self._all(lambda v: _matches(v.label, matcher, exact=True), hidden)
-
-    def get_by_label(self, matcher: Matcher, *, hidden: bool = False) -> FakeView:
-        """Return the single view whose ``accessibility_label`` matches ``matcher``; raise ``LookupError`` if not."""
-        return self._one("label", matcher, self.get_all_by_label(matcher, hidden=hidden))
-
-    def query_by_label(self, matcher: Matcher, *, hidden: bool = False) -> Optional[FakeView]:
-        """Return the first view whose ``accessibility_label`` prop matches ``matcher``, or ``None``."""
-        found = self.get_all_by_label(matcher, hidden=hidden)
-        return found[0] if found else None
-
-    def get_all_by_type(self, type_name: str, *, hidden: bool = False) -> List[FakeView]:
-        """Return every view of native type ``type_name`` (for example ``"Text"``)."""
-        return self._all(lambda v: v.type_name == type_name, hidden)
-
-    def get_by_type(self, type_name: str, *, hidden: bool = False) -> FakeView:
-        """Return the single view of native type ``type_name``; raise ``LookupError`` otherwise."""
-        return self._one("type", type_name, self.get_all_by_type(type_name, hidden=hidden))
-
-    def query_by_type(self, type_name: str, *, hidden: bool = False) -> Optional[FakeView]:
-        """Return the first view of native type ``type_name``, or ``None``."""
-        found = self.get_all_by_type(type_name, hidden=hidden)
-        return found[0] if found else None
-
     # -- events ---------------------------------------------------------
 
     def fire(self, target: Target, event: str, *args: Any) -> None:
         """Dispatch ``event`` (an ``on_*`` prop name) to ``target`` and settle.
 
+        Payloads are decoded through the element's contract the way the
+        native bridge decodes them, so a handler receives the same types it
+        gets on a device: ``fire(scroll, "on_scroll", {"x": 0, "y": 40})``
+        delivers a [`ScrollEvent`][pythonnative.ScrollEvent], not a dict.
+
         Raises:
             LookupError: If no handler is registered for the event.
+            TypeError: If the payload doesn't match the event's contract.
         """
         tag = target.tag if isinstance(target, FakeView) else int(target)
         if not get_event_registry().has(tag, event):
             raise LookupError(f"fire({target!r}, {event!r}): no handler registered\n\n{self.dump()}")
-        dispatch_event(tag, event, *args)
+        dispatch_event(tag, event, *self._decoded(target, event, args))
         self.settle()
 
-    def press(self, target: Target) -> None:
-        """Fire ``on_press`` on ``target``."""
+    def _decoded(self, target: Target, event: str, args: Tuple[Any, ...]) -> Tuple[Any, ...]:
+        """Decode ``args`` through the target's contract when it declares ``event``."""
+        from ..sdk.schema import COMPONENTS
+
+        view = self._resolve(target)
+        contract = COMPONENTS.get(view.type_name) if view is not None else None
+        if contract is None or event.startswith("gesture:") or event not in contract.props:
+            return args
+        return tuple(contract.decode_event(event, list(args)))
+
+    def _resolve(self, target: Target) -> Optional[FakeView]:
+        return target if isinstance(target, FakeView) else self.backend.views.get(int(target))
+
+    def press(self, target: Target, *, force: bool = False) -> None:
+        """Fire ``on_press`` on ``target``.
+
+        Like a real tap, the press is refused when the target is disabled
+        (``disabled=True`` or ``accessibility_state={"disabled": True}``)
+        or sits inside a disabled ``Pressable`` or ``Button``.
+
+        Args:
+            target: The view (or tag) to press.
+            force: Dispatch even if the target is disabled.
+
+        Raises:
+            AssertionError: If the target is disabled and ``force`` is ``False``.
+            LookupError: If no ``on_press`` handler is registered.
+        """
+        view = self._resolve(target)
+        if view is not None and not force:
+            blocker = view if view.disabled else None
+            ancestor = view.parent
+            while blocker is None and ancestor is not None:
+                if ancestor.type_name in PRESSABLE_TYPES and ancestor.disabled:
+                    blocker = ancestor
+                ancestor = ancestor.parent
+            if blocker is not None:
+                where = "is disabled" if blocker is view else f"is inside disabled {blocker!r}"
+                raise AssertionError(
+                    f"press({view!r}): target {where}; pass force=True to press anyway\n\n{self.dump()}"
+                )
         self.fire(target, "on_press")
+
+    def act(self, fn: Callable[[], Any]) -> None:
+        """Run ``fn`` (state setters, imperative calls) and settle so the next line sees the result."""
+        fn()
+        self.settle()
 
     def change_text(self, target: Target, value: str) -> None:
         """Fire ``on_change`` on a ``TextInput``."""
@@ -242,6 +236,10 @@ class RenderResult:
         """Flush pending renders and async work (see [`settle`][pythonnative.testing.settle])."""
         settle(self.reconciler, timeout)
 
+    def _flush_renders(self) -> None:
+        if self.reconciler.root is not None:
+            _flush_renders(self.reconciler)
+
     def rerender(self, element: Node) -> None:
         """Reconcile a new root element (new props from outside the tree)."""
         self.reconciler.reconcile(self._wrap(element))
@@ -250,6 +248,7 @@ class RenderResult:
     def unmount(self) -> None:
         """Unmount the tree, running effect cleanups and destroying every view."""
         self.reconciler.unmount()
+        _live.discard(self)
 
     def __enter__(self) -> "RenderResult":
         return self

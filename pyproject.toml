@@ -26,9 +26,7 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Topic :: Software Development :: User Interfaces",
 ]
-dependencies = [
-  "requests>=2.31.0",
-]
+dependencies = []
 
 [project.optional-dependencies]
 build = [
@@ -63,6 +61,9 @@ docs = [
 
 [project.scripts]
 pn = "pythonnative.cli.pn:main"
+
+[project.entry-points.pytest11]
+pythonnative = "pythonnative.testing.pytest_plugin"
 
 [project.urls]
 Homepage = "https://github.com/pythonnative/pythonnative"

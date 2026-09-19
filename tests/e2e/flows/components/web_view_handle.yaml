@@ -1,0 +1,37 @@
+# Tests WebViewHandle on ref.current: eval_js() answers from the page,
+# can_go_back() reports the history state, and reload()/inject_javascript()
+# run without error.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/web_view_handle.py
+# Source under test: src/pythonnative/handles.py :: WebViewHandle
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: WebViewHandle
+- assertVisible: "Eval result: (unread)"
+- tapOn: "Evaluate JS"
+- extendedWaitUntil:
+    visible: "Eval result: 42"
+    timeout: 15000
+- assertVisible: "Can go back: no"
+- assertVisible: "Handle attached: yes"
+- tapOn: "Inject JS"
+- assertVisible: "Last call: inject_javascript"
+- tapOn: "Reload page"
+- assertVisible: "Reloads: 1"
+- tapOn: "Load second page"
+- assertVisible: "Last call: load_url"
+# The WebView section sits below the controls; on a short screen (CI's
+# Android emulator is 320x640) it starts below the fold.
+- scrollUntilVisible:
+    element: "WebViewHandle visible marker"
+    direction: DOWN
+    timeout: 20000
+    centerElement: false
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

@@ -118,10 +118,10 @@ final class PNModuleTests: XCTestCase {
 
     func testDeviceInfoShape() {
         let info = DeviceModule.snapshot()
-        XCTAssertEqual(info["os"] as? String, "ios")
+        XCTAssertEqual(info["platform"] as? String, "ios")
         XCTAssertNotNil(info["os_version"])
         XCTAssertNotNil(info["app_dir"])
-        XCTAssertNotNil(info["cache_dir"])
+        XCTAssertNotNil(info["bundle_id"])
         XCTAssertNotNil(info["scale"])
     }
 

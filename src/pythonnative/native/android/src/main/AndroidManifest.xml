@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Runtime-gated on Android 13+ (API 33); requested by the
          Notifications module before posting. -->
@@ -8,7 +9,26 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <application>
+    <!-- `enableOnBackInvokedCallback` opts the merged app into predictive
+         back (Android 13+). Screens register an `OnBackPressedCallback`
+         with progress no-ops, so the system back-to-home preview plays
+         when no PythonNative callback is enabled; see PNScreenFragment. -->
+    <application
+        android:enableOnBackInvokedCallback="true"
+        tools:targetApi="tiramisu">
         <receiver android:name="com.pythonnative.runtime.modules.NotificationReceiver" android:exported="false" />
+
+        <!-- Camera.take_photo writes the full-resolution capture through
+             this provider (`EXTRA_OUTPUT`); `${applicationId}` resolves to
+             the consuming app's id at manifest-merge time. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.pythonnative.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/pn_file_paths" />
+        </provider>
     </application>
 </manifest>

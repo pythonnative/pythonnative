@@ -59,6 +59,7 @@ from typing import (
     List,
     Optional,
     Protocol,
+    Sequence,
     Tuple,
     TypeVar,
     Union,
@@ -66,16 +67,24 @@ from typing import (
 )
 
 from . import diagnostics
+from . import journal as _journal
+from .appearance import ColorScheme
 from .element import Element, Node
+from .equality import equal
 from .platform_metrics import SafeAreaInsets, WindowDimensions
 from .runtime import TaskScope, _scope, call_on_application_thread
 from .scheduler import TransitionQueue, in_transition, run_in_transition, schedule_trigger
 from .suspense import Resource
 
 T = TypeVar("T")
+S = TypeVar("S")
+A = TypeVar("A")
 
 StateSetter = Callable[[Union[T, Callable[[T], T]]], None]
 """Setter returned by [`use_state`][pythonnative.use_state]: accepts a value or ``current -> new``."""
+
+Deps = Optional[Sequence[object]]
+"""A hook dependency list: any sequence (list or tuple) of values, or ``None`` for "every render"."""
 
 _SENTINEL = object()
 
@@ -132,34 +141,27 @@ class Ref(Generic[T]):
     place for timers, last-seen values, and imperative handles.
 
     When a ``Ref`` is passed to a built-in element via the ``ref=``
-    prop, the reconciler populates ``current`` with the underlying
-    native view (``UIView`` on iOS, ``android.view.View`` on Android,
-    a DOM element in the browser preview) after commit, and clears it back to
-    ``None`` on unmount. Composite components (e.g.
-    [`FlatList`][pythonnative.FlatList]) instead publish a typed
-    controller object on ``current`` via
+    prop, the reconciler publishes a typed imperative handle on
+    ``current`` after commit (a ``TextInputHandle`` for ``TextInput``, a
+    ``ScrollViewHandle`` for ``ScrollView``, a plain ``ViewHandle`` with
+    ``tag`` and ``frame`` for everything else; see
+    ``pythonnative.handles``) and clears it back to ``None`` on unmount.
+    Composite components (e.g. [`FlatList`][pythonnative.FlatList])
+    instead publish a controller object on ``current`` via
     [`use_imperative_handle`][pythonnative.use_imperative_handle].
 
     Attributes:
-        current: The referenced value. ``None`` until populated.
+        current: The referenced value.
     """
 
-    __slots__ = ("current", "_pn_tag", "_pn_frame")
+    __slots__ = ("current",)
 
-    def __init__(self, initial: Optional[T] = None) -> None:
-        self.current: Optional[T] = initial
-        # Internal: the native view tag, populated by the reconciler
-        # when the ref is attached to a built-in element.
-        self._pn_tag: Optional[int] = None
-        # Internal: the last committed frame ``(x, y, w, h)``, mirrored
-        # by the layout pass so Python code can read measured geometry
-        # without a native round-trip.
-        self._pn_frame: Optional[Tuple[float, float, float, float]] = None
+    def __init__(self, initial: T = None) -> None:
+        self.current: T = initial
 
     def __setattr__(self, name: str, value: Any) -> None:
-        from .reconciler.journal import record_attribute
-
-        record_attribute(self, name)
+        if _journal.journal_active:
+            _journal.record_attribute(self, name)
         object.__setattr__(self, name, value)
 
     def __repr__(self) -> str:
@@ -374,7 +376,7 @@ class HookState:
                 cleanup = _activate_effect(effect_fn)
             finally:
                 _scope.reset(token)
-            self.layout_effects[idx] = (list(deps) if deps is not None else None, cleanup)
+            self.layout_effects[idx] = (_copy_deps(deps), cleanup)
 
     def flush_pending_effects(self) -> None:
         """Run passive effects queued during render, after native commit.
@@ -397,7 +399,7 @@ class HookState:
                 cleanup = _activate_effect(effect_fn)
             finally:
                 _scope.reset(token)
-            self.effects[idx] = (list(deps) if deps is not None else None, cleanup)
+            self.effects[idx] = (_copy_deps(deps), cleanup)
 
     def cleanup_all_effects(self) -> None:
         """Run every outstanding cleanup function, then clear state.
@@ -467,17 +469,33 @@ def _require_hook_state(hook_name: str) -> HookState:
     return ctx
 
 
-def _deps_changed(prev: Any, current: Any) -> bool:
-    """Return whether the dependency arrays differ enough to re-run an effect."""
+def _deps_changed(prev: Any, current: Deps, ctx: Optional[HookState] = None, hook: str = "") -> bool:
+    """Return whether the dependency lists differ enough to re-run a hook.
+
+    ``None`` on either side means "every render". In dev mode a list
+    whose length changed between renders is reported once per hook
+    site, since it almost always means a dependency was computed
+    conditionally.
+    """
     if prev is _SENTINEL:
         return True
     if prev is None or current is None:
         return True
     if len(prev) != len(current):
+        if ctx is not None and diagnostics.is_dev():
+            diagnostics.warn_once(
+                f"{ctx._component_name or 'A component'} passed {len(current)} dependencies to {hook} "
+                f"but {len(prev)} on the previous render. Dependency lists must have the same length on "
+                "every render; use a stable list and put conditionals inside the values.",
+                key=f"deps-length:{ctx._component_name}:{hook}",
+            )
         return True
-    from .equality import equal
-
     return any(not equal(p, c) for p, c in zip(prev, current))
+
+
+def _copy_deps(deps: Deps) -> Optional[List[object]]:
+    """Snapshot a dependency sequence so later in-place edits can't hide a change."""
+    return None if deps is None else list(deps)
 
 
 def _run_cleanup(cleanup: Any) -> None:
@@ -634,9 +652,20 @@ def _state_setter(ctx: HookState, idx: int) -> Callable[[Any], None]:
 
         def apply() -> None:
             if ctx.task_scope.closed:
+                if diagnostics.is_dev():
+                    diagnostics.warn_once(
+                        f"A state setter of {ctx._component_name or 'a component'} was called after the "
+                        "component unmounted; the update is dropped. Cancel timers and subscriptions in "
+                        "the effect cleanup, or check a mounted flag before setting state.",
+                        key=f"set-after-unmount:{ctx._component_name}",
+                    )
                 return
-            from .equality import equal
-
+            if diagnostics.is_dev() and _hook_context.get() is ctx:
+                diagnostics.warn_once(
+                    f"{ctx._component_name or 'A component'} called a state setter during its own render. "
+                    "Derive the value inline or move the update into use_effect.",
+                    key=f"set-during-render:{ctx._component_name}",
+                )
             if deferred:
                 if idx not in ctx._state_queues:
                     ctx._state_queues[idx] = (ctx.states[idx], [])
@@ -649,6 +678,13 @@ def _state_setter(ctx: HookState, idx: int) -> Callable[[Any], None]:
             if idx in ctx._state_queues:
                 ctx._state_queues[idx][1].append(update)
             value = update(ctx.states[idx]) if callable(update) else update
+            if value is ctx.states[idx] and isinstance(value, (list, dict, set)) and diagnostics.is_dev():
+                diagnostics.warn_once(
+                    f"{ctx._component_name or 'A component'} set state to the same {type(value).__name__} "
+                    "object it already holds. In-place mutation never re-renders; pass a new object "
+                    "(for example items + [new] or {**mapping, key: value}).",
+                    key=f"set-same-object:{ctx._component_name}:{idx}",
+                )
             if not equal(ctx.states[idx], value):
                 ctx.states[idx] = value
                 _notify_state_changed(ctx)
@@ -662,8 +698,6 @@ def _state_setter(ctx: HookState, idx: int) -> Callable[[Any], None]:
         value, updates = queued
         for update in updates:
             value = update(value) if callable(update) else update
-        from .equality import equal
-
         if not equal(ctx.states[idx], value):
             ctx.states[idx] = value
             _notify_state_changed(ctx)
@@ -672,23 +706,23 @@ def _state_setter(ctx: HookState, idx: int) -> Callable[[Any], None]:
     return setter
 
 
-def use_reducer(
-    reducer: Callable[[T, Any], T], initial_state: Union[T, Callable[[], T]]
-) -> Tuple[T, Callable[[Any], None]]:
+def use_reducer(reducer: Callable[[S, A], S], initial: Union[S, Callable[[], S]]) -> Tuple[S, Callable[[A], None]]:
     """Return ``(state, dispatch)`` for reducer-based state management.
 
     A reducer is a pure function that takes the current state and an
     action and returns the next state. Use it instead of
     [`use_state`][pythonnative.use_state] when state transitions are
     complex enough that centralizing them in one function aids
-    readability and testing.
+    readability and testing. The hook is generic over the state type
+    ``S`` and the action type ``A``, so ``dispatch`` only accepts the
+    actions ``reducer`` handles.
 
     Args:
         reducer: ``reducer(current_state, action) -> new_state``.
             The component re-renders only when ``reducer`` returns a
             value different from the current state.
-        initial_state: Initial state value, or a callable invoked once
-            on the first render.
+        initial: Initial state value, or a callable invoked once on
+            the first render.
 
     Returns:
         A 2-tuple ``(state, dispatch)`` where ``dispatch`` runs the
@@ -704,7 +738,7 @@ def use_reducer(
     ctx.state_index += 1
 
     if idx >= len(ctx.states):
-        val = initial_state() if callable(initial_state) else initial_state
+        val = initial() if callable(initial) else initial
         ctx.states.append(val)
 
     ctx._reducers[idx] = reducer
@@ -723,18 +757,20 @@ def use_reducer(
 # ======================================================================
 
 
-def use_effect(effect: Callable[[], Any], deps: Optional[list] = None) -> None:
+def use_effect(effect: Callable[[], Any], deps: Deps = None) -> None:
     """Schedule a side effect to run after the native commit.
 
     Effects are queued during the render pass and flushed once the
     reconciler has finished applying all native-view mutations, which
     means effect callbacks can safely measure layout or interact with
-    committed native views.
+    committed native views. An exception raised by the effect is routed
+    to the nearest [`ErrorBoundary`][pythonnative.ErrorBoundary],
+    exactly like an exception raised during render.
 
     The ``deps`` argument controls when the effect re-runs:
 
     - ``None``: every render.
-    - ``[]``: mount only.
+    - ``[]`` (or ``()``): mount only.
     - ``[a, b]``: when ``a`` or ``b`` change (compared by identity, then ``==``).
 
     A synchronous ``effect`` may return a cleanup callable; the previous
@@ -751,7 +787,7 @@ def use_effect(effect: Callable[[], Any], deps: Optional[list] = None) -> None:
         effect: A zero-arg callable invoked after commit: either a
             synchronous function (optionally returning a cleanup
             callable) or an ``async def``.
-        deps: Dependency list, or ``None`` to run on every render.
+        deps: Dependency sequence, or ``None`` to run on every render.
 
     Raises:
         RuntimeError: If called outside a ``@component`` function.
@@ -788,11 +824,11 @@ def use_effect(effect: Callable[[], Any], deps: Optional[list] = None) -> None:
         return
 
     prev_deps, _prev_cleanup = ctx.effects[idx]
-    if _deps_changed(prev_deps, deps):
+    if _deps_changed(prev_deps, deps, ctx, "use_effect"):
         ctx._pending_effects.append((idx, effect, deps))
 
 
-def use_layout_effect(effect: Callable[[], Any], deps: Optional[list] = None) -> None:
+def use_layout_effect(effect: Callable[[], Any], deps: Deps = None) -> None:
     """Schedule a side effect that runs synchronously inside the commit.
 
     Like [`use_effect`][pythonnative.use_effect], but the callback
@@ -808,7 +844,7 @@ def use_layout_effect(effect: Callable[[], Any], deps: Optional[list] = None) ->
     Args:
         effect: A zero-arg callable invoked during commit. Optionally
             returns a cleanup callable.
-        deps: Dependency list, or ``None`` to run on every render.
+        deps: Dependency sequence, or ``None`` to run on every render.
 
     Raises:
         RuntimeError: If called outside a ``@component`` function.
@@ -825,7 +861,7 @@ def use_layout_effect(effect: Callable[[], Any], deps: Optional[list] = None) ->
         return
 
     prev_deps, _prev_cleanup = ctx.layout_effects[idx]
-    if _deps_changed(prev_deps, deps):
+    if _deps_changed(prev_deps, deps, ctx, "use_layout_effect"):
         ctx._pending_layout_effects.append((idx, effect, deps))
 
 
@@ -834,7 +870,7 @@ def use_layout_effect(effect: Callable[[], Any], deps: Optional[list] = None) ->
 # ======================================================================
 
 
-def use_memo(factory: Callable[[], T], deps: list) -> T:
+def use_memo(factory: Callable[[], T], deps: Deps = None) -> T:
     """Return a memoized value that is recomputed only when ``deps`` change.
 
     Use this for expensive computations whose inputs change rarely. For
@@ -843,8 +879,9 @@ def use_memo(factory: Callable[[], T], deps: list) -> T:
 
     Args:
         factory: Zero-arg callable returning the value.
-        deps: Dependency list. The value is recomputed when any element
-            differs from the previous render.
+        deps: Dependency sequence. The value is recomputed when any
+            element differs from the previous render; ``None``
+            recomputes on every render.
 
     Returns:
         The cached or freshly computed value.
@@ -860,22 +897,22 @@ def use_memo(factory: Callable[[], T], deps: list) -> T:
 
     if idx >= len(ctx.memos):
         value = factory()
-        ctx.memos.append((list(deps), value))
+        ctx.memos.append((_copy_deps(deps), value))
         return value
 
     prev_deps, prev_value = ctx.memos[idx]
-    if not _deps_changed(prev_deps, deps):
+    if not _deps_changed(prev_deps, deps, ctx, "use_memo"):
         return prev_value
 
     value = factory()
-    ctx.memos[idx] = (list(deps), value)
+    ctx.memos[idx] = (_copy_deps(deps), value)
     return value
 
 
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def use_callback(callback: F, deps: list) -> F:
+def use_callback(callback: F, deps: Deps = None) -> F:
     """Return a stable reference to ``callback``, refreshed when ``deps`` change.
 
     Equivalent to ``use_memo(lambda: callback, deps)``. Useful when
@@ -884,7 +921,7 @@ def use_callback(callback: F, deps: list) -> F:
 
     Args:
         callback: The callable to memoize.
-        deps: Dependency list controlling when the reference refreshes.
+        deps: Dependency sequence controlling when the reference refreshes.
 
     Returns:
         A callable with stable identity across renders (until ``deps`` change).
@@ -892,18 +929,28 @@ def use_callback(callback: F, deps: list) -> F:
     return use_memo(lambda: callback, deps)
 
 
-def use_ref(initial: Optional[T] = None) -> Ref[T]:
+@overload
+def use_ref(initial: None = None) -> Ref[Any]: ...
+
+
+@overload
+def use_ref(initial: T) -> Ref[T]: ...
+
+
+def use_ref(initial: Any = None) -> Ref[Any]:
     """Return a [`Ref`][pythonnative.Ref] that persists across renders.
 
     Refs are useful for storing values that must survive renders without
     triggering them: timers, last-seen values, native handles, and so on.
+    ``use_ref(0)`` is a ``Ref[int]``; ``use_ref()`` is a ``Ref[Any]``
+    meant to be filled in later.
 
-    ``ref.current`` is also populated by the reconciler with the
-    underlying native view when the ref is passed via the ``ref=`` prop
-    on a built-in element, and cleared to ``None`` when that element
-    unmounts. Composite components such as
-    [`FlatList`][pythonnative.FlatList] publish a typed controller
-    object instead (see
+    When the ref is passed via the ``ref=`` prop on a built-in element,
+    the reconciler publishes a typed imperative handle on
+    ``ref.current`` after commit and clears it to ``None`` when that
+    element unmounts. Composite components such as
+    [`FlatList`][pythonnative.FlatList] publish a controller object
+    instead (see
     [`use_imperative_handle`][pythonnative.use_imperative_handle]).
 
     Args:
@@ -923,7 +970,7 @@ def use_ref(initial: Optional[T] = None) -> Ref[T]:
     ctx.ref_index += 1
 
     if idx >= len(ctx.refs):
-        ref: Ref[T] = Ref(initial)
+        ref: Ref[Any] = Ref(initial)
         ctx.refs.append(ref)
         return ref
 
@@ -933,7 +980,7 @@ def use_ref(initial: Optional[T] = None) -> Ref[T]:
 def use_imperative_handle(
     ref: Optional[Ref[Any]],
     factory: Callable[[], Any],
-    deps: Optional[list] = None,
+    deps: Deps = None,
 ) -> None:
     """Publish a controller object on ``ref.current``.
 
@@ -949,7 +996,7 @@ def use_imperative_handle(
             ``ref`` prop. ``None`` is allowed (the parent didn't
             request a handle), in which case this is a no-op.
         factory: Zero-arg callable returning the handle object.
-        deps: Dependency list controlling when the handle is rebuilt.
+        deps: Dependency sequence controlling when the handle is rebuilt.
             ``None`` rebuilds on every render, matching effects.
 
     Raises:
@@ -982,7 +1029,7 @@ def use_imperative_handle(
 # ======================================================================
 
 
-def use_resource(fetcher: Callable[[], Any], deps: Optional[list] = None) -> Resource[Any]:
+def use_resource(fetcher: Callable[[], Any], deps: Deps = None) -> Resource[Any]:
     """Start an async fetch and cache it across renders.
 
     The fetch starts immediately (during render, not after commit) and
@@ -1002,8 +1049,8 @@ def use_resource(fetcher: Callable[[], Any], deps: Optional[list] = None) -> Res
         fetcher: Zero-arg ``async def`` (or plain callable) producing
             the value. Synchronous fetchers resolve immediately and
             never suspend.
-        deps: Dependency list controlling when to refetch. Defaults to
-            ``[]`` (fetch once per component instance).
+        deps: Dependency sequence controlling when to refetch. Defaults
+            to ``[]`` (fetch once per component instance).
 
     Returns:
         The cached [`Resource`][pythonnative.Resource].
@@ -1026,7 +1073,7 @@ def use_resource(fetcher: Callable[[], Any], deps: Optional[list] = None) -> Res
 
     idx = ctx.resource_index
     ctx.resource_index += 1
-    deps = [] if deps is None else deps
+    deps = () if deps is None else deps
 
     if idx >= len(ctx.resources):
         resource = start_resource(fetcher)
@@ -1034,7 +1081,7 @@ def use_resource(fetcher: Callable[[], Any], deps: Optional[list] = None) -> Res
         return resource
 
     prev_deps, prev_resource = ctx.resources[idx]
-    if not _deps_changed(prev_deps, deps):
+    if not _deps_changed(prev_deps, deps, ctx, "use_resource"):
         return prev_resource
 
     prev_resource.cancel()
@@ -1148,7 +1195,7 @@ class QueryResult(Generic[T]):
 
 def use_query(
     fetcher: Callable[[], Awaitable[T]],
-    deps: Optional[list] = None,
+    deps: Deps = None,
     *,
     initial: Optional[T] = None,
     key: Any = None,
@@ -1193,7 +1240,7 @@ def use_query(
     from .query import default_client
 
     cache = client or default_client()
-    local_key = use_memo(object, deps or [])
+    local_key = use_memo(object, deps if deps is not None else ())
     if key is None:
         key = local_key
     snapshot = use_subscription(
@@ -1359,8 +1406,6 @@ def use_subscription(subscribe: Callable[[Callable[[], None]], Callable[[], None
     Raises:
         RuntimeError: If called outside a ``@component`` function.
     """
-    from .equality import equal
-
     _require_hook_state("use_subscription")
     _, set_tick = use_state(0)
     snapshot = get_snapshot()
@@ -1442,7 +1487,7 @@ def use_keyboard_height() -> float:
     return use_subscription(platform_metrics.subscribe, platform_metrics.get_keyboard_height)
 
 
-def use_color_scheme() -> str:
+def use_color_scheme() -> ColorScheme:
     """Return the effective color scheme and re-render when it changes.
 
     Equivalent to React Native's ``useColorScheme``. The system value
@@ -1458,7 +1503,10 @@ def use_color_scheme() -> str:
     """
     from . import appearance
 
-    return use_subscription(appearance.subscribe, appearance.get_color_scheme)
+    def current() -> ColorScheme:
+        return "dark" if appearance.get_color_scheme() == "dark" else "light"
+
+    return use_subscription(appearance.subscribe, current)
 
 
 # ======================================================================
@@ -1471,7 +1519,7 @@ class Context(Generic[T]):
 
     Provide a value with [`Provider`][pythonnative.hooks.Context.Provider]
     and read it with [`use_context`][pythonnative.use_context]. A
-    ``Context`` is itself an element type: ``ctx.Provider(value, ...)``
+    ``Context`` is itself an element type: ``ctx.Provider(..., value=v)``
     returns an element whose ``type`` is ``ctx``.
 
     Context is *reactive*: when a Provider's value changes, every
@@ -1489,19 +1537,21 @@ class Context(Generic[T]):
         self.default = default
         self.name = name
 
-    def Provider(self, value: T, *children: Node, key: Optional[str] = None) -> Element:
+    def Provider(self, *children: Node, value: T, key: Optional[str] = None) -> Element:
         """Provide ``value`` to every descendant of ``children``.
 
         A Provider contributes no native view of its own; its children
-        mount directly into the surrounding native parent.
+        mount directly into the surrounding native parent. Like every
+        other container, children are positional and ``value`` is a
+        keyword argument.
 
         When ``value`` differs from the previous render (identity, then
         ``==``), every descendant that read the context re-renders,
         including descendants of memoized components that skipped.
 
         Args:
-            value: Value made available to descendants.
             *children: Subtree(s) under which the provider applies.
+            value: Value made available to descendants (keyword-only).
             key: Stable identity for keyed reconciliation.
 
         Example:
@@ -1510,7 +1560,7 @@ class Context(Generic[T]):
 
             @pn.component
             def App():
-                return Theme.Provider({"primary": "#FF0000"}, Header(), Body())
+                return Theme.Provider(Header(), Body(), value={"primary": "#FF0000"})
             ```
         """
         return Element(self, {"value": value}, children, key=key)
@@ -1650,7 +1700,9 @@ def use_back_handler(handler: Callable[[], bool]) -> None:
 
 
 __all__ = [
+    "ColorScheme",
     "Context",
+    "Deps",
     "HookState",
     "MutationCall",
     "MutationState",

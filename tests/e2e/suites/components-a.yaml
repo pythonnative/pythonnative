@@ -13,6 +13,7 @@ appId: ${APP_ID}
 - runFlow: ../flows/components/text.yaml
 - runFlow: ../flows/components/button.yaml
 - runFlow: ../flows/components/text_input.yaml
+- runFlow: ../flows/components/text_input_handle.yaml
 - runFlow: ../flows/components/image.yaml
 - runFlow: ../flows/components/icon.yaml
 - runFlow: ../flows/components/svg.yaml
@@ -22,3 +23,4 @@ appId: ${APP_ID}
 - runFlow: ../flows/components/activity_indicator.yaml
 - runFlow: ../flows/components/view_column_row.yaml
 - runFlow: ../flows/components/scroll_view.yaml
+- runFlow: ../flows/components/scroll_view_handle.yaml

@@ -1,4 +1,6 @@
-# Tests SectionList renders section headers and items together.
+# Tests SectionList renders section headers and rows, and that
+# sticky_section_headers keeps the current section's header on screen
+# while its rows scroll underneath.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/section_list.py
 # Source under test: src/pythonnative/components/lists.py :: SectionList
@@ -11,7 +13,20 @@ appId: ${APP_ID}
       DEMO_TITLE: SectionList
 - assertVisible: "Section Alpha"
 - assertVisible: "Alpha row 1"
-- assertVisible: "Section Beta"
+# Scroll inside the 240 dp list box (a swipe anchored on a row, not the
+# screen center; see AGENTS.md "Scrolling fixed-height containers").
+- swipe:
+    from:
+      text: "Alpha row 3"
+    direction: UP
+    duration: 400
+# Alpha row 1 has scrolled out, but the Alpha header is still pinned by
+# the sticky overlay (or Beta's header has taken over if the swipe went
+# far enough); either way a section header is on screen.
+- extendedWaitUntil:
+    visible:
+      text: "Section (Alpha|Beta)"
+    timeout: 5000
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

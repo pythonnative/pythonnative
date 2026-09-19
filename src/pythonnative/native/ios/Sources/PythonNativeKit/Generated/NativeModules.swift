@@ -1,5 +1,42 @@
 import Foundation
 
+public protocol AccessibilityInfoImplementation {
+    init()
+    func `announce`(`message`: String) throws -> Void
+    func `is_reduce_motion_enabled`() throws -> Bool
+    func `is_screen_reader_enabled`() throws -> Bool
+    func `set_accessibility_focus`(`tag`: Int64) throws -> Void
+}
+
+public final class AccessibilityInfoModuleAdapter<Implementation: AccessibilityInfoImplementation>: PNNativeModule {
+    public static var name: String { "AccessibilityInfo" }
+    private let implementation: Implementation
+    public init() { implementation = Implementation() }
+    public init(implementation: Implementation) { self.implementation = implementation }
+    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
+        do {
+            guard PNContracts.validateModule("AccessibilityInfo", method, args) else { throw NativeDecodeError.invalid("AccessibilityInfo.\(method)") }
+            switch method {
+            case "announce":
+                let `message` = try PNValues.decode(String.self, args["message"])
+                try implementation.`announce`(`message`: `message`); promise.resolve(nil)
+            case "is_reduce_motion_enabled":
+                promise.resolve(try PNValues.checkedEncode(implementation.`is_reduce_motion_enabled`()))
+            case "is_screen_reader_enabled":
+                promise.resolve(try PNValues.checkedEncode(implementation.`is_screen_reader_enabled`()))
+            case "set_accessibility_focus":
+                let `tag` = try PNValues.decode(Int64.self, args["tag"])
+                try implementation.`set_accessibility_focus`(`tag`: `tag`); promise.resolve(nil)
+            default: promise.reject("Unknown method", code: "unknown_method")
+            }
+        } catch { promise.reject(error) }
+    }
+}
+
+public enum AccessibilityInfoEvents {
+    public static func `change`(_ payload: [String: PNJSONValue]) { PNModuleEvents.emit(module: "AccessibilityInfo", event: "change", payload: PNValues.encode(payload)) }
+}
+
 public protocol AlertImplementation {
     init()
     func `present`(`title`: String, `message`: String?, `buttons`: [[String: PNJSONValue]], `style`: String, completion: @escaping (Result<Int64, Error>) -> Void) -> (() -> Void)?
@@ -120,6 +157,10 @@ public final class BatteryModuleAdapter<Implementation: BatteryImplementation>: 
             }
         } catch { promise.reject(error) }
     }
+}
+
+public enum BatteryEvents {
+    public static func `change`(_ payload: [String: PNJSONValue]) { PNModuleEvents.emit(module: "Battery", event: "change", payload: PNValues.encode(payload)) }
 }
 
 public protocol BiometricsImplementation {
@@ -322,6 +363,35 @@ public final class ImagesModuleAdapter<Implementation: ImagesImplementation>: PN
     }
 }
 
+public protocol KeyboardImplementation {
+    init()
+    func `dismiss`() throws -> Void
+    func `is_visible`() throws -> Bool
+}
+
+public final class KeyboardModuleAdapter<Implementation: KeyboardImplementation>: PNNativeModule {
+    public static var name: String { "Keyboard" }
+    private let implementation: Implementation
+    public init() { implementation = Implementation() }
+    public init(implementation: Implementation) { self.implementation = implementation }
+    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
+        do {
+            guard PNContracts.validateModule("Keyboard", method, args) else { throw NativeDecodeError.invalid("Keyboard.\(method)") }
+            switch method {
+            case "dismiss":
+                try implementation.`dismiss`(); promise.resolve(nil)
+            case "is_visible":
+                promise.resolve(try PNValues.checkedEncode(implementation.`is_visible`()))
+            default: promise.reject("Unknown method", code: "unknown_method")
+            }
+        } catch { promise.reject(error) }
+    }
+}
+
+public enum KeyboardEvents {
+    public static func `change`(_ payload: [String: PNJSONValue]) { PNModuleEvents.emit(module: "Keyboard", event: "change", payload: PNValues.encode(payload)) }
+}
+
 public protocol LinkingImplementation {
     init()
     func `can_open_url`(`url`: String) throws -> Bool
@@ -354,6 +424,35 @@ public final class LinkingModuleAdapter<Implementation: LinkingImplementation>: 
 
 public enum LinkingEvents {
     public static func `url`(_ payload: String) { PNModuleEvents.emit(module: "Linking", event: "url", payload: PNValues.encode(payload)) }
+}
+
+public protocol LocalizationImplementation {
+    init()
+    func `get_locales`() throws -> [[String: PNJSONValue]]
+    func `get_timezone`() throws -> String
+}
+
+public final class LocalizationModuleAdapter<Implementation: LocalizationImplementation>: PNNativeModule {
+    public static var name: String { "Localization" }
+    private let implementation: Implementation
+    public init() { implementation = Implementation() }
+    public init(implementation: Implementation) { self.implementation = implementation }
+    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
+        do {
+            guard PNContracts.validateModule("Localization", method, args) else { throw NativeDecodeError.invalid("Localization.\(method)") }
+            switch method {
+            case "get_locales":
+                promise.resolve(try PNValues.checkedEncode(implementation.`get_locales`()))
+            case "get_timezone":
+                promise.resolve(try PNValues.checkedEncode(implementation.`get_timezone`()))
+            default: promise.reject("Unknown method", code: "unknown_method")
+            }
+        } catch { promise.reject(error) }
+    }
+}
+
+public enum LocalizationEvents {
+    public static func `change`(_ payload: [String: PNJSONValue]) { PNModuleEvents.emit(module: "Localization", event: "change", payload: PNValues.encode(payload)) }
 }
 
 public protocol LocationImplementation {
@@ -406,6 +505,10 @@ public final class NetInfoModuleAdapter<Implementation: NetInfoImplementation>: 
             }
         } catch { promise.reject(error) }
     }
+}
+
+public enum NetInfoEvents {
+    public static func `change`(_ payload: [String: PNJSONValue]) { PNModuleEvents.emit(module: "NetInfo", event: "change", payload: PNValues.encode(payload)) }
 }
 
 public protocol NotificationsImplementation {
@@ -605,6 +708,36 @@ public final class StorageModuleAdapter<Implementation: StorageImplementation>: 
                 let `key` = try PNValues.decode(String.self, args["key"])
                 let `value` = try PNValues.decode(String.self, args["value"])
                 try implementation.`set`(`key`: `key`, `value`: `value`); promise.resolve(nil)
+            default: promise.reject("Unknown method", code: "unknown_method")
+            }
+        } catch { promise.reject(error) }
+    }
+}
+
+public protocol WebViewsImplementation {
+    init()
+    func `eval_js`(`tag`: Int64, `script`: String, completion: @escaping (Result<String, Error>) -> Void) -> (() -> Void)?
+}
+
+public final class WebViewsModuleAdapter<Implementation: WebViewsImplementation>: PNNativeModule {
+    public static var name: String { "WebViews" }
+    private let implementation: Implementation
+    public init() { implementation = Implementation() }
+    public init(implementation: Implementation) { self.implementation = implementation }
+    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
+        do {
+            guard PNContracts.validateModule("WebViews", method, args) else { throw NativeDecodeError.invalid("WebViews.\(method)") }
+            switch method {
+            case "eval_js":
+                let `tag` = try PNValues.decode(Int64.self, args["tag"])
+                let `script` = try PNValues.decode(String.self, args["script"])
+                let cancellation = implementation.`eval_js`(`tag`: `tag`, `script`: `script`) { result in
+                    switch result {
+                    case .success(let value): do { promise.resolve(try PNValues.checkedEncode(value)) } catch { promise.reject(error) }
+                    case .failure(let error): promise.reject(error)
+                    }
+                }
+                if let cancellation = cancellation { promise.onCancel(cancellation) }
             default: promise.reject("Unknown method", code: "unknown_method")
             }
         } catch { promise.reject(error) }

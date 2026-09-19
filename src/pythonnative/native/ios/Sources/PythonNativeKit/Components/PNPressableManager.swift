@@ -19,22 +19,29 @@ public final class PNPressableManager: PNComponentManager {
         let handler = PNPressHandler(view: view)
         PNViewState.existing(for: view)?.retained.append(handler)
         handler.install()
+        // The initial `apply` ran before the recognizers existed.
+        if let delay = PNProps.double(PNProps.value(props, "delay_long_press")) {
+            handler.longPress.minimumPressDuration = max(0.05, delay / 1000)
+        }
         return view
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! PressableProps(props)
         PNViewStyler.applyCommon(view, props)
-        if PNProps.has(props, "disabled") {
-            view.isUserInteractionEnabled = !(PNProps.bool(PNProps.value(props, "disabled")) ?? false)
+        if typed.has_disabled {
+            let disabled = typed.disabled ?? false
+            // A disabled pressable ignores every press callback and reads as
+            // disabled to assistive technology; it stays visible and laid out.
+            PNViewState.existing(for: view)?.extras["press_disabled"] = disabled
+            if disabled { view.accessibilityTraits.insert(.notEnabled) } else { view.accessibilityTraits.remove(.notEnabled) }
         }
-        if PNProps.has(props, "disabled") {
-            view.isUserInteractionEnabled = !(PNProps.bool(PNProps.value(props, "disabled")) ?? false)
-        }
-        if let delay = PNProps.double(PNProps.value(props, "delay_long_press")),
+        if typed.has_delay_long_press, let delay = typed.delay_long_press,
            let handler = PNViewState.existing(for: view)?.retained.compactMap({ $0 as? PNPressHandler }).first
         {
             handler.longPress.minimumPressDuration = max(0.05, delay / 1000)
         }
+        // `android_ripple` is Android-only and ignored here.
     }
 }
 
@@ -67,18 +74,22 @@ final class PNPressHandler: NSObject, UIGestureRecognizerDelegate {
         view.flatMap { PNViewState.existing(for: $0)?.props } ?? [:]
     }
 
+    private var disabled: Bool {
+        view.flatMap { PNViewState.existing(for: $0)?.flag("press_disabled") } ?? false
+    }
+
     @objc private func onTap(_ recognizer: UITapGestureRecognizer) {
-        guard let view = view, recognizer.state == .ended else { return }
+        guard let view = view, recognizer.state == .ended, !disabled else { return }
         PNEvents.emit(view, "on_press")
     }
 
     @objc private func onLongPress(_ recognizer: UILongPressGestureRecognizer) {
-        guard let view = view, recognizer.state == .began else { return }
+        guard let view = view, recognizer.state == .began, !disabled else { return }
         PNEvents.emit(view, "on_long_press")
     }
 
     @objc private func onTouch(_ recognizer: UILongPressGestureRecognizer) {
-        guard let view = view else { return }
+        guard let view = view, !disabled else { return }
         switch recognizer.state {
         case .began:
             feedback(pressed: true)

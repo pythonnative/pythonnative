@@ -49,7 +49,7 @@ def test_async_provider_environment_survives_await() -> None:
         await asyncio.sleep(0)
         return pn.Text(pn.use_context(context))
 
-    result = render(context.Provider("provided", pn.Suspense(Child(), fallback=pn.Text("loading"))))
+    result = render(context.Provider(pn.Suspense(Child(), fallback=pn.Text("loading")), value="provided"))
     assert result.get_by_text("provided")
     result.unmount()
 
@@ -73,8 +73,11 @@ def test_urgent_state_rebases_after_deferred_updates_and_setters_are_stable() ->
         rec.mount(Counter())
         handles["start"](lambda: handles["set"](lambda value: value + 10))
         handles["set"](lambda value: value + 1)
+        assert snapshots[-1] == (0, False), "setters schedule the flush for the next loop turn"
+        await asyncio.sleep(0)
         assert snapshots[-1] == (1, True)
         rec.transitions.flush()
+        await asyncio.sleep(0)
         assert snapshots[-1] == (11, False)
         assert all(setter is setters[0] for setter in setters)
         rec.unmount()
@@ -96,7 +99,7 @@ def test_failed_render_keeps_committed_tree_refs_events_and_effects() -> None:
     backend = FakeBackend()
     rec = Reconciler(backend)
     rec.mount(pn.Column(pn.Button("old", ref=old_ref, on_press=old_callback)))
-    tag = old_ref._pn_tag
+    tag = old_ref.current.tag
     before = old_ref.current
     with pytest.raises(ValueError, match="render rejected"):
         rec.reconcile(pn.Column(pn.Button("new", ref=new_ref, on_press=new_callback), Failing()))
@@ -275,9 +278,12 @@ def test_failed_render_preserves_accepted_async_work() -> None:
         gate.set()
         for _ in range(8):
             await asyncio.sleep(0)
-        assert started == ["accepted"]
-        assert canceled == []
+        # Async bodies step eagerly, so the rejected sibling's body did start;
+        # the failed pass cancelled it before it could publish anything.
+        assert started == ["accepted", "rejected"]
+        assert canceled == ["rejected"]
         assert any(view.text == "accepted" for view in backend.views.values())
+        assert all(view.text != "rejected" for view in backend.views.values())
         rec.unmount()
 
     run_blocking(exercise(), timeout=2)

@@ -1,10 +1,9 @@
 """Batched mutation protocol between the reconciler and native backends.
 
-The reconciler no longer talks to the native layer one call at a time.
-Instead, every commit pass produces an ordered list of small mutation
-ops referencing integer **tags** (stable per-view identifiers), and the
+Every commit pass produces an ordered list of small mutation ops
+referencing integer **tags** (stable per-view identifiers), and the
 whole list is applied in a single
-[`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]
+[`apply_mutations`][pythonnative.native_views.bridge_backend.BridgeBackend.apply_mutations]
 call. This mirrors React Native's Fabric mounting layer: the diff phase
 is pure, and the native side sees one coherent transaction per commit.
 
@@ -14,9 +13,8 @@ Why tags instead of view objects?
   reference views directly.
 - Tags give the native side a stable identity to key its own view
   registry, event routing, and animation bookkeeping on.
-- A flat list of `(op, tag, payload)` tuples is trivially serializable,
-  which keeps the door open for applying mutations from a background
-  thread or through a single JNI/ObjC crossing in the future.
+- A flat list of `(op, tag, payload)` tuples serializes directly into
+  the bridge's transaction envelope, so one commit is one crossing.
 
 Op ordering rules (the reconciler guarantees these):
 
@@ -116,9 +114,9 @@ class InsertOp:
 class DestroyOp:
     """Release the native view registered under ``tag``.
 
-    The registry drops its tag record and calls the handler's
-    ``destroy`` hook so platform resources (listeners, timers, image
-    loads) can be released eagerly instead of waiting for GC.
+    The backend drops its tag record and the native component manager
+    releases platform resources (listeners, timers, image loads)
+    eagerly instead of waiting for GC.
 
     Attributes:
         tag: Unique integer identity of the view to destroy.

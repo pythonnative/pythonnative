@@ -23,7 +23,22 @@ from . import PROTOCOL_VERSION, codec
 __all__ = ["BROWSER_MODULES", "WebTransport"]
 
 BROWSER_MODULES = frozenset(
-    {"Host", "Layout", "Alert", "Clipboard", "Linking", "Share", "Haptics", "NetInfo", "AppState", "Device"}
+    {
+        "Host",
+        "Layout",
+        "Alert",
+        "Clipboard",
+        "Linking",
+        "Share",
+        "Haptics",
+        "NetInfo",
+        "AppState",
+        "Device",
+        "Keyboard",
+        "AccessibilityInfo",
+        "Localization",
+        "WebViews",
+    }
 )
 """Native modules the preview page implements; the rest use Python fallbacks."""
 
@@ -359,12 +374,16 @@ class WebTransport:
         pointer = int(info.get("id", 0))
         x = float(info.get("x", 0.0))
         y = float(info.get("y", 0.0))
+        # The page sends window coordinates beside the view-local ones; the
+        # arbiter reports them as ``GestureEvent.absolute_x`` / ``absolute_y``.
+        absolute_x = _optional_float(info.get("absolute_x"))
+        absolute_y = _optional_float(info.get("absolute_y"))
         if phase == "down":
-            arbiter.pointer_down(pointer, x, y, t)
+            arbiter.pointer_down(pointer, x, y, t, absolute_x=absolute_x, absolute_y=absolute_y)
         elif phase == "move":
-            arbiter.pointer_move(pointer, x, y, t)
+            arbiter.pointer_move(pointer, x, y, t, absolute_x=absolute_x, absolute_y=absolute_y)
         elif phase == "up":
-            arbiter.pointer_up(pointer, x, y, t)
+            arbiter.pointer_up(pointer, x, y, t, absolute_x=absolute_x, absolute_y=absolute_y)
         elif phase == "cancel":
             arbiter.cancel(t)
         elif phase == "clear":
@@ -459,6 +478,14 @@ class WebTransport:
 
 _UNBOUNDED = 1e6
 """Wire sentinel for an unconstrained measure axis (matches the native runtimes)."""
+
+
+def _optional_float(value: Any) -> Optional[float]:
+    """A finite float from the wire, or ``None`` when the page didn't send one."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    f = float(value)
+    return f if f == f and f not in (float("inf"), float("-inf")) else None
 
 
 def _finite(value: Any) -> float:

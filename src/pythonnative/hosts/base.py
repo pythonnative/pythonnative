@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import os
 import sys
 import traceback
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
@@ -18,25 +17,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from .. import diagnostics
 from ..element import Element
 
-__all__ = ["ScreenHost", "import_component", "log_pn", "debug_enabled"]
-
-MAX_RENDER_PASSES = 25
-_DEBUG_ENV = "PYTHONNATIVE_DEBUG"
-
-
-def debug_enabled() -> bool:
-    """Return whether the ``PYTHONNATIVE_DEBUG`` environment variable turns on host diagnostics."""
-    return os.environ.get(_DEBUG_ENV, "").lower() in {"1", "true", "yes", "on"}
-
-
-def log_pn(msg: str) -> None:
-    """Emit optional diagnostics when ``PYTHONNATIVE_DEBUG`` is enabled."""
-    if not debug_enabled():
-        return
-    try:
-        print(f"[PN] {msg}", flush=True)
-    except Exception:
-        pass
+__all__ = ["ScreenHost", "import_component"]
 
 
 # ======================================================================
@@ -210,37 +191,13 @@ class ScreenHost:
                 raise
             self.show_redbox(exc, phase="mount")
 
-    def on_start(self) -> None:
-        """Handle the platform's start event (no-op by default)."""
-        pass
-
     def on_resume(self) -> None:
         """Mark the screen focused and notify focus listeners."""
         self.set_focused(True)
 
-    def on_layout(self) -> None:
-        """Handle a native layout pass (no-op by default; platforms sync the viewport here)."""
-        pass
-
     def on_pause(self) -> None:
         """Mark the screen unfocused and notify focus listeners."""
         self.set_focused(False)
-
-    def on_stop(self) -> None:
-        """Handle the platform's stop event (no-op by default)."""
-        pass
-
-    def on_restart(self) -> None:
-        """Handle the platform's restart event (no-op by default)."""
-        pass
-
-    def on_save_instance_state(self) -> None:
-        """Handle the platform's save-state request (no-op by default)."""
-        pass
-
-    def on_restore_instance_state(self) -> None:
-        """Handle the platform's restore-state event (no-op by default)."""
-        pass
 
     def on_destroy(self) -> None:
         """Tear down: unmount (running effect cleanups), release native views."""
@@ -251,7 +208,7 @@ class ScreenHost:
             try:
                 reconciler.unmount()
             except Exception:
-                log_pn("on_destroy: reconciler.unmount() failed")
+                diagnostics.log("on_destroy: reconciler.unmount() failed")
         root, self.root_native_view = self.root_native_view, None
         if root is not None:
             try:
@@ -322,10 +279,10 @@ class ScreenHost:
         return HostRoot(self.component(), host=self)
 
     def _new_reconciler(self) -> Any:
-        from ..native_views import get_registry
+        from ..native_views import get_backend
         from ..reconciler import Reconciler
 
-        reconciler = Reconciler(get_registry())
+        reconciler = Reconciler(get_backend())
         reconciler.on_render_requested = self.request_render
         return reconciler
 
@@ -367,7 +324,7 @@ class ScreenHost:
         self._re_render()
 
     def _re_render(self) -> None:
-        log_pn("_re_render: starting local render pass")
+        diagnostics.log("_re_render: starting local render pass")
         try:
             self._is_rendering = True
             try:
@@ -380,22 +337,25 @@ class ScreenHost:
             if not diagnostics.is_dev():
                 raise
             self.show_redbox(exc, phase="render")
-        log_pn("_re_render: done")
+        diagnostics.log("_re_render: done")
 
     def _commit_dirty(self) -> None:
         new_root = self.reconciler.flush_dirty()
         if new_root is not self.root_native_view:
-            log_pn("_commit_dirty: root view changed; reattaching")
+            diagnostics.log("_commit_dirty: root view changed; reattaching")
             self._detach_root(self.root_native_view)
             self.root_native_view = new_root
             self._attach_root(new_root)
 
     def _drain_renders(self) -> None:
-        """Flush renders queued by effects; capped to break runaway loops."""
-        for i in range(MAX_RENDER_PASSES):
-            if not self._render_queued:
-                break
-            log_pn(f"_drain_renders: pass #{i + 1}")
+        """Flush renders requested while this host was rendering.
+
+        The reconciler drains updates requested during its own pass and
+        raises ``RuntimeError("Too many re-renders")`` on a storm, so no
+        second cap is needed here.
+        """
+        while self._render_queued:
+            diagnostics.log("_drain_renders: flushing a queued render")
             self._render_queued = False
             self._commit_dirty()
 
@@ -409,7 +369,7 @@ class ScreenHost:
 
     def show_redbox(self, exc: BaseException, phase: str = "render") -> None:
         """Mount the dev error overlay over this screen (from any thread)."""
-        log_pn(f"show_redbox: {type(exc).__name__} during {phase}")
+        diagnostics.log(f"show_redbox: {type(exc).__name__} during {phase}")
         try:
             print(f"[PN] {phase} error:", file=sys.stderr)
             traceback.print_exception(type(exc), exc, exc.__traceback__)
@@ -419,10 +379,10 @@ class ScreenHost:
         def mount() -> None:
             try:
                 self.clear_redbox(reattach=False)
-                from ..native_views import get_registry
+                from ..native_views import get_backend
                 from ..reconciler import Reconciler
 
-                redbox = Reconciler(get_registry())
+                redbox = Reconciler(get_backend())
                 element = _redbox_element(exc, phase, lambda: self.clear_redbox())
                 root = redbox.mount(element)
                 width, height = self.reconciler.viewport_size if self.reconciler is not None else (0.0, 0.0)
@@ -484,7 +444,7 @@ class ScreenHost:
         targets = ModuleReloader.expand_reload_targets(requested, self.component_path)
         reloaded = ModuleReloader.reload_modules(targets)
         if not reloaded:
-            log_pn(f"reload: no modules could be reloaded from {targets!r}")
+            diagnostics.log(f"reload: no modules could be reloaded from {targets!r}")
             return "none"
         return self.refresh(reloaded)
 
@@ -536,7 +496,7 @@ class ScreenHost:
                 self.root_native_view = new_root
                 self._attach_root(new_root)
         except Exception as exc:
-            log_pn(f"fast refresh: render failed after swap: {exc!r}; falling back to remount")
+            diagnostics.log(f"fast refresh: render failed after swap: {exc!r}; falling back to remount")
             return False
         finally:
             self._is_rendering = False

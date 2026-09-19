@@ -49,6 +49,23 @@ Hardware / media:
 - [`Biometrics`][pythonnative.native_modules.Biometrics]: Face ID /
   Touch ID / fingerprint auth.
 
+Device and environment:
+
+- [`Device`][pythonnative.native_modules.Device]: static device and app
+  facts as a [`DeviceInfo`][pythonnative.native_modules.DeviceInfo].
+- [`Dimensions`][pythonnative.native_modules.Dimensions] /
+  [`PixelRatio`][pythonnative.native_modules.PixelRatio]: window and
+  screen size, density, and pixel rounding.
+- [`Keyboard`][pythonnative.native_modules.Keyboard]: keyboard
+  visibility, dismissal, and transitions.
+- [`Localization`][pythonnative.native_modules.Localization] +
+  [`use_locales`][pythonnative.use_locales]: preferred locales, layout
+  direction, and time zone.
+- [`AccessibilityInfo`][pythonnative.native_modules.AccessibilityInfo] +
+  [`use_screen_reader_enabled`][pythonnative.use_screen_reader_enabled] /
+  [`use_reduce_motion`][pythonnative.use_reduce_motion]: screen-reader
+  and reduce-motion state, announcements, focus.
+
 System integration:
 
 - [`FileSystem`][pythonnative.native_modules.FileSystem]: app-scoped
@@ -76,15 +93,20 @@ Reactive state (with hooks):
   [`use_net_info`][pythonnative.use_net_info]: connectivity.
 """
 
+from .accessibility_info import AccessibilityEvent, AccessibilityInfo, use_reduce_motion, use_screen_reader_enabled
 from .app_state import AppState, use_app_state
 from .battery import Battery
 from .biometrics import Biometrics
 from .camera import Camera
 from .clipboard import Clipboard
+from .device import Device, DeviceInfo
+from .dimensions import Dimensions, DimensionsEvent, PixelRatio
 from .file_system import FileSystem
 from .haptics import Haptics, Vibration
 from .images import Images, ImageSize
+from .keyboard import Keyboard, KeyboardEvent
 from .linking import Linking
+from .localization import Locale, Localization, use_locales
 from .location import Location
 from .net_info import NetInfo, use_net_info
 from .notifications import Notifications
@@ -101,23 +123,34 @@ from .secure_store import SecureStore
 from .share import Share
 
 __all__ = [
+    "AccessibilityEvent",
+    "AccessibilityInfo",
     "AppState",
     "Battery",
     "Biometrics",
     "BridgeModule",
     "Camera",
     "Clipboard",
+    "Device",
+    "DeviceInfo",
+    "Dimensions",
+    "DimensionsEvent",
     "FileSystem",
     "Haptics",
     "ImageSize",
     "Images",
+    "Keyboard",
+    "KeyboardEvent",
     "Linking",
+    "Locale",
+    "Localization",
     "Location",
     "NativeModule",
     "NativeModuleError",
     "NetInfo",
     "Notifications",
     "Permissions",
+    "PixelRatio",
     "PythonModule",
     "SecureStore",
     "Share",
@@ -125,5 +158,8 @@ __all__ = [
     "native_module",
     "register_python_module",
     "use_app_state",
+    "use_locales",
     "use_net_info",
+    "use_reduce_motion",
+    "use_screen_reader_enabled",
 ]

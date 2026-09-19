@@ -4,9 +4,9 @@ KeyboardAvoidingView "height" behavior."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, List, Tuple
 
-from pythonnative.components import KeyboardAvoidingView, Pressable, Text, View
+from pythonnative.components import KeyboardAvoidingView, LayoutEvent, Pressable, Text, View
 from pythonnative.element import Element
 from pythonnative.reconciler import Reconciler
 from pythonnative.style import Style
@@ -82,7 +82,7 @@ def test_uniform_hit_slop_on_view() -> None:
 
 
 def test_on_layout_fires_with_frame_after_mount() -> None:
-    frames: List[Dict[str, float]] = []
+    frames: List[LayoutEvent] = []
     # The measured view is nested: the native root's frame is owned by
     # the screen host and never collected.
     _, _, backend = _mount(
@@ -94,12 +94,13 @@ def test_on_layout_fires_with_frame_after_mount() -> None:
         )
     )
     assert len(frames) == 1
-    assert frames[0]["width"] == 120.0
-    assert frames[0]["height"] == 80.0
+    assert isinstance(frames[0], LayoutEvent)
+    assert frames[0].width == 120.0
+    assert frames[0].height == 80.0
 
 
 def test_on_layout_fires_again_only_when_frame_changes() -> None:
-    frames: List[Dict[str, float]] = []
+    frames: List[LayoutEvent] = []
 
     def build(width: float) -> Element:
         return View(View(on_layout=frames.append, style={"width": width, "height": 50}))
@@ -112,7 +113,7 @@ def test_on_layout_fires_again_only_when_frame_changes() -> None:
 
     rec.reconcile(build(200))
     assert len(frames) == 2
-    assert frames[1]["width"] == 200.0
+    assert frames[1].width == 200.0
 
 
 def test_on_layout_never_reaches_native_props() -> None:

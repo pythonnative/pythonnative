@@ -53,7 +53,7 @@ class BatteryModule : BatteryImplementation {
                 val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
                 val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
                 val fraction = if (level >= 0 && scale > 0) level.toDouble() / scale.toDouble() else -1.0
-                ModuleEvents.emit(name, "change", JSONObject().put("level", fraction).put("state", stateName(status)))
+                BatteryEvents.change(mapOf("level" to PNJSONValue(fraction), "state" to PNJSONValue(stateName(status))))
             }
         }
         try {
@@ -136,7 +136,7 @@ class NetInfoModule : NetInfoImplementation {
             val current = snapshot()
             if (last?.toString() == current.toString()) return@post
             last = current
-            ModuleEvents.emit(name, "change", current)
+            NetInfoEvents.change(current.keys().asSequence().associateWith { PNJSONValue(current.get(it)) })
         }
     }
 

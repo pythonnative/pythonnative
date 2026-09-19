@@ -1,0 +1,56 @@
+# Tests Keyboard.is_visible / add_listener / dismiss: focusing the field
+# shows the keyboard (reported to Python on Android) and dismiss() from
+# Python resigns it (on_blur fires).
+#
+# Demo screen: examples/e2e-suite/app/screens/device/keyboard.py
+# Source under test: src/pythonnative/native_modules/keyboard.py :: Keyboard
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Device
+      DEMO_TITLE: Keyboard
+- assertVisible: "Focused: OFF"
+- assertVisible: "Dismiss calls: 0"
+- tapOn: "Focus me for the keyboard"
+- extendedWaitUntil:
+    visible: "Focused: ON"
+    timeout: 5000
+# The iOS simulator only shows its software keyboard when it isn't using
+# the host's hardware keyboard, so the "visible" readout is checked while
+# the keyboard is up on Android only, and after dismiss on both.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible: "Keyboard visible: yes"
+          timeout: 5000
+      - assertVisible: "Last height positive: yes"
+# The button sits above the field, but on a short screen (CI's Android
+# emulator is 320x640) the page may scroll it away to show the field.
+- scrollUntilVisible:
+    element: "Dismiss keyboard"
+    direction: UP
+    timeout: 15000
+    centerElement: false
+- tapOn: "Dismiss keyboard"
+- scrollUntilVisible:
+    element: "Dismiss calls: .*"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- extendedWaitUntil:
+    visible: "Dismiss calls: 1"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "Focused: OFF"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "Keyboard visible: no"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Device

@@ -2,10 +2,11 @@ import UIKit
 
 /// `ScrollView`: a `UIScrollView` wrapping one layout-engine-sized child.
 ///
-/// Scroll offsets are reported through `on_scroll` with
-/// `{"x", "y", "extent", "range", "content_width", "content_height"}`.
-/// Commands: `scroll_to_offset`, `scroll_to_end`, `get_scroll_offset`,
-/// `flash_scroll_indicators`.
+/// Scroll events (`on_scroll`, `on_scroll_begin_drag`, `on_scroll_end_drag`,
+/// `on_momentum_scroll_end`) carry exactly the `ScrollEvent` record:
+/// `{"x", "y", "content_width", "content_height", "viewport_width",
+/// "viewport_height"}`. Commands: `scroll_to_offset`, `scroll_to_end`,
+/// `get_scroll_offset`, `flash_scroll_indicators`.
 public final class PNScrollViewManager: PNComponentManager {
     public override func makeView(props: [String: Any]) -> UIView {
         let scroll = UIScrollView(frame: .zero)
@@ -19,6 +20,10 @@ public final class PNScrollViewManager: PNComponentManager {
             let delegate = PNScrollDelegate()
             scroll.delegate = delegate
             PNViewState.existing(for: scroll)?.retained.append(delegate)
+            let tap = UITapGestureRecognizer(target: delegate, action: #selector(PNScrollDelegate.backgroundTapped(_:)))
+            tap.cancelsTouchesInView = false
+            tap.delegate = delegate
+            scroll.addGestureRecognizer(tap)
         }
         return view
     }
@@ -26,7 +31,7 @@ public final class PNScrollViewManager: PNComponentManager {
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
         let typed = try! ScrollViewProps(props)
 
-        guard let scroll = view as? UIScrollView else { return }
+        guard let scroll = view as? UIScrollView, let state = PNViewState.existing(for: scroll) else { return }
         PNViewStyler.applyCommon(scroll, props)
         if typed.has_refresh_control {
             applyRefresh(scroll, PNProps.value(props, "refresh_control"))
@@ -42,11 +47,12 @@ public final class PNScrollViewManager: PNComponentManager {
         if typed.has_bounces {
             scroll.bounces = typed.bounces ?? true
         }
-        if PNProps.has(props, "scroll_enabled") {
-            scroll.isScrollEnabled = PNProps.bool(PNProps.value(props, "scroll_enabled")) ?? true
+        if typed.has_scroll_enabled {
+            scroll.isScrollEnabled = typed.scroll_enabled ?? true
         }
-        if PNProps.has(props, "horizontal") {
-            let horizontal = PNProps.bool(PNProps.value(props, "horizontal")) ?? false
+        if typed.has_horizontal {
+            let horizontal = typed.horizontal ?? false
+            state.extras["horizontal"] = horizontal
             scroll.alwaysBounceHorizontal = horizontal
             scroll.alwaysBounceVertical = !horizontal && scroll.refreshControl != nil
         }
@@ -57,24 +63,28 @@ public final class PNScrollViewManager: PNComponentManager {
             default: scroll.keyboardDismissMode = .none
             }
         }
-        if PNProps.has(props, "content_inset") {
-            let inset = PNProps.dict(PNProps.value(props, "content_inset")) ?? [:]
-            scroll.contentInset = UIEdgeInsets(
-                top: CGFloat(PNProps.double(inset["top"]) ?? 0), left: CGFloat(PNProps.double(inset["left"]) ?? 0),
-                bottom: CGFloat(PNProps.double(inset["bottom"]) ?? 0), right: CGFloat(PNProps.double(inset["right"]) ?? 0)
-            )
+        if typed.has_keyboard_should_persist_taps {
+            state.extras["persist_taps"] = typed.keyboard_should_persist_taps?.rawValue ?? "never"
+        }
+        if typed.has_content_inset {
+            scroll.contentInset = PNScrollViewManager.edgeInsets(PNProps.value(props, "content_inset"))
         }
         if PNProps.has(props, "scroll_indicator_insets") {
-            let inset = PNProps.dict(PNProps.value(props, "scroll_indicator_insets")) ?? [:]
-            let insets = UIEdgeInsets(
-                top: CGFloat(PNProps.double(inset["top"]) ?? 0), left: CGFloat(PNProps.double(inset["left"]) ?? 0),
-                bottom: CGFloat(PNProps.double(inset["bottom"]) ?? 0), right: CGFloat(PNProps.double(inset["right"]) ?? 0)
-            )
+            let insets = PNScrollViewManager.edgeInsets(PNProps.value(props, "scroll_indicator_insets"))
             scroll.verticalScrollIndicatorInsets = insets
             scroll.horizontalScrollIndicatorInsets = insets
         }
-        if PNProps.has(props, "scroll_event_throttle") {
-            PNViewState.existing(for: scroll)?.extras["throttle"] = PNProps.double(PNProps.value(props, "scroll_event_throttle")) ?? 0
+        if typed.has_scroll_event_throttle {
+            state.extras["throttle"] = typed.scroll_event_throttle ?? 0
+        }
+        if typed.has_snap_to_interval {
+            state.extras["snap_interval"] = typed.snap_to_interval.map { max(0, $0) } as Any? ?? NSNull()
+        }
+        if typed.has_snap_to_alignment {
+            state.extras["snap_alignment"] = typed.snap_to_alignment?.rawValue ?? "start"
+        }
+        if typed.has_deceleration_rate {
+            scroll.decelerationRate = PNScrollViewManager.decelerationRate(PNProps.value(props, "deceleration_rate"))
         }
     }
 
@@ -91,7 +101,7 @@ public final class PNScrollViewManager: PNComponentManager {
             let bounds = scroll.bounds.size
             let targetY = max(0, content.height - bounds.height)
             let targetX = max(0, content.width - bounds.width)
-            let horizontal = content.width > bounds.width && content.height <= bounds.height
+            let horizontal = PNScrollViewManager.isHorizontal(scroll)
             scroll.setContentOffset(horizontal ? CGPoint(x: targetX, y: 0) : CGPoint(x: 0, y: targetY), animated: animated)
         case "get_scroll_offset":
             return ["x": Double(scroll.contentOffset.x), "y": Double(scroll.contentOffset.y)]
@@ -101,6 +111,63 @@ public final class PNScrollViewManager: PNComponentManager {
             break
         }
         return nil
+    }
+
+    // MARK: - Helpers
+
+    /// Whether the scroll view scrolls horizontally (the `horizontal` prop,
+    /// or the content shape when the prop is absent).
+    static func isHorizontal(_ scroll: UIScrollView) -> Bool {
+        if let flag = PNViewState.existing(for: scroll)?.extras["horizontal"] as? Bool { return flag }
+        let content = scroll.contentSize, bounds = scroll.bounds.size
+        return content.width > bounds.width && content.height <= bounds.height
+    }
+
+    /// `EdgeInsets` (`top`/`left`/`bottom`/`right` with the `all`,
+    /// `horizontal`, and `vertical` shorthands) to `UIEdgeInsets`.
+    public static func edgeInsets(_ value: Any?) -> UIEdgeInsets {
+        guard let dict = value as? [String: Any] else {
+            if let uniform = PNProps.double(value) { return UIEdgeInsets(top: CGFloat(uniform), left: CGFloat(uniform), bottom: CGFloat(uniform), right: CGFloat(uniform)) }
+            return .zero
+        }
+        let all = PNProps.double(dict["all"]) ?? 0
+        let horizontal = PNProps.double(dict["horizontal"]) ?? all
+        let vertical = PNProps.double(dict["vertical"]) ?? all
+        return UIEdgeInsets(
+            top: CGFloat(PNProps.double(dict["top"]) ?? vertical), left: CGFloat(PNProps.double(dict["left"]) ?? horizontal),
+            bottom: CGFloat(PNProps.double(dict["bottom"]) ?? vertical), right: CGFloat(PNProps.double(dict["right"]) ?? horizontal)
+        )
+    }
+
+    /// `deceleration_rate`: `"normal"`, `"fast"`, or a raw per-frame rate.
+    public static func decelerationRate(_ value: Any?) -> UIScrollView.DecelerationRate {
+        if let name = value as? String {
+            return name == "fast" ? .fast : .normal
+        }
+        if let rate = PNProps.double(value), rate.isFinite, rate > 0, rate < 1 {
+            return UIScrollView.DecelerationRate(rawValue: CGFloat(rate))
+        }
+        return .normal
+    }
+
+    /// The offset a drag ending at `proposed` with `velocity` settles on
+    /// for `snap_to_interval` / `snap_to_alignment`.
+    public static func snapTarget(proposed: CGFloat, velocity: CGFloat, interval: CGFloat, alignment: String, viewport: CGFloat, maximum: CGFloat) -> CGFloat {
+        guard interval > 0 else { return proposed }
+        let shift: CGFloat
+        switch alignment {
+        case "center": shift = (viewport - interval) / 2
+        case "end": shift = viewport - interval
+        default: shift = 0
+        }
+        let raw = (proposed + shift) / interval
+        let index: CGFloat
+        if abs(velocity) > 0.1 {
+            index = velocity > 0 ? ceil(raw) : floor(raw)
+        } else {
+            index = raw.rounded()
+        }
+        return min(max(0, index * interval - shift), max(0, maximum))
     }
 
     // MARK: - Refresh control
@@ -145,28 +212,26 @@ public final class PNScrollViewManager: PNComponentManager {
     }
 }
 
-/// Shared scroll payload builder.
+/// Shared scroll payload builder: the `ScrollEvent` record and nothing else.
 enum PNScrollPayload {
-    static func make(_ scroll: UIScrollView) -> [String: Any] {
+    static func event(_ scroll: UIScrollView) -> PNScrollEvent {
         let offset = scroll.contentOffset
         let bounds = scroll.bounds.size
         let content = scroll.contentSize
-        let horizontal = content.width > bounds.width && content.height <= bounds.height
-        return [
-            "x": Double(offset.x),
-            "y": Double(offset.y),
-            "extent": Double(horizontal ? bounds.width : bounds.height),
-            "range": Double(horizontal ? content.width : content.height),
-            "content_width": Double(content.width),
-            "content_height": Double(content.height),
-            "width": Double(bounds.width),
-            "height": Double(bounds.height),
-        ]
+        return PNScrollEvent(
+            x: Double(offset.x), y: Double(offset.y),
+            content_width: Double(content.width), content_height: Double(content.height),
+            viewport_width: Double(bounds.width), viewport_height: Double(bounds.height)
+        )
+    }
+
+    static func make(_ scroll: UIScrollView) -> [String: Any] {
+        (PNValues.encode(event(scroll)) as? [String: Any]) ?? [:]
     }
 }
 
 /// Forwards `UIScrollViewDelegate` callbacks to Python events.
-final class PNScrollDelegate: NSObject, UIScrollViewDelegate {
+final class PNScrollDelegate: NSObject, UIScrollViewDelegate, UIGestureRecognizerDelegate {
     private var lastEmit: TimeInterval = 0
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
@@ -175,25 +240,91 @@ final class PNScrollDelegate: NSObject, UIScrollViewDelegate {
         let now = CACurrentMediaTime()
         if throttle > 0, now - lastEmit < throttle, scrollView.isDragging || scrollView.isDecelerating { return }
         lastEmit = now
-        PNEvents.emit(scrollView, "on_scroll", [PNScrollPayload.make(scrollView)])
+        PNComponentEvents.ScrollView.on_scroll(scrollView, PNScrollPayload.event(scrollView))
     }
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-        PNEvents.emitIfWired(scrollView, "on_scroll_begin_drag", [PNScrollPayload.make(scrollView)])
+        PNComponentEvents.ScrollView.on_scroll_begin_drag(scrollView, PNScrollPayload.event(scrollView))
+    }
+
+    func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) {
+        guard let state = PNViewState.existing(for: scrollView), let interval = state.extras["snap_interval"] as? Double, interval > 0 else { return }
+        let alignment = state.extras["snap_alignment"] as? String ?? "start"
+        let horizontal = PNScrollViewManager.isHorizontal(scrollView)
+        let proposed = targetContentOffset.pointee
+        if horizontal {
+            let maximum = scrollView.contentSize.width - scrollView.bounds.width
+            targetContentOffset.pointee.x = PNScrollViewManager.snapTarget(
+                proposed: proposed.x, velocity: velocity.x, interval: CGFloat(interval), alignment: alignment,
+                viewport: scrollView.bounds.width, maximum: maximum
+            )
+        } else {
+            let maximum = scrollView.contentSize.height - scrollView.bounds.height
+            targetContentOffset.pointee.y = PNScrollViewManager.snapTarget(
+                proposed: proposed.y, velocity: velocity.y, interval: CGFloat(interval), alignment: alignment,
+                viewport: scrollView.bounds.height, maximum: maximum
+            )
+        }
     }
 
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        PNEvents.emitIfWired(scrollView, "on_scroll_end_drag", [PNScrollPayload.make(scrollView)])
+        PNComponentEvents.ScrollView.on_scroll_end_drag(scrollView, PNScrollPayload.event(scrollView))
         if !decelerate {
-            PNEvents.emitIfWired(scrollView, "on_momentum_scroll_end", [PNScrollPayload.make(scrollView)])
+            PNComponentEvents.ScrollView.on_momentum_scroll_end(scrollView, PNScrollPayload.event(scrollView))
         }
     }
 
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-        PNEvents.emitIfWired(scrollView, "on_momentum_scroll_end", [PNScrollPayload.make(scrollView)])
+        PNComponentEvents.ScrollView.on_momentum_scroll_end(scrollView, PNScrollPayload.event(scrollView))
     }
 
     func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
-        PNEvents.emitIfWired(scrollView, "on_scroll", [PNScrollPayload.make(scrollView)])
+        PNComponentEvents.ScrollView.on_scroll(scrollView, PNScrollPayload.event(scrollView))
+    }
+
+    // MARK: keyboard_should_persist_taps
+
+    /// `never` (default): a tap anywhere in the content dismisses the
+    /// keyboard. `handled`: only taps that no control handles dismiss it.
+    /// `always`: taps never dismiss it.
+    @objc func backgroundTapped(_ recognizer: UITapGestureRecognizer) {
+        guard recognizer.state == .ended, let scroll = recognizer.view as? UIScrollView,
+              PNKeyboardObserver.shared.isVisible || scroll.window?.firstResponderView != nil else { return }
+        let mode = PNViewState.existing(for: scroll)?.extras["persist_taps"] as? String ?? "never"
+        guard mode != "always" else { return }
+        let hit = scroll.hitTest(recognizer.location(in: scroll), with: nil)
+        if hit is UITextInput || hit?.isFirstResponder == true { return }
+        if mode == "handled", PNScrollDelegate.isHandled(hit, within: scroll) { return }
+        scroll.window?.endEditing(true)
+    }
+
+    /// Whether a tap on `view` is consumed by a control or a pressable
+    /// between it and the scroll view.
+    static func isHandled(_ view: UIView?, within scroll: UIScrollView) -> Bool {
+        var current = view
+        while let candidate = current, candidate !== scroll {
+            if candidate is UIControl { return true }
+            if let recognizers = candidate.gestureRecognizers, recognizers.contains(where: { $0 is UITapGestureRecognizer || $0 is UILongPressGestureRecognizer }) {
+                return true
+            }
+            current = candidate.superview
+        }
+        return false
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        true
+    }
+}
+
+extension UIWindow {
+    /// The view that currently owns the keyboard, if any.
+    var firstResponderView: UIView? {
+        func search(_ view: UIView) -> UIView? {
+            if view.isFirstResponder { return view }
+            for child in view.subviews { if let found = search(child) { return found } }
+            return nil
+        }
+        return search(self)
     }
 }

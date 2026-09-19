@@ -50,6 +50,8 @@ class Shell {
       screensEl: this.screens,
       overlaysEl: this.overlays,
       frameMetrics: () => this.frameMetrics(),
+      deviceName: () => this.device.name,
+      projectName: () => this.project,
       scheme: () => this.scheme,
       color: (value) => parseColor(value, this.scheme),
       log: (level, text) => this.logLine(level, text),
@@ -153,11 +155,17 @@ class Shell {
       gesture: (tag, phase, info) => this.bridge.send(["gesture", tag, phase, info]),
       animationFinished: (id, finished) => this.bridge.callback("animation", 0, "", JSON.stringify({ id, finished })),
       scheme: () => this.scheme,
+      nativeStackChanged: () => this.host?.nativeStackChanged(),
       overlays: () => this.overlays,
       bottomInset: () => this.frameMetrics().bottomInset,
       frameWidth: () => this.frameMetrics().width,
       pointInFrame: (event) => {
         const rect = event.currentTarget.getBoundingClientRect();
+        return { x: (event.clientX - rect.left) / this.scale, y: (event.clientY - rect.top) / this.scale };
+      },
+      // Window coordinates for `absolute_x` / `absolute_y`: the device frame is the app window.
+      pointInWindow: (event) => {
+        const rect = this.screens.getBoundingClientRect();
         return { x: (event.clientX - rect.left) / this.scale, y: (event.clientY - rect.top) / this.scale };
       },
       statusBar: (opts) => {

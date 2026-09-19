@@ -37,11 +37,14 @@ public final class PNTabBarManager: PNComponentManager {
         guard let bar = view as? UITabBar else { return }
         let merged = mergedProps(bar)
         let items = PNTabBarManager.items(merged)
-        if typed.has_items {
+        if typed.has_items || typed.has_shows_labels {
+            let showsLabels = PNProps.bool(PNProps.value(merged, "shows_labels")) ?? true
             bar.setItems(items.enumerated().map { index, item in
                 let title = PNProps.string(item["title"]) ?? PNProps.string(item["name"]) ?? ""
                 let icon = PNTabBarManager.icon(item["icon"])
-                let barItem = UITabBarItem(title: title, image: icon, tag: index)
+                let barItem = UITabBarItem(title: showsLabels ? title : nil, image: icon, tag: index)
+                if !showsLabels { barItem.imageInsets = UIEdgeInsets(top: 6, left: 0, bottom: -6, right: 0) }
+                barItem.accessibilityLabel = title
                 if let badge = PNProps.string(PNProps.value(item, "badge")) { barItem.badgeValue = badge }
                 return barItem
             }, animated: false)
@@ -56,11 +59,11 @@ public final class PNTabBarManager: PNComponentManager {
                 bar.selectedItem = barItems[index]
             }
         }
-        if let color = PNColor.parse(PNProps.value(props, "active_color") ?? PNProps.value(props, "tint_color")) {
-            bar.tintColor = color
+        if typed.has_tint_color {
+            bar.tintColor = PNColor.parse(PNProps.value(props, "tint_color"))
         }
-        if let color = PNColor.parse(PNProps.value(props, "inactive_color")) {
-            bar.unselectedItemTintColor = color
+        if typed.has_inactive_tint_color {
+            bar.unselectedItemTintColor = PNColor.parse(PNProps.value(props, "inactive_tint_color"))
         }
         if let color = PNColor.parse(PNProps.value(props, "background_color")) {
             bar.barTintColor = color
@@ -73,8 +76,8 @@ public final class PNTabBarManager: PNComponentManager {
                 bar.scrollEdgeAppearance = appearance
             }
         }
-        if PNProps.has(props, "translucent") {
-            bar.isTranslucent = PNProps.bool(PNProps.value(props, "translucent")) ?? true
+        if typed.has_translucent {
+            bar.isTranslucent = typed.translucent ?? true
         }
         PNViewStyler.applyAccessibility(bar, props)
     }
@@ -107,13 +110,12 @@ public final class PNTabBarManager: PNComponentManager {
     }
 }
 
-/// Forwards `tabBar(_:didSelect:)` as `on_tab_select(name)` (plus `on_select(index)`).
+/// Forwards `tabBar(_:didSelect:)` as `on_tab_select(name)`.
 final class PNTabBarDelegate: NSObject, UITabBarDelegate {
     func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
         let index = item.tag
         let items = PNTabBarManager.items(PNViewState.existing(for: tabBar)?.props ?? [:])
         guard index >= 0, index < items.count else { return }
-        PNEvents.emit(tabBar, "on_tab_select", [PNProps.string(items[index]["name"]) ?? ""])
-        PNEvents.emitIfWired(tabBar, "on_select", [index])
+        PNComponentEvents.TabBar.on_tab_select(tabBar, PNProps.string(items[index]["name"]) ?? "")
     }
 }

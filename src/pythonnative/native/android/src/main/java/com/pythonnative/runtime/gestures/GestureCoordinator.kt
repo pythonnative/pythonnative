@@ -77,17 +77,17 @@ object GestureCoordinator {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                     val idx = event.actionIndex
-                    arbiter.pointerDown(event.getPointerId(idx), (event.getX(idx) / density).toDouble(), (event.getY(idx) / density).toDouble(), t)
+                    arbiter.pointerDown(event.getPointerId(idx), (event.getX(idx) / density).toDouble(), (event.getY(idx) / density).toDouble(), t, rawX(event, idx) / density, rawY(event, idx) / density)
                 }
                 MotionEvent.ACTION_MOVE -> {
                     for (i in 0 until event.pointerCount) {
-                        arbiter.pointerMove(event.getPointerId(i), (event.getX(i) / density).toDouble(), (event.getY(i) / density).toDouble(), t)
+                        arbiter.pointerMove(event.getPointerId(i), (event.getX(i) / density).toDouble(), (event.getY(i) / density).toDouble(), t, rawX(event, i) / density, rawY(event, i) / density)
                     }
                     if (arbiter.hasActivePan()) record.view.parent?.requestDisallowInterceptTouchEvent(true)
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                     val idx = event.actionIndex
-                    arbiter.pointerUp(event.getPointerId(idx), (event.getX(idx) / density).toDouble(), (event.getY(idx) / density).toDouble(), t)
+                    arbiter.pointerUp(event.getPointerId(idx), (event.getX(idx) / density).toDouble(), (event.getY(idx) / density).toDouble(), t, rawX(event, idx) / density, rawY(event, idx) / density)
                 }
                 MotionEvent.ACTION_CANCEL -> arbiter.cancel(t)
             }
@@ -100,6 +100,15 @@ object GestureCoordinator {
 
     /** Seconds on the monotonic uptime clock. */
     private fun now(): Double = SystemClock.uptimeMillis() / 1000.0
+
+    /** Window x of pointer `index` in px (per-pointer raw coordinates need API 29; older releases offset from pointer 0). */
+    private fun rawX(event: MotionEvent, index: Int): Double =
+        if (android.os.Build.VERSION.SDK_INT >= 29) event.getRawX(index).toDouble()
+        else (event.rawX - event.getX(0) + event.getX(index)).toDouble()
+
+    private fun rawY(event: MotionEvent, index: Int): Double =
+        if (android.os.Build.VERSION.SDK_INT >= 29) event.getRawY(index).toDouble()
+        else (event.rawY - event.getY(0) + event.getY(index)).toDouble()
 
     private fun schedulePoll(record: ViewRecord) {
         val state = record.state

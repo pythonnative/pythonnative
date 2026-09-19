@@ -32,11 +32,11 @@ jobs:
     # app, dies). Sharding the run into a few balanced groups, each on
     # its own freshly booted emulator, keeps every session under the
     # limit, and parallelizes the Android pass as a bonus. Groups are
-    # sized so none exceeds ~12 heavy flows: ``components`` (35 flows
-    # after the graphics additions) dropped offline at ~11.5 minutes
-    # when split in two, so it runs as three parts; ``hooks`` (23 quick
-    # flows, ~10 minutes of driving) gets a dedicated emulator; the
-    # remaining categories are grouped to similar totals.
+    # sized to about nine minutes of driving or less: ``components``
+    # (39 flows) runs as three parts; ``hooks`` (26 flows) dropped
+    # offline at ~11.5 minutes in one session, so it runs as two parts;
+    # the remaining categories pair up to similar totals, and ``misc``
+    # (14 flows) runs alone.
     # ``fail-fast: false`` so one shard's failure still lets the others
     # report.
     strategy:
@@ -49,12 +49,18 @@ jobs:
             suites: components-b
           - name: components-c
             suites: components-c
-          - name: hooks
-            suites: hooks
-          - name: nav-gestures-layout-styling
-            suites: navigation gestures layout styling
-          - name: anim-misc
-            suites: animations assets misc
+          - name: hooks-a
+            suites: hooks-a
+          - name: hooks-b
+            suites: hooks-b
+          - name: nav-gestures
+            suites: navigation gestures
+          - name: layout-styling
+            suites: layout styling
+          - name: anim-assets
+            suites: animations assets
+          - name: misc
+            suites: misc
           - name: inbox
             suites: inbox
 

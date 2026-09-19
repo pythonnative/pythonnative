@@ -23,7 +23,7 @@ from pythonnative.components import (
     WebView,
 )
 from pythonnative.element import ERROR_BOUNDARY, FRAGMENT
-from pythonnative.style import AccessibilityState
+from pythonnative.style import AccessibilityState, Style
 from pythonnative.testing import FakeBackend
 
 # ---------------------------------------------------------------------------
@@ -104,8 +104,8 @@ def test_text_layout_via_style() -> None:
 
 
 def test_text_style_list() -> None:
-    base = {"font_size": 16, "color": "#000"}
-    override = {"color": "#FFF", "bold": True}
+    base: Style = {"font_size": 16, "color": "#000"}
+    override: Style = {"color": "#FFF", "bold": True}
     el = Text("combo", style=[base, override])
     assert el.props["font_size"] == 16
     assert el.props["color"] == "#FFF"
@@ -534,7 +534,7 @@ def test_pressable_callable_style_tracks_pressed_state() -> None:
 
     el = Pressable(
         Text("tap"),
-        style=lambda s: {"background_color": "#222222" if s["pressed"] else "#EEEEEE"},
+        style=lambda s: {"background_color": "#222222" if s.pressed else "#EEEEEE"},
     )
     assert callable(el.type)  # stateful composite
 

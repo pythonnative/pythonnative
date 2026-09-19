@@ -8,3 +8,5 @@ appId: ${APP_ID}
 - runFlow: ../flows/animations/interpolate_animation.yaml
 - runFlow: ../flows/animations/loop_stagger.yaml
 - runFlow: ../flows/animations/collapsing_header.yaml
+- runFlow: ../flows/animations/easing.yaml
+- runFlow: ../flows/animations/decay_animation.yaml

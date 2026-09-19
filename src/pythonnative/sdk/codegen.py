@@ -27,11 +27,23 @@ def generate(destination: str | Path) -> list[Path]:
         "import com.pythonnative.runtime.components.PNEvents",
         "",
     ]
-    common = dict(COMPONENTS["View"].props) if "View" in COMPONENTS else {}
+
+    # A View prop is shared (a getter on the base class, and a type named after
+    # View) when every component that declares it declares the same schema.
+    # Compare JSON forms: extension manifests arrive through JSON, so a
+    # built-in tuple and an extension's list must still count as equal, or a
+    # plugin build would rename the built-in types hand-written code uses.
+    def canonical(field: Any) -> str:
+        return json.dumps(to_jsonable(field), sort_keys=True, default=str)
+
+    view_props = dict(COMPONENTS["View"].props) if "View" in COMPONENTS else {}
     common = {
         key: field
-        for key, field in common.items()
-        if all(key not in component.props or component.props[key] == field for component in COMPONENTS.values())
+        for key, field in view_props.items()
+        if all(
+            key not in component.props or canonical(component.props[key]) == canonical(field)
+            for component in COMPONENTS.values()
+        )
     }
 
     def getters(fields: dict[str, Any], hint: str) -> None:

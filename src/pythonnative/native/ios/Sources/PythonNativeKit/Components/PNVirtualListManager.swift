@@ -134,11 +134,18 @@ private final class PNCollectionList: UICollectionView, UICollectionViewDelegate
         return horizontal ? CGSize(width: max(1, extent), height: bounds.height) : CGSize(width: bounds.width, height: max(1, extent))
     }
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        // Like `ScrollView`, only emit when the app wired `on_scroll`.
+        guard PNViewState.existing(for: self)?.hasEvent("on_scroll") == true else { return }
         let visible = indexPathsForVisibleItems.map { $0.item }
-        PNBridge.shared.emitEvent(tag: listTag, name: "on_scroll", args: [[
-            "x": contentOffset.x, "y": contentOffset.y, "extent": horizontal ? bounds.width : bounds.height, "range": horizontal ? contentSize.width : contentSize.height,
-            "first": visible.min() ?? 0, "last": visible.max() ?? -1,
-        ]])
+        // The `ScrollEvent` record, plus the window hints (`first`, `last`,
+        // `extent`, `range`) Python's list windowing reads from this
+        // untyped event.
+        var payload = PNScrollPayload.make(self)
+        payload["extent"] = Double(horizontal ? bounds.width : bounds.height)
+        payload["range"] = Double(horizontal ? contentSize.width : contentSize.height)
+        payload["first"] = visible.min() ?? 0
+        payload["last"] = visible.max() ?? -1
+        PNBridge.shared.emitEvent(tag: listTag, name: "on_scroll", args: [payload])
     }
 }
 

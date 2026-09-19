@@ -166,7 +166,7 @@ def test_flush_dirty_preserves_provider_context() -> None:
 
     @component
     def app() -> Element:
-        return theme.Provider("dark", consumer())
+        return theme.Provider(consumer(), value="dark")
 
     rec, _backend = _make_reconciler()
     rec.mount(app())

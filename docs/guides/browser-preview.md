@@ -116,7 +116,17 @@ stack of screens in the page, the same way they drive
 screen remains a logical child of the application's shared tree;
 `navigate(...)` selects or adds a route, `go_back()` pops, and covered
 screens keep their state.
-Pushes and pops animate with a slide.
+Pushes and pops animate with the screen's `animation` and
+`presentation` options.
+
+Each stack draws a navigation bar from the top screen's options, the way
+the native stacks do: `title`, `header_shown`, `header_large_title`,
+`header_back_visible`, `header_back_title`, `header_tint_color`,
+`header_style`, and `header_title_style`, with `header_left` and
+`header_right` rendered in the bar. The back button pops through the same
+path as an iOS swipe back, so a `before_remove` listener can veto it. A
+stack at the root of the app replaces the host's own bar, as it does on
+iOS.
 
 ### Dev mode and errors
 

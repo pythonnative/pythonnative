@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional, Sequence, Tuple
 from .. import appearance, diagnostics, platform_metrics
 from ..bridge import codec
 from ..native_modules.registry import native_module
-from .base import ScreenHost, flush_hosts, log_pn
+from .base import ScreenHost, flush_hosts
 
 __all__ = ["NativeScreenHost", "dispatch_host_event", "host_for_screen", "live_hosts"]
 
@@ -49,7 +49,7 @@ def _flush_scheduled() -> None:
     hosts = list(_SCHEDULED.values())
     _SCHEDULED.clear()
     if hosts:
-        log_pn(f"render_scheduler: flushing {len(hosts)} host(s)")
+        diagnostics.log(f"render_scheduler: flushing {len(hosts)} host(s)")
     flush_hosts(hosts)
 
 
@@ -69,8 +69,21 @@ def _request_flush() -> None:
 # ======================================================================
 
 
+def _optional_float(payload: Dict[str, Any], key: str) -> Optional[float]:
+    """Return ``payload[key]`` as a float, or ``None`` when absent or not a number."""
+    value = payload.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
 def _publish_metrics(payload: Any) -> Tuple[float, float]:
-    """Publish viewport, insets, keyboard, and color scheme from a host payload.
+    """Publish viewport, insets, keyboard, density, and color scheme from a host payload.
+
+    The payload carries ``width`` and ``height`` (the window, in layout
+    units) and may carry ``scale``, ``font_scale``, ``screen_width``, and
+    ``screen_height``. A missing density keeps the last published value
+    (``1.0`` initially); a missing screen size falls back to the window.
 
     Returns the ``(width, height)`` it found (``0, 0`` when absent).
     """
@@ -78,6 +91,8 @@ def _publish_metrics(payload: Any) -> Tuple[float, float]:
         return (0.0, 0.0)
     width = float(payload.get("width") or 0.0)
     height = float(payload.get("height") or 0.0)
+    scale = _optional_float(payload, "scale")
+    font_scale = _optional_float(payload, "font_scale")
     insets = payload.get("insets")
     if isinstance(insets, dict):
         platform_metrics.set_safe_area_insets(
@@ -92,7 +107,10 @@ def _publish_metrics(payload: Any) -> Tuple[float, float]:
     if scheme in ("light", "dark"):
         appearance.set_system_color_scheme(str(scheme))
     if width > 0 and height > 0:
-        platform_metrics.set_window_dimensions(width, height)
+        platform_metrics.set_window_dimensions(width, height, scale=scale, font_scale=font_scale)
+        screen_width = _optional_float(payload, "screen_width") or width
+        screen_height = _optional_float(payload, "screen_height") or height
+        platform_metrics.set_screen_dimensions(screen_width, screen_height, scale=scale, font_scale=font_scale)
     return (width, height)
 
 
@@ -145,7 +163,7 @@ class NativeScreenHost(ScreenHost):
         except Exception as exc:
             self._render_scheduled = False
             _SCHEDULED.pop(id(self), None)
-            log_pn(f"request_render: bridge defer failed ({exc!r}); rendering synchronously")
+            diagnostics.log(f"request_render: bridge defer failed ({exc!r}); rendering synchronously")
             return False
         return True
 
@@ -196,7 +214,8 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
       ``args`` a JSON string. Returns ``{"root": tag}``.
     - ``start`` / ``resume`` / ``pause`` / ``stop`` / ``destroy``:
       lifecycle. ``resume`` and ``layout`` carry metrics.
-    - ``layout`` ``{width, height, insets, keyboard_height, color_scheme}``.
+    - ``layout`` ``{width, height, insets, keyboard_height, color_scheme,
+      scale, font_scale, screen_width, screen_height}``.
     - ``appearance`` ``{"color_scheme"}``.
     - ``back_pressed``: returns ``"true"`` when a handler consumed it.
     - ``save_state`` / ``restore_state``: instance-state hooks.
@@ -215,34 +234,30 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
         return None
     host = _HOSTS.get(screen_id)
     if host is None:
-        log_pn(f"dispatch_host_event: no host for screen={screen_id} event={event!r}")
+        diagnostics.log(f"dispatch_host_event: no host for screen={screen_id} event={event!r}")
         return None
     if event == "layout":
         host.apply_metrics(payload)
-        host.on_layout()
         return None
     if event == "resume":
         host.apply_metrics(payload)
         host.on_resume()
         return None
+    if event == "pause":
+        host.on_pause()
+        return None
     if event == "back_pressed":
         if not host.on_back_pressed():
             _host_module().call("finish", screen=host.screen_id)
         return None
-    if event == "save_state":
-        host.on_save_instance_state()
-        return None
-    if event == "restore_state":
-        host.on_restore_instance_state()
+    if event in ("save_state", "restore_state"):
+        # Restoration state is cached as Python publishes it; the host
+        # has nothing synchronous to do when the platform saves.
         return None
     if event == "destroy":
         host.on_destroy()
         return None
-    handler = getattr(host, f"on_{event}", None)
-    if handler is None:
-        log_pn(f"dispatch_host_event: unknown event {event!r}")
-        return None
-    handler()
+    diagnostics.log(f"dispatch_host_event: unknown event {event!r}")
     return None
 
 

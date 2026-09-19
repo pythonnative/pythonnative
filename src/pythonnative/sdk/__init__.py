@@ -3,13 +3,10 @@
 The ``pythonnative.sdk`` package collects the *stable* extension
 contract that third-party packages rely on: the
 [`Style`][pythonnative.sdk.Style] type, the
-[`@native_component`][pythonnative.sdk.native_component] /
-[`register_component`][pythonnative.sdk.register_component]
-registration helpers, the
-[`element_factory`][pythonnative.sdk.element_factory] helper for
-producing strongly-typed element constructors, the
-[`ViewHandler`][pythonnative.sdk.ViewHandler] protocol for off-device
-stand-ins, and the native module registry
+[`define_component`][pythonnative.sdk.define_component] helper that
+declares a custom native component and returns its typed element
+factory, [`element_factory`][pythonnative.sdk.element_factory] for
+rebuilding that factory elsewhere, and the native module registry
 ([`native_module`][pythonnative.sdk.native_module],
 [`register_python_module`][pythonnative.sdk.register_python_module]).
 
@@ -20,16 +17,15 @@ A custom native component is three things:
 2. A Swift ``PNComponentManager`` and a Kotlin ``ComponentManager``
    registered under the component's name by the package's native
    plugin (``pn_plugin.json`` next to ``ios/`` and ``android/`` source
-   folders; see ``docs/guides/custom-components.md``).
-3. A registration call in Python
-   ([`register_component`][pythonnative.sdk.register_component], or the
-   [`@native_component`][pythonnative.sdk.native_component] decorator
-   when you also supply a test
-   [`ViewHandler`][pythonnative.sdk.ViewHandler] for the Python backend)
-   that declares the element name and binds its props type.
+   folders; see ``docs/guides/custom-native-components.md``).
+3. A ``define_component(name, props)`` call in Python that declares the
+   element name, binds its props type, and returns the element factory.
 
-Once registered, the component appears alongside the built-ins: the
-reconciler, layout engine, and Fast Refresh treat it identically.
+Once defined, the component appears alongside the built-ins: the
+reconciler, layout engine, commit validator, contract generator, and
+Fast Refresh treat it identically. The browser preview draws it as a
+labeled placeholder; headless tests render it into the
+[`FakeBackend`][pythonnative.testing.FakeBackend] like any element.
 
 A native module (device API without a view) follows the same split: a
 Swift / Kotlin class registered by name in the plugin, a Python facade
@@ -46,7 +42,7 @@ Example:
     ```python
     from dataclasses import dataclass
     import pythonnative as pn
-    from pythonnative.sdk import Props, element_factory, register_component
+    from pythonnative.sdk import Props, define_component
 
 
     @dataclass(frozen=True)
@@ -56,8 +52,7 @@ Example:
         style: pn.StyleProp = None
 
 
-    register_component(name="Badge", props=BadgeProps)
-    Badge = element_factory("Badge")
+    Badge = define_component("Badge", BadgeProps)
 
 
     @pn.component
@@ -79,7 +74,7 @@ from ..native_modules.registry import (
     native_module,
     register_python_module,
 )
-from ..native_views.base import ViewHandler, parse_color_int
+from ..native_views import parse_color_int
 from ..style import (
     Color,
     Dimension,
@@ -97,13 +92,10 @@ from ..style import (
 from ._components import (
     ENTRY_POINT_GROUP,
     Props,
+    define_component,
     element_factory,
     get_props_type,
-    get_test_handler,
-    install_into_registry,
     list_components,
-    native_component,
-    register_component,
     unregister_component,
 )
 from .codegen import generate
@@ -119,7 +111,6 @@ __all__ = [
     "generate",
     # Core types
     "Element",
-    "ViewHandler",
     # Style types
     "Color",
     "Dimension",
@@ -138,13 +129,10 @@ __all__ = [
     # Native-component SDK
     "ENTRY_POINT_GROUP",
     "Props",
+    "define_component",
     "element_factory",
-    "get_test_handler",
     "get_props_type",
-    "install_into_registry",
     "list_components",
-    "native_component",
-    "register_component",
     "unregister_component",
     # Native-module SDK
     "NativeModule",

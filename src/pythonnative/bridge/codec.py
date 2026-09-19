@@ -24,6 +24,7 @@ from ..mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, SetFrame
 __all__ = [
     "INF",
     "NEG_INF",
+    "build_transaction",
     "dumps",
     "encode_transaction",
     "loads",
@@ -95,42 +96,38 @@ def split_props(
     ``wire_props`` is JSON-ready; ``python_props`` holds callbacks and
     fields explicitly declared Python-only. Other unsupported values
     fail encoding. The backend keeps Python props in a per-tag sidecar.
+    (The reconciler has already published ``Animated.event`` bindings
+    under ``_pn_animated_events`` before props reach the codec.)
     """
     wire: Dict[str, Any] = {}
     python: Dict[str, Any] = {}
     for key, value in props.items():
         if value is UNSET:
             continue
-        if key in python_only:
-            python[key] = value
-            continue
-        if callable(value) and not isinstance(value, type):
-            from ..animated import AnimatedEvent
-
-            if isinstance(value, AnimatedEvent):
-                wire.setdefault("_pn_animated_events", {})[key] = {
-                    name: id(node) for name, node in value._bindings.items()
-                }
+        if key in python_only or (callable(value) and not isinstance(value, type)):
             python[key] = value
             continue
         wire[key] = to_jsonable(value)
     return wire, python
 
 
-def encode_transaction(
+def build_transaction(
     ops: Sequence[Mutation], types: Mapping[int, str] | None = None
-) -> Tuple[str, List[Tuple[int, Dict[str, Any]]]]:
-    """Encode a mutation batch as the bridge's transaction JSON.
+) -> Tuple[List[Any], List[Tuple[int, Dict[str, Any]]]]:
+    """Build the wire operations for a mutation batch, JSON-ready but not yet serialized.
 
     Args:
         ops: Ordered mutations from the reconciler.
         types: Native component names for tags, used to identify Python-only props.
 
     Returns:
-        ``(json_text, python_props)`` where ``python_props`` lists
-        ``(tag, props)`` pairs for values that stayed Python-side (for
-        ``c`` and ``u`` ops). The backend removes sidecar entries using
-        ``UNSET`` values in the original update operations.
+        ``(wire_ops, python_props)`` where ``wire_ops`` is the list the
+        transaction envelope carries under ``"ops"`` (every value already
+        normalized by [`to_jsonable`][pythonnative.bridge.codec.to_jsonable])
+        and ``python_props`` lists ``(tag, props)`` pairs for values that
+        stayed Python-side (for ``c`` and ``u`` ops). The backend removes
+        sidecar entries using ``UNSET`` values in the original update
+        operations.
     """
     from ..sdk.schema import COMPONENTS
 
@@ -167,6 +164,22 @@ def encode_transaction(
             encoded.append(["f", op.tag, _num(op.x), _num(op.y), _num(op.width), _num(op.height)])
         else:  # pragma: no cover - the reconciler only emits the five op kinds
             raise TypeError(f"Unknown mutation op: {op!r}")
+    return encoded, sidecar
+
+
+def encode_transaction(
+    ops: Sequence[Mutation], types: Mapping[int, str] | None = None
+) -> Tuple[str, List[Tuple[int, Dict[str, Any]]]]:
+    """Encode a mutation batch as the bridge's transaction JSON.
+
+    A convenience over [`build_transaction`][pythonnative.bridge.codec.build_transaction]
+    for callers that want the serialized op list alone (tests and
+    tooling); the backend serializes the whole envelope itself.
+
+    Returns:
+        ``(json_text, python_props)``; see ``build_transaction``.
+    """
+    encoded, sidecar = build_transaction(ops, types)
     return dumps(encoded), sidecar
 
 

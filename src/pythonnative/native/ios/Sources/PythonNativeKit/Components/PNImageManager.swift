@@ -39,7 +39,13 @@ public final class PNImageManager: PNTypedComponentManager<ImageProps> {
         if props.has_placeholder_color {
             imageView.backgroundColor = props.placeholder_color.flatMap { PNColor.parse(PNValues.encode($0)) }
         }
-        if props.has_source || props.has_default_source || props.has_blur_radius {
+        if props.has_fade_duration {
+            PNViewState.existing(for: imageView)?.extras["fade_duration"] = props.fade_duration ?? 0
+        }
+        if props.has_headers {
+            PNViewState.existing(for: imageView)?.extras["headers"] = props.headers ?? [:]
+        }
+        if props.has_source || props.has_default_source || props.has_blur_radius || props.has_headers {
             let merged = mergedProps(imageView)
             (PNViewState.existing(for: imageView)?.extras.removeValue(forKey: "cancel_image") as? (() -> Void))?()
             let source = PNProps.string(PNProps.value(merged, "source")) ?? ""
@@ -106,21 +112,25 @@ public final class PNImageManager: PNTypedComponentManager<ImageProps> {
         if let fallback = fallback, !Self.isRemote(fallback), let placeholder = Self.loadLocal(fallback, targetSize: size, blur: blur) {
             setImage(imageView, placeholder)
         }
+        if !silent { PNComponentEvents.Image.on_load_start(imageView) }
+        let fade = PNProps.double(state.extras["fade_duration"]) ?? 0
         let finish: (Result<UIImage, Error>) -> Void = { [weak imageView] result in
             guard let imageView = imageView,
                   PNViewState.existing(for: imageView)?.extras["image_request"] as? UUID == request else { return }
             switch result {
             case .success(let image):
-                self.setImage(imageView, image)
+                self.setImage(imageView, image, fadeMs: fade)
                 if !silent {
                     PNComponentEvents.Image.on_load(imageView, PNImageLoadEvent(width: Double(image.size.width), height: Double(image.size.height)))
                 }
             case .failure(let error):
                 if !silent { PNComponentEvents.Image.on_error(imageView, error.localizedDescription) }
             }
+            if !silent { PNComponentEvents.Image.on_load_end(imageView) }
         }
         if Self.isRemote(source) {
-            state.extras["cancel_image"] = PNImageLoader.shared.fetch(source) { result in
+            let headers = (state.extras["headers"] as? [String: String]) ?? [:]
+            state.extras["cancel_image"] = PNImageLoader.shared.fetch(source, headers: headers) { result in
                 DispatchQueue.global(qos: .userInitiated).async {
                     let decoded = result.flatMap { data -> Result<UIImage, Error> in
                         guard let image = PNImageManager.decode(data, targetSize: size, blur: blur) else { return .failure(PNImageLoader.LoadError.decode) }
@@ -168,9 +178,17 @@ public final class PNImageManager: PNTypedComponentManager<ImageProps> {
         return decode(data, targetSize: targetSize, assetScale: scale, blur: blur)
     }
 
-    private func setImage(_ imageView: UIImageView, _ image: UIImage) {
+    /// Install `image`; `fade_duration` (ms) cross-fades it over the current contents.
+    private func setImage(_ imageView: UIImageView, _ image: UIImage, fadeMs: Double = 0) {
         let tinted = PNProps.value(mergedProps(imageView), "tint_color")
-        imageView.image = tinted != nil ? image.withRenderingMode(.alwaysTemplate) : image
+        let resolved = tinted != nil ? image.withRenderingMode(.alwaysTemplate) : image
+        if fadeMs > 0, imageView.window != nil, !UIAccessibility.isReduceMotionEnabled {
+            UIView.transition(with: imageView, duration: fadeMs / 1000, options: [.transitionCrossDissolve, .allowUserInteraction]) {
+                imageView.image = resolved
+            }
+        } else {
+            imageView.image = resolved
+        }
         if let state = PNViewState.existing(for: imageView) { PNLayout.invalidate(state.tag) }
     }
 
@@ -265,8 +283,9 @@ public final class PNImageLoader {
         session = URLSession(configuration: config)
     }
 
-    /// Fetch `url`, delivering the raw bytes on the main queue.
-    @discardableResult public func fetch(_ url: String, completion: @escaping (Result<Data, Error>) -> Void) -> () -> Void {
+    /// Fetch `url`, delivering the raw bytes on the main queue. `headers`
+    /// are sent with the request; the cache is keyed by URL alone.
+    @discardableResult public func fetch(_ url: String, headers: [String: String] = [:], completion: @escaping (Result<Data, Error>) -> Void) -> () -> Void {
         if let cached = memory.object(forKey: url as NSString) { completion(.success(cached as Data)); return {} }
         let id = UUID()
         let request: Request
@@ -285,7 +304,9 @@ public final class PNImageLoader {
                     guard let remote = URL(string: url) else {
                         self.deliver(url, request, .failure(LoadError.badURL)); return
                     }
-                    let task = self.session.downloadTask(with: remote) { file, response, error in
+                    var urlRequest = URLRequest(url: remote)
+                    for (field, value) in headers { urlRequest.setValue(value, forHTTPHeaderField: field) }
+                    let task = self.session.downloadTask(with: urlRequest) { file, response, error in
                         if let error = error { self.deliver(url, request, .failure(error)); return }
                         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
                             self.deliver(url, request, .failure(LoadError.http(http.statusCode))); return

@@ -28,6 +28,11 @@ tag indexes, dirty component work, and pending effects. Updating a child preserv
 its ancestors and siblings unless their own inputs or context change. Native
 child relationships are rebuilt when a component's native roots change.
 Effects run after committed views exist, with child effects preceding parents.
+Renders are batched automatically: setter calls made in one callback, effect,
+or task step coalesce into one flush on the application loop. An effect that
+raises is routed to the nearest error boundary like a render error, and a
+component that re-dirties itself for more than fifty passes raises
+`RuntimeError("Too many re-renders")` through the same path.
 
 Equality accepts identity and scalar Boolean comparisons. Array-like comparisons
 that produce another array aren't coerced to a Boolean. Mutable objects must be
@@ -54,7 +59,7 @@ footers, empty states, grouped grids, and sections use the same ownership model.
 
 ## Contracts and tooling
 
-Protocol 2 validates commits before mutation and acknowledges exact revisions.
+Protocol 3 validates commits before mutation and acknowledges exact revisions.
 Events carry application and revision identities. Controlled inputs additionally
 acknowledge native edit revisions to avoid overwriting newer typing. Native
 animation graphs perform frame updates independently of Python callbacks.
@@ -100,11 +105,14 @@ validate device signing, store submission, or performance on physical devices.
 | Components and lifetimes | `component.py`, `hooks.py`, `runtime.py` |
 | Reconciliation | `reconciler/`, `mutations.py`, `events.py` |
 | Bridge protocol | `bridge/`, `native_views/bridge_backend.py` |
+| Imperative handles and undo journal | `handles.py`, `journal.py` |
 | Native renderers | `native/ios/`, `native/android/` |
 | Shared layout core | `native/yoga/`, `layout.py` |
 | Navigation and lists | `navigation/`, `components/lists.py` |
 | Animation graphs | `animated.py`, `animation_graph.py` |
 | Contracts and plugins | `sdk/`, `project/plugins.py` |
+| Device modules | `native_modules/` |
+| Testing library and pytest plugin | `testing/` |
 | Build and dependency locks | `project/`, `cli/` |
 | Browser preview | `preview.py`, `devserver/static/` |
 

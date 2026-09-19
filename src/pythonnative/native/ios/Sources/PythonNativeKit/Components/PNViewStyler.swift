@@ -82,6 +82,7 @@ public enum PNViewStyler {
         }
         updateCornerMask(view, state: state, size: size)
         updateSideBorderLayers(view, state: state, size: size)
+        updateBorderStyleLayer(view, state: state, size: size)
     }
 
     // MARK: - Borders
@@ -111,6 +112,62 @@ public enum PNViewStyler {
         if PNProps.has(props, "border_color") {
             layer.borderColor = PNColor.parse(PNProps.value(props, "border_color"))?.cgColor
         }
+        if PNProps.has(props, "border_style") || PNProps.has(props, "border_width") || PNProps.has(props, "border_color")
+            || PNProps.has(props, "border_radius") {
+            applyBorderStyle(view, props)
+        }
+    }
+
+    // MARK: - Border style (dashed / dotted)
+
+    /// `border_style`: `"solid"` (default) uses `layer.borderWidth`;
+    /// `"dashed"` and `"dotted"` draw the uniform border with a
+    /// `CAShapeLayer` whose `lineDashPattern` follows the border width
+    /// (dashes are three widths long, dots one width; gaps match). The
+    /// layer is refit on every frame change. Per-side widths and colors
+    /// keep drawing solid.
+    static func applyBorderStyle(_ view: UIView, _ props: [String: Any]) {
+        guard let state = PNViewState.existing(for: view) else { return }
+        let merged = state.props
+        let style = PNProps.string(PNProps.value(merged, "border_style"))?.lowercased()
+        let width = CGFloat(PNProps.double(PNProps.value(merged, "border_width")) ?? 0)
+        guard let style = style, style == "dashed" || style == "dotted", width > 0 else {
+            if state.borderStyle != nil {
+                state.borderStyle = nil
+                state.borderStyleLayer?.removeFromSuperlayer()
+                state.borderStyleLayer = nil
+                if state.sideBorderWidths == nil { view.layer.borderWidth = width }
+            }
+            return
+        }
+        state.borderStyle = style
+        view.layer.borderWidth = 0
+        let shape = state.borderStyleLayer ?? {
+            let created = CAShapeLayer()
+            created.fillColor = nil
+            view.layer.addSublayer(created)
+            state.borderStyleLayer = created
+            return created
+        }()
+        shape.strokeColor = (PNColor.parse(PNProps.value(merged, "border_color")) ?? .black).cgColor
+        shape.lineWidth = width
+        shape.lineCap = .butt
+        shape.lineDashPattern = style == "dashed"
+            ? [NSNumber(value: Double(width * 3)), NSNumber(value: Double(width * 3))]
+            : [NSNumber(value: Double(width)), NSNumber(value: Double(width))]
+        let size = view.bounds.size
+        if size.width > 0, size.height > 0 { updateBorderStyleLayer(view, state: state, size: size) }
+    }
+
+    static func updateBorderStyleLayer(_ view: UIView, state: PNViewState, size: CGSize) {
+        guard let shape = state.borderStyleLayer, size.width > 0, size.height > 0 else { return }
+        let width = shape.lineWidth
+        shape.frame = CGRect(origin: .zero, size: size)
+        let rect = CGRect(origin: .zero, size: size).insetBy(dx: width / 2, dy: width / 2)
+        let radius = max(0, view.layer.cornerRadius - width / 2)
+        shape.path = UIBezierPath(roundedRect: rect, cornerRadius: radius).cgPath
+        // Keep the stroke above the side-border layers and any children.
+        shape.zPosition = 1
     }
 
     static func applySideBorders(_ view: UIView, _ props: [String: Any]) {
@@ -121,7 +178,8 @@ public enum PNViewStyler {
             state.sideBorderWidths = nil
             state.sideBorderColors = nil
             for index in 0..<4 { state.sideBorderLayers[index]?.removeFromSuperlayer(); state.sideBorderLayers[index] = nil }
-            view.layer.borderWidth = CGFloat(PNProps.double(PNProps.value(merged, "border_width")) ?? 0)
+            // A dashed / dotted border is stroked by its shape layer instead.
+            view.layer.borderWidth = state.borderStyle == nil ? CGFloat(PNProps.double(PNProps.value(merged, "border_width")) ?? 0) : 0
             return
         }
         let baseWidth = CGFloat(PNProps.double(PNProps.value(merged, "border_width")) ?? 0)
@@ -305,6 +363,8 @@ public enum PNViewStyler {
         "adjustable": .adjustable, "header": .header, "selected": .selected, "checkbox": .button, "none": [],
     ]
 
+    static let accessibilityValueKeys = ["accessibility_value", "accessibility_role", "accessibility_state"]
+
     static func applyAccessibility(_ view: UIView, _ props: [String: Any]) {
         if PNProps.has(props, "accessible") {
             view.isAccessibilityElement = PNProps.bool(PNProps.value(props, "accessible")) ?? false
@@ -318,12 +378,18 @@ public enum PNViewStyler {
         if PNProps.has(props, "test_id") {
             view.accessibilityIdentifier = PNProps.string(PNProps.value(props, "test_id"))
         }
-        guard PNProps.has(props, "accessibility_role") || PNProps.has(props, "accessibility_state") else { return }
+        if PNProps.has(props, "accessibility_actions") {
+            applyAccessibilityActions(view, PNProps.value(props, "accessibility_actions"))
+        }
+        if PNProps.has(props, "important_for_accessibility") {
+            applyImportance(view, PNProps.string(PNProps.value(props, "important_for_accessibility")))
+        }
+        guard accessibilityValueKeys.contains(where: { PNProps.has(props, $0) }) else { return }
         let merged = PNViewState.existing(for: view)?.props ?? props
         let role = PNProps.string(PNProps.value(merged, "accessibility_role"))
         let state = PNProps.dict(PNProps.value(merged, "accessibility_state"))
         var traits: UIAccessibilityTraits = []
-        view.accessibilityValue = nil
+        var value = accessibilityValue(PNProps.value(merged, "accessibility_value"))
         if let role = role {
             traits.formUnion(traitByRole[role.lowercased()] ?? [])
         }
@@ -333,10 +399,71 @@ public enum PNViewStyler {
             }
             if PNProps.bool(state["disabled"]) == true { traits.insert(.notEnabled) }
             if PNProps.bool(state["busy"]) == true { traits.insert(.updatesFrequently) }
-            if let expanded = PNProps.bool(state["expanded"]) {
-                view.accessibilityValue = expanded ? "expanded" : "collapsed"
+            if value == nil, let expanded = PNProps.bool(state["expanded"]) {
+                value = expanded ? "expanded" : "collapsed"
             }
         }
+        view.accessibilityValue = value
         view.accessibilityTraits = traits
+    }
+
+    /// `accessibility_value`: a string, or `{"min", "max", "now", "text"}`
+    /// where `text` wins, then a `min`/`max`/`now` triple reads as a
+    /// percentage (React Native's iOS behavior), then `now` alone.
+    public static func accessibilityValue(_ raw: Any?) -> String? {
+        guard let raw = raw, !(raw is NSNull) else { return nil }
+        if let text = raw as? String { return text }
+        if let number = raw as? NSNumber { return number.stringValue }
+        guard let dict = raw as? [String: Any] else { return nil }
+        if let text = PNProps.string(dict["text"]), !text.isEmpty { return text }
+        let now = PNProps.double(dict["now"])
+        if let now = now, let min = PNProps.double(dict["min"]), let max = PNProps.double(dict["max"]), max > min {
+            let percent = (now - min) / (max - min) * 100
+            return "\(Int(percent.rounded()))%"
+        }
+        if let now = now {
+            return now.rounded() == now ? String(Int(now)) : String(now)
+        }
+        return nil
+    }
+
+    /// `accessibility_actions`: `[{"name", "label"?}]` become custom
+    /// actions that emit `on_accessibility_action(name)`.
+    static func applyAccessibilityActions(_ view: UIView, _ raw: Any?) {
+        let specs = ((raw as? [Any]) ?? []).compactMap { $0 as? [String: Any] }
+        guard !specs.isEmpty else {
+            view.accessibilityCustomActions = nil
+            return
+        }
+        view.accessibilityCustomActions = specs.compactMap { spec in
+            guard let name = PNProps.string(spec["name"]), !name.isEmpty else { return nil }
+            let label = PNProps.string(spec["label"]) ?? name
+            return UIAccessibilityCustomAction(name: label) { [weak view] _ in
+                guard let view = view else { return false }
+                PNEvents.emitIfWired(view, "on_accessibility_action", [name])
+                return true
+            }
+        }
+    }
+
+    /// `important_for_accessibility`: `"yes"` exposes the view,
+    /// `"no"` hides it but keeps its descendants, `"no_hide_descendants"`
+    /// hides the whole subtree, `"auto"` restores the `accessible` prop.
+    static func applyImportance(_ view: UIView, _ mode: String?) {
+        let merged = PNViewState.existing(for: view)?.props
+        switch mode {
+        case "yes":
+            view.accessibilityElementsHidden = false
+            view.isAccessibilityElement = true
+        case "no":
+            view.accessibilityElementsHidden = false
+            view.isAccessibilityElement = false
+        case "no_hide_descendants":
+            view.accessibilityElementsHidden = true
+            view.isAccessibilityElement = false
+        default:
+            view.accessibilityElementsHidden = false
+            view.isAccessibilityElement = merged.flatMap { PNProps.bool(PNProps.value($0, "accessible")) } ?? false
+        }
     }
 }

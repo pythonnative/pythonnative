@@ -1,14 +1,24 @@
 """Media factories: ``Image``, ``ImageBackground``, and ``WebView``."""
 
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Any, Callable, Literal, Mapping, Optional, Sequence, Union
 
 from ..assets import Asset
 from ..element import Element
 from ..hooks import Ref
-from ..style import AccessibilityState, Color, ScaleType, StyleProp, resolve_style
-from ._base import _make_element
+from ..style import (
+    AccessibilityAction,
+    AccessibilityState,
+    AccessibilityValue,
+    Color,
+    ImportantForAccessibility,
+    ScaleType,
+    Style,
+    StyleProp,
+    StyleSheet,
+)
+from ._base import _accessibility_actions, _accessibility_value, _make_element
+from .events import ImageLoadEvent, WebNavigationEvent
 from .layout import View
-from .media_events import ImageLoadEvent, WebNavigationEvent
 
 ImageSource = Union[str, Asset]
 """What ``Image.source`` accepts: a URL, ``data:`` URI, file path, or bundled [`Asset`][pythonnative.Asset]."""
@@ -30,14 +40,22 @@ def Image(
     tint_color: Optional[Color] = None,
     placeholder_color: Optional[Color] = None,
     blur_radius: Optional[float] = None,
+    on_load_start: Optional[Callable[[], Any]] = None,
     on_load: Optional[Callable[[ImageLoadEvent], Any]] = None,
+    on_load_end: Optional[Callable[[], Any]] = None,
     on_error: Optional[Callable[[str], Any]] = None,
+    fade_duration: Optional[float] = None,
+    headers: Optional[Mapping[str, str]] = None,
     style: StyleProp = None,
     accessibility_label: Optional[str] = None,
     accessibility_role: Optional[str] = None,
     accessible: Optional[bool] = None,
     accessibility_state: Optional[AccessibilityState] = None,
+    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
+    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
+    on_accessibility_action: Optional[Callable[[str], Any]] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    important_for_accessibility: Optional[ImportantForAccessibility] = None,
     test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
@@ -72,10 +90,18 @@ def Image(
             is loading (and left in place if it fails).
         blur_radius: Gaussian blur radius in logical points applied to
             the decoded image.
+        on_load_start: Callback invoked when loading begins (a network
+            fetch or a decode).
         on_load: Callback invoked once the image has been decoded and
             displayed, with its logical width and height.
+        on_load_end: Callback invoked when loading finishes, after
+            ``on_load`` or ``on_error``.
         on_error: Callback invoked with an error message when a remote
             image fails to download or decode.
+        fade_duration: Milliseconds to cross-fade the image in once it
+            has loaded (Android and the browser; iOS shows it at once).
+        headers: Extra HTTP headers sent with a network ``source``
+            (authorization, cache control).
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
         accessibility_role: Override the default ``"image"`` role.
@@ -84,9 +110,16 @@ def Image(
             e.g. ``{"disabled": True, "selected": False}``. Recognized
             keys: ``disabled``, ``selected``, ``checked``, ``busy``,
             ``expanded``.
+        accessibility_value: The widget's current value for assistive
+            tech (a string or an
+            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
+        accessibility_actions: Custom screen-reader actions, each an
+            [`AccessibilityAction`][pythonnative.AccessibilityAction].
+        on_accessibility_action: Callback invoked with the action name.
         accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``
-            (Android only).
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
+        important_for_accessibility: Whether AT sees this view and its
+            subtree.
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
@@ -110,13 +143,21 @@ def Image(
         tint_color=tint_color,
         placeholder_color=placeholder_color,
         blur_radius=blur_radius,
+        on_load_start=on_load_start,
         on_load=on_load,
+        on_load_end=on_load_end,
         on_error=on_error,
+        fade_duration=fade_duration,
+        headers=dict(headers) if headers else None,
         accessibility_label=accessibility_label,
         accessibility_role=accessibility_role,
         accessible=accessible,
         accessibility_state=accessibility_state,
+        accessibility_value=_accessibility_value(accessibility_value),
+        accessibility_actions=_accessibility_actions(accessibility_actions),
+        on_accessibility_action=on_accessibility_action,
         accessibility_live_region=accessibility_live_region,
+        important_for_accessibility=important_for_accessibility,
         test_id=test_id,
         _defaults={"accessibility_role": "image"},
     )
@@ -130,7 +171,11 @@ def ImageBackground(
     accessibility_label: Optional[str] = None,
     accessible: Optional[bool] = None,
     accessibility_state: Optional[AccessibilityState] = None,
+    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
+    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
+    on_accessibility_action: Optional[Callable[[str], Any]] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    important_for_accessibility: Optional[ImportantForAccessibility] = None,
     test_id: Optional[str] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -155,9 +200,16 @@ def ImageBackground(
             e.g. ``{"disabled": True, "selected": False}``. Recognized
             keys: ``disabled``, ``selected``, ``checked``, ``busy``,
             ``expanded``.
+        accessibility_value: The widget's current value for assistive
+            tech (a string or an
+            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
+        accessibility_actions: Custom screen-reader actions, each an
+            [`AccessibilityAction`][pythonnative.AccessibilityAction].
+        on_accessibility_action: Callback invoked with the action name.
         accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``
-            (Android only).
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
+        important_for_accessibility: Whether AT sees this view and its
+            subtree.
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
@@ -167,7 +219,7 @@ def ImageBackground(
         An [`Element`][pythonnative.Element] of type ``"View"`` wrapping
         the background image and foreground content.
     """
-    fill = {"position": "absolute", "top": 0, "left": 0, "right": 0, "bottom": 0}
+    fill: Style = {"position": "absolute", "top": 0, "left": 0, "right": 0, "bottom": 0}
     background = Image(
         source,
         scale_type=scale_type or "cover",
@@ -175,14 +227,18 @@ def ImageBackground(
         accessibility_label=accessibility_label,
         accessible=accessible,
         accessibility_state=accessibility_state,
+        accessibility_value=accessibility_value,
+        accessibility_actions=accessibility_actions,
+        on_accessibility_action=on_accessibility_action,
         accessibility_live_region=accessibility_live_region,
+        important_for_accessibility=important_for_accessibility,
         test_id=test_id,
     )
     content = View(*children, style={"flex": 1})
     return View(
         background,
         content,
-        style=[{"overflow": "hidden"}, resolve_style(style)],
+        style=[{"overflow": "hidden"}, StyleSheet.flatten(style)],
         key=key,
     )
 
@@ -199,6 +255,7 @@ def WebView(
     inject_javascript: Optional[str] = None,
     scroll_enabled: bool = True,
     style: StyleProp = None,
+    ref: Optional[Ref] = None,
     key: Optional[str] = None,
 ) -> Element:
     """Embed web content from a URL or an inline HTML string.
@@ -221,6 +278,9 @@ def WebView(
         scroll_enabled: When ``False``, disables scrolling inside the
             web content.
         style: Style dict (or list of dicts).
+        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``;
+            receives a [`WebViewHandle`][pythonnative.WebViewHandle]
+            with ``reload()``, ``go_back()``, ``eval_js()``, and friends.
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -229,6 +289,7 @@ def WebView(
     return _make_element(
         "WebView",
         style=style,
+        ref=ref,
         key=key,
         url=url or None,
         html=html,

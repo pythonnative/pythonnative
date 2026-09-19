@@ -72,6 +72,15 @@ gestures=[
 Every callback receives a [`GestureEvent`][pythonnative.gestures.GestureEvent]
 with position, translation, velocity, scale, and rotation populated as
 appropriate for the gesture kind.
+
+Every descriptor accepts ``enabled=False`` to keep it in the list (so
+sibling indices and composition stay stable) while it neither
+recognizes nor takes part in arbitration. [`Pan`][pythonnative.gestures.Pan]
+adds React Native Gesture Handler's activation criteria
+(``active_offset_x``, ``fail_offset_y``, ``max_pointers``,
+``min_velocity``, ...); the rules are spelled out on the class and
+implemented identically by the arbiter below and by the native
+recognizers.
 """
 
 from __future__ import annotations
@@ -79,11 +88,14 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, Tuple, Union
 
 __all__ = [
+    "DEFAULT_PAN_MIN_DISTANCE",
     "GestureState",
     "GestureEvent",
+    "GestureSpec",
+    "SwipeDirection",
     "Tap",
     "LongPress",
     "Pan",
@@ -127,7 +139,16 @@ class GestureState(str, Enum):
 
 GestureCallback = Callable[["GestureEvent"], Any]
 
-SwipeDirection = Literal["any", "left", "right", "up", "down"]
+SwipeDirection = Literal["left", "right", "up", "down"]
+"""A resolved swipe or fling direction; ``None`` on a descriptor means any direction."""
+
+_SWIPE_DIRECTIONS = frozenset({"left", "right", "up", "down"})
+
+Offset = Union[float, Tuple[float, float]]
+"""A pan activation or failure bound: one number or a ``(negative_bound, positive_bound)`` pair."""
+
+DEFAULT_PAN_MIN_DISTANCE = 10.0
+"""Points a pan must travel before activating when no other activation criterion is given."""
 
 
 @dataclass(frozen=True)
@@ -140,6 +161,10 @@ class GestureEvent:
         state: One of [`GestureState`][pythonnative.gestures.GestureState].
         x: Pointer x-position in the view's coordinate space (points).
         y: Pointer y-position in the view's coordinate space (points).
+        absolute_x: Pointer x-position in the window's coordinate
+            space (points).
+        absolute_y: Pointer y-position in the window's coordinate
+            space (points).
         translation_x: Horizontal displacement since the gesture
             activated (pan only).
         translation_y: Vertical displacement since the gesture
@@ -152,13 +177,16 @@ class GestureEvent:
         rotation: Rotation in radians relative to activation
             (rotation only).
         pointer_count: Number of pointers currently down.
-        direction: Resolved swipe/fling direction.
+        direction: Resolved swipe/fling direction, or ``None`` for
+            other gesture kinds.
     """
 
     kind: str
     state: GestureState
     x: float = 0.0
     y: float = 0.0
+    absolute_x: float = 0.0
+    absolute_y: float = 0.0
     translation_x: float = 0.0
     translation_y: float = 0.0
     velocity_x: float = 0.0
@@ -166,7 +194,7 @@ class GestureEvent:
     scale: float = 1.0
     rotation: float = 0.0
     pointer_count: int = 1
-    direction: Optional[str] = None
+    direction: Optional[SwipeDirection] = None
 
     def __post_init__(self) -> None:
         # Payloads from the native bridge carry plain strings; coerce
@@ -181,6 +209,8 @@ _EVENT_FIELDS = frozenset(
         "state",
         "x",
         "y",
+        "absolute_x",
+        "absolute_y",
         "translation_x",
         "translation_y",
         "velocity_x",
@@ -209,11 +239,22 @@ def event_from_payload(payload: Dict[str, Any]) -> GestureEvent:
 
 @dataclass(frozen=True)
 class _BaseGesture:
-    """Shared callback slots for continuous gestures."""
+    """Shared callback slots and the ``enabled`` switch for every gesture.
+
+    Attributes:
+        on_begin: Called when a continuous gesture activates.
+        on_change: Called on every update of a continuous gesture.
+        on_end: Called when the gesture ends or is cancelled.
+        enabled: When ``False`` the gesture stays in the list (indices
+            and composition are unchanged) but never recognizes and is
+            skipped by ``Race`` and ``Exclusive`` arbitration, so a
+            later ``Exclusive`` member doesn't wait for it.
+    """
 
     on_begin: Optional[GestureCallback] = None
     on_change: Optional[GestureCallback] = None
     on_end: Optional[GestureCallback] = None
+    enabled: bool = True
 
     kind: str = ""
 
@@ -221,7 +262,7 @@ class _BaseGesture:
         return {}
 
     def _to_spec(self) -> Dict[str, Any]:
-        spec: Dict[str, Any] = {"kind": self.kind}
+        spec: Dict[str, Any] = {"kind": self.kind, "enabled": bool(self.enabled)}
         spec.update(self._config())
         return spec
 
@@ -301,28 +342,154 @@ class LongPress(_BaseGesture):
             super()._dispatch(event)
 
 
+def _normalize_offset(name: str, value: Any) -> Optional[List[Optional[float]]]:
+    """Turn an ``Offset`` argument into the wire form ``[negative_bound, positive_bound]``.
+
+    A single number ``n`` is a one-sided threshold: ``n >= 0`` bounds the
+    positive direction only (``[None, n]``) and ``n < 0`` the negative
+    direction only (``[n, None]``). A pair is ``(negative_bound,
+    positive_bound)`` and must satisfy ``negative_bound <= 0 <=
+    positive_bound``; either side may be ``None`` for "unbounded".
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise TypeError(f"{name} must be a number or a (negative_bound, positive_bound) pair, not a bool")
+    if isinstance(value, (int, float)):
+        n = float(value)
+        return [None, n] if n >= 0 else [n, None]
+    try:
+        lo, hi = value
+    except (TypeError, ValueError):
+        raise TypeError(f"{name} must be a number or a (negative_bound, positive_bound) pair (got {value!r})") from None
+    low = None if lo is None else float(lo)
+    high = None if hi is None else float(hi)
+    if (low is not None and low > 0.0) or (high is not None and high < 0.0):
+        raise ValueError(f"{name} pair must satisfy negative_bound <= 0 <= positive_bound (got {value!r})")
+    return [low, high]
+
+
+def _crosses(bounds: Optional[List[Optional[float]]], delta: float) -> bool:
+    """Whether ``delta`` lies outside ``[negative_bound, positive_bound]`` (strict)."""
+    if bounds is None:
+        return False
+    low, high = bounds
+    return (low is not None and delta < low) or (high is not None and delta > high)
+
+
 @dataclass(frozen=True)
 class Pan(_BaseGesture):
     """Track a drag with translation and velocity.
 
-    Activates once the pointer travels ``min_distance`` points, then
-    reports ``on_change`` for every movement with translation measured
-    from the activation point, and ``on_end`` with release velocity.
+    Once the pan activates it reports ``on_change`` for every movement
+    with translation measured from the activation point, and ``on_end``
+    with the release velocity.
+
+    **Activation rules** (the same on iOS, Android, and the browser
+    preview). Before activation, with ``dx``/``dy`` the pointer travel
+    from where it first touched down:
+
+    1. If ``dx`` crosses ``fail_offset_x`` or ``dy`` crosses
+       ``fail_offset_y``, the pan fails for the rest of the interaction.
+    2. Otherwise the pan activates as soon as any one criterion holds:
+       ``dx`` crosses ``active_offset_x``; ``dy`` crosses
+       ``active_offset_y``; the straight-line travel is at least
+       ``min_distance``; or the pointer speed is at least
+       ``min_velocity``.
+
+    "Crossing" a bound is strict: a single number ``n`` means ``dx > n``
+    when ``n >= 0`` and ``dx < n`` when ``n < 0``; a
+    ``(negative_bound, positive_bound)`` pair means ``dx <
+    negative_bound or dx > positive_bound``, and the pair must satisfy
+    ``negative_bound <= 0 <= positive_bound``. Following React Native
+    Gesture Handler, the default ``min_distance`` of
+    ``DEFAULT_PAN_MIN_DISTANCE`` (10 points) applies only when none of
+    the offset or velocity criteria is given; pass ``min_distance``
+    explicitly to combine it with them.
+
+    Pointer counts: the pan tracks only while at least ``min_pointers``
+    are down. When more than ``max_pointers`` touch down, a pan that
+    hasn't activated fails and an active pan is cancelled.
 
     Attributes:
-        min_distance: Travel (points) required before the pan activates.
+        min_distance: Travel (points) that activates the pan. ``None``
+            (default) means 10 points unless another activation
+            criterion is set.
         min_pointers: Minimum pointers that must be down.
+        max_pointers: Maximum pointers allowed; ``None`` for no limit.
+        active_offset_x: Horizontal travel that activates the pan.
+        active_offset_y: Vertical travel that activates the pan.
+        fail_offset_x: Horizontal travel that fails the pan.
+        fail_offset_y: Vertical travel that fails the pan.
+        min_velocity: Pointer speed in points/second that activates the
+            pan regardless of distance.
+
+    Example:
+        ```python
+        # A horizontal swipe-to-dismiss row inside a vertical list.
+        gestures.Pan(active_offset_x=(-20, 20), fail_offset_y=(-15, 15), on_change=drag)
+        ```
     """
 
-    min_distance: float = 10.0
+    min_distance: Optional[float] = None
     min_pointers: int = 1
+    max_pointers: Optional[int] = None
+    active_offset_x: Optional[Offset] = None
+    active_offset_y: Optional[Offset] = None
+    fail_offset_x: Optional[Offset] = None
+    fail_offset_y: Optional[Offset] = None
+    min_velocity: Optional[float] = None
     kind: str = "pan"
 
+    def __post_init__(self) -> None:
+        for name in ("active_offset_x", "active_offset_y", "fail_offset_x", "fail_offset_y"):
+            _normalize_offset(name, getattr(self, name))
+        if self.min_distance is not None and float(self.min_distance) < 0.0:
+            raise ValueError("min_distance must be non-negative")
+        if int(self.min_pointers) < 1:
+            raise ValueError("min_pointers must be at least 1")
+        if self.max_pointers is not None and int(self.max_pointers) < int(self.min_pointers):
+            raise ValueError("max_pointers must be at least min_pointers")
+        if self.min_velocity is not None and float(self.min_velocity) < 0.0:
+            raise ValueError("min_velocity must be non-negative")
+
+    def _has_custom_activation(self) -> bool:
+        return any(
+            value is not None
+            for value in (
+                self.active_offset_x,
+                self.active_offset_y,
+                self.fail_offset_x,
+                self.fail_offset_y,
+                self.min_velocity,
+            )
+        )
+
     def _config(self) -> Dict[str, Any]:
+        min_distance: Optional[float]
+        if self.min_distance is not None:
+            min_distance = float(self.min_distance)
+        elif self._has_custom_activation():
+            min_distance = None
+        else:
+            min_distance = DEFAULT_PAN_MIN_DISTANCE
         return {
-            "min_distance": float(self.min_distance),
+            "min_distance": min_distance,
             "min_pointers": int(self.min_pointers),
+            "max_pointers": None if self.max_pointers is None else int(self.max_pointers),
+            "active_offset_x": _normalize_offset("active_offset_x", self.active_offset_x),
+            "active_offset_y": _normalize_offset("active_offset_y", self.active_offset_y),
+            "fail_offset_x": _normalize_offset("fail_offset_x", self.fail_offset_x),
+            "fail_offset_y": _normalize_offset("fail_offset_y", self.fail_offset_y),
+            "min_velocity": None if self.min_velocity is None else float(self.min_velocity),
         }
+
+
+def _check_direction(direction: Any) -> None:
+    if direction is not None and direction not in _SWIPE_DIRECTIONS:
+        raise ValueError(
+            f"direction must be one of left, right, up, down, or None for any direction (got {direction!r})"
+        )
 
 
 @dataclass(frozen=True)
@@ -332,17 +499,20 @@ class Swipe(_BaseGesture):
     Attributes:
         on_swipe: Called once on release with the resolved
             ``direction`` and release velocity.
-        direction: Required direction, or ``"any"``.
+        direction: Required direction, or ``None`` for any direction.
         min_velocity: Minimum release speed in points/second.
     """
 
     on_swipe: Optional[GestureCallback] = None
-    direction: SwipeDirection = "any"
+    direction: Optional[SwipeDirection] = None
     min_velocity: float = 300.0
     kind: str = "swipe"
 
+    def __post_init__(self) -> None:
+        _check_direction(self.direction)
+
     def _config(self) -> Dict[str, Any]:
-        return {"direction": str(self.direction), "min_velocity": float(self.min_velocity)}
+        return {"direction": self.direction or "any", "min_velocity": float(self.min_velocity)}
 
     def _dispatch(self, event: GestureEvent) -> None:
         if event.state == GestureState.ENDED and self.on_swipe is not None:
@@ -370,20 +540,23 @@ class Fling(_BaseGesture):
     Attributes:
         on_fling: Called once on release with the resolved
             ``direction`` and release velocity.
-        direction: Required direction, or ``"any"``.
+        direction: Required direction, or ``None`` for any direction.
         n_pointers: Number of pointers that must participate.
         min_velocity: Minimum release speed in points/second.
     """
 
     on_fling: Optional[GestureCallback] = None
-    direction: SwipeDirection = "any"
+    direction: Optional[SwipeDirection] = None
     n_pointers: int = 1
     min_velocity: float = 300.0
     kind: str = "fling"
 
+    def __post_init__(self) -> None:
+        _check_direction(self.direction)
+
     def _config(self) -> Dict[str, Any]:
         return {
-            "direction": str(self.direction),
+            "direction": self.direction or "any",
             "n_pointers": int(self.n_pointers),
             "min_velocity": float(self.min_velocity),
         }
@@ -491,6 +664,11 @@ def serialize_gestures(
     the top-level list (outside any composition node) are mutually
     simultaneous.
 
+    A gesture with ``enabled=False`` keeps its index and its
+    ``"enabled": false`` config so the native side can skip it, but it
+    is left out of every relationship: nothing waits for it and it
+    races nobody.
+
     Args:
         specs: The value of an element's ``gestures`` prop. Plain dicts
             are passed through with relationship metadata attached (no
@@ -530,6 +708,17 @@ def serialize_gestures(
             for a in top_level[a_i]:
                 for b in top_level[b_i]:
                     sim_pairs.add((a, b))
+
+    def _enabled(leaf: Any) -> bool:
+        if isinstance(leaf, _BaseGesture):
+            return bool(leaf.enabled)
+        if isinstance(leaf, dict):
+            return leaf.get("enabled", True) is not False
+        return True
+
+    disabled = {i for i, leaf in enumerate(leaves) if not _enabled(leaf)}
+    sim_pairs = {(a, b) for a, b in sim_pairs if a not in disabled and b not in disabled}
+    wait_pairs = {(w, t) for w, t in wait_pairs if w not in disabled and t not in disabled}
 
     clean: List[Dict[str, Any]] = []
     events: Dict[str, Callable[..., Any]] = {}
@@ -794,13 +983,35 @@ class _LongPressRecognizer(_Recognizer):
 
 
 class _PanRecognizer(_Recognizer):
+    """Pan state machine implementing the activation rules documented on ``Pan``."""
+
     def __init__(self, index: int, config: Dict[str, Any], emit: EmitFn) -> None:
         super().__init__(index, config, emit)
-        self._min_distance = float(config.get("min_distance", 10.0))
         self._min_pointers = max(1, int(config.get("min_pointers", 1)))
+        max_pointers = config.get("max_pointers")
+        self._max_pointers: Optional[int] = None if max_pointers is None else int(max_pointers)
+        self._active_x = _normalize_offset("active_offset_x", config.get("active_offset_x"))
+        self._active_y = _normalize_offset("active_offset_y", config.get("active_offset_y"))
+        self._fail_x = _normalize_offset("fail_offset_x", config.get("fail_offset_x"))
+        self._fail_y = _normalize_offset("fail_offset_y", config.get("fail_offset_y"))
+        min_velocity = config.get("min_velocity")
+        self._min_velocity: Optional[float] = None if min_velocity is None else float(min_velocity)
+        custom = (
+            any(b is not None for b in (self._active_x, self._active_y, self._fail_x, self._fail_y))
+            or self._min_velocity is not None
+        )
+        self._min_distance: Optional[float]
+        if "min_distance" in config:
+            raw = config["min_distance"]
+            self._min_distance = None if raw is None else float(raw)
+        else:
+            # Hand-built specs follow the descriptor's rule: the default
+            # distance applies only without other activation criteria.
+            self._min_distance = None if custom else DEFAULT_PAN_MIN_DISTANCE
         self._origin: Optional[Tuple[float, float]] = None
         self._anchor: Optional[Tuple[float, float]] = None
         self._active = False
+        self._failed = False
         self._velocity = _VelocityTracker()
         self._last_translation: Tuple[float, float] = (0.0, 0.0)
 
@@ -808,8 +1019,32 @@ class _PanRecognizer(_Recognizer):
     def active(self) -> bool:
         return self._active
 
+    def _should_fail(self, dx: float, dy: float) -> bool:
+        return _crosses(self._fail_x, dx) or _crosses(self._fail_y, dy)
+
+    def _should_activate(self, dx: float, dy: float) -> bool:
+        if _crosses(self._active_x, dx) or _crosses(self._active_y, dy):
+            return True
+        if self._min_distance is not None and math.hypot(dx, dy) >= self._min_distance:
+            return True
+        if self._min_velocity is not None:
+            vx, vy = self._velocity.velocity()
+            if math.hypot(vx, vy) >= self._min_velocity:
+                return True
+        return False
+
     def down(self, pointers: Dict[int, Tuple[float, float]], t: float) -> None:
-        if len(pointers) < self._min_pointers:
+        if self._max_pointers is not None and len(pointers) > self._max_pointers:
+            if self._active:
+                x, y = _centroid(pointers)
+                self.emit(GestureState.CANCELLED, x=x, y=y, pointer_count=len(pointers))
+                self._reset()
+                self._failed = True
+            elif not self._failed:
+                self._failed = True
+                self.fail()
+            return
+        if self._failed or len(pointers) < self._min_pointers:
             return
         if self._origin is None:
             self._origin = _centroid(pointers)
@@ -822,12 +1057,18 @@ class _PanRecognizer(_Recognizer):
             self._rebase(pointers)
 
     def move(self, pointers: Dict[int, Tuple[float, float]], t: float) -> None:
-        if self._origin is None or len(pointers) < self._min_pointers:
+        if self._failed or self._origin is None or len(pointers) < self._min_pointers:
             return
         x, y = _centroid(pointers)
         self._velocity.add(x, y, t)
         if not self._active:
-            if math.hypot(x - self._origin[0], y - self._origin[1]) < self._min_distance:
+            dx = x - self._origin[0]
+            dy = y - self._origin[1]
+            if self._should_fail(dx, dy):
+                self._failed = True
+                self.fail()
+                return
+            if not self._should_activate(dx, dy):
                 return
             self._active = True
             self._anchor = (x, y)
@@ -863,7 +1104,7 @@ class _PanRecognizer(_Recognizer):
             )
             self._reset()
         elif not pointers:
-            if not self._active and self._origin is not None:
+            if not self._active and self._origin is not None and not self._failed:
                 self.fail()
             self._reset()
         elif self._active:
@@ -887,6 +1128,7 @@ class _PanRecognizer(_Recognizer):
         self._origin = None
         self._anchor = None
         self._active = False
+        self._failed = False
         self._velocity.reset()
         self._last_translation = (0.0, 0.0)
 
@@ -1108,7 +1350,15 @@ class GestureArbiter:
       discarded if a target succeeds.
 
     Specs without relationship metadata (hand-built dicts) default to
-    fully simultaneous, matching pre-composition behavior.
+    fully simultaneous, matching pre-composition behavior. Specs with
+    ``"enabled": false`` get no recognizer at all: they never emit and
+    are invisible to arbitration.
+
+    Positions: ``x``/``y`` are in the view's coordinate space. Hosts that
+    know the pointer's window position pass it as ``absolute_x`` /
+    ``absolute_y``; the arbiter stamps every payload that carries a
+    position with the matching window position (identical to ``x``/``y``
+    when the host doesn't provide it).
 
     Timing: after each pointer event, hosts should check
     [`next_deadline`][pythonnative.gestures.GestureArbiter.next_deadline]
@@ -1128,7 +1378,12 @@ class GestureArbiter:
         self._states: Dict[int, str] = {}
         self._buffers: Dict[int, List[Dict[str, Any]]] = {}
         self._last_t = 0.0
+        # Window position minus view position for the latest pointer
+        # sample; constant per view, so it converts any payload position.
+        self._absolute_offset: Tuple[float, float] = (0.0, 0.0)
         for i, spec in enumerate(specs):
+            if spec.get("enabled", True) is False:
+                continue
             recognizer_cls = _RECOGNIZERS.get(str(spec.get("kind", "")))
             if recognizer_cls is None:
                 continue
@@ -1143,9 +1398,31 @@ class GestureArbiter:
 
     # -- pointer input ---------------------------------------------------
 
-    def pointer_down(self, pointer_id: int, x: float, y: float, t: float) -> None:
-        """Record a pointer press and advance every recognizer."""
+    def _note_absolute(self, x: float, y: float, absolute_x: Optional[float], absolute_y: Optional[float]) -> None:
+        if absolute_x is not None and absolute_y is not None:
+            self._absolute_offset = (float(absolute_x) - x, float(absolute_y) - y)
+
+    def pointer_down(
+        self,
+        pointer_id: int,
+        x: float,
+        y: float,
+        t: float,
+        absolute_x: Optional[float] = None,
+        absolute_y: Optional[float] = None,
+    ) -> None:
+        """Record a pointer press and advance every recognizer.
+
+        Args:
+            pointer_id: Host pointer identifier.
+            x: Position in the view's coordinate space (points).
+            y: Position in the view's coordinate space (points).
+            t: Timestamp in seconds on any monotonic clock.
+            absolute_x: Position in the window's coordinate space, if known.
+            absolute_y: Position in the window's coordinate space, if known.
+        """
         self._last_t = t
+        self._note_absolute(x, y, absolute_x, absolute_y)
         if not self._pointers and not any(s == _WAITING for s in self._states.values()):
             # Fresh interaction: clear per-interaction verdicts.
             for i in self._indices:
@@ -1155,18 +1432,36 @@ class GestureArbiter:
         for recognizer in self._recognizers:
             recognizer.down(self._pointers, t)
 
-    def pointer_move(self, pointer_id: int, x: float, y: float, t: float) -> None:
-        """Record pointer travel and advance every recognizer."""
+    def pointer_move(
+        self,
+        pointer_id: int,
+        x: float,
+        y: float,
+        t: float,
+        absolute_x: Optional[float] = None,
+        absolute_y: Optional[float] = None,
+    ) -> None:
+        """Record pointer travel and advance every recognizer (arguments as for ``pointer_down``)."""
         self._last_t = t
         if pointer_id not in self._pointers:
             return
+        self._note_absolute(x, y, absolute_x, absolute_y)
         self._pointers[pointer_id] = (x, y)
         for recognizer in self._recognizers:
             recognizer.move(self._pointers, t)
 
-    def pointer_up(self, pointer_id: int, x: float, y: float, t: float) -> None:
-        """Record a pointer release and advance every recognizer."""
+    def pointer_up(
+        self,
+        pointer_id: int,
+        x: float,
+        y: float,
+        t: float,
+        absolute_x: Optional[float] = None,
+        absolute_y: Optional[float] = None,
+    ) -> None:
+        """Record a pointer release and advance every recognizer (arguments as for ``pointer_down``)."""
         self._last_t = t
+        self._note_absolute(x, y, absolute_x, absolute_y)
         self._pointers.pop(pointer_id, None)
         for recognizer in self._recognizers:
             recognizer.up(self._pointers, t, x, y)
@@ -1204,6 +1499,14 @@ class GestureArbiter:
 
     # -- arbitration -------------------------------------------------------
 
+    def _deliver(self, index: int, payload: Dict[str, Any]) -> None:
+        """Stamp window coordinates onto a positioned payload and hand it to the host."""
+        if "x" in payload and "y" in payload:
+            offset_x, offset_y = self._absolute_offset
+            payload.setdefault("absolute_x", float(payload["x"]) + offset_x)
+            payload.setdefault("absolute_y", float(payload["y"]) + offset_y)
+        self._emit_out(index, payload)
+
     def _recognizer_for(self, index: int) -> Optional[_Recognizer]:
         for r in self._recognizers:
             if r.index == index:
@@ -1230,7 +1533,7 @@ class GestureArbiter:
             return
 
         if current == _ACTIVE:
-            self._emit_out(index, payload)
+            self._deliver(index, payload)
             if state == GestureState.ENDED:
                 self._states[index] = _DONE
                 self._on_resolved(index, succeeded=True)
@@ -1288,7 +1591,7 @@ class GestureArbiter:
                     recognizer.force_fail(self._last_t)
                 self._set_failed(j, discard_buffer=True)
         for payload in payloads:
-            self._emit_out(index, payload)
+            self._deliver(index, payload)
         if self._states[index] == _DONE:
             self._on_resolved(index, succeeded=True)
 

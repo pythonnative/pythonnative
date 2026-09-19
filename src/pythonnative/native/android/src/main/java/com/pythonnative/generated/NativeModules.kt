@@ -4,6 +4,43 @@ import org.json.JSONObject
 import com.pythonnative.runtime.modules.NativeModule
 import com.pythonnative.runtime.modules.Promise
 
+interface AccessibilityInfoImplementation {
+    fun `announce`(`message`: String): Unit
+    fun `is_reduce_motion_enabled`(): Boolean
+    fun `is_screen_reader_enabled`(): Boolean
+    fun `set_accessibility_focus`(`tag`: Long): Unit
+}
+
+class AccessibilityInfoModuleAdapter(private val implementation: AccessibilityInfoImplementation): NativeModule {
+    override val name = "AccessibilityInfo"
+    override fun call(method: String, args: JSONObject, promise: Promise) {
+        try {
+            require(PNContracts.validateModule(name, method, args)) { "Invalid native arguments" }
+            when (method) {
+                "announce" -> {
+                    val `message` = PNValues.string((args.opt("message")))
+                    implementation.`announce`(`message`); promise.resolve(null)
+                }
+                "is_reduce_motion_enabled" -> {
+                    promise.resolve(PNValues.encode(implementation.`is_reduce_motion_enabled`()))
+                }
+                "is_screen_reader_enabled" -> {
+                    promise.resolve(PNValues.encode(implementation.`is_screen_reader_enabled`()))
+                }
+                "set_accessibility_focus" -> {
+                    val `tag` = PNValues.integer((args.opt("tag")))
+                    implementation.`set_accessibility_focus`(`tag`); promise.resolve(null)
+                }
+                else -> promise.rejectUnknownMethod(method)
+            }
+        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+    }
+}
+
+object AccessibilityInfoEvents {
+    fun `change`(payload: Map<String, PNJSONValue>) = com.pythonnative.runtime.modules.ModuleEvents.emit("AccessibilityInfo", "change", PNValues.encode(payload))
+}
+
 interface AlertImplementation {
     fun `present`(`title`: String, `message`: String?, `buttons`: List<Map<String, PNJSONValue>>, `style`: String, completion: (Result<Long>) -> Unit): (() -> Unit)?
     fun `show`(`title`: String, `message`: String?, `buttons`: List<Map<String, PNJSONValue>>, `style`: String): Unit
@@ -115,6 +152,10 @@ class BatteryModuleAdapter(private val implementation: BatteryImplementation): N
             }
         } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
     }
+}
+
+object BatteryEvents {
+    fun `change`(payload: Map<String, PNJSONValue>) = com.pythonnative.runtime.modules.ModuleEvents.emit("Battery", "change", PNValues.encode(payload))
 }
 
 interface BiometricsImplementation {
@@ -303,6 +344,33 @@ class ImagesModuleAdapter(private val implementation: ImagesImplementation): Nat
     }
 }
 
+interface KeyboardImplementation {
+    fun `dismiss`(): Unit
+    fun `is_visible`(): Boolean
+}
+
+class KeyboardModuleAdapter(private val implementation: KeyboardImplementation): NativeModule {
+    override val name = "Keyboard"
+    override fun call(method: String, args: JSONObject, promise: Promise) {
+        try {
+            require(PNContracts.validateModule(name, method, args)) { "Invalid native arguments" }
+            when (method) {
+                "dismiss" -> {
+                    implementation.`dismiss`(); promise.resolve(null)
+                }
+                "is_visible" -> {
+                    promise.resolve(PNValues.encode(implementation.`is_visible`()))
+                }
+                else -> promise.rejectUnknownMethod(method)
+            }
+        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+    }
+}
+
+object KeyboardEvents {
+    fun `change`(payload: Map<String, PNJSONValue>) = com.pythonnative.runtime.modules.ModuleEvents.emit("Keyboard", "change", PNValues.encode(payload))
+}
+
 interface LinkingImplementation {
     fun `can_open_url`(`url`: String): Boolean
     fun `open_settings`(): Boolean
@@ -334,6 +402,33 @@ class LinkingModuleAdapter(private val implementation: LinkingImplementation): N
 
 object LinkingEvents {
     fun `url`(payload: String) = com.pythonnative.runtime.modules.ModuleEvents.emit("Linking", "url", PNValues.encode(payload))
+}
+
+interface LocalizationImplementation {
+    fun `get_locales`(): List<Map<String, PNJSONValue>>
+    fun `get_timezone`(): String
+}
+
+class LocalizationModuleAdapter(private val implementation: LocalizationImplementation): NativeModule {
+    override val name = "Localization"
+    override fun call(method: String, args: JSONObject, promise: Promise) {
+        try {
+            require(PNContracts.validateModule(name, method, args)) { "Invalid native arguments" }
+            when (method) {
+                "get_locales" -> {
+                    promise.resolve(PNValues.encode(implementation.`get_locales`()))
+                }
+                "get_timezone" -> {
+                    promise.resolve(PNValues.encode(implementation.`get_timezone`()))
+                }
+                else -> promise.rejectUnknownMethod(method)
+            }
+        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+    }
+}
+
+object LocalizationEvents {
+    fun `change`(payload: Map<String, PNJSONValue>) = com.pythonnative.runtime.modules.ModuleEvents.emit("Localization", "change", PNValues.encode(payload))
 }
 
 interface LocationImplementation {
@@ -379,6 +474,10 @@ class NetInfoModuleAdapter(private val implementation: NetInfoImplementation): N
             }
         } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
     }
+}
+
+object NetInfoEvents {
+    fun `change`(payload: Map<String, PNJSONValue>) = com.pythonnative.runtime.modules.ModuleEvents.emit("NetInfo", "change", PNValues.encode(payload))
 }
 
 interface NotificationsImplementation {
@@ -566,6 +665,32 @@ class StorageModuleAdapter(private val implementation: StorageImplementation): N
                     val `key` = PNValues.string((args.opt("key")))
                     val `value` = PNValues.string((args.opt("value")))
                     implementation.`set`(`key`, `value`); promise.resolve(null)
+                }
+                else -> promise.rejectUnknownMethod(method)
+            }
+        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+    }
+}
+
+interface WebViewsImplementation {
+    fun `eval_js`(`tag`: Long, `script`: String, completion: (Result<String>) -> Unit): (() -> Unit)?
+}
+
+class WebViewsModuleAdapter(private val implementation: WebViewsImplementation): NativeModule {
+    override val name = "WebViews"
+    override fun call(method: String, args: JSONObject, promise: Promise) {
+        try {
+            require(PNContracts.validateModule(name, method, args)) { "Invalid native arguments" }
+            when (method) {
+                "eval_js" -> {
+                    val `tag` = PNValues.integer((args.opt("tag")))
+                    val `script` = PNValues.string((args.opt("script")))
+                    val cancellation = implementation.`eval_js`(`tag`, `script`) { result ->
+                        try {
+                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
+                        } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
+                    }
+                    if (cancellation != null) promise.onCancel(cancellation)
                 }
                 else -> promise.rejectUnknownMethod(method)
             }

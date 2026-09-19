@@ -146,8 +146,10 @@ final class PNManagerTests: XCTestCase {
         scroll.contentOffset = CGPoint(x: 0, y: 40)
         let payload = PNScrollPayload.make(scroll)
         XCTAssertEqual(payload["y"] as? Double, 40)
-        XCTAssertEqual(payload["extent"] as? Double, 200)
-        XCTAssertEqual(payload["range"] as? Double, 800)
+        XCTAssertEqual(payload["viewport_height"] as? Double, 200)
+        XCTAssertEqual(payload["content_height"] as? Double, 800)
+        XCTAssertEqual(Set(payload.keys), ["x", "y", "content_width", "content_height", "viewport_width", "viewport_height"],
+                       "ScrollEvent rejects extra keys")
     }
 
     func testRegistryKnowsEveryBuiltinType() {

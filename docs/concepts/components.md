@@ -33,15 +33,17 @@ pn.Column(
   flex container (fixed `flex_direction: "column"`).
 - [`Row(*children, style=...)`][pythonnative.Row]: horizontal flex
   container (fixed `flex_direction: "row"`).
-- [`ScrollView(child, style=...)`][pythonnative.ScrollView]:
-  scrollable container.
+- [`ScrollView(*children, horizontal, content_container_style, ...)`][pythonnative.ScrollView]:
+  scrollable container with drag, momentum, snapping, and keyboard
+  options.
 - [`SafeAreaView(*children, style=...)`][pythonnative.SafeAreaView]:
   safe-area-aware container.
 - [`Spacer(size, flex)`][pythonnative.Spacer]: empty space.
 
 **Display:**
 
-- [`Text(text, style=...)`][pythonnative.Text]: text display.
+- [`Text(*parts, ellipsize_mode, selectable, on_press, style=...)`][pythonnative.Text]:
+  text display, with nested pressable spans.
 - [`Image(source, style=...)`][pythonnative.Image]: image display
   (supports URLs and resource names).
 - [`WebView(url)`][pythonnative.WebView]: embedded web content.
@@ -55,8 +57,9 @@ pn.Column(
 - [`Switch(value, on_change)`][pythonnative.Switch]: toggle switch.
 - [`Slider(value, min_value, max_value, on_change)`][pythonnative.Slider]:
   continuous slider.
-- [`Pressable(child, on_press, on_long_press)`][pythonnative.Pressable]:
-  tap handler wrapper.
+- [`Pressable(child, on_press, on_long_press, disabled, android_ripple)`][pythonnative.Pressable]:
+  tap handler wrapper whose child and `style` may be functions of a
+  [`PressState`][pythonnative.PressState].
 
 **Feedback:**
 
@@ -67,7 +70,7 @@ pn.Column(
 
 **Overlay:**
 
-- [`Modal(*children, visible, on_dismiss, title)`][pythonnative.Modal]:
+- [`Modal(*children, visible, on_dismiss, on_request_close, title)`][pythonnative.Modal]:
   modal dialog.
 - [`Portal(*children)`][pythonnative.Portal]: render children into a
   full-screen overlay above everything else (analogous to React DOM's
@@ -94,16 +97,16 @@ pn.Column(
 
 **Lists:**
 
-- [`FlatList(data, render_item, key_extractor, item_height, ...)`][pythonnative.FlatList]:
+- [`FlatList(data, render_item, key_extractor, item_height, inverted, item_separator, ...)`][pythonnative.FlatList]:
   virtualized scrollable data list. Rows are mounted lazily as they
   scroll into view; pass `item_height=` (or `get_item_height=`) for
   exact extents, or let rows be measured on screen.
-- [`SectionList(sections, render_item, render_section_header, item_height, ...)`][pythonnative.SectionList]:
+- [`SectionList(sections, render_item, render_section_header, sticky_section_headers, ...)`][pythonnative.SectionList]:
   virtualized list with section headers.
 
 **Platform UI:**
 
-- [`StatusBar(bar_style, background_color, hidden)`][pythonnative.StatusBar]:
+- [`StatusBar(bar_style, background_color, hidden, translucent, animated)`][pythonnative.StatusBar]:
   configure the device's status bar (light/dark icons, color, hidden).
 - [`KeyboardAvoidingView(*children, behavior)`][pythonnative.KeyboardAvoidingView]:
   shift content up when the software keyboard appears.
@@ -274,9 +277,11 @@ Card(pn.Text("Body"), pn.Button("OK"), title="Hello")
 
 `@pn.component` preserves the function's signature for type checkers,
 so `Card(titel="x")` is a static error and editors autocomplete props.
-Every component also accepts `key=` for keyed reconciliation; when a
-strict type checker complains about it, declare `key: str | None =
-None` in the signature or call `.with_key(...)` on the element.
+Every component also accepts `key=` for keyed reconciliation. For a
+strictly typed call site, [`Component.keyed`][pythonnative.Component.keyed]
+returns the component's own signature with the key attached, so
+`[Row.keyed(item.id)(item) for item in items]` type-checks without
+declaring `key` in `Row`'s signature.
 
 Components that return a `list` of elements render them as siblings;
 `None` and `False` are dropped, so `cond and pn.Text("...")` is a
@@ -299,14 +304,14 @@ fine way to render conditionally.
   function references.
 - [`use_ref(initial)`][pythonnative.use_ref]: mutable
   [`Ref`][pythonnative.Ref] that persists across renders. When passed
-  via the `ref=` prop, the reconciler populates `ref.current` with the
-  underlying native view.
+  via the `ref=` prop, the reconciler publishes a typed
+  [handle](../api/handles.md) on `ref.current`.
 - [`use_imperative_handle(ref, factory, deps)`][pythonnative.use_imperative_handle]:
   publish a controller object on `ref.current` from a composite
   component (how `FlatList` exposes its
   [`ListController`][pythonnative.ListController]).
 - [`use_back_handler(handler)`][pythonnative.use_back_handler]:
-  intercept the Android back button / desktop Escape; return `True`
+  intercept the Android back action / browser Escape; return `True`
   to consume.
 - [`use_animated_value(initial)`][pythonnative.use_animated_value]:
   stable [`AnimatedValue`][pythonnative.AnimatedValue] across renders;
@@ -326,6 +331,12 @@ fine way to render conditionally.
   reactive safe-area insets.
 - [`use_keyboard_height()`][pythonnative.use_keyboard_height]:
   reactive software-keyboard height.
+- [`use_color_scheme()`][pythonnative.use_color_scheme]: the effective
+  [`ColorScheme`][pythonnative.hooks.ColorScheme], `"light"` or `"dark"`.
+- [`use_screen_reader_enabled()`][pythonnative.use_screen_reader_enabled],
+  [`use_reduce_motion()`][pythonnative.use_reduce_motion],
+  [`use_locales()`][pythonnative.use_locales]: reactive device settings
+  from the [native modules](../guides/native-modules.md).
 - [`@memo`][pythonnative.memo]: decorator that skips a function
   component's re-render when its props are shallowly equal and its
   internal state is unchanged.
@@ -351,7 +362,7 @@ theme = pn.create_context({"primary": "#007AFF"})
 
 @pn.component
 def App():
-    return theme.Provider({"primary": "#FF0000"}, MyComponent())
+    return theme.Provider(MyComponent(), value={"primary": "#FF0000"})
 
 @pn.component
 def MyComponent():

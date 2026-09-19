@@ -1,7 +1,7 @@
 import specification from "./schema.js";
 import {validateRemoval, validateProps, normalize, requiresRecreation, validateCommand} from "./contracts.js";
 import { AnimationGraph } from "./animation_graph.js";
-import {computeLayout, disposeLayout} from "./layout.js";
+import {computeLayout, disposeLayout, stackHeaderHeight} from "./layout.js";
 // The DOM "native runtime" for the browser preview.
 //
 // This module plays the role PythonNativeKit (Swift) and the pythonnative
@@ -68,11 +68,16 @@ const COMMON_KEYS = new Set([
   "shadow_offset",
   "elevation",
   "transform",
+  "border_style",
   "accessible",
   "accessibility_label",
   "accessibility_hint",
   "accessibility_role",
   "accessibility_state",
+  "accessibility_live_region",
+  "accessibility_value",
+  "accessibility_actions",
+  "important_for_accessibility",
   "test_id",
 ]);
 
@@ -82,21 +87,38 @@ function offsetOf(value) {
   return { x: 0, y: 0 };
 }
 
-function transformToCSS(value) {
+/** Degrees or radians, as the wire spells them (`"45deg"`, `"0.5rad"`, or a bare number of degrees). */
+function angle(raw, n) {
+  return typeof raw === "string" && raw.endsWith("rad") ? `${n}rad` : `${n}deg`;
+}
+
+/**
+ * The transform operations every renderer supports (RFC 0002): `rotate`,
+ * `rotate_x`, `rotate_y`, `rotate_z`, `scale`, `scale_x`, `scale_y`,
+ * `translate_x`, `translate_y`, `skew_x`, `skew_y`, and `perspective`.
+ * `perspective` is hoisted to the front, as CSS requires.
+ */
+export function transformToCSS(value) {
   if (value == null) return "";
   const ops = Array.isArray(value) ? value : [value];
   const parts = [];
+  let perspective = "";
   for (const op of ops) {
     if (!op || typeof op !== "object") continue;
     for (const [key, raw] of Object.entries(op)) {
       const n = typeof raw === "string" ? parseFloat(raw) : Number(raw);
       if (!Number.isFinite(n)) return "";
       switch (key) {
-        case "rotate": {
-          const rad = typeof raw === "string" && raw.endsWith("rad");
-          parts.push(`rotate(${rad ? n + "rad" : n + "deg"})`);
+        case "rotate":
+        case "rotate_z":
+          parts.push(`rotate${key === "rotate_z" ? "Z" : ""}(${angle(raw, n)})`);
           break;
-        }
+        case "rotate_x":
+          parts.push(`rotateX(${angle(raw, n)})`);
+          break;
+        case "rotate_y":
+          parts.push(`rotateY(${angle(raw, n)})`);
+          break;
         case "scale":
           parts.push(`scale(${n})`);
           break;
@@ -113,18 +135,24 @@ function transformToCSS(value) {
           parts.push(`translateY(${n}px)`);
           break;
         case "skew_x":
-          parts.push(`skewX(${n}deg)`);
+          parts.push(`skewX(${angle(raw, n)})`);
           break;
         case "skew_y":
-          parts.push(`skewY(${n}deg)`);
+          parts.push(`skewY(${angle(raw, n)})`);
+          break;
+        case "perspective":
+          if (n > 0) perspective = `perspective(${n}px)`;
           break;
         default:
           break;
       }
     }
   }
-  return parts.join(" ");
+  return [perspective, ...parts].filter(Boolean).join(" ");
 }
+
+const LIVE_REGIONS = { polite: "polite", assertive: "assertive", none: "off" };
+const BORDER_STYLES = new Set(["solid", "dashed", "dotted"]);
 
 /** Style keys shared by containers and leaves. `leaf` skips the container-only ones. */
 export function applyStyle(view, props, changed, scheme, { leaf = false } = {}) {
@@ -177,6 +205,7 @@ export function applyStyle(view, props, changed, scheme, { leaf = false } = {}) 
   const borderKeys = [
     "border_width",
     "border_color",
+    "border_style",
     "border_left_width",
     "border_top_width",
     "border_right_width",
@@ -189,13 +218,14 @@ export function applyStyle(view, props, changed, scheme, { leaf = false } = {}) 
   if (borderKeys.some(has)) {
     const uniformColor = c(props.border_color) ?? "#000";
     const uniform = Number(props.border_width) || 0;
+    const style = BORDER_STYLES.has(props.border_style) ? props.border_style : "solid";
     const sides = ["top", "right", "bottom", "left"];
     for (const side of sides) {
       const width = props[`border_${side}_width`];
       const sideColor = c(props[`border_${side}_color`]);
       const w = width != null ? Number(width) || 0 : uniform;
       const Side = side[0].toUpperCase() + side.slice(1);
-      s[`border${Side}`] = w > 0 ? `${px(w)} solid ${sideColor ?? uniformColor}` : "";
+      s[`border${Side}`] = w > 0 ? `${px(w)} ${style} ${sideColor ?? uniformColor}` : "";
     }
   }
 
@@ -245,6 +275,96 @@ export function applyStyle(view, props, changed, scheme, { leaf = false } = {}) 
     if ("selected" in st) el.setAttribute("aria-selected", String(!!st.selected));
     if ("checked" in st) el.setAttribute("aria-checked", String(st.checked));
   }
+  if (has("accessibility_live_region")) {
+    const live = LIVE_REGIONS[props.accessibility_live_region];
+    if (live) {
+      el.setAttribute("aria-live", live);
+      el.setAttribute("aria-atomic", "true");
+    } else {
+      el.removeAttribute("aria-live");
+      el.removeAttribute("aria-atomic");
+    }
+  }
+  if (has("accessibility_value")) applyAccessibilityValue(el, props.accessibility_value);
+  if (has("accessibility_actions")) applyAccessibilityActions(view, props.accessibility_actions);
+  if (has("important_for_accessibility")) applyImportance(view, props.important_for_accessibility);
+}
+
+/** `accessibility_value` is a string (`aria-valuetext`) or `{min, max, now, text}` (the `aria-value*` set). */
+function applyAccessibilityValue(el, value) {
+  for (const name of ["aria-valuemin", "aria-valuemax", "aria-valuenow", "aria-valuetext"]) el.removeAttribute(name);
+  if (value == null) return;
+  if (typeof value !== "object") {
+    el.setAttribute("aria-valuetext", String(value));
+    return;
+  }
+  const pairs = [["min", "aria-valuemin"], ["max", "aria-valuemax"], ["now", "aria-valuenow"], ["text", "aria-valuetext"]];
+  for (const [key, name] of pairs) if (value[key] != null) el.setAttribute(name, String(value[key]));
+}
+
+/**
+ * The DOM has no custom accessibility actions. The names are exposed on
+ * `data-pn-actions` for tooling, and the one action the keyboard can
+ * trigger, `activate`, fires `on_accessibility_action("activate")` on
+ * Enter or Space while the view is focused.
+ */
+function applyAccessibilityActions(view, actions) {
+  const el = view.el;
+  const names = Array.isArray(actions) ? actions.map((a) => (a && typeof a === "object" ? a.name : a)).filter((n) => n != null).map(String) : [];
+  if (!names.length) {
+    delete el.dataset.pnActions;
+    if (view.a11yFocusable) {
+      el.removeAttribute("tabindex");
+      view.a11yFocusable = false;
+    }
+    return;
+  }
+  el.dataset.pnActions = JSON.stringify(names);
+  if (!el.hasAttribute("tabindex") && view.importance !== "no") {
+    el.tabIndex = 0;
+    view.a11yFocusable = true;
+  }
+  if (!view.a11yKeyInstalled) {
+    view.a11yKeyInstalled = true;
+    el.addEventListener("keydown", (event) => {
+      if (event.target !== el || (event.key !== "Enter" && event.key !== " ")) return;
+      let current = [];
+      try {
+        current = JSON.parse(el.dataset.pnActions || "[]");
+      } catch (err) {
+        current = [];
+      }
+      if (!current.includes("activate")) return;
+      event.preventDefault();
+      view.ctx.emit(view.tag, "on_accessibility_action", ["activate"]);
+    });
+  }
+}
+
+/**
+ * `important_for_accessibility`: `no_hide_descendants` hides the subtree
+ * (`aria-hidden`); `no` drops the view's own semantics and focusability
+ * (`role="presentation"`, `tabindex="-1"`) while its descendants stay
+ * reachable, which is what React Native's `no` means; `yes` and `auto`
+ * restore the defaults.
+ */
+function applyImportance(view, mode) {
+  const el = view.el;
+  const previous = view.importance;
+  view.importance = mode;
+  if (mode === "no_hide_descendants") {
+    el.setAttribute("aria-hidden", "true");
+  } else if (previous === "no_hide_descendants") {
+    el.removeAttribute("aria-hidden");
+  }
+  if (mode === "no") {
+    if (!view.props.accessibility_role) el.setAttribute("role", "presentation");
+    el.tabIndex = -1;
+  } else if (previous === "no") {
+    if (el.getAttribute("role") === "presentation") el.removeAttribute("role");
+    if (view.a11yFocusable || view.type === "Pressable") el.tabIndex = 0;
+    else el.removeAttribute("tabindex");
+  }
 }
 
 function applyPointerInheritance(child, parent) {
@@ -277,6 +397,8 @@ export function composeTransform(view) {
     if (anim.scale_x != null) parts.push(`scaleX(${anim.scale_x})`);
     if (anim.scale_y != null) parts.push(`scaleY(${anim.scale_y})`);
     if (anim.rotate != null) parts.push(`rotate(${anim.rotate}deg)`);
+    if (anim.rotate_x != null) parts.push(`rotateX(${anim.rotate_x}deg)`);
+    if (anim.rotate_y != null) parts.push(`rotateY(${anim.rotate_y}deg)`);
     css = parts.join(" ");
   }
   view.el.style.transform = css;
@@ -389,11 +511,21 @@ class SpacerManager extends ViewManager {
   update() {}
 }
 
+const ELLIPSIS = "…";
+
 class TextManager extends ViewManager {
   create(view, props) {
     const el = document.createElement("div");
     el.className = "pn-view pn-text";
     view.el = el;
+    view.maxLines = 0;
+    view.truncated = null;
+    // `on_press` on the label. Presses on a pressable span stop here so
+    // the label doesn't also fire (`on_span_press` carries the index).
+    el.addEventListener("click", (event) => {
+      if (event.target.closest?.(".pn-span-pressable")) return;
+      if (view.hasEvent("on_press")) view.ctx.emit(view.tag, "on_press", []);
+    });
     this.update(view, props);
   }
   update(view, changed) {
@@ -402,38 +534,103 @@ class TextManager extends ViewManager {
     const scheme = view.ctx.scheme();
     if ("text" in changed || "spans" in changed) this.render(view);
     applyTextStyle(el, props, changed, scheme);
-    if ("max_lines" in changed || "number_of_lines" in changed) {
-      const n = Number(props.max_lines ?? props.number_of_lines) || 0;
+    if ("max_lines" in changed || "ellipsize_mode" in changed) {
+      const n = Number(props.max_lines) || 0;
+      view.maxLines = n;
+      view.ellipsize = props.ellipsize_mode || "tail";
       el.classList.toggle("pn-clamp", n > 1);
       el.classList.toggle("pn-clamp-1", n === 1);
       el.style.webkitLineClamp = n > 1 ? String(n) : "";
-      view.maxLines = n;
+      // `tail` is the browser's own ellipsis; `clip` cuts without one.
+      // `head` and `middle` have no CSS equivalent: a single clamped line
+      // is truncated in JavaScript once its frame is known (see `frame`),
+      // and multi-line `head`/`middle` render as `tail`.
+      el.style.textOverflow = view.ellipsize === "clip" ? "clip" : "";
+      if (view.truncated) this.render(view);
     }
     if ("selectable" in changed) el.classList.toggle("pn-selectable", !!props.selectable);
+    // `allow_font_scaling` is Dynamic Type / Android `sp` opt-out; the
+    // browser preview renders at font scale 1.0, so it has no effect.
+    if ("on_press" in changed || "_pn_events" in changed) el.classList.toggle("pn-text-pressable", view.hasEvent("on_press"));
     applyStyle(view, props, changed, scheme, { leaf: true });
     view.measureCache = null;
+    if (view.frame && view.maxLines === 1 && (view.ellipsize === "head" || view.ellipsize === "middle")) this.truncate(view);
   }
   render(view) {
     const el = view.el;
     const props = view.props;
     el.textContent = "";
+    view.truncated = null;
     if (Array.isArray(props.spans) && props.spans.length) {
       const scheme = view.ctx.scheme();
-      for (const span of props.spans) {
-        if (!span || typeof span !== "object") continue;
+      props.spans.forEach((span, index) => {
+        if (!span || typeof span !== "object") return;
         const node = document.createElement("span");
         node.textContent = span.text == null ? "" : String(span.text);
         applyTextStyle(node, span, span, scheme);
+        if (span.pressable) {
+          node.className = "pn-span-pressable";
+          node.setAttribute("role", "link");
+          node.tabIndex = 0;
+          const press = (event) => {
+            event.stopPropagation();
+            view.ctx.emit(view.tag, "on_span_press", [index]);
+          };
+          node.addEventListener("click", press);
+          node.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              press(event);
+            }
+          });
+        }
         el.appendChild(node);
-      }
+      });
       return;
     }
     el.textContent = props.text == null ? "" : String(props.text);
   }
+  frame(view, x, y, w, h) {
+    super.frame(view, x, y, w, h);
+    if (view.maxLines === 1 && (view.ellipsize === "head" || view.ellipsize === "middle")) this.truncate(view);
+  }
+  /** JavaScript fallback for `head` / `middle` on one line of plain text (spans keep the browser's tail ellipsis). */
+  truncate(view) {
+    const el = view.el;
+    const props = view.props;
+    if (Array.isArray(props.spans) && props.spans.length) return;
+    const full = props.text == null ? "" : String(props.text);
+    if (view.truncated !== null) el.textContent = full;
+    view.truncated = null;
+    if (!el.isConnected || el.clientWidth <= 0 || el.scrollWidth <= el.clientWidth) return;
+    const chars = [...full];
+    const fits = (text) => {
+      el.textContent = text;
+      return el.scrollWidth <= el.clientWidth;
+    };
+    const candidate = (keep) => {
+      if (view.ellipsize === "head") return ELLIPSIS + chars.slice(chars.length - keep).join("");
+      const head = Math.ceil(keep / 2);
+      return chars.slice(0, head).join("") + ELLIPSIS + chars.slice(chars.length - (keep - head)).join("");
+    };
+    let lo = 0;
+    let hi = chars.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (fits(candidate(mid))) lo = mid;
+      else hi = mid - 1;
+    }
+    view.truncated = candidate(lo);
+    el.textContent = view.truncated;
+  }
   measure(view, maxW, maxH) {
     const key = `${maxW}|${maxH}`;
     if (view.measureCache && view.measureCache.key === key) return view.measureCache.size;
+    // Measure the full text, never the truncated copy.
+    const truncated = view.truncated;
+    if (truncated !== null) view.el.textContent = view.props.text == null ? "" : String(view.props.text);
     let size = measureElement(view.el, maxW, maxH, { block: true });
+    if (truncated !== null) view.el.textContent = truncated;
     if (view.maxLines > 0) {
       const lh = parseFloat(getComputedStyle(view.el).lineHeight) || Number(view.props.font_size || 17) * 1.25;
       size = [size[0], Math.min(size[1], Math.ceil(lh * view.maxLines * 100) / 100)];
@@ -476,19 +673,33 @@ class ButtonManager extends ViewManager {
   }
 }
 
+/**
+ * `keyboard_type` -> `<input type>` and `inputmode`. The type carries the
+ * browser's validation and native pickers where one exists; `inputmode`
+ * picks the on-screen keyboard on touch devices, the closest the web gets
+ * to iOS keyboard types.
+ */
 const KEYBOARD_TYPES = {
-  ascii: "text",
-  numbers_and_punctuation: "text",
-  url: "url",
-  number_pad: "tel",
-  numeric: "text",
-  phone_pad: "tel",
-  email_address: "email",
-  email: "email",
-  decimal_pad: "text",
-  decimal: "text",
-  web_search: "search",
+  default: { type: "text", inputmode: "" },
+  ascii: { type: "text", inputmode: "text" },
+  numbers_and_punctuation: { type: "text", inputmode: "decimal" },
+  url: { type: "url", inputmode: "url" },
+  number_pad: { type: "text", inputmode: "numeric" },
+  numeric: { type: "text", inputmode: "numeric" },
+  phone_pad: { type: "tel", inputmode: "tel" },
+  email_address: { type: "email", inputmode: "email" },
+  email: { type: "email", inputmode: "email" },
+  decimal_pad: { type: "text", inputmode: "decimal" },
+  decimal: { type: "text", inputmode: "decimal" },
+  web_search: { type: "search", inputmode: "search" },
+  visible_password: { type: "text", inputmode: "text" },
 };
+
+/** `on_key_press` reports the typed character, or `"Backspace"` / `"Enter"`, as React Native does. */
+export function keyPressName(key) {
+  if (key === "Backspace" || key === "Enter") return key;
+  return typeof key === "string" && [...key].length === 1 ? key : null;
+}
 
 class TextInputManager extends ViewManager {
   create(view, props) {
@@ -499,6 +710,8 @@ class TextInputManager extends ViewManager {
     view.el = el;
     view.suppressEcho = false;
     view.composing = false;
+    view.lastSelection = null;
+    view.contentSize = null;
     el.addEventListener("compositionstart", () => { view.composing = true; });
     el.addEventListener("compositionend", () => {
       view.composing = false;
@@ -513,17 +726,50 @@ class TextInputManager extends ViewManager {
         el.value = el.value.slice(0, limit);
       }
       view.ctx.emit(view.tag, "on_change", [el.value]);
+      this.reportContentSize(view);
     });
-    el.addEventListener("focus", () => view.ctx.emit(view.tag, "on_focus", []));
-    el.addEventListener("blur", () => view.ctx.emit(view.tag, "on_blur", []));
-    if (!multiline) {
-      el.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") view.ctx.emit(view.tag, "on_submit", [el.value]);
-      });
-    }
+    // `select_text_on_focus`: select on focus, and keep the selection through
+    // the `mouseup` of the click that focused the field (the browser would
+    // otherwise collapse it to a caret).
+    view.selectAllPending = false;
+    el.addEventListener("focus", () => {
+      view.ctx.emit(view.tag, "on_focus", []);
+      if (view.props.select_text_on_focus && el.value) {
+        el.select();
+        view.selectAllPending = true;
+      }
+    });
+    el.addEventListener("mouseup", (event) => {
+      if (!view.selectAllPending) return;
+      view.selectAllPending = false;
+      event.preventDefault();
+    });
+    el.addEventListener("blur", () => {
+      view.selectAllPending = false;
+      view.ctx.emit(view.tag, "on_blur", []);
+    });
+    el.addEventListener("keydown", (event) => {
+      const key = keyPressName(event.key);
+      if (key && view.hasEvent("on_key_press")) view.ctx.emit(view.tag, "on_key_press", [{ key }]);
+      if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+      // Single-line inputs submit on Enter and blur unless told otherwise;
+      // a multiline input keeps inserting newlines unless `blur_on_submit`
+      // is set, in which case Enter submits and blurs instead.
+      const blurOnSubmit = view.props.blur_on_submit != null ? !!view.props.blur_on_submit : !multiline;
+      if (!multiline) {
+        view.ctx.emit(view.tag, "on_submit", [el.value]);
+        if (blurOnSubmit) el.blur();
+      } else if (blurOnSubmit) {
+        event.preventDefault();
+        view.ctx.emit(view.tag, "on_submit", [el.value]);
+        el.blur();
+      }
+    });
     view.selectionListener = () => {
-      if (document.activeElement !== el || !view.hasEvent("on_selection_change")) return;
-      view.ctx.emit(view.tag, "on_selection_change", [{ start: el.selectionStart || 0, end: el.selectionEnd || 0 }]);
+      if (document.activeElement !== el) return;
+      const selection = { start: el.selectionStart || 0, end: el.selectionEnd || 0 };
+      view.lastSelection = selection;
+      if (view.hasEvent("on_selection_change")) view.ctx.emit(view.tag, "on_selection_change", [selection]);
     };
     document.addEventListener("selectionchange", view.selectionListener);
     this.update(view, props);
@@ -531,6 +777,50 @@ class TextInputManager extends ViewManager {
   }
   destroy(view) {
     document.removeEventListener("selectionchange", view.selectionListener);
+  }
+  frame(view, x, y, w, h) {
+    super.frame(view, x, y, w, h);
+    this.reportContentSize(view);
+  }
+  /** `on_content_size_change` for multiline inputs: the text's own extent, as `contentSize` on native. */
+  reportContentSize(view) {
+    const el = view.el;
+    if (el.tagName !== "TEXTAREA" || !view.hasEvent("on_content_size_change") || !el.isConnected) return;
+    const size = { width: el.clientWidth, height: el.scrollHeight };
+    if (view.contentSize && view.contentSize.width === size.width && view.contentSize.height === size.height) return;
+    view.contentSize = size;
+    view.ctx.emit(view.tag, "on_content_size_change", [size]);
+  }
+  applyKeyboardType(view) {
+    const el = view.el;
+    const props = view.props;
+    const spec = KEYBOARD_TYPES[props.keyboard_type] || KEYBOARD_TYPES.default;
+    if (el.tagName === "INPUT") el.type = props.secure ? "password" : spec.type;
+    if (spec.inputmode) el.inputMode = spec.inputmode;
+    else el.removeAttribute("inputmode");
+    // `visible_password` shows what would otherwise be dots; the browser
+    // equivalent is a plain text field without password autofill.
+    if (props.keyboard_type === "visible_password") el.autocomplete = "off";
+  }
+  /**
+   * Controlled `selection` `{start, end}`. A value equal to the selection
+   * the page itself just reported is Python echoing state back, so it is
+   * left alone rather than yanking the caret from under the user.
+   */
+  applySelection(view, selection) {
+    const el = view.el;
+    if (!selection || typeof selection !== "object" || el.setSelectionRange == null) return;
+    const length = el.value.length;
+    const start = Math.max(0, Math.min(length, Number(selection.start) || 0));
+    const end = Math.max(start, Math.min(length, selection.end != null ? Number(selection.end) : start));
+    const last = view.lastSelection;
+    if (last && last.start === start && last.end === end) return;
+    if (el.selectionStart === start && el.selectionEnd === end) return;
+    try {
+      el.setSelectionRange(start, end);
+    } catch (err) {
+      /* not a text control (`type=email` etc. in some browsers) */
+    }
   }
   update(view, changed) {
     const props = view.props;
@@ -543,14 +833,16 @@ class TextInputManager extends ViewManager {
       const start = el.selectionStart, end = el.selectionEnd;
       el.value = String(props.value);
       if (start != null) el.setSelectionRange(Math.min(start, el.value.length), Math.min(end, el.value.length));
+      this.reportContentSize(view);
     }
+    if (has("selection")) this.applySelection(view, props.selection);
     if (has("placeholder")) el.placeholder = props.placeholder == null ? "" : String(props.placeholder);
     if (has("placeholder_color")) el.style.setProperty("--pn-placeholder", parseColor(props.placeholder_color, scheme) ?? "");
     if (has("font_size")) el.style.fontSize = props.font_size != null ? px(Number(props.font_size)) : "";
     if (has("color")) el.style.color = parseColor(props.color, scheme) ?? "";
     if (has("background_color")) el.style.backgroundColor = parseColor(props.background_color, scheme) ?? "";
-    if (has("secure") && el.tagName === "INPUT") el.type = props.secure ? "password" : KEYBOARD_TYPES[props.keyboard_type] || "text";
-    if (has("keyboard_type") && el.tagName === "INPUT" && !props.secure) el.type = KEYBOARD_TYPES[props.keyboard_type] || "text";
+    if (has("secure") || has("keyboard_type")) this.applyKeyboardType(view);
+    // `keyboard_appearance` (light/dark keyboard) is an iOS keyboard skin; the browser has none.
     if (has("auto_capitalize")) el.autocapitalize = props.auto_capitalize || "sentences";
     if (has("auto_correct")) el.autocomplete = props.auto_correct === false ? "off" : "on";
     if (has("return_key_type")) el.enterKeyHint = props.return_key_type || "";
@@ -586,6 +878,8 @@ class TextInputManager extends ViewManager {
         return null;
       case "clear":
         el.value = "";
+        // `clear()` is an edit: report it so a controlled value follows.
+        if (view.hasEvent("on_change")) view.ctx.emit(view.tag, "on_change", [""]);
         return null;
       case "get_value":
         return el.value;
@@ -620,11 +914,27 @@ class ImageManager extends ViewManager {
     view.tint = tint;
     view.natural = null;
     view.assetScale = 1;
+    view.loading = false;
+    const loadEnd = () => {
+      if (!view.loading) return;
+      view.loading = false;
+      if (view.hasEvent("on_load_end")) view.ctx.emit(view.tag, "on_load_end", []);
+    };
     img.addEventListener("load", () => {
       const scale = view.assetScale || 1;
       view.natural = [img.naturalWidth / scale, img.naturalHeight / scale];
       view.measureCache = null;
+      // `fade_duration`: the image fades in over the given milliseconds once decoded.
+      const fade = Number(view.props.fade_duration);
+      if (fade > 0 && img.style.opacity === "0") {
+        img.style.transition = `opacity ${fade}ms ease-out`;
+        requestAnimationFrame(() => { img.style.opacity = "1"; });
+      } else {
+        img.style.transition = "";
+        img.style.opacity = "";
+      }
       view.ctx.emit(view.tag, "on_load", [{ width: view.natural[0], height: view.natural[1] }]);
+      loadEnd();
     });
     img.addEventListener("error", () => {
       const fallback = imageSource(view.props.default_source);
@@ -633,7 +943,10 @@ class ImageManager extends ViewManager {
         view.img.src = fallback;
         return;
       }
+      img.style.transition = "";
+      img.style.opacity = "";
       view.ctx.emit(view.tag, "on_error", [`failed to load ${img.src}`]);
+      loadEnd();
     });
     view.unsubscribeAssets = assets.onChange(() => {
       if (assets.isAssetUri(view.props.source) || assets.isAssetUri(view.props.default_source)) {
@@ -650,8 +963,16 @@ class ImageManager extends ViewManager {
       const src = imageSource(props.source);
       const fallback = imageSource(props.default_source);
       view.natural = null;
+      // `headers` for network sources can't be attached to an `<img>`
+      // request; the preview fetches the URL without them.
       if (src) {
         view.assetScale = assetScaleOf(props.source);
+        view.loading = true;
+        if (view.hasEvent("on_load_start")) view.ctx.emit(view.tag, "on_load_start", []);
+        if (Number(props.fade_duration) > 0) {
+          view.img.style.transition = "";
+          view.img.style.opacity = "0";
+        }
         // Show the local placeholder immediately for remote sources.
         if (fallback && /^https?:/.test(String(props.source))) view.img.src = fallback;
         view.img.src = src;
@@ -664,13 +985,13 @@ class ImageManager extends ViewManager {
       const maskSrc = src || fallback;
       view.tint.style.maskImage = view.tint.style.webkitMaskImage = maskSrc ? `url("${maskSrc}")` : "";
     }
-    if (has("scale_type") || has("resize_mode")) {
-      const mode = props.scale_type ?? props.resize_mode;
+    if (has("scale_type")) {
+      const mode = props.scale_type;
       view.img.style.objectFit = mode === "cover" || mode === "repeat" ? "cover" : mode === "stretch" ? "fill" : mode === "center" ? "none" : "contain";
     }
     if (has("placeholder_color")) view.el.style.backgroundColor = parseColor(props.placeholder_color, scheme) ?? "";
-    if (has("tint_color") || has("tint")) {
-      const tint = parseColor(props.tint_color ?? props.tint, scheme);
+    if (has("tint_color")) {
+      const tint = parseColor(props.tint_color, scheme);
       view.tint.style.display = tint ? "" : "none";
       view.tint.style.backgroundColor = tint ?? "";
       view.img.style.visibility = tint ? "hidden" : "";
@@ -856,19 +1177,38 @@ class ProgressBarManager extends ViewManager {
   }
 }
 
-function scrollPayload(el, horizontal) {
-  const contentWidth = el.scrollWidth;
-  const contentHeight = el.scrollHeight;
+/** The `ScrollEvent` payload every renderer sends: offset, content size, and viewport size. */
+export function scrollPayload(el) {
   return {
     x: el.scrollLeft,
     y: el.scrollTop,
-    extent: horizontal ? el.clientWidth : el.clientHeight,
-    range: horizontal ? contentWidth : contentHeight,
-    content_width: contentWidth,
-    content_height: contentHeight,
-    width: el.clientWidth,
-    height: el.clientHeight,
+    content_width: el.scrollWidth,
+    content_height: el.scrollHeight,
+    viewport_width: el.clientWidth,
+    viewport_height: el.clientHeight,
   };
+}
+
+const SCROLL_IDLE_MS = 150;
+const TEXT_CONTROL = "input, textarea, select, [contenteditable]";
+
+/** The focused text control, if any (what `Keyboard.dismiss` and `keyboard_dismiss_mode` act on). */
+function focusedTextControl() {
+  const active = document.activeElement;
+  return active && active.matches?.(TEXT_CONTROL) ? active : null;
+}
+
+/**
+ * `snap_to_interval` / `snap_to_alignment`: the offset the scroller should
+ * settle on, or `null` when snapping is off.
+ */
+export function snapTarget(offset, interval, alignment, viewport, range) {
+  const step = Number(interval) || 0;
+  if (step <= 0) return null;
+  const shift = alignment === "center" ? (viewport - step) / 2 : alignment === "end" ? viewport - step : 0;
+  const n = Math.round((offset + shift) / step);
+  const target = n * step - shift;
+  return Math.max(0, Math.min(Math.max(0, range - viewport), target));
 }
 
 class ScrollViewManager extends ViewManager {
@@ -882,47 +1222,141 @@ class ScrollViewManager extends ViewManager {
     view.content = content;
     view.lastScrollEmit = 0;
     view.scrollIdleTimer = null;
-    view.dragging = false;
+    view.pointerDown = false; // a pointer is held on the scroller
+    view.dragging = false; // the content moved while the pointer was held
+    view.moving = false; // any scrolling since the last settle
+    view.snapping = false; // a programmatic snap is in flight
+    const emit = (name, payload) => { if (view.hasEvent(name)) view.ctx.emit(view.tag, name, [payload]); };
+    // The scroller came to rest: close the drag, snap if asked, then report
+    // the final offset and the end of momentum.
+    const settle = () => {
+      clearTimeout(view.scrollIdleTimer);
+      view.scrollIdleTimer = null;
+      if (!view.moving) return;
+      const payload = scrollPayload(el);
+      if (view.dragging) {
+        view.dragging = false;
+        emit("on_scroll_end_drag", payload);
+      }
+      if (!view.snapping && this.snap(view) != null) return; // settles again once the snap lands
+      view.moving = false;
+      view.snapping = false;
+      view.ctx.emit(view.tag, "on_scroll", [payload]);
+      emit("on_momentum_scroll_end", payload);
+    };
+    view.settle = settle;
+    el.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      view.pointerDown = true;
+      this.handleTap(view, event);
+    });
+    const release = () => {
+      if (!view.pointerDown) return;
+      view.pointerDown = false;
+      if (view.dragging) {
+        view.dragging = false;
+        emit("on_scroll_end_drag", scrollPayload(el));
+      }
+    };
+    el.addEventListener("pointerup", release);
+    el.addEventListener("pointercancel", release);
+    el.addEventListener("mousedown", (event) => this.keepFocus(view, event));
     el.addEventListener(
       "scroll",
       () => {
+        if (view.snapping) {
+          // The smooth snap is still moving; settle once it stops.
+          clearTimeout(view.scrollIdleTimer);
+          view.scrollIdleTimer = setTimeout(settle, SCROLL_IDLE_MS);
+          return;
+        }
         const props = view.props;
-        const horizontal = !!props.horizontal;
-        if (!view.dragging) {
+        const payload = scrollPayload(el);
+        if (!view.moving) {
+          view.moving = true;
+          // Wheel and trackpad scrolling has no pointer; treat the first
+          // movement as the drag React Native would report for a finger.
           view.dragging = true;
-          if (view.hasEvent("on_scroll_begin_drag")) view.ctx.emit(view.tag, "on_scroll_begin_drag", [scrollPayload(el, horizontal)]);
+          emit("on_scroll_begin_drag", payload);
+          if (props.keyboard_dismiss_mode === "on_drag") focusedTextControl()?.blur();
         }
         const throttle = Number(props.scroll_event_throttle) || 0;
         const now = performance.now();
         if (throttle <= 0 || now - view.lastScrollEmit >= throttle) {
           view.lastScrollEmit = now;
-          view.ctx.emit(view.tag, "on_scroll", [scrollPayload(el, horizontal)]);
+          view.ctx.emit(view.tag, "on_scroll", [payload]);
         }
         clearTimeout(view.scrollIdleTimer);
-        view.scrollIdleTimer = setTimeout(() => {
-          view.dragging = false;
-          const payload = scrollPayload(el, horizontal);
-          view.ctx.emit(view.tag, "on_scroll", [payload]);
-          if (view.hasEvent("on_scroll_end_drag")) view.ctx.emit(view.tag, "on_scroll_end_drag", [payload]);
-          if (view.hasEvent("on_momentum_scroll_end")) view.ctx.emit(view.tag, "on_momentum_scroll_end", [payload]);
-        }, 120);
+        view.scrollIdleTimer = setTimeout(settle, SCROLL_IDLE_MS);
       },
       { passive: true },
     );
+    // Chrome fires `scrollend` once momentum stops; the idle timer covers the rest.
+    el.addEventListener("scrollend", () => { if (!view.pointerDown) settle(); });
     this.update(view, props);
   }
   container(view) {
     return view.content;
+  }
+  /**
+   * `keyboard_should_persist_taps`: `never` (the default) blurs the focused
+   * input on a tap anywhere else in the scroller; `always` keeps it;
+   * `handled` keeps it only when the tap landed on a control that handles
+   * presses (a `Pressable`, `Button`, or another input).
+   */
+  handleTap(view, event) {
+    const target = event.target;
+    if (target.closest?.(TEXT_CONTROL)) return;
+    const focused = focusedTextControl();
+    if (!focused) return;
+    const mode = view.props.keyboard_should_persist_taps || "never";
+    if (mode === "never") focused.blur();
+  }
+  /** Stop the browser's default focus loss on `mousedown` when the taps should persist. */
+  keepFocus(view, event) {
+    const mode = view.props.keyboard_should_persist_taps || "never";
+    if (mode === "never" || !focusedTextControl() || event.target.closest?.(TEXT_CONTROL)) return;
+    const handled = !!event.target.closest?.(".pn-pressable, .pn-button, button, .pn-span-pressable, .pn-text-pressable");
+    if (mode === "always" || (mode === "handled" && handled)) event.preventDefault();
+  }
+  /** Programmatic snap after the finger lifts; returns the target offset or `null`. */
+  snap(view) {
+    const props = view.props;
+    const el = view.el;
+    const horizontal = !!props.horizontal;
+    const offset = horizontal ? el.scrollLeft : el.scrollTop;
+    const target = snapTarget(
+      offset,
+      props.snap_to_interval,
+      props.snap_to_alignment || "start",
+      horizontal ? el.clientWidth : el.clientHeight,
+      horizontal ? el.scrollWidth : el.scrollHeight,
+    );
+    if (target == null || Math.abs(target - offset) < 0.5) return null;
+    view.snapping = true;
+    el.scrollTo({ [horizontal ? "left" : "top"]: target, behavior: "smooth" });
+    // The scroll events of the smooth animation keep pushing the settle
+    // out; this timer covers a scroller that produces none.
+    clearTimeout(view.scrollIdleTimer);
+    view.scrollIdleTimer = setTimeout(view.settle, SCROLL_IDLE_MS * 3);
+    return target;
+  }
+  applyOverflow(view) {
+    const props = view.props;
+    const el = view.el;
+    if (props.scroll_enabled === false) {
+      // Inline overflow wins over the class, so `scroll_enabled=False` is set here too.
+      el.style.overflowX = el.style.overflowY = "hidden";
+      return;
+    }
+    el.style.overflowX = props.horizontal ? "auto" : "hidden";
+    el.style.overflowY = props.horizontal ? "hidden" : "auto";
   }
   update(view, changed) {
     const props = view.props;
     const el = view.el;
     const scheme = view.ctx.scheme();
     const has = (k) => k in changed;
-    if (has("horizontal")) {
-      el.style.overflowX = props.horizontal ? "auto" : "hidden";
-      el.style.overflowY = props.horizontal ? "hidden" : "auto";
-    }
     if (has("shows_scroll_indicator")) el.classList.toggle("pn-no-indicator", props.shows_scroll_indicator === false);
     if (has("paging_enabled")) el.classList.toggle("pn-paging", !!props.paging_enabled);
     if (has("scroll_enabled")) el.classList.toggle("pn-scroll-disabled", props.scroll_enabled === false);
@@ -930,13 +1364,13 @@ class ScrollViewManager extends ViewManager {
       const inset = props.content_inset || {};
       view.content.style.padding = `${px(Number(inset.top) || 0)} ${px(Number(inset.right) || 0)} ${px(Number(inset.bottom) || 0)} ${px(Number(inset.left) || 0)}`;
     }
+    // `deceleration_rate` tunes UIScrollView / OverScroller physics and
+    // `bounces` the iOS rubber band; the browser owns both, so neither is
+    // applied here.
     if (has("refresh_control")) this.updateRefresh(view);
     applyStyle(view, props, changed, scheme);
-    if ("overflow" in changed && props.overflow !== "hidden") el.style.overflow = "";
-    if (has("horizontal") || has("overflow")) {
-      el.style.overflowX = props.horizontal ? "auto" : "hidden";
-      el.style.overflowY = props.horizontal ? "hidden" : "auto";
-    }
+    if (has("overflow") && props.overflow !== "hidden") el.style.overflow = "";
+    if (has("horizontal") || has("overflow") || has("scroll_enabled")) this.applyOverflow(view);
   }
   updateRefresh(view) {
     const rc = view.props.refresh_control;
@@ -1061,8 +1495,19 @@ class PressableManager extends ViewManager {
   update(view, changed) {
     const props = view.props;
     const disabled = !!props.disabled;
+    // `disabled` suppresses every press callback (see `enabled()` above),
+    // drops the pressed styling, and exposes the disabled state.
     view.el.classList.toggle("pn-disabled", disabled);
-    view.el.tabIndex = disabled ? -1 : 0;
+    view.el.tabIndex = disabled || view.importance === "no" ? -1 : 0;
+    if (disabled) view.el.setAttribute("aria-disabled", "true");
+    else if (!(props.accessibility_state && props.accessibility_state.disabled)) view.el.removeAttribute("aria-disabled");
+    if (disabled && view.pressed) {
+      clearTimeout(view.longPressTimer);
+      view.pressed = false;
+      view.pressedOpacityActive = false;
+      view.el.style.opacity = props.opacity != null ? String(props.opacity) : "";
+    }
+    // `android_ripple` is a Material ripple; iOS and the browser ignore it.
     applyStyle(view, props, changed, view.ctx.scheme());
   }
 }
@@ -1219,15 +1664,18 @@ class TabBarManager extends ViewManager {
     el.textContent = "";
     const items = Array.isArray(props.items) ? props.items : [];
     const activeName = props.active_tab;
-    const activeIndex = props.active_index != null ? Number(props.active_index) : -1;
-    el.style.setProperty("--pn-tab-active", parseColor(props.active_color ?? props.tint_color, scheme) ?? "");
-    const inactive = parseColor(props.inactive_color, scheme);
+    // The `TabBar` contract's styling props: `tint_color`,
+    // `inactive_tint_color`, `background_color`, `translucent`, `shows_labels`.
+    el.style.setProperty("--pn-tab-active", parseColor(props.tint_color, scheme) ?? "");
+    const inactive = parseColor(props.inactive_tint_color, scheme);
+    el.classList.toggle("pn-opaque", props.translucent === false);
+    el.classList.toggle("pn-no-labels", props.shows_labels === false);
     el.style.paddingBottom = px(view.ctx.bottomInset());
     items.forEach((item, index) => {
       const name = item.name ?? item.title ?? String(index);
       const button = document.createElement("button");
       button.type = "button";
-      const active = activeName != null ? name === activeName : index === activeIndex;
+      const active = activeName != null && name === activeName;
       button.classList.toggle("pn-active", active);
       if (!active && inactive) button.style.color = inactive;
       const icon = document.createElement("span");
@@ -1243,10 +1691,7 @@ class TabBarManager extends ViewManager {
         badge.textContent = String(item.badge);
         button.appendChild(badge);
       }
-      button.addEventListener("click", () => {
-        view.ctx.emit(view.tag, "on_tab_select", [name]);
-        if (view.hasEvent("on_select")) view.ctx.emit(view.tag, "on_select", [index]);
-      });
+      button.addEventListener("click", () => view.ctx.emit(view.tag, "on_tab_select", [name]));
       el.appendChild(button);
     });
     applyStyle(view, props, changed, scheme);
@@ -1498,11 +1943,29 @@ class ModalManager extends ViewManager {
     const sheet = document.createElement("div");
     sheet.className = "pn-modal-sheet";
     backdrop.appendChild(sheet);
-    backdrop.addEventListener("click", (event) => {
-      if (event.target !== backdrop) return;
-      if (view.props.dismiss_on_backdrop === false) return;
+    // `on_request_close` is the browser's stand-in for the Android back
+    // button and the iOS sheet pull-down: the backdrop tap and the Escape
+    // key ask Python to close. Without the callback the modal stays open.
+    const requestClose = () => {
       if (view.hasEvent("on_request_close")) view.ctx.emit(view.tag, "on_request_close", []);
+    };
+    backdrop.addEventListener("click", (event) => {
+      // An overlay's sheet fills the backdrop, so its own empty area (not a
+      // child) counts as the backdrop there.
+      const overlay = view.props.presentation_style === "overlay" || !!view.props.transparent;
+      if (event.target !== backdrop && !(overlay && event.target === sheet)) return;
+      if (view.props.dismiss_on_backdrop === false) return;
+      requestClose();
     });
+    view.onKeyDown = (event) => {
+      if (event.key !== "Escape" || !view.shown || event.defaultPrevented) return;
+      // Only the topmost modal answers Escape.
+      const layer = view.ctx.overlays();
+      if (layer.lastElementChild !== view.backdrop) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      requestClose();
+    };
     view.el = el;
     view.backdrop = backdrop;
     view.sheet = sheet;
@@ -1524,18 +1987,23 @@ class ModalManager extends ViewManager {
     if (overlay) view.sheet.classList.add("pn-overlay");
     view.backdrop.classList.toggle("pn-transparent", overlay);
     view.sheet.style.backgroundColor = !overlay ? (parseColor(props.background_color, scheme) ?? "") : "transparent";
+    // `status_bar_translucent` lets Android draw under the status bar; the
+    // preview's status bar is part of the frame chrome, so nothing to do.
     const visible = !!props.visible;
     if (visible && !view.shown) {
       view.shown = true;
       view.ctx.overlays().appendChild(view.backdrop);
+      document.addEventListener("keydown", view.onKeyDown, true);
       view.ctx.emit(view.tag, "on_show", []);
     } else if (!visible && view.shown) {
       view.shown = false;
       view.backdrop.remove();
+      document.removeEventListener("keydown", view.onKeyDown, true);
       view.ctx.emit(view.tag, "on_dismiss", []);
     }
   }
   destroy(view) {
+    document.removeEventListener("keydown", view.onKeyDown, true);
     if (view.shown) view.backdrop.remove();
   }
 }
@@ -1580,6 +2048,8 @@ class StatusBarManager extends ViewManager {
   update(view) {
     const props = view.props;
     const style = props.bar_style;
+    // `translucent` (Android draws under the bar) and `animated` (iOS
+    // animates the change) don't apply to the frame's painted status bar.
     view.ctx.statusBar({
       hidden: !!props.hidden,
       light: style === "light" || style === "light_content",
@@ -1597,7 +2067,7 @@ class WebViewManager extends ViewManager {
     frame.setAttribute("sandbox", "allow-scripts allow-forms allow-popups allow-same-origin");
     el.appendChild(frame);
     view.el = el;
-    view.frame = frame;
+    view.iframe = frame;
     frame.addEventListener("load", () => {
       let url = view.props.url || view.props.base_url || "about:srcdoc";
       try {
@@ -1621,24 +2091,23 @@ class WebViewManager extends ViewManager {
   update(view, changed) {
     const props = view.props;
     if ("url" in changed && props.url) {
-      view.frame.removeAttribute("srcdoc");
-      view.frame.src = String(props.url);
+      view.iframe.removeAttribute("srcdoc");
+      view.iframe.src = String(props.url);
       if (view.hasEvent("on_load_start")) view.ctx.emit(view.tag, "on_load_start", [String(props.url)]);
     } else if ("html" in changed && props.html != null) {
       const shim =
         "<script>window.webkit={messageHandlers:{pythonnative:{postMessage:function(m){parent.postMessage(m,'*');}}}};</script>";
-      view.frame.srcdoc = shim + String(props.html);
+      view.iframe.srcdoc = shim + String(props.html);
     }
-    if ("scroll_enabled" in changed) view.frame.style.overflow = props.scroll_enabled === false ? "hidden" : "";
+    if ("scroll_enabled" in changed) view.iframe.style.overflow = props.scroll_enabled === false ? "hidden" : "";
     applyStyle(view, props, changed, view.ctx.scheme(), { leaf: true });
   }
   command(view, name, args) {
-    const win = view.frame.contentWindow;
+    const win = view.iframe.contentWindow;
     try {
       switch (name) {
-        case "eval_js":
         case "inject_javascript":
-          win.eval(String(args.source ?? args.script ?? ""));
+          win.eval(String(args.script ?? ""));
           return null;
         case "reload":
           win.location.reload();
@@ -1653,7 +2122,7 @@ class WebViewManager extends ViewManager {
           win.stop();
           return null;
         case "load_url":
-          view.frame.src = String(args.url || "");
+          view.iframe.src = String(args.url || "");
           return null;
         case "get_url":
           return win.location.href;
@@ -1679,7 +2148,8 @@ class VirtualListManager extends ViewManager {
     view.el.appendChild(view.spacer); view.requested = new Set();
     view.el.addEventListener("scroll", () => {
       this.childrenChanged(view);
-      view.ctx.emit(view.tag, "on_scroll", [{...scrollPayload(view.el, false), first:view.first, last:view.last}]);
+      // Like ScrollView: only apps that wired `on_scroll` pay for the stream.
+      if (view.hasEvent("on_scroll")) view.ctx.emit(view.tag, "on_scroll", [{...scrollPayload(view.el), first:view.first, last:view.last}]);
     }, {passive:true});
     this.update(view, props);
   }
@@ -1730,9 +2200,175 @@ class VirtualListManager extends ViewManager {
   }
 }
 
+const SCREEN_TRANSITION_MS = 260;
+const MODAL_PRESENTATIONS = new Set(["modal", "full_screen_modal", "form_sheet", "transparent_modal"]);
+
+/**
+ * The entering/leaving CSS class for a `Screen`'s `animation` and
+ * `presentation` props: `default` slides from the right for cards and from
+ * the bottom for the modal presentations; `none` skips the transition.
+ */
+export function screenTransition(props) {
+  const animation = props?.animation || "default";
+  if (animation === "none") return null;
+  if (animation === "fade") return "pn-screen-fade";
+  if (animation === "slide_from_bottom") return "pn-screen-bottom";
+  if (animation === "slide_from_right") return "pn-screen-right";
+  return MODAL_PRESENTATIONS.has(props?.presentation) ? "pn-screen-bottom" : "pn-screen-right";
+}
+
+/**
+ * The native stack container. Only the topmost `Screen` is shown, with the
+ * screen beneath a `transparent_modal` kept visible under it. Pushes slide
+ * or fade the new screen in; pops animate a snapshot of the removed screen
+ * out, since Python destroys the real views in the same transaction.
+ *
+ * Like `UINavigationController` and the Android toolbar, the stack draws a
+ * navigation bar from the top screen's options (`title`, `header_shown`,
+ * `header_large_title`, `header_back_visible`, `header_tint_color`,
+ * `header_style`, `header_title_style`) and hosts its `header_left` /
+ * `header_right` slot views. The back button reports `on_native_back`, so
+ * Python pops the route (or vetoes it through `before_remove`) exactly as
+ * it does for an iOS swipe back.
+ */
 class ScreenStackManager extends ViewManager {
+  create(view, props) {
+    super.create(view, props);
+    view.el.classList.add("pn-stack");
+    view.header = document.createElement("div");
+    view.header.className = "pn-stack-header";
+    view.back = document.createElement("button");
+    view.back.type = "button";
+    view.back.className = "pn-stack-back";
+    view.back.addEventListener("click", () => this.goBack(view));
+    view.left = document.createElement("div");
+    view.left.className = "pn-stack-slot pn-stack-left";
+    view.titleEl = document.createElement("span");
+    view.titleEl.className = "pn-stack-title";
+    view.right = document.createElement("div");
+    view.right.className = "pn-stack-slot pn-stack-right";
+    const leading = document.createElement("div");
+    leading.className = "pn-stack-leading";
+    leading.append(view.back, view.left);
+    view.header.append(leading, view.titleEl, view.right);
+    view.body = document.createElement("div");
+    view.body.className = "pn-stack-body";
+    view.el.append(view.header, view.body);
+    view.topTag = null;
+  }
+  container(view) {
+    return view.body;
+  }
+  goBack(view) {
+    if (view.children.length > 1 && view.hasEvent("on_native_back")) view.ctx.emit(view.tag, "on_native_back", [1]);
+  }
+  command(view, name) {
+    // A vetoed back never left the DOM stack in the preview; just redraw.
+    if (name === "restore_stack") this.refreshHeader(view);
+    return null;
+  }
+  /** Draw the navigation bar for the top screen and move its header slots into it. */
+  refreshHeader(view) {
+    const children = view.children;
+    const top = children[children.length - 1] || null;
+    const o = top?.props || {};
+    const height = top ? stackHeaderHeight(o) : 0;
+    const scheme = view.ctx.scheme();
+    view.header.style.display = height ? "" : "none";
+    view.header.style.height = px(height);
+    view.header.classList.toggle("pn-stack-large", !!o.header_large_title);
+    view.body.style.top = px(height);
+    view.titleEl.textContent = o.title == null ? "" : String(o.title);
+    const previous = children[children.length - 2];
+    const canGoBack = !!previous && o.header_back_visible !== false;
+    view.back.style.display = canGoBack ? "" : "none";
+    // UIKit labels the back button with the previous screen's title when it
+    // fits, and falls back to "Back"; an explicit `header_back_title` wins.
+    const explicit = previous?.props.header_back_title;
+    const previousTitle = previous?.props.title == null ? "" : String(previous.props.title);
+    view.back.textContent = explicit != null && explicit !== "" ? String(explicit)
+      : previousTitle && previousTitle.length <= 12 ? previousTitle : "Back";
+    const tint = parseColor(o.header_tint_color, scheme);
+    view.back.style.color = tint ?? "";
+    const bar = o.header_style && typeof o.header_style === "object" ? o.header_style : {};
+    view.header.style.background = parseColor(bar.background_color, scheme) ?? "";
+    const titleStyle = o.header_title_style && typeof o.header_title_style === "object" ? o.header_title_style : {};
+    view.titleEl.style.color = parseColor(titleStyle.color, scheme) ?? "";
+    view.titleEl.style.fontSize = titleStyle.font_size != null ? px(Number(titleStyle.font_size)) : "";
+    view.titleEl.style.fontWeight = titleStyle.bold === false ? "400"
+      : titleStyle.font_weight != null ? String(titleStyle.font_weight) : titleStyle.bold ? "700" : "";
+    for (const child of children) {
+      for (const slot of child.children) {
+        const side = slot.props._pn_header_slot;
+        if (!side) continue;
+        if (child === top) (side === "left" ? view.left : view.right).appendChild(slot.el);
+        else if (slot.el.parentNode !== child.el) child.el.appendChild(slot.el);
+      }
+    }
+  }
   childrenChanged(view) {
-    for (const [index, child] of view.children.entries()) child.el.style.display = index === view.children.length - 1 ? "" : "none";
+    const children = view.children;
+    const visible = new Set();
+    for (let index = children.length - 1; index >= 0; index--) {
+      visible.add(children[index]);
+      if (children[index].props.presentation !== "transparent_modal") break;
+    }
+    for (const child of children) {
+      child.el.classList.add("pn-stack-screen");
+      child.el.classList.toggle("pn-screen-transparent", child.props.presentation === "transparent_modal");
+      child.el.style.display = visible.has(child) ? "" : "none";
+    }
+    this.refreshHeader(view);
+    view.ctx.nativeStackChanged?.();
+    const top = children[children.length - 1] || null;
+    const previous = view.topTag;
+    view.topTag = top ? top.tag : null;
+    if (!top || previous == null || previous === top.tag || !top.el.isConnected) return;
+    const known = view.seen || (view.seen = new Set());
+    if (known.has(top.tag)) return; // revealed by a pop, not pushed
+    this.enter(top);
+  }
+  enter(child) {
+    const cls = screenTransition(child.props);
+    if (!cls) return;
+    const el = child.el;
+    el.classList.add(cls);
+    // Two frames so the initial transform is committed before it transitions away.
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove(cls)));
+  }
+  /** A child is leaving (pop): animate a snapshot of it out over the revealed screen. */
+  childWillDetach(view, child) {
+    view.seen?.delete(child.tag);
+    const cls = screenTransition(child.props);
+    if (!cls || child !== view.children[view.children.length - 1] || !child.el.isConnected) return;
+    const ghost = child.el.cloneNode(true);
+    ghost.classList.add("pn-screen-ghost");
+    ghost.style.pointerEvents = "none";
+    ghost.removeAttribute("data-pn-tag");
+    view.body.appendChild(ghost);
+    requestAnimationFrame(() => ghost.classList.add(cls));
+    setTimeout(() => ghost.remove(), SCREEN_TRANSITION_MS + 40);
+  }
+  frame(view, x, y, w, h) {
+    super.frame(view, x, y, w, h);
+    // Every child laid out at least once is "known": its reappearance
+    // after a pop is a reveal, not a push.
+    view.seen ||= new Set();
+    for (const child of view.children) view.seen.add(child.tag);
+  }
+  destroy(view) {
+    view.ctx.nativeStackChanged?.();
+  }
+}
+
+/** A native-stack screen; option changes redraw the stack's navigation bar. */
+class ScreenManager extends ViewManager {
+  update(view, changed) {
+    super.update(view, changed);
+    if (view.parent?.type === "ScreenStack") view.parent.manager.refreshHeader(view.parent);
+  }
+  childrenChanged(view) {
+    if (view.parent?.type === "ScreenStack") view.parent.manager.refreshHeader(view.parent);
   }
 }
 
@@ -1767,7 +2403,7 @@ const MANAGERS = {
   StatusBar: StatusBarManager,
   WebView: WebViewManager,
   VirtualList: VirtualListManager,
-  Screen: ViewManager,
+  Screen: ScreenManager,
   ScreenStack: ScreenStackManager,
 };
 
@@ -1775,14 +2411,21 @@ const MANAGERS = {
 // Animations (PNAnimator equivalent)
 // ---------------------------------------------------------------------------
 
+/**
+ * The named easings every renderer implements (`pythonnative.animated`
+ * `_NAMED_EASING_BEZIERS`): React Native's `Easing.ease` is
+ * `bezier(0.42, 0, 1, 1)`, and `ease_in` / `ease_out` / `ease_in_out` are
+ * the CSS `ease-in` / `ease-out` / `ease-in-out` keywords; `quad` and
+ * `cubic` are the bare powers.
+ */
 const EASINGS = {
   linear: (t) => t,
-  ease_in: (t) => t * t,
-  ease_in_quad: (t) => t * t,
-  ease_out: (t) => 1 - (1 - t) * (1 - t),
-  ease_out_quad: (t) => 1 - (1 - t) * (1 - t),
-  ease: (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
-  ease_in_out: (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
+  ease: cubicBezier(0.42, 0, 1, 1),
+  ease_in: cubicBezier(0.42, 0, 1, 1),
+  ease_out: cubicBezier(0, 0, 0.58, 1),
+  ease_in_out: cubicBezier(0.42, 0, 0.58, 1),
+  quad: (t) => t * t,
+  cubic: (t) => t * t * t,
   bounce: (t) => {
     const n1 = 7.5625;
     const d1 = 2.75;
@@ -1792,6 +2435,41 @@ const EASINGS = {
     return n1 * (t -= 2.625 / d1) * t + 0.984375;
   },
 };
+
+/**
+ * Resolve a timing spec's `easing`: one of the names above, or a bare
+ * `[x1, y1, x2, y2]` cubic bezier. Python validates before sending, so
+ * anything else is `null` and the animation is declined (`{ok: false}`)
+ * rather than played with a guessed curve. No `easing` means `ease_in_out`.
+ */
+export function easingFor(spec) {
+  const value = spec && typeof spec === "object" && !Array.isArray(spec) ? spec.easing : spec;
+  if (value == null) return EASINGS.ease_in_out;
+  if (typeof value === "string") return EASINGS[value] || null;
+  if (Array.isArray(value) && value.length === 4 && value.every((n) => typeof n === "number" && Number.isFinite(n))) {
+    return cubicBezier(...value);
+  }
+  return null;
+}
+
+/**
+ * React Native's decay model: `velocity` in points per millisecond decays
+ * as `v0 * deceleration^t` (default `0.998`), so the value travels
+ * `v0 / (1 - deceleration)` in total. The animation rests once the speed
+ * drops under `DECAY_REST_VELOCITY` and lands on that final value.
+ */
+export const DEFAULT_DECELERATION = 0.998;
+export const DECAY_REST_VELOCITY = 0.001;
+export function decayFinalValue(from, velocity, deceleration = DEFAULT_DECELERATION) {
+  const d = Number(deceleration) || DEFAULT_DECELERATION;
+  return Number(from) + (Number(velocity) || 0) / (1 - d);
+}
+/** Position and velocity after `elapsedMs` of decay from `(from, velocity)`. */
+export function decayAt(from, velocity, deceleration, elapsedMs) {
+  const d = Number(deceleration) || DEFAULT_DECELERATION;
+  const factor = Math.pow(d, Math.max(0, elapsedMs));
+  return [Number(from) + ((Number(velocity) || 0) * (1 - factor)) / (1 - d), (Number(velocity) || 0) * factor];
+}
 
 function cubicBezier(x1, y1, x2, y2) {
   const sample = (t, a, b) => 3 * a * (1 - t) * (1 - t) * t + 3 * b * (1 - t) * t * t + t * t * t;
@@ -1810,7 +2488,7 @@ function cubicBezier(x1, y1, x2, y2) {
   };
 }
 
-const ANIM_TRANSFORM = new Set(["translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate"]);
+const ANIM_TRANSFORM = new Set(["translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate", "rotate_x", "rotate_y"]);
 
 class Animator {
   constructor(renderer) {
@@ -1851,9 +2529,8 @@ class Animator {
     if (kind === "timing") {
       const to = Number(spec.to);
       const duration = Math.max(1, Number(spec.duration_ms) || 300);
-      let easing = EASINGS.ease_in_out;
-      if (Array.isArray(spec.easing) && spec.easing.length === 4) easing = cubicBezier(...spec.easing.map(Number));
-      else if (typeof spec.easing === "string" && EASINGS[spec.easing]) easing = EASINGS[spec.easing];
+      const easing = easingFor(spec);
+      if (!easing) return false;
       step = (elapsed) => {
         const t = Math.min(1, elapsed / duration);
         const value = from + (to - from) * easing(t);
@@ -1881,17 +2558,15 @@ class Animator {
         return [done ? to : position, done];
       };
     } else if (kind === "decay") {
-      let velocity = Number(spec.velocity) || 0; // units per second
-      const deceleration = Number(spec.deceleration) || 0.997;
-      let position = from;
-      let last = 0;
+      const velocity = Number(spec.velocity) || 0; // points per millisecond
+      const deceleration = Number(spec.deceleration) || DEFAULT_DECELERATION;
+      const final = decayFinalValue(from, velocity, deceleration);
       step = (elapsed) => {
-        const dt = elapsed - last;
-        last = elapsed;
-        const factor = Math.pow(deceleration, dt);
-        position += (velocity * (1 - factor)) / (1000 * (1 - deceleration));
-        velocity *= factor;
-        return [position, Math.abs(velocity) < 0.5];
+        const [position, remaining] = decayAt(from, velocity, deceleration, elapsed);
+        // Rest once the speed drops under the shared threshold, landing on
+        // the projected value so Python and the page agree on the result.
+        const done = Math.abs(remaining) < DECAY_REST_VELOCITY;
+        return [done ? final : position, done];
       };
     } else {
       return false;
@@ -1945,9 +2620,19 @@ function installGestureSource(view) {
   if (view.gestureInstalled) return;
   view.gestureInstalled = true;
   const el = view.el;
+  // View-local `x`/`y` plus the window-relative `absolute_x`/`absolute_y`
+  // (`GestureEvent.absolute_x`), both in points inside the device frame.
   const send = (phase, event) => {
     const point = view.ctx.pointInFrame(event);
-    view.ctx.gesture(view.tag, phase, { id: event.pointerId, x: point.x, y: point.y, specs: view.props.gestures || [] });
+    const absolute = view.ctx.pointInWindow ? view.ctx.pointInWindow(event) : { x: event.clientX, y: event.clientY };
+    view.ctx.gesture(view.tag, phase, {
+      id: event.pointerId,
+      x: point.x,
+      y: point.y,
+      absolute_x: absolute.x,
+      absolute_y: absolute.y,
+      specs: view.props.gestures || [],
+    });
   };
   el.addEventListener("pointerdown", (event) => {
     if (!Array.isArray(view.props.gestures) || !view.props.gestures.length) return;
@@ -1989,12 +2674,16 @@ export class Renderer {
   constructor(ctx) {
     this.ctx = {...ctx};
     this.eventSequence = 0;
+    this.applying = null;
     this.ctx.emit = (tag, name, args) => {
       this.graph.event(tag, name, args);
       const view = this.views.get(tag);
       const edit = name === "on_change" && view?.type === "TextInput" ? (view.editRevision = (view.editRevision || 0) + 1) : 0;
+      // A view emitting while its commit applies (an image starting to
+      // load during create) belongs to that commit's revision.
+      const identity = this.applying || this;
       return ctx.emit(tag, name, {
-      application: this.application, surface: this.surface, revision: this.revision,
+      application: identity.application, surface: identity.surface, revision: identity.revision,
       sequence: ++this.eventSequence, args, edit_revision: edit,
       });
     };
@@ -2082,14 +2771,16 @@ export class Renderer {
     const mutationStarted = performance.now();
     try {
       if (replacing && this.application) this.reset();
+      this.applying = {application, surface, revision};
       for (const op of ops) this.applyOne(op);
       for (const view of this.dirtyContainers) if (this.views.has(view.tag)) view.manager.childrenChanged(view);
       this.dirtyContainers.clear();
+      this.applying = null;
       this.failed = false; this.application = application; this.surface = surface; this.revision = revision;
       return {ok: true, application, surface, revision,
         ...(envelope.layout ? {layout: this.computeLayout(envelope.layout)} : {}),
         metrics:{mutation_ns: Math.round((performance.now() - mutationStarted)*1e6)}};
-    } catch (error) { this.reset(); this.failed = true; return fail(String(error)); }
+    } catch (error) { this.applying = null; this.reset(); this.failed = true; return fail(String(error)); }
   }
 
   computeLayout(request) {
@@ -2206,6 +2897,7 @@ export class Renderer {
   destroyView(view) {
     this.graph.forget(view.tag);
     this.animator.cancelForView(view);
+    if (view.parent && view.parent.manager.childWillDetach) view.parent.manager.childWillDetach(view.parent, view);
     for (const child of [...view.children]) this.destroyView(child);
     if (view.parent) {
       const idx = view.parent.children.indexOf(view);

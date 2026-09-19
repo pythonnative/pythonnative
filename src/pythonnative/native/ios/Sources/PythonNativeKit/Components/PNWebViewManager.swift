@@ -62,8 +62,8 @@ public final class PNWebViewManager: PNComponentManager {
     public override func command(view: UIView, name: String, args: [String: Any]) -> Any? {
         guard let webView = view as? WKWebView else { return nil }
         switch name {
-        case "eval_js", "inject_javascript":
-            webView.evaluateJavaScript(PNProps.string(args["source"]) ?? PNProps.string(args["script"]) ?? "") { _, _ in }
+        case "inject_javascript":
+            webView.evaluateJavaScript(PNProps.string(args["script"]) ?? "") { _, _ in }
         case "reload": webView.reload()
         case "go_back": webView.goBack()
         case "go_forward": webView.goForward()
@@ -122,5 +122,52 @@ final class PNWebViewDelegate: NSObject, WKNavigationDelegate, WKScriptMessageHa
             body = PNJSON.encode(message.body)
         }
         PNEvents.emit(webView, "on_message", [body])
+    }
+}
+
+/// `WebViews`: asynchronous questions for a mounted `WebView`. WebKit
+/// answers `evaluateJavaScript` later on the main thread, so the result
+/// settles a promise instead of returning from a synchronous view command.
+public final class WebViewsModule: WebViewsImplementation {
+    public init() {}
+
+    public func eval_js(tag: Int64, script: String, completion: @escaping (Result<String, Error>) -> Void) -> (() -> Void)? {
+        DispatchQueue.main.async {
+            guard let webView = PNViewRegistry.shared.view(for: tag) as? WKWebView else {
+                completion(.failure(NSError(domain: "WebViews", code: 1, userInfo: [NSLocalizedDescriptionKey: "no WebView with tag \(tag)"])))
+                return
+            }
+            webView.evaluateJavaScript(script) { value, error in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(WebViewsModule.stringify(value)))
+                }
+            }
+        }
+        return nil
+    }
+
+    /// A script result as a string: strings as-is, `null` and `undefined`
+    /// as `""`, booleans and numbers in their JavaScript spelling, and
+    /// arrays and objects as JSON.
+    public static func stringify(_ value: Any?) -> String {
+        switch value {
+        case nil, is NSNull:
+            return ""
+        case let string as String:
+            return string
+        case let number as NSNumber:
+            if CFGetTypeID(number) == CFBooleanGetTypeID() { return number.boolValue ? "true" : "false" }
+            let double = number.doubleValue
+            if double.isFinite, double == double.rounded(), abs(double) < 1e15 { return String(Int64(double)) }
+            return number.stringValue
+        default:
+            if let value = value, JSONSerialization.isValidJSONObject(value),
+               let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) {
+                return String(decoding: data, as: UTF8.self)
+            }
+            return String(describing: value!)
+        }
     }
 }

@@ -23,7 +23,10 @@ import org.json.JSONObject
  * by [ImageLoader]), absolute file paths, `content://` URIs, and base64
  * `data:` URIs. `default_source` (a local source) shows immediately while
  * a remote `source` loads and stays up if it fails. `blur_radius` blurs
- * the decoded bitmap. Fires `on_load` / `on_error`.
+ * the decoded bitmap. Fires `on_load_start` when a `source` load begins,
+ * `on_load` / `on_error` with the outcome, and `on_load_end` after
+ * either. `fade_duration` (ms) fades a newly decoded source in;
+ * `headers` are sent with network requests.
  */
 class ImageManager : TypedComponentManager<ImageProps>({ values, partial -> ImageProps(values, partial) }) {
     private val assetViews = java.util.Collections.newSetFromMap(java.util.WeakHashMap<ImageView, Boolean>())
@@ -38,7 +41,7 @@ class ImageManager : TypedComponentManager<ImageProps>({ values, partial -> Imag
         val iv = view as ImageView
         if (props.has_tint_color) iv.imageTintList = props.tint_color?.let { PNColor.parse(PNValues.encode(it)) }?.let { ColorStateList.valueOf(it) }
         if (props.has_placeholder_color) iv.setBackgroundColor(props.placeholder_color?.let { PNColor.parse(PNValues.encode(it)) } ?: android.graphics.Color.TRANSPARENT)
-        if (props.has_source || props.has_default_source || props.has_blur_radius) {
+        if (props.has_source || props.has_default_source || props.has_blur_radius || props.has_headers) {
             load(iv, propsOf(iv))
         }
         if (props.has_scale_type) {
@@ -89,11 +92,25 @@ class ImageManager : TypedComponentManager<ImageProps>({ values, partial -> Imag
             })
         }
         if (source != null) {
+            if (hasEvent(iv, "on_load_start")) PNComponentEvents.Image.on_load_start(iv)
+            val fadeMs = (merged.opt("fade_duration") as? Number)?.toLong() ?: 0L
             cancels.add(start(iv, source, blur, request, report = true) { bitmap ->
                 stateOf(iv)["shown_source"] = source
                 iv.setImageBitmap(bitmap)
+                if (fadeMs > 0) {
+                    iv.alpha = 0f
+                    iv.animate().alpha(1f).setDuration(fadeMs).start()
+                }
             })
         }
+    }
+
+    /** Request headers for network sources (`headers` prop). */
+    private fun headers(iv: ImageView): Map<String, String> {
+        val dict = propsOf(iv).optJSONObject("headers") ?: return emptyMap()
+        val out = LinkedHashMap<String, String>()
+        for (key in dict.keys()) dict.optString(key, null)?.let { out[key] = it }
+        return out
     }
 
     private fun isRemote(source: String) = source.startsWith("http://") || source.startsWith("https://")
@@ -111,32 +128,38 @@ class ImageManager : TypedComponentManager<ImageProps>({ values, partial -> Imag
             } else if (report) {
                 PNComponentEvents.Image.on_error(iv, error ?: "load failed")
             }
+            if (report && hasEvent(iv, "on_load_end")) PNComponentEvents.Image.on_load_end(iv)
         }
         return try {
             when {
                 PNAssets.isAssetUri(source) -> {
                     val resolved = PNAssets.resolve(source)
                     if (resolved == null) {
-                        if (report) PNComponentEvents.Image.on_error(iv, "asset not found: ${PNAssets.pathOf(source)}")
+                        if (report) failed(iv, "asset not found: ${PNAssets.pathOf(source)}")
                         return {}
                     }
                     ImageLoader.loadAsset(resolved, tw, th, callback, blur)
                 }
                 source.startsWith("data:") || source.startsWith("content://") ->
                     ImageLoader.loadData(iv.context, source, tw, th, callback, blur)
-                isRemote(source) -> ImageLoader.loadRemote(iv.context, source, tw, th, callback, blur)
+                isRemote(source) -> ImageLoader.loadRemote(iv.context, source, tw, th, callback, blur, headers(iv))
                 source.startsWith("/") || source.startsWith("file://") ->
                     ImageLoader.loadFile(source.removePrefix("file://"), tw, th, callback, blur)
                 else -> {
-                    if (report) PNComponentEvents.Image.on_error(iv, "unsupported image source: $source")
+                    if (report) failed(iv, "unsupported image source: $source")
                     return {}
                 }
             }
         } catch (e: Exception) {
             PNLog.swallowed("ImageManager.start", e)
-            if (report) PNComponentEvents.Image.on_error(iv, e.message ?: "load failed")
+            if (report) failed(iv, e.message ?: "load failed")
             return {}
         }
+    }
+
+    private fun failed(iv: ImageView, message: String) {
+        PNComponentEvents.Image.on_error(iv, message)
+        if (hasEvent(iv, "on_load_end")) PNComponentEvents.Image.on_load_end(iv)
     }
 
     private fun emitLoaded(view: ImageView) {

@@ -18,9 +18,15 @@ Library-style queries to do it.
 - **Reducers and helpers**: pure functions; test them as you would any
   other Python code.
 
-What *not* to test (or to test sparingly): the platform handler
-implementations themselves. Those run only on the device and are
-covered by the Maestro E2E suite (`tests/e2e/`).
+What *not* to test (or to test sparingly): the Swift and Kotlin
+component managers themselves. Those run only on the device and are
+covered by their XCTest and JUnit suites and by the Maestro E2E suite
+(`tests/e2e/`).
+
+Installing `pythonnative` also installs a pytest plugin (registered
+under the `pytest11` entry point) that resets the framework runtime
+between tests and provides the `pn_clock` fixture, so no `conftest.py`
+is needed. Disable it with `-p no:pythonnative`.
 
 ## Rendering a component
 
@@ -43,14 +49,19 @@ def Counter():
 
 def test_counter_increments():
     result = render(Counter())
-    result.press(result.get_by_text("+"))
+    result.press(result.get_by_role("button", name="+"))
     assert result.get_by_text("Count: 1")
 ```
 
 `press` (and the general `fire(target, "on_event", *args)`) dispatch
 the event exactly as a native listener would, then settle: pending
 re-renders, effects, and async work run before the call returns, so
-the next line can assert on the new tree.
+the next line can assert on the new tree. Like a real tap, `press`
+refuses a disabled target (`disabled=True`,
+`accessibility_state={"disabled": True}`, or a disabled `Pressable` or
+`Button` ancestor) with an `AssertionError`; pass `force=True` to
+dispatch anyway. `act(fn)` runs a plain callable (a state setter, an
+imperative handle call) and settles the same way.
 
 ### Queries
 
@@ -58,9 +69,10 @@ Queries mirror Testing Library:
 
 | Query | Returns |
 |---|---|
-| `get_by_text`, `get_by_test_id`, `get_by_label`, `get_by_type` | exactly one view, or raises `LookupError` with the tree dumped in the message |
+| `get_by_text`, `get_by_test_id`, `get_by_label`, `get_by_type`, `get_by_role`, `get_by_placeholder_text`, `get_by_display_value` | exactly one view, or raises `LookupError` with the tree dumped in the message |
 | `query_by_*` | the view or `None` |
 | `get_all_by_*` | every match |
+| `find_by_*` | `get_by_*` wrapped in [`wait_for`][pythonnative.testing.wait_for]: polls until the view appears |
 
 Matchers are exact strings, compiled regexes, or predicates;
 `get_by_text("Count", exact=False)` matches substrings. Views inside a
@@ -68,20 +80,93 @@ Matchers are exact strings, compiled regexes, or predicates;
 stack) are skipped unless you pass `hidden=True`, which is how you
 assert that a hidden screen kept its state.
 
+`get_by_role(role, name=...)` matches the `accessibility_role` prop, or
+the type's implicit role when the prop is unset, optionally narrowed by
+the accessible name (the `accessibility_label`, else the visible text
+or title, else the text of descendants). The implicit roles come from
+[`IMPLICIT_ROLES`][pythonnative.testing.IMPLICIT_ROLES]:
+
+| Type | Implicit role |
+|---|---|
+| `Button`, `Pressable`, `Picker`, `DatePicker` | `"button"` |
+| `Switch` | `"switch"` |
+| `Checkbox` | `"checkbox"` |
+| `TextInput` | `"textbox"` |
+| `Image`, `ImageBackground` | `"image"` |
+| `Slider` | `"adjustable"` |
+| `ProgressBar` | `"progressbar"` |
+
+`Text` has no implicit role; `pn.Text("Title", accessibility_role="header")`
+matches `get_by_role("header")` through the prop.
+
 Each match is a [`FakeView`][pythonnative.testing.FakeView] with
-`type_name`, `props`, `children`, `parent`, `frame`, and `text`.
+`type_name`, `props`, `children`, `parent`, `frame`, `text`, `value`,
+and `placeholder`. `text` is the visible static text (`Text.text` or
+`Button.title`); a `TextInput`'s contents are exposed as `value` and
+`placeholder`, so `get_by_text` never matches a form field, while
+`get_by_display_value` and `get_by_placeholder_text` do.
 `result.text()` lists the visible strings in order, and
 `result.dump()` prints the tree when a test is confusing.
 
+Scope any query to one subtree with
+[`within`][pythonnative.testing.within]:
+
+```python
+from pythonnative.testing import render, wait_for, within
+
+
+def test_form(pn_clock):
+    r = render(Form())
+    r.change_text(r.get_by_placeholder_text("Email"), "a@b.c")
+    r.press(r.get_by_role("button", name="Save"))
+    pn_clock.advance(2.0)                     # timers fire, no real sleep
+    assert wait_for(lambda: r.query_by_text("Saved"))
+    card = within(r.get_by_test_id("summary"))
+    assert card.get_by_display_value("a@b.c")
+```
+
+`wait_for(predicate, timeout=1.0, interval=0.01)` polls `predicate`
+while draining the framework loop; a `LookupError` or `AssertionError`
+raised by the predicate counts as "not yet", so both `get_by_*` and
+`query_by_*` work inside it.
+
 ### Other helpers
 
-- `change_text(input, "value")` fires `on_change_text`.
+- `change_text(input, "value")` fires `on_change` on a `TextInput`.
+- `press(target, force=False)` fires `on_press`; `act(fn)` runs any
+  callable and settles.
 - `back()` simulates the system back action and returns whether a
   handler consumed it.
 - `rerender(element)` reconciles new root props from outside the tree.
 - `settle()` pumps the framework loop until async work is done.
 - `unmount()` tears down and runs effect cleanups; `RenderResult` is
   also a context manager.
+
+### Virtual time
+
+Timers (`asyncio.sleep`, `call_later`, `asyncio.timeout`) on the
+framework loop can run on virtual time. The `pn_clock` fixture from the
+shipped pytest plugin installs a
+[`FakeClock`][pythonnative.testing.FakeClock];
+[`fake_clock`][pythonnative.testing.fake_clock] is the context-manager
+form for code outside pytest:
+
+```python
+from pythonnative.testing import fake_clock, render
+
+
+def test_toast_disappears():
+    with fake_clock() as clock:
+        result = render(Toast())          # hides itself after asyncio.sleep(3)
+        assert result.query_by_text("Saved")
+        clock.advance(3.0)                # timers fire, no real sleep
+        assert result.query_by_text("Saved") is None
+```
+
+The clock patches the loop's `time()` rather than `asyncio.sleep`, so
+the framework's own timers (transitions, animations, debounced hooks)
+advance together with the app's. `advance()` steps timer by timer, so
+a re-arming timer fires the right number of times.
 
 ## Testing hooks in isolation
 
@@ -107,8 +192,8 @@ is how you test hooks that react to prop changes.
 
 ## Testing navigation
 
-Navigators render in Python when no host is present, so a whole flow
-fits in one test:
+Navigators draw their own header when no native host is present, so a
+whole flow fits in one test:
 
 ```python
 def test_home_to_detail_and_back():

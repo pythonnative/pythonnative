@@ -55,4 +55,32 @@ class PNTransactionTest {
         assertEquals("""{"x":1.5}""", JsonUtil.encode(mapOf("x" to 1.5)))
         assertEquals("[1,2]", JsonUtil.encode(listOf(1, 2)))
     }
+
+    @Test
+    fun eventsEmittedWhileACommitAppliesCarryThatCommitsIdentity() {
+        val state = com.pythonnative.runtime.bridge.CommitState()
+        // A view that emits during its own creation (an image starting to
+        // load) is born in the applying revision; Python drops events that
+        // claim an older one.
+        val during = state.stampedAs("app-1", 1, 1) { org.json.JSONObject(state.event(org.json.JSONArray())) }
+        assertEquals("app-1", during.getString("application"))
+        assertEquals(1, during.getInt("surface"))
+        assertEquals(1, during.getInt("revision"))
+        val after = org.json.JSONObject(state.event(org.json.JSONArray()))
+        assertEquals("", after.getString("application"))
+        assertEquals(0, after.getInt("revision"))
+        assertEquals(during.getInt("sequence") + 1, after.getInt("sequence"))
+    }
+
+    @Test
+    fun webViewScriptResultsAreStringifiedLikeIosAndTheBrowser() {
+        val stringify = com.pythonnative.runtime.components.WebViewsModule::stringify
+        assertEquals("", stringify(null))
+        assertEquals("", stringify("null"))
+        assertEquals("hi", stringify("\"hi\""))
+        assertEquals("42", stringify("42"))
+        assertEquals("4.5", stringify("4.5"))
+        assertEquals("true", stringify("true"))
+        assertEquals("[1,2]", stringify("[1,2]"))
+    }
 }

@@ -12,22 +12,39 @@ public final class DeviceModule: DeviceImplementation {
         try Self.snapshot().mapValues { try PNValues.decode(PNJSONValue.self, $0) }
     }
 
-    /// The `Device.info()` payload.
+    /// The `Device.info()` payload: `platform`, `os_version`, `model`,
+    /// `manufacturer`, `is_simulator`, `is_tablet`, `app_name`, `app_version`,
+    /// `build_number`, `bundle_id`, `scale`, `font_scale`, `locale` (BCP 47),
+    /// plus `app_dir` (the Documents directory) for file storage.
     public static func snapshot() -> [String: Any] {
         let paths = FileManager.default
         let documents = paths.urls(for: .documentDirectory, in: .userDomainMask).first?.path ?? NSHomeDirectory() + "/Documents"
-        let caches = paths.urls(for: .cachesDirectory, in: .userDomainMask).first?.path ?? NSTemporaryDirectory()
+        let info = Bundle.main.infoDictionary ?? [:]
+        let appName = (info["CFBundleDisplayName"] as? String) ?? (info["CFBundleName"] as? String) ?? ""
         return [
-            "os": "ios",
+            "platform": "ios",
             "os_version": UIDevice.current.systemVersion,
             "model": UIDevice.current.model,
-            "name": UIDevice.current.name,
-            "app_dir": documents,
-            "cache_dir": caches,
-            "locale": Locale.current.identifier,
-            "scale": Double(PNWindow.screenScale()),
+            "manufacturer": "Apple",
             "is_simulator": DeviceModule.isSimulator,
+            "is_tablet": UIDevice.current.userInterfaceIdiom == .pad,
+            "app_name": appName,
+            "app_version": (info["CFBundleShortVersionString"] as? String) ?? "",
+            "build_number": (info["CFBundleVersion"] as? String) ?? "",
+            "bundle_id": Bundle.main.bundleIdentifier ?? "",
+            "scale": Double(PNWindow.screenScale()),
+            "font_scale": PNWindow.fontScale(),
+            "locale": DeviceModule.languageTag(Locale.current),
+            "app_dir": documents,
         ]
+    }
+
+    /// The locale as a BCP 47 language tag (`en-US`), not a POSIX identifier.
+    public static func languageTag(_ locale: Locale) -> String {
+        if #available(iOS 16.0, *) {
+            return locale.identifier(.bcp47)
+        }
+        return locale.identifier.replacingOccurrences(of: "_", with: "-")
     }
 
     static var isSimulator: Bool {
@@ -96,7 +113,8 @@ public final class SecureStoreModule: SecureStoreImplementation {
     }
 
     static func delete(_ key: String) -> Bool {
-        SecItemDelete(query(key) as CFDictionary) == errSecSuccess
+        let status = SecItemDelete(query(key) as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
     }
 }
 
