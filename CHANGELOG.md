@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.46.0 (2026-09-21)
+
+### Features
+
+- Close React Native parity gaps, and fix correctness bugs
+  ([#104](https://github.com/pythonnative/pythonnative/pull/104),
+  [`66f486e`](https://github.com/pythonnative/pythonnative/commit/66f486e560c7a71787e92ce8f6b463a77e45fc5a))
+
+
 ## v0.45.0 (2026-09-18)
 
 ### Features
