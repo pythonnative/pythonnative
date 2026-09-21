@@ -1,6 +1,6 @@
 """Tests for the navigation package: state, core, navigators, hooks, linking."""
 
-from typing import Any, Dict, List, NotRequired, TypedDict
+from typing import Any, Dict, List, NotRequired, Optional, TypedDict
 
 import pytest
 
@@ -29,6 +29,7 @@ from pythonnative.navigation import (
     use_navigation,
     use_route,
 )
+from pythonnative.navigation import linking as navigation_linking
 from pythonnative.testing import FakeHost, render, render_hook
 
 # ======================================================================
@@ -1162,6 +1163,136 @@ def test_linking_url_from_state() -> None:
     unknown = NavigationState([Route("Tabs", state=NavigationState([Route("Ghost")]))])
     assert cfg.url_from_state(unknown) == "myapp://tabs"  # deepest ancestor with a path
     assert cfg.url_from_state(NavigationState([Route("Nowhere")])) is None
+
+
+def _profile_linking() -> LinkingConfig:
+    return LinkingConfig(prefixes=["myapp://"], screens={"Profile": "u/:user"})
+
+
+def _leaf(state: Optional[NavigationState]) -> Route:
+    assert state is not None
+    route = state.current
+    while route.state is not None:
+        route = route.state.current
+    return route
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param("Ada Lovelace", id="space"),
+        pytest.param("Zo\u00eb \u03a9mega \u65e5\u672c", id="unicode"),
+        pytest.param("c++", id="literal-plus"),
+        pytest.param("100%", id="percent-sign"),
+        pytest.param("a/b", id="slash"),
+    ],
+)
+def test_linking_path_param_round_trips(value: str) -> None:
+    cfg = _profile_linking()
+    url = cfg.url_from_state(NavigationState([Route("Profile", {"user": value})]))
+    assert url is not None
+
+    assert _leaf(cfg.state_from_url(url)).params == {"user": value}
+
+
+def test_linking_every_capture_is_decoded() -> None:
+    # Two captured segments, each encoded differently, so a decode applied
+    # to only one of them (say, the last) leaves the other raw.
+    cfg = LinkingConfig(prefixes=["myapp://"], screens={"Thread": "org/:org/repo/:repo"})
+    params = {"org": "Ada Lovelace", "repo": "a/b"}
+    url = cfg.url_from_state(NavigationState([Route("Thread", params)]))
+    assert url == "myapp://org/Ada%20Lovelace/repo/a%2Fb"
+
+    route = _leaf(cfg.state_from_url(url))
+    assert route.name == "Thread"
+    assert route.params == params
+
+
+def test_linking_captures_are_decoded_across_a_nested_navigator() -> None:
+    # One capture belongs to the outer navigator's path and one to the
+    # inner screen's; both land on the leaf and both must be decoded.
+    cfg = LinkingConfig(
+        prefixes=["myapp://"],
+        screens={"Org": {"path": "org/:org", "screens": {"Repo": "repo/:repo"}}},
+    )
+    params = {"org": "Zo\u00eb", "repo": "c++"}
+    state = NavigationState([Route("Org", state=NavigationState([Route("Repo", params)]))])
+    url = cfg.url_from_state(state)
+    assert url == "myapp://org/Zo%C3%AB/repo/c%2B%2B"
+
+    read = cfg.state_from_url(url)
+    assert read is not None and read.current.name == "Org"
+    route = _leaf(read)
+    assert route.name == "Repo"
+    assert route.params == params
+
+
+def test_linking_encoded_slash_stays_in_one_value() -> None:
+    # Decoding happens per segment, after the path is split, so %2F can't
+    # become a segment boundary and shift the match.
+    route = _leaf(_profile_linking().state_from_url("myapp://u/a%2Fb"))
+    assert route.name == "Profile"
+    assert route.params == {"user": "a/b"}
+
+
+def test_linking_double_encoded_value_decodes_once() -> None:
+    assert _leaf(_profile_linking().state_from_url("myapp://u/%252F")).params == {"user": "%2F"}
+
+
+def test_linking_converter_sees_the_decoded_value() -> None:
+    route = _leaf(_linking().state_from_url("myapp://item/%34%32"))
+    assert route.name == "Detail"
+    assert route.params == {"id": 42}
+
+
+def test_linking_plus_is_literal_in_the_path_and_a_space_in_the_query() -> None:
+    cfg = _profile_linking()
+    route = _leaf(cfg.state_from_url("myapp://u/a+b?q=a+b"))
+    assert route.params == {"user": "a+b", "q": "a b"}
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [pytest.param("%FF", id="invalid-utf8"), pytest.param("caf%E9", id="latin-1")],
+)
+def test_linking_undecodable_path_param_is_left_raw(raw: str) -> None:
+    # Strict decoding with a raw fallback: a value that isn't valid UTF-8
+    # reads back exactly as it did before decoding existed, rather than
+    # being replaced with U+FFFD.
+    assert _leaf(_profile_linking().state_from_url(f"myapp://u/{raw}")).params == {"user": raw}
+
+
+def test_linking_failing_converter_keeps_the_raw_undecodable_value() -> None:
+    # int() fails and the converter's except leaves the value in place, so
+    # what's left must be the original "%FF", not an unrecoverable "\ufffd".
+    route = _leaf(_linking().state_from_url("myapp://item/%FF"))
+    assert route.params == {"id": "%FF"}
+
+
+def test_linking_decode_fallback_only_swallows_unicode_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The raw-segment fallback is for undecodable bytes only. Anything else
+    # going wrong inside the decode is a bug and must surface, not quietly
+    # hand the screen an undecoded value.
+    def _boom(*args: Any, **kwargs: Any) -> str:
+        raise RuntimeError("not a decoding problem")
+
+    monkeypatch.setattr(navigation_linking, "unquote", _boom)
+
+    with pytest.raises(RuntimeError, match="not a decoding problem"):
+        _profile_linking().state_from_url("myapp://u/ada")
+
+
+def test_linking_literal_segments_are_not_decoded() -> None:
+    # Only captured values are decoded. An encoded "new" still falls through
+    # to the :param route, exactly as before, rather than matching the
+    # literal route. Decoding every segment would route this to New instead.
+    cfg = LinkingConfig(prefixes=["myapp://"], screens={"New": "u/new", "Profile": "u/:user"})
+
+    encoded = _leaf(cfg.state_from_url("myapp://u/%6Eew"))
+    assert encoded.name == "Profile"
+    assert encoded.params == {"user": "new"}
+
+    assert _leaf(cfg.state_from_url("myapp://u/new")).name == "New"
 
 
 def test_container_seeds_from_launch_url_and_follows_later_links(monkeypatch: pytest.MonkeyPatch) -> None:
