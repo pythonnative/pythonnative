@@ -1989,6 +1989,8 @@
       
         
       
+        
+      
     
     
     
@@ -2136,6 +2138,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3033,6 +3063,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;log
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.diagnostics.warn" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3493,6 +3534,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;log
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.diagnostics.warn" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3722,6 +3774,14 @@ module (hooks, reconciler, events) may import it freely.</p>
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;log&lt;/span&gt; (&lt;code&gt;pythonnative.diagnostics.log&lt;/code&gt;)" href="#pythonnative.diagnostics.log">log</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Print a framework trace line (<code>[PN] message</code>) in dev mode.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;warn&lt;/span&gt; (&lt;code&gt;pythonnative.diagnostics.warn&lt;/code&gt;)" href="#pythonnative.diagnostics.warn">warn</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -3908,6 +3968,60 @@ variable.</p>
 <p>Resolution order: an explicit
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_dev_mode&lt;/span&gt;" href="#pythonnative.diagnostics.set_dev_mode"><code>set_dev_mode</code></a> call, then
 the <code>PN_DEV</code> environment variable, then <code>False</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.diagnostics.log" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">log</span>
+
+
+<a href="#pythonnative.diagnostics.log" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">log</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Print a framework trace line (<code>[PN] message</code>) in dev mode.</p>
+<p>The reconciler and screen hosts call this at phase boundaries
+(mount, re-render, RedBox) so a dev console shows what the runtime
+is doing. No-op in production.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The trace text.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>

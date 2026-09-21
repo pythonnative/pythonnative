@@ -2092,6 +2092,8 @@
       
         
       
+        
+      
     
     
     
@@ -2238,6 +2240,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3503,7 +3533,12 @@ ordinary asyncio APIs and explicitly move blocking I/O off the application loop.
 tag indexes, dirty component work, and pending effects. Updating a child preserves
 its ancestors and siblings unless their own inputs or context change. Native
 child relationships are rebuilt when a component's native roots change.
-Effects run after committed views exist, with child effects preceding parents.</p>
+Effects run after committed views exist, with child effects preceding parents.
+Renders are batched automatically: setter calls made in one callback, effect,
+or task step coalesce into one flush on the application loop. An effect that
+raises is routed to the nearest error boundary like a render error, and a
+component that re-dirties itself for more than fifty passes raises
+<code>RuntimeError("Too many re-renders")</code> through the same path.</p>
 <p>Equality accepts identity and scalar Boolean comparisons. Array-like comparisons
 that produce another array aren't coerced to a Boolean. Mutable objects must be
 replaced to signal a state or dependency change. Frozen dataclasses are a good
@@ -3523,7 +3558,7 @@ window. Native collection and recycler views request rows asynchronously by
 key, index, and data revision. Measured heights replace estimates. Headers,
 footers, empty states, grouped grids, and sections use the same ownership model.</p>
 <h2 id="contracts-and-tooling">Contracts and tooling<a class="headerlink" href="#contracts-and-tooling" title="Permanent link">&para;</a></h2>
-<p>Protocol 2 validates commits before mutation and acknowledges exact revisions.
+<p>Protocol 3 validates commits before mutation and acknowledges exact revisions.
 Events carry application and revision identities. Controlled inputs additionally
 acknowledge native edit revisions to avoid overwriting newer typing. Native
 animation graphs perform frame updates independently of Python callbacks.</p>
@@ -3576,6 +3611,10 @@ validate device signing, store submission, or performance on physical devices.</
 <td><code>bridge/</code>, <code>native_views/bridge_backend.py</code></td>
 </tr>
 <tr>
+<td>Imperative handles and undo journal</td>
+<td><code>handles.py</code>, <code>journal.py</code></td>
+</tr>
+<tr>
 <td>Native renderers</td>
 <td><code>native/ios/</code>, <code>native/android/</code></td>
 </tr>
@@ -3594,6 +3633,14 @@ validate device signing, store submission, or performance on physical devices.</
 <tr>
 <td>Contracts and plugins</td>
 <td><code>sdk/</code>, <code>project/plugins.py</code></td>
+</tr>
+<tr>
+<td>Device modules</td>
+<td><code>native_modules/</code></td>
+</tr>
+<tr>
+<td>Testing library and pytest plugin</td>
+<td><code>testing/</code></td>
 </tr>
 <tr>
 <td>Build and dependency locks</td>

@@ -1987,6 +1987,8 @@
       
         
       
+        
+      
     
     
     
@@ -2133,6 +2135,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3770,12 +3800,18 @@ For a declarative alternative, use
 </li>
 </ul>
 <h2 id="how-do-i-add-a-new-widget">How do I add a new widget?<a class="headerlink" href="#how-do-i-add-a-new-widget" title="Permanent link">&para;</a></h2>
-<p>Implement a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a>
-for each platform you support, register it on
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;get_registry&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.get_registry"><code>get_registry()</code></a>, and write
-a small Python factory that returns
-<code>Element(&lt;type&gt;, props, children)</code>. Step-by-step instructions live in
-<a href="../../concepts/native-views/#custom-widgets">Native views (concept)</a>.</p>
+<p>Declare a frozen <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Props&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/sdk/#pythonnative.sdk.Props"><code>Props</code></a> dataclass, call
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;define_component&lt;/span&gt;" href="../../api/sdk/#pythonnative.sdk.define_component"><code>define_component(name, props)</code></a>
+to get a typed element factory, generate the native contract, and
+implement a Swift <code>PNComponentManager</code> and a Kotlin <code>ComponentManager</code>
+under the same name. Headless tests and the browser preview need no
+extra Python code. Step-by-step instructions live in
+<a href="../../guides/custom-native-components/">Custom native components</a>.</p>
 <h2 id="does-pythonnative-work-on-the-desktop-or-the-web">Does PythonNative work on the desktop or the web?<a class="headerlink" href="#does-pythonnative-work-on-the-desktop-or-the-web" title="Permanent link">&para;</a></h2>
 <p>For <strong>previewing</strong>, yes. <code>pn preview</code> renders your app in a browser tab
 inside a phone frame, with Fast Refresh on every save. It's the fastest

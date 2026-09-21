@@ -2231,6 +2231,8 @@
       
         
       
+        
+      
     
     
     
@@ -2377,6 +2379,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3792,15 +3822,17 @@ objects are created until the
   flex container (fixed <code>flex_direction: "column"</code>).</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Row&lt;/span&gt;" href="../../api/components/#pythonnative.components.Row"><code>Row(*children, style=...)</code></a>: horizontal flex
   container (fixed <code>flex_direction: "row"</code>).</li>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;ScrollView&lt;/span&gt;" href="../../api/components/#pythonnative.components.ScrollView"><code>ScrollView(child, style=...)</code></a>:
-  scrollable container.</li>
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;ScrollView&lt;/span&gt;" href="../../api/components/#pythonnative.components.ScrollView"><code>ScrollView(*children, horizontal, content_container_style, ...)</code></a>:
+  scrollable container with drag, momentum, snapping, and keyboard
+  options.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;SafeAreaView&lt;/span&gt;" href="../../api/components/#pythonnative.components.SafeAreaView"><code>SafeAreaView(*children, style=...)</code></a>:
   safe-area-aware container.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Spacer&lt;/span&gt;" href="../../api/components/#pythonnative.components.Spacer"><code>Spacer(size, flex)</code></a>: empty space.</li>
 </ul>
 <p><strong>Display:</strong></p>
 <ul>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Text&lt;/span&gt;" href="../../api/components/#pythonnative.components.Text"><code>Text(text, style=...)</code></a>: text display.</li>
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Text&lt;/span&gt;" href="../../api/components/#pythonnative.components.Text"><code>Text(*parts, ellipsize_mode, selectable, on_press, style=...)</code></a>:
+  text display, with nested pressable spans.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Image&lt;/span&gt;" href="../../api/components/#pythonnative.components.Image"><code>Image(source, style=...)</code></a>: image display
   (supports URLs and resource names).</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;WebView&lt;/span&gt;" href="../../api/components/#pythonnative.components.WebView"><code>WebView(url)</code></a>: embedded web content.</li>
@@ -3814,8 +3846,14 @@ objects are created until the
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Switch&lt;/span&gt;" href="../../api/components/#pythonnative.components.Switch"><code>Switch(value, on_change)</code></a>: toggle switch.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Slider&lt;/span&gt;" href="../../api/components/#pythonnative.components.Slider"><code>Slider(value, min_value, max_value, on_change)</code></a>:
   continuous slider.</li>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Pressable&lt;/span&gt;" href="../../api/components/#pythonnative.components.Pressable"><code>Pressable(child, on_press, on_long_press)</code></a>:
-  tap handler wrapper.</li>
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Pressable&lt;/span&gt;" href="../../api/components/#pythonnative.components.Pressable"><code>Pressable(child, on_press, on_long_press, disabled, android_ripple)</code></a>:
+  tap handler wrapper whose child and <code>style</code> may be functions of a
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;PressState&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/components/#pythonnative.components.PressState"><code>PressState</code></a>.</li>
 </ul>
 <p><strong>Feedback:</strong></p>
 <ul>
@@ -3826,7 +3864,7 @@ objects are created until the
 </ul>
 <p><strong>Overlay:</strong></p>
 <ul>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Modal&lt;/span&gt;" href="../../api/components/#pythonnative.components.Modal"><code>Modal(*children, visible, on_dismiss, title)</code></a>:
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Modal&lt;/span&gt;" href="../../api/components/#pythonnative.components.Modal"><code>Modal(*children, visible, on_dismiss, on_request_close, title)</code></a>:
   modal dialog.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Portal&lt;/span&gt;" href="../../api/components/#pythonnative.components.Portal"><code>Portal(*children)</code></a>: render children into a
   full-screen overlay above everything else (analogous to React DOM's
@@ -3853,16 +3891,16 @@ objects are created until the
 </ul>
 <p><strong>Lists:</strong></p>
 <ul>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;FlatList&lt;/span&gt;" href="../../api/components/#pythonnative.components.FlatList"><code>FlatList(data, render_item, key_extractor, item_height, ...)</code></a>:
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;FlatList&lt;/span&gt;" href="../../api/components/#pythonnative.components.FlatList"><code>FlatList(data, render_item, key_extractor, item_height, inverted, item_separator, ...)</code></a>:
   virtualized scrollable data list. Rows are mounted lazily as they
   scroll into view; pass <code>item_height=</code> (or <code>get_item_height=</code>) for
   exact extents, or let rows be measured on screen.</li>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;SectionList&lt;/span&gt;" href="../../api/components/#pythonnative.components.SectionList"><code>SectionList(sections, render_item, render_section_header, item_height, ...)</code></a>:
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;SectionList&lt;/span&gt;" href="../../api/components/#pythonnative.components.SectionList"><code>SectionList(sections, render_item, render_section_header, sticky_section_headers, ...)</code></a>:
   virtualized list with section headers.</li>
 </ul>
 <p><strong>Platform UI:</strong></p>
 <ul>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;StatusBar&lt;/span&gt;" href="../../api/components/#pythonnative.components.StatusBar"><code>StatusBar(bar_style, background_color, hidden)</code></a>:
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;StatusBar&lt;/span&gt;" href="../../api/components/#pythonnative.components.StatusBar"><code>StatusBar(bar_style, background_color, hidden, translucent, animated)</code></a>:
   configure the device's status bar (light/dark icons, color, hidden).</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;KeyboardAvoidingView&lt;/span&gt;" href="../../api/components/#pythonnative.components.KeyboardAvoidingView"><code>KeyboardAvoidingView(*children, behavior)</code></a>:
   shift content up when the software keyboard appears.</li>
@@ -4023,9 +4061,11 @@ built-in containers. A component that accepts children declares
 </span></code></pre></div>
 <p><code>@pn.component</code> preserves the function's signature for type checkers,
 so <code>Card(titel="x")</code> is a static error and editors autocomplete props.
-Every component also accepts <code>key=</code> for keyed reconciliation; when a
-strict type checker complains about it, declare <code>key: str | None =
-None</code> in the signature or call <code>.with_key(...)</code> on the element.</p>
+Every component also accepts <code>key=</code> for keyed reconciliation. For a
+strictly typed call site, <a class="autorefs autorefs-internal" href="../../api/component/#pythonnative.Component.keyed"><code>Component.keyed</code></a>
+returns the component's own signature with the key attached, so
+<code>[Row.keyed(item.id)(item) for item in items]</code> type-checks without
+declaring <code>key</code> in <code>Row</code>'s signature.</p>
 <p>Components that return a <code>list</code> of elements render them as siblings;
 <code>None</code> and <code>False</code> are dropped, so <code>cond and pn.Text("...")</code> is a
 fine way to render conditionally.</p>
@@ -4046,14 +4086,14 @@ fine way to render conditionally.</p>
   function references.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_ref&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_ref"><code>use_ref(initial)</code></a>: mutable
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Ref&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.Ref"><code>Ref</code></a> that persists across renders. When passed
-  via the <code>ref=</code> prop, the reconciler populates <code>ref.current</code> with the
-  underlying native view.</li>
+  via the <code>ref=</code> prop, the reconciler publishes a typed
+  <a href="../../api/handles/">handle</a> on <code>ref.current</code>.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_imperative_handle&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_imperative_handle"><code>use_imperative_handle(ref, factory, deps)</code></a>:
   publish a controller object on <code>ref.current</code> from a composite
   component (how <code>FlatList</code> exposes its
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ListController&lt;/span&gt;" href="../../api/components/#pythonnative.components.ListController"><code>ListController</code></a>).</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_back_handler&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_back_handler"><code>use_back_handler(handler)</code></a>:
-  intercept the Android back button / desktop Escape; return <code>True</code>
+  intercept the Android back action / browser Escape; return <code>True</code>
   to consume.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_value&lt;/span&gt;" href="../../api/animated/#pythonnative.animated.use_animated_value"><code>use_animated_value(initial)</code></a>:
   stable <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="../../api/animated/#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a> across renders;
@@ -4073,6 +4113,17 @@ fine way to render conditionally.</p>
   reactive safe-area insets.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_keyboard_height&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_keyboard_height"><code>use_keyboard_height()</code></a>:
   reactive software-keyboard height.</li>
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_color_scheme&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_color_scheme"><code>use_color_scheme()</code></a>: the effective
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;ColorScheme&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.ColorScheme"><code>ColorScheme</code></a>, <code>"light"</code> or <code>"dark"</code>.</li>
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_screen_reader_enabled&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.accessibility_info.use_screen_reader_enabled"><code>use_screen_reader_enabled()</code></a>,
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_reduce_motion&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.accessibility_info.use_reduce_motion"><code>use_reduce_motion()</code></a>,
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_locales&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.localization.use_locales"><code>use_locales()</code></a>: reactive device settings
+  from the <a href="../../guides/native-modules/">native modules</a>.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;memo&lt;/span&gt;" href="../../api/component/#pythonnative.component.memo"><code>@memo</code></a>: decorator that skips a function
   component's re-render when its props are shallowly equal and its
   internal state is unchanged.</li>
@@ -4091,7 +4142,7 @@ fine way to render conditionally.</p>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="k">return</span> <span class="n">theme</span><span class="o">.</span><span class="n">Provider</span><span class="p">({</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#FF0000"</span><span class="p">},</span> <span class="n">MyComponent</span><span class="p">())</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="k">return</span> <span class="n">theme</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span><span class="n">MyComponent</span><span class="p">(),</span> <span class="n">value</span><span class="o">=</span><span class="p">{</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#FF0000"</span><span class="p">})</span>
 </span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
 </span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
 </span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">MyComponent</span><span class="p">():</span>

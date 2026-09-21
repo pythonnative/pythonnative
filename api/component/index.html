@@ -1989,6 +1989,8 @@
       
         
       
+        
+      
     
     
     
@@ -2188,6 +2190,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pythonnative.component.Component.keyed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;keyed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pythonnative.component.Component.render" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2299,6 +2312,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3511,6 +3552,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pythonnative.component.Component.keyed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;keyed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pythonnative.component.Component.render" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3616,6 +3668,7 @@ body, and the reconciler runs the body (with hooks) when the element
 mounts or its props change. Positional arguments are children; keyword
 arguments are props. <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;memo&lt;/span&gt;" href="#pythonnative.component.memo"><code>memo</code></a> skips re-rendering
 when props are unchanged.</p>
+<p><a href="" id="pythonnative.Component.keyed"></a></p>
 
 
 <div class="doc doc-object doc-module">
@@ -3660,12 +3713,15 @@ and editors autocomplete props from the function definition.</p>
 positional parameters, so <code>Greeting("World")</code> works for
 <code>def Greeting(name: str)</code>.</p>
 <h3 id="pythonnative.component--keys">Keys<a class="headerlink" href="#pythonnative.component--keys" title="Permanent link">&para;</a></h3>
-<p>Every component accepts <code>key=</code> at the call site for keyed
-reconciliation. <code>key</code> is consumed by the framework and is not passed
-to the function unless the function declares a <code>key</code> parameter
-itself. Declaring it (<code>key: str | None = None</code>) is the way to keep
-strict type checkers happy when a component is rendered in a list;
-otherwise use <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;with_key&lt;/span&gt;" href="../element/#pythonnative.element.Element.with_key"><code>Element.with_key</code></a>.</p>
+<p>Elements rendered in a list need a stable <code>key</code>. Use
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;keyed&lt;/span&gt;" href="#pythonnative.component.Component.keyed"><code>Component.keyed</code></a>, which returns a
+callable with the component's own signature whose result carries the
+key, so the call site type-checks:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">Row</span><span class="o">.</span><span class="n">keyed</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="p">)(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">])</span>
+</span></code></pre></div>
+<p><code>key=</code> is also accepted at every component call site at runtime and
+consumed by the framework (it reaches the function only when the
+function declares a <code>key</code> parameter itself).</p>
 
 
 
@@ -3936,6 +3992,14 @@ when its props are shallowly equal to the previous render.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;keyed&lt;/span&gt; (&lt;code&gt;pythonnative.component.Component.keyed&lt;/code&gt;)" href="#pythonnative.component.Component.keyed">keyed</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Return this component's call signature with <code>key</code> attached to the result.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;render&lt;/span&gt; (&lt;code&gt;pythonnative.component.Component.render&lt;/code&gt;)" href="#pythonnative.component.Component.render">render</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -3985,6 +4049,66 @@ when its props are shallowly equal to the previous render.</p>
 
 
 
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pythonnative.component.Component.keyed" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">keyed</span>
+
+
+<a href="#pythonnative.component.Component.keyed" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">keyed</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#object">object</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Callable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Callable">Callable</a></span><span class="p">[</span><span class="n"><span title="pythonnative.component.P">P</span></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.element.Element&lt;/code&gt;)" href="../element/#pythonnative.element.Element">Element</a></span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return this component's call signature with <code>key</code> attached to the result.</p>
+<p>The returned callable accepts exactly the component's own
+parameters, so <code>[Row.keyed(item.id)(item) for item in items]</code>
+type-checks without declaring <code>key</code> in <code>Row</code>'s signature.
+Non-string keys are converted with <code>str</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>key</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#object">object</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Stable identity for keyed reconciliation.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-function">
 

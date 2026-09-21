@@ -2169,6 +2169,8 @@
       
         
       
+        
+      
     
     
     
@@ -2315,6 +2317,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3700,14 +3730,19 @@ Native scrolling and supported animation drivers run independently; see
 <p>Rendering records changes in an undo journal and stages native operations,
 callbacks, refs, and effects. A render that fails restores the committed tree
 without publishing those changes. At the end of the pass, staged mutations are
-applied through a single
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply_mutations&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.NativeViewRegistry.apply_mutations"><code>apply_mutations</code></a>
-call. The renderer validates the versioned transaction before applying it
+applied through a single <code>apply_mutations</code> call on the view backend (see
+<a href="../../api/native_views/">Native views</a>). The renderer validates the
+versioned transaction before applying it
 and acknowledges the committed revision. Layout then runs beside the native
 widgets and returns changed frames. Headless backends instead use the host
 Yoga binding and receive <code>SetFrameOp</code> mutations.</p>
-<p><code>flush_dirty</code> combines work from several dirty components into a batch.
-See <a href="../bridge/#commits">Commits</a> for validation and failure handling.</p>
+<p><code>flush_dirty</code> combines work from several dirty components into a batch, and
+state setters schedule that flush rather than rendering inline, so every
+setter call in one callback lands in one pass. Layout and passive effects
+that raise are routed to the nearest error boundary, and a flush that
+re-schedules itself more than fifty times raises
+<code>RuntimeError("Too many re-renders")</code> through the same path. See
+<a href="../bridge/#commits">Commits</a> for validation and failure handling.</p>
 <p>Callable props never enter the transaction at all. They're registered
 in the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../../api/events/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a> keyed by
 <code>(tag, event name)</code>, so a render that only changes callback identities
@@ -3781,7 +3816,7 @@ memoized ancestor in between skips its subtree.</p>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">Screen</span><span class="p">():</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">return</span> <span class="n">ThemeContext</span><span class="o">.</span><span class="n">Provider</span><span class="p">({</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#222"</span><span class="p">},</span> <span class="n">Header</span><span class="p">())</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">return</span> <span class="n">ThemeContext</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span><span class="n">Header</span><span class="p">(),</span> <span class="n">value</span><span class="o">=</span><span class="p">{</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#222"</span><span class="p">})</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">Header</span><span class="p">():</span>
@@ -3824,15 +3859,17 @@ through <code>set_state</code> is wasteful. Two ways to bypass:</p>
   when the platform can run the animation natively, no Python code
   runs per frame at all. See the
   <a href="../../guides/animations/">Animations guide</a>.</li>
-<li>Use <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_ref&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_ref"><code>use_ref</code></a> to hold a reference to a
-  native view and mutate it directly from inside an effect callback.</li>
+<li>Use <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_ref&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_ref"><code>use_ref</code></a> to receive a typed
+  <a href="../../api/handles/">handle</a> for a mounted view and drive it
+  imperatively (<code>scroll_to</code>, <code>focus</code>, a custom component's <code>command</code>)
+  from inside an effect callback.</li>
 </ul>
 <p>Reach for these only when profiling tells you that re-rendering is the
 bottleneck.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Browse the algorithm in code: <a href="../../api/reconciler/">Reconciler API</a>.</li>
-<li>Understand handlers underneath the diff: <a href="../native-views/">Native views</a>.</li>
+<li>Understand the backend underneath the diff: <a href="../native-views/">Native views</a>.</li>
 <li>See how mounting interacts with hooks: <a href="../lifecycle/">Lifecycle</a>.</li>
 </ul>
 <h2 id="elements-and-update-priority">Elements and update priority<a class="headerlink" href="#elements-and-update-priority" title="Permanent link">&para;</a></h2>

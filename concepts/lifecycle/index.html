@@ -2114,6 +2114,8 @@
       
         
       
+        
+      
     
     
     
@@ -2260,6 +2262,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3541,7 +3571,10 @@ fold into it, and where you can hook in.</p>
 </ul>
 <p>A <code>use_state</code> / <code>use_reducer</code> setter re-renders <strong>locally</strong>: only the
 component that owns the changed state (and the subtree it returns) is
-re-run. Sibling and ancestor components retain their native views and hook
+re-run. Setters never render inline: every setter call made during one
+callback, effect, or task step lands in the same flush, scheduled on the
+application loop (automatic batching), on every host including headless
+tests. Sibling and ancestor components retain their native views and hook
 state unless their own inputs or context change. Screens and mounted list
 rows belong to the same logical tree. Navigation updates that tree, and
 Fast Refresh preserves compatible component instances.</p>
@@ -3553,10 +3586,11 @@ Fast Refresh preserves compatible component instances.</p>
    so this phase is cheap and pure (modulo <code>use_state</code> updates).</li>
 <li><strong>Commit</strong>. The
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> diffs the
-   re-rendered subtree against the previous one, applies the smallest
-   set of native mutations through the registered
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a>s, and
-   runs the layout pass.</li>
+   re-rendered subtree against the previous one, hands the smallest
+   set of native mutations to the view backend in one
+   <code>apply_mutations</code> call (the Swift and Kotlin component managers
+   apply them; see <a href="../native-views/">Native views</a>), and runs the
+   layout pass.</li>
 <li><strong>Layout effects</strong>.
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_layout_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_layout_effect"><code>use_layout_effect</code></a> callbacks run
    on the application thread after committed geometry is available,
@@ -3564,10 +3598,15 @@ Fast Refresh preserves compatible component instances.</p>
    the platform UI thread owns presentation.</li>
 <li><strong>Passive effects</strong>. Cleanup callbacks from the <em>previous</em> render
    run first; new <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a> callbacks
-   run after, in depth-first order so children run before parents.</li>
+   run after, in depth-first order so children run before parents. An
+   exception raised by a layout or passive effect is routed to the
+   nearest <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;ErrorBoundary&lt;/span&gt;" href="../../api/components/#pythonnative.components.ErrorBoundary"><code>ErrorBoundary</code></a> exactly like a
+   render error; it never fails the native surface.</li>
 <li><strong>Drain</strong>. If any effect set state, another render pass is queued
-   immediately. The screen host caps the loop to prevent runaway
-   re-renders.</li>
+   immediately. A flush that keeps re-scheduling itself more than
+   fifty times raises <code>RuntimeError("Too many re-renders")</code> from the
+   component that keeps dirtying itself, routed through the nearest
+   <code>ErrorBoundary</code> (or the RedBox in dev mode).</li>
 </ol>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[render] -&gt; [commit + layout] -&gt; [layout effects] -&gt; [passive effects] -&gt; drain? -&gt; [render] ...
 </span></code></pre></div>
@@ -3642,8 +3681,12 @@ component unmounts; no manual task bookkeeping is needed. See the
 and effects:</p>
 <ul>
 <li><strong>Resume / <code>viewWillAppear</code></strong>: the active screen's <code>use_focus_effect</code>
-  is re-armed.</li>
+  is re-armed, and the event carries fresh viewport metrics.</li>
 <li><strong>Pause / <code>viewWillDisappear</code></strong>: focus cleanups run.</li>
+<li><strong>Save / restore instance state</strong>: acknowledged without calling into
+  Python. The host caches navigation restoration state as Python
+  publishes it, so platform state-saving never waits on the
+  application thread.</li>
 <li><strong>Destroy / <code>dealloc</code></strong>: every effect cleanup runs and the
   reconciler tears down its native tree.</li>
 </ul>

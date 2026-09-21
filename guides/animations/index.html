@@ -2169,6 +2169,8 @@
       
         
       
+        
+      
     
     
     
@@ -2315,6 +2317,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3649,10 +3679,23 @@ without re-rendering the component tree on every frame.</p>
    <code>Animated.Text</code>, or <code>Animated.Image</code>.</li>
 <li>Drive the value with <code>Animated.timing</code>, <code>Animated.spring</code>, or
    <code>Animated.decay</code>. Each driver returns a handle with two faces:</li>
-<li><code>handle.start()</code> is fire-and-forget (returns <code>self</code>).</li>
-<li><code>await handle</code> runs the animation and suspends until it
-     completes. Cancelling the awaiting task stops the animation.</li>
+<li><code>handle.start(callback=None)</code> is fire-and-forget (returns <code>self</code>);
+     the optional callback receives an
+     <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimationResult&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/animated/#pythonnative.animated.AnimationResult"><code>AnimationResult</code></a>.</li>
+<li><code>await handle</code> runs the animation, suspends until it settles, and
+     returns the same <code>AnimationResult</code>. Cancelling the awaiting task
+     stops the animation.</li>
 </ol>
+<p><code>AnimationResult.finished</code> is <code>True</code> when the animation ran to
+   completion and <code>False</code> when it was stopped, superseded by another
+   animation on the same value, or interrupted by the platform.
+   Composites (<code>sequence</code>, <code>parallel</code>, <code>stagger</code>, <code>loop</code>) are finished
+   only if every child finished.</p>
 <p>The animated component attaches the value to its native view's
 animation bindings after mount. From there, the <strong>native driver</strong>
 takes over whenever it can.</p>
@@ -3727,9 +3770,24 @@ too:</p>
 </span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p>Available transform shortcuts inside <code>style</code>: <code>scale</code>, <code>scale_x</code>,
-<code>scale_y</code>, <code>translate_x</code>, <code>translate_y</code>, <code>rotate</code>. Each accepts an
-<code>AnimatedValue</code> and the runtime maps them to the underlying native
-animation property.</p>
+<code>scale_y</code>, <code>translate_x</code>, <code>translate_y</code>, <code>rotate</code>, <code>rotate_x</code>, and
+<code>rotate_y</code>. Each accepts an <code>AnimatedValue</code> and the runtime maps them
+to the underlying native animation property; iOS keeps each animated
+channel separately and composes them with the static <code>transform</code> prop,
+so binding <code>translate_x</code> and <code>translate_y</code> together works.</p>
+<p>The full set of style keys an animated node may drive is
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;ANIMATABLE_PROPS&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/animated/#pythonnative.animated.ANIMATABLE_PROPS"><code>ANIMATABLE_PROPS</code></a>: <code>opacity</code>,
+<code>background_color</code>, <code>color</code>, and the eight transform channels above.
+These are the properties every renderer can animate on its UI thread
+without a layout pass. Binding a node to any other key (<code>width</code>,
+<code>margin</code>, <code>padding</code>, <code>top</code>, <code>skew_x</code>, ...) raises <code>ValueError</code> naming
+the animatable set when the element is constructed, so an animation
+never silently degrades to a re-render per frame.</p>
 <h2 id="sequencing-and-parallel-composition">Sequencing and parallel composition<a class="headerlink" href="#sequencing-and-parallel-composition" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_intro</span><span class="p">():</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">opacity</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_animated_value</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
@@ -3843,28 +3901,63 @@ downward travel, reappear on any upward travel):</p>
 <p>The e2e-suite app ships this exact pattern as the "Collapsing header"
 demo under Animations.</p>
 <h2 id="easing">Easing<a class="headerlink" href="#easing" title="Permanent link">&para;</a></h2>
-<p><code>Animated.timing</code> accepts an <code>easing</code> argument: <code>"linear"</code>,
-<code>"ease_in"</code>, <code>"ease_out"</code>, <code>"ease_in_out"</code>, or <code>"bounce"</code>.</p>
+<p><code>Animated.timing(easing=...)</code> takes a curve from the
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;Easing&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/animated/#pythonnative.animated.Easing"><code>Easing</code></a> namespace, which mirrors React
+Native's: <code>Easing.linear</code>, <code>Easing.ease</code>, <code>Easing.ease_in</code>,
+<code>Easing.ease_out</code>, <code>Easing.ease_in_out</code> (the default), <code>Easing.quad</code>,
+<code>Easing.cubic</code>, <code>Easing.bounce</code>, and <code>Easing.bezier(x1, y1, x2, y2)</code>
+for a CSS-style cubic bezier:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">timing</span><span class="p">(</span><span class="n">opacity</span><span class="p">,</span> <span class="n">to</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">easing</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">Easing</span><span class="o">.</span><span class="n">ease_out</span><span class="p">)</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">timing</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">to</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">easing</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">Easing</span><span class="o">.</span><span class="n">bezier</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">timing</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">to</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">easing</span><span class="o">=</span><span class="s2">"bounce"</span><span class="p">)</span>   <span class="c1"># the names also work as strings</span>
+</span></code></pre></div>
+<p>Each curve is a serializable <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EasingSpec&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/animated/#pythonnative.animated.EasingSpec"><code>EasingSpec</code></a>,
+so it crosses the bridge as data and the native drivers run it on the
+UI thread; bezier control points travel as numbers, not as a string.
+A misspelled easing name raises <code>ValueError</code> instead of falling back
+silently. <code>Easing.ease</code> follows React Native (the same curve as
+<code>ease_in</code>), not CSS <code>ease</code>. A plain callable <code>progress -&gt; eased</code> is
+still accepted for custom curves, at the cost of ticking in Python.</p>
 <h2 id="decay-fling">Decay (fling)<a class="headerlink" href="#decay-fling" title="Permanent link">&para;</a></h2>
-<p><code>Animated.decay</code> decelerates a value from an initial velocity,
-the standard ending for a pan gesture:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">on_pan_end</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">decay</span><span class="p">(</span><span class="n">tx</span><span class="p">,</span> <span class="n">velocity</span><span class="o">=</span><span class="n">event</span><span class="o">.</span><span class="n">velocity_x</span> <span class="o">/</span> <span class="mf">1000.0</span><span class="p">)</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+<p><code>Animated.decay</code> decelerates a value from an initial velocity, the
+standard ending for a pan gesture. It uses React Native's model on
+every platform: with <code>t</code> in milliseconds, the velocity decays as
+<code>v0 * deceleration ** t</code>, and the value comes to rest at
+<code>start + v0 / (1 - deceleration)</code>. <code>velocity</code> is in points per
+millisecond; gesture events report points per second, so divide by
+1000. <code>deceleration</code> defaults to <code>0.998</code>; <code>0.99</code> stops quickly, and a
+value outside <code>(0, 1)</code> raises <code>ValueError</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">on_pan_end</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">decay</span><span class="p">(</span><span class="n">tx</span><span class="p">,</span> <span class="n">velocity</span><span class="o">=</span><span class="n">event</span><span class="o">.</span><span class="n">velocity_x</span> <span class="o">/</span> <span class="mf">1000.0</span><span class="p">)</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">decay</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">velocity</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">deceleration</span><span class="o">=</span><span class="mf">0.99</span><span class="p">)</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
 </span></code></pre></div>
 <p>See the <a href="../gestures/">Gestures guide</a> for the full drag-and-release
 pattern.</p>
 <h2 id="stopping-an-animation">Stopping an animation<a class="headerlink" href="#stopping-an-animation" title="Permanent link">&para;</a></h2>
 <p><code>start()</code> returns the handle you started with, and the handle exposes
 <code>.stop()</code>. A common pattern is to keep the handle in a <code>use_ref</code> so
-you can cancel a long-running animation when the user interrupts. If
-you're awaiting the animation instead, cancelling the awaiting task
+you can cancel a long-running animation when the user interrupts. A
+stopped animation resolves with <code>AnimationResult(finished=False)</code>;
+a <code>sequence</code> whose step is stopped stops too, with <code>finished=False</code>.
+If you're awaiting the animation instead, cancelling the awaiting task
 stops the animation:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_enter</span><span class="p">():</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="k">await</span> <span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">timing</span><span class="p">(</span><span class="n">opacity</span><span class="p">,</span> <span class="n">to</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mi">2000</span><span class="p">)</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">task</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">run_async</span><span class="p">(</span><span class="n">_enter</span><span class="p">())</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="c1"># Sometime later:</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">task</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>  <span class="c1"># animation snaps to wherever it was; opacity stops here.</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_enter</span><span class="p">():</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="k">await</span> <span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">timing</span><span class="p">(</span><span class="n">opacity</span><span class="p">,</span> <span class="n">to</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mi">2000</span><span class="p">)</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">task</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">run_async</span><span class="p">(</span><span class="n">_enter</span><span class="p">())</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># Sometime later:</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="n">task</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>  <span class="c1"># animation snaps to wherever it was; opacity stops here.</span>
 </span></code></pre></div>
 <h2 id="when-not-to-use-animated">When NOT to use <code>Animated</code><a class="headerlink" href="#when-not-to-use-animated" title="Permanent link">&para;</a></h2>
 <ul>

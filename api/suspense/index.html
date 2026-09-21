@@ -1989,6 +1989,8 @@
       
         
       
+        
+      
     
     
     
@@ -2136,6 +2138,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -2393,6 +2423,17 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;start_resource
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.suspense.run_eagerly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;run_eagerly
       
     </span>
   </a>
@@ -3505,6 +3546,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.suspense.run_eagerly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;run_eagerly
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.suspense.lazy" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3581,6 +3633,11 @@ other <a href="../hooks/">hooks</a>); this page covers the underlying machinery.
     <div class="doc doc-contents first">
 
         <p>Suspense resources backed by standard asyncio tasks.</p>
+<p>Also home to <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;run_eagerly&lt;/span&gt;" href="#pythonnative.suspense.run_eagerly"><code>run_eagerly</code></a>, the
+driver behind <code>async def</code> components: it steps a coroutine once
+synchronously and only hands the remainder to a task when the first
+<code>await</code> is really pending, so bodies whose awaits are already resolved
+render inline without a fallback flash.</p>
 
 
 
@@ -3636,6 +3693,14 @@ other <a href="../hooks/">hooks</a>); this page covers the underlying machinery.
               <td>
                 <div class="doc-md-description">
                   <p>Start <code>fetcher</code> immediately and wrap it in a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Resource&lt;/span&gt;" href="#pythonnative.suspense.Resource"><code>Resource</code></a>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;run_eagerly&lt;/span&gt; (&lt;code&gt;pythonnative.suspense.run_eagerly&lt;/code&gt;)" href="#pythonnative.suspense.run_eagerly">run_eagerly</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Start <code>coro</code> now and return a future for its result.</p>
                 </div>
               </td>
             </tr>
@@ -4037,6 +4102,107 @@ it never suspends.</p>
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;lazy&lt;/span&gt;" href="#pythonnative.suspense.lazy"><code>lazy</code></a>. Inside components, prefer
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_resource&lt;/span&gt;" href="../hooks/#pythonnative.hooks.use_resource"><code>use_resource</code></a>, which caches per
 component instance and re-fetches when dependencies change.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.suspense.run_eagerly" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">run_eagerly</span>
+
+
+<a href="#pythonnative.suspense.run_eagerly" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">run_eagerly</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">coro</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Coroutine&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Coroutine">Coroutine</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">,</span> <span class="n"><span title="pythonnative.suspense.T">T</span></span><span class="p">],</span> <span class="n">scope</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;asyncio.Future&lt;/code&gt;" href="https://docs.python.org/3/library/asyncio-future.html#asyncio.Future">Future</a></span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Start <code>coro</code> now and return a future for its result.</p>
+<p>The first step of the coroutine runs synchronously, in a copy of the
+caller's context (so provider values and the installed hook state
+survive later <code>await</code> boundaries, exactly as in an
+:class:<code>asyncio.Task</code>). If the body finishes in that step, the
+returned future is already done; if it suspends, the rest of the
+body is driven by a task owned by <code>scope</code> and the returned object
+is that task.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>coro</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Coroutine&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Coroutine">Coroutine</a>[<a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a>, <a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a>, <span title="pythonnative.suspense.T">T</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The coroutine to drive.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>scope</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;TaskScope&lt;/span&gt;" href="../runtime/#pythonnative.runtime.TaskScope"><code>TaskScope</code></a> that
+owns the remaining work; cancelling the returned future
+cancels the body.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/exceptions.html#RuntimeError">RuntimeError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>When <code>scope</code> is already closed.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>

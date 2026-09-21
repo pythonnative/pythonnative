@@ -1276,6 +1276,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Drag with spring-back">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#activation-offsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation offsets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2136,6 +2153,8 @@
       
         
       
+        
+      
     
     
     
@@ -2282,6 +2301,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3479,6 +3526,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Drag with spring-back">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#activation-offsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation offsets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3637,8 +3701,9 @@ combinators: <a class="autorefs autorefs-internal" title="&lt;code class=&quot;d
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
   &lt;/span&gt;" href="../../api/gestures/#pythonnative.gestures.GestureEvent"><code>GestureEvent</code></a> snapshot with
-position, translation, velocity, scale, and rotation populated as
-appropriate for the gesture kind.</p>
+position (<code>x</code>, <code>y</code> in the view; <code>absolute_x</code>, <code>absolute_y</code> in the
+window), translation, velocity, scale, rotation, and <code>direction</code>
+populated as appropriate for the gesture kind.</p>
 <h2 id="how-recognition-works">How recognition works<a class="headerlink" href="#how-recognition-works" title="Permanent link">&para;</a></h2>
 <p>Gesture descriptors are frozen dataclasses: numeric configuration plus
 your callbacks. The reconciler serializes the configuration into plain
@@ -3739,14 +3804,39 @@ close."</p>
 </span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p><code>Pan</code> activates once the pointer travels <code>min_distance</code> points (10 by
-default), reports <code>on_change</code> with translation measured from the
-activation point, and <code>on_end</code> with release velocity, ready to feed
-into <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;Animated&lt;/span&gt;
+default, unless another activation criterion is set), reports
+<code>on_change</code> with translation measured from the activation point, and
+<code>on_end</code> with release velocity, ready to feed into
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;Animated&lt;/span&gt;
 
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
   &lt;/span&gt;" href="../../api/animated/#pythonnative.animated.Animated"><code>Animated.decay</code></a> for a fling.</p>
+<h3 id="activation-offsets">Activation offsets<a class="headerlink" href="#activation-offsets" title="Permanent link">&para;</a></h3>
+<p>Inside a scrolling list a plain <code>Pan</code> fights the scroll view. <code>Pan</code>
+adds React Native Gesture Handler's activation criteria, applied the
+same way on iOS, Android, and in the browser preview:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># A horizontal swipe-to-dismiss row inside a vertical list.</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">active_offset_x</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span>   <span class="c1"># activate once the finger moves 20 pt left or right</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">fail_offset_y</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">15</span><span class="p">,</span> <span class="mi">15</span><span class="p">),</span>     <span class="c1"># give up if it moves 15 pt up or down first</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">max_pointers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">on_change</span><span class="o">=</span><span class="n">drag</span><span class="p">,</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>Before activation, with <code>dx</code> and <code>dy</code> the travel from where the finger
+touched down: crossing <code>fail_offset_x</code> or <code>fail_offset_y</code> fails the
+pan for the rest of the interaction; otherwise the pan activates as
+soon as <code>dx</code> crosses <code>active_offset_x</code>, <code>dy</code> crosses <code>active_offset_y</code>,
+the straight-line travel reaches <code>min_distance</code>, or the pointer speed
+reaches <code>min_velocity</code> (points per second). Each offset is a single
+number (<code>20</code> means <code>dx &gt; 20</code>, <code>-20</code> means <code>dx &lt; -20</code>) or a
+<code>(negative_bound, positive_bound)</code> pair. The default 10-point
+<code>min_distance</code> applies only when no offset or velocity criterion is
+given; pass it explicitly to combine it with them. <code>min_pointers</code> and
+<code>max_pointers</code> bound how many fingers may take part: too many fingers
+fail a pending pan and cancel an active one.</p>
 <h2 id="callback-slots">Callback slots<a class="headerlink" href="#callback-slots" title="Permanent link">&para;</a></h2>
 <p>Continuous gestures (<code>Pan</code>, <code>Pinch</code>, <code>Rotation</code>) expose three slots:</p>
 <table>
@@ -3773,29 +3863,44 @@ into <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbo
 </table>
 <p>Discrete gestures add a dedicated shortcut: <code>Tap(on_tap=...)</code>,
 <code>LongPress(on_long_press=...)</code> (fires at activation time, like
-<code>UILongPressGestureRecognizer</code>), and <code>Swipe(on_swipe=...)</code> (fires on
-release with the resolved <code>direction</code>).</p>
+<code>UILongPressGestureRecognizer</code>), and <code>Swipe(on_swipe=...)</code> /
+<code>Fling(on_fling=...)</code> (fire on release with the resolved <code>direction</code>).
+<code>direction</code> is a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;SwipeDirection&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/gestures/#pythonnative.gestures.SwipeDirection"><code>SwipeDirection</code></a>
+(<code>"left"</code>, <code>"right"</code>, <code>"up"</code>, or <code>"down"</code>) or <code>None</code> for other gesture
+kinds; <code>Swipe(direction=None)</code> and <code>Fling(direction=None)</code> accept any
+direction.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Tap</span><span class="p">(</span><span class="n">n_taps</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>                      <span class="c1"># double-tap</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">gestures</span><span class="o">.</span><span class="n">LongPress</span><span class="p">(</span><span class="n">min_duration_ms</span><span class="o">=</span><span class="mi">350</span><span class="p">)</span>     <span class="c1"># quicker activation</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span><span class="n">min_distance</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">min_pointers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Swipe</span><span class="p">(</span><span class="n">direction</span><span class="o">=</span><span class="s2">"left"</span><span class="p">,</span> <span class="n">min_velocity</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Tap</span><span class="p">(</span><span class="n">n_taps</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>                      <span class="c1"># double-tap</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">gestures</span><span class="o">.</span><span class="n">LongPress</span><span class="p">(</span><span class="n">min_duration_ms</span><span class="o">=</span><span class="mi">350</span><span class="p">)</span>     <span class="c1"># quicker activation</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span><span class="n">min_distance</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">min_pointers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Swipe</span><span class="p">(</span><span class="n">direction</span><span class="o">=</span><span class="s2">"left"</span><span class="p">,</span> <span class="n">min_velocity</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span><span class="n">on_change</span><span class="o">=</span><span class="n">drag</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="n">can_drag</span><span class="p">)</span>   <span class="c1"># keep the slot, stop recognizing</span>
 </span></code></pre></div>
+<p>Every descriptor accepts <code>enabled=False</code>. A disabled gesture stays in
+the list, so sibling indices and composition nodes are unchanged, but
+it never recognizes and is skipped by <code>Race</code> and <code>Exclusive</code>
+arbitration, so a later <code>Exclusive</code> member doesn't wait for it. Toggle
+<code>enabled</code> from state instead of rebuilding the <code>gestures=</code> list.</p>
 <p><code>GestureEvent.state</code> is a
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;GestureState&lt;/span&gt;" href="../../api/gestures/#pythonnative.gestures.GestureState"><code>GestureState</code></a> enum member
 (<code>BEGAN</code>, <code>CHANGED</code>, <code>ENDED</code>, <code>CANCELLED</code>), which matters mostly when
 you share one handler across slots:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.gestures</span><span class="w"> </span><span class="kn">import</span> <span class="n">GestureState</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">on_pan</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">match</span> <span class="n">event</span><span class="o">.</span><span class="n">state</span><span class="p">:</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">BEGAN</span><span class="p">:</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>            <span class="n">grab</span><span class="p">()</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">CHANGED</span><span class="p">:</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>            <span class="n">move</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">translation_x</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">translation_y</span><span class="p">)</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">ENDED</span> <span class="o">|</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">CANCELLED</span><span class="p">:</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>            <span class="n">release</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.gestures</span><span class="w"> </span><span class="kn">import</span> <span class="n">GestureState</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">on_pan</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="k">match</span> <span class="n">event</span><span class="o">.</span><span class="n">state</span><span class="p">:</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">BEGAN</span><span class="p">:</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>            <span class="n">grab</span><span class="p">()</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">CHANGED</span><span class="p">:</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>            <span class="n">move</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">translation_x</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">translation_y</span><span class="p">)</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">ENDED</span> <span class="o">|</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">CANCELLED</span><span class="p">:</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>            <span class="n">release</span><span class="p">()</span>
 </span></code></pre></div>
 <p>It is a <code>str</code> enum, so <code>event.state == "ended"</code> also works.</p>
 <h2 id="gestures-vs-pressable">Gestures vs. <code>Pressable</code><a class="headerlink" href="#gestures-vs-pressable" title="Permanent link">&para;</a></h2>

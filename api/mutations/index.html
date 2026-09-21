@@ -1989,6 +1989,8 @@
       
         
       
+        
+      
     
     
     
@@ -2136,6 +2138,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3607,8 +3637,8 @@
 <p>Five record types describe every change to the native view tree:
 create, update, insert, destroy, and set frame. The
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> emits them; the
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NativeViewRegistry&lt;/span&gt;" href="../native_views/#pythonnative.native_views.NativeViewRegistry"><code>NativeViewRegistry</code></a>
-applies them.</p>
+view backend from <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;get_backend&lt;/span&gt;" href="../native_views/#pythonnative.native_views.get_backend"><code>get_backend</code></a>
+applies them in one <code>apply_mutations</code> call per commit.</p>
 
 
 <div class="doc doc-object doc-module">
@@ -3619,11 +3649,10 @@ applies them.</p>
     <div class="doc doc-contents first">
 
         <p>Batched mutation protocol between the reconciler and native backends.</p>
-<p>The reconciler no longer talks to the native layer one call at a time.
-Instead, every commit pass produces an ordered list of small mutation
-ops referencing integer <strong>tags</strong> (stable per-view identifiers), and the
+<p>Every commit pass produces an ordered list of small mutation ops
+referencing integer <strong>tags</strong> (stable per-view identifiers), and the
 whole list is applied in a single
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply_mutations&lt;/span&gt;" href="../native_views/#pythonnative.native_views.NativeViewRegistry.apply_mutations"><code>apply_mutations</code></a>
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply_mutations&lt;/span&gt;" href="../native_views/#pythonnative.native_views.bridge_backend.BridgeBackend.apply_mutations"><code>apply_mutations</code></a>
 call. This mirrors React Native's Fabric mounting layer: the diff phase
 is pure, and the native side sees one coherent transaction per commit.</p>
 <p>Why tags instead of view objects?</p>
@@ -3632,9 +3661,8 @@ is pure, and the native side sees one coherent transaction per commit.</p>
   reference views directly.</li>
 <li>Tags give the native side a stable identity to key its own view
   registry, event routing, and animation bookkeeping on.</li>
-<li>A flat list of <code>(op, tag, payload)</code> tuples is trivially serializable,
-  which keeps the door open for applying mutations from a background
-  thread or through a single JNI/ObjC crossing in the future.</li>
+<li>A flat list of <code>(op, tag, payload)</code> tuples serializes directly into
+  the bridge's transaction envelope, so one commit is one crossing.</li>
 </ul>
 <p>Op ordering rules (the reconciler guarantees these):</p>
 <ol>
@@ -4259,9 +4287,9 @@ current child count.</p>
 
 
         <p>Release the native view registered under <code>tag</code>.</p>
-<p>The registry drops its tag record and calls the handler's
-<code>destroy</code> hook so platform resources (listeners, timers, image
-loads) can be released eagerly instead of waiting for GC.</p>
+<p>The backend drops its tag record and the native component manager
+releases platform resources (listeners, timers, image loads)
+eagerly instead of waiting for GC.</p>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -4492,7 +4520,7 @@ exactly as computed by the layout engine.</p>
   <a href="../events/">Events</a>.</li>
 <li>See how each op is applied to a concrete widget in
   <a href="../native_views/">Native views</a>.</li>
-<li>Read what handlers size themselves against in
+<li>Read what component managers size themselves against in
   <a href="../platform_metrics/">Platform metrics</a>.</li>
 <li>Read the diffing pass that produces these lists in
   <a href="../../concepts/reconciliation/">Reconciliation</a>.</li>

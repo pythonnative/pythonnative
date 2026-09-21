@@ -1989,6 +1989,8 @@
       
         
       
+        
+      
     
     
     
@@ -2136,6 +2138,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3343,6 +3373,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#statusbar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StatusBar
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#touchableopacity" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3435,6 +3476,17 @@
     <span class="md-ellipsis">
       
         FlatList
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sectionlist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SectionList
       
     </span>
   </a>
@@ -3956,6 +4008,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#statusbar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StatusBar
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#touchableopacity" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4054,6 +4117,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#sectionlist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SectionList
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4133,6 +4207,9 @@ differences.</p>
   removed from the normal flow and placed using <code>top</code> / <code>right</code> / <code>bottom</code> /
   <code>left</code> (numbers or percentage strings).</li>
 <li><code>top</code>, <code>right</code>, <code>bottom</code>, <code>left</code>: offsets used when <code>position: "absolute"</code>.</li>
+<li><code>inset</code>, <code>inset_horizontal</code>, <code>inset_vertical</code>: shorthands that fill all
+  four edges, <code>left</code> and <code>right</code>, or <code>top</code> and <code>bottom</code>; explicit edge keys
+  win. They mirror the <code>padding_horizontal</code> / <code>padding_vertical</code> vocabulary.</li>
 </ul>
 <h3 id="other">Other<a class="headerlink" href="#other" title="Permanent link">&para;</a></h3>
 <ul>
@@ -4147,9 +4224,27 @@ differences.</p>
   <code>accessible</code></li>
 <li><code>accessibility_state</code>: dict of <code>disabled</code> / <code>selected</code> / <code>checked</code> /
   <code>busy</code> / <code>expanded</code> flags</li>
-<li><code>accessibility_live_region</code>: <code>"polite"</code> or <code>"assertive"</code></li>
+<li><code>accessibility_value</code>: a string or an
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AccessibilityValue&lt;/span&gt;" href="../style/#pythonnative.style.AccessibilityValue"><code>AccessibilityValue</code></a> with <code>min</code> /
+  <code>max</code> / <code>now</code> / <code>text</code></li>
+<li><code>accessibility_actions</code> and <code>on_accessibility_action</code>: custom
+  screen-reader actions (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AccessibilityAction&lt;/span&gt;" href="../style/#pythonnative.style.AccessibilityAction"><code>AccessibilityAction</code></a>)
+  and the callback that receives the invoked action's name</li>
+<li><code>accessibility_live_region</code>: <code>"none"</code>, <code>"polite"</code>, or <code>"assertive"</code></li>
+<li><code>important_for_accessibility</code>: <code>"auto"</code>, <code>"yes"</code>, <code>"no"</code>, or
+  <code>"no_hide_descendants"</code></li>
 <li><code>test_id</code>: stable identifier exposed to UI test frameworks
   (<code>accessibilityIdentifier</code> on iOS, resource-id on Android)</li>
+<li><code>ref</code>: a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Ref&lt;/span&gt;" href="../hooks/#pythonnative.hooks.Ref"><code>Ref</code></a> that receives a typed
+  <a href="../handles/">handle</a> after commit</li>
+<li><code>on_layout</code> (views): callback receiving a
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LayoutEvent&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../components/#pythonnative.components.events.LayoutEvent"><code>LayoutEvent</code></a> after layout and on frame
+  changes</li>
 </ul>
 <h2 id="view">View<a class="headerlink" href="#view" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span>
@@ -4181,17 +4276,30 @@ differences.</p>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="text">Text<a class="headerlink" href="#text" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">18</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#333"</span><span class="p">,</span> <span class="s2">"bold"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"text_align"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">})</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">ellipsize_mode</span><span class="o">=</span><span class="s2">"tail"</span><span class="p">,</span> <span class="n">selectable</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">allow_font_scaling</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>        <span class="n">on_press</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">18</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#333"</span><span class="p">,</span> <span class="s2">"bold"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"text_align"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">})</span>
 </span></code></pre></div>
 <ul>
 <li><code>text</code>: display string (positional)</li>
+<li><code>on_press</code>: callback <code>() -&gt; None</code> when the label is tapped; on a nested
+  span, when that span is tapped</li>
+<li><code>ellipsize_mode</code>: where to truncate past <code>max_lines</code>: <code>"head"</code>, <code>"middle"</code>,
+  <code>"tail"</code> (default), or <code>"clip"</code>. Android draws <code>"head"</code> and <code>"middle"</code> only
+  on single-line text.</li>
+<li><code>selectable</code>: let the user select and copy the text</li>
+<li><code>allow_font_scaling</code>: scale with the user's text-size setting (default
+  <code>True</code>); set <code>False</code> for text that must keep its exact size</li>
 <li>Style properties: <code>font_size</code>, <code>color</code>, <code>bold</code>, <code>text_align</code>, <code>background_color</code>, <code>max_lines</code></li>
 </ul>
 <p>Rich text: pass a mix of strings and nested <code>Text</code> elements as the
 positional parts; they flatten into a single native attributed string
 (each nested <code>Text</code> styles its own run and inherits the rest):</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Total: "</span><span class="p">,</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"$42"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"bold"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#16A34A"</span><span class="p">}))</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Read the "</span><span class="p">,</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"terms"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">open_terms</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#06F"</span><span class="p">}),</span> <span class="s2">"."</span><span class="p">)</span>
 </span></code></pre></div>
+<p>A nested <code>Text</code> with <code>on_press</code> becomes a pressable span; only nested
+spans produce span presses, while <code>on_press</code> on the outer element is the
+whole-label event.</p>
 <h2 id="button">Button<a class="headerlink" href="#button" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#007AFF"</span><span class="p">,</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span>
 </span></code></pre></div>
@@ -4228,60 +4336,160 @@ positional parts; they flatten into a single native attributed string
 <p>Container that respects safe area insets (notch, status bar).</p>
 <h2 id="scrollview">ScrollView<a class="headerlink" href="#scrollview" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">ScrollView</span><span class="p">(</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">child</span><span class="p">,</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">scroll_axis</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">,</span>        <span class="c1"># or "horizontal"</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">on_scroll</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span>    <span class="c1"># content offset as the user scrolls</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">shows_scroll_indicator</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">paging_enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>          <span class="c1"># snap to viewport-sized pages (carousel)</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">bounces</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>                  <span class="c1"># iOS rubber-band overscroll</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="n">keyboard_dismiss_mode</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>    <span class="c1"># "none" | "on_drag" | "interactive"</span>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    <span class="n">content_container_style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="n">refresh_control</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">RefreshControl</span><span class="p">(</span><span class="n">refreshing</span><span class="o">=</span><span class="n">loading</span><span class="p">,</span> <span class="n">on_refresh</span><span class="o">=</span><span class="n">reload</span><span class="p">),</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">},</span>
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="p">)</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="o">*</span><span class="n">children</span><span class="p">,</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">horizontal</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>                       <span class="c1"># scroll along x instead of y</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">content_container_style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"gap"</span><span class="p">:</span> <span class="mi">12</span><span class="p">},</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">content_inset</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">EdgeInsets</span><span class="p">(</span><span class="n">bottom</span><span class="o">=</span><span class="mi">80</span><span class="p">),</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">scroll_enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">scroll_event_throttle</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>               <span class="c1"># ms between on_scroll callbacks</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="n">on_scroll</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span>                <span class="c1"># ScrollEvent</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    <span class="n">on_scroll_begin_drag</span><span class="o">=...</span><span class="p">,</span> <span class="n">on_scroll_end_drag</span><span class="o">=...</span><span class="p">,</span> <span class="n">on_momentum_scroll_end</span><span class="o">=...</span><span class="p">,</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="n">shows_scroll_indicator</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="n">paging_enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>                   <span class="c1"># snap to viewport-sized pages (carousel)</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    <span class="n">bounces</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>                           <span class="c1"># iOS rubber-band overscroll</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>    <span class="n">keyboard_dismiss_mode</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>             <span class="c1"># "none" | "on_drag" | "interactive"</span>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    <span class="n">keyboard_should_persist_taps</span><span class="o">=</span><span class="s2">"never"</span><span class="p">,</span>   <span class="c1"># "never" | "always" | "handled"</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    <span class="n">snap_to_interval</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">snap_to_alignment</span><span class="o">=</span><span class="s2">"start"</span><span class="p">,</span>
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>    <span class="n">deceleration_rate</span><span class="o">=</span><span class="s2">"normal"</span><span class="p">,</span>             <span class="c1"># "normal" | "fast" | a float</span>
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>    <span class="n">refresh_control</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">RefreshControl</span><span class="p">(</span><span class="n">refreshing</span><span class="o">=</span><span class="n">loading</span><span class="p">,</span> <span class="n">on_refresh</span><span class="o">=</span><span class="n">reload</span><span class="p">),</span>
+</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>    <span class="n">ref</span><span class="o">=</span><span class="n">scroll_ref</span><span class="p">,</span>                         <span class="c1"># receives a ScrollViewHandle</span>
+</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">},</span>
+</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a><span class="p">)</span>
 </span></code></pre></div>
 <ul>
-<li><code>scroll_axis</code>: <code>"vertical"</code> (default) or <code>"horizontal"</code></li>
-<li><code>on_scroll</code>: callback <code>(x, y) -&gt; None</code> with the content offset</li>
+<li><code>horizontal</code>: scroll along the x axis instead of the y axis</li>
+<li><code>content_container_style</code>: style for the scrollable content (padding,
+  gap, alignment), distinct from <code>style</code> (the scroll frame). The children
+  are wrapped in one inner <code>View</code> carrying this style, so every layout key
+  works on every renderer.</li>
+<li><code>content_inset</code>: extra scrollable space around the content, as an
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EdgeInsets&lt;/span&gt;" href="../style/#pythonnative.style.EdgeInsets"><code>EdgeInsets</code></a></li>
+<li><code>scroll_enabled</code>: when <code>False</code>, the user can't scroll (imperative
+  scrolling still works)</li>
+<li><code>scroll_event_throttle</code>: minimum milliseconds between <code>on_scroll</code>
+  callbacks; native emits <code>on_scroll</code> only when the app wired it</li>
+<li><code>on_scroll</code>, <code>on_scroll_begin_drag</code>, <code>on_scroll_end_drag</code>,
+  <code>on_momentum_scroll_end</code>: callbacks receiving a
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ScrollEvent&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../components/#pythonnative.components.events.ScrollEvent"><code>ScrollEvent</code></a> (<code>x</code>, <code>y</code>, <code>content_width</code>,
+  <code>content_height</code>, <code>viewport_width</code>, <code>viewport_height</code>)</li>
 <li><code>shows_scroll_indicator</code>: show/hide the scroll bar</li>
 <li><code>paging_enabled</code>: snap scrolling to multiples of the viewport size</li>
 <li><code>bounces</code>: enable the iOS overscroll bounce</li>
-<li><code>content_container_style</code>: style for the inner content wrapper (padding,
-  alignment, spacing), distinct from <code>style</code> (the scroll frame)</li>
 <li><code>keyboard_dismiss_mode</code>: <code>"none"</code>, <code>"on_drag"</code>, or <code>"interactive"</code></li>
+<li><code>keyboard_should_persist_taps</code>: whether a tap inside the scroll view
+  dismisses the keyboard: <code>"never"</code> (default), <code>"always"</code>, or <code>"handled"</code></li>
+<li><code>snap_to_interval</code>, <code>snap_to_alignment</code>: snap the resting offset to
+  multiples of a length, aligned to <code>"start"</code>, <code>"center"</code>, or <code>"end"</code></li>
+<li><code>deceleration_rate</code>: <code>"normal"</code>, <code>"fast"</code>, or a per-millisecond factor
+  (<code>0.998</code> is normal, <code>0.99</code> is fast)</li>
 <li><code>refresh_control</code>: pull-to-refresh element (see <a href="#refreshcontrol"><code>RefreshControl</code></a>)</li>
+<li><code>ref</code>: receives a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ScrollViewHandle&lt;/span&gt;" href="../handles/#pythonnative.handles.ScrollViewHandle"><code>ScrollViewHandle</code></a>
+  (<code>scroll_to</code>, <code>scroll_to_end</code>, <code>flash_scroll_indicators</code>,
+  <code>await get_scroll_offset()</code>)</li>
 </ul>
 <h2 id="textinput">TextInput<a class="headerlink" href="#textinput" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">TextInput</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">placeholder</span><span class="o">=</span><span class="s2">"Enter text"</span><span class="p">,</span> <span class="n">on_change</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">secure</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>             <span class="n">editable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">clear_button</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">on_focus</span><span class="o">=</span><span class="n">f</span><span class="p">,</span> <span class="n">on_blur</span><span class="o">=</span><span class="n">g</span><span class="p">,</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>             <span class="n">selection_color</span><span class="o">=</span><span class="s2">"#007AFF"</span><span class="p">,</span> <span class="n">text_content_type</span><span class="o">=</span><span class="s2">"password"</span><span class="p">,</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>             <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#000"</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">})</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>             <span class="n">selection</span><span class="o">=</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">),</span> <span class="n">on_selection_change</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>             <span class="n">on_key_press</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span> <span class="n">on_content_size_change</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>             <span class="n">select_text_on_focus</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">blur_on_submit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>             <span class="n">keyboard_type</span><span class="o">=</span><span class="s2">"default"</span><span class="p">,</span> <span class="n">keyboard_appearance</span><span class="o">=</span><span class="s2">"default"</span><span class="p">,</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>             <span class="n">selection_color</span><span class="o">=</span><span class="s2">"#007AFF"</span><span class="p">,</span> <span class="n">text_content_type</span><span class="o">=</span><span class="s2">"password"</span><span class="p">,</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>             <span class="n">ref</span><span class="o">=</span><span class="n">input_ref</span><span class="p">,</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>             <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#000"</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">})</span>
 </span></code></pre></div>
 <ul>
 <li><code>on_change</code>: callback <code>(str) -&gt; None</code> receiving new text</li>
 <li><code>on_submit</code>: callback <code>(str) -&gt; None</code> on Return / Done</li>
+<li><code>selection</code>: controlled selection as <code>(start, end)</code> UTF-16 offsets;
+  <code>start == end</code> places the caret</li>
+<li><code>on_selection_change</code>: callback receiving a
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SelectionEvent&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../components/#pythonnative.components.events.SelectionEvent"><code>SelectionEvent</code></a> (<code>start</code>, <code>end</code>)</li>
+<li><code>on_key_press</code>: callback receiving a
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;KeyPressEvent&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../components/#pythonnative.components.events.KeyPressEvent"><code>KeyPressEvent</code></a> whose <code>key</code> is the typed
+  character or <code>"Backspace"</code> / <code>"Enter"</code>. iOS and Android report only
+  what their input pipeline exposes; the browser reports every key.</li>
+<li><code>on_content_size_change</code>: callback receiving a
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ContentSizeEvent&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../components/#pythonnative.components.events.ContentSizeEvent"><code>ContentSizeEvent</code></a> (<code>width</code>,
+  <code>height</code>) when the measured text size changes (auto-growing
+  multiline fields)</li>
+<li><code>select_text_on_focus</code>: select the whole text when the field gains focus</li>
+<li><code>blur_on_submit</code>: whether submitting blurs the field; <code>None</code> (default)
+  blurs single-line fields and keeps multiline fields focused</li>
+<li><code>keyboard_type</code>: a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;KeyboardType&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../style/#pythonnative.style.KeyboardType"><code>KeyboardType</code></a>:
+  <code>"default"</code>, <code>"email_address"</code>, <code>"number_pad"</code>, <code>"decimal_pad"</code>,
+  <code>"phone_pad"</code>, <code>"url"</code>, <code>"ascii"</code>, <code>"numbers_and_punctuation"</code>,
+  <code>"web_search"</code>, or <code>"visible_password"</code></li>
+<li><code>keyboard_appearance</code>: iOS keyboard theme, <code>"default"</code>, <code>"light"</code>, or
+  <code>"dark"</code>; ignored elsewhere</li>
 <li><code>editable</code>: when <code>False</code>, the field is read-only</li>
 <li><code>clear_button</code>: show an inline clear ("x") button while editing</li>
 <li><code>on_focus</code> / <code>on_blur</code>: callbacks <code>() -&gt; None</code> on focus changes</li>
 <li><code>selection_color</code>: cursor / selection highlight color</li>
 <li><code>text_content_type</code>: autofill hint (<code>"username"</code>, <code>"password"</code>,
-  <code>"one_time_code"</code>, …)</li>
-<li>Other kwargs: <code>secure</code>, <code>multiline</code>, <code>keyboard_type</code>, <code>auto_capitalize</code>,
-  <code>auto_correct</code>, <code>auto_focus</code>, <code>return_key_type</code>, <code>max_length</code>,
-  <code>placeholder_color</code></li>
+  <code>"one_time_code"</code>, ...)</li>
+<li><code>ref</code>: receives a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;TextInputHandle&lt;/span&gt;" href="../handles/#pythonnative.handles.TextInputHandle"><code>TextInputHandle</code></a>
+  (<code>focus</code>, <code>blur</code>, <code>clear</code>, <code>select_all</code>, <code>set_selection</code>,
+  <code>await get_value()</code>)</li>
+<li>Other kwargs: <code>secure</code>, <code>multiline</code>, <code>auto_capitalize</code>, <code>auto_correct</code>,
+  <code>auto_focus</code>, <code>return_key_type</code>, <code>max_length</code>, <code>placeholder_color</code></li>
 </ul>
 <h2 id="image">Image<a class="headerlink" href="#image" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">"https://example.com/photo.jpg"</span><span class="p">,</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>         <span class="n">placeholder_color</span><span class="o">=</span><span class="s2">"#E2E8F0"</span><span class="p">,</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>         <span class="n">on_load</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span> <span class="n">on_error</span><span class="o">=</span><span class="k">lambda</span> <span class="n">message</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>         <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">150</span><span class="p">,</span> <span class="s2">"scale_type"</span><span class="p">:</span> <span class="s2">"cover"</span><span class="p">})</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>         <span class="n">on_load_start</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span> <span class="n">on_load</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span> <span class="n">on_load_end</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>         <span class="n">on_error</span><span class="o">=</span><span class="k">lambda</span> <span class="n">message</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>         <span class="n">fade_duration</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">},</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>         <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">150</span><span class="p">,</span> <span class="s2">"scale_type"</span><span class="p">:</span> <span class="s2">"cover"</span><span class="p">})</span>
 </span></code></pre></div>
 <ul>
-<li><code>source</code>: image URL (<code>http://...</code> / <code>https://...</code>), inline <code>data:</code> URI,
-  absolute file path, or local resource name</li>
+<li><code>source</code>: a bundled <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Asset&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../assets/#pythonnative.assets.Asset"><code>Asset</code></a>, an image URL
+  (<code>http://...</code> / <code>https://...</code>), an inline <code>data:</code> URI, or an absolute
+  file path</li>
 <li><code>placeholder_color</code>: background shown while a remote image loads</li>
-<li><code>on_load</code>: callback <code>() -&gt; None</code> when the image is displayed</li>
+<li><code>on_load_start</code>: callback <code>() -&gt; None</code> when loading begins</li>
+<li><code>on_load</code>: callback receiving an <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ImageLoadEvent&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../components/#pythonnative.components.events.ImageLoadEvent"><code>ImageLoadEvent</code></a>
+  (<code>width</code>, <code>height</code>) once the image is displayed</li>
+<li><code>on_load_end</code>: callback <code>() -&gt; None</code> after <code>on_load</code> or <code>on_error</code></li>
 <li><code>on_error</code>: callback <code>(str) -&gt; None</code> when loading or decoding fails</li>
+<li><code>fade_duration</code>: milliseconds to cross-fade the image in (Android and
+  the browser; iOS shows it at once)</li>
+<li><code>headers</code>: extra HTTP headers sent with a network <code>source</code></li>
 <li>Style properties: <code>width</code>, <code>height</code>, <code>scale_type</code> (<code>"cover"</code>, <code>"contain"</code>, <code>"stretch"</code>, <code>"center"</code>), <code>background_color</code>, <code>tint_color</code></li>
 </ul>
 <p>Remote sources load through the shared <a href="../images/">image pipeline</a>:
@@ -4344,43 +4552,93 @@ and decode downsampled to the view's bounds.</p>
 <li><code>flex</code>: flex grow factor</li>
 </ul>
 <h2 id="pressable">Pressable<a class="headerlink" href="#pressable" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Pressable</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">on_long_press</span><span class="o">=</span><span class="n">handler</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Pressable</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">on_long_press</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>             <span class="n">disabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">delay_long_press</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>             <span class="n">android_ripple</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">Ripple</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">"#33000000"</span><span class="p">))</span>
 </span></code></pre></div>
 <p>Wraps any child element with tap/long-press handling.</p>
-<p><code>style</code> may also be a callable receiving <code>{"pressed": bool}</code>, re-applied
-as the press state changes:</p>
+<ul>
+<li><code>disabled</code>: when <code>True</code>, no press callback fires and the view reports
+  the disabled accessibility state</li>
+<li><code>delay_long_press</code>: milliseconds a press must be held before
+  <code>on_long_press</code> fires (default 500)</li>
+<li><code>pressed_opacity</code>: opacity applied while the finger is down (default 0.6)</li>
+<li><code>android_ripple</code>: a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Ripple&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../components/#pythonnative.components.Ripple"><code>Ripple</code></a> (<code>color</code>,
+  <code>borderless</code>, <code>radius</code>, <code>foreground</code>) drawn on Android while pressed;
+  ignored on iOS and in the browser</li>
+<li><code>hit_slop</code>, <code>gestures</code>, <code>on_layout</code>: as on <code>View</code></li>
+</ul>
+<p><code>style</code> and the single child may also be callables receiving a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;PressState&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../components/#pythonnative.components.PressState"><code>PressState</code></a>, re-evaluated as the press state
+changes:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Pressable</span><span class="p">(</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    <span class="n">child</span><span class="p">,</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    <span class="k">lambda</span> <span class="n">state</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Pressed"</span> <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">pressed</span> <span class="k">else</span> <span class="s2">"Press me"</span><span class="p">),</span>
 </span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    <span class="n">on_press</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="n">style</span><span class="o">=</span><span class="k">lambda</span> <span class="n">state</span><span class="p">:</span> <span class="p">{</span><span class="s2">"opacity"</span><span class="p">:</span> <span class="mf">0.6</span> <span class="k">if</span> <span class="n">state</span><span class="p">[</span><span class="s2">"pressed"</span><span class="p">]</span> <span class="k">else</span> <span class="mf">1.0</span><span class="p">},</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="n">style</span><span class="o">=</span><span class="k">lambda</span> <span class="n">state</span><span class="p">:</span> <span class="p">{</span><span class="s2">"opacity"</span><span class="p">:</span> <span class="mf">0.6</span> <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">pressed</span> <span class="k">else</span> <span class="mf">1.0</span><span class="p">},</span>
 </span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="modal">Modal<a class="headerlink" href="#modal" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Modal</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">,</span> <span class="n">visible</span><span class="o">=</span><span class="n">show_modal</span><span class="p">,</span> <span class="n">on_dismiss</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">on_show</span><span class="o">=</span><span class="n">shown</span><span class="p">,</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>         <span class="n">title</span><span class="o">=</span><span class="s2">"Confirm"</span><span class="p">,</span> <span class="n">animation_type</span><span class="o">=</span><span class="s2">"slide"</span><span class="p">,</span> <span class="n">transparent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>         <span class="n">presentation_style</span><span class="o">=</span><span class="s2">"page_sheet"</span><span class="p">,</span> <span class="n">dismiss_on_backdrop</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>         <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">})</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>         <span class="n">on_request_close</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_show_modal</span><span class="p">(</span><span class="kc">False</span><span class="p">),</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>         <span class="n">title</span><span class="o">=</span><span class="s2">"Confirm"</span><span class="p">,</span> <span class="n">animation_type</span><span class="o">=</span><span class="s2">"slide"</span><span class="p">,</span> <span class="n">transparent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>         <span class="n">presentation_style</span><span class="o">=</span><span class="s2">"page_sheet"</span><span class="p">,</span> <span class="n">dismiss_on_backdrop</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>         <span class="n">status_bar_translucent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>         <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">})</span>
 </span></code></pre></div>
 <p>Overlay dialog shown when <code>visible=True</code>.</p>
 <ul>
-<li><code>on_dismiss</code>: callback <code>() -&gt; None</code> when dismissed via gesture</li>
+<li><code>on_dismiss</code>: callback <code>() -&gt; None</code> once the modal has closed after
+  <code>visible</code> became <code>False</code></li>
 <li><code>on_show</code>: callback <code>() -&gt; None</code> once the modal finishes presenting</li>
+<li><code>on_request_close</code>: callback <code>() -&gt; None</code> when the user asks to close
+  the modal from outside your content (the Android back button, an iOS
+  sheet pull-down, or a tap on an overlay's backdrop); set <code>visible=False</code>
+  in response. When unset, the modal stays open.</li>
+<li><code>status_bar_translucent</code>: draw the modal under a translucent status bar
+  (Android only)</li>
 <li><code>animation_type</code>: <code>"slide"</code> (default), <code>"fade"</code>, <code>"none"</code></li>
 <li><code>transparent</code>: dim the underlying view instead of fully covering it</li>
 <li><code>presentation_style</code>: <code>"page_sheet"</code> (default), <code>"form_sheet"</code>,
   <code>"full_screen"</code>, <code>"overlay"</code></li>
-<li><code>dismiss_on_backdrop</code>: tapping the dimmed backdrop dismisses the modal</li>
+<li><code>dismiss_on_backdrop</code>: when <code>True</code> (default), a tap on the dimmed backdrop
+  of a transparent or <code>"overlay"</code> modal, outside its content, calls
+  <code>on_request_close</code>; <code>False</code> ignores those taps and locks an iOS sheet
+  against the pull-down</li>
+</ul>
+<h2 id="statusbar">StatusBar<a class="headerlink" href="#statusbar" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">StatusBar</span><span class="p">(</span><span class="n">bar_style</span><span class="o">=</span><span class="s2">"light"</span><span class="p">,</span> <span class="n">background_color</span><span class="o">=</span><span class="s2">"#000000"</span><span class="p">,</span> <span class="n">hidden</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>             <span class="n">translucent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">animated</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Side-effect element that configures the device status bar; it renders
+nothing visible.</p>
+<ul>
+<li><code>bar_style</code>: <code>"light"</code>, <code>"dark"</code>, or <code>"default"</code></li>
+<li><code>background_color</code>: status-bar background (Android only)</li>
+<li><code>hidden</code>: hide the status bar</li>
+<li><code>translucent</code>: draw content under the status bar instead of below it
+  (Android only; iOS always draws underneath)</li>
+<li><code>animated</code>: animate <code>bar_style</code> and <code>hidden</code> changes (iOS only)</li>
 </ul>
 <h2 id="touchableopacity">TouchableOpacity<a class="headerlink" href="#touchableopacity" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">TouchableOpacity</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">on_long_press</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>                    <span class="n">active_opacity</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">disabled</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">TouchableOpacity</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">on_long_press</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>                    <span class="n">active_opacity</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">disabled</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Tappable wrapper that dips to <code>active_opacity</code> while pressed (a thin alias
 over <a href="#pressable"><code>Pressable</code></a>). <code>disabled=True</code> ignores presses and dims the
 content.</p>
 <h2 id="imagebackground">ImageBackground<a class="headerlink" href="#imagebackground" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">ImageBackground</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">"bg.png"</span><span class="p">,</span> <span class="n">scale_type</span><span class="o">=</span><span class="s2">"cover"</span><span class="p">,</span>
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>                   <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">320</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">180</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">ImageBackground</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">"bg.png"</span><span class="p">,</span> <span class="n">scale_type</span><span class="o">=</span><span class="s2">"cover"</span><span class="p">,</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>                   <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">320</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">180</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span>
 </span></code></pre></div>
 <p>Renders <code>child</code> content layered over a background image. Composed from an
 absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
@@ -4389,8 +4647,8 @@ absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
 <li><code>scale_type</code>: <code>"cover"</code> (default), <code>"contain"</code>, <code>"stretch"</code>, <code>"center"</code></li>
 </ul>
 <h2 id="checkbox">Checkbox<a class="headerlink" href="#checkbox" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Checkbox</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">accepted</span><span class="p">,</span> <span class="n">on_change</span><span class="o">=</span><span class="n">set_accepted</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"Accept terms"</span><span class="p">,</span>
-</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>            <span class="n">disabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"#007AFF"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Checkbox</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">accepted</span><span class="p">,</span> <span class="n">on_change</span><span class="o">=</span><span class="n">set_accepted</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"Accept terms"</span><span class="p">,</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>            <span class="n">disabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"#007AFF"</span><span class="p">)</span>
 </span></code></pre></div>
 <ul>
 <li><code>value</code>: checked state (<code>bool</code>)</li>
@@ -4418,8 +4676,8 @@ absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
 </tbody>
 </table>
 <h2 id="segmentedcontrol">SegmentedControl<a class="headerlink" href="#segmentedcontrol" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">SegmentedControl</span><span class="p">(</span><span class="n">segments</span><span class="o">=</span><span class="p">[</span><span class="s2">"Day"</span><span class="p">,</span> <span class="s2">"Week"</span><span class="p">,</span> <span class="s2">"Month"</span><span class="p">],</span> <span class="n">selected_index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
-</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>                    <span class="n">on_change</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">tint_color</span><span class="o">=</span><span class="s2">"#007AFF"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">SegmentedControl</span><span class="p">(</span><span class="n">segments</span><span class="o">=</span><span class="p">[</span><span class="s2">"Day"</span><span class="p">,</span> <span class="s2">"Week"</span><span class="p">,</span> <span class="s2">"Month"</span><span class="p">],</span> <span class="n">selected_index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>                    <span class="n">on_change</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">tint_color</span><span class="o">=</span><span class="s2">"#007AFF"</span><span class="p">)</span>
 </span></code></pre></div>
 <ul>
 <li><code>segments</code>: list of segment label strings</li>
@@ -4446,8 +4704,8 @@ absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
 </tbody>
 </table>
 <h2 id="datepicker">DatePicker<a class="headerlink" href="#datepicker" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">DatePicker</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s2">"2026-05-31"</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">"date"</span><span class="p">,</span> <span class="n">on_change</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span>
-</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>              <span class="n">minimum</span><span class="o">=</span><span class="s2">"2026-01-01"</span><span class="p">,</span> <span class="n">maximum</span><span class="o">=</span><span class="s2">"2026-12-31"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">DatePicker</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s2">"2026-05-31"</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">"date"</span><span class="p">,</span> <span class="n">on_change</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>              <span class="n">minimum</span><span class="o">=</span><span class="s2">"2026-01-01"</span><span class="p">,</span> <span class="n">maximum</span><span class="o">=</span><span class="s2">"2026-12-31"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>ISO-8601 string values: <code>"YYYY-MM-DD"</code> (date), <code>"HH:MM"</code> (time),
 <code>"YYYY-MM-DDTHH:MM"</code> (datetime).</p>
@@ -4476,13 +4734,13 @@ absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
 </tbody>
 </table>
 <h2 id="picker">Picker<a class="headerlink" href="#picker" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Picker</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">selected</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="p">[{</span><span class="s2">"value"</span><span class="p">:</span> <span class="s2">"a"</span><span class="p">,</span> <span class="s2">"label"</span><span class="p">:</span> <span class="s2">"Apple"</span><span class="p">}],</span>
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>          <span class="n">on_change</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">placeholder</span><span class="o">=</span><span class="s2">"Select…"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Picker</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">selected</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="p">[{</span><span class="s2">"value"</span><span class="p">:</span> <span class="s2">"a"</span><span class="p">,</span> <span class="s2">"label"</span><span class="p">:</span> <span class="s2">"Apple"</span><span class="p">}],</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>          <span class="n">on_change</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">placeholder</span><span class="o">=</span><span class="s2">"Select…"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Native dropdown / select. <code>items</code> is a list of <code>{"value": Any, "label": str}</code>.</p>
 <h2 id="refreshcontrol">RefreshControl<a class="headerlink" href="#refreshcontrol" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">ScrollView</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">refresh_control</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">RefreshControl</span><span class="p">(</span>
-</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>    <span class="n">refreshing</span><span class="o">=</span><span class="n">loading</span><span class="p">,</span> <span class="n">on_refresh</span><span class="o">=</span><span class="n">reload</span><span class="p">,</span> <span class="n">tint_color</span><span class="o">=</span><span class="s2">"#007AFF"</span><span class="p">))</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">ScrollView</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">refresh_control</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">RefreshControl</span><span class="p">(</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>    <span class="n">refreshing</span><span class="o">=</span><span class="n">loading</span><span class="p">,</span> <span class="n">on_refresh</span><span class="o">=</span><span class="n">reload</span><span class="p">,</span> <span class="n">tint_color</span><span class="o">=</span><span class="s2">"#007AFF"</span><span class="p">))</span>
 </span></code></pre></div>
 <p>Pull-to-refresh control, an element of type <code>"RefreshControl"</code>, passed as the <code>refresh_control=</code> prop of a <code>ScrollView</code>, <code>FlatList</code>, or <code>SectionList</code>. The scroll container attaches it to its native scroll view rather than rendering it as a child, and raises <code>TypeError</code> for anything that isn't a <code>RefreshControl</code>.</p>
 <ul>
@@ -4491,14 +4749,14 @@ absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
 <li><code>tint_color</code>: spinner color</li>
 </ul>
 <h2 id="tabbar">TabBar<a class="headerlink" href="#tabbar" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Element</span><span class="p">(</span><span class="s2">"TabBar"</span><span class="p">,</span> <span class="p">{</span>
-</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>    <span class="s2">"items"</span><span class="p">:</span> <span class="p">[</span>
-</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"Home"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">:</span> <span class="s2">"Home"</span><span class="p">},</span>
-</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"Settings"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">:</span> <span class="s2">"Settings"</span><span class="p">},</span>
-</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>    <span class="p">],</span>
-</span><span id="__span-26-6"><a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>    <span class="s2">"active_tab"</span><span class="p">:</span> <span class="s2">"Home"</span><span class="p">,</span>
-</span><span id="__span-26-7"><a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>    <span class="s2">"on_tab_select"</span><span class="p">:</span> <span class="n">handler</span><span class="p">,</span>
-</span><span id="__span-26-8"><a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a><span class="p">})</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Element</span><span class="p">(</span><span class="s2">"TabBar"</span><span class="p">,</span> <span class="p">{</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>    <span class="s2">"items"</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"Home"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">:</span> <span class="s2">"Home"</span><span class="p">},</span>
+</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"Settings"</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">:</span> <span class="s2">"Settings"</span><span class="p">},</span>
+</span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>    <span class="p">],</span>
+</span><span id="__span-27-6"><a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>    <span class="s2">"active_tab"</span><span class="p">:</span> <span class="s2">"Home"</span><span class="p">,</span>
+</span><span id="__span-27-7"><a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a>    <span class="s2">"on_tab_select"</span><span class="p">:</span> <span class="n">handler</span><span class="p">,</span>
+</span><span id="__span-27-8"><a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a><span class="p">})</span>
 </span></code></pre></div>
 <p>Native tab bar, typically created automatically by <code>Tab.Navigator</code>.</p>
 <table>
@@ -4525,15 +4783,15 @@ absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
 <li><code>on_tab_select</code>: callback <code>(str) -&gt; None</code> receiving the selected tab name</li>
 </ul>
 <h2 id="flatlist">FlatList<a class="headerlink" href="#flatlist" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">FlatList</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">items</span><span class="p">,</span> <span class="n">render_item</span><span class="o">=</span><span class="n">render_fn</span><span class="p">,</span> <span class="n">key_extractor</span><span class="o">=</span><span class="n">key_fn</span><span class="p">,</span>
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>            <span class="n">item_height</span><span class="o">=</span><span class="mi">44</span><span class="p">,</span> <span class="n">separator_height</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>            <span class="n">horizontal</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">num_columns</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>            <span class="n">list_header</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Header"</span><span class="p">),</span> <span class="n">list_footer</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Footer"</span><span class="p">),</span>
-</span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>            <span class="n">list_empty</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Nothing here"</span><span class="p">),</span>
-</span><span id="__span-27-6"><a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>            <span class="n">on_end_reached</span><span class="o">=</span><span class="n">load_more</span><span class="p">,</span> <span class="n">on_end_reached_threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
-</span><span id="__span-27-7"><a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a>            <span class="n">refresh_control</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">RefreshControl</span><span class="p">(</span><span class="n">refreshing</span><span class="o">=</span><span class="n">loading</span><span class="p">,</span> <span class="n">on_refresh</span><span class="o">=</span><span class="n">reload</span><span class="p">),</span>
-</span><span id="__span-27-8"><a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a>            <span class="n">content_container_style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
-</span><span id="__span-27-9"><a id="__codelineno-27-9" name="__codelineno-27-9" href="#__codelineno-27-9"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">})</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">FlatList</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">items</span><span class="p">,</span> <span class="n">render_item</span><span class="o">=</span><span class="n">render_fn</span><span class="p">,</span> <span class="n">key_extractor</span><span class="o">=</span><span class="n">key_fn</span><span class="p">,</span>
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>            <span class="n">item_height</span><span class="o">=</span><span class="mi">44</span><span class="p">,</span> <span class="n">separator_height</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>            <span class="n">horizontal</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">num_columns</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>            <span class="n">list_header</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Header"</span><span class="p">),</span> <span class="n">list_footer</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Footer"</span><span class="p">),</span>
+</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>            <span class="n">list_empty</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Nothing here"</span><span class="p">),</span>
+</span><span id="__span-28-6"><a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>            <span class="n">on_end_reached</span><span class="o">=</span><span class="n">load_more</span><span class="p">,</span> <span class="n">on_end_reached_threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+</span><span id="__span-28-7"><a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>            <span class="n">refresh_control</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">RefreshControl</span><span class="p">(</span><span class="n">refreshing</span><span class="o">=</span><span class="n">loading</span><span class="p">,</span> <span class="n">on_refresh</span><span class="o">=</span><span class="n">reload</span><span class="p">),</span>
+</span><span id="__span-28-8"><a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>            <span class="n">content_container_style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
+</span><span id="__span-28-9"><a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">})</span>
 </span></code></pre></div>
 <ul>
 <li><code>data</code>: list of items</li>
@@ -4543,14 +4801,51 @@ absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
   RecyclerView / UICollectionView containers (see the
   <a href="../../guides/lists/">Lists guide</a>)</li>
 <li><code>separator_height</code>: spacing between items</li>
+<li><code>item_separator</code>: an element, or a zero-argument function returning one,
+  rendered after every row except the last</li>
 <li><code>horizontal</code>: scroll horizontally; row extents become widths</li>
+<li><code>inverted</code>: render bottom-up (or right-to-left when <code>horizontal</code>), so
+  rows appended to <code>data</code> appear at the visible end, as in a chat</li>
+<li><code>initial_scroll_index</code>: item index scrolled to, without animation, once
+  the list mounts</li>
 <li><code>num_columns</code>: render as a grid of N columns</li>
+<li><code>on_scroll</code>: callback receiving a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ScrollEvent&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../components/#pythonnative.components.events.ScrollEvent"><code>ScrollEvent</code></a></li>
+<li><code>on_viewable_items_changed</code>: callback receiving a list of
+  <code>{"index", "key", "item"}</code> dicts whenever the visible rows change</li>
 <li><code>list_header</code> / <code>list_footer</code>: elements rendered once above / below rows</li>
 <li><code>list_empty</code>: element rendered when <code>data</code> is empty</li>
 <li><code>on_end_reached</code>: callback <code>() -&gt; None</code> near the end (virtualized)</li>
 <li><code>on_end_reached_threshold</code>: fraction-of-viewport trigger distance</li>
 <li><code>content_container_style</code>: style for the inner content wrapper</li>
 <li><code>refresh_control</code>: pull-to-refresh element (see <a href="#refreshcontrol"><code>RefreshControl</code></a>)</li>
+<li><code>ref</code>: receives a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ListController&lt;/span&gt;" href="../components/#pythonnative.components.ListController"><code>ListController</code></a></li>
+</ul>
+<h2 id="sectionlist">SectionList<a class="headerlink" href="#sectionlist" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">SectionList</span><span class="p">(</span><span class="n">sections</span><span class="o">=</span><span class="p">[{</span><span class="s2">"title"</span><span class="p">:</span> <span class="s2">"A"</span><span class="p">,</span> <span class="s2">"data"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"Apple"</span><span class="p">]}],</span>
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>               <span class="n">render_item</span><span class="o">=</span><span class="k">lambda</span> <span class="n">item</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">item</span><span class="p">),</span>
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>               <span class="n">render_section_header</span><span class="o">=</span><span class="k">lambda</span> <span class="n">section</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">section</span><span class="p">[</span><span class="s2">"title"</span><span class="p">]),</span>
+</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>               <span class="n">sticky_section_headers</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">inverted</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-29-5"><a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>               <span class="n">item_separator</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"height"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#EEE"</span><span class="p">}),</span>
+</span><span id="__span-29-6"><a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a>               <span class="n">on_viewable_items_changed</span><span class="o">=</span><span class="n">handler</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Virtualized list with section headers interleaved between row groups;
+shares the windowing engine and most arguments with <code>FlatList</code>.</p>
+<ul>
+<li><code>sections</code>: list of <code>{"title": ..., "data": [...]}</code> dicts</li>
+<li><code>render_item</code>: <code>(item, item_index, section_index) -&gt; Element</code></li>
+<li><code>render_section_header</code>: <code>(section, section_index) -&gt; Element</code></li>
+<li><code>sticky_section_headers</code>: keep the current section's header pinned at the
+  top while its items scroll by (rendered by Python as an overlay)</li>
+<li><code>inverted</code>: render bottom-up</li>
+<li><code>item_separator</code>: rendered between the items of each section, never after
+  a header or a section's last item</li>
+<li><code>on_viewable_items_changed</code>: callback receiving <code>{"index", "key", "item"}</code>
+  dicts for the visible items (flat indices)</li>
 </ul>
 
 

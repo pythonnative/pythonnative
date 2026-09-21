@@ -2191,6 +2191,8 @@
       
         
       
+        
+      
     
     
     
@@ -2337,6 +2339,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3754,20 +3784,28 @@ render <strong>suspends</strong> and the nearest
 </span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p>No <code>loading</code> flag, no conditional render, no effect that copies data
-into state. Two timing rules, matching React:</p>
+into state. Three timing rules, matching React:</p>
 <ul>
 <li><strong>Initial mount</strong>: the fallback shows until the content is ready.</li>
 <li><strong>Updates</strong>: a component that's already on screen and suspends again
   (its inputs changed) keeps its previous content visible and
   re-renders when the new data arrives; there's no fallback flash.</li>
+<li><strong>A new descendant suspends</strong>: when a boundary with committed content
+  gains a child that suspends, the boundary keeps its content mounted
+  and hidden (<code>display: "none"</code>) while the fallback shows, then lifts
+  the override when the data arrives. Hook state, native views, focus,
+  and scroll position of the siblings survive, so a <code>TextInput</code> next to
+  the loading widget keeps its text and its keyboard.</li>
 </ul>
 <p>Boundaries nest: each <code>Suspense</code> covers exactly the subtree it wraps,
 so one slow widget doesn't blank the whole screen. A boundary without
 a <code>fallback</code> is transparent and lets the suspension propagate to the
 next boundary up.</p>
-<p>Awaits on already-resolved values complete inline during the render
-pass, so a re-render of an async component whose data is cached costs
-no event-loop round trips.</p>
+<p>The reconciler steps an <code>async def</code> body once synchronously and only
+schedules a task (and suspends) if the first <code>await</code> is actually
+pending. Awaits on already-resolved values therefore complete inline
+during the render pass: a re-render of an async component whose data
+is cached costs no event-loop round trip and shows no fallback.</p>
 <h2 id="fetch-during-render-use_resource">Fetch-during-render: <code>use_resource</code><a class="headerlink" href="#fetch-during-render-use_resource" title="Permanent link">&para;</a></h2>
 <p><code>use_resource(fetcher, deps)</code> starts an async fetch <strong>during render</strong>
 (not after commit, so there's no mount-then-fetch waterfall) and
@@ -3837,10 +3875,12 @@ effect may also return a callable, which runs as its cleanup:</p>
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">pn</span><span class="o">.</span><span class="n">use_effect</span><span class="p">(</span><span class="n">subscribe</span><span class="p">,</span> <span class="p">[])</span>
 </span></code></pre></div>
 <h2 id="keeping-the-ui-responsive-use_transition-and-use_deferred_value">Keeping the UI responsive: <code>use_transition</code> and <code>use_deferred_value</code><a class="headerlink" href="#keeping-the-ui-responsive-use_transition-and-use_deferred_value" title="Permanent link">&para;</a></h2>
-<p>State updates are urgent by default: they render synchronously so
-taps and typing feel immediate. When an update drives <em>expensive</em>
-work (filtering a large list, re-rendering a chart), mark it as a
-<strong>transition</strong> so urgent updates queued in the meantime render first:</p>
+<p>State updates are urgent by default: every setter call in one
+handler is batched into a single render pass that runs as soon as the
+handler returns, so taps and typing feel immediate. When an update
+drives <em>expensive</em> work (filtering a large list, re-rendering a
+chart), mark it as a <strong>transition</strong> so urgent updates queued in the
+meantime render first:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Search</span><span class="p">():</span>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">query</span><span class="p">,</span> <span class="n">set_query</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
@@ -4074,8 +4114,8 @@ data + form + persistence + animations" shape:</p>
 </span><span id="__span-15-43"><a id="__codelineno-15-43" name="__codelineno-15-43" href="#__codelineno-15-43"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p>Each piece (fetch, animation, persistence, mutation) is its own
-hook with its own lifecycle, and <code>asyncio</code> is the glue, running right
-on the UI thread.</p>
+hook with its own lifecycle, and <code>asyncio</code> is the glue, running on the
+application thread.</p>
 
 
 

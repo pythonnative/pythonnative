@@ -1987,6 +1987,8 @@
       
         
       
+        
+      
     
     
     
@@ -2133,6 +2135,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3845,6 +3875,13 @@ way:</p>
 <ul>
 <li><code>src/pythonnative/</code>: installable library and CLI</li>
 <li>Core Python modules, UI components, and utilities</li>
+<li><code>components/</code>: element factories and the typed event records (<code>components/events.py</code>)</li>
+<li><code>handles.py</code>: typed imperative handles published on <code>ref.current</code></li>
+<li><code>journal.py</code>: the undo journal a failed render pass rolls back through</li>
+<li><code>native_views/</code>: the thin backend accessor (<code>get_backend</code> / <code>set_backend</code>) and the bridge backend that serializes commits</li>
+<li><code>native_modules/</code>: device module facades and their Python fallbacks</li>
+<li><code>navigation/</code>: navigators, container, hooks, linking, theme, and the navigation ref</li>
+<li><code>testing/</code>: the headless testing library and the shipped pytest plugin (<code>testing/pytest_plugin.py</code>)</li>
 <li><code>bridge/</code>: JSON codec and per-platform transports into the native rendering core</li>
 <li><code>cli/</code>: <code>pn</code> command</li>
 <li><code>project/</code>: config loading, template configuration, native plugin staging, and the builder behind <code>pn</code></li>
@@ -3969,16 +4006,18 @@ aren't.</p>
 <li><code>element</code>: Element descriptor class (<code>element.py</code>)</li>
 <li><code>events</code>: tag-based event routing between native views and Python callbacks (<code>events.py</code>)</li>
 <li><code>gestures</code>: gesture descriptors and the pure-Python recognition arbiter (<code>gestures.py</code>)</li>
+<li><code>handles</code>: typed imperative handles published on refs (<code>handles.py</code>)</li>
 <li><code>hooks</code>: hooks and contexts (<code>hooks.py</code>)</li>
 <li><code>hosts</code>: screen hosts, lifecycle forwarding, and render scheduling (<code>hosts/</code>)</li>
 <li><code>devserver</code>: dev server, file watcher, and WebSocket implementation (<code>devserver/</code>)</li>
 <li><code>devclient</code>: on-device dev client that syncs sources and Fast Refreshes (<code>devclient.py</code>)</li>
 <li><code>hot_reload</code>: module reloader and Fast Refresh (<code>hot_reload.py</code>)</li>
+<li><code>journal</code>: render undo journal (<code>journal.py</code>)</li>
 <li><code>layout</code>: Yoga layout integration and the host binding (<code>layout.py</code>, <code>native/yoga/</code>)</li>
 <li><code>mutations</code>: batched mutation ops between reconciler and native backends (<code>mutations.py</code>)</li>
 <li><code>native_modules</code>: native module registry, Python facades, and Python fallbacks (<code>native_modules/</code>)</li>
-<li><code>native_views</code>: view registry protocol and bridge backend (<code>native_views/</code>)</li>
-<li><code>navigation</code>: navigation state, container, navigators, hooks, and linking (<code>navigation/</code>)</li>
+<li><code>native_views</code>: view backend accessor and bridge backend (<code>native_views/</code>)</li>
+<li><code>navigation</code>: navigation state, container, navigators, hooks, linking, theme, and ref (<code>navigation/</code>)</li>
 <li><code>net</code>: awaitable HTTP client (<code>net.py</code>)</li>
 <li><code>package</code>: <code>src/pythonnative/__init__.py</code> exports and package boundary</li>
 <li><code>platform</code>: <code>Platform.OS</code>/<code>Platform.select</code> and version detection (<code>platform.py</code>)</li>
@@ -3991,7 +4030,7 @@ aren't.</p>
 <li><code>storage</code>: AsyncStorage key/value persistence and <code>use_persisted_state</code> (<code>storage.py</code>)</li>
 <li><code>scheduler</code>: render batching and transition queues (<code>scheduler.py</code>)</li>
 <li><code>style</code>: StyleSheet and theming (<code>style.py</code>)</li>
-<li><code>testing</code>: public test utilities (<code>testing/</code>)</li>
+<li><code>testing</code>: public test utilities and the pytest plugin (<code>testing/</code>)</li>
 <li>
 <p><code>utils</code>: shared utilities (<code>utils.py</code>)</p>
 </li>
@@ -4087,7 +4126,7 @@ aren't.</p>
 <li>PR title: Conventional Commits format (CI-enforced by <code>pr-lint.yml</code>).</li>
 <li>Tests: added/updated; <code>uv run pytest</code> passes.</li>
 <li>Lint/format: <code>uv run ruff check .</code> and <code>uv run black --check src examples tests</code> pass.</li>
-<li>Docs: update <code>README.md</code> if behavior changes.</li>
+<li>Docs: update <code>README.md</code> and the affected pages under <code>docs/</code> if behavior changes; <code>uv run --group docs mkdocs build --strict</code> must pass.</li>
 <li>Templates: update <code>src/pythonnative/templates/</code> if generator output changes.</li>
 <li>Generated contracts and example schemas are regenerated and reviewed when changed; vendored dependencies retain their licenses and provenance.</li>
 <li>No local build outputs, caches, credentials, or machine-specific files are committed.</li>
@@ -4168,16 +4207,18 @@ or commit to check. This runs the full matrix without publishing anything:</p>
 </span></code></pre></div>
 <p>For tight iteration, run a single category instead of the full pass:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>android<span class="w"> </span>hooks
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>ios<span class="w"> </span>components
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>uv<span class="w"> </span>run<span class="w"> </span>./scripts/run-e2e.sh<span class="w"> </span>ios<span class="w"> </span>navigation
 </span></code></pre></div>
-<p>Available categories: <code>components</code>, <code>hooks</code>, <code>navigation</code>, <code>layout</code>, <code>styling</code>, <code>animations</code>, <code>misc</code>.</p>
+<p>Each category is one file under <code>tests/e2e/suites/</code> (<code>hooks.yaml</code>, <code>navigation.yaml</code>, <code>gestures.yaml</code>, and so on; large areas are split into lettered parts such as <code>components-a.yaml</code>). List the directory for the current set:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>ls<span class="w"> </span>tests/e2e/suites
+</span></code></pre></div>
 <p>A coverage checker, <code>scripts/check-e2e-coverage.py</code>, gates CI: every name in <code>pythonnative.__all__</code> must be covered by a demo + flow, or listed in <code>INTENTIONAL_EXEMPTIONS</code> with a justification.</p>
 <p>When you add a new public symbol you must also:</p>
 <ol>
 <li>Add a demo screen under <code>examples/e2e-suite/app/screens/&lt;category&gt;/</code>.</li>
 <li>Append a <code>DemoEntry</code> in <code>examples/e2e-suite/app/registry.py</code>.</li>
 <li>Add a Maestro flow at <code>tests/e2e/flows/&lt;category&gt;/&lt;name&gt;.yaml</code>.</li>
-<li>Append the flow to the top-level <code>tests/e2e/android.yaml</code>, <code>tests/e2e/ios.yaml</code>, and the matching <code>tests/e2e/suites/&lt;category&gt;.yaml</code>.</li>
+<li>Append the flow to the top-level <code>tests/e2e/android.yaml</code>, <code>tests/e2e/ios.yaml</code>, and the matching <code>tests/e2e/suites/&lt;category&gt;.yaml</code> (or the lettered part it belongs to).</li>
 <li>Confirm <code>uv run python scripts/check-e2e-coverage.py</code> exits 0.</li>
 </ol>
 <p><code>tests/e2e/AGENTS.md</code> is the deeper reference (label conventions, failure triage, naming rules); AI agents should read it before touching the suite. The <code>e2e.yml</code> workflow runs the suite automatically on pushes to <code>main</code> and PRs.</p>

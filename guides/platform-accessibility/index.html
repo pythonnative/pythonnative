@@ -1386,6 +1386,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#values-and-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Values and actions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#live-regions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1409,6 +1420,28 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#accessibility-settings-accessibilityinfo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accessibility settings: AccessibilityInfo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#localization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Localization
+      
+    </span>
+  </a>
   
 </li>
       
@@ -2131,6 +2164,8 @@
       
         
       
+        
+      
     
     
     
@@ -2277,6 +2312,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3500,6 +3563,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#values-and-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Values and actions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#live-regions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3523,6 +3597,28 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#accessibility-settings-accessibilityinfo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accessibility settings: AccessibilityInfo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#localization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Localization
+      
+    </span>
+  </a>
   
 </li>
       
@@ -3579,7 +3675,7 @@ platform-aware code:</p>
 <code>default=</code> argument. <code>Platform.OS</code> is <code>"test"</code> when running off-device,
 which is useful for skipping native-only code paths in tests.</p>
 <h2 id="window-dimensions-safe-area-keyboard">Window dimensions, safe area, keyboard<a class="headerlink" href="#window-dimensions-safe-area-keyboard" title="Permanent link">&para;</a></h2>
-<p>PythonNative ships three reactive hooks that subscribe to the
+<p>PythonNative ships reactive hooks that subscribe to the
 platform-published metrics in <code>pythonnative.platform_metrics</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Responsive</span><span class="p">():</span>
@@ -3595,17 +3691,28 @@ platform-published metrics in <code>pythonnative.platform_metrics</code>:</p>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p>The component re-renders whenever the underlying value actually
-changes (no spurious renders on no-op updates). For most apps,
+changes (no spurious renders on no-op updates). <code>dims</code> is a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;WindowDimensions&lt;/span&gt;" href="../../api/platform_metrics/#pythonnative.platform_metrics.WindowDimensions"><code>WindowDimensions</code></a> with <code>width</code>,
+<code>height</code>, <code>scale</code>, and <code>font_scale</code>. For most apps,
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;KeyboardAvoidingView&lt;/span&gt;" href="../../api/components/#pythonnative.components.KeyboardAvoidingView"><code>KeyboardAvoidingView</code></a> handles
 the keyboard case for you and you won't need
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_keyboard_height&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_keyboard_height"><code>use_keyboard_height</code></a> directly.</p>
+<p>Outside a component, the same values are available imperatively from
+the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Dimensions&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.dimensions.Dimensions"><code>Dimensions</code></a>,
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;PixelRatio&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.dimensions.PixelRatio"><code>PixelRatio</code></a>, and
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Keyboard&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.keyboard.Keyboard"><code>Keyboard</code></a> modules (<code>Dimensions.get("screen")</code>,
+<code>PixelRatio.round_to_nearest_pixel(0.5)</code>, <code>Keyboard.dismiss()</code>); see the
+<a href="../native-modules/#keyboard-dimensions-and-pixel-ratio">Native modules guide</a>.</p>
 <h2 id="status-bar">Status bar<a class="headerlink" href="#status-bar" title="Permanent link">&para;</a></h2>
 <p>Mount <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;StatusBar&lt;/span&gt;" href="../../api/components/#pythonnative.components.StatusBar"><code>StatusBar</code></a> anywhere in the tree (it
 renders nothing visible) to control style and visibility:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">StatusBar</span><span class="p">(</span><span class="n">bar_style</span><span class="o">=</span><span class="s2">"light"</span><span class="p">,</span> <span class="n">background_color</span><span class="o">=</span><span class="s2">"#000000"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">StatusBar</span><span class="p">(</span><span class="n">bar_style</span><span class="o">=</span><span class="s2">"light"</span><span class="p">,</span> <span class="n">background_color</span><span class="o">=</span><span class="s2">"#000000"</span><span class="p">,</span> <span class="n">translucent</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">animated</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </span></code></pre></div>
-<p><code>style</code> is <code>"light"</code> (light icons, dark background), <code>"dark"</code> (dark
-icons, light background), or <code>"default"</code>.</p>
+<p><code>bar_style</code> is <code>"light"</code> (light icons, dark background), <code>"dark"</code> (dark
+icons, light background), or <code>"default"</code>. <code>background_color</code> and
+<code>translucent</code> (draw your content under the bar) apply on Android only;
+iOS always draws underneath. <code>animated</code> animates <code>bar_style</code> and
+<code>hidden</code> changes on iOS only.</p>
 <h2 id="alerts-and-pickers">Alerts and pickers<a class="headerlink" href="#alerts-and-pickers" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;show&lt;/span&gt;
 
@@ -3641,7 +3748,7 @@ accessibility kwargs:</p>
 </tr>
 <tr>
 <td><code>accessibility_hint</code></td>
-<td>Extra detail (iOS only)</td>
+<td>Extra detail. iOS reads it after the label; Android appends it to the content description, as React Native does</td>
 </tr>
 <tr>
 <td><code>accessibility_role</code></td>
@@ -3656,8 +3763,24 @@ accessibility kwargs:</p>
 <td>Dict of state flags announced with the element</td>
 </tr>
 <tr>
+<td><code>accessibility_value</code></td>
+<td>The widget's current value: a string, or an <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AccessibilityValue&lt;/span&gt;" href="../../api/style/#pythonnative.style.AccessibilityValue"><code>AccessibilityValue</code></a> with <code>min</code> / <code>max</code> / <code>now</code> / <code>text</code></td>
+</tr>
+<tr>
+<td><code>accessibility_actions</code></td>
+<td>Custom actions a screen reader may invoke, each an <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AccessibilityAction&lt;/span&gt;" href="../../api/style/#pythonnative.style.AccessibilityAction"><code>AccessibilityAction</code></a></td>
+</tr>
+<tr>
+<td><code>on_accessibility_action</code></td>
+<td>Callback receiving the invoked action's <code>name</code></td>
+</tr>
+<tr>
 <td><code>accessibility_live_region</code></td>
-<td>Announce content changes: <code>"polite"</code> or <code>"assertive"</code></td>
+<td>Announce content changes: <code>"none"</code>, <code>"polite"</code>, or <code>"assertive"</code> (<code>aria-live</code> in the browser)</td>
+</tr>
+<tr>
+<td><code>important_for_accessibility</code></td>
+<td>Whether assistive tech sees this view and its subtree: <code>"auto"</code>, <code>"yes"</code>, <code>"no"</code>, or <code>"no_hide_descendants"</code></td>
 </tr>
 <tr>
 <td><code>test_id</code></td>
@@ -3666,7 +3789,9 @@ accessibility kwargs:</p>
 </tbody>
 </table>
 <p>Components like <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Button&lt;/span&gt;" href="../../api/components/#pythonnative.components.Button"><code>Button</code></a> supply a sensible
-default <code>accessibility_role</code> for you.</p>
+default <code>accessibility_role</code> for you, and <code>Pressable(disabled=True)</code>
+sets the disabled state unless you pass <code>accessibility_state</code>
+explicitly.</p>
 <h3 id="state-flags">State flags<a class="headerlink" href="#state-flags" title="Permanent link">&para;</a></h3>
 <p><code>accessibility_state</code> mirrors React Native's prop of the same name.
 Supported keys are <code>disabled</code>, <code>selected</code>, <code>checked</code>, <code>busy</code>, and
@@ -3679,19 +3804,110 @@ Supported keys are <code>disabled</code>, <code>selected</code>, <code>checked</
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">accessibility_state</span><span class="o">=</span><span class="p">{</span><span class="s2">"selected"</span><span class="p">:</span> <span class="n">current_tab</span> <span class="o">==</span> <span class="s2">"inbox"</span><span class="p">},</span>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
 </span></code></pre></div>
+<h3 id="values-and-actions">Values and actions<a class="headerlink" href="#values-and-actions" title="Permanent link">&para;</a></h3>
+<p><code>accessibility_value</code> describes range-like widgets (<code>min</code>, <code>max</code>,
+<code>now</code>) or gives a spoken value for anything else (<code>text</code>; a plain
+string is shorthand for <code>{"text": ...}</code>). <code>accessibility_actions</code>
+lists actions a screen reader can invoke without a visible control;
+the standard names <code>"activate"</code>, <code>"increment"</code>, <code>"decrement"</code>,
+<code>"longpress"</code>, <code>"magicTap"</code>, and <code>"escape"</code> map to the platform's
+built-in actions, and any other name is announced with its <code>label</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">Slider</span><span class="p">(</span><span class="o">...</span><span class="p">),</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">accessibility_role</span><span class="o">=</span><span class="s2">"adjustable"</span><span class="p">,</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">accessibility_value</span><span class="o">=</span><span class="p">{</span><span class="s2">"min"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"max"</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span> <span class="s2">"now"</span><span class="p">:</span> <span class="n">volume</span><span class="p">},</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">accessibility_actions</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"increment"</span><span class="p">},</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"decrement"</span><span class="p">},</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"mute"</span><span class="p">,</span> <span class="s2">"label"</span><span class="p">:</span> <span class="s2">"Mute"</span><span class="p">},</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="p">],</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">on_accessibility_action</span><span class="o">=</span><span class="k">lambda</span> <span class="n">name</span><span class="p">:</span> <span class="n">adjust</span><span class="p">(</span><span class="n">name</span><span class="p">),</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><code>important_for_accessibility="no_hide_descendants"</code> hides decorative
+subtrees from the accessibility tree.</p>
 <h3 id="live-regions">Live regions<a class="headerlink" href="#live-regions" title="Permanent link">&para;</a></h3>
 <p>Set <code>accessibility_live_region="polite"</code> on a status line so screen
 readers announce its text when it changes without moving focus (use
 <code>"assertive"</code> only for content the user must hear immediately):</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">unread</span><span class="si">}</span><span class="s2"> unread messages"</span><span class="p">,</span> <span class="n">accessibility_live_region</span><span class="o">=</span><span class="s2">"polite"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">unread</span><span class="si">}</span><span class="s2"> unread messages"</span><span class="p">,</span> <span class="n">accessibility_live_region</span><span class="o">=</span><span class="s2">"polite"</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="test-identifiers">Test identifiers<a class="headerlink" href="#test-identifiers" title="Permanent link">&para;</a></h3>
 <p><code>test_id</code> gives UI-test frameworks (Maestro, Appium, XCUITest,
 Espresso) a stable handle that is independent of visible text. It
 maps to <code>accessibilityIdentifier</code> on iOS and to the accessibility
 node's <code>viewIdResourceName</code> (resource-id) on Android:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Continue"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">next_step</span><span class="p">,</span> <span class="n">test_id</span><span class="o">=</span><span class="s2">"onboarding-continue"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Continue"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">next_step</span><span class="p">,</span> <span class="n">test_id</span><span class="o">=</span><span class="s2">"onboarding-continue"</span><span class="p">)</span>
 </span></code></pre></div>
+<h2 id="accessibility-settings-accessibilityinfo">Accessibility settings: <code>AccessibilityInfo</code><a class="headerlink" href="#accessibility-settings-accessibilityinfo" title="Permanent link">&para;</a></h2>
+<p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AccessibilityInfo&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.accessibility_info.AccessibilityInfo"><code>AccessibilityInfo</code></a> mirrors React
+Native's module of the same name over <code>UIAccessibility</code> on iOS and
+<code>AccessibilityManager</code> on Android. The two readers answer from state
+the OS already holds, so they are synchronous; <code>announce</code> and
+<code>set_accessibility_focus</code> hand a request to the OS and return at once:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">AccessibilityInfo</span><span class="o">.</span><span class="n">is_screen_reader_enabled</span><span class="p">()</span>   <span class="c1"># VoiceOver or TalkBack running</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">pn</span><span class="o">.</span><span class="n">AccessibilityInfo</span><span class="o">.</span><span class="n">is_reduce_motion_enabled</span><span class="p">()</span>   <span class="c1"># the system Reduce Motion setting</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">pn</span><span class="o">.</span><span class="n">AccessibilityInfo</span><span class="o">.</span><span class="n">announce</span><span class="p">(</span><span class="s2">"Message sent"</span><span class="p">)</span>     <span class="c1"># a no-op when no screen reader runs</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">pn</span><span class="o">.</span><span class="n">AccessibilityInfo</span><span class="o">.</span><span class="n">set_accessibility_focus</span><span class="p">(</span><span class="n">heading_ref</span><span class="p">)</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">unsubscribe</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">AccessibilityInfo</span><span class="o">.</span><span class="n">add_listener</span><span class="p">(</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">screen_reader</span><span class="p">,</span> <span class="n">e</span><span class="o">.</span><span class="n">reduce_motion</span><span class="p">))</span>
+</span></code></pre></div>
+<p>The listener receives an <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AccessibilityEvent&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.accessibility_info.AccessibilityEvent"><code>AccessibilityEvent</code></a>
+whenever either setting flips. Inside components, prefer the reactive
+hooks <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_screen_reader_enabled&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.accessibility_info.use_screen_reader_enabled"><code>use_screen_reader_enabled</code></a>
+and <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_reduce_motion&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.accessibility_info.use_reduce_motion"><code>use_reduce_motion</code></a>, which
+re-render when the setting changes:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Toast</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">reduce_motion</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_reduce_motion</span><span class="p">()</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">use_effect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">AccessibilityInfo</span><span class="o">.</span><span class="n">announce</span><span class="p">(</span><span class="n">message</span><span class="p">),</span> <span class="p">[</span><span class="n">message</span><span class="p">])</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>        <span class="n">message</span><span class="p">,</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>        <span class="n">style</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">style</span><span class="p">(</span><span class="n">opacity</span><span class="o">=</span><span class="mi">1</span> <span class="k">if</span> <span class="n">reduce_motion</span> <span class="k">else</span> <span class="mf">0.9</span><span class="p">),</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>        <span class="n">accessibility_live_region</span><span class="o">=</span><span class="s2">"polite"</span><span class="p">,</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>    <span class="p">)</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="k">def</span><span class="w"> </span><span class="nf">Chart</span><span class="p">(</span><span class="n">points</span><span class="p">):</span>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>    <span class="k">if</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_screen_reader_enabled</span><span class="p">():</span>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>        <span class="k">return</span> <span class="n">DataTable</span><span class="p">(</span><span class="n">points</span><span class="o">=</span><span class="n">points</span><span class="p">)</span>   <span class="c1"># a readable alternative to the drawing</span>
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Svg</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Text respects the user's text-size setting by default (iOS Dynamic
+Type, Android <code>sp</code>); pass <code>allow_font_scaling=False</code> on a <code>Text</code> that
+must keep its exact size, and read the multiplier with
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;get_font_scale&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-staticmethod&quot;&gt;&lt;code&gt;staticmethod&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.dimensions.PixelRatio.get_font_scale"><code>PixelRatio.get_font_scale</code></a>.</p>
+<h2 id="localization">Localization<a class="headerlink" href="#localization" title="Permanent link">&para;</a></h2>
+<p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Localization&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.localization.Localization"><code>Localization</code></a> reads the user's preferred
+languages and time zone; the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_locales&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.localization.use_locales"><code>use_locales</code></a>
+hook re-renders when they change. Each <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Locale&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.localization.Locale"><code>Locale</code></a>
+carries <code>language_tag</code>, <code>language_code</code>, <code>region_code</code>, and <code>is_rtl</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Greeting</span><span class="p">():</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">locale</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_locales</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">text</span> <span class="o">=</span> <span class="s2">"Hola"</span> <span class="k">if</span> <span class="n">locale</span><span class="o">.</span><span class="n">language_code</span> <span class="o">==</span> <span class="s2">"es"</span> <span class="k">else</span> <span class="s2">"Hello"</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">style</span><span class="p">(</span><span class="n">text_align</span><span class="o">=</span><span class="s2">"right"</span> <span class="k">if</span> <span class="n">locale</span><span class="o">.</span><span class="n">is_rtl</span> <span class="k">else</span> <span class="s2">"left"</span><span class="p">))</span>
+</span></code></pre></div>
+<p><code>Localization.get_timezone()</code> returns the IANA name
+(<code>"America/New_York"</code>) and <code>Localization.is_rtl()</code> answers for the
+preferred locale. The layout engine's <code>direction: "rtl"</code> style flips
+rows and resolves <code>margin_start</code> / <code>padding_end</code>; see
+<a href="../styling/">Styling</a>.</p>
 
 
 

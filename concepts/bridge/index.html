@@ -2103,6 +2103,8 @@
       
         
       
+        
+      
     
     
     
@@ -2249,6 +2251,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3516,7 +3546,10 @@ On iOS, the ctypes transport releases the GIL during this crossing. Native input
 is queued back to Python rather than waiting for a Python handler on the UI thread.</p>
 <p>A callback must never depend on a synchronous Python answer. Navigation back
 requests and recycled-row requests are asynchronous. Platforms cache restoration
-state as Python publishes it, so lifecycle saves don't wait for Python.
+state as Python publishes it, so the <code>save_state</code> and <code>restore_state</code> lifecycle
+callbacks are acknowledged without calling into Python. Viewport metrics
+(size, insets, keyboard height, color scheme, scale, and font scale) travel on
+the <code>layout</code> and <code>resume</code> host events.
 Adjacent continuous scroll and gesture samples can be coalesced. Discrete input
 preserves order. Animation input bindings evaluate before the sample is queued.</p>
 <h2 id="commits">Commits<a class="headerlink" href="#commits" title="Permanent link">&para;</a></h2>
@@ -3563,8 +3596,11 @@ preserves order. Animation input bindings evaluate before the sample is queued.<
 </tr>
 </tbody>
 </table>
-<p>The renderer validates the entire operation sequence before mutation: operation
-arity, live tags, insertion bounds, cycles, typed values, and finite geometry.
+<p>Python builds the wire operations once, validates them once against the
+generated contract, and serializes the envelope once per commit; there is no
+encode-decode-patch round trip. The renderer then validates the entire
+operation sequence before mutation: operation arity, live tags, insertion
+bounds, cycles, typed values, and finite geometry.
 An accepted commit returns <code>ok</code>, <code>application</code>, <code>surface</code>, and the exact
 <code>revision</code>, plus optional native timing metrics. Python advances its bookkeeping
 only after that acknowledgment. A rejection with <code>failed: false</code> reports
@@ -3575,7 +3611,10 @@ isn't a recovery strategy. The current app host uses one surface.</p>
 <h2 id="events-and-controlled-input">Events and controlled input<a class="headerlink" href="#events-and-controlled-input" title="Permanent link">&para;</a></h2>
 <p>Events carry <code>application</code>, <code>surface</code>, <code>revision</code>, <code>sequence</code>, and an <code>args</code> list.
 The backend rejects callbacks from earlier applications, destroyed tags, future
-revisions, and replayed sequences. A ref addresses a live native tag; commands
+revisions, and replayed sequences. Event payloads for <code>on_layout</code>, <code>on_scroll</code>,
+<code>on_selection_change</code>, <code>on_key_press</code>, and <code>on_content_size_change</code> are
+reconstructed into the frozen dataclasses in <code>pythonnative.components.events</code>
+before the callback runs. A ref's handle addresses a live native tag; commands
 against a destroyed tag raise an error.</p>
 <p>Text changes also carry an edit revision. Python echoes the latest revision it
 has processed with controlled <code>value</code> updates. A native input ignores older

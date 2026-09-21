@@ -2092,6 +2092,8 @@
       
         
       
+        
+      
     
     
     
@@ -2238,6 +2240,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3495,7 +3525,7 @@ Python object.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Protocol</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.sdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">element_factory</span><span class="p">,</span> <span class="n">register_component</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.sdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">define_component</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.sdk.schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModuleSchema</span><span class="p">,</span> <span class="n">NativeField</span><span class="p">,</span> <span class="n">register_schema</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
@@ -3516,9 +3546,8 @@ Python object.</p>
 </span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">records</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Record</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Record</span><span class="p">]:</span> <span class="o">...</span>
 </span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
 </span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="n">register_component</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Badge"</span><span class="p">,</span> <span class="n">props</span><span class="o">=</span><span class="n">BadgeProps</span><span class="p">)</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="n">Badge</span> <span class="o">=</span> <span class="n">define_component</span><span class="p">(</span><span class="s2">"Badge"</span><span class="p">,</span> <span class="n">BadgeProps</span><span class="p">)</span>
 </span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="n">register_schema</span><span class="p">(</span><span class="n">ModuleSchema</span><span class="o">.</span><span class="n">from_protocol</span><span class="p">(</span><span class="s2">"Tools"</span><span class="p">,</span> <span class="n">ToolsProtocol</span><span class="p">,</span> <span class="n">events</span><span class="o">=</span><span class="p">{</span><span class="s2">"prepared"</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Record</span><span class="p">]}))</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="n">Badge</span> <span class="o">=</span> <span class="n">element_factory</span><span class="p">(</span><span class="s2">"Badge"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Generate from an importable declaration module:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pn<span class="w"> </span>codegen<span class="w"> </span>--module<span class="w"> </span>my_package.contracts<span class="w"> </span>--output<span class="w"> </span>generated
@@ -3533,10 +3562,10 @@ Record field names must be Python identifiers; use a mapping for other JSON
 keys. Records reject missing required fields and unknown fields. Recursive type
 cycles aren't supported. Values marked <code>NativeField(python_only=True)</code> remain
 in Python; other unserializable values raise an error.</p>
-<p>Custom components accept <code>style=</code> through <code>element_factory</code>, even when the
-props dataclass doesn't declare a style field. Shared style fields are included
-in the generated native contract. Declare <code>platforms=("ios",)</code> on
-<code>register_component</code> or <code>native_component</code> for an iOS-only renderer; custom
+<p>Custom components accept <code>style=</code> through the factory <code>define_component</code>
+returns, even when the props dataclass doesn't declare a style field. Shared
+style fields are included in the generated native contract. Declare
+<code>platforms=("ios",)</code> on <code>define_component</code> for an iOS-only renderer; custom
 components default to iOS and Android support. A browser placeholder doesn't
 make <code>Platform.supports</code> return true.</p>
 <h2 id="implement-the-native-side">Implement the native side<a class="headerlink" href="#implement-the-native-side" title="Permanent link">&para;</a></h2>
@@ -3628,11 +3657,14 @@ contract. This checks declared support; a permission grant or attached piece of
 hardware is a separate runtime condition. Android remote push needs a provider
 extension and reports an unsupported operation instead of a successful empty
 token.</p>
-<p><code>Permissions.check()</code> is now a coroutine, matching asynchronous platform
+<p><code>Permissions.check()</code> is a coroutine, matching asynchronous platform
 settings APIs: use <code>await pn.Permissions.check("camera")</code>. Android camera
 editing (<code>allow_editing=True</code>) raises an unsupported-operation error; use
-a provider plugin if your application needs an Android image editor.</p>
-<p>Protocol 2 clients aren't supported. Rebuild the app after changing declarations,
+a provider plugin if your application needs an Android image editor.
+<code>Notifications.get_device_token()</code> raises
+<code>NativeModuleError("unsupported")</code> on Android, where remote push needs a
+provider extension.</p>
+<p>Only protocol 3 clients are supported. Rebuild the app after changing declarations,
 native sources, or native dependencies. Startup checks the exact contract
 fingerprint and Yoga version before mounting. Fast Refresh handles Python
 application changes within that compiled interface.</p>

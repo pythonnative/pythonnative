@@ -1987,6 +1987,8 @@
       
         
       
+        
+      
     
     
     
@@ -2133,6 +2135,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3652,10 +3682,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#tests-fail-with-runtimeerror-no-handler-registered-for-type" class="md-nav__link">
+  <a href="#tests-fail-with-runtimeerror-no-view-backend-is-available-off-device" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tests fail with RuntimeError: No handler registered for type ...
+        Tests fail with RuntimeError: No view backend is available off device
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtimeerror-too-many-re-renders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RuntimeError: Too many re-renders
       
     </span>
   </a>
@@ -4143,10 +4184,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#tests-fail-with-runtimeerror-no-handler-registered-for-type" class="md-nav__link">
+  <a href="#tests-fail-with-runtimeerror-no-view-backend-is-available-off-device" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tests fail with RuntimeError: No handler registered for type ...
+        Tests fail with RuntimeError: No view backend is available off device
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtimeerror-too-many-re-renders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RuntimeError: Too many re-renders
       
     </span>
   </a>
@@ -4384,10 +4436,20 @@ running <code>pn start</code>; the CLI warns about those on startup.</p>
 <p>A captured reference to the old version of a function survived the
 reload. Restart the app to clear <code>sys.modules</code>.</p>
 <h2 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h2>
-<h3 id="tests-fail-with-runtimeerror-no-handler-registered-for-type">Tests fail with <code>RuntimeError: No handler registered for type ...</code><a class="headerlink" href="#tests-fail-with-runtimeerror-no-handler-registered-for-type" title="Permanent link">&para;</a></h3>
-<p>Install the fake backend from the
-<a href="../../guides/testing/">Testing guide</a> before
-the first render. A session-scoped fixture is the easiest place.</p>
+<h3 id="tests-fail-with-runtimeerror-no-view-backend-is-available-off-device">Tests fail with <code>RuntimeError: No view backend is available off device</code><a class="headerlink" href="#tests-fail-with-runtimeerror-no-view-backend-is-available-off-device" title="Permanent link">&para;</a></h3>
+<p>Render through <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;render&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.render"><code>render</code></a>, which installs a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeBackend&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.FakeBackend"><code>FakeBackend</code></a>, or install one
+yourself with <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_backend&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.set_backend"><code>set_backend</code></a>
+before the first commit. If you disabled the shipped pytest plugin with
+<code>-p no:pythonnative</code>, the runtime is no longer reset between tests;
+re-enable it or reset it in your own fixture.</p>
+<h3 id="runtimeerror-too-many-re-renders"><code>RuntimeError: Too many re-renders</code><a class="headerlink" href="#runtimeerror-too-many-re-renders" title="Permanent link">&para;</a></h3>
+<p>A component kept re-dirtying itself for more than fifty passes in one
+flush: an effect that sets state unconditionally (give it a <code>deps</code>
+list), or a setter called during the component's own render (move it
+into an effect or a handler). The error names the component and is
+routed through the nearest <code>ErrorBoundary</code>; in dev mode the RedBox
+shows it.</p>
 <h3 id="mkdocs-build-strict-fails-on-pr-with-autorefs-warnings"><code>mkdocs build --strict</code> fails on PR with autorefs warnings<a class="headerlink" href="#mkdocs-build-strict-fails-on-pr-with-autorefs-warnings" title="Permanent link">&para;</a></h3>
 <p>Autorefs only resolves names that are actually documented. If you
 referenced <code>[</code>Foo<code>][pythonnative.Foo]</code> but <code>Foo</code> isn't exported (or

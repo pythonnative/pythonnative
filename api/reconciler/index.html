@@ -1989,6 +1989,8 @@
       
         
       
+        
+      
     
     
     
@@ -2136,6 +2138,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -2619,6 +2649,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.reconciler.core.MAX_RENDER_PASSES" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;MAX_RENDER_PASSES
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.reconciler.core.Reconciler" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2910,17 +2951,6 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;next_tag
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pythonnative.reconciler.vnode.shallow_equal_props" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;shallow_equal_props
       
     </span>
   </a>
@@ -3725,6 +3755,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.reconciler.core.MAX_RENDER_PASSES" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;MAX_RENDER_PASSES
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.reconciler.core.Reconciler" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4023,17 +4064,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pythonnative.reconciler.vnode.shallow_equal_props" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;shallow_equal_props
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#pythonnative.reconciler.vnode.normalize_children" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4126,8 +4156,12 @@
 mutations that bring the on-screen view tree in line with the new
 description. The reconciler is platform-agnostic; it talks to native
 widgets exclusively through a backend such as the
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NativeViewRegistry&lt;/span&gt;" href="../native_views/#pythonnative.native_views.NativeViewRegistry"><code>NativeViewRegistry</code></a> or
-the in-memory <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeBackend&lt;/span&gt;" href="../testing/#pythonnative.testing.FakeBackend"><code>FakeBackend</code></a>.</p>
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;BridgeBackend&lt;/span&gt;" href="../native_views/#pythonnative.native_views.bridge_backend.BridgeBackend"><code>BridgeBackend</code></a>
+or the in-memory <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeBackend&lt;/span&gt;" href="../testing/#pythonnative.testing.FakeBackend"><code>FakeBackend</code></a>.
+Renders are batched automatically (one flush per callback, effect, or
+task step), and a flush that re-schedules itself more than fifty times
+raises <code>RuntimeError("Too many re-renders")</code> through the nearest
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;ErrorBoundary&lt;/span&gt;" href="../components/#pythonnative.components.ErrorBoundary"><code>ErrorBoundary</code></a>.</p>
 
 
 <div class="doc doc-object doc-module">
@@ -4213,12 +4247,20 @@ Each pass runs the same phases in order:</p>
    list instead of being applied immediately.</li>
 <li><strong>Commit</strong>: the staged ops go to the backend in one batch, refs are
    populated, the layout pass runs (once a viewport is known), then
-   effects flush: <code>use_layout_effect</code> first, <code>use_effect</code> after.</li>
+   effects flush: <code>use_layout_effect</code> first, <code>use_effect</code> after. An
+   effect that raises is routed to the nearest <code>ErrorBoundary</code>, exactly
+   like a render-time exception.</li>
 </ol>
-<p>A render requested while a pass is in flight (an effect setting
-state, a boundary reset) is queued and drained before the call
-returns, bounded so runaway update loops surface as an error rather
-than a hang. Hosts never observe a half-committed tree.</p>
+<p>State setters never render inline. <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;request_render&lt;/span&gt;" href="#pythonnative.reconciler.core.Reconciler.request_render"><code>request_render</code></a>
+schedules one flush on the application loop with <code>call_soon</code>, so every
+setter call within one callback, effect, or task step coalesces into one
+pass on every host. A render requested while a pass is in flight (an
+effect setting state, a boundary reset) is drained before the pass
+returns, so hosts never observe a half-committed tree. A flush that keeps
+re-scheduling itself more than <code>MAX_RENDER_PASSES</code> times raises
+<code>RuntimeError("Too many re-renders")</code> from the component that keeps
+dirtying itself, routed through the nearest boundary like any render
+error.</p>
 <p>The class is assembled from mixins to keep each concern readable:
 this module holds the render/diff/commit pipeline,
 <code>boundaries</code> handles
@@ -4259,6 +4301,35 @@ this module holds the render/diff/commit pipeline,
 
 
 
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;MAX_RENDER_PASSES&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.reconciler.core.MAX_RENDER_PASSES&lt;/code&gt;)" href="#pythonnative.reconciler.core.MAX_RENDER_PASSES">MAX_RENDER_PASSES</a></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How many times one flush may re-schedule itself before it is a render storm.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
 
 <div class="doc doc-children">
 
@@ -4267,6 +4338,35 @@ this module holds the render/diff/commit pipeline,
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="pythonnative.reconciler.core.MAX_RENDER_PASSES" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">MAX_RENDER_PASSES</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#pythonnative.reconciler.core.MAX_RENDER_PASSES" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">MAX_RENDER_PASSES</span> <span class="o">=</span> <span class="mi">50</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>How many times one flush may re-schedule itself before it is a render storm.</p>
+<p>A component that sets state unconditionally in an effect, or a setter
+called on every render, keeps the tree dirty forever. After this many
+drain iterations inside one flush the reconciler raises
+<code>RuntimeError("Too many re-renders")</code> from the offending component
+and routes it through the nearest <code>ErrorBoundary</code>.</p>
+
+    </div>
+
+</div>
 
 
 
@@ -4311,10 +4411,10 @@ this module holds the render/diff/commit pipeline,
             </td>
             <td>
               <div class="doc-md-description">
-                <p>An object implementing the registry protocol
+                <p>An object implementing the backend protocol
 (<code>apply_mutations</code>, <code>resolve_view</code>, <code>measure_intrinsic</code>,
-<code>command</code>). PythonNative ships Android, iOS, and browser
-registries; tests use
+<code>command</code>). PythonNative ships the bridge backend for iOS,
+Android, and the browser preview; tests use
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeBackend&lt;/span&gt;" href="../testing/#pythonnative.testing.FakeBackend"><code>FakeBackend</code></a>.</p>
               </div>
             </td>
@@ -4354,10 +4454,12 @@ registries; tests use
             <td>
               <div class="doc-md-description">
                 <p>Optional callback hosts set to be told a
-re-render is wanted (to hop onto the UI thread or guard
-with a red box). When <code>None</code> the reconciler re-renders
-inline. Whatever the callback does, it should end up
-calling <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;flush_dirty&lt;/span&gt;" href="#pythonnative.reconciler.core.Reconciler.flush_dirty"><code>flush_dirty</code></a>.</p>
+flush is due (to hop onto the UI thread or guard with a red
+box). It runs on the application loop, one turn after the
+first state change that scheduled it. When <code>None</code> the
+reconciler calls <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;flush_dirty&lt;/span&gt;" href="#pythonnative.reconciler.core.Reconciler.flush_dirty"><code>flush_dirty</code></a>
+itself; whatever the callback does, it should end up calling
+<code>flush_dirty</code>.</p>
               </div>
             </td>
           </tr>
@@ -4485,7 +4587,7 @@ reconciler so screens never delay each other.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;request_render&lt;/span&gt; (&lt;code&gt;pythonnative.reconciler.core.Reconciler.request_render&lt;/code&gt;)" href="#pythonnative.reconciler.core.Reconciler.request_render">request_render</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Ask for a flush: via the host callback when set, inline otherwise.</p>
+                  <p>Schedule one flush on the application loop (automatic batching).</p>
                 </div>
               </td>
             </tr>
@@ -4797,7 +4899,11 @@ should not run its default behavior).</p>
 
     <div class="doc doc-contents ">
 
-        <p>Ask for a flush: via the host callback when set, inline otherwise.</p>
+        <p>Schedule one flush on the application loop (automatic batching).</p>
+<p>Never renders inline: every request made during one callback,
+effect, or task step lands in the same <code>call_soon</code> flush.
+Requests made while a pass is in flight are drained by that
+pass instead.</p>
 
 
     </div>
@@ -4962,14 +5068,6 @@ native layer.</p>
               <td>
                 <div class="doc-md-description">
                   <p>Allocate a fresh, process-unique view tag.</p>
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;shallow_equal_props&lt;/span&gt; (&lt;code&gt;pythonnative.reconciler.vnode.shallow_equal_props&lt;/code&gt;)" href="#pythonnative.reconciler.vnode.shallow_equal_props">shallow_equal_props</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  <p>Return whether two prop dicts are equal under shallow comparison.</p>
                 </div>
               </td>
             </tr>
@@ -5373,38 +5471,13 @@ entries in the reconciler's dirty set are skipped.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="pythonnative.reconciler.vnode.shallow_equal_props" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">shallow_equal_props</span>
-
-
-<a href="#pythonnative.reconciler.vnode.shallow_equal_props" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">shallow_equal_props</span><span class="p">(</span><span class="n">old</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#dict">dict</a></span><span class="p">,</span> <span class="n">new</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#dict">dict</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#bool">bool</a></span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Return whether two prop dicts are equal under shallow comparison.</p>
-<p>Used by <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;memo&lt;/span&gt;" href="../component/#pythonnative.component.memo"><code>memo</code></a> to skip re-rendering when none
-of a component's props changed identity. Callables only count as
-equal if they're the <em>same object</em>; fresh closures always invalidate
-the memo (matching React's behavior; pair with
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_callback&lt;/span&gt;" href="../hooks/#pythonnative.hooks.use_callback"><code>use_callback</code></a> when stability matters).</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h2 id="pythonnative.reconciler.vnode.normalize_children" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">normalize_children</span>
 
 
 <a href="#pythonnative.reconciler.vnode.normalize_children" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">normalize_children</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">children</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">,</span> <span class="n">owner</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span> <span class="o">=</span> <span class="s2">""</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">children</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">,</span> <span class="n">owner</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dynamic</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#bool">bool</a></span> <span class="o">=</span> <span class="kc">False</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.List&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.List">List</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
 
 
@@ -5424,6 +5497,74 @@ Keyed Fragments are preserved so they can participate in keyed
 reconciliation as a unit.</p>
 <p>Non-Element values other than the above are dropped with a
 dev-mode warning.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>children</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The value to normalize.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>owner</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Label of the element or component the children belong
+to, for diagnostics.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dynamic</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#bool">bool</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether <code>children</code> itself is a list a component
+returned (as opposed to a container's positional children).
+In dev mode, a dynamic list of two or more elements without
+keys is reported once per <code>owner</code>, as is any nested list
+found among positional children.</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -5650,7 +5791,7 @@ appear here.</p>
 <ul>
 <li>Read the high-level walkthrough in
   <a href="../../concepts/reconciliation/">Reconciliation</a>.</li>
-<li>See how native widgets are registered in <a href="../native_views/">Native views</a>.</li>
+<li>See the backend the reconciler commits to in <a href="../native_views/">Native views</a>.</li>
 </ul>
 
 

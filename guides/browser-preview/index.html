@@ -2153,6 +2153,8 @@
       
         
       
+        
+      
     
     
     
@@ -2299,6 +2301,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3702,7 +3732,16 @@ stack of screens in the page, the same way they drive
 screen remains a logical child of the application's shared tree;
 <code>navigate(...)</code> selects or adds a route, <code>go_back()</code> pops, and covered
 screens keep their state.
-Pushes and pops animate with a slide.</p>
+Pushes and pops animate with the screen's <code>animation</code> and
+<code>presentation</code> options.</p>
+<p>Each stack draws a navigation bar from the top screen's options, the way
+the native stacks do: <code>title</code>, <code>header_shown</code>, <code>header_large_title</code>,
+<code>header_back_visible</code>, <code>header_back_title</code>, <code>header_tint_color</code>,
+<code>header_style</code>, and <code>header_title_style</code>, with <code>header_left</code> and
+<code>header_right</code> rendered in the bar. The back button pops through the same
+path as an iOS swipe back, so a <code>before_remove</code> listener can veto it. A
+stack at the root of the app replaces the host's own bar, as it does on
+iOS.</p>
 <h3 id="dev-mode-and-errors">Dev mode and errors<a class="headerlink" href="#dev-mode-and-errors" title="Permanent link">&para;</a></h3>
 <p>The preview always runs with dev diagnostics on: unknown style keys and
 duplicate list keys print <code>[PN] WARN</code> messages, hook-order violations

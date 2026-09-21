@@ -1989,6 +1989,8 @@
       
         
       
+        
+      
     
     
     
@@ -2136,6 +2138,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -2998,6 +3028,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.platform_metrics.set_screen_dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;set_screen_dimensions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.platform_metrics.get_screen_dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;get_screen_dimensions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.platform_metrics.reset_screen_dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;reset_screen_dimensions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.platform_metrics.set_keyboard_height" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3614,6 +3677,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.platform_metrics.set_screen_dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;set_screen_dimensions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.platform_metrics.get_screen_dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;get_screen_dimensions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.platform_metrics.reset_screen_dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;reset_screen_dimensions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.platform_metrics.set_keyboard_height" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3704,14 +3800,15 @@
 <h1 id="platform-metrics">Platform metrics<a class="headerlink" href="#platform-metrics" title="Permanent link">&para;</a></h1>
 <p>A small process-wide store for values only the screen host can observe:
 safe-area insets, viewport size, and keyboard height. The host publishes
-them as the platform reports changes, and view handlers read them on
-demand instead of receiving them through every measurement call.
+them as the platform reports changes, and the <code>Dimensions</code>, <code>PixelRatio</code>,
+and <code>Keyboard</code> modules read them on demand.
 Everything here is in layout units, points on iOS and
 density-independent pixels on Android, so the values add directly to
 other layout-unit values without conversion. Most app code reaches this
 indirectly, through
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_safe_area_insets&lt;/span&gt;" href="../hooks/#pythonnative.hooks.use_safe_area_insets"><code>use_safe_area_insets</code></a> and
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_window_dimensions&lt;/span&gt;" href="../hooks/#pythonnative.hooks.use_window_dimensions"><code>use_window_dimensions</code></a>.</p>
+<p><a href="" id="pythonnative.platform_metrics"></a></p>
 
 
 <div class="doc doc-object doc-module">
@@ -3736,7 +3833,7 @@ that state to size themselves correctly:</p>
   of asking each native view for window metrics.</li>
 </ul>
 <p>Rather than threading those values through every
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;measure_intrinsic&lt;/span&gt;" href="../native_views/#pythonnative.native_views.base.ViewHandler.measure_intrinsic"><code>measure_intrinsic</code></a>
+the backend's intrinsic measurement
 call signature, the screen host writes them here and handlers read
 them on demand. Values are in <strong>dp on Android</strong> and <strong>pt on iOS</strong>,
 i.e., the same "layout units" the layout engine uses on each
@@ -3792,7 +3889,7 @@ get_safe_area_insets().bottom
             <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;WindowDimensions&lt;/span&gt; (&lt;code&gt;pythonnative.platform_metrics.WindowDimensions&lt;/code&gt;)" href="#pythonnative.platform_metrics.WindowDimensions">WindowDimensions</a></code></td>
             <td>
               <div class="doc-md-description">
-                <p>Viewport size in layout units (pt on iOS, dp on Android).</p>
+                <p>Viewport size in layout units (pt on iOS, dp on Android) plus its density.</p>
               </div>
             </td>
           </tr>
@@ -3855,7 +3952,7 @@ get_safe_area_insets().bottom
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;get_window_dimensions&lt;/span&gt; (&lt;code&gt;pythonnative.platform_metrics.get_window_dimensions&lt;/code&gt;)" href="#pythonnative.platform_metrics.get_window_dimensions">get_window_dimensions</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Return the current viewport size, or <code>(0, 0)</code> before first layout.</p>
+                  <p>Return the current viewport size, or <code>(0, 0, 1, 1)</code> before first layout.</p>
                 </div>
               </td>
             </tr>
@@ -3863,7 +3960,31 @@ get_safe_area_insets().bottom
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;reset_window_dimensions&lt;/span&gt; (&lt;code&gt;pythonnative.platform_metrics.reset_window_dimensions&lt;/code&gt;)" href="#pythonnative.platform_metrics.reset_window_dimensions">reset_window_dimensions</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Reset window dimensions back to <code>(0, 0)</code>. Intended for tests.</p>
+                  <p>Reset window dimensions back to <code>(0, 0, 1, 1)</code>. Intended for tests.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_screen_dimensions&lt;/span&gt; (&lt;code&gt;pythonnative.platform_metrics.set_screen_dimensions&lt;/code&gt;)" href="#pythonnative.platform_metrics.set_screen_dimensions">set_screen_dimensions</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Publish the physical screen size in layout units.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;get_screen_dimensions&lt;/span&gt; (&lt;code&gt;pythonnative.platform_metrics.get_screen_dimensions&lt;/code&gt;)" href="#pythonnative.platform_metrics.get_screen_dimensions">get_screen_dimensions</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Return the physical screen size, or the window size before a host publishes one.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;reset_screen_dimensions&lt;/span&gt; (&lt;code&gt;pythonnative.platform_metrics.reset_screen_dimensions&lt;/code&gt;)" href="#pythonnative.platform_metrics.reset_screen_dimensions">reset_screen_dimensions</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Reset screen dimensions back to <code>(0, 0, 1, 1)</code>. Intended for tests.</p>
                 </div>
               </td>
             </tr>
@@ -4045,7 +4166,68 @@ indicator.</p>
 
 
 
-        <p>Viewport size in layout units (pt on iOS, dp on Android).</p>
+        <p>Viewport size in layout units (pt on iOS, dp on Android) plus its density.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="pythonnative.platform_metrics.WindowDimensions.width">width</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Width in layout units.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="pythonnative.platform_metrics.WindowDimensions.height">height</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Height in layout units.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="pythonnative.platform_metrics.WindowDimensions.scale">scale</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Physical pixels per layout unit (<code>UIScreen.scale</code> /
+<code>DisplayMetrics.density</code> / <code>devicePixelRatio</code>); <code>1.0</code>
+until the host reports it.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="pythonnative.platform_metrics.WindowDimensions.font_scale">font_scale</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The user's text-size multiplier (Dynamic Type /
+<code>fontScale</code>); <code>1.0</code> until the host reports it.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 
@@ -4272,7 +4454,13 @@ instead.</p>
 
 
 <a href="#pythonnative.platform_metrics.set_window_dimensions" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_window_dimensions</span><span class="p">(</span><span class="n">width</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_window_dimensions</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">width</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">height</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">scale</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">font_scale</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -4280,8 +4468,89 @@ instead.</p>
         <p>Publish the viewport size in layout units.</p>
 <p>Called by the screen host on initial layout, rotation, and split-
 view changes. Notifies subscribers (and therefore re-renders
-components using <code>use_window_dimensions</code>) only when the size
+components using <code>use_window_dimensions</code>) only when a value
 actually changes.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>width</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Viewport width in layout units.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>height</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Viewport height in layout units.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>scale</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pixels per layout unit. <code>None</code> keeps the current value
+(<code>1.0</code> until a host reports one); <code>0</code> is treated as <code>1.0</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>font_scale</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Text-size multiplier. <code>None</code> keeps the current
+value; <code>0</code> is treated as <code>1.0</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -4301,7 +4570,7 @@ actually changes.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Return the current viewport size, or <code>(0, 0)</code> before first layout.</p>
+        <p>Return the current viewport size, or <code>(0, 0, 1, 1)</code> before first layout.</p>
 
 
     </div>
@@ -4321,7 +4590,157 @@ actually changes.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Reset window dimensions back to <code>(0, 0)</code>. Intended for tests.</p>
+        <p>Reset window dimensions back to <code>(0, 0, 1, 1)</code>. Intended for tests.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.platform_metrics.set_screen_dimensions" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">set_screen_dimensions</span>
+
+
+<a href="#pythonnative.platform_metrics.set_screen_dimensions" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_screen_dimensions</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">width</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">height</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">scale</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">font_scale</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Publish the physical screen size in layout units.</p>
+<p>The screen is the whole display (<code>UIScreen.main.bounds</code> /
+<code>DisplayMetrics</code>), as opposed to the window the app occupies in
+split view or with a keyboard showing. Hosts that can't tell the two
+apart publish the window size here. Notifies subscribers only when a
+value actually changes.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>width</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Screen width in layout units.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>height</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Screen height in layout units.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>scale</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pixels per layout unit; <code>None</code> keeps the current value.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>font_scale</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Text-size multiplier; <code>None</code> keeps the current value.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.platform_metrics.get_screen_dimensions" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">get_screen_dimensions</span>
+
+
+<a href="#pythonnative.platform_metrics.get_screen_dimensions" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_screen_dimensions</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;WindowDimensions&lt;/span&gt; (&lt;code&gt;pythonnative.platform_metrics.WindowDimensions&lt;/code&gt;)" href="#pythonnative.platform_metrics.WindowDimensions">WindowDimensions</a></span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the physical screen size, or the window size before a host publishes one.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.platform_metrics.reset_screen_dimensions" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">reset_screen_dimensions</span>
+
+
+<a href="#pythonnative.platform_metrics.reset_screen_dimensions" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">reset_screen_dimensions</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Reset screen dimensions back to <code>(0, 0, 1, 1)</code>. Intended for tests.</p>
 
 
     </div>
@@ -4426,7 +4845,7 @@ off device.</p>
 
 </div><h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
-<li>See the handlers that read these values in
+<li>See the backend that ships these values natively in
   <a href="../native_views/">Native views</a>.</li>
 <li>See the ops that position a view once it's measured in
   <a href="../mutations/">Mutation ops</a>.</li>

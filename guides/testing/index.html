@@ -1559,6 +1559,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#virtual-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Virtual time
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2214,6 +2225,8 @@
       
         
       
+        
+      
     
     
     
@@ -2360,6 +2373,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3560,6 +3601,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#virtual-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Virtual time
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3743,9 +3795,14 @@ Library-style queries to do it.</p>
 <li><strong>Reducers and helpers</strong>: pure functions; test them as you would any
   other Python code.</li>
 </ul>
-<p>What <em>not</em> to test (or to test sparingly): the platform handler
-implementations themselves. Those run only on the device and are
-covered by the Maestro E2E suite (<code>tests/e2e/</code>).</p>
+<p>What <em>not</em> to test (or to test sparingly): the Swift and Kotlin
+component managers themselves. Those run only on the device and are
+covered by their XCTest and JUnit suites and by the Maestro E2E suite
+(<code>tests/e2e/</code>).</p>
+<p>Installing <code>pythonnative</code> also installs a pytest plugin (registered
+under the <code>pytest11</code> entry point) that resets the framework runtime
+between tests and provides the <code>pn_clock</code> fixture, so no <code>conftest.py</code>
+is needed. Disable it with <code>-p no:pythonnative</code>.</p>
 <h2 id="rendering-a-component">Rendering a component<a class="headerlink" href="#rendering-a-component" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;render&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.render"><code>render</code></a> mounts an element and returns a
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RenderResult&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.RenderResult"><code>RenderResult</code></a>:</p>
@@ -3764,13 +3821,18 @@ covered by the Maestro E2E suite (<code>tests/e2e/</code>).</p>
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_counter_increments</span><span class="p">():</span>
 </span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">Counter</span><span class="p">())</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">result</span><span class="o">.</span><span class="n">press</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"+"</span><span class="p">))</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">result</span><span class="o">.</span><span class="n">press</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_by_role</span><span class="p">(</span><span class="s2">"button"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"+"</span><span class="p">))</span>
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Count: 1"</span><span class="p">)</span>
 </span></code></pre></div>
 <p><code>press</code> (and the general <code>fire(target, "on_event", *args)</code>) dispatch
 the event exactly as a native listener would, then settle: pending
 re-renders, effects, and async work run before the call returns, so
-the next line can assert on the new tree.</p>
+the next line can assert on the new tree. Like a real tap, <code>press</code>
+refuses a disabled target (<code>disabled=True</code>,
+<code>accessibility_state={"disabled": True}</code>, or a disabled <code>Pressable</code> or
+<code>Button</code> ancestor) with an <code>AssertionError</code>; pass <code>force=True</code> to
+dispatch anyway. <code>act(fn)</code> runs a plain callable (a state setter, an
+imperative handle call) and settles the same way.</p>
 <h3 id="queries">Queries<a class="headerlink" href="#queries" title="Permanent link">&para;</a></h3>
 <p>Queries mirror Testing Library:</p>
 <table>
@@ -3782,7 +3844,7 @@ the next line can assert on the new tree.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>get_by_text</code>, <code>get_by_test_id</code>, <code>get_by_label</code>, <code>get_by_type</code></td>
+<td><code>get_by_text</code>, <code>get_by_test_id</code>, <code>get_by_label</code>, <code>get_by_type</code>, <code>get_by_role</code>, <code>get_by_placeholder_text</code>, <code>get_by_display_value</code></td>
 <td>exactly one view, or raises <code>LookupError</code> with the tree dumped in the message</td>
 </tr>
 <tr>
@@ -3793,6 +3855,10 @@ the next line can assert on the new tree.</p>
 <td><code>get_all_by_*</code></td>
 <td>every match</td>
 </tr>
+<tr>
+<td><code>find_by_*</code></td>
+<td><code>get_by_*</code> wrapped in <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;wait_for&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.wait_for"><code>wait_for</code></a>: polls until the view appears</td>
+</tr>
 </tbody>
 </table>
 <p>Matchers are exact strings, compiled regexes, or predicates;
@@ -3800,13 +3866,87 @@ the next line can assert on the new tree.</p>
 <code>display: "none"</code> subtree (inactive tabs, screens beneath the top of a
 stack) are skipped unless you pass <code>hidden=True</code>, which is how you
 assert that a hidden screen kept its state.</p>
+<p><code>get_by_role(role, name=...)</code> matches the <code>accessibility_role</code> prop, or
+the type's implicit role when the prop is unset, optionally narrowed by
+the accessible name (the <code>accessibility_label</code>, else the visible text
+or title, else the text of descendants). The implicit roles come from
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;IMPLICIT_ROLES&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/testing/#pythonnative.testing.IMPLICIT_ROLES"><code>IMPLICIT_ROLES</code></a>:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Implicit role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Button</code>, <code>Pressable</code>, <code>Picker</code>, <code>DatePicker</code></td>
+<td><code>"button"</code></td>
+</tr>
+<tr>
+<td><code>Switch</code></td>
+<td><code>"switch"</code></td>
+</tr>
+<tr>
+<td><code>Checkbox</code></td>
+<td><code>"checkbox"</code></td>
+</tr>
+<tr>
+<td><code>TextInput</code></td>
+<td><code>"textbox"</code></td>
+</tr>
+<tr>
+<td><code>Image</code>, <code>ImageBackground</code></td>
+<td><code>"image"</code></td>
+</tr>
+<tr>
+<td><code>Slider</code></td>
+<td><code>"adjustable"</code></td>
+</tr>
+<tr>
+<td><code>ProgressBar</code></td>
+<td><code>"progressbar"</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>Text</code> has no implicit role; <code>pn.Text("Title", accessibility_role="header")</code>
+matches <code>get_by_role("header")</code> through the prop.</p>
 <p>Each match is a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeView&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.FakeView"><code>FakeView</code></a> with
-<code>type_name</code>, <code>props</code>, <code>children</code>, <code>parent</code>, <code>frame</code>, and <code>text</code>.
+<code>type_name</code>, <code>props</code>, <code>children</code>, <code>parent</code>, <code>frame</code>, <code>text</code>, <code>value</code>,
+and <code>placeholder</code>. <code>text</code> is the visible static text (<code>Text.text</code> or
+<code>Button.title</code>); a <code>TextInput</code>'s contents are exposed as <code>value</code> and
+<code>placeholder</code>, so <code>get_by_text</code> never matches a form field, while
+<code>get_by_display_value</code> and <code>get_by_placeholder_text</code> do.
 <code>result.text()</code> lists the visible strings in order, and
 <code>result.dump()</code> prints the tree when a test is confusing.</p>
+<p>Scope any query to one subtree with
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;within&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.within"><code>within</code></a>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render</span><span class="p">,</span> <span class="n">wait_for</span><span class="p">,</span> <span class="n">within</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_form</span><span class="p">(</span><span class="n">pn_clock</span><span class="p">):</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">r</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">Form</span><span class="p">())</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">r</span><span class="o">.</span><span class="n">change_text</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">get_by_placeholder_text</span><span class="p">(</span><span class="s2">"Email"</span><span class="p">),</span> <span class="s2">"a@b.c"</span><span class="p">)</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">r</span><span class="o">.</span><span class="n">press</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">get_by_role</span><span class="p">(</span><span class="s2">"button"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"Save"</span><span class="p">))</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">pn_clock</span><span class="o">.</span><span class="n">advance</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span>                     <span class="c1"># timers fire, no real sleep</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="k">assert</span> <span class="n">wait_for</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">query_by_text</span><span class="p">(</span><span class="s2">"Saved"</span><span class="p">))</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">card</span> <span class="o">=</span> <span class="n">within</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">get_by_test_id</span><span class="p">(</span><span class="s2">"summary"</span><span class="p">))</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="k">assert</span> <span class="n">card</span><span class="o">.</span><span class="n">get_by_display_value</span><span class="p">(</span><span class="s2">"a@b.c"</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>wait_for(predicate, timeout=1.0, interval=0.01)</code> polls <code>predicate</code>
+while draining the framework loop; a <code>LookupError</code> or <code>AssertionError</code>
+raised by the predicate counts as "not yet", so both <code>get_by_*</code> and
+<code>query_by_*</code> work inside it.</p>
 <h3 id="other-helpers">Other helpers<a class="headerlink" href="#other-helpers" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>change_text(input, "value")</code> fires <code>on_change_text</code>.</li>
+<li><code>change_text(input, "value")</code> fires <code>on_change</code> on a <code>TextInput</code>.</li>
+<li><code>press(target, force=False)</code> fires <code>on_press</code>; <code>act(fn)</code> runs any
+  callable and settles.</li>
 <li><code>back()</code> simulates the system back action and returns whether a
   handler consumed it.</li>
 <li><code>rerender(element)</code> reconciles new root props from outside the tree.</li>
@@ -3814,48 +3954,69 @@ assert that a hidden screen kept its state.</p>
 <li><code>unmount()</code> tears down and runs effect cleanups; <code>RenderResult</code> is
   also a context manager.</li>
 </ul>
+<h3 id="virtual-time">Virtual time<a class="headerlink" href="#virtual-time" title="Permanent link">&para;</a></h3>
+<p>Timers (<code>asyncio.sleep</code>, <code>call_later</code>, <code>asyncio.timeout</code>) on the
+framework loop can run on virtual time. The <code>pn_clock</code> fixture from the
+shipped pytest plugin installs a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeClock&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.FakeClock"><code>FakeClock</code></a>;
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;fake_clock&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.fake_clock"><code>fake_clock</code></a> is the context-manager
+form for code outside pytest:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">fake_clock</span><span class="p">,</span> <span class="n">render</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_toast_disappears</span><span class="p">():</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">with</span> <span class="n">fake_clock</span><span class="p">()</span> <span class="k">as</span> <span class="n">clock</span><span class="p">:</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">Toast</span><span class="p">())</span>          <span class="c1"># hides itself after asyncio.sleep(3)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">query_by_text</span><span class="p">(</span><span class="s2">"Saved"</span><span class="p">)</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="n">clock</span><span class="o">.</span><span class="n">advance</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span>                <span class="c1"># timers fire, no real sleep</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">query_by_text</span><span class="p">(</span><span class="s2">"Saved"</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span>
+</span></code></pre></div>
+<p>The clock patches the loop's <code>time()</code> rather than <code>asyncio.sleep</code>, so
+the framework's own timers (transitions, animations, debounced hooks)
+advance together with the app's. <code>advance()</code> steps timer by timer, so
+a re-arming timer fires the right number of times.</p>
 <h2 id="testing-hooks-in-isolation">Testing hooks in isolation<a class="headerlink" href="#testing-hooks-in-isolation" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render_hook</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">use_toggle</span><span class="p">(</span><span class="n">initial</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">on</span><span class="p">,</span> <span class="n">set_on</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="n">initial</span><span class="p">)</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="k">return</span> <span class="n">on</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="n">set_on</span><span class="p">(</span><span class="ow">not</span> <span class="n">on</span><span class="p">)</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_use_toggle</span><span class="p">():</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">hook</span> <span class="o">=</span> <span class="n">render_hook</span><span class="p">(</span><span class="n">use_toggle</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="k">assert</span> <span class="n">hook</span><span class="o">.</span><span class="n">current</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">True</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">hook</span><span class="o">.</span><span class="n">act</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">hook</span><span class="o">.</span><span class="n">current</span><span class="p">[</span><span class="mi">1</span><span class="p">]())</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="k">assert</span> <span class="n">hook</span><span class="o">.</span><span class="n">current</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">False</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="k">assert</span> <span class="n">hook</span><span class="o">.</span><span class="n">render_count</span> <span class="o">==</span> <span class="mi">2</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render_hook</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">use_toggle</span><span class="p">(</span><span class="n">initial</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">on</span><span class="p">,</span> <span class="n">set_on</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="n">initial</span><span class="p">)</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="k">return</span> <span class="n">on</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="n">set_on</span><span class="p">(</span><span class="ow">not</span> <span class="n">on</span><span class="p">)</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_use_toggle</span><span class="p">():</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">hook</span> <span class="o">=</span> <span class="n">render_hook</span><span class="p">(</span><span class="n">use_toggle</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="k">assert</span> <span class="n">hook</span><span class="o">.</span><span class="n">current</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">True</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">hook</span><span class="o">.</span><span class="n">act</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">hook</span><span class="o">.</span><span class="n">current</span><span class="p">[</span><span class="mi">1</span><span class="p">]())</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="k">assert</span> <span class="n">hook</span><span class="o">.</span><span class="n">current</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">False</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    <span class="k">assert</span> <span class="n">hook</span><span class="o">.</span><span class="n">render_count</span> <span class="o">==</span> <span class="mi">2</span>
 </span></code></pre></div>
 <p><code>hook.rerender(*args, **kwargs)</code> re-renders with new arguments, which
 is how you test hooks that react to prop changes.</p>
 <h2 id="testing-navigation">Testing navigation<a class="headerlink" href="#testing-navigation" title="Permanent link">&para;</a></h2>
-<p>Navigators render in Python when no host is present, so a whole flow
-fits in one test:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_home_to_detail_and_back</span><span class="p">():</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">App</span><span class="p">())</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">result</span><span class="o">.</span><span class="n">press</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Open item 42"</span><span class="p">))</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Detail #42"</span><span class="p">)</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">back</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">True</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Home"</span><span class="p">)</span>
+<p>Navigators draw their own header when no native host is present, so a
+whole flow fits in one test:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_home_to_detail_and_back</span><span class="p">():</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">App</span><span class="p">())</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">result</span><span class="o">.</span><span class="n">press</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Open item 42"</span><span class="p">))</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Detail #42"</span><span class="p">)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">back</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">True</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Home"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>To test what a root stack asks the <em>platform</em> to do, render under a
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeHost&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.FakeHost"><code>FakeHost</code></a>. It records <code>pushed</code>,
 <code>popped</code>, <code>replaced</code>, <code>resets</code>, and <code>options</code>, exposes the latest
 <code>title</code>, and lets you simulate focus changes with <code>set_focused</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeHost</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_detail_pushes_native_screen</span><span class="p">():</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">host</span> <span class="o">=</span> <span class="n">FakeHost</span><span class="p">()</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">App</span><span class="p">(),</span> <span class="n">host</span><span class="o">=</span><span class="n">host</span><span class="p">)</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">result</span><span class="o">.</span><span class="n">press</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Open item 42"</span><span class="p">))</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">state</span><span class="p">,</span> <span class="n">options</span> <span class="o">=</span> <span class="n">host</span><span class="o">.</span><span class="n">pushed</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="k">assert</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">state</span><span class="p">[</span><span class="s2">"routes"</span><span class="p">]]</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"Home"</span><span class="p">,</span> <span class="s2">"Detail"</span><span class="p">]</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="k">assert</span> <span class="n">options</span><span class="p">[</span><span class="s2">"title"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"Item 42"</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeHost</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_detail_pushes_native_screen</span><span class="p">():</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">host</span> <span class="o">=</span> <span class="n">FakeHost</span><span class="p">()</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">App</span><span class="p">(),</span> <span class="n">host</span><span class="o">=</span><span class="n">host</span><span class="p">)</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">result</span><span class="o">.</span><span class="n">press</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_by_text</span><span class="p">(</span><span class="s2">"Open item 42"</span><span class="p">))</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">state</span><span class="p">,</span> <span class="n">options</span> <span class="o">=</span> <span class="n">host</span><span class="o">.</span><span class="n">pushed</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="k">assert</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">state</span><span class="p">[</span><span class="s2">"routes"</span><span class="p">]]</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"Home"</span><span class="p">,</span> <span class="s2">"Detail"</span><span class="p">]</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="k">assert</span> <span class="n">options</span><span class="p">[</span><span class="s2">"title"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"Item 42"</span>
 </span></code></pre></div>
 <p>Booting a screen "mid-stack" the way a pushed native screen does is
 <code>FakeHost(initial_state=state.to_dict())</code>.</p>
@@ -3866,17 +4027,17 @@ reproduce platform fonts or control metrics. Rendered views carry their
 computed <code>frame</code> (<code>x, y, width, height</code>) once
 <code>render</code> runs the layout pass for the default 390x844 viewport (pass
 <code>viewport=(w, h)</code> to change it, or <code>viewport=None</code> to skip layout):</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_row_distributes_flex_children</span><span class="p">():</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">test_id</span><span class="o">=</span><span class="s2">"a"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">50</span><span class="p">}),</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">test_id</span><span class="o">=</span><span class="s2">"b"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">50</span><span class="p">}),</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">310</span><span class="p">,</span> <span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">10</span><span class="p">},</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="p">)</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="p">)</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_test_id</span><span class="p">(</span><span class="s2">"a"</span><span class="p">),</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_test_id</span><span class="p">(</span><span class="s2">"b"</span><span class="p">)</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="k">assert</span> <span class="n">a</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">pytest</span><span class="o">.</span><span class="n">approx</span><span class="p">((</span><span class="mi">310</span> <span class="o">-</span> <span class="mi">10</span><span class="p">)</span> <span class="o">/</span> <span class="mi">3</span><span class="p">)</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="k">assert</span> <span class="n">b</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">pytest</span><span class="o">.</span><span class="n">approx</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="mi">10</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_row_distributes_flex_children</span><span class="p">():</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">test_id</span><span class="o">=</span><span class="s2">"a"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">50</span><span class="p">}),</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">test_id</span><span class="o">=</span><span class="s2">"b"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">50</span><span class="p">}),</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">310</span><span class="p">,</span> <span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">10</span><span class="p">},</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>        <span class="p">)</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="p">)</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_test_id</span><span class="p">(</span><span class="s2">"a"</span><span class="p">),</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_test_id</span><span class="p">(</span><span class="s2">"b"</span><span class="p">)</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="k">assert</span> <span class="n">a</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">pytest</span><span class="o">.</span><span class="n">approx</span><span class="p">((</span><span class="mi">310</span> <span class="o">-</span> <span class="mi">10</span><span class="p">)</span> <span class="o">/</span> <span class="mi">3</span><span class="p">)</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="k">assert</span> <span class="n">b</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">pytest</span><span class="o">.</span><span class="n">approx</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="mi">10</span><span class="p">)</span>
 </span></code></pre></div>
 <p>For the engine alone, build <code>LayoutNode</code> trees and call
 <code>calculate_layout</code> directly (see
@@ -3887,15 +4048,15 @@ implementation, so <code>pn.Clipboard</code>, <code>pn.SecureStore</code>, <code
 and friends work in <code>pytest</code> with in-memory state. To control what a
 module answers, register your own implementation under the module's
 name before the component under test runs:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.native_modules.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">emit</span><span class="p">,</span> <span class="n">register_python_module</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">FakeLocation</span><span class="p">:</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_current</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">options</span><span class="p">):</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">"latitude"</span><span class="p">:</span> <span class="mf">59.91</span><span class="p">,</span> <span class="s2">"longitude"</span><span class="p">:</span> <span class="mf">10.75</span><span class="p">}</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">register_python_module</span><span class="p">(</span><span class="s2">"Location"</span><span class="p">,</span> <span class="n">FakeLocation</span><span class="p">())</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.native_modules.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">emit</span><span class="p">,</span> <span class="n">register_python_module</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">FakeLocation</span><span class="p">:</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_current</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">options</span><span class="p">):</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">"latitude"</span><span class="p">:</span> <span class="mf">59.91</span><span class="p">,</span> <span class="s2">"longitude"</span><span class="p">:</span> <span class="mf">10.75</span><span class="p">}</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="n">register_python_module</span><span class="p">(</span><span class="s2">"Location"</span><span class="p">,</span> <span class="n">FakeLocation</span><span class="p">())</span>
 </span></code></pre></div>
 <p>Methods are matched by name and receive the keyword arguments the
 facade passed. Module events (<code>AppState</code> changes, <code>NetInfo</code> updates,
@@ -3922,11 +4083,11 @@ events, module results, and host lifecycle from the "native" side.
 style.</p>
 <h2 id="testing-native-code">Testing native code<a class="headerlink" href="#testing-native-code" title="Permanent link">&para;</a></h2>
 <p>The Swift and Kotlin halves have their own suites next to the code:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">cd</span><span class="w"> </span>src/pythonnative/native/ios
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>xcodebuild<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-project<span class="w"> </span>Tests/NativeTests.xcodeproj<span class="w"> </span>-scheme<span class="w"> </span>NativeTests<span class="w"> </span>-destination<span class="w"> </span><span class="s1">'platform=iOS Simulator,name=iPhone 15 Pro'</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nb">cd</span><span class="w"> </span>src/pythonnative/templates/android_template
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>./gradlew<span class="w"> </span>:pythonnative:testDebugUnitTest
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nb">cd</span><span class="w"> </span>src/pythonnative/native/ios
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>xcodebuild<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-project<span class="w"> </span>Tests/NativeTests.xcodeproj<span class="w"> </span>-scheme<span class="w"> </span>NativeTests<span class="w"> </span>-destination<span class="w"> </span><span class="s1">'platform=iOS Simulator,name=iPhone 15 Pro'</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="nb">cd</span><span class="w"> </span>src/pythonnative/templates/android_template
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>./gradlew<span class="w"> </span>:pythonnative:testDebugUnitTest
 </span></code></pre></div>
 <p>Both drive component managers and modules with decoded transactions and
 promise envelopes, so a wire-format change is caught on every side. Add
@@ -3956,18 +4117,18 @@ See <a href="../async/#testing-async-code">Testing async code</a>.</p>
 assert on the <em>mutations</em> themselves (how many <code>InsertOp</code>s a reorder
 produced, which props an <code>UpdateOp</code> changed) can pass their own
 backend and read <code>backend.ops</code>, or construct the reconciler directly:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.reconciler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reconciler</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeBackend</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">FakeBackend</span><span class="p">()</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">rec</span> <span class="o">=</span> <span class="n">Reconciler</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">rec</span><span class="o">.</span><span class="n">mount</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"hi"</span><span class="p">))</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="k">assert</span> <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">op</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">backend</span><span class="o">.</span><span class="n">ops</span><span class="p">]</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"CreateOp"</span><span class="p">]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.reconciler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reconciler</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeBackend</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">FakeBackend</span><span class="p">()</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">rec</span> <span class="o">=</span> <span class="n">Reconciler</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">rec</span><span class="o">.</span><span class="n">mount</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"hi"</span><span class="p">))</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="k">assert</span> <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">op</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">backend</span><span class="o">.</span><span class="n">ops</span><span class="p">]</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"CreateOp"</span><span class="p">]</span>
 </span></code></pre></div>
 <h2 id="running-the-suite">Running the suite<a class="headerlink" href="#running-the-suite" title="Permanent link">&para;</a></h2>
 <p>PythonNative uses <code>pytest</code> plus the standard CI matrix (Ruff, Black,
 MyPy). Run them all locally before pushing:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>./scripts/check.sh
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>./scripts/check.sh
 </span></code></pre></div>
 <p>The same commands run in CI on every push and pull request.</p>
 <p>Two optional suites need the network and are skipped by default:</p>

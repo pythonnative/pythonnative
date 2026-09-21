@@ -2125,6 +2125,8 @@
       
         
       
+        
+      
     
     
     
@@ -2271,6 +2273,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3610,25 +3640,27 @@ exception <em>and</em> a <code>reset</code> function:</p>
 <h2 id="what-gets-caught">What gets caught<a class="headerlink" href="#what-gets-caught" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Exceptions raised inside a child <code>@component</code> function during
-  render.</li>
-<li>Exceptions raised inside a child
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a>'s
-  <code>create</code> or <code>update</code> while the boundary is reconciling
-  that subtree.</li>
+  render, including the synchronous part of an <code>async def</code> body.</li>
+<li>Exceptions raised by a child's
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_layout_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_layout_effect"><code>use_layout_effect</code></a> or
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a> callback (the synchronous
+  body, or the cleanup it returned). The reconciler routes them to the
+  nearest boundary exactly like render errors; a failing effect never
+  fails the native surface.</li>
+<li><code>RuntimeError("Too many re-renders")</code>, raised from a component that
+  keeps re-dirtying itself for more than fifty passes.</li>
 </ul>
 <h2 id="what-doesnt-get-caught">What doesn't get caught<a class="headerlink" href="#what-doesnt-get-caught" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Exceptions inside <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a> callbacks
-  (effects run <em>after</em> commit, so the boundary has already reported
-  success). Wrap the callback body in <code>try/except</code> and surface the
-  error via <code>set_state</code>. In dev mode these errors show the RedBox
+<li>Exceptions raised <em>inside an async task</em> after its first <code>await</code>:
+  an <code>async def</code> effect that fails later, or a coroutine started with
+  <code>pn.run_async</code>. Catch them at the boundary of the task, or surface
+  the error via <code>set_state</code>. In dev mode these errors show the RedBox
   overlay instead of vanishing.</li>
-<li>Exceptions in event handlers (<code>on_press</code>, <code>on_change</code>). Same
-  reasoning: handlers fire later, on user interaction. Use
-  <code>try/except</code> inside the handler. Dev mode routes these to the
-  RedBox too.</li>
-<li>Exceptions raised from threads or async tasks scheduled by your
-  code. Catch them at the boundary of the task.</li>
+<li>Exceptions in event handlers (<code>on_press</code>, <code>on_change</code>). Handlers
+  fire later, on user interaction. Use <code>try/except</code> inside the
+  handler. Dev mode routes these to the RedBox too.</li>
+<li>Exceptions raised from threads you start yourself.</li>
 </ul>
 <h2 id="recovery">Recovery<a class="headerlink" href="#recovery" title="Permanent link">&para;</a></h2>
 <p>Once a boundary shows its fallback, the subtree stays in the fallback

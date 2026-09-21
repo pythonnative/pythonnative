@@ -2103,6 +2103,8 @@
       
         
       
+        
+      
     
     
     
@@ -2249,6 +2251,34 @@
     
   
     Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/handles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handles
   
 
     
@@ -3521,7 +3551,8 @@ runtime, however, is meaningfully different.</p>
   the tree.</li>
 <li>Hooks (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_state&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_state"><code>use_state</code></a>,
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a>, etc.) drive re-renders.
-  State updates are batched per render pass.</li>
+  State updates are batched automatically: every setter call in one
+  callback, effect, or task step produces one render pass.</li>
 <li>Re-rendering produces a new tree; the reconciler diffs it against
   the previous one and applies the smallest set of native mutations.</li>
 <li>Native widgets are created and updated by Swift and Kotlin
@@ -3543,15 +3574,16 @@ runtime, however, is meaningfully different.</p>
 <li><strong>Render</strong>: component functions run; hooks record state reads,
    queue effects, register memos. No native widgets change yet.</li>
 <li><strong>Commit</strong>: the reconciler applies the diff to native views,
-   creating, updating, and removing widgets through the registered
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a>
-   implementations.</li>
+   creating, updating, and removing widgets through one serialized
+   transaction that the Swift and Kotlin component managers apply.</li>
 <li><strong>Effect</strong>: pending <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a>
    callbacks fire in depth-first order; cleanups from the previous
    render run before the new callbacks.</li>
 </ol>
-<p>If an effect sets state, the loop kicks off again (with a safety cap
-that prevents render storms).</p>
+<p>If an effect sets state, the loop kicks off again. A component that
+keeps dirtying itself for more than fifty passes raises
+<code>RuntimeError("Too many re-renders")</code>, routed through the nearest
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;ErrorBoundary&lt;/span&gt;" href="../../api/components/#pythonnative.components.ErrorBoundary"><code>ErrorBoundary</code></a> like any render error.</p>
 <h2 id="how-pythonnative-differs-from-react-native">How PythonNative differs from React Native<a class="headerlink" href="#how-pythonnative-differs-from-react-native" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3635,8 +3667,10 @@ belong in <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-
 <div class="admonition tip">
 <p class="admonition-title">Native widgets are real</p>
 <p>A <code>pn.Text</code> becomes a <code>UILabel</code> or a <code>TextView</code>. Anything you can
-do to those in their respective SDKs, you can usually do via a
-custom <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewHandler&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.base.ViewHandler"><code>ViewHandler</code></a>.</p>
+do to those in their respective SDKs, you can usually do with a
+<a href="../../guides/custom-native-components/">custom native component</a>:
+a Swift and a Kotlin manager plus a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;define_component&lt;/span&gt;" href="../../api/sdk/#pythonnative.sdk.define_component"><code>define_component</code></a> call.</p>
 </div>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
