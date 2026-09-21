@@ -50,8 +50,21 @@ def test_serialize_gestures_emits_config_and_routers() -> None:
         ]
     )
     assert specs == [
-        {"kind": "tap", "n_taps": 1, "max_distance": 12.0, "simultaneous": [1], "wait_for": []},
-        {"kind": "pan", "min_distance": 4.0, "min_pointers": 1, "simultaneous": [0], "wait_for": []},
+        {"kind": "tap", "enabled": True, "n_taps": 1, "max_distance": 12.0, "simultaneous": [1], "wait_for": []},
+        {
+            "kind": "pan",
+            "enabled": True,
+            "min_distance": 4.0,
+            "min_pointers": 1,
+            "max_pointers": None,
+            "active_offset_x": None,
+            "active_offset_y": None,
+            "fail_offset_x": None,
+            "fail_offset_y": None,
+            "min_velocity": None,
+            "simultaneous": [0],
+            "wait_for": [],
+        },
     ]
     assert set(events) == {"gesture:0", "gesture:1"}
 
@@ -63,6 +76,43 @@ def test_serialize_passes_plain_dicts_through() -> None:
     specs, events = serialize_gestures([{"kind": "tap", "n_taps": 3}])
     assert specs == [{"kind": "tap", "n_taps": 3, "simultaneous": [], "wait_for": []}]
     assert events == {}
+
+
+def test_disabled_descriptor_serializes_enabled_false() -> None:
+    specs, events = serialize_gestures([Tap(enabled=False), Pan()])
+    assert specs[0]["enabled"] is False
+    assert specs[1]["enabled"] is True
+    # Indices stay stable so the native side can keep its recognizer list aligned.
+    assert set(events) == {"gesture:0", "gesture:1"}
+    # A disabled gesture takes part in no relationship.
+    assert specs[0]["simultaneous"] == []
+    assert specs[1]["simultaneous"] == []
+
+
+def test_swipe_direction_none_means_any_on_the_wire() -> None:
+    from pythonnative.gestures import Fling, Swipe
+
+    assert Swipe()._config()["direction"] == "any"
+    assert Swipe(direction="left")._config()["direction"] == "left"
+    assert Fling(direction="down")._config()["direction"] == "down"
+    with pytest.raises(ValueError):
+        Swipe(direction="any")  # type: ignore[arg-type]
+    with pytest.raises(ValueError):
+        Fling(direction="sideways")  # type: ignore[arg-type]
+
+
+def test_gesture_event_carries_absolute_position() -> None:
+    from pythonnative.gestures import event_from_payload
+
+    event = event_from_payload(
+        {"kind": "tap", "state": "ended", "x": 4.0, "y": 5.0, "absolute_x": 104.0, "absolute_y": 205.0}
+    )
+    assert (event.x, event.y) == (4.0, 5.0)
+    assert (event.absolute_x, event.absolute_y) == (104.0, 205.0)
+    # Defaults keep older payloads valid.
+    plain = event_from_payload({"kind": "tap", "state": "ended"})
+    assert (plain.absolute_x, plain.absolute_y) == (0.0, 0.0)
+    assert plain.direction is None
 
 
 def test_router_drops_unknown_payload_keys() -> None:
@@ -87,6 +137,31 @@ def test_arbiter_emits_plain_string_states() -> None:
     arbiter.pointer_down(0, 10.0, 10.0, 0.0)
     arbiter.pointer_up(0, 10.0, 10.0, 0.05)
     assert emitted and all(type(p["state"]) is str for _i, p in emitted)
+
+
+def test_arbiter_stamps_window_coordinates_on_positioned_payloads() -> None:
+    arbiter, emitted = _arbiter({"kind": "tap"})
+    # The view sits at (100, 200) in the window.
+    arbiter.pointer_down(0, 10.0, 10.0, 0.0, absolute_x=110.0, absolute_y=210.0)
+    arbiter.pointer_up(0, 12.0, 11.0, 0.05, absolute_x=112.0, absolute_y=211.0)
+    payload = emitted[-1][1]
+    assert (payload["x"], payload["y"]) == (12.0, 11.0)
+    assert (payload["absolute_x"], payload["absolute_y"]) == (112.0, 211.0)
+
+
+def test_arbiter_absolute_defaults_to_view_coordinates() -> None:
+    arbiter, emitted = _arbiter({"kind": "tap"})
+    arbiter.pointer_down(0, 10.0, 10.0, 0.0)
+    arbiter.pointer_up(0, 10.0, 10.0, 0.05)
+    payload = emitted[-1][1]
+    assert (payload["absolute_x"], payload["absolute_y"]) == (10.0, 10.0)
+
+
+def test_disabled_gesture_never_recognizes() -> None:
+    arbiter, emitted = _arbiter({"kind": "tap", "enabled": False}, {"kind": "tap"})
+    arbiter.pointer_down(0, 10.0, 10.0, 0.0)
+    arbiter.pointer_up(0, 10.0, 10.0, 0.05)
+    assert [i for i, _p in emitted] == [1]
 
 
 def test_descriptor_callback_routing_by_state() -> None:
@@ -346,7 +421,7 @@ def test_gesture_events_route_through_view_tag() -> None:
     # The native payload received serialized specs (no closures).
     view = backend.views[tag]
     assert view.props["gestures"] == [
-        {"kind": "tap", "n_taps": 1, "max_distance": 12.0, "simultaneous": [], "wait_for": []}
+        {"kind": "tap", "enabled": True, "n_taps": 1, "max_distance": 12.0, "simultaneous": [], "wait_for": []}
     ]
 
     # A handler-side arbiter (as the browser preview runs) feeds dispatch_event.

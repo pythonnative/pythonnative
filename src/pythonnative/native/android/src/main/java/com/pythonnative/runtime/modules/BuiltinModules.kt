@@ -29,6 +29,9 @@ object BuiltinModules {
     val biometrics = BiometricsModule()
     val assets = AssetsModule()
     val images = ImagesModule()
+    val keyboard = KeyboardModule()
+    val accessibilityInfo = AccessibilityInfoModule()
+    val localization = LocalizationModule()
 
     private val all: List<NativeModule> = listOf(
         host,
@@ -50,6 +53,10 @@ object BuiltinModules {
         com.pythonnative.generated.BiometricsModuleAdapter(biometrics),
         com.pythonnative.generated.AssetsModuleAdapter(assets),
         com.pythonnative.generated.ImagesModuleAdapter(images),
+        com.pythonnative.generated.WebViewsModuleAdapter(com.pythonnative.runtime.components.WebViewsModule()),
+        com.pythonnative.generated.KeyboardModuleAdapter(keyboard),
+        com.pythonnative.generated.AccessibilityInfoModuleAdapter(accessibilityInfo),
+        com.pythonnative.generated.LocalizationModuleAdapter(localization),
     )
 
     fun register(registry: PNRegistry) {
@@ -61,6 +68,10 @@ object BuiltinModules {
         com.pythonnative.runtime.assets.PNAssets.attach(activity)
         battery.attach(activity)
         netInfo.attach(activity)
+        com.pythonnative.runtime.screens.PNKeyboard.attach(activity)
+        keyboard.attach()
+        accessibilityInfo.attach(activity)
+        localization.attach(activity)
         activity.intent?.dataString?.let { linking.onDeepLink(it) }
     }
 
@@ -89,5 +100,9 @@ object BuiltinModules {
     fun onActivityDestroyed(activity: Activity) {
         battery.detach(activity)
         netInfo.detach(activity)
+        com.pythonnative.runtime.screens.PNKeyboard.detach(activity)
+        keyboard.detach()
+        accessibilityInfo.detach(activity)
+        localization.detach(activity)
     }
 }

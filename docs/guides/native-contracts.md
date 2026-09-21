@@ -17,7 +17,7 @@ Python object.
 from dataclasses import dataclass
 from typing import Annotated, Callable, Protocol
 
-from pythonnative.sdk import element_factory, register_component
+from pythonnative.sdk import define_component
 from pythonnative.sdk.schema import ModuleSchema, NativeField, register_schema
 
 
@@ -38,9 +38,8 @@ class ToolsProtocol(Protocol):
     async def prepare(self, records: list[Record], *, limit: int = 10) -> list[Record]: ...
 
 
-register_component(name="Badge", props=BadgeProps)
+Badge = define_component("Badge", BadgeProps)
 register_schema(ModuleSchema.from_protocol("Tools", ToolsProtocol, events={"prepared": list[Record]}))
-Badge = element_factory("Badge")
 ```
 
 Generate from an importable declaration module:
@@ -61,10 +60,10 @@ keys. Records reject missing required fields and unknown fields. Recursive type
 cycles aren't supported. Values marked `NativeField(python_only=True)` remain
 in Python; other unserializable values raise an error.
 
-Custom components accept `style=` through `element_factory`, even when the
-props dataclass doesn't declare a style field. Shared style fields are included
-in the generated native contract. Declare `platforms=("ios",)` on
-`register_component` or `native_component` for an iOS-only renderer; custom
+Custom components accept `style=` through the factory `define_component`
+returns, even when the props dataclass doesn't declare a style field. Shared
+style fields are included in the generated native contract. Declare
+`platforms=("ios",)` on `define_component` for an iOS-only renderer; custom
 components default to iOS and Android support. A browser placeholder doesn't
 make `Platform.supports` return true.
 
@@ -176,12 +175,15 @@ hardware is a separate runtime condition. Android remote push needs a provider
 extension and reports an unsupported operation instead of a successful empty
 token.
 
-`Permissions.check()` is now a coroutine, matching asynchronous platform
+`Permissions.check()` is a coroutine, matching asynchronous platform
 settings APIs: use `await pn.Permissions.check("camera")`. Android camera
 editing (`allow_editing=True`) raises an unsupported-operation error; use
 a provider plugin if your application needs an Android image editor.
+`Notifications.get_device_token()` raises
+`NativeModuleError("unsupported")` on Android, where remote push needs a
+provider extension.
 
-Protocol 2 clients aren't supported. Rebuild the app after changing declarations,
+Only protocol 3 clients are supported. Rebuild the app after changing declarations,
 native sources, or native dependencies. Startup checks the exact contract
 fingerprint and Yoga version before mounting. Fast Refresh handles Python
 application changes within that compiled interface.

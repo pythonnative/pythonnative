@@ -29,6 +29,16 @@ public enum PNWindow {
         return scenes.first?.screen.scale ?? 2.0
     }
 
+    /// The Dynamic Type multiplier: the body text style's scaled size over
+    /// its default (`1.0` at the Large content size category).
+    public static func fontScale() -> Double {
+        let category = UIApplication.shared.preferredContentSizeCategory
+        let traits = UITraitCollection(preferredContentSizeCategory: category)
+        let scaled = UIFontMetrics(forTextStyle: .body).scaledValue(for: 100, compatibleWith: traits)
+        guard scaled.isFinite, scaled > 0 else { return 1.0 }
+        return (Double(scaled) / 100 * 1000).rounded() / 1000
+    }
+
     /// The topmost view controller suitable for presenting alerts and sheets.
     public static func topViewController() -> UIViewController? {
         guard var top = keyWindow()?.rootViewController else { return nil }

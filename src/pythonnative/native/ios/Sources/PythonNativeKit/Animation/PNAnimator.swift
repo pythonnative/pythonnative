@@ -2,26 +2,36 @@ import UIKit
 
 /// Drives the `animate(tag, request)` protocol for animatable props
 /// (`opacity`, `background_color`, `color`, `translate_x`, `translate_y`,
-/// `scale`, `scale_x`, `scale_y`, `rotate`).
+/// `scale`, `scale_x`, `scale_y`, `rotate`, `rotate_x`, `rotate_y`).
 ///
 /// - `set` applies one Python-driven frame immediately.
 /// - `start` runs `timing` / `spring` with `UIViewPropertyAnimator` and
 ///   `decay` with a display-link integrator; completion posts
 ///   `callback("animation", 0, "", {"id": n, "finished": bool})`.
 /// - `cancel` stops the animation and returns the presentation value.
+///
+/// Transform channels are stored per view in
+/// `PNViewState.animatedTransform` and composed with the static
+/// `transform` prop by `PNTransform`, so binding `translate_x` and
+/// `translate_y` together (or on top of a static `rotate`) works.
 public final class PNAnimator {
     public static let shared = PNAnimator()
 
     /// Prop names accepted by `set` and `start`.
     public static let animatableProps: Set<String> = [
-        "opacity", "background_color", "color", "translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate",
+        "opacity", "background_color", "color",
+        "translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate", "rotate_x", "rotate_y",
     ]
+
+    /// Transform channels routed through `PNTransform.compose`.
+    static let transformProps: Set<String> = Set(PNTransform.animatedChannels)
 
     final class Running {
         weak var view: UIView?
         let prop: String
         var animator: UIViewPropertyAnimator?
         var decay: PNDecayDriver?
+        var sampled: PNSampledDriver?
         init(view: UIView, prop: String) {
             self.view = view
             self.prop = prop
@@ -96,12 +106,22 @@ public final class PNAnimator {
             } else if let button = view as? UIButton {
                 button.setTitleColor(color, for: .normal)
             }
-        case "translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate":
+        case _ where PNAnimator.transformProps.contains(prop):
             guard let v = PNProps.double(value), v.isFinite else { return }
-            PNTransform.apply(view, spec: [[prop: v]])
+            setTransformChannel(view: view, channel: prop, value: v)
         default:
             PNLog.once(PNLog.animation, key: "prop:\(prop)", "ignoring unknown animated prop '\(prop)'")
         }
+    }
+
+    /// Record one animated transform channel and recompose the layer transform.
+    func setTransformChannel(view: UIView, channel: String, value: Double) {
+        guard let state = PNViewState.existing(for: view) else {
+            view.layer.transform = PNTransform.compose(base: nil, animated: [channel: value])
+            return
+        }
+        state.animatedTransform[channel] = value
+        PNTransform.refresh(view)
     }
 
     /// Read the value of `prop` currently on screen (presentation layer when animating).
@@ -113,8 +133,10 @@ public final class PNAnimator {
         case "background_color":
             return layer.backgroundColor.map { PNColor.hexString(UIColor(cgColor: $0)) }
         case "translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate":
-            let t = layer.affineTransform()
-            let parts = PNTransform.decompose(t)
+            guard let overlay = PNTransform.presentedOverlay(view) else {
+                return PNViewState.existing(for: view)?.animatedTransform[prop]
+            }
+            let parts = PNTransform.decompose(overlay)
             switch prop {
             case "translate_x": return Double(parts.translateX)
             case "translate_y": return Double(parts.translateY)
@@ -122,6 +144,8 @@ public final class PNAnimator {
             case "scale_y": return Double(parts.scaleY)
             default: return Double(parts.rotateDegrees)
             }
+        case _ where PNAnimator.transformProps.contains(prop):
+            return PNViewState.existing(for: view)?.animatedTransform[prop]
         default:
             return nil
         }
@@ -133,13 +157,33 @@ public final class PNAnimator {
     /// ticked by Python instead.
     public func start(view: UIView, id: Int64, prop: String, spec: [String: Any]) -> Bool {
         guard PNAnimator.animatableProps.contains(prop), Thread.isMainThread else { return false }
-        let kind = PNProps.string(spec["kind"]) ?? ""
+        let kind = PNProps.string(spec["kind"] ?? spec["type"]) ?? ""
         let entry = Running(view: view, prop: prop)
         switch kind {
         case "timing", "spring":
             guard spec["to"] != nil else { return false }
+            if kind == "timing", PNEasing.needsSampling(spec["easing"]) {
+                // Curves UIKit can't express (bounce) are sampled on a display link.
+                guard let from = PNProps.double(spec["from"] ?? presentationValue(view: view, prop: prop)), let to = PNProps.double(spec["to"]),
+                      let function = PNEasing.function(spec["easing"]) else { return false }
+                let driver = PNSampledDriver(
+                    from: from, to: to, durationMs: PNProps.double(spec["duration_ms"]) ?? 300,
+                    delayMs: PNProps.double(spec["delay_ms"]) ?? 0, easing: function
+                ) { [weak self, weak view] value in
+                    guard let self = self, let view = view else { return }
+                    self.applyValue(view: view, prop: prop, value: value)
+                } completion: { [weak self] in
+                    guard let self = self, self.running[id] != nil else { return }
+                    self.running.removeValue(forKey: id)
+                    PNAnimator.reportCompletion(id: id, finished: true)
+                }
+                entry.sampled = driver
+                running[id] = entry
+                driver.start()
+                return true
+            }
+            guard let timing = PNAnimator.timingParameters(kind: kind, spec: spec) else { return false }
             if let from = spec["from"] { applyValue(view: view, prop: prop, value: from) }
-            let timing = PNAnimator.timingParameters(kind: kind, spec: spec)
             let animator = UIViewPropertyAnimator(duration: timing.duration, timingParameters: timing.parameters)
             animator.isUserInteractionEnabled = true
             animator.addAnimations { [weak self, weak view] in
@@ -157,8 +201,9 @@ public final class PNAnimator {
             animator.startAnimation(afterDelay: delay)
             return true
         case "decay":
-            guard let from = PNProps.double(spec["from"]), let velocity = PNProps.double(spec["velocity"]) else { return false }
-            let deceleration = max(1e-6, PNProps.double(spec["deceleration"]) ?? 0.997)
+            guard let velocity = PNProps.double(spec["velocity"]) else { return false }
+            let from = PNProps.double(spec["from"]) ?? PNProps.double(presentationValue(view: view, prop: prop)) ?? 0
+            let deceleration = PNProps.double(spec["deceleration"]) ?? PNDecayDriver.defaultDeceleration
             let driver = PNDecayDriver(from: from, velocity: velocity, deceleration: deceleration) { [weak self, weak view] value in
                 guard let self = self, let view = view else { return }
                 self.applyValue(view: view, prop: prop, value: value)
@@ -191,6 +236,10 @@ public final class PNAnimator {
             value = decay.currentValue
             decay.stop()
         }
+        if let sampled = entry.sampled {
+            value = sampled.currentValue
+            sampled.stop()
+        }
         if let view = entry.view, let value = value {
             view.layer.removeAllAnimations()
             applyValue(view: view, prop: entry.prop, value: value)
@@ -203,6 +252,7 @@ public final class PNAnimator {
         for (id, entry) in running where entry.view === view || entry.view == nil {
             entry.animator?.stopAnimation(true)
             entry.decay?.stop()
+            entry.sampled?.stop()
             running.removeValue(forKey: id)
         }
     }
@@ -213,8 +263,10 @@ public final class PNAnimator {
         PNBridge.shared.callPython(kind: "animation", tag: 0, name: "", payload: PNJSON.encode(["id": id, "finished": finished]))
     }
 
-    /// Resolve `timing` / `spring` specs to UIKit timing parameters.
-    static func timingParameters(kind: String, spec: [String: Any]) -> (duration: TimeInterval, parameters: UITimingCurveProvider) {
+    /// Resolve `timing` / `spring` specs to UIKit timing parameters, or
+    /// `nil` when the easing isn't one UIKit can run (Python validates
+    /// names; nothing falls back silently).
+    static func timingParameters(kind: String, spec: [String: Any]) -> (duration: TimeInterval, parameters: UITimingCurveProvider)? {
         if kind == "spring" {
             let stiffness = max(1e-3, PNProps.double(spec["stiffness"]) ?? 100)
             let damping = max(1e-3, PNProps.double(spec["damping"]) ?? 10)
@@ -232,59 +284,196 @@ public final class PNAnimator {
             return (duration, parameters)
         }
         let duration = max(0, (PNProps.double(spec["duration_ms"]) ?? 300) / 1000)
-        return (duration, curve(for: spec["easing"]))
+        guard let curve = curve(for: spec["easing"]) else { return nil }
+        return (duration, curve)
     }
 
-    /// Map an easing name (or `[x1, y1, x2, y2]` control points) to a timing curve.
-    static func curve(for easing: Any?) -> UITimingCurveProvider {
-        if let points = easing as? [Any], points.count == 4 {
-            let values = points.compactMap { PNProps.double($0) }
-            if values.count == 4 {
-                return UICubicTimingParameters(
-                    controlPoint1: CGPoint(x: values[0], y: values[1]), controlPoint2: CGPoint(x: values[2], y: values[3])
-                )
-            }
-        }
-        switch PNProps.string(easing) ?? "ease_in_out" {
-        case "linear": return UICubicTimingParameters(animationCurve: .linear)
-        case "ease_in", "ease_in_quad": return UICubicTimingParameters(animationCurve: .easeIn)
-        case "ease_out", "ease_out_quad": return UICubicTimingParameters(animationCurve: .easeOut)
-        case "ease", "ease_in_out": return UICubicTimingParameters(animationCurve: .easeInOut)
-        case "bounce":
-            // No CoreAnimation equivalent; approximate with an overshoot curve.
-            return UICubicTimingParameters(controlPoint1: CGPoint(x: 0.34, y: 1.56), controlPoint2: CGPoint(x: 0.64, y: 1))
-        default: return UICubicTimingParameters(animationCurve: .easeInOut)
-        }
+    /// Map a wire easing (a name or `[x1, y1, x2, y2]`) to a UIKit curve;
+    /// `nil` for `bounce` (sampled instead) and for unknown names.
+    static func curve(for easing: Any?) -> UITimingCurveProvider? {
+        guard let points = PNEasing.controlPoints(easing) else { return nil }
+        return UICubicTimingParameters(controlPoint1: CGPoint(x: points.0, y: points.1), controlPoint2: CGPoint(x: points.2, y: points.3))
     }
 }
 
-/// Integrates the `decay` model on a `CADisplayLink`, mirroring the
-/// Python ticker: `v(t) = v0 * e^(-k * 1000 * t)` with `t` in seconds and
-/// `v0` in units per second, so the closed-form position is
-/// `from + v0 / (k * 1000) * (1 - e^(-k * 1000 * t))`.
-final class PNDecayDriver {
+/// The wire easing vocabulary shared with Python's `Easing`:
+/// `linear`, `ease` (an alias of `ease_in`), `ease_in`, `ease_out`,
+/// `ease_in_out`, `quad` (`t^2`), `cubic` (`t^3`), `bounce` (Penner
+/// bounce-out), or a bare `[x1, y1, x2, y2]` cubic bezier.
+public enum PNEasing {
+    /// Cubic bezier control points for every curve that has them. `quad`
+    /// and `cubic` are exact: with `x1 = 1/3, x2 = 2/3` the bezier's x is
+    /// linear in `u`, and `y1 = 0, y2 = 1/3` (or `0`) makes y `u^2` (`u^3`).
+    public static let named: [String: (Double, Double, Double, Double)] = [
+        "linear": (0, 0, 1, 1),
+        "ease": (0.42, 0, 1, 1),
+        "ease_in": (0.42, 0, 1, 1),
+        "ease_out": (0, 0, 0.58, 1),
+        "ease_in_out": (0.42, 0, 0.58, 1),
+        "quad": (1.0 / 3.0, 0, 2.0 / 3.0, 1.0 / 3.0),
+        "cubic": (1.0 / 3.0, 0, 2.0 / 3.0, 0),
+    ]
+
+    /// Control points for `easing`, or `nil` when it has none (`bounce`,
+    /// unknown names, malformed arrays). A missing easing is `ease_in_out`.
+    public static func controlPoints(_ easing: Any?) -> (Double, Double, Double, Double)? {
+        switch easing {
+        case nil, is NSNull:
+            return named["ease_in_out"]
+        case let points as [Any]:
+            let values = points.compactMap { PNProps.double($0) }
+            guard values.count == 4, values.allSatisfy({ $0.isFinite }) else { return nil }
+            return (values[0], values[1], values[2], values[3])
+        case let name as String:
+            return named[name]
+        default:
+            return nil
+        }
+    }
+
+    /// Whether `easing` is a curve this platform can run at all.
+    public static func isValid(_ easing: Any?) -> Bool {
+        controlPoints(easing) != nil || (easing as? String) == "bounce"
+    }
+
+    /// Whether the curve has no bezier form and must be sampled per frame.
+    public static func needsSampling(_ easing: Any?) -> Bool {
+        (easing as? String) == "bounce"
+    }
+
+    /// `progress -> eased` for `easing`, or `nil` when unknown.
+    public static func function(_ easing: Any?) -> ((Double) -> Double)? {
+        if needsSampling(easing) { return bounce }
+        guard let points = controlPoints(easing) else { return nil }
+        return { t in PNGraphDriver.bezier(t, CGPoint(x: points.0, y: points.1), CGPoint(x: points.2, y: points.3)) }
+    }
+
+    /// Robert Penner's bounce-out, as React Native's `Easing.bounce`.
+    public static func bounce(_ t: Double) -> Double {
+        if t < 1 / 2.75 { return 7.5625 * t * t }
+        if t < 2 / 2.75 { let u = t - 1.5 / 2.75; return 7.5625 * u * u + 0.75 }
+        if t < 2.5 / 2.75 { let u = t - 2.25 / 2.75; return 7.5625 * u * u + 0.9375 }
+        let u = t - 2.625 / 2.75
+        return 7.5625 * u * u + 0.984375
+    }
+}
+
+/// Runs a `timing` animation whose curve UIKit can't express (bounce) by
+/// sampling the easing function on a display link.
+public final class PNSampledDriver {
     private(set) var currentValue: Double
-    private let from: Double
-    private let velocity0: Double
-    private let k: Double
+    let from: Double, to: Double, durationMs: Double, delayMs: Double
+    private let easing: (Double) -> Double
     private let frame: (Double) -> Void
     private let completion: () -> Void
     private var link: CADisplayLink?
     private var startTime: CFTimeInterval = 0
-    private let restVelocity = 0.001
+
+    init(from: Double, to: Double, durationMs: Double, delayMs: Double, easing: @escaping (Double) -> Double,
+         frame: @escaping (Double) -> Void, completion: @escaping () -> Void) {
+        self.from = from; self.to = to
+        self.durationMs = max(0, durationMs); self.delayMs = max(0, delayMs)
+        self.easing = easing; self.frame = frame; self.completion = completion
+        currentValue = from
+    }
+
+    func start() {
+        startTime = CACurrentMediaTime()
+        let link = CADisplayLink(target: self, selector: #selector(tick(_:)))
+        link.add(to: .main, forMode: .common)
+        self.link = link
+    }
+
+    func stop() {
+        link?.invalidate()
+        link = nil
+    }
+
+    /// Advance to `elapsedMs` since start; returns `true` when finished.
+    @discardableResult
+    func advance(elapsedMs: Double) -> Bool {
+        let active = elapsedMs - delayMs
+        guard active >= 0 else { return false }
+        let progress = durationMs <= 0 ? 1 : min(1, active / durationMs)
+        let done = progress >= 1 || UIAccessibility.isReduceMotionEnabled
+        currentValue = done ? to : from + (to - from) * easing(progress)
+        frame(currentValue)
+        return done
+    }
+
+    @objc private func tick(_ link: CADisplayLink) {
+        if advance(elapsedMs: max(0, link.targetTimestamp - startTime) * 1000) {
+            stop()
+            completion()
+        }
+    }
+}
+
+/// Integrates React Native's `decay` model on a `CADisplayLink`.
+///
+/// Velocity is in points per millisecond and decays as
+/// `v(t) = v0 * d^t` (`t` in milliseconds, `d` defaulting to `0.998`),
+/// so the closed-form position is `x(t) = x0 + v0 * (1 - d^t) / (1 - d)`
+/// and the projected rest point is `x0 + v0 / (1 - d)`. The driver stops
+/// once `|v| < 0.001` pt/ms or the value is within `0.1` of the rest point.
+public final class PNDecayDriver {
+    public static let defaultDeceleration = 0.998
+    public static let restVelocity = 0.001
+    public static let restDistance = 0.1
+
+    private(set) var currentValue: Double
+    let from: Double
+    let velocity0: Double
+    let deceleration: Double
+    private let frame: (Double) -> Void
+    private let completion: () -> Void
+    private var link: CADisplayLink?
+    private var startTime: CFTimeInterval = 0
 
     init(from: Double, velocity: Double, deceleration: Double, frame: @escaping (Double) -> Void, completion: @escaping () -> Void) {
         self.from = from
         currentValue = from
         velocity0 = velocity
-        k = deceleration
+        self.deceleration = PNDecayDriver.clamp(deceleration)
         self.frame = frame
         self.completion = completion
     }
 
+    /// Keep `d` strictly inside `(0, 1)` so the closed form stays finite.
+    static func clamp(_ deceleration: Double) -> Double {
+        guard deceleration.isFinite else { return defaultDeceleration }
+        return min(0.999_999, max(0.000_001, deceleration))
+    }
+
+    /// `v0 * d^t` for `t` in milliseconds.
+    public static func velocity(velocity v0: Double, deceleration d: Double, elapsedMs t: Double) -> Double {
+        v0 * pow(clamp(d), max(0, t))
+    }
+
+    /// `x0 + v0 * (1 - d^t) / (1 - d)` for `t` in milliseconds.
+    public static func position(from x0: Double, velocity v0: Double, deceleration d: Double, elapsedMs t: Double) -> Double {
+        let d = clamp(d)
+        return x0 + v0 * (1 - pow(d, max(0, t))) / (1 - d)
+    }
+
+    /// `x0 + v0 / (1 - d)`: where the value comes to rest.
+    public static func finalValue(from x0: Double, velocity v0: Double, deceleration d: Double) -> Double {
+        let d = clamp(d)
+        return x0 + v0 / (1 - d)
+    }
+
+    /// Whether the animation is finished at `t` milliseconds.
+    public static func isAtRest(from x0: Double, velocity v0: Double, deceleration d: Double, elapsedMs t: Double) -> Bool {
+        abs(velocity(velocity: v0, deceleration: d, elapsedMs: t)) < restVelocity
+            || abs(position(from: x0, velocity: v0, deceleration: d, elapsedMs: t) - finalValue(from: x0, velocity: v0, deceleration: d)) < restDistance
+    }
+
+    /// The rest point of this driver.
+    public var finalValue: Double { PNDecayDriver.finalValue(from: from, velocity: velocity0, deceleration: deceleration) }
+
     func start() {
         startTime = CACurrentMediaTime()
-        if abs(velocity0) < restVelocity {
+        if abs(velocity0) < PNDecayDriver.restVelocity {
             completion()
             return
         }
@@ -298,13 +487,18 @@ final class PNDecayDriver {
         link = nil
     }
 
-    @objc private func tick(_ link: CADisplayLink) {
-        let elapsed = max(0, link.targetTimestamp - startTime)
-        let decayFactor = exp(-k * 1000 * elapsed)
-        let velocity = velocity0 * decayFactor
-        currentValue = from + velocity0 / (k * 1000) * (1 - decayFactor)
+    /// Advance to `elapsedMs` since start; returns `true` when finished.
+    @discardableResult
+    func advance(elapsedMs: Double) -> Bool {
+        let done = PNDecayDriver.isAtRest(from: from, velocity: velocity0, deceleration: deceleration, elapsedMs: elapsedMs)
+        currentValue = done ? finalValue : PNDecayDriver.position(from: from, velocity: velocity0, deceleration: deceleration, elapsedMs: elapsedMs)
         frame(currentValue)
-        if abs(velocity) < restVelocity {
+        return done
+    }
+
+    @objc private func tick(_ link: CADisplayLink) {
+        let elapsed = max(0, link.targetTimestamp - startTime) * 1000
+        if advance(elapsedMs: elapsed) {
             stop()
             completion()
         }

@@ -278,6 +278,45 @@ enum class PNViewOverflow(val rawValue: String) : PNNativeValue {
     }
 }
 
+data class PNDynamicColor(
+    val `light`: String,
+    val `dark`: String
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("light", PNValues.encode(`light`))
+        result.put("dark", PNValues.encode(`dark`))
+    }
+    companion object {
+        fun decode(value: Any?): PNDynamicColor {
+            val objectValue = PNValues.objectValue(value)
+            return PNDynamicColor(PNValues.string((objectValue.get("light"))), PNValues.string((objectValue.get("dark"))))
+        }
+    }
+}
+
+sealed class PNViewBorderColor : PNNativeValue {
+    data class Option0(val value: String) : PNViewBorderColor() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option1(val value: PNDynamicColor) : PNViewBorderColor() { override fun nativeValue(): Any = PNValues.encode(value) }
+    companion object {
+        fun decode(value: Any?): PNViewBorderColor {
+            try { return Option0(PNValues.string(value)) } catch (_: Exception) { }
+            try { return Option1(PNDynamicColor.decode(value)) } catch (_: Exception) { }
+            throw IllegalArgumentException("Invalid PNViewBorderColor")
+        }
+    }
+}
+
+enum class PNViewBorderStyle(val rawValue: String) : PNNativeValue {
+    `solid`("solid"),
+    `dashed`("dashed"),
+    `dotted`("dotted");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNViewBorderStyle = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNViewBorderStyle")
+    }
+}
+
 enum class PNViewFontWeight(val rawValue: String) : PNNativeValue {
     `normal`("normal"),
     `bold`("bold"),
@@ -407,6 +446,48 @@ data class PNTransformRotate(
     }
 }
 
+data class PNTransformRotateX(
+    val `rotate_x`: PNPNTransformRotateRotate
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("rotate_x", PNValues.encode(`rotate_x`))
+    }
+    companion object {
+        fun decode(value: Any?): PNTransformRotateX {
+            val objectValue = PNValues.objectValue(value)
+            return PNTransformRotateX(PNPNTransformRotateRotate.decode((objectValue.get("rotate_x"))))
+        }
+    }
+}
+
+data class PNTransformRotateY(
+    val `rotate_y`: PNPNTransformRotateRotate
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("rotate_y", PNValues.encode(`rotate_y`))
+    }
+    companion object {
+        fun decode(value: Any?): PNTransformRotateY {
+            val objectValue = PNValues.objectValue(value)
+            return PNTransformRotateY(PNPNTransformRotateRotate.decode((objectValue.get("rotate_y"))))
+        }
+    }
+}
+
+data class PNTransformRotateZ(
+    val `rotate_z`: PNPNTransformRotateRotate
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("rotate_z", PNValues.encode(`rotate_z`))
+    }
+    companion object {
+        fun decode(value: Any?): PNTransformRotateZ {
+            val objectValue = PNValues.objectValue(value)
+            return PNTransformRotateZ(PNPNTransformRotateRotate.decode((objectValue.get("rotate_z"))))
+        }
+    }
+}
+
 data class PNTransformScale(
     val `scale`: Double
 ) : PNNativeValue {
@@ -465,43 +546,109 @@ data class PNTransformTranslate(
     }
 }
 
-sealed class PNPNViewTransform6Item : PNNativeValue {
-    data class Option0(val value: PNTransformRotate) : PNPNViewTransform6Item() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option1(val value: PNTransformScale) : PNPNViewTransform6Item() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option2(val value: PNTransformScaleX) : PNPNViewTransform6Item() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option3(val value: PNTransformScaleY) : PNPNViewTransform6Item() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option4(val value: PNTransformTranslate) : PNPNViewTransform6Item() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option5(val value: Map<String, PNJSONValue>) : PNPNViewTransform6Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+data class PNTransformSkewX(
+    val `skew_x`: PNPNTransformRotateRotate
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("skew_x", PNValues.encode(`skew_x`))
+    }
     companion object {
-        fun decode(value: Any?): PNPNViewTransform6Item {
+        fun decode(value: Any?): PNTransformSkewX {
+            val objectValue = PNValues.objectValue(value)
+            return PNTransformSkewX(PNPNTransformRotateRotate.decode((objectValue.get("skew_x"))))
+        }
+    }
+}
+
+data class PNTransformSkewY(
+    val `skew_y`: PNPNTransformRotateRotate
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("skew_y", PNValues.encode(`skew_y`))
+    }
+    companion object {
+        fun decode(value: Any?): PNTransformSkewY {
+            val objectValue = PNValues.objectValue(value)
+            return PNTransformSkewY(PNPNTransformRotateRotate.decode((objectValue.get("skew_y"))))
+        }
+    }
+}
+
+data class PNTransformPerspective(
+    val `perspective`: Double
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("perspective", PNValues.encode(`perspective`))
+    }
+    companion object {
+        fun decode(value: Any?): PNTransformPerspective {
+            val objectValue = PNValues.objectValue(value)
+            return PNTransformPerspective(PNValues.number((objectValue.get("perspective"))))
+        }
+    }
+}
+
+sealed class PNPNViewTransform12Item : PNNativeValue {
+    data class Option0(val value: PNTransformRotate) : PNPNViewTransform12Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option1(val value: PNTransformRotateX) : PNPNViewTransform12Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option2(val value: PNTransformRotateY) : PNPNViewTransform12Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option3(val value: PNTransformRotateZ) : PNPNViewTransform12Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option4(val value: PNTransformScale) : PNPNViewTransform12Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option5(val value: PNTransformScaleX) : PNPNViewTransform12Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option6(val value: PNTransformScaleY) : PNPNViewTransform12Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option7(val value: PNTransformTranslate) : PNPNViewTransform12Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option8(val value: PNTransformSkewX) : PNPNViewTransform12Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option9(val value: PNTransformSkewY) : PNPNViewTransform12Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option10(val value: PNTransformPerspective) : PNPNViewTransform12Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option11(val value: Map<String, PNJSONValue>) : PNPNViewTransform12Item() { override fun nativeValue(): Any = PNValues.encode(value) }
+    companion object {
+        fun decode(value: Any?): PNPNViewTransform12Item {
             try { return Option0(PNTransformRotate.decode(value)) } catch (_: Exception) { }
-            try { return Option1(PNTransformScale.decode(value)) } catch (_: Exception) { }
-            try { return Option2(PNTransformScaleX.decode(value)) } catch (_: Exception) { }
-            try { return Option3(PNTransformScaleY.decode(value)) } catch (_: Exception) { }
-            try { return Option4(PNTransformTranslate.decode(value)) } catch (_: Exception) { }
-            try { return Option5(PNValues.objectValue(value).let { objectValue -> objectValue.keys().asSequence().associateWith { key -> PNJSONValue(objectValue.get(key) ?: JSONObject.NULL) } }) } catch (_: Exception) { }
-            throw IllegalArgumentException("Invalid PNPNViewTransform6Item")
+            try { return Option1(PNTransformRotateX.decode(value)) } catch (_: Exception) { }
+            try { return Option2(PNTransformRotateY.decode(value)) } catch (_: Exception) { }
+            try { return Option3(PNTransformRotateZ.decode(value)) } catch (_: Exception) { }
+            try { return Option4(PNTransformScale.decode(value)) } catch (_: Exception) { }
+            try { return Option5(PNTransformScaleX.decode(value)) } catch (_: Exception) { }
+            try { return Option6(PNTransformScaleY.decode(value)) } catch (_: Exception) { }
+            try { return Option7(PNTransformTranslate.decode(value)) } catch (_: Exception) { }
+            try { return Option8(PNTransformSkewX.decode(value)) } catch (_: Exception) { }
+            try { return Option9(PNTransformSkewY.decode(value)) } catch (_: Exception) { }
+            try { return Option10(PNTransformPerspective.decode(value)) } catch (_: Exception) { }
+            try { return Option11(PNValues.objectValue(value).let { objectValue -> objectValue.keys().asSequence().associateWith { key -> PNJSONValue(objectValue.get(key) ?: JSONObject.NULL) } }) } catch (_: Exception) { }
+            throw IllegalArgumentException("Invalid PNPNViewTransform12Item")
         }
     }
 }
 
 sealed class PNViewTransform : PNNativeValue {
     data class Option0(val value: PNTransformRotate) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option1(val value: PNTransformScale) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option2(val value: PNTransformScaleX) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option3(val value: PNTransformScaleY) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option4(val value: PNTransformTranslate) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option5(val value: Map<String, PNJSONValue>) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option6(val value: List<PNPNViewTransform6Item>) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option1(val value: PNTransformRotateX) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option2(val value: PNTransformRotateY) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option3(val value: PNTransformRotateZ) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option4(val value: PNTransformScale) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option5(val value: PNTransformScaleX) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option6(val value: PNTransformScaleY) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option7(val value: PNTransformTranslate) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option8(val value: PNTransformSkewX) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option9(val value: PNTransformSkewY) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option10(val value: PNTransformPerspective) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option11(val value: Map<String, PNJSONValue>) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option12(val value: List<PNPNViewTransform12Item>) : PNViewTransform() { override fun nativeValue(): Any = PNValues.encode(value) }
     companion object {
         fun decode(value: Any?): PNViewTransform {
             try { return Option0(PNTransformRotate.decode(value)) } catch (_: Exception) { }
-            try { return Option1(PNTransformScale.decode(value)) } catch (_: Exception) { }
-            try { return Option2(PNTransformScaleX.decode(value)) } catch (_: Exception) { }
-            try { return Option3(PNTransformScaleY.decode(value)) } catch (_: Exception) { }
-            try { return Option4(PNTransformTranslate.decode(value)) } catch (_: Exception) { }
-            try { return Option5(PNValues.objectValue(value).let { objectValue -> objectValue.keys().asSequence().associateWith { key -> PNJSONValue(objectValue.get(key) ?: JSONObject.NULL) } }) } catch (_: Exception) { }
-            try { return Option6(PNValues.array(value).map { item -> PNPNViewTransform6Item.decode(item) }) } catch (_: Exception) { }
+            try { return Option1(PNTransformRotateX.decode(value)) } catch (_: Exception) { }
+            try { return Option2(PNTransformRotateY.decode(value)) } catch (_: Exception) { }
+            try { return Option3(PNTransformRotateZ.decode(value)) } catch (_: Exception) { }
+            try { return Option4(PNTransformScale.decode(value)) } catch (_: Exception) { }
+            try { return Option5(PNTransformScaleX.decode(value)) } catch (_: Exception) { }
+            try { return Option6(PNTransformScaleY.decode(value)) } catch (_: Exception) { }
+            try { return Option7(PNTransformTranslate.decode(value)) } catch (_: Exception) { }
+            try { return Option8(PNTransformSkewX.decode(value)) } catch (_: Exception) { }
+            try { return Option9(PNTransformSkewY.decode(value)) } catch (_: Exception) { }
+            try { return Option10(PNTransformPerspective.decode(value)) } catch (_: Exception) { }
+            try { return Option11(PNValues.objectValue(value).let { objectValue -> objectValue.keys().asSequence().associateWith { key -> PNJSONValue(objectValue.get(key) ?: JSONObject.NULL) } }) } catch (_: Exception) { }
+            try { return Option12(PNValues.array(value).map { item -> PNPNViewTransform12Item.decode(item) }) } catch (_: Exception) { }
             throw IllegalArgumentException("Invalid PNViewTransform")
         }
     }
@@ -576,6 +723,56 @@ data class PNAccessibilityState(
     }
 }
 
+data class PNAccessibilityValue(
+    val `min`: Double?,
+    val `max`: Double?,
+    val `now`: Double?,
+    val `text`: String?
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        if (`min` != null) result.put("min", PNValues.encode(`min`))
+        if (`max` != null) result.put("max", PNValues.encode(`max`))
+        if (`now` != null) result.put("now", PNValues.encode(`now`))
+        if (`text` != null) result.put("text", PNValues.encode(`text`))
+    }
+    companion object {
+        fun decode(value: Any?): PNAccessibilityValue {
+            val objectValue = PNValues.objectValue(value)
+            return PNAccessibilityValue(if (PNValues.isNull(objectValue.opt("min"))) null else PNValues.number((objectValue.opt("min"))), if (PNValues.isNull(objectValue.opt("max"))) null else PNValues.number((objectValue.opt("max"))), if (PNValues.isNull(objectValue.opt("now"))) null else PNValues.number((objectValue.opt("now"))), if (PNValues.isNull(objectValue.opt("text"))) null else PNValues.string((objectValue.opt("text"))))
+        }
+    }
+}
+
+sealed class PNViewAccessibilityValue : PNNativeValue {
+    data class Option0(val value: String) : PNViewAccessibilityValue() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option1(val value: PNAccessibilityValue) : PNViewAccessibilityValue() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option2(val value: PNJSONValue) : PNViewAccessibilityValue() { override fun nativeValue(): Any = PNValues.encode(value) }
+    companion object {
+        fun decode(value: Any?): PNViewAccessibilityValue {
+            try { return Option0(PNValues.string(value)) } catch (_: Exception) { }
+            try { return Option1(PNAccessibilityValue.decode(value)) } catch (_: Exception) { }
+            try { return Option2(PNJSONValue(value ?: JSONObject.NULL)) } catch (_: Exception) { }
+            throw IllegalArgumentException("Invalid PNViewAccessibilityValue")
+        }
+    }
+}
+
+data class PNAccessibilityAction(
+    val `name`: String,
+    val `label`: String?
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("name", PNValues.encode(`name`))
+        if (`label` != null) result.put("label", PNValues.encode(`label`))
+    }
+    companion object {
+        fun decode(value: Any?): PNAccessibilityAction {
+            val objectValue = PNValues.objectValue(value)
+            return PNAccessibilityAction(PNValues.string((objectValue.get("name"))), if (PNValues.isNull(objectValue.opt("label"))) null else PNValues.string((objectValue.opt("label"))))
+        }
+    }
+}
+
 enum class PNViewAccessibilityLiveRegion(val rawValue: String) : PNNativeValue {
     `none`("none"),
     `polite`("polite"),
@@ -584,6 +781,18 @@ enum class PNViewAccessibilityLiveRegion(val rawValue: String) : PNNativeValue {
     companion object {
         fun decode(value: Any?): PNViewAccessibilityLiveRegion = entries.firstOrNull { it.rawValue == value }
             ?: throw IllegalArgumentException("Invalid PNViewAccessibilityLiveRegion")
+    }
+}
+
+enum class PNViewImportantForAccessibility(val rawValue: String) : PNNativeValue {
+    `auto`("auto"),
+    `yes`("yes"),
+    `no`("no"),
+    `no_hide_descendants`("no_hide_descendants");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNViewImportantForAccessibility = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNViewImportantForAccessibility")
     }
 }
 
@@ -597,6 +806,20 @@ enum class PNViewPnHeaderSlot(val rawValue: String) : PNNativeValue {
     }
 }
 
+sealed class PNActivityIndicatorColor : PNNativeValue {
+    data class Option0(val value: String) : PNActivityIndicatorColor() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option1(val value: PNDynamicColor) : PNActivityIndicatorColor() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option2(val value: PNJSONValue) : PNActivityIndicatorColor() { override fun nativeValue(): Any = PNValues.encode(value) }
+    companion object {
+        fun decode(value: Any?): PNActivityIndicatorColor {
+            try { return Option0(PNValues.string(value)) } catch (_: Exception) { }
+            try { return Option1(PNDynamicColor.decode(value)) } catch (_: Exception) { }
+            try { return Option2(PNJSONValue(value ?: JSONObject.NULL)) } catch (_: Exception) { }
+            throw IllegalArgumentException("Invalid PNActivityIndicatorColor")
+        }
+    }
+}
+
 enum class PNActivityIndicatorSize(val rawValue: String) : PNNativeValue {
     `small`("small"),
     `large`("large");
@@ -604,6 +827,26 @@ enum class PNActivityIndicatorSize(val rawValue: String) : PNNativeValue {
     companion object {
         fun decode(value: Any?): PNActivityIndicatorSize = entries.firstOrNull { it.rawValue == value }
             ?: throw IllegalArgumentException("Invalid PNActivityIndicatorSize")
+    }
+}
+
+data class PNLayoutEvent(
+    val `x`: Double,
+    val `y`: Double,
+    val `width`: Double,
+    val `height`: Double
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("x", PNValues.encode(`x`))
+        result.put("y", PNValues.encode(`y`))
+        result.put("width", PNValues.encode(`width`))
+        result.put("height", PNValues.encode(`height`))
+    }
+    companion object {
+        fun decode(value: Any?): PNLayoutEvent {
+            val objectValue = PNValues.objectValue(value)
+            return PNLayoutEvent(PNValues.number((objectValue.get("x"))), PNValues.number((objectValue.get("y"))), PNValues.number((objectValue.get("width"))), PNValues.number((objectValue.get("height"))))
+        }
     }
 }
 
@@ -697,6 +940,26 @@ enum class PNModalPresentationStyle(val rawValue: String) : PNNativeValue {
     }
 }
 
+data class PNRipple(
+    val `color`: PNViewBorderColor,
+    val `borderless`: Boolean,
+    val `radius`: Double?,
+    val `foreground`: Boolean
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("color", PNValues.encode(`color`))
+        result.put("borderless", PNValues.encode(`borderless`))
+        result.put("radius", PNValues.encode(`radius`))
+        result.put("foreground", PNValues.encode(`foreground`))
+    }
+    companion object {
+        fun decode(value: Any?): PNRipple {
+            val objectValue = PNValues.objectValue(value)
+            return PNRipple(PNViewBorderColor.decode((objectValue.get("color"))), PNValues.boolean((if (objectValue.has("borderless")) objectValue.get("borderless") else PNValues.defaultValue("false"))), if (PNValues.isNull((if (objectValue.has("radius")) objectValue.get("radius") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("radius")) objectValue.get("radius") else PNValues.defaultValue("null"))), PNValues.boolean((if (objectValue.has("foreground")) objectValue.get("foreground") else PNValues.defaultValue("false"))))
+        }
+    }
+}
+
 enum class PNSafeAreaViewEdgesItem(val rawValue: String) : PNNativeValue {
     `top`("top"),
     `left`("left"),
@@ -711,7 +974,10 @@ enum class PNSafeAreaViewEdgesItem(val rawValue: String) : PNNativeValue {
 
 enum class PNScreenPresentation(val rawValue: String) : PNNativeValue {
     `card`("card"),
-    `modal`("modal");
+    `modal`("modal"),
+    `full_screen_modal`("full_screen_modal"),
+    `form_sheet`("form_sheet"),
+    `transparent_modal`("transparent_modal");
     override fun nativeValue(): Any = rawValue
     companion object {
         fun decode(value: Any?): PNScreenPresentation = entries.firstOrNull { it.rawValue == value }
@@ -794,12 +1060,13 @@ data class PNScrollViewRefreshControl(
     val `row_gap`: Double?,
     val `column_gap`: Double?,
     val `overflow`: PNViewOverflow?,
-    val `background_color`: String?,
-    val `color`: String?,
-    val `border_color`: String?,
-    val `placeholder_color`: String?,
-    val `tint_color`: PNPresence<String?>,
+    val `background_color`: PNViewBorderColor?,
+    val `color`: PNViewBorderColor?,
+    val `border_color`: PNViewBorderColor?,
+    val `placeholder_color`: PNViewBorderColor?,
+    val `tint_color`: PNActivityIndicatorColor?,
     val `border_width`: Double?,
+    val `border_style`: PNViewBorderStyle?,
     val `border_radius`: Double?,
     val `border_top_left_radius`: Double?,
     val `border_top_right_radius`: Double?,
@@ -809,10 +1076,10 @@ data class PNScrollViewRefreshControl(
     val `border_right_width`: Double?,
     val `border_bottom_width`: Double?,
     val `border_left_width`: Double?,
-    val `border_top_color`: String?,
-    val `border_right_color`: String?,
-    val `border_bottom_color`: String?,
-    val `border_left_color`: String?,
+    val `border_top_color`: PNViewBorderColor?,
+    val `border_right_color`: PNViewBorderColor?,
+    val `border_bottom_color`: PNViewBorderColor?,
+    val `border_left_color`: PNViewBorderColor?,
     val `font_size`: Double?,
     val `font_family`: String?,
     val `font_weight`: PNViewFontWeight?,
@@ -824,10 +1091,10 @@ data class PNScrollViewRefreshControl(
     val `line_height`: Double?,
     val `letter_spacing`: Double?,
     val `max_lines`: Long?,
-    val `text_shadow_color`: String?,
+    val `text_shadow_color`: PNViewBorderColor?,
     val `text_shadow_offset`: PNViewTextShadowOffset?,
     val `text_shadow_radius`: Double?,
-    val `shadow_color`: String?,
+    val `shadow_color`: PNViewBorderColor?,
     val `shadow_offset`: PNViewTextShadowOffset?,
     val `shadow_opacity`: Double?,
     val `shadow_radius`: Double?,
@@ -896,8 +1163,9 @@ data class PNScrollViewRefreshControl(
         if (`color` != null) result.put("color", PNValues.encode(`color`))
         if (`border_color` != null) result.put("border_color", PNValues.encode(`border_color`))
         if (`placeholder_color` != null) result.put("placeholder_color", PNValues.encode(`placeholder_color`))
-        if (`tint_color` is PNPresence.Present) result.put("tint_color", PNValues.encode(`tint_color`.value))
+        if (`tint_color` != null) result.put("tint_color", PNValues.encode(`tint_color`))
         if (`border_width` != null) result.put("border_width", PNValues.encode(`border_width`))
+        if (`border_style` != null) result.put("border_style", PNValues.encode(`border_style`))
         if (`border_radius` != null) result.put("border_radius", PNValues.encode(`border_radius`))
         if (`border_top_left_radius` != null) result.put("border_top_left_radius", PNValues.encode(`border_top_left_radius`))
         if (`border_top_right_radius` != null) result.put("border_top_right_radius", PNValues.encode(`border_top_right_radius`))
@@ -943,241 +1211,7 @@ data class PNScrollViewRefreshControl(
     companion object {
         fun decode(value: Any?): PNScrollViewRefreshControl {
             val objectValue = PNValues.objectValue(value)
-            return PNScrollViewRefreshControl(if (PNValues.isNull(objectValue.opt("width"))) null else PNViewWidth.decode((objectValue.opt("width"))), if (PNValues.isNull(objectValue.opt("height"))) null else PNViewWidth.decode((objectValue.opt("height"))), if (PNValues.isNull(objectValue.opt("min_width"))) null else PNViewWidth.decode((objectValue.opt("min_width"))), if (PNValues.isNull(objectValue.opt("max_width"))) null else PNViewWidth.decode((objectValue.opt("max_width"))), if (PNValues.isNull(objectValue.opt("min_height"))) null else PNViewWidth.decode((objectValue.opt("min_height"))), if (PNValues.isNull(objectValue.opt("max_height"))) null else PNViewWidth.decode((objectValue.opt("max_height"))), if (PNValues.isNull(objectValue.opt("aspect_ratio"))) null else PNValues.number((objectValue.opt("aspect_ratio"))), if (PNValues.isNull(objectValue.opt("flex"))) null else PNValues.number((objectValue.opt("flex"))), if (PNValues.isNull(objectValue.opt("flex_grow"))) null else PNValues.number((objectValue.opt("flex_grow"))), if (PNValues.isNull(objectValue.opt("flex_shrink"))) null else PNValues.number((objectValue.opt("flex_shrink"))), if (PNValues.isNull(objectValue.opt("flex_basis"))) null else PNViewWidth.decode((objectValue.opt("flex_basis"))), if (PNValues.isNull(objectValue.opt("flex_direction"))) null else PNViewFlexDirection.decode((objectValue.opt("flex_direction"))), if (PNValues.isNull(objectValue.opt("flex_wrap"))) null else PNViewFlexWrap.decode((objectValue.opt("flex_wrap"))), if (PNValues.isNull(objectValue.opt("justify_content"))) null else PNViewJustifyContent.decode((objectValue.opt("justify_content"))), if (PNValues.isNull(objectValue.opt("align_items"))) null else PNViewAlignItems.decode((objectValue.opt("align_items"))), if (PNValues.isNull(objectValue.opt("align_self"))) null else PNViewAlignItems.decode((objectValue.opt("align_self"))), if (PNValues.isNull(objectValue.opt("align_content"))) null else PNViewAlignContent.decode((objectValue.opt("align_content"))), if (PNValues.isNull(objectValue.opt("direction"))) null else PNViewDirection.decode((objectValue.opt("direction"))), if (PNValues.isNull(objectValue.opt("display"))) null else PNViewDisplay.decode((objectValue.opt("display"))), if (PNValues.isNull(objectValue.opt("position"))) null else PNViewPosition.decode((objectValue.opt("position"))), if (PNValues.isNull(objectValue.opt("top"))) null else PNViewWidth.decode((objectValue.opt("top"))), if (PNValues.isNull(objectValue.opt("right"))) null else PNViewWidth.decode((objectValue.opt("right"))), if (PNValues.isNull(objectValue.opt("bottom"))) null else PNViewWidth.decode((objectValue.opt("bottom"))), if (PNValues.isNull(objectValue.opt("left"))) null else PNViewWidth.decode((objectValue.opt("left"))), if (PNValues.isNull(objectValue.opt("start"))) null else PNViewWidth.decode((objectValue.opt("start"))), if (PNValues.isNull(objectValue.opt("end"))) null else PNViewWidth.decode((objectValue.opt("end"))), if (PNValues.isNull(objectValue.opt("padding"))) null else PNViewPadding.decode((objectValue.opt("padding"))), if (PNValues.isNull(objectValue.opt("padding_top"))) null else PNViewWidth.decode((objectValue.opt("padding_top"))), if (PNValues.isNull(objectValue.opt("padding_bottom"))) null else PNViewWidth.decode((objectValue.opt("padding_bottom"))), if (PNValues.isNull(objectValue.opt("padding_left"))) null else PNViewWidth.decode((objectValue.opt("padding_left"))), if (PNValues.isNull(objectValue.opt("padding_right"))) null else PNViewWidth.decode((objectValue.opt("padding_right"))), if (PNValues.isNull(objectValue.opt("padding_start"))) null else PNViewWidth.decode((objectValue.opt("padding_start"))), if (PNValues.isNull(objectValue.opt("padding_end"))) null else PNViewWidth.decode((objectValue.opt("padding_end"))), if (PNValues.isNull(objectValue.opt("padding_horizontal"))) null else PNViewWidth.decode((objectValue.opt("padding_horizontal"))), if (PNValues.isNull(objectValue.opt("padding_vertical"))) null else PNViewWidth.decode((objectValue.opt("padding_vertical"))), if (PNValues.isNull(objectValue.opt("margin"))) null else PNViewMargin.decode((objectValue.opt("margin"))), if (PNValues.isNull(objectValue.opt("margin_top"))) null else PNViewMarginTop.decode((objectValue.opt("margin_top"))), if (PNValues.isNull(objectValue.opt("margin_bottom"))) null else PNViewMarginTop.decode((objectValue.opt("margin_bottom"))), if (PNValues.isNull(objectValue.opt("margin_left"))) null else PNViewMarginTop.decode((objectValue.opt("margin_left"))), if (PNValues.isNull(objectValue.opt("margin_right"))) null else PNViewMarginTop.decode((objectValue.opt("margin_right"))), if (PNValues.isNull(objectValue.opt("margin_start"))) null else PNViewMarginTop.decode((objectValue.opt("margin_start"))), if (PNValues.isNull(objectValue.opt("margin_end"))) null else PNViewMarginTop.decode((objectValue.opt("margin_end"))), if (PNValues.isNull(objectValue.opt("margin_horizontal"))) null else PNViewMarginTop.decode((objectValue.opt("margin_horizontal"))), if (PNValues.isNull(objectValue.opt("margin_vertical"))) null else PNViewMarginTop.decode((objectValue.opt("margin_vertical"))), if (PNValues.isNull(objectValue.opt("spacing"))) null else PNValues.number((objectValue.opt("spacing"))), if (PNValues.isNull(objectValue.opt("gap"))) null else PNValues.number((objectValue.opt("gap"))), if (PNValues.isNull(objectValue.opt("row_gap"))) null else PNValues.number((objectValue.opt("row_gap"))), if (PNValues.isNull(objectValue.opt("column_gap"))) null else PNValues.number((objectValue.opt("column_gap"))), if (PNValues.isNull(objectValue.opt("overflow"))) null else PNViewOverflow.decode((objectValue.opt("overflow"))), if (PNValues.isNull(objectValue.opt("background_color"))) null else PNValues.string((objectValue.opt("background_color"))), if (PNValues.isNull(objectValue.opt("color"))) null else PNValues.string((objectValue.opt("color"))), if (PNValues.isNull(objectValue.opt("border_color"))) null else PNValues.string((objectValue.opt("border_color"))), if (PNValues.isNull(objectValue.opt("placeholder_color"))) null else PNValues.string((objectValue.opt("placeholder_color"))), if (objectValue.has("tint_color")) PNPresence.Present(if (PNValues.isNull((objectValue.opt("tint_color")))) null else PNValues.string((objectValue.opt("tint_color")))) else PNPresence.Absent, if (PNValues.isNull(objectValue.opt("border_width"))) null else PNValues.number((objectValue.opt("border_width"))), if (PNValues.isNull(objectValue.opt("border_radius"))) null else PNValues.number((objectValue.opt("border_radius"))), if (PNValues.isNull(objectValue.opt("border_top_left_radius"))) null else PNValues.number((objectValue.opt("border_top_left_radius"))), if (PNValues.isNull(objectValue.opt("border_top_right_radius"))) null else PNValues.number((objectValue.opt("border_top_right_radius"))), if (PNValues.isNull(objectValue.opt("border_bottom_left_radius"))) null else PNValues.number((objectValue.opt("border_bottom_left_radius"))), if (PNValues.isNull(objectValue.opt("border_bottom_right_radius"))) null else PNValues.number((objectValue.opt("border_bottom_right_radius"))), if (PNValues.isNull(objectValue.opt("border_top_width"))) null else PNValues.number((objectValue.opt("border_top_width"))), if (PNValues.isNull(objectValue.opt("border_right_width"))) null else PNValues.number((objectValue.opt("border_right_width"))), if (PNValues.isNull(objectValue.opt("border_bottom_width"))) null else PNValues.number((objectValue.opt("border_bottom_width"))), if (PNValues.isNull(objectValue.opt("border_left_width"))) null else PNValues.number((objectValue.opt("border_left_width"))), if (PNValues.isNull(objectValue.opt("border_top_color"))) null else PNValues.string((objectValue.opt("border_top_color"))), if (PNValues.isNull(objectValue.opt("border_right_color"))) null else PNValues.string((objectValue.opt("border_right_color"))), if (PNValues.isNull(objectValue.opt("border_bottom_color"))) null else PNValues.string((objectValue.opt("border_bottom_color"))), if (PNValues.isNull(objectValue.opt("border_left_color"))) null else PNValues.string((objectValue.opt("border_left_color"))), if (PNValues.isNull(objectValue.opt("font_size"))) null else PNValues.number((objectValue.opt("font_size"))), if (PNValues.isNull(objectValue.opt("font_family"))) null else PNValues.string((objectValue.opt("font_family"))), if (PNValues.isNull(objectValue.opt("font_weight"))) null else PNViewFontWeight.decode((objectValue.opt("font_weight"))), if (PNValues.isNull(objectValue.opt("bold"))) null else PNValues.boolean((objectValue.opt("bold"))), if (PNValues.isNull(objectValue.opt("italic"))) null else PNValues.boolean((objectValue.opt("italic"))), if (PNValues.isNull(objectValue.opt("text_align"))) null else PNViewTextAlign.decode((objectValue.opt("text_align"))), if (PNValues.isNull(objectValue.opt("text_decoration"))) null else PNViewTextDecoration.decode((objectValue.opt("text_decoration"))), if (PNValues.isNull(objectValue.opt("text_transform"))) null else PNViewTextTransform.decode((objectValue.opt("text_transform"))), if (PNValues.isNull(objectValue.opt("line_height"))) null else PNValues.number((objectValue.opt("line_height"))), if (PNValues.isNull(objectValue.opt("letter_spacing"))) null else PNValues.number((objectValue.opt("letter_spacing"))), if (PNValues.isNull(objectValue.opt("max_lines"))) null else PNValues.integer((objectValue.opt("max_lines"))), if (PNValues.isNull(objectValue.opt("text_shadow_color"))) null else PNValues.string((objectValue.opt("text_shadow_color"))), if (PNValues.isNull(objectValue.opt("text_shadow_offset"))) null else PNViewTextShadowOffset.decode((objectValue.opt("text_shadow_offset"))), if (PNValues.isNull(objectValue.opt("text_shadow_radius"))) null else PNValues.number((objectValue.opt("text_shadow_radius"))), if (PNValues.isNull(objectValue.opt("shadow_color"))) null else PNValues.string((objectValue.opt("shadow_color"))), if (PNValues.isNull(objectValue.opt("shadow_offset"))) null else PNViewTextShadowOffset.decode((objectValue.opt("shadow_offset"))), if (PNValues.isNull(objectValue.opt("shadow_opacity"))) null else PNValues.number((objectValue.opt("shadow_opacity"))), if (PNValues.isNull(objectValue.opt("shadow_radius"))) null else PNValues.number((objectValue.opt("shadow_radius"))), if (PNValues.isNull(objectValue.opt("elevation"))) null else PNValues.number((objectValue.opt("elevation"))), if (PNValues.isNull(objectValue.opt("opacity"))) null else PNValues.number((objectValue.opt("opacity"))), if (PNValues.isNull(objectValue.opt("transform"))) null else PNViewTransform.decode((objectValue.opt("transform"))), if (PNValues.isNull(objectValue.opt("z_index"))) null else PNValues.integer((objectValue.opt("z_index"))), if (PNValues.isNull(objectValue.opt("pointer_events"))) null else PNViewPointerEvents.decode((objectValue.opt("pointer_events"))), if (PNValues.isNull(objectValue.opt("refreshing"))) null else PNValues.boolean((objectValue.opt("refreshing"))), if (objectValue.has("on_refresh")) PNPresence.Present(if (PNValues.isNull((objectValue.opt("on_refresh")))) null else PNValues.boolean((objectValue.opt("on_refresh")))) else PNPresence.Absent, if (PNValues.isNull(objectValue.opt("accessibility_role"))) null else PNValues.string((objectValue.opt("accessibility_role"))), if (PNValues.isNull(objectValue.opt("ref"))) null else PNJSONValue((objectValue.opt("ref")) ?: JSONObject.NULL), if (PNValues.isNull(objectValue.opt("on_layout"))) null else PNValues.boolean((objectValue.opt("on_layout"))))
-        }
-    }
-}
-
-enum class PNScrollViewScrollAxis(val rawValue: String) : PNNativeValue {
-    `vertical`("vertical"),
-    `horizontal`("horizontal");
-    override fun nativeValue(): Any = rawValue
-    companion object {
-        fun decode(value: Any?): PNScrollViewScrollAxis = entries.firstOrNull { it.rawValue == value }
-            ?: throw IllegalArgumentException("Invalid PNScrollViewScrollAxis")
-    }
-}
-
-data class PNStyle(
-    val `width`: PNViewWidth?,
-    val `height`: PNViewWidth?,
-    val `min_width`: PNViewWidth?,
-    val `max_width`: PNViewWidth?,
-    val `min_height`: PNViewWidth?,
-    val `max_height`: PNViewWidth?,
-    val `aspect_ratio`: Double?,
-    val `flex`: Double?,
-    val `flex_grow`: Double?,
-    val `flex_shrink`: Double?,
-    val `flex_basis`: PNViewWidth?,
-    val `flex_direction`: PNViewFlexDirection?,
-    val `flex_wrap`: PNViewFlexWrap?,
-    val `justify_content`: PNViewJustifyContent?,
-    val `align_items`: PNViewAlignItems?,
-    val `align_self`: PNViewAlignItems?,
-    val `align_content`: PNViewAlignContent?,
-    val `direction`: PNViewDirection?,
-    val `display`: PNViewDisplay?,
-    val `position`: PNViewPosition?,
-    val `top`: PNViewWidth?,
-    val `right`: PNViewWidth?,
-    val `bottom`: PNViewWidth?,
-    val `left`: PNViewWidth?,
-    val `start`: PNViewWidth?,
-    val `end`: PNViewWidth?,
-    val `padding`: PNViewPadding?,
-    val `padding_top`: PNViewWidth?,
-    val `padding_bottom`: PNViewWidth?,
-    val `padding_left`: PNViewWidth?,
-    val `padding_right`: PNViewWidth?,
-    val `padding_start`: PNViewWidth?,
-    val `padding_end`: PNViewWidth?,
-    val `padding_horizontal`: PNViewWidth?,
-    val `padding_vertical`: PNViewWidth?,
-    val `margin`: PNViewMargin?,
-    val `margin_top`: PNViewMarginTop?,
-    val `margin_bottom`: PNViewMarginTop?,
-    val `margin_left`: PNViewMarginTop?,
-    val `margin_right`: PNViewMarginTop?,
-    val `margin_start`: PNViewMarginTop?,
-    val `margin_end`: PNViewMarginTop?,
-    val `margin_horizontal`: PNViewMarginTop?,
-    val `margin_vertical`: PNViewMarginTop?,
-    val `spacing`: Double?,
-    val `gap`: Double?,
-    val `row_gap`: Double?,
-    val `column_gap`: Double?,
-    val `overflow`: PNViewOverflow?,
-    val `background_color`: String?,
-    val `color`: String?,
-    val `border_color`: String?,
-    val `placeholder_color`: String?,
-    val `tint_color`: String?,
-    val `border_width`: Double?,
-    val `border_radius`: Double?,
-    val `border_top_left_radius`: Double?,
-    val `border_top_right_radius`: Double?,
-    val `border_bottom_left_radius`: Double?,
-    val `border_bottom_right_radius`: Double?,
-    val `border_top_width`: Double?,
-    val `border_right_width`: Double?,
-    val `border_bottom_width`: Double?,
-    val `border_left_width`: Double?,
-    val `border_top_color`: String?,
-    val `border_right_color`: String?,
-    val `border_bottom_color`: String?,
-    val `border_left_color`: String?,
-    val `font_size`: Double?,
-    val `font_family`: String?,
-    val `font_weight`: PNViewFontWeight?,
-    val `bold`: Boolean?,
-    val `italic`: Boolean?,
-    val `text_align`: PNViewTextAlign?,
-    val `text_decoration`: PNViewTextDecoration?,
-    val `text_transform`: PNViewTextTransform?,
-    val `line_height`: Double?,
-    val `letter_spacing`: Double?,
-    val `max_lines`: Long?,
-    val `text_shadow_color`: String?,
-    val `text_shadow_offset`: PNViewTextShadowOffset?,
-    val `text_shadow_radius`: Double?,
-    val `shadow_color`: String?,
-    val `shadow_offset`: PNViewTextShadowOffset?,
-    val `shadow_opacity`: Double?,
-    val `shadow_radius`: Double?,
-    val `elevation`: Double?,
-    val `opacity`: Double?,
-    val `transform`: PNViewTransform?,
-    val `z_index`: Long?,
-    val `pointer_events`: PNViewPointerEvents?
-) : PNNativeValue {
-    override fun nativeValue(): Any = JSONObject().also { result ->
-        if (`width` != null) result.put("width", PNValues.encode(`width`))
-        if (`height` != null) result.put("height", PNValues.encode(`height`))
-        if (`min_width` != null) result.put("min_width", PNValues.encode(`min_width`))
-        if (`max_width` != null) result.put("max_width", PNValues.encode(`max_width`))
-        if (`min_height` != null) result.put("min_height", PNValues.encode(`min_height`))
-        if (`max_height` != null) result.put("max_height", PNValues.encode(`max_height`))
-        if (`aspect_ratio` != null) result.put("aspect_ratio", PNValues.encode(`aspect_ratio`))
-        if (`flex` != null) result.put("flex", PNValues.encode(`flex`))
-        if (`flex_grow` != null) result.put("flex_grow", PNValues.encode(`flex_grow`))
-        if (`flex_shrink` != null) result.put("flex_shrink", PNValues.encode(`flex_shrink`))
-        if (`flex_basis` != null) result.put("flex_basis", PNValues.encode(`flex_basis`))
-        if (`flex_direction` != null) result.put("flex_direction", PNValues.encode(`flex_direction`))
-        if (`flex_wrap` != null) result.put("flex_wrap", PNValues.encode(`flex_wrap`))
-        if (`justify_content` != null) result.put("justify_content", PNValues.encode(`justify_content`))
-        if (`align_items` != null) result.put("align_items", PNValues.encode(`align_items`))
-        if (`align_self` != null) result.put("align_self", PNValues.encode(`align_self`))
-        if (`align_content` != null) result.put("align_content", PNValues.encode(`align_content`))
-        if (`direction` != null) result.put("direction", PNValues.encode(`direction`))
-        if (`display` != null) result.put("display", PNValues.encode(`display`))
-        if (`position` != null) result.put("position", PNValues.encode(`position`))
-        if (`top` != null) result.put("top", PNValues.encode(`top`))
-        if (`right` != null) result.put("right", PNValues.encode(`right`))
-        if (`bottom` != null) result.put("bottom", PNValues.encode(`bottom`))
-        if (`left` != null) result.put("left", PNValues.encode(`left`))
-        if (`start` != null) result.put("start", PNValues.encode(`start`))
-        if (`end` != null) result.put("end", PNValues.encode(`end`))
-        if (`padding` != null) result.put("padding", PNValues.encode(`padding`))
-        if (`padding_top` != null) result.put("padding_top", PNValues.encode(`padding_top`))
-        if (`padding_bottom` != null) result.put("padding_bottom", PNValues.encode(`padding_bottom`))
-        if (`padding_left` != null) result.put("padding_left", PNValues.encode(`padding_left`))
-        if (`padding_right` != null) result.put("padding_right", PNValues.encode(`padding_right`))
-        if (`padding_start` != null) result.put("padding_start", PNValues.encode(`padding_start`))
-        if (`padding_end` != null) result.put("padding_end", PNValues.encode(`padding_end`))
-        if (`padding_horizontal` != null) result.put("padding_horizontal", PNValues.encode(`padding_horizontal`))
-        if (`padding_vertical` != null) result.put("padding_vertical", PNValues.encode(`padding_vertical`))
-        if (`margin` != null) result.put("margin", PNValues.encode(`margin`))
-        if (`margin_top` != null) result.put("margin_top", PNValues.encode(`margin_top`))
-        if (`margin_bottom` != null) result.put("margin_bottom", PNValues.encode(`margin_bottom`))
-        if (`margin_left` != null) result.put("margin_left", PNValues.encode(`margin_left`))
-        if (`margin_right` != null) result.put("margin_right", PNValues.encode(`margin_right`))
-        if (`margin_start` != null) result.put("margin_start", PNValues.encode(`margin_start`))
-        if (`margin_end` != null) result.put("margin_end", PNValues.encode(`margin_end`))
-        if (`margin_horizontal` != null) result.put("margin_horizontal", PNValues.encode(`margin_horizontal`))
-        if (`margin_vertical` != null) result.put("margin_vertical", PNValues.encode(`margin_vertical`))
-        if (`spacing` != null) result.put("spacing", PNValues.encode(`spacing`))
-        if (`gap` != null) result.put("gap", PNValues.encode(`gap`))
-        if (`row_gap` != null) result.put("row_gap", PNValues.encode(`row_gap`))
-        if (`column_gap` != null) result.put("column_gap", PNValues.encode(`column_gap`))
-        if (`overflow` != null) result.put("overflow", PNValues.encode(`overflow`))
-        if (`background_color` != null) result.put("background_color", PNValues.encode(`background_color`))
-        if (`color` != null) result.put("color", PNValues.encode(`color`))
-        if (`border_color` != null) result.put("border_color", PNValues.encode(`border_color`))
-        if (`placeholder_color` != null) result.put("placeholder_color", PNValues.encode(`placeholder_color`))
-        if (`tint_color` != null) result.put("tint_color", PNValues.encode(`tint_color`))
-        if (`border_width` != null) result.put("border_width", PNValues.encode(`border_width`))
-        if (`border_radius` != null) result.put("border_radius", PNValues.encode(`border_radius`))
-        if (`border_top_left_radius` != null) result.put("border_top_left_radius", PNValues.encode(`border_top_left_radius`))
-        if (`border_top_right_radius` != null) result.put("border_top_right_radius", PNValues.encode(`border_top_right_radius`))
-        if (`border_bottom_left_radius` != null) result.put("border_bottom_left_radius", PNValues.encode(`border_bottom_left_radius`))
-        if (`border_bottom_right_radius` != null) result.put("border_bottom_right_radius", PNValues.encode(`border_bottom_right_radius`))
-        if (`border_top_width` != null) result.put("border_top_width", PNValues.encode(`border_top_width`))
-        if (`border_right_width` != null) result.put("border_right_width", PNValues.encode(`border_right_width`))
-        if (`border_bottom_width` != null) result.put("border_bottom_width", PNValues.encode(`border_bottom_width`))
-        if (`border_left_width` != null) result.put("border_left_width", PNValues.encode(`border_left_width`))
-        if (`border_top_color` != null) result.put("border_top_color", PNValues.encode(`border_top_color`))
-        if (`border_right_color` != null) result.put("border_right_color", PNValues.encode(`border_right_color`))
-        if (`border_bottom_color` != null) result.put("border_bottom_color", PNValues.encode(`border_bottom_color`))
-        if (`border_left_color` != null) result.put("border_left_color", PNValues.encode(`border_left_color`))
-        if (`font_size` != null) result.put("font_size", PNValues.encode(`font_size`))
-        if (`font_family` != null) result.put("font_family", PNValues.encode(`font_family`))
-        if (`font_weight` != null) result.put("font_weight", PNValues.encode(`font_weight`))
-        if (`bold` != null) result.put("bold", PNValues.encode(`bold`))
-        if (`italic` != null) result.put("italic", PNValues.encode(`italic`))
-        if (`text_align` != null) result.put("text_align", PNValues.encode(`text_align`))
-        if (`text_decoration` != null) result.put("text_decoration", PNValues.encode(`text_decoration`))
-        if (`text_transform` != null) result.put("text_transform", PNValues.encode(`text_transform`))
-        if (`line_height` != null) result.put("line_height", PNValues.encode(`line_height`))
-        if (`letter_spacing` != null) result.put("letter_spacing", PNValues.encode(`letter_spacing`))
-        if (`max_lines` != null) result.put("max_lines", PNValues.encode(`max_lines`))
-        if (`text_shadow_color` != null) result.put("text_shadow_color", PNValues.encode(`text_shadow_color`))
-        if (`text_shadow_offset` != null) result.put("text_shadow_offset", PNValues.encode(`text_shadow_offset`))
-        if (`text_shadow_radius` != null) result.put("text_shadow_radius", PNValues.encode(`text_shadow_radius`))
-        if (`shadow_color` != null) result.put("shadow_color", PNValues.encode(`shadow_color`))
-        if (`shadow_offset` != null) result.put("shadow_offset", PNValues.encode(`shadow_offset`))
-        if (`shadow_opacity` != null) result.put("shadow_opacity", PNValues.encode(`shadow_opacity`))
-        if (`shadow_radius` != null) result.put("shadow_radius", PNValues.encode(`shadow_radius`))
-        if (`elevation` != null) result.put("elevation", PNValues.encode(`elevation`))
-        if (`opacity` != null) result.put("opacity", PNValues.encode(`opacity`))
-        if (`transform` != null) result.put("transform", PNValues.encode(`transform`))
-        if (`z_index` != null) result.put("z_index", PNValues.encode(`z_index`))
-        if (`pointer_events` != null) result.put("pointer_events", PNValues.encode(`pointer_events`))
-    }
-    companion object {
-        fun decode(value: Any?): PNStyle {
-            val objectValue = PNValues.objectValue(value)
-            return PNStyle(if (PNValues.isNull(objectValue.opt("width"))) null else PNViewWidth.decode((objectValue.opt("width"))), if (PNValues.isNull(objectValue.opt("height"))) null else PNViewWidth.decode((objectValue.opt("height"))), if (PNValues.isNull(objectValue.opt("min_width"))) null else PNViewWidth.decode((objectValue.opt("min_width"))), if (PNValues.isNull(objectValue.opt("max_width"))) null else PNViewWidth.decode((objectValue.opt("max_width"))), if (PNValues.isNull(objectValue.opt("min_height"))) null else PNViewWidth.decode((objectValue.opt("min_height"))), if (PNValues.isNull(objectValue.opt("max_height"))) null else PNViewWidth.decode((objectValue.opt("max_height"))), if (PNValues.isNull(objectValue.opt("aspect_ratio"))) null else PNValues.number((objectValue.opt("aspect_ratio"))), if (PNValues.isNull(objectValue.opt("flex"))) null else PNValues.number((objectValue.opt("flex"))), if (PNValues.isNull(objectValue.opt("flex_grow"))) null else PNValues.number((objectValue.opt("flex_grow"))), if (PNValues.isNull(objectValue.opt("flex_shrink"))) null else PNValues.number((objectValue.opt("flex_shrink"))), if (PNValues.isNull(objectValue.opt("flex_basis"))) null else PNViewWidth.decode((objectValue.opt("flex_basis"))), if (PNValues.isNull(objectValue.opt("flex_direction"))) null else PNViewFlexDirection.decode((objectValue.opt("flex_direction"))), if (PNValues.isNull(objectValue.opt("flex_wrap"))) null else PNViewFlexWrap.decode((objectValue.opt("flex_wrap"))), if (PNValues.isNull(objectValue.opt("justify_content"))) null else PNViewJustifyContent.decode((objectValue.opt("justify_content"))), if (PNValues.isNull(objectValue.opt("align_items"))) null else PNViewAlignItems.decode((objectValue.opt("align_items"))), if (PNValues.isNull(objectValue.opt("align_self"))) null else PNViewAlignItems.decode((objectValue.opt("align_self"))), if (PNValues.isNull(objectValue.opt("align_content"))) null else PNViewAlignContent.decode((objectValue.opt("align_content"))), if (PNValues.isNull(objectValue.opt("direction"))) null else PNViewDirection.decode((objectValue.opt("direction"))), if (PNValues.isNull(objectValue.opt("display"))) null else PNViewDisplay.decode((objectValue.opt("display"))), if (PNValues.isNull(objectValue.opt("position"))) null else PNViewPosition.decode((objectValue.opt("position"))), if (PNValues.isNull(objectValue.opt("top"))) null else PNViewWidth.decode((objectValue.opt("top"))), if (PNValues.isNull(objectValue.opt("right"))) null else PNViewWidth.decode((objectValue.opt("right"))), if (PNValues.isNull(objectValue.opt("bottom"))) null else PNViewWidth.decode((objectValue.opt("bottom"))), if (PNValues.isNull(objectValue.opt("left"))) null else PNViewWidth.decode((objectValue.opt("left"))), if (PNValues.isNull(objectValue.opt("start"))) null else PNViewWidth.decode((objectValue.opt("start"))), if (PNValues.isNull(objectValue.opt("end"))) null else PNViewWidth.decode((objectValue.opt("end"))), if (PNValues.isNull(objectValue.opt("padding"))) null else PNViewPadding.decode((objectValue.opt("padding"))), if (PNValues.isNull(objectValue.opt("padding_top"))) null else PNViewWidth.decode((objectValue.opt("padding_top"))), if (PNValues.isNull(objectValue.opt("padding_bottom"))) null else PNViewWidth.decode((objectValue.opt("padding_bottom"))), if (PNValues.isNull(objectValue.opt("padding_left"))) null else PNViewWidth.decode((objectValue.opt("padding_left"))), if (PNValues.isNull(objectValue.opt("padding_right"))) null else PNViewWidth.decode((objectValue.opt("padding_right"))), if (PNValues.isNull(objectValue.opt("padding_start"))) null else PNViewWidth.decode((objectValue.opt("padding_start"))), if (PNValues.isNull(objectValue.opt("padding_end"))) null else PNViewWidth.decode((objectValue.opt("padding_end"))), if (PNValues.isNull(objectValue.opt("padding_horizontal"))) null else PNViewWidth.decode((objectValue.opt("padding_horizontal"))), if (PNValues.isNull(objectValue.opt("padding_vertical"))) null else PNViewWidth.decode((objectValue.opt("padding_vertical"))), if (PNValues.isNull(objectValue.opt("margin"))) null else PNViewMargin.decode((objectValue.opt("margin"))), if (PNValues.isNull(objectValue.opt("margin_top"))) null else PNViewMarginTop.decode((objectValue.opt("margin_top"))), if (PNValues.isNull(objectValue.opt("margin_bottom"))) null else PNViewMarginTop.decode((objectValue.opt("margin_bottom"))), if (PNValues.isNull(objectValue.opt("margin_left"))) null else PNViewMarginTop.decode((objectValue.opt("margin_left"))), if (PNValues.isNull(objectValue.opt("margin_right"))) null else PNViewMarginTop.decode((objectValue.opt("margin_right"))), if (PNValues.isNull(objectValue.opt("margin_start"))) null else PNViewMarginTop.decode((objectValue.opt("margin_start"))), if (PNValues.isNull(objectValue.opt("margin_end"))) null else PNViewMarginTop.decode((objectValue.opt("margin_end"))), if (PNValues.isNull(objectValue.opt("margin_horizontal"))) null else PNViewMarginTop.decode((objectValue.opt("margin_horizontal"))), if (PNValues.isNull(objectValue.opt("margin_vertical"))) null else PNViewMarginTop.decode((objectValue.opt("margin_vertical"))), if (PNValues.isNull(objectValue.opt("spacing"))) null else PNValues.number((objectValue.opt("spacing"))), if (PNValues.isNull(objectValue.opt("gap"))) null else PNValues.number((objectValue.opt("gap"))), if (PNValues.isNull(objectValue.opt("row_gap"))) null else PNValues.number((objectValue.opt("row_gap"))), if (PNValues.isNull(objectValue.opt("column_gap"))) null else PNValues.number((objectValue.opt("column_gap"))), if (PNValues.isNull(objectValue.opt("overflow"))) null else PNViewOverflow.decode((objectValue.opt("overflow"))), if (PNValues.isNull(objectValue.opt("background_color"))) null else PNValues.string((objectValue.opt("background_color"))), if (PNValues.isNull(objectValue.opt("color"))) null else PNValues.string((objectValue.opt("color"))), if (PNValues.isNull(objectValue.opt("border_color"))) null else PNValues.string((objectValue.opt("border_color"))), if (PNValues.isNull(objectValue.opt("placeholder_color"))) null else PNValues.string((objectValue.opt("placeholder_color"))), if (PNValues.isNull(objectValue.opt("tint_color"))) null else PNValues.string((objectValue.opt("tint_color"))), if (PNValues.isNull(objectValue.opt("border_width"))) null else PNValues.number((objectValue.opt("border_width"))), if (PNValues.isNull(objectValue.opt("border_radius"))) null else PNValues.number((objectValue.opt("border_radius"))), if (PNValues.isNull(objectValue.opt("border_top_left_radius"))) null else PNValues.number((objectValue.opt("border_top_left_radius"))), if (PNValues.isNull(objectValue.opt("border_top_right_radius"))) null else PNValues.number((objectValue.opt("border_top_right_radius"))), if (PNValues.isNull(objectValue.opt("border_bottom_left_radius"))) null else PNValues.number((objectValue.opt("border_bottom_left_radius"))), if (PNValues.isNull(objectValue.opt("border_bottom_right_radius"))) null else PNValues.number((objectValue.opt("border_bottom_right_radius"))), if (PNValues.isNull(objectValue.opt("border_top_width"))) null else PNValues.number((objectValue.opt("border_top_width"))), if (PNValues.isNull(objectValue.opt("border_right_width"))) null else PNValues.number((objectValue.opt("border_right_width"))), if (PNValues.isNull(objectValue.opt("border_bottom_width"))) null else PNValues.number((objectValue.opt("border_bottom_width"))), if (PNValues.isNull(objectValue.opt("border_left_width"))) null else PNValues.number((objectValue.opt("border_left_width"))), if (PNValues.isNull(objectValue.opt("border_top_color"))) null else PNValues.string((objectValue.opt("border_top_color"))), if (PNValues.isNull(objectValue.opt("border_right_color"))) null else PNValues.string((objectValue.opt("border_right_color"))), if (PNValues.isNull(objectValue.opt("border_bottom_color"))) null else PNValues.string((objectValue.opt("border_bottom_color"))), if (PNValues.isNull(objectValue.opt("border_left_color"))) null else PNValues.string((objectValue.opt("border_left_color"))), if (PNValues.isNull(objectValue.opt("font_size"))) null else PNValues.number((objectValue.opt("font_size"))), if (PNValues.isNull(objectValue.opt("font_family"))) null else PNValues.string((objectValue.opt("font_family"))), if (PNValues.isNull(objectValue.opt("font_weight"))) null else PNViewFontWeight.decode((objectValue.opt("font_weight"))), if (PNValues.isNull(objectValue.opt("bold"))) null else PNValues.boolean((objectValue.opt("bold"))), if (PNValues.isNull(objectValue.opt("italic"))) null else PNValues.boolean((objectValue.opt("italic"))), if (PNValues.isNull(objectValue.opt("text_align"))) null else PNViewTextAlign.decode((objectValue.opt("text_align"))), if (PNValues.isNull(objectValue.opt("text_decoration"))) null else PNViewTextDecoration.decode((objectValue.opt("text_decoration"))), if (PNValues.isNull(objectValue.opt("text_transform"))) null else PNViewTextTransform.decode((objectValue.opt("text_transform"))), if (PNValues.isNull(objectValue.opt("line_height"))) null else PNValues.number((objectValue.opt("line_height"))), if (PNValues.isNull(objectValue.opt("letter_spacing"))) null else PNValues.number((objectValue.opt("letter_spacing"))), if (PNValues.isNull(objectValue.opt("max_lines"))) null else PNValues.integer((objectValue.opt("max_lines"))), if (PNValues.isNull(objectValue.opt("text_shadow_color"))) null else PNValues.string((objectValue.opt("text_shadow_color"))), if (PNValues.isNull(objectValue.opt("text_shadow_offset"))) null else PNViewTextShadowOffset.decode((objectValue.opt("text_shadow_offset"))), if (PNValues.isNull(objectValue.opt("text_shadow_radius"))) null else PNValues.number((objectValue.opt("text_shadow_radius"))), if (PNValues.isNull(objectValue.opt("shadow_color"))) null else PNValues.string((objectValue.opt("shadow_color"))), if (PNValues.isNull(objectValue.opt("shadow_offset"))) null else PNViewTextShadowOffset.decode((objectValue.opt("shadow_offset"))), if (PNValues.isNull(objectValue.opt("shadow_opacity"))) null else PNValues.number((objectValue.opt("shadow_opacity"))), if (PNValues.isNull(objectValue.opt("shadow_radius"))) null else PNValues.number((objectValue.opt("shadow_radius"))), if (PNValues.isNull(objectValue.opt("elevation"))) null else PNValues.number((objectValue.opt("elevation"))), if (PNValues.isNull(objectValue.opt("opacity"))) null else PNValues.number((objectValue.opt("opacity"))), if (PNValues.isNull(objectValue.opt("transform"))) null else PNViewTransform.decode((objectValue.opt("transform"))), if (PNValues.isNull(objectValue.opt("z_index"))) null else PNValues.integer((objectValue.opt("z_index"))), if (PNValues.isNull(objectValue.opt("pointer_events"))) null else PNViewPointerEvents.decode((objectValue.opt("pointer_events"))))
-        }
-    }
-}
-
-sealed class PNPNScrollViewContentContainerStyle2Item : PNNativeValue {
-    data class Option0(val value: PNStyle) : PNPNScrollViewContentContainerStyle2Item() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option1(val value: Map<String, PNJSONValue>) : PNPNScrollViewContentContainerStyle2Item() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option2(val value: PNJSONValue) : PNPNScrollViewContentContainerStyle2Item() { override fun nativeValue(): Any = PNValues.encode(value) }
-    companion object {
-        fun decode(value: Any?): PNPNScrollViewContentContainerStyle2Item {
-            try { return Option0(PNStyle.decode(value)) } catch (_: Exception) { }
-            try { return Option1(PNValues.objectValue(value).let { objectValue -> objectValue.keys().asSequence().associateWith { key -> PNJSONValue(objectValue.get(key) ?: JSONObject.NULL) } }) } catch (_: Exception) { }
-            try { return Option2(PNJSONValue(value ?: JSONObject.NULL)) } catch (_: Exception) { }
-            throw IllegalArgumentException("Invalid PNPNScrollViewContentContainerStyle2Item")
-        }
-    }
-}
-
-sealed class PNScrollViewContentContainerStyle : PNNativeValue {
-    data class Option0(val value: PNStyle) : PNScrollViewContentContainerStyle() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option1(val value: Map<String, PNJSONValue>) : PNScrollViewContentContainerStyle() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option2(val value: List<PNPNScrollViewContentContainerStyle2Item>) : PNScrollViewContentContainerStyle() { override fun nativeValue(): Any = PNValues.encode(value) }
-    data class Option3(val value: PNJSONValue) : PNScrollViewContentContainerStyle() { override fun nativeValue(): Any = PNValues.encode(value) }
-    companion object {
-        fun decode(value: Any?): PNScrollViewContentContainerStyle {
-            try { return Option0(PNStyle.decode(value)) } catch (_: Exception) { }
-            try { return Option1(PNValues.objectValue(value).let { objectValue -> objectValue.keys().asSequence().associateWith { key -> PNJSONValue(objectValue.get(key) ?: JSONObject.NULL) } }) } catch (_: Exception) { }
-            try { return Option2(PNValues.array(value).map { item -> PNPNScrollViewContentContainerStyle2Item.decode(item) }) } catch (_: Exception) { }
-            try { return Option3(PNJSONValue(value ?: JSONObject.NULL)) } catch (_: Exception) { }
-            throw IllegalArgumentException("Invalid PNScrollViewContentContainerStyle")
+            return PNScrollViewRefreshControl(if (PNValues.isNull(objectValue.opt("width"))) null else PNViewWidth.decode((objectValue.opt("width"))), if (PNValues.isNull(objectValue.opt("height"))) null else PNViewWidth.decode((objectValue.opt("height"))), if (PNValues.isNull(objectValue.opt("min_width"))) null else PNViewWidth.decode((objectValue.opt("min_width"))), if (PNValues.isNull(objectValue.opt("max_width"))) null else PNViewWidth.decode((objectValue.opt("max_width"))), if (PNValues.isNull(objectValue.opt("min_height"))) null else PNViewWidth.decode((objectValue.opt("min_height"))), if (PNValues.isNull(objectValue.opt("max_height"))) null else PNViewWidth.decode((objectValue.opt("max_height"))), if (PNValues.isNull(objectValue.opt("aspect_ratio"))) null else PNValues.number((objectValue.opt("aspect_ratio"))), if (PNValues.isNull(objectValue.opt("flex"))) null else PNValues.number((objectValue.opt("flex"))), if (PNValues.isNull(objectValue.opt("flex_grow"))) null else PNValues.number((objectValue.opt("flex_grow"))), if (PNValues.isNull(objectValue.opt("flex_shrink"))) null else PNValues.number((objectValue.opt("flex_shrink"))), if (PNValues.isNull(objectValue.opt("flex_basis"))) null else PNViewWidth.decode((objectValue.opt("flex_basis"))), if (PNValues.isNull(objectValue.opt("flex_direction"))) null else PNViewFlexDirection.decode((objectValue.opt("flex_direction"))), if (PNValues.isNull(objectValue.opt("flex_wrap"))) null else PNViewFlexWrap.decode((objectValue.opt("flex_wrap"))), if (PNValues.isNull(objectValue.opt("justify_content"))) null else PNViewJustifyContent.decode((objectValue.opt("justify_content"))), if (PNValues.isNull(objectValue.opt("align_items"))) null else PNViewAlignItems.decode((objectValue.opt("align_items"))), if (PNValues.isNull(objectValue.opt("align_self"))) null else PNViewAlignItems.decode((objectValue.opt("align_self"))), if (PNValues.isNull(objectValue.opt("align_content"))) null else PNViewAlignContent.decode((objectValue.opt("align_content"))), if (PNValues.isNull(objectValue.opt("direction"))) null else PNViewDirection.decode((objectValue.opt("direction"))), if (PNValues.isNull(objectValue.opt("display"))) null else PNViewDisplay.decode((objectValue.opt("display"))), if (PNValues.isNull(objectValue.opt("position"))) null else PNViewPosition.decode((objectValue.opt("position"))), if (PNValues.isNull(objectValue.opt("top"))) null else PNViewWidth.decode((objectValue.opt("top"))), if (PNValues.isNull(objectValue.opt("right"))) null else PNViewWidth.decode((objectValue.opt("right"))), if (PNValues.isNull(objectValue.opt("bottom"))) null else PNViewWidth.decode((objectValue.opt("bottom"))), if (PNValues.isNull(objectValue.opt("left"))) null else PNViewWidth.decode((objectValue.opt("left"))), if (PNValues.isNull(objectValue.opt("start"))) null else PNViewWidth.decode((objectValue.opt("start"))), if (PNValues.isNull(objectValue.opt("end"))) null else PNViewWidth.decode((objectValue.opt("end"))), if (PNValues.isNull(objectValue.opt("padding"))) null else PNViewPadding.decode((objectValue.opt("padding"))), if (PNValues.isNull(objectValue.opt("padding_top"))) null else PNViewWidth.decode((objectValue.opt("padding_top"))), if (PNValues.isNull(objectValue.opt("padding_bottom"))) null else PNViewWidth.decode((objectValue.opt("padding_bottom"))), if (PNValues.isNull(objectValue.opt("padding_left"))) null else PNViewWidth.decode((objectValue.opt("padding_left"))), if (PNValues.isNull(objectValue.opt("padding_right"))) null else PNViewWidth.decode((objectValue.opt("padding_right"))), if (PNValues.isNull(objectValue.opt("padding_start"))) null else PNViewWidth.decode((objectValue.opt("padding_start"))), if (PNValues.isNull(objectValue.opt("padding_end"))) null else PNViewWidth.decode((objectValue.opt("padding_end"))), if (PNValues.isNull(objectValue.opt("padding_horizontal"))) null else PNViewWidth.decode((objectValue.opt("padding_horizontal"))), if (PNValues.isNull(objectValue.opt("padding_vertical"))) null else PNViewWidth.decode((objectValue.opt("padding_vertical"))), if (PNValues.isNull(objectValue.opt("margin"))) null else PNViewMargin.decode((objectValue.opt("margin"))), if (PNValues.isNull(objectValue.opt("margin_top"))) null else PNViewMarginTop.decode((objectValue.opt("margin_top"))), if (PNValues.isNull(objectValue.opt("margin_bottom"))) null else PNViewMarginTop.decode((objectValue.opt("margin_bottom"))), if (PNValues.isNull(objectValue.opt("margin_left"))) null else PNViewMarginTop.decode((objectValue.opt("margin_left"))), if (PNValues.isNull(objectValue.opt("margin_right"))) null else PNViewMarginTop.decode((objectValue.opt("margin_right"))), if (PNValues.isNull(objectValue.opt("margin_start"))) null else PNViewMarginTop.decode((objectValue.opt("margin_start"))), if (PNValues.isNull(objectValue.opt("margin_end"))) null else PNViewMarginTop.decode((objectValue.opt("margin_end"))), if (PNValues.isNull(objectValue.opt("margin_horizontal"))) null else PNViewMarginTop.decode((objectValue.opt("margin_horizontal"))), if (PNValues.isNull(objectValue.opt("margin_vertical"))) null else PNViewMarginTop.decode((objectValue.opt("margin_vertical"))), if (PNValues.isNull(objectValue.opt("spacing"))) null else PNValues.number((objectValue.opt("spacing"))), if (PNValues.isNull(objectValue.opt("gap"))) null else PNValues.number((objectValue.opt("gap"))), if (PNValues.isNull(objectValue.opt("row_gap"))) null else PNValues.number((objectValue.opt("row_gap"))), if (PNValues.isNull(objectValue.opt("column_gap"))) null else PNValues.number((objectValue.opt("column_gap"))), if (PNValues.isNull(objectValue.opt("overflow"))) null else PNViewOverflow.decode((objectValue.opt("overflow"))), if (PNValues.isNull(objectValue.opt("background_color"))) null else PNViewBorderColor.decode((objectValue.opt("background_color"))), if (PNValues.isNull(objectValue.opt("color"))) null else PNViewBorderColor.decode((objectValue.opt("color"))), if (PNValues.isNull(objectValue.opt("border_color"))) null else PNViewBorderColor.decode((objectValue.opt("border_color"))), if (PNValues.isNull(objectValue.opt("placeholder_color"))) null else PNViewBorderColor.decode((objectValue.opt("placeholder_color"))), if (PNValues.isNull(objectValue.opt("tint_color"))) null else PNActivityIndicatorColor.decode((objectValue.opt("tint_color"))), if (PNValues.isNull(objectValue.opt("border_width"))) null else PNValues.number((objectValue.opt("border_width"))), if (PNValues.isNull(objectValue.opt("border_style"))) null else PNViewBorderStyle.decode((objectValue.opt("border_style"))), if (PNValues.isNull(objectValue.opt("border_radius"))) null else PNValues.number((objectValue.opt("border_radius"))), if (PNValues.isNull(objectValue.opt("border_top_left_radius"))) null else PNValues.number((objectValue.opt("border_top_left_radius"))), if (PNValues.isNull(objectValue.opt("border_top_right_radius"))) null else PNValues.number((objectValue.opt("border_top_right_radius"))), if (PNValues.isNull(objectValue.opt("border_bottom_left_radius"))) null else PNValues.number((objectValue.opt("border_bottom_left_radius"))), if (PNValues.isNull(objectValue.opt("border_bottom_right_radius"))) null else PNValues.number((objectValue.opt("border_bottom_right_radius"))), if (PNValues.isNull(objectValue.opt("border_top_width"))) null else PNValues.number((objectValue.opt("border_top_width"))), if (PNValues.isNull(objectValue.opt("border_right_width"))) null else PNValues.number((objectValue.opt("border_right_width"))), if (PNValues.isNull(objectValue.opt("border_bottom_width"))) null else PNValues.number((objectValue.opt("border_bottom_width"))), if (PNValues.isNull(objectValue.opt("border_left_width"))) null else PNValues.number((objectValue.opt("border_left_width"))), if (PNValues.isNull(objectValue.opt("border_top_color"))) null else PNViewBorderColor.decode((objectValue.opt("border_top_color"))), if (PNValues.isNull(objectValue.opt("border_right_color"))) null else PNViewBorderColor.decode((objectValue.opt("border_right_color"))), if (PNValues.isNull(objectValue.opt("border_bottom_color"))) null else PNViewBorderColor.decode((objectValue.opt("border_bottom_color"))), if (PNValues.isNull(objectValue.opt("border_left_color"))) null else PNViewBorderColor.decode((objectValue.opt("border_left_color"))), if (PNValues.isNull(objectValue.opt("font_size"))) null else PNValues.number((objectValue.opt("font_size"))), if (PNValues.isNull(objectValue.opt("font_family"))) null else PNValues.string((objectValue.opt("font_family"))), if (PNValues.isNull(objectValue.opt("font_weight"))) null else PNViewFontWeight.decode((objectValue.opt("font_weight"))), if (PNValues.isNull(objectValue.opt("bold"))) null else PNValues.boolean((objectValue.opt("bold"))), if (PNValues.isNull(objectValue.opt("italic"))) null else PNValues.boolean((objectValue.opt("italic"))), if (PNValues.isNull(objectValue.opt("text_align"))) null else PNViewTextAlign.decode((objectValue.opt("text_align"))), if (PNValues.isNull(objectValue.opt("text_decoration"))) null else PNViewTextDecoration.decode((objectValue.opt("text_decoration"))), if (PNValues.isNull(objectValue.opt("text_transform"))) null else PNViewTextTransform.decode((objectValue.opt("text_transform"))), if (PNValues.isNull(objectValue.opt("line_height"))) null else PNValues.number((objectValue.opt("line_height"))), if (PNValues.isNull(objectValue.opt("letter_spacing"))) null else PNValues.number((objectValue.opt("letter_spacing"))), if (PNValues.isNull(objectValue.opt("max_lines"))) null else PNValues.integer((objectValue.opt("max_lines"))), if (PNValues.isNull(objectValue.opt("text_shadow_color"))) null else PNViewBorderColor.decode((objectValue.opt("text_shadow_color"))), if (PNValues.isNull(objectValue.opt("text_shadow_offset"))) null else PNViewTextShadowOffset.decode((objectValue.opt("text_shadow_offset"))), if (PNValues.isNull(objectValue.opt("text_shadow_radius"))) null else PNValues.number((objectValue.opt("text_shadow_radius"))), if (PNValues.isNull(objectValue.opt("shadow_color"))) null else PNViewBorderColor.decode((objectValue.opt("shadow_color"))), if (PNValues.isNull(objectValue.opt("shadow_offset"))) null else PNViewTextShadowOffset.decode((objectValue.opt("shadow_offset"))), if (PNValues.isNull(objectValue.opt("shadow_opacity"))) null else PNValues.number((objectValue.opt("shadow_opacity"))), if (PNValues.isNull(objectValue.opt("shadow_radius"))) null else PNValues.number((objectValue.opt("shadow_radius"))), if (PNValues.isNull(objectValue.opt("elevation"))) null else PNValues.number((objectValue.opt("elevation"))), if (PNValues.isNull(objectValue.opt("opacity"))) null else PNValues.number((objectValue.opt("opacity"))), if (PNValues.isNull(objectValue.opt("transform"))) null else PNViewTransform.decode((objectValue.opt("transform"))), if (PNValues.isNull(objectValue.opt("z_index"))) null else PNValues.integer((objectValue.opt("z_index"))), if (PNValues.isNull(objectValue.opt("pointer_events"))) null else PNViewPointerEvents.decode((objectValue.opt("pointer_events"))), if (PNValues.isNull(objectValue.opt("refreshing"))) null else PNValues.boolean((objectValue.opt("refreshing"))), if (objectValue.has("on_refresh")) PNPresence.Present(if (PNValues.isNull((objectValue.opt("on_refresh")))) null else PNValues.boolean((objectValue.opt("on_refresh")))) else PNPresence.Absent, if (PNValues.isNull(objectValue.opt("accessibility_role"))) null else PNValues.string((objectValue.opt("accessibility_role"))), if (PNValues.isNull(objectValue.opt("ref"))) null else PNJSONValue((objectValue.opt("ref")) ?: JSONObject.NULL), if (PNValues.isNull(objectValue.opt("on_layout"))) null else PNValues.boolean((objectValue.opt("on_layout"))))
         }
     }
 }
@@ -1190,6 +1224,74 @@ enum class PNScrollViewKeyboardDismissMode(val rawValue: String) : PNNativeValue
     companion object {
         fun decode(value: Any?): PNScrollViewKeyboardDismissMode = entries.firstOrNull { it.rawValue == value }
             ?: throw IllegalArgumentException("Invalid PNScrollViewKeyboardDismissMode")
+    }
+}
+
+enum class PNScrollViewKeyboardShouldPersistTaps(val rawValue: String) : PNNativeValue {
+    `never`("never"),
+    `always`("always"),
+    `handled`("handled");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNScrollViewKeyboardShouldPersistTaps = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNScrollViewKeyboardShouldPersistTaps")
+    }
+}
+
+enum class PNScrollViewSnapToAlignment(val rawValue: String) : PNNativeValue {
+    `start`("start"),
+    `center`("center"),
+    `end`("end");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNScrollViewSnapToAlignment = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNScrollViewSnapToAlignment")
+    }
+}
+
+enum class PNPNScrollViewDecelerationRate0(val rawValue: String) : PNNativeValue {
+    `normal`("normal"),
+    `fast`("fast");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNPNScrollViewDecelerationRate0 = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNPNScrollViewDecelerationRate0")
+    }
+}
+
+sealed class PNScrollViewDecelerationRate : PNNativeValue {
+    data class Option0(val value: PNPNScrollViewDecelerationRate0) : PNScrollViewDecelerationRate() { override fun nativeValue(): Any = PNValues.encode(value) }
+    data class Option1(val value: Double) : PNScrollViewDecelerationRate() { override fun nativeValue(): Any = PNValues.encode(value) }
+    companion object {
+        fun decode(value: Any?): PNScrollViewDecelerationRate {
+            try { return Option0(PNPNScrollViewDecelerationRate0.decode(value)) } catch (_: Exception) { }
+            try { return Option1(PNValues.number(value)) } catch (_: Exception) { }
+            throw IllegalArgumentException("Invalid PNScrollViewDecelerationRate")
+        }
+    }
+}
+
+data class PNScrollEvent(
+    val `x`: Double,
+    val `y`: Double,
+    val `content_width`: Double,
+    val `content_height`: Double,
+    val `viewport_width`: Double,
+    val `viewport_height`: Double
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("x", PNValues.encode(`x`))
+        result.put("y", PNValues.encode(`y`))
+        result.put("content_width", PNValues.encode(`content_width`))
+        result.put("content_height", PNValues.encode(`content_height`))
+        result.put("viewport_width", PNValues.encode(`viewport_width`))
+        result.put("viewport_height", PNValues.encode(`viewport_height`))
+    }
+    companion object {
+        fun decode(value: Any?): PNScrollEvent {
+            val objectValue = PNValues.objectValue(value)
+            return PNScrollEvent(PNValues.number((objectValue.get("x"))), PNValues.number((objectValue.get("y"))), PNValues.number((if (objectValue.has("content_width")) objectValue.get("content_width") else PNValues.defaultValue("0.0"))), PNValues.number((if (objectValue.has("content_height")) objectValue.get("content_height") else PNValues.defaultValue("0.0"))), PNValues.number((if (objectValue.has("viewport_width")) objectValue.get("viewport_width") else PNValues.defaultValue("0.0"))), PNValues.number((if (objectValue.has("viewport_height")) objectValue.get("viewport_height") else PNValues.defaultValue("0.0"))))
+        }
     }
 }
 
@@ -1268,10 +1370,10 @@ data class PNSvgShape(
     val `x2`: Double?,
     val `y2`: Double?,
     val `points`: String?,
-    val `fill`: String?,
+    val `fill`: PNActivityIndicatorColor,
     val `fill_opacity`: Double?,
     val `fill_rule`: PNPNSvgShapeFillRule?,
-    val `stroke`: String?,
+    val `stroke`: PNActivityIndicatorColor,
     val `stroke_width`: Double?,
     val `stroke_opacity`: Double?,
     val `stroke_linecap`: PNPNSvgShapeStrokeLinecap?,
@@ -1312,7 +1414,7 @@ data class PNSvgShape(
     companion object {
         fun decode(value: Any?): PNSvgShape {
             val objectValue = PNValues.objectValue(value)
-            return PNSvgShape(PNPNSvgShapeKind.decode((objectValue.get("kind"))), if (PNValues.isNull((if (objectValue.has("d")) objectValue.get("d") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("d")) objectValue.get("d") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("cx")) objectValue.get("cx") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("cx")) objectValue.get("cx") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("cy")) objectValue.get("cy") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("cy")) objectValue.get("cy") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("r")) objectValue.get("r") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("r")) objectValue.get("r") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("rx")) objectValue.get("rx") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("rx")) objectValue.get("rx") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("ry")) objectValue.get("ry") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("ry")) objectValue.get("ry") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("x")) objectValue.get("x") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("x")) objectValue.get("x") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("y")) objectValue.get("y") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("y")) objectValue.get("y") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("width")) objectValue.get("width") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("width")) objectValue.get("width") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("height")) objectValue.get("height") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("height")) objectValue.get("height") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("x1")) objectValue.get("x1") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("x1")) objectValue.get("x1") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("y1")) objectValue.get("y1") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("y1")) objectValue.get("y1") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("x2")) objectValue.get("x2") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("x2")) objectValue.get("x2") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("y2")) objectValue.get("y2") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("y2")) objectValue.get("y2") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("points")) objectValue.get("points") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("points")) objectValue.get("points") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("fill")) objectValue.get("fill") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("fill")) objectValue.get("fill") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("fill_opacity")) objectValue.get("fill_opacity") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("fill_opacity")) objectValue.get("fill_opacity") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("fill_rule")) objectValue.get("fill_rule") else PNValues.defaultValue("null")))) null else PNPNSvgShapeFillRule.decode((if (objectValue.has("fill_rule")) objectValue.get("fill_rule") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke")) objectValue.get("stroke") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("stroke")) objectValue.get("stroke") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_width")) objectValue.get("stroke_width") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("stroke_width")) objectValue.get("stroke_width") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_opacity")) objectValue.get("stroke_opacity") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("stroke_opacity")) objectValue.get("stroke_opacity") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_linecap")) objectValue.get("stroke_linecap") else PNValues.defaultValue("null")))) null else PNPNSvgShapeStrokeLinecap.decode((if (objectValue.has("stroke_linecap")) objectValue.get("stroke_linecap") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_linejoin")) objectValue.get("stroke_linejoin") else PNValues.defaultValue("null")))) null else PNPNSvgShapeStrokeLinejoin.decode((if (objectValue.has("stroke_linejoin")) objectValue.get("stroke_linejoin") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_dasharray")) objectValue.get("stroke_dasharray") else PNValues.defaultValue("null")))) null else PNValues.array((if (objectValue.has("stroke_dasharray")) objectValue.get("stroke_dasharray") else PNValues.defaultValue("null"))).map { item -> PNValues.number(item) }, if (PNValues.isNull((if (objectValue.has("opacity")) objectValue.get("opacity") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("opacity")) objectValue.get("opacity") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("transform")) objectValue.get("transform") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("transform")) objectValue.get("transform") else PNValues.defaultValue("null"))))
+            return PNSvgShape(PNPNSvgShapeKind.decode((objectValue.get("kind"))), if (PNValues.isNull((if (objectValue.has("d")) objectValue.get("d") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("d")) objectValue.get("d") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("cx")) objectValue.get("cx") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("cx")) objectValue.get("cx") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("cy")) objectValue.get("cy") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("cy")) objectValue.get("cy") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("r")) objectValue.get("r") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("r")) objectValue.get("r") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("rx")) objectValue.get("rx") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("rx")) objectValue.get("rx") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("ry")) objectValue.get("ry") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("ry")) objectValue.get("ry") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("x")) objectValue.get("x") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("x")) objectValue.get("x") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("y")) objectValue.get("y") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("y")) objectValue.get("y") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("width")) objectValue.get("width") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("width")) objectValue.get("width") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("height")) objectValue.get("height") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("height")) objectValue.get("height") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("x1")) objectValue.get("x1") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("x1")) objectValue.get("x1") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("y1")) objectValue.get("y1") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("y1")) objectValue.get("y1") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("x2")) objectValue.get("x2") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("x2")) objectValue.get("x2") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("y2")) objectValue.get("y2") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("y2")) objectValue.get("y2") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("points")) objectValue.get("points") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("points")) objectValue.get("points") else PNValues.defaultValue("null"))), PNActivityIndicatorColor.decode((if (objectValue.has("fill")) objectValue.get("fill") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("fill_opacity")) objectValue.get("fill_opacity") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("fill_opacity")) objectValue.get("fill_opacity") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("fill_rule")) objectValue.get("fill_rule") else PNValues.defaultValue("null")))) null else PNPNSvgShapeFillRule.decode((if (objectValue.has("fill_rule")) objectValue.get("fill_rule") else PNValues.defaultValue("null"))), PNActivityIndicatorColor.decode((if (objectValue.has("stroke")) objectValue.get("stroke") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_width")) objectValue.get("stroke_width") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("stroke_width")) objectValue.get("stroke_width") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_opacity")) objectValue.get("stroke_opacity") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("stroke_opacity")) objectValue.get("stroke_opacity") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_linecap")) objectValue.get("stroke_linecap") else PNValues.defaultValue("null")))) null else PNPNSvgShapeStrokeLinecap.decode((if (objectValue.has("stroke_linecap")) objectValue.get("stroke_linecap") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_linejoin")) objectValue.get("stroke_linejoin") else PNValues.defaultValue("null")))) null else PNPNSvgShapeStrokeLinejoin.decode((if (objectValue.has("stroke_linejoin")) objectValue.get("stroke_linejoin") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("stroke_dasharray")) objectValue.get("stroke_dasharray") else PNValues.defaultValue("null")))) null else PNValues.array((if (objectValue.has("stroke_dasharray")) objectValue.get("stroke_dasharray") else PNValues.defaultValue("null"))).map { item -> PNValues.number(item) }, if (PNValues.isNull((if (objectValue.has("opacity")) objectValue.get("opacity") else PNValues.defaultValue("null")))) null else PNValues.number((if (objectValue.has("opacity")) objectValue.get("opacity") else PNValues.defaultValue("null"))), if (PNValues.isNull((if (objectValue.has("transform")) objectValue.get("transform") else PNValues.defaultValue("null")))) null else PNValues.string((if (objectValue.has("transform")) objectValue.get("transform") else PNValues.defaultValue("null"))))
         }
     }
 }
@@ -1366,17 +1468,60 @@ data class PNTabBarItemsItem(
     }
 }
 
+enum class PNTextEllipsizeMode(val rawValue: String) : PNNativeValue {
+    `head`("head"),
+    `middle`("middle"),
+    `tail`("tail"),
+    `clip`("clip");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNTextEllipsizeMode = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNTextEllipsizeMode")
+    }
+}
+
+data class PNSelection(
+    val `start`: Long,
+    val `end`: Long
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("start", PNValues.encode(`start`))
+        result.put("end", PNValues.encode(`end`))
+    }
+    companion object {
+        fun decode(value: Any?): PNSelection {
+            val objectValue = PNValues.objectValue(value)
+            return PNSelection(PNValues.integer((objectValue.get("start"))), PNValues.integer((objectValue.get("end"))))
+        }
+    }
+}
+
 enum class PNTextInputKeyboardType(val rawValue: String) : PNNativeValue {
     `default`("default"),
     `email_address`("email_address"),
     `number_pad`("number_pad"),
     `decimal_pad`("decimal_pad"),
     `phone_pad`("phone_pad"),
-    `url`("url");
+    `url`("url"),
+    `ascii`("ascii"),
+    `numbers_and_punctuation`("numbers_and_punctuation"),
+    `web_search`("web_search"),
+    `visible_password`("visible_password");
     override fun nativeValue(): Any = rawValue
     companion object {
         fun decode(value: Any?): PNTextInputKeyboardType = entries.firstOrNull { it.rawValue == value }
             ?: throw IllegalArgumentException("Invalid PNTextInputKeyboardType")
+    }
+}
+
+enum class PNTextInputKeyboardAppearance(val rawValue: String) : PNNativeValue {
+    `default`("default"),
+    `light`("light"),
+    `dark`("dark");
+    override fun nativeValue(): Any = rawValue
+    companion object {
+        fun decode(value: Any?): PNTextInputKeyboardAppearance = entries.firstOrNull { it.rawValue == value }
+            ?: throw IllegalArgumentException("Invalid PNTextInputKeyboardAppearance")
     }
 }
 
@@ -1403,6 +1548,52 @@ enum class PNTextInputReturnKeyType(val rawValue: String) : PNNativeValue {
     companion object {
         fun decode(value: Any?): PNTextInputReturnKeyType = entries.firstOrNull { it.rawValue == value }
             ?: throw IllegalArgumentException("Invalid PNTextInputReturnKeyType")
+    }
+}
+
+data class PNSelectionEvent(
+    val `start`: Long,
+    val `end`: Long
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("start", PNValues.encode(`start`))
+        result.put("end", PNValues.encode(`end`))
+    }
+    companion object {
+        fun decode(value: Any?): PNSelectionEvent {
+            val objectValue = PNValues.objectValue(value)
+            return PNSelectionEvent(PNValues.integer((objectValue.get("start"))), PNValues.integer((objectValue.get("end"))))
+        }
+    }
+}
+
+data class PNKeyPressEvent(
+    val `key`: String
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("key", PNValues.encode(`key`))
+    }
+    companion object {
+        fun decode(value: Any?): PNKeyPressEvent {
+            val objectValue = PNValues.objectValue(value)
+            return PNKeyPressEvent(PNValues.string((objectValue.get("key"))))
+        }
+    }
+}
+
+data class PNContentSizeEvent(
+    val `width`: Double,
+    val `height`: Double
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("width", PNValues.encode(`width`))
+        result.put("height", PNValues.encode(`height`))
+    }
+    companion object {
+        fun decode(value: Any?): PNContentSizeEvent {
+            val objectValue = PNValues.objectValue(value)
+            return PNContentSizeEvent(PNValues.number((objectValue.get("width"))), PNValues.number((objectValue.get("height"))))
+        }
     }
 }
 

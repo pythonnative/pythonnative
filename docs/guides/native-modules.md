@@ -3,7 +3,9 @@
 Native modules are PythonNative's wrappers around device APIs that
 aren't part of the view tree: the camera, GPS, file I/O, clipboard,
 share sheet, deep links, permissions, connectivity, secure storage,
-battery, haptics, and biometrics. Each module is a Swift class in
+battery, haptics, biometrics, and the device-environment set React
+Native core ships (`Keyboard`, `Dimensions`, `PixelRatio`, `Device`,
+`Localization`, `AccessibilityInfo`). Each module is a Swift class in
 `PythonNativeKit` and a Kotlin class in the `pythonnative` Gradle
 module, registered by name; the Python class you call is a thin facade
 that routes through the [native bridge](../concepts/bridge.md). Off
@@ -18,11 +20,13 @@ one up:
    plain function when the answer is already on the device and returns
    on the calling thread: `Clipboard`, `Linking`, `Haptics` /
    `Vibration`, `Battery`, `NetInfo.fetch`, `SecureStore`, `AppState`,
-   `FileSystem`, `Biometrics.is_available`. It is
-   a coroutine when the OS has to prompt the user, drive hardware, or
-   hand off to another process: `Camera.take_photo` /
-   `pick_from_gallery`, `Location.get_current`, `Share.share`,
-   `Permissions.check` / `request`, `Biometrics.authenticate`, `Notifications.*`,
+   `FileSystem`, `Biometrics.is_available`, `Keyboard`, `Dimensions`,
+   `PixelRatio`, `Device.info`, `Localization`, and
+   `AccessibilityInfo`. It is a coroutine when the OS has to prompt
+   the user, drive hardware, or hand off to another process:
+   `Camera.take_photo` / `pick_from_gallery`, `Location.get_current`,
+   `Share.share`, `Permissions.check` / `request`,
+   `Biometrics.authenticate`, `Notifications.*`,
    `Alert.confirm` / `choose`, and all of `AsyncStorage`. Inside a
    component, drive coroutines with an `async def`
    [`use_effect`][pythonnative.use_effect] callback,
@@ -41,9 +45,14 @@ one up:
    into a default. Off device the desktop implementations never raise;
    they answer with the "nothing happened" value.
 
-Two modules also ship reactive hooks:
-[`use_app_state`][pythonnative.use_app_state] and
-[`use_net_info`][pythonnative.use_net_info].
+Several modules also ship reactive hooks:
+[`use_app_state`][pythonnative.use_app_state],
+[`use_net_info`][pythonnative.use_net_info],
+[`use_locales`][pythonnative.use_locales],
+[`use_screen_reader_enabled`][pythonnative.use_screen_reader_enabled],
+and [`use_reduce_motion`][pythonnative.use_reduce_motion]. Return
+values are frozen dataclasses (`DeviceInfo`, `Locale`, `KeyboardEvent`,
+`DimensionsEvent`, `AccessibilityEvent`) rather than dicts.
 
 ## Permissions: declare them once, request at runtime
 
@@ -96,6 +105,12 @@ def CameraScreen():
     denies it, subsequent calls resolve to `None` immediately; surface
     a helpful message in your UI rather than calling in a loop.
 
+On Android, `take_photo` writes the full-resolution capture to a
+`FileProvider` URI handed to the camera app as `EXTRA_OUTPUT`, so the
+returned path is the real photo, not the intent's thumbnail. The
+library manifest declares the provider; `allow_editing=True` raises
+`NativeModuleError("unsupported")` on Android.
+
 ## Location
 
 [`Location.get_current`][pythonnative.native_modules.location.Location.get_current]
@@ -118,6 +133,8 @@ def WhereAmI():
 
 [`use_query`][pythonnative.hooks.use_query] manages the
 loading/data/error state for you and exposes a `refetch()` callable.
+`get_current` requests when-in-use permission inline on both platforms
+the first time it runs; a denial comes back as `None`.
 
 For continuous updates, write a small native module that subscribes
 to `CLLocationManagerDelegate` (iOS) or `LocationManager.requestUpdates`
@@ -190,8 +207,10 @@ token = await pn.Notifications.get_device_token()  # APNs hex token
 
 Your server passes the token to APNs to address this install. The
 simulator has no APNs connection, so test on a real device. Android
-remote push requires Firebase Cloud Messaging, which the built-in
-module doesn't wire up; `get_device_token()` returns `None` there.
+remote push requires a provider extension (Firebase Cloud Messaging),
+which the built-in module doesn't wire up; `get_device_token()` raises
+`NativeModuleError("unsupported")` there, and
+`Platform.supports("Notifications", "get_device_token")` reports it.
 
 ## Clipboard
 
@@ -249,8 +268,9 @@ unsubscribe = pn.Linking.add_listener(lambda url: navigate_to(url))
 ## Permissions (runtime)
 
 [`Permissions`][pythonnative.Permissions] normalizes the iOS/Android
-permission models. `check` is synchronous; `request` prompts and is a
-coroutine. Names are the `[permissions]` keys from `pythonnative.toml`
+permission models. Both `check` and `request` are coroutines (`check`
+reads asynchronous platform settings APIs; `request` prompts). Names
+are the `[permissions]` keys from `pythonnative.toml`
 that have a runtime prompt: `"camera"`, `"microphone"`,
 `"photo_library"`, `"location_when_in_use"`, `"contacts"`,
 `"notifications"` (any other name raises `ValueError`). Statuses:
@@ -308,10 +328,14 @@ not [`AsyncStorage`][pythonnative.storage.AsyncStorage], which is
 unencrypted.
 
 ```python
-pn.SecureStore.set_item("auth_token", token)      # raises NativeModuleError on failure
+pn.SecureStore.set_item("auth_token", token)      # raises NativeModuleError(code="write_failed")
 token = pn.SecureStore.get_item("auth_token")     # None when absent
-pn.SecureStore.delete_item("auth_token")          # True if it existed
+pn.SecureStore.delete_item("auth_token")          # raises NativeModuleError(code="delete_failed")
 ```
+
+Both writers raise when the Keychain or `EncryptedSharedPreferences`
+reports failure (for example a Keychain entitlement problem) instead of
+returning `False`; deleting a key that isn't stored is not an error.
 
 ## Battery
 
@@ -345,6 +369,95 @@ async def unlock():
     if pn.Biometrics.is_available() and await pn.Biometrics.authenticate("Unlock"):
         show_secrets()
 ```
+
+## Keyboard, dimensions, and pixel ratio
+
+[`Keyboard`][pythonnative.Keyboard] reads and dismisses the on-screen
+keyboard. Native pushes a `change` event on every show, hide, and
+resize (iOS `keyboardWillChangeFrame`, Android
+`WindowInsetsCompat.Type.ime()`), which also feeds
+[`use_keyboard_height`][pythonnative.use_keyboard_height] and
+[`KeyboardAvoidingView`][pythonnative.KeyboardAvoidingView] on both
+platforms:
+
+```python
+pn.Pressable(pn.Text("Done"), on_press=pn.Keyboard.dismiss)
+if pn.Keyboard.is_visible():
+    ...
+unsubscribe = pn.Keyboard.add_listener(lambda e: print(e.height, e.visible, e.duration_ms))
+```
+
+[`Dimensions`][pythonnative.Dimensions] and
+[`PixelRatio`][pythonnative.PixelRatio] read the window and screen
+size and the display density. Neither talks to a native module: the
+screen host publishes `width`, `height`, `scale`, `font_scale`,
+`screen_width`, and `screen_height` on every layout pass, so both work
+anywhere, including outside components. `Dimensions.add_listener`
+delivers a [`DimensionsEvent`][pythonnative.DimensionsEvent] with both
+`window` and `screen`, and fires only when a size or density changed:
+
+```python
+window = pn.Dimensions.get("window")            # a WindowDimensions
+screen = pn.Dimensions.get("screen")
+columns = 3 if window.width >= 600 else 2
+
+pn.PixelRatio.get()                              # 2.0 on a 2x display
+pn.PixelRatio.get_font_scale()                   # the user's text-size multiplier
+pn.PixelRatio.get_pixel_size_for_layout_size(1)  # whole pixels for 1 layout unit
+hairline = pn.PixelRatio.round_to_nearest_pixel(0.5)
+```
+
+Inside a component prefer
+[`use_window_dimensions`][pythonnative.use_window_dimensions], which
+re-renders on change and now carries `scale` and `font_scale` too.
+
+## Device
+
+[`Device.info`][pythonnative.Device] returns one frozen
+[`DeviceInfo`][pythonnative.DeviceInfo] record: `platform`,
+`os_version`, `model`, `manufacturer`, `is_simulator`, `is_tablet`,
+`app_name`, `app_version`, `build_number`, `bundle_id`, `scale`,
+`font_scale`, and `locale`. Every key is filled on both platforms;
+the browser preview answers from `navigator`, and off device
+`platform` is `"test"`:
+
+```python
+info = pn.Device.info()
+if info.is_tablet:
+    columns = 3
+print(f"{info.app_name} {info.app_version} ({info.build_number}) on {info.model}")
+```
+
+The writable data directory isn't part of `DeviceInfo`; use
+`FileSystem.app_dir()`.
+
+## Localization
+
+[`Localization`][pythonnative.Localization] reads the user's preferred
+languages and time zone (`Locale.preferredLanguages` on iOS,
+`LocaleList.getDefault()` on Android, `navigator.languages` in the
+browser). `get_locales()` returns [`Locale`][pythonnative.Locale]
+records (`language_tag`, `language_code`, `region_code`, `is_rtl`),
+most preferred first; `get_timezone()` returns the IANA name; and
+`is_rtl()` answers for the preferred locale. The
+[`use_locales`][pythonnative.use_locales] hook re-renders when the
+user changes either setting:
+
+```python
+locales = pn.Localization.get_locales()
+tz = pn.Localization.get_timezone()             # "America/New_York"
+direction = "rtl" if pn.Localization.is_rtl() else "ltr"
+```
+
+## Accessibility info
+
+[`AccessibilityInfo`][pythonnative.AccessibilityInfo] reads whether a
+screen reader or Reduce Motion is on, announces messages, and moves
+accessibility focus; the
+[`use_screen_reader_enabled`][pythonnative.use_screen_reader_enabled]
+and [`use_reduce_motion`][pythonnative.use_reduce_motion] hooks are the
+reactive form. See
+[Platform & Accessibility](platform-accessibility.md#accessibility-settings-accessibilityinfo).
 
 ## Writing your own native module
 

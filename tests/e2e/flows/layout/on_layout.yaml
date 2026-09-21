@@ -1,11 +1,8 @@
-# Tests the declarative on_layout prop reporting computed frames.
+# Tests on_layout delivers a LayoutEvent with the computed frame after each
+# layout pass, and that the element's ViewHandle.frame matches it.
 #
 # Demo screen: examples/e2e-suite/app/screens/layout/on_layout.py
-# Source under test: src/pythonnative/reconciler.py :: on_layout dispatch
-#
-# The readout is set exclusively from the on_layout callback, so the
-# assertions prove the callback fired with the box's real computed
-# frame after the initial mount and again after the width change.
+# Source under test: src/pythonnative/components/_base.py :: on_layout, src/pythonnative/handles.py :: ViewHandle
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -16,10 +13,12 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Measured: 120x60"
     timeout: 5000
+- assertVisible: "Handle frame: 120x60"
 - tapOn: "Widen box"
 - extendedWaitUntil:
     visible: "Measured: 200x60"
     timeout: 5000
+- assertVisible: "Handle frame: 200x60"
 - tapOn: "Shrink box"
 - extendedWaitUntil:
     visible: "Measured: 120x60"

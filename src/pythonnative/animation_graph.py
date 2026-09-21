@@ -1,4 +1,35 @@
-"""Portable animation expressions evaluated by the native UI thread."""
+"""Portable animation expressions evaluated by the native UI thread.
+
+When an animated node is attached to a view on a backend that exposes
+``install_animation_graph``, Python serializes the node's whole connected
+graph (every ancestor and descendant) and hands it to the renderer, which
+evaluates it per frame without a round trip. The wire shape is:
+
+```json
+{
+  "id": <graph id: the smallest node id in the graph>,
+  "nodes": [
+    {"id": 1, "kind": "value", "value": 0.0},
+    {"id": 2, "kind": "multiply", "inputs": [{"node": 1}, {"constant": 2.0}]},
+    {"id": 3, "kind": "interpolate", "inputs": [{"node": 2}], "ranges": [0, 100],
+     "outputs": [0, 1], "color": false, "left": "extend", "right": "clamp"},
+    {"id": 4, "kind": "diff_clamp", "inputs": [{"node": 1}], "minimum": 0,
+     "maximum": 56, "previous": 0.0, "value": 0.0}
+  ],
+  "bindings": [[<tag>, "<prop>", <node id>], ...]
+}
+```
+
+``nodes`` is in dependency order (inputs precede consumers). Arithmetic
+kinds are ``add``, ``subtract``, ``multiply``, ``divide``, ``modulo``, and
+``negate``. Color interpolations list ``outputs`` as ``[a, r, g, b]``
+channel arrays and set ``"color": true``. Stateful nodes carry their live
+state: ``diff_clamp`` reports the last input it saw (``previous``) and its
+current output (``value``). Python keeps that state current even while
+the renderer drives the graph, because ``Animated.event`` propagates every
+native-evaluated sample through the Python graph without echoing it back,
+so a re-install after a re-render never rewinds a collapsing header.
+"""
 
 from __future__ import annotations
 

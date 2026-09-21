@@ -30,8 +30,8 @@ public final class PNSwitchManager: PNComponentManager {
             }
         }
         if typed.has_on_tint_color || typed.has_tint_color {
-            let merged = try! SwitchProps(state.props)
-            control.onTintColor = (merged.on_tint_color ?? merged.tint_color).flatMap { PNColor.parse(PNValues.encode($0)) }
+            // `on_tint_color` and `tint_color` decode to different color unions; resolve from the raw values.
+            control.onTintColor = PNColor.parse(PNProps.value(state.props, "on_tint_color") ?? PNProps.value(state.props, "tint_color"))
         }
         if typed.has_thumb_color {
             control.thumbTintColor = typed.thumb_color.flatMap { PNColor.parse(PNValues.encode($0)) }
@@ -100,8 +100,7 @@ public final class PNSliderManager: PNComponentManager {
             state.extras["suppress"] = false
         }
         if typed.has_minimum_track_color || typed.has_tint_color {
-            let merged = try! SliderProps(state.props)
-            slider.minimumTrackTintColor = (merged.minimum_track_color ?? merged.tint_color).flatMap { PNColor.parse(PNValues.encode($0)) }
+            slider.minimumTrackTintColor = PNColor.parse(PNProps.value(state.props, "minimum_track_color") ?? PNProps.value(state.props, "tint_color"))
         }
         if typed.has_maximum_track_color { slider.maximumTrackTintColor = typed.maximum_track_color.flatMap { PNColor.parse(PNValues.encode($0)) } }
         if typed.has_thumb_color { slider.thumbTintColor = typed.thumb_color.flatMap { PNColor.parse(PNValues.encode($0)) } }

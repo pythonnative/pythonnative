@@ -60,7 +60,7 @@ object ImageLoader {
     }
 
     /** Load `url` (http/https) into a bitmap sized for `targetW` x `targetH` pixels. */
-    fun loadRemote(context: Context, url: String, targetW: Int, targetH: Int, callback: Callback, blur: Float = 0f): () -> Unit {
+    fun loadRemote(context: Context, url: String, targetW: Int, targetH: Int, callback: Callback, blur: Float = 0f, headers: Map<String, String> = emptyMap()): () -> Unit {
         val key = "$url@$targetW:$targetH:$blur"
         memory.get(key)?.let { callback.onResult(it, null); return {} }
         val id = identifiers.incrementAndGet()
@@ -80,7 +80,7 @@ object ImageLoader {
                     var error: String? = null
                     try {
                         val file = cachedFile(cacheDir, url)
-                        if (!file.exists() || file.length() == 0L) download(url, file, request)
+                        if (!file.exists() || file.length() == 0L) download(url, file, request, headers)
                         if (!request.cancelled.get()) {
                             bitmap = decodeDownsampled(file.absolutePath, targetW, targetH, blur = blur)
                             if (bitmap == null) { file.delete(); error = "decode failed" }
@@ -268,7 +268,8 @@ object ImageLoader {
         return File(dir, if (ext != null) "$hex.$ext" else hex)
     }
 
-    private fun download(url: String, target: File, request: Request) {
+    /** Fetch `url` into `target`, sending `headers` (the `Image.headers` prop) on every hop. */
+    private fun download(url: String, target: File, request: Request, headers: Map<String, String> = emptyMap()) {
         var current = url
         var redirects = 0
         while (true) {
@@ -279,6 +280,7 @@ object ImageLoader {
             connection.readTimeout = 30_000
             connection.instanceFollowRedirects = true
             connection.setRequestProperty("User-Agent", "PythonNative/Android")
+            for ((name, value) in headers) connection.setRequestProperty(name, value)
             try {
                 val code = connection.responseCode
                 if (code in 300..399 && redirects < 5) {

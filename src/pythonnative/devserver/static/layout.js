@@ -1,6 +1,19 @@
 import Yoga from "./yoga/src/index.js";
 
 const detached = new Set(["VirtualList", "Modal", "Portal", "ScreenStack"]);
+
+/** Height of a native-stack navigation bar, and of one with a large title. */
+export const STACK_HEADER = 44;
+export const STACK_LARGE_HEADER = 96;
+
+/**
+ * Height of the navigation bar a native-stack `Screen` reserves above its
+ * content, read from the same options the iOS and Android stacks read.
+ */
+export function stackHeaderHeight(props) {
+  if (!props || props.header_shown === false) return 0;
+  return props.header_large_title ? STACK_LARGE_HEADER : STACK_HEADER;
+}
 const containers = new Set([...detached, "View", "Row", "Column", "ScrollView", "Screen"]);
 const edges = {left:0, top:1, right:2, bottom:3, start:4, end:5, horizontal:6, vertical:7, all:8};
 const enums = {
@@ -57,7 +70,9 @@ export function computeLayout(renderer, {roots = [], width, height}) {
     view.yoga.unsetMeasureFunc();
   }
   for (const view of views) {
-    if (!detached.has(view.type)) for (const child of view.children) view.yoga.insertChild(child.yoga, view.yoga.getChildCount());
+    // Header slots (`header_left` / `header_right`) live in the stack's
+    // navigation bar, so they're laid out on their own at the bar height.
+    if (!detached.has(view.type)) for (const child of view.children) if (!child.props._pn_header_slot) view.yoga.insertChild(child.yoga, view.yoga.getChildCount());
     if (!view.yoga.getChildCount() && !containers.has(view.type)) view.yoga.setMeasureFunc((w, wm, h, hm) => {
       const [width, height] = view.manager.measure(view, wm ? w : 1e6, hm ? h : 1e6);
       return {width, height};
@@ -66,9 +81,12 @@ export function computeLayout(renderer, {roots = [], width, height}) {
   for (const tag of roots) renderer.views.get(tag)?.yoga.calculateLayout(width, height, 1);
   for (const view of views) if (view.parent && !view.yoga.getParent()) {
     const parent = view.parent;
+    if (view.props._pn_header_slot) { view.yoga.calculateLayout(NaN, STACK_HEADER, 1); continue; }
     const isList = parent.type === "VirtualList", horizontal = parent.props.horizontal;
+    // A native-stack screen sits below its navigation bar.
+    const inset = parent.type === "ScreenStack" ? stackHeaderHeight(view.props) : 0;
     view.yoga.calculateLayout(isList && horizontal ? NaN : parent.frame?.w || width,
-      isList && !horizontal ? NaN : parent.frame?.h || height, 1);
+      isList && !horizontal ? NaN : Math.max(0, (parent.frame?.h || height) - inset), 1);
   }
   const frames = [];
   for (const view of views) {

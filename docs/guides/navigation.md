@@ -13,12 +13,13 @@ mental model carries over directly:
   ([`NavigationState`][pythonnative.navigation.NavigationState]), so it
   can be persisted, restored, and deep-linked.
 
-The one thing React Navigation can't do: at the root of the app, the
-stack is **native-backed**. Pushing a screen pushes a real
-`UIViewController` on iOS or a `Fragment` on Android, so you get the
+The one thing React Navigation can't do: on a device, every stack is
+**native-backed**. Pushing a screen pushes a real `UIViewController` on
+iOS or a `Fragment` on Android, at every nesting level, so you get the
 platform's transitions, swipe-back, and state preservation for free.
-Nested navigators (tabs inside a stack, stacks inside tabs) are drawn
-in Python and keep their screens mounted between switches.
+Tab bars are native too; the drawer is drawn in Python on every
+platform and styled by the navigation theme. Without a native host
+(headless tests) the stack draws a themed header itself.
 
 ## A complete example
 
@@ -88,16 +89,32 @@ Stack = pn.create_stack_navigator()
 Stack.Navigator(
     Stack.Screen("Home", HomeScreen, title="Home"),
     Stack.Screen("Detail", DetailScreen, initial_params={"id": 0}),
-    Stack.Screen("Settings", SettingsScreen, presentation="modal"),
+    Stack.Group(
+        Stack.Screen("Settings", SettingsScreen),
+        Stack.Screen("Compose", ComposeScreen),
+        screen_options={"presentation": "modal"},
+    ),
+    screen_options=lambda route: {"title": route.name.title()},
     initial_route="Home",
 )
 ```
 
-At the root of a native host the stack pushes native screens; nested
-stacks are drawn in Python with a header (title, back button, and the
-`header_left` / `header_right` slots). Screens beneath the top stay
-mounted with their state, so popping back restores scroll position and
-inputs.
+On a device the stack pushes native screens whether it sits at the
+root or inside a tab; the native container draws the header (title,
+back button, and the `header_left` / `header_right` slots). Screens
+beneath the top stay mounted with their state, so popping back
+restores scroll position and inputs.
+
+### Navigator-level options and groups
+
+`Navigator(screen_options=...)` applies a
+[`ScreenOptions`][pythonnative.ScreenOptions] dict, or a
+`(route) -> dict` callable, to every screen. `Group(*screens,
+screen_options=...)` layers another set on a subset of screens without
+changing the route list; a group has no state of its own. Options
+resolve in this order, later entries winning: navigator, group, the
+screen itself, then `nav.set_options(...)` at runtime. Every navigator
+(stack, tab, drawer) accepts both.
 
 ### Tabs
 
@@ -113,6 +130,9 @@ Tab.Navigator(
     Tab.Screen("Inbox", InboxScreen, tab_bar_label="Inbox", tab_bar_badge=3),
     Tab.Screen("Settings", SettingsScreen, lazy=False),
     Tab.Screen("Camera", CameraScreen, unmount_on_blur=True),
+    Tab.Screen("Feed", FeedScreen, freeze_on_blur=True),
+    Tab.Screen("Threads", ThreadsStack, tab_bar_visible=False),
+    tab_bar_style={"active_tint_color": "#FF2D55", "show_labels": False},
 )
 ```
 
@@ -123,6 +143,18 @@ Tab.Navigator(
   `lazy=False` mounts it with the navigator.
 - `unmount_on_blur=True` tears a tab down when it loses focus, for
   screens that hold expensive resources.
+- `freeze_on_blur=True` reuses an unfocused tab's last rendered element
+  instead of re-rendering it when the navigator re-renders. It's a
+  parent-driven memo: a state change inside the frozen screen still
+  re-renders that component, and the screen renders fresh again when it
+  regains focus.
+- `tab_bar_visible=False` hides the tab bar while that tab is focused.
+  Set it on a tab whose nested stack pushes detail screens, or toggle it
+  at runtime with `nav.get_parent().set_options(tab_bar_visible=False)`.
+- `tab_bar_style` is a [`TabBarStyle`][pythonnative.TabBarStyle] with
+  `background_color`, `active_tint_color`, `inactive_tint_color`,
+  `translucent` (iOS only), and `show_labels`. Unset keys fall back to
+  the [navigation theme](#theming).
 
 Inside a tab screen, `use_navigation()` returns a
 [`TabNavigation`][pythonnative.navigation.TabNavigation] with
@@ -168,6 +200,7 @@ nav.push("Detail", id=43)           # always push a new Detail
 nav.replace("Login")                # swap the current screen
 nav.pop()                           # back one screen (also nav.go_back())
 nav.pop(2)                          # back two
+nav.pop_to("Home", refresh=True)    # back to the most recent Home, merging params
 nav.pop_to_top()                    # back to the first screen
 nav.reset("Home")                   # replace the whole history
 nav.reset(pn.Route("Home"), pn.Route("Detail", {"id": 1}))
@@ -175,10 +208,46 @@ nav.set_params(id=44)               # merge params into this screen's route
 nav.set_options(title="Edited")     # change ScreenOptions at runtime
 ```
 
+`pop_to` on a route that isn't in the history replaces the active
+screen, as React Navigation does; on tab and drawer navigators it falls
+back to `navigate`. `get_state()` is truthful right after an action,
+because the navigator commits its state eagerly.
+
 Introspection: `nav.route`, `nav.get_params()`, `nav.get_options()`,
 `nav.get_state()`, `nav.get_parent()`, `nav.can_go_back()`,
 `nav.is_focused()`, and `nav.kind` (`"stack"`, `"tab"`, or
 `"drawer"`).
+
+### Navigating from outside the tree
+
+Push-notification handlers, deep-link code, and services have no
+component in scope. Create a [`NavigationRef`][pythonnative.NavigationRef]
+at module level with
+[`create_navigation_ref`][pythonnative.create_navigation_ref] and bind
+it with `NavigationContainer(ref=...)`:
+
+```python
+nav_ref = pn.create_navigation_ref()
+
+
+@pn.component
+def App():
+    return pn.NavigationContainer(Stack.Navigator(...), ref=nav_ref)
+
+
+def on_push_notification(payload):
+    if nav_ref.is_ready():
+        nav_ref.navigate("Thread", id=payload["thread"])
+```
+
+The ref proxies `navigate`, `go_back`, `push`, `pop`, `pop_to`,
+`pop_to_top`, `replace`, `reset`, and `get_state` to the root
+navigator, and exposes the root
+[`Navigation`][pythonnative.Navigation] handle as `nav_ref.current`.
+Every method raises `RuntimeError` while no container is mounted, so
+check `is_ready()` from code that may run before the UI is up. The ref
+resolves only routes the root navigator knows; reach a nested screen
+with `nav_ref.navigate("Tabs", screen="Profile")`.
 
 ### Listeners
 
@@ -205,8 +274,16 @@ Events are `"focus"`, `"blur"`, `"before_remove"` (call
 with the navigator's new state). `add_listener` returns an unsubscribe
 callable, so it slots straight into `use_effect`.
 
-Native back gestures on iOS can't be intercepted by `before_remove`;
-set `gesture_enabled=False` on screens that need a guard.
+`before_remove` fires for **every** removal of the route: `pop`,
+`pop_to`, `navigate` back to an existing route, `replace`, `reset`,
+the Android back action, and the iOS swipe-back or sheet pull-down;
+`event.data["action"]` names the cause. While a route has a
+`before_remove` listener the stack marks its native screen as guarded,
+so UIKit refuses the pop synchronously and asks Python first; a vetoed
+back therefore doesn't animate the screen out and back in, and if the
+race is lost the stack restores the native screens to match Python's
+state. `gesture_enabled=False` (iOS only) disables the swipe gesture
+outright instead.
 
 ## Route params
 
@@ -365,10 +442,74 @@ listeners and back handlers can decide whether to remove a route.
 Header factories (`header_left` and `header_right`) render ordinary Python
 components within their route's providers and navigation context. Their native
 views are installed in UIKit navigation items or the Android toolbar.
-On iOS, `presentation="modal"` starts a native sheet containing its own stack;
-subsequent cards push within that sheet. Android presents these routes through
-its full-screen fragment stack. `gesture_enabled=False` prevents interactive
-iOS dismissal, and rejected native back requests restore the existing route.
+
+### Presentation and transitions
+
+`presentation` is `"card"` (default, a push) or one of the modal
+styles: `"modal"`, `"full_screen_modal"`, `"form_sheet"`, or
+`"transparent_modal"`. On iOS these map to `pageSheet`, `fullScreen`,
+`formSheet`, and `overFullScreen`; a sheet contains its own stack, so
+cards pushed from a modal screen push within the sheet. Android presents
+every modal style as a full-screen screen with a slide-from-bottom
+transition, which is what React Navigation's native stack does there.
+
+`animation` picks the push transition on both platforms: `"default"`,
+`"none"`, `"fade"`, `"slide_from_right"`, or `"slide_from_bottom"`.
+Android pushes and pops slide by default, draw a back arrow in an
+inset-aware toolbar, and render `header_large_title` as an expanded
+toolbar with a larger title (iOS uses the system large title).
+
+Two options are iOS-only and ignored on Android: `header_back_title`
+(the label of the back button on the next screen; Android shows a bare
+arrow) and `gesture_enabled` (whether the interactive swipe-back can
+pop the screen; Android's system back is always available). Predictive
+back on Android is enabled at the activity level: the system back
+preview appears once Python reports that the stack can't pop; screens
+themselves don't animate with the gesture.
+
+## Theming
+
+Navigators draw their chrome from a
+[`NavigationTheme`][pythonnative.NavigationTheme]: a frozen record with
+`dark: bool` and six [`NavigationColors`][pythonnative.NavigationColors]
+(`primary`, `background`, `card`, `text`, `border`, `notification`),
+the same shape as React Navigation's theme object. Pass one to
+`NavigationContainer(theme=...)`; without one, navigators pick
+[`DEFAULT_NAVIGATION_THEME`][pythonnative.DEFAULT_NAVIGATION_THEME] or
+[`DARK_NAVIGATION_THEME`][pythonnative.DARK_NAVIGATION_THEME] from the
+color scheme and switch when it changes.
+
+```python
+import dataclasses
+
+BRAND = dataclasses.replace(
+    pn.DEFAULT_NAVIGATION_THEME,
+    colors=dataclasses.replace(pn.DEFAULT_NAVIGATION_THEME.colors, primary="#FF2D55"),
+)
+
+
+@pn.component
+def App():
+    scheme = pn.use_color_scheme()
+    return pn.NavigationContainer(
+        Stack.Navigator(...),
+        theme=pn.DARK_NAVIGATION_THEME if scheme == "dark" else BRAND,
+    )
+```
+
+The theme supplies the default header tint, header background, title
+color, tab tint, and tab bar background sent to the native containers
+(explicit `header_tint_color`, `header_style`, `header_title_style`,
+and `tab_bar_style` keys win), and the Python-drawn header, drawer
+panel, and fallbacks use it directly. Read it in your own components
+with [`use_navigation_theme`][pythonnative.use_navigation_theme]:
+
+```python
+@pn.component
+def Card(*children):
+    theme = pn.use_navigation_theme()
+    return pn.View(*children, style=pn.style(background_color=theme.colors.card))
+```
 
 ## Testing
 

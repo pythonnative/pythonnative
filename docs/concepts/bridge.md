@@ -15,7 +15,10 @@ is queued back to Python rather than waiting for a Python handler on the UI thre
 
 A callback must never depend on a synchronous Python answer. Navigation back
 requests and recycled-row requests are asynchronous. Platforms cache restoration
-state as Python publishes it, so lifecycle saves don't wait for Python.
+state as Python publishes it, so the `save_state` and `restore_state` lifecycle
+callbacks are acknowledged without calling into Python. Viewport metrics
+(size, insets, keyboard height, color scheme, scale, and font scale) travel on
+the `layout` and `resume` host events.
 Adjacent continuous scroll and gesture samples can be coalesced. Discrete input
 preserves order. Animation input bindings evaluate before the sample is queued.
 
@@ -45,8 +48,11 @@ A surface commit has this shape:
 | `d` | tag; children must already be destroyed |
 | `f` | tag, x, y, width, height |
 
-The renderer validates the entire operation sequence before mutation: operation
-arity, live tags, insertion bounds, cycles, typed values, and finite geometry.
+Python builds the wire operations once, validates them once against the
+generated contract, and serializes the envelope once per commit; there is no
+encode-decode-patch round trip. The renderer then validates the entire
+operation sequence before mutation: operation arity, live tags, insertion
+bounds, cycles, typed values, and finite geometry.
 An accepted commit returns `ok`, `application`, `surface`, and the exact
 `revision`, plus optional native timing metrics. Python advances its bookkeeping
 only after that acknowledgment. A rejection with `failed: false` reports
@@ -59,7 +65,10 @@ isn't a recovery strategy. The current app host uses one surface.
 
 Events carry `application`, `surface`, `revision`, `sequence`, and an `args` list.
 The backend rejects callbacks from earlier applications, destroyed tags, future
-revisions, and replayed sequences. A ref addresses a live native tag; commands
+revisions, and replayed sequences. Event payloads for `on_layout`, `on_scroll`,
+`on_selection_change`, `on_key_press`, and `on_content_size_change` are
+reconstructed into the frozen dataclasses in `pythonnative.components.events`
+before the callback runs. A ref's handle addresses a live native tag; commands
 against a destroyed tag raise an error.
 
 Text changes also carry an edit revision. Python echoes the latest revision it

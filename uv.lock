@@ -964,9 +964,6 @@ wheels = [
 name = "pythonnative"
 version = "0.45.0"
 source = { editable = "." }
-dependencies = [
-    { name = "requests" },
-]
 
 [package.optional-dependencies]
 build = [
@@ -994,10 +991,7 @@ docs = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "pillow", marker = "extra == 'build'", specifier = ">=10.0" },
-    { name = "requests", specifier = ">=2.31.0" },
-]
+requires-dist = [{ name = "pillow", marker = "extra == 'build'", specifier = ">=10.0" }]
 provides-extras = ["build"]
 
 [package.metadata.requires-dev]

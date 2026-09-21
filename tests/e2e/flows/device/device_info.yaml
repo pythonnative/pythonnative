@@ -1,0 +1,30 @@
+# Tests Device.info() returns the platform name, the app identity from
+# pythonnative.toml, and positive density values.
+#
+# Demo screen: examples/e2e-suite/app/screens/device/device_info.py
+# Source under test: src/pythonnative/native_modules/device.py :: Device
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Device
+      DEMO_TITLE: Device info
+- assertVisible:
+    text: "Platform: (ios|android)"
+- assertVisible: "Simulator: yes"
+- assertVisible: "Bundle id: com.pythonnative.e2e"
+- assertVisible: "App version: 1.0.0"
+- assertVisible: "Scale positive: yes"
+- assertVisible: "Font scale positive: yes"
+- scrollUntilVisible:
+    element:
+      text: "Locale: .*"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    text: "Locale: .+"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Device

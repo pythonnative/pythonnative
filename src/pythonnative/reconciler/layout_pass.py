@@ -36,6 +36,30 @@ if TYPE_CHECKING:
 
 Frame = Tuple[float, float, float, float]
 
+_ViewHandle: Any = None
+_LayoutEvent: Any = None
+
+
+def _layout_event(frame: Frame) -> Any:
+    """Build the ``LayoutEvent`` record for ``frame`` (import deferred to avoid a cycle)."""
+    global _LayoutEvent
+    if _LayoutEvent is None:
+        from ..components.events import LayoutEvent
+
+        _LayoutEvent = LayoutEvent
+    return _LayoutEvent(*frame)
+
+
+def _is_view_handle(value: Any) -> bool:
+    """Whether ``value`` is an imperative handle whose ``frame`` the layout pass maintains."""
+    global _ViewHandle
+    if _ViewHandle is None:
+        from ..handles import ViewHandle
+
+        _ViewHandle = ViewHandle
+    return isinstance(value, _ViewHandle)
+
+
 # Native leaves whose size derives from their content; any prop change
 # invalidates their measurement.
 INTRINSIC_TYPES = frozenset(
@@ -186,20 +210,31 @@ class LayoutMixin:
         self._clear_layout_dirty(root)
 
     def _accept_native_layout(self, frames: list[list[float]]) -> None:
-        """Update refs and queue observations only for acknowledged native frames."""
+        """Update handles and queue observations only for acknowledged native frames."""
         for tag, x, y, width, height in frames:
             node = self._tag_nodes.get(int(tag))
             if node is None or not node.mounted:
                 continue
-            frame = (x, y, width, height)
-            node.last_frame = frame
-            ref = node.element.props.get("ref")
-            if ref is not None:
-                ref._pn_frame = frame
-            if "on_layout" in node.element.props:
-                self._pending_layout_events.append((int(tag), frame))
+            self._publish_frame(node, (x, y, width, height))
         if not self._rendering:
             self._dispatch_layout_events()
+
+    def _publish_frame(self, node: VNode, frame: Frame) -> None:
+        """Record a committed frame on the node, its ref's handle, and the ``on_layout`` queue."""
+        node.last_frame = frame
+        ref = node.element.props.get("ref")
+        if ref is not None:
+            handle = getattr(ref, "current", None)
+            if handle is not None:
+                self._publish_frame_to_handle(handle, frame)
+        if "on_layout" in node.element.props and node.tag is not None:
+            self._pending_layout_events.append((node.tag, frame))
+
+    @staticmethod
+    def _publish_frame_to_handle(handle: Any, frame: Frame) -> None:
+        """Write ``frame`` to ``handle.frame`` when ``handle`` is an imperative view handle."""
+        if _is_view_handle(handle):
+            handle.frame = _layout_event(frame)
 
     def _layout_detached_subtrees(self, node: VNode, viewport_w: float, viewport_h: float) -> None:
         element = node.element
@@ -274,7 +309,10 @@ class LayoutMixin:
 
     def _new_layout_node(self, node: VNode) -> LayoutNode:
         element = node.element
-        layout = LayoutNode(style=extract_layout_style(dict(element.props)), user_data=node)
+        style = extract_layout_style(dict(element.props))
+        if node.hidden_by_suspense:
+            style["display"] = "none"
+        layout = LayoutNode(style=style, user_data=node)
         layout.dirty = True
         if element.type == "ScrollView":
             # Mark the scroll axis so the engine clamps the container's
@@ -289,7 +327,7 @@ class LayoutMixin:
 
     @staticmethod
     def _scroll_axis(element: Element) -> str:
-        return "x" if element.props.get("scroll_axis", "vertical") == "horizontal" else "y"
+        return "x" if element.props.get("horizontal") else "y"
 
     @staticmethod
     def _direct_child_layouts(layout: LayoutNode, element: Element) -> List[LayoutNode]:
@@ -363,16 +401,8 @@ class LayoutMixin:
                 layout_node.height,
             )
             if node.last_frame != frame:
-                node.last_frame = frame
                 self._ops.append(SetFrameOp(node.tag, *frame))
-                ref = node.element.props.get("ref")
-                if ref is not None and hasattr(ref, "current"):
-                    try:
-                        ref._pn_frame = frame
-                    except Exception:
-                        pass
-                if "on_layout" in node.element.props:
-                    self._pending_layout_events.append((node.tag, frame))
+                self._publish_frame(node, frame)
             child_x = child_y = 0.0
         else:
             child_x = layout_node.x + parent_x
@@ -381,7 +411,7 @@ class LayoutMixin:
             self._collect_frames(child, child_x, child_y)
 
     def _dispatch_layout_events(self) -> None:
-        """Fire queued ``on_layout`` callbacks after frames were applied."""
+        """Fire queued ``on_layout`` callbacks (with a ``LayoutEvent``) after frames were applied."""
         if not self._pending_layout_events:
             return
         from ..events import dispatch_event
@@ -389,6 +419,6 @@ class LayoutMixin:
         pending, self._pending_layout_events = self._pending_layout_events, []
         for tag, frame in pending:
             try:
-                dispatch_event(tag, "on_layout", {"x": frame[0], "y": frame[1], "width": frame[2], "height": frame[3]})
+                dispatch_event(tag, "on_layout", _layout_event(frame))
             except Exception as exc:
                 diagnostics.report_error(exc, phase="event")

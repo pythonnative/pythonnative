@@ -19,6 +19,9 @@ public final class PNViewState {
     public var retained: [AnyObject] = []
     /// Recognizers installed from the `gestures` prop.
     public var gestureRecognizers: [UIGestureRecognizer] = []
+    /// Animated transform channels (`translate_x`, `rotate`, ...) overlaid
+    /// on the static `transform` prop by `PNTransform.compose`.
+    public var animatedTransform: [String: Double] = [:]
 
     // Style bookkeeping used by `PNViewStyler` at frame time.
     var requestedCornerRadius: CGFloat?
@@ -26,6 +29,9 @@ public final class PNViewState {
     var sideBorderWidths: [CGFloat]?
     var sideBorderColors: [UIColor]?
     var sideBorderLayers: [CALayer?] = [nil, nil, nil, nil]
+    /// `"dashed"` / `"dotted"` border drawn by `borderStyleLayer`; `nil` is solid.
+    var borderStyle: String?
+    var borderStyleLayer: CAShapeLayer?
 
     init(tag: Int64, typeName: String) {
         self.tag = tag

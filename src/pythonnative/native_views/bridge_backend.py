@@ -1,9 +1,11 @@
 """Revisioned native view backend.
 
-Each commit is validated, sent as a protocol-3 envelope, and acknowledged before
-Python updates its native tag index. Rejected commits poison the surface until
-it is remounted. Native events carry application, revision, sequence, and text
-edit identities. NativeViewRef holds a live native tag rather than a UI object.
+Each commit is built as wire operations once, validated once against the
+committed view state, serialized once, sent as a protocol-3 envelope, and
+acknowledged before Python updates its native tag index. Rejected commits
+poison the surface until it is remounted. Native events carry application,
+revision, sequence, and text edit identities. NativeViewRef holds a live
+native tag rather than a UI object.
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ class NativeViewRef:
 
     Attributes:
         tag: The reconciler-assigned tag; pass it to
-            ``Reconciler.dispatch_command`` or ``get_registry().command``.
+            ``Reconciler.dispatch_command`` or ``get_backend().command``.
         type_name: The element type (``"Text"``, ``"ScrollView"``, ...).
     """
 
@@ -44,7 +46,7 @@ class NativeViewRef:
 
 
 class BridgeBackend:
-    """Registry protocol implementation that forwards to the native runtime."""
+    """Backend protocol implementation that forwards to the native runtime."""
 
     def __init__(self, transport: Any = None) -> None:
         self._transport = transport
@@ -57,7 +59,6 @@ class BridgeBackend:
         self._types: Dict[int, str] = {}
         self._refs: Dict[int, NativeViewRef] = {}
         self._python_props: Dict[int, Dict[str, Any]] = {}
-        self._handlers: Dict[str, Any] = {}
         self._layout_request: Any = None
         self._layout_required = True
         self._pending_layout_request: dict[str, Any] | None = None
@@ -121,24 +122,6 @@ class BridgeBackend:
             self.on_layout(frames)
 
     # ------------------------------------------------------------------
-    # Registration (kept for protocol parity with NativeViewRegistry)
-    # ------------------------------------------------------------------
-
-    def register(self, type_name: str, handler: Any) -> None:
-        """Record a Python handler for diagnostics only.
-
-        On device, rendering is native; a Python ``ViewHandler`` can't
-        create platform views. The registration is kept so
-        ``handler_for`` can answer introspection questions and so the
-        SDK's install step doesn't fail, but it is never invoked.
-        """
-        self._handlers[type_name] = handler
-
-    def handler_for(self, type_name: str) -> Any:
-        """Return the diagnostic Python handler registered for ``type_name``."""
-        return self._handlers.get(type_name)
-
-    # ------------------------------------------------------------------
     # Tag table
     # ------------------------------------------------------------------
 
@@ -163,17 +146,21 @@ class BridgeBackend:
     # ------------------------------------------------------------------
 
     def apply_mutations(self, ops: Sequence[Mutation]) -> None:
-        """Serialize ``ops`` and apply them natively in one crossing."""
+        """Build, validate, serialize, and apply ``ops`` natively in one crossing.
+
+        A ``TextInput`` value update echoes the last edit revision the
+        native side reported, so native can discard a stale value that
+        raced a newer keystroke.
+        """
         if not ops:
             return
         if self._failed:
             raise CommitError("Native surface failed; remount the application with a new backend")
-        payload, sidecar = codec.encode_transaction(ops, self._types)
-        wire_ops = codec.loads(payload)
+        wire_ops, sidecar = codec.build_transaction(ops, self._types)
         for op in wire_ops:
             if op[0] == "u" and self._types.get(op[1]) == "TextInput" and "value" in op[2]:
                 op[2]["_pn_edit_revision"] = self._edit_revisions.get(op[1], 0)
-        envelope = {
+        envelope: Dict[str, Any] = {
             "version": PROTOCOL_VERSION,
             "application": self._commit.application,
             "surface": self._commit.surface,
@@ -182,17 +169,16 @@ class BridgeBackend:
         }
         if self._pending_layout_request is not None:
             envelope["layout"] = self._pending_layout_request
-        from ..profiling import count
+        candidate = self._commit.prepare(envelope)
+        payload = codec.dumps(envelope)
+        from ..profiling import count, native_sample, span
 
         count("bridge.commits")
         count("bridge.operations", len(ops))
         count("bridge.bytes", len(payload.encode("utf-8")))
-        candidate = self._commit.prepare(envelope)
-        from ..profiling import native_sample, span
-
         try:
             with span("transport.apply"):
-                ack = codec.loads(self.transport.apply(codec.dumps(envelope)))
+                ack = codec.loads(self.transport.apply(payload))
         except Exception:
             self._failed = True
             raise

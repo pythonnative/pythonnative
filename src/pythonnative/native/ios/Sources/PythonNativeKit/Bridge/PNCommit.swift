@@ -12,11 +12,19 @@ enum PNCommit {
     private static var types: [Int64: String] = [:]
     private static var failed = false
 
+    /// The identity of the commit being applied, while its operations run.
+    /// A view that emits during its own creation (an image starting to
+    /// load, a text input reporting its selection) belongs to that commit's
+    /// revision; stamping it with the previous one would make Python drop
+    /// the event as older than the view.
+    private static var applying: (application: String, surface: Int, revision: Int)?
+
     private static var sequence = 0
     static func event(_ args: [Any?], editRevision: Int = 0) -> String {
         sequence += 1
-        return PNJSON.encode(["application": application, "surface": surface,
-                              "revision": revision, "sequence": sequence, "args": args, "edit_revision": editRevision])
+        let identity = applying ?? (application, surface, revision)
+        return PNJSON.encode(["application": identity.application, "surface": identity.surface,
+                              "revision": identity.revision, "sequence": sequence, "args": args, "edit_revision": editRevision])
     }
 
     static func layout(_ frames: Any) -> [String: Any] {
@@ -110,6 +118,8 @@ enum PNCommit {
                 for tag in live { try PNTransaction.apply([.destroy(tag: tag)]) }
                 PNLayout.reset()
             }
+            applying = (app, target, next)
+            defer { applying = nil }
             try PNTransaction.apply(decoded)
         } catch {
             failed = true

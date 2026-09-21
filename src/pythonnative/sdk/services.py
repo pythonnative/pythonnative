@@ -13,7 +13,56 @@ from .schema import ModuleSchema, register_schema
 
 
 class DeviceService(Protocol):
+    """Static device and application facts.
+
+    ``info`` returns ``platform``, ``os_version``, ``model``,
+    ``manufacturer``, ``is_simulator``, ``is_tablet``, ``app_name``,
+    ``app_version``, ``build_number``, ``bundle_id``, ``scale``,
+    ``font_scale``, and ``locale`` on every platform. Natives also return
+    ``app_dir`` (the writable data directory ``FileSystem`` resolves
+    against), which the Python ``DeviceInfo`` record doesn't expose.
+    """
+
     def info(self) -> Dict[str, Any]: ...
+
+
+class AccessibilityInfoService(Protocol):
+    """Screen-reader and reduce-motion state, announcements, and focus.
+
+    The ``change`` event carries ``{"screen_reader": bool, "reduce_motion": bool}``.
+    """
+
+    def is_screen_reader_enabled(self) -> bool: ...
+
+    def is_reduce_motion_enabled(self) -> bool: ...
+
+    def announce(self, message: str) -> None: ...
+
+    def set_accessibility_focus(self, tag: int) -> None: ...
+
+
+class KeyboardService(Protocol):
+    """On-screen keyboard state.
+
+    The ``change`` event carries ``{"height": float, "visible": bool, "duration_ms": float}``.
+    """
+
+    def dismiss(self) -> None: ...
+
+    def is_visible(self) -> bool: ...
+
+
+class LocalizationService(Protocol):
+    """User locales and time zone.
+
+    ``get_locales`` returns records with ``language_tag``, ``language_code``,
+    ``region_code``, and ``is_rtl``, preferred locale first. The ``change``
+    event carries ``{"locales": [...], "timezone": str}``.
+    """
+
+    def get_locales(self) -> List[Dict[str, Any]]: ...
+
+    def get_timezone(self) -> str: ...
 
 
 class AppStateService(Protocol):
@@ -136,6 +185,12 @@ class AssetsService(Protocol):
     def exists(self, path: str) -> bool: ...
 
 
+class WebViewsService(Protocol):
+    """Asynchronous questions for a mounted ``WebView``, addressed by view tag."""
+
+    async def eval_js(self, tag: int, script: str) -> str: ...
+
+
 class ImagesService(Protocol):
     """Image pipeline helpers that don't belong on the ``Image`` element."""
 
@@ -149,6 +204,11 @@ class ImagesService(Protocol):
 def install_services() -> None:
     """Register the canonical interfaces without constructing service objects."""
     register_schema(ModuleSchema.from_protocol("Device", DeviceService))
+    register_schema(
+        ModuleSchema.from_protocol("AccessibilityInfo", AccessibilityInfoService, events={"change": Dict[str, Any]})
+    )
+    register_schema(ModuleSchema.from_protocol("Keyboard", KeyboardService, events={"change": Dict[str, Any]}))
+    register_schema(ModuleSchema.from_protocol("Localization", LocalizationService, events={"change": Dict[str, Any]}))
     register_schema(ModuleSchema.from_protocol("AppState", AppStateService, events={"change": str}))
     register_schema(ModuleSchema.from_protocol("Storage", StorageService))
     register_schema(ModuleSchema.from_protocol("SecureStore", SecureStoreService))
@@ -157,8 +217,8 @@ def install_services() -> None:
     register_schema(ModuleSchema.from_protocol("Share", ShareService))
     register_schema(ModuleSchema.from_protocol("Linking", LinkingService, events={"url": str}))
     register_schema(ModuleSchema.from_protocol("Haptics", HapticsService))
-    register_schema(ModuleSchema.from_protocol("Battery", BatteryService))
-    register_schema(ModuleSchema.from_protocol("NetInfo", NetInfoService))
+    register_schema(ModuleSchema.from_protocol("Battery", BatteryService, events={"change": Dict[str, Any]}))
+    register_schema(ModuleSchema.from_protocol("NetInfo", NetInfoService, events={"change": Dict[str, Any]}))
     register_schema(ModuleSchema.from_protocol("Permissions", PermissionsService))
     notifications = ModuleSchema.from_protocol("Notifications", NotificationsService)
     notifications.methods["get_device_token"]["platforms"] = ["ios"]
@@ -168,3 +228,4 @@ def install_services() -> None:
     register_schema(ModuleSchema.from_protocol("Biometrics", BiometricsService))
     register_schema(ModuleSchema.from_protocol("Assets", AssetsService))
     register_schema(ModuleSchema.from_protocol("Images", ImagesService))
+    register_schema(ModuleSchema.from_protocol("WebViews", WebViewsService))

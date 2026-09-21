@@ -26,7 +26,7 @@ from pythonnative.element import Element
 from pythonnative.hooks import use_state
 from pythonnative.mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, SetFrameOp, UpdateOp
 from pythonnative.native_modules import registry as modules
-from pythonnative.native_views import get_registry, set_registry
+from pythonnative.native_views import get_backend, set_backend
 from pythonnative.native_views.bridge_backend import BridgeBackend, NativeViewRef
 from pythonnative.reconciler import Reconciler
 from pythonnative.sdk.schema import COMPONENTS
@@ -37,17 +37,17 @@ def transport() -> Generator[FakeTransport, None, None]:
     fake = FakeTransport()
     bridge.set_transport(fake)
     backend = BridgeBackend(fake)
-    set_registry(backend)
+    set_backend(backend)
     modules._reset_for_tests()
     yield fake
     modules._reset_for_tests()
-    set_registry(None)
+    set_backend(None)
     bridge._reset_for_tests()
 
 
 @pytest.fixture
 def backend(transport: FakeTransport) -> BridgeBackend:
-    reg = get_registry()
+    reg = get_backend()
     assert isinstance(reg, BridgeBackend)
     return reg
 
@@ -253,7 +253,7 @@ def test_reconciler_commits_through_bridge(transport: FakeTransport) -> None:
             style={"flex": 1},
         )
 
-    rec = Reconciler(get_registry())
+    rec = Reconciler(get_backend())
     rec.on_render_requested = lambda: rec.flush_dirty()
     root = rec.mount(App())
     rec.set_viewport_size(320, 480)
@@ -267,6 +267,9 @@ def test_reconciler_commits_through_bridge(transport: FakeTransport) -> None:
     assert column.frame[2:] == (320.0, 480.0) or column.frame == (0.0, 0.0, 0.0, 0.0)
 
     transport.fire(button.tag, "on_press")
+    from pythonnative import runtime
+
+    runtime.drain(0.2)  # the setter schedules one flush on the loop
     assert transport.find("Text")[0].props["text"] == "count=1"
     rec.unmount()
     assert transport.views == {}
@@ -307,7 +310,7 @@ def test_animated_transform_shorthands_cross_the_bridge(name: str, transport: Fa
     translate = pn.Animated.Value(10)
     factory = getattr(pn.Animated, name)
     children = [] if name == "View" else ["box" if name == "Text" else "https://example.com/image.png"]
-    rec = Reconciler(get_registry())
+    rec = Reconciler(get_backend())
     try:
         rec.mount(factory(*children, style={"scale": scale, "translate_x": translate, "rotate": 45}))
         props = transport.find(name)[0].props
@@ -320,7 +323,7 @@ def test_animated_transform_shorthands_cross_the_bridge(name: str, transport: Fa
 def test_event_handler_return_value_is_returned_to_native(transport: FakeTransport) -> None:
     from pythonnative.events import get_event_registry
 
-    get_registry().apply_mutations([CreateOp(11, "VirtualList", {})])
+    get_backend().apply_mutations([CreateOp(11, "VirtualList", {})])
     get_event_registry().set_events(11, {"on_bind_row": lambda payload: {"root": payload["index"] * 2}})
     try:
         assert transport.fire(11, "on_bind_row", {"index": 21}) == {"root": 42}
@@ -332,7 +335,7 @@ def test_event_handler_return_value_is_returned_to_native(transport: FakeTranspo
 def test_destroyed_view_drops_queued_event(transport: FakeTransport) -> None:
     from pythonnative.events import get_event_registry
 
-    backend = get_registry()
+    backend = get_backend()
     backend.apply_mutations([CreateOp(50, "Button", {"title": "Press"})])
     seen: list[str] = []
     get_event_registry().set_events(50, {"on_press": lambda: seen.append("press")})
@@ -416,7 +419,7 @@ def test_facades_use_bridge_modules_on_device(transport: FakeTransport) -> None:
     transport.module_handlers["SecureStore"] = secure
     assert pn.SecureStore.set_item("token", "abc") is None
     assert pn.SecureStore.get_item("token") == "abc"
-    assert pn.SecureStore.delete_item("token") is True
+    assert pn.SecureStore.delete_item("token") is None
     assert pn.SecureStore.get_item("token") is None
 
 
@@ -516,7 +519,9 @@ def _install_app(monkeypatch: pytest.MonkeyPatch, name: str, root: Any) -> str:
     return name
 
 
-def test_native_host_lifecycle_and_navigation(transport: FakeTransport, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_native_host_lifecycle_and_navigation(
+    transport: FakeTransport, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
     from pythonnative import platform_metrics
     from pythonnative.hosts import native as hosts
 
@@ -540,7 +545,7 @@ def test_native_host_lifecycle_and_navigation(transport: FakeTransport, monkeypa
     assert transport.views[root_tag].type_name == "Column"
     assert ("Host", "attach_root", {"screen": 1, "tag": root_tag}) in transport.calls
     assert platform_metrics.get_safe_area_insets().bottom == 34.0
-    assert platform_metrics.get_window_dimensions() == (390.0, 844.0)
+    assert platform_metrics.get_window_dimensions()[:2] == (390.0, 844.0)
     assert pn.appearance.get_system_color_scheme() == "dark"
     assert host.reconciler.viewport_size == (390.0, 844.0)
 
@@ -564,6 +569,9 @@ def test_native_host_lifecycle_and_navigation(transport: FakeTransport, monkeypa
     transport.host_event(1, "destroy")
     assert hosts.host_for_screen(1) is None
     assert transport.views == {}
+    # Bridge callbacks swallow exceptions and print them; a lifecycle
+    # event that raises would otherwise pass silently.
+    assert "Traceback" not in capfd.readouterr().err
     pn.appearance.reset_color_scheme()
     platform_metrics.reset_safe_area_insets()
     platform_metrics.reset_window_dimensions()

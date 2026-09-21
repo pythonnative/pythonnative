@@ -170,7 +170,7 @@ def test_use_theme_provider_pins_explicit_theme() -> None:
 
     @component
     def app() -> Element:
-        return ThemeContext.Provider(custom, consumer())
+        return ThemeContext.Provider(consumer(), value=custom)
 
     rec = Reconciler(FakeBackend())
     rec.on_render_requested = lambda: None
@@ -191,7 +191,7 @@ def test_use_theme_rejects_untyped_provider_values() -> None:
 
     @component
     def app() -> Element:
-        return ThemeContext.Provider({"text_color": "#ABCDEF"}, consumer())
+        return ThemeContext.Provider(consumer(), value={"text_color": "#ABCDEF"})
 
     rec = Reconciler(FakeBackend())
     rec.on_render_requested = lambda: None

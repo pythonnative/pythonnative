@@ -73,9 +73,9 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
             diagnostics.set_dev_mode(True)
         # Import the view backend eagerly: on a slow device the first
         # commit shouldn't also pay for importing the reconciler.
-        from .native_views import get_registry
+        from .native_views import get_backend
 
-        get_registry()
+        get_backend()
         if dev_mode:
             # Debug builds are dev clients: connect to `pn start` when
             # the build (or a remembered connection) names a server.

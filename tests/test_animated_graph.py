@@ -16,7 +16,7 @@ from pythonnative.animated import (
     _resolve_style_with_values,
 )
 from pythonnative.gestures import GestureEvent, GestureState
-from pythonnative.native_views import set_registry
+from pythonnative.native_views import set_backend
 from pythonnative.testing import FakeBackend
 
 # ======================================================================
@@ -161,7 +161,7 @@ def test_operator_divide_by_zero_is_safe() -> None:
 
 def test_derived_node_pushes_to_native_attachment() -> None:
     backend = FakeBackend()
-    set_registry(backend)
+    set_backend(backend)
     try:
         v = AnimatedValue(0.0)
         iv = v.interpolate([0, 1], [0, 100])
@@ -170,12 +170,12 @@ def test_derived_node_pushes_to_native_attachment() -> None:
         v.set_value(0.5)
         assert (9, "translate_y", 50.0) in backend.animated
     finally:
-        set_registry(None)
+        set_backend(None)
 
 
 def test_derived_chain_pushes_through_operators() -> None:
     backend = FakeBackend()
-    set_registry(backend)
+    set_backend(backend)
     try:
         v = AnimatedValue(1.0)
         node = v * 10 + 5
@@ -184,7 +184,7 @@ def test_derived_chain_pushes_through_operators() -> None:
         v.set_value(2.0)
         assert (3, "translate_x", 25.0) in backend.animated
     finally:
-        set_registry(None)
+        set_backend(None)
 
 
 # ======================================================================
@@ -250,6 +250,50 @@ def test_event_ignores_missing_fields() -> None:
     assert y.value == 1.0
 
 
+class _GraphBackend(FakeBackend):
+    """FakeBackend that evaluates animation graphs natively (like the platform hosts)."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.graphs: List[Any] = []
+
+    def install_animation_graph(self, tag: int, graph: Any) -> None:
+        self.graphs.append(graph)
+
+
+def test_event_on_graph_backend_updates_listeners_and_dependents_without_echo() -> None:
+    from pythonnative.animation_graph import serialize
+
+    backend = _GraphBackend()
+    set_backend(backend)
+    try:
+        y = AnimatedValue(0.0)
+        clamp = Animated.diff_clamp(y, 0, 50)
+        clamp.attach(3, "translate_y")
+        seen: List[float] = []
+        y.add_listener("y", seen.append)
+        backend.animated.clear()
+
+        handler = Animated.event(y=y)
+        handler({"y": 100.0})
+        handler({"y": 60.0})
+
+        # Python listeners observe every sample.
+        assert seen == [100.0, 60.0]
+        assert y.value == 60.0
+        # Stateful dependents track the deltas exactly as the native graph did.
+        assert clamp.value == 10.0
+        # The frame is already on screen: nothing is pushed back to the renderer.
+        assert backend.animated == []
+        # A later re-install (re-render) serializes the current state, not the initial one.
+        nodes = {node["kind"]: node for node in serialize(y)["nodes"]}
+        assert nodes["value"]["value"] == 60.0
+        assert nodes["diff_clamp"]["previous"] == 60.0
+        assert nodes["diff_clamp"]["value"] == 10.0
+    finally:
+        set_backend(None)
+
+
 # ======================================================================
 # Native driver eligibility
 # ======================================================================
@@ -270,7 +314,7 @@ class _AcceptingBackend(FakeBackend):
 
 def test_values_with_derived_dependents_stay_on_python_driver() -> None:
     backend = _AcceptingBackend()
-    set_registry(backend)
+    set_backend(backend)
     try:
         v = AnimatedValue(0.0)
         v.attach(1, "translate_y")
@@ -291,7 +335,7 @@ def test_values_with_derived_dependents_stay_on_python_driver() -> None:
         opacity_values = [val for tag, prop, val in backend.animated if (tag, prop) == (2, "opacity")]
         assert opacity_values and abs(opacity_values[-1]) < 0.01
     finally:
-        set_registry(None)
+        set_backend(None)
 
 
 # ======================================================================

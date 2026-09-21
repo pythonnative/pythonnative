@@ -23,6 +23,9 @@ import org.json.JSONObject
 class GestureArbiter(specs: List<GestureConfig>, private val emitOut: EmitFn) {
     private enum class State { POSSIBLE, WAITING, ACTIVE, DONE, FAILED }
 
+    /** Offset from view coordinates to window coordinates (dp), from the latest pointer sample. */
+    private var windowOffset = Point(0.0, 0.0)
+
     private val pointers = LinkedHashMap<Int, Point>()
     private val recognizers = ArrayList<Recognizer>()
     private val indices = ArrayList<Int>()
@@ -33,7 +36,9 @@ class GestureArbiter(specs: List<GestureConfig>, private val emitOut: EmitFn) {
     private var lastT = 0.0
 
     init {
+        // Disabled specs are skipped but keep their index so `gesture:<index>` events stay aligned.
         specs.forEachIndexed { i, spec ->
+            if (!spec.enabled) return@forEachIndexed
             val recognizer = Recognizer.create(i, spec) { index, payload -> mediate(index, payload) } ?: return@forEachIndexed
             recognizers.add(recognizer)
             indices.add(i)
@@ -45,9 +50,14 @@ class GestureArbiter(specs: List<GestureConfig>, private val emitOut: EmitFn) {
 
     // -- pointer input ---------------------------------------------------
 
-    /** Record a pointer press and advance every recognizer. */
-    fun pointerDown(pointerId: Int, x: Double, y: Double, t: Double) {
+    /**
+     * Record a pointer press and advance every recognizer. `absX`/`absY`
+     * are the same point in window coordinates (defaulting to `x`/`y`);
+     * emitted payloads gain `absolute_x`/`absolute_y` from them.
+     */
+    fun pointerDown(pointerId: Int, x: Double, y: Double, t: Double, absX: Double = x, absY: Double = y) {
         lastT = t
+        windowOffset = Point(absX - x, absY - y)
         if (pointers.isEmpty() && states.values.none { it == State.WAITING }) {
             for (i in indices) states[i] = State.POSSIBLE
             buffers.clear()
@@ -57,16 +67,18 @@ class GestureArbiter(specs: List<GestureConfig>, private val emitOut: EmitFn) {
     }
 
     /** Record pointer travel and advance every recognizer. */
-    fun pointerMove(pointerId: Int, x: Double, y: Double, t: Double) {
+    fun pointerMove(pointerId: Int, x: Double, y: Double, t: Double, absX: Double = x, absY: Double = y) {
         lastT = t
+        windowOffset = Point(absX - x, absY - y)
         if (!pointers.containsKey(pointerId)) return
         pointers[pointerId] = Point(x, y)
         for (r in recognizers) r.move(pointers, t)
     }
 
     /** Record a pointer release and advance every recognizer. */
-    fun pointerUp(pointerId: Int, x: Double, y: Double, t: Double) {
+    fun pointerUp(pointerId: Int, x: Double, y: Double, t: Double, absX: Double = x, absY: Double = y) {
         lastT = t
+        windowOffset = Point(absX - x, absY - y)
         pointers.remove(pointerId)
         for (r in recognizers) r.up(pointers, t, x, y)
     }
@@ -96,6 +108,20 @@ class GestureArbiter(specs: List<GestureConfig>, private val emitOut: EmitFn) {
 
     private fun recognizerFor(index: Int): Recognizer? = recognizers.firstOrNull { it.index == index }
 
+    /** Emit `payload`, adding window coordinates for positioned payloads. */
+    private fun deliver(index: Int, payload: Map<String, Any?>) {
+        val x = payload["x"] as? Double
+        val y = payload["y"] as? Double
+        if (x == null || y == null) {
+            emitOut(index, payload)
+            return
+        }
+        val out = LinkedHashMap(payload)
+        out["absolute_x"] = x + windowOffset.x
+        out["absolute_y"] = y + windowOffset.y
+        emitOut(index, out)
+    }
+
     private fun isSimultaneous(a: Int, b: Int): Boolean {
         val simA = sim[a] ?: return true
         val simB = sim[b] ?: return true
@@ -112,7 +138,7 @@ class GestureArbiter(specs: List<GestureConfig>, private val emitOut: EmitFn) {
         when (current) {
             State.FAILED -> return
             State.ACTIVE -> {
-                emitOut(index, payload)
+                deliver(index, payload)
                 if (state == GestureState.ENDED) {
                     states[index] = State.DONE
                     onResolved(index, succeeded = true)
@@ -161,7 +187,7 @@ class GestureArbiter(specs: List<GestureConfig>, private val emitOut: EmitFn) {
                 setFailed(j)
             }
         }
-        for (p in payloads) emitOut(index, p)
+        for (p in payloads) deliver(index, p)
         if (states[index] == State.DONE) onResolved(index, succeeded = true)
     }
 
@@ -209,19 +235,45 @@ class GestureArbiter(specs: List<GestureConfig>, private val emitOut: EmitFn) {
 
         /** Decode one spec object. */
         fun decodeSpec(spec: JSONObject): GestureConfig {
+            val kind = spec.optString("kind", "")
             return GestureConfig(
-                kind = spec.optString("kind", ""),
+                kind = kind,
+                enabled = spec.optBoolean("enabled", true),
                 nTaps = spec.optInt("n_taps", 1),
                 maxDistance = spec.optDouble("max_distance", 12.0),
                 minDurationMs = spec.optDouble("min_duration_ms", 500.0),
-                minDistance = spec.optDouble("min_distance", 10.0),
+                minDistance = nullableDouble(spec, "min_distance", 10.0),
                 minPointers = spec.optInt("min_pointers", 1),
-                direction = spec.optString("direction", "any"),
-                minVelocity = spec.optDouble("min_velocity", 300.0),
+                maxPointers = if (spec.isNull("max_pointers") || !spec.has("max_pointers")) null else spec.optInt("max_pointers"),
+                activeOffsetX = offset(spec.opt("active_offset_x")),
+                activeOffsetY = offset(spec.opt("active_offset_y")),
+                failOffsetX = offset(spec.opt("fail_offset_x")),
+                failOffsetY = offset(spec.opt("fail_offset_y")),
+                // Swipes default to 300 dp/s; a pan without a velocity criterion sends null.
+                minVelocity = nullableDouble(spec, "min_velocity", if (kind == "pan") null else 300.0),
+                direction = spec.optString("direction", "any").takeIf { it.isNotEmpty() && it != "any" && !spec.isNull("direction") },
                 nPointers = spec.optInt("n_pointers", 1),
                 simultaneous = spec.optJSONArray("simultaneous")?.let { intSet(it) },
                 waitFor = spec.optJSONArray("wait_for")?.let { intSet(it) } ?: emptySet(),
             )
+        }
+
+        /** `default` when the key is absent, `null` when it is an explicit JSON null. */
+        private fun nullableDouble(spec: JSONObject, key: String, default: Double?): Double? = when {
+            !spec.has(key) -> default
+            spec.isNull(key) -> null
+            else -> spec.optDouble(key).takeIf { it.isFinite() } ?: default
+        }
+
+        /** Decode `[negative|null, positive|null]` (or a bare number, one-sided) into an [Offset]. */
+        fun offset(value: Any?): Offset? = when (value) {
+            null, JSONObject.NULL -> null
+            is Number -> value.toDouble().let { if (it >= 0) Offset(null, it) else Offset(it, null) }
+            is JSONArray -> Offset(
+                if (value.isNull(0)) null else value.optDouble(0).takeIf { it.isFinite() },
+                if (value.isNull(1)) null else value.optDouble(1).takeIf { it.isFinite() },
+            )
+            else -> null
         }
 
         private fun intSet(array: JSONArray): Set<Int> {

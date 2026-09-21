@@ -75,11 +75,11 @@ def DrawerNavigatorDemo() -> pn.Element:
             "Drawer (nested)",
             pn.View(
                 _NavBus.Provider(
-                    bus,
                     _Drawer.Navigator(
                         _Drawer.Screen("One", _DrawerOne, title="One"),
                         _Drawer.Screen("Two", _DrawerTwo, title="Two"),
                     ),
+                    value=bus,
                 ),
                 style=pn.style(height=260, border_radius=8, background_color="#F8FAFC"),
             ),

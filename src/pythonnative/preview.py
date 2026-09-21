@@ -180,14 +180,14 @@ class PreviewSession:
     def _destroy_hosts(self) -> None:
         """Unmount every screen the page created (it is gone, so are its views)."""
         from .hosts.native import live_hosts
-        from .native_views import get_registry
+        from .native_views import get_backend
 
         for host in list(live_hosts()):
             try:
                 host.on_destroy()
             except Exception:
                 traceback.print_exc()
-        backend = get_registry()
+        backend = get_backend()
         reset = getattr(backend, "reset", None)
         if callable(reset):
             reset()

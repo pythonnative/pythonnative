@@ -13,7 +13,8 @@ runtime, however, is meaningfully different.
   the tree.
 - Hooks ([`use_state`][pythonnative.use_state],
   [`use_effect`][pythonnative.use_effect], etc.) drive re-renders.
-  State updates are batched per render pass.
+  State updates are batched automatically: every setter call in one
+  callback, effect, or task step produces one render pass.
 - Re-rendering produces a new tree; the reconciler diffs it against
   the previous one and applies the smallest set of native mutations.
 - Native widgets are created and updated by Swift and Kotlin
@@ -38,15 +39,16 @@ Each render pass has three phases:
 1. **Render**: component functions run; hooks record state reads,
    queue effects, register memos. No native widgets change yet.
 2. **Commit**: the reconciler applies the diff to native views,
-   creating, updating, and removing widgets through the registered
-   [`ViewHandler`][pythonnative.native_views.base.ViewHandler]
-   implementations.
+   creating, updating, and removing widgets through one serialized
+   transaction that the Swift and Kotlin component managers apply.
 3. **Effect**: pending [`use_effect`][pythonnative.use_effect]
    callbacks fire in depth-first order; cleanups from the previous
    render run before the new callbacks.
 
-If an effect sets state, the loop kicks off again (with a safety cap
-that prevents render storms).
+If an effect sets state, the loop kicks off again. A component that
+keeps dirtying itself for more than fifty passes raises
+`RuntimeError("Too many re-renders")`, routed through the nearest
+[`ErrorBoundary`][pythonnative.ErrorBoundary] like any render error.
 
 ## How PythonNative differs from React Native
 
@@ -96,8 +98,10 @@ When something feels surprising, fall back on these rules:
 
 !!! tip "Native widgets are real"
     A `pn.Text` becomes a `UILabel` or a `TextView`. Anything you can
-    do to those in their respective SDKs, you can usually do via a
-    custom [`ViewHandler`][pythonnative.native_views.base.ViewHandler].
+    do to those in their respective SDKs, you can usually do with a
+    [custom native component](../guides/custom-native-components.md):
+    a Swift and a Kotlin manager plus a
+    [`define_component`][pythonnative.sdk.define_component] call.
 
 ## Next steps
 

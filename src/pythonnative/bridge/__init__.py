@@ -214,10 +214,9 @@ def native_callback(kind: str, tag: int, name: str, payload: str) -> Optional[st
         return None
     try:
         if kind == "layout":
-            from ..native_views import get_registry
+            from ..native_views import get_backend
 
-            backend = get_registry()
-            backend.accept_layout(codec.loads(payload))
+            get_backend().accept_layout(codec.loads(payload))
             return None
         if kind == "event":
             return _on_event(int(tag), name, payload)
@@ -251,10 +250,9 @@ def _on_event(tag: int, name: str, payload: str) -> Optional[str]:
     from ..events import get_event_registry
 
     args = codec.loads(payload)
-    from ..native_views import get_registry
+    from ..native_views import get_backend
 
-    backend = get_registry()
-    accept = getattr(backend, "accept_event", None)
+    accept = getattr(get_backend(), "accept_event", None)
     if accept is not None:
         if not accept(tag, name, args):
             return None
@@ -265,13 +263,6 @@ def _on_event(tag: int, name: str, payload: str) -> Optional[str]:
         args = [args]
     callback = get_event_registry().get(tag, name)
     if callback is None:
-        from ..native_views import get_registry
-
-        backend = get_registry()
-        internal = getattr(backend, "handle_internal_event", None)
-        if internal is not None:
-            result = internal(tag, name, args)
-            return None if result is None else codec.dumps(codec.to_jsonable(result))
         return None
     try:
         result = get_event_registry().invoke(tag, name, *args)

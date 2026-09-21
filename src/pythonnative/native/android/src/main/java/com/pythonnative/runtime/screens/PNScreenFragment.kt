@@ -1,10 +1,12 @@
 package com.pythonnative.runtime.screens
 
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.activity.BackEventCompat
 import androidx.activity.OnBackPressedCallback
 import androidx.core.os.bundleOf
 import androidx.core.view.ViewCompat
@@ -27,6 +29,21 @@ import org.json.JSONObject
  * [defaultPath] to supply the entry module when the fragment arguments
  * don't carry one. Fast Refresh needs nothing from the fragment: the
  * Python dev client reloads modules and refreshes mounted screens.
+ *
+ * Back handling: an [OnBackPressedCallback] forwards `back_pressed` to
+ * Python, which pops its own stack or calls `Host.finish`. Its
+ * predictive-back hooks (`handleOnBackStarted` / `Progressed` /
+ * `Cancelled`) are no-ops. With `enableOnBackInvokedCallback` on in the
+ * manifest, Android 13+ plays the system back-to-home preview only while
+ * no callback is enabled. The callback is enabled by default and stays
+ * so until Python toggles [backEnabled] through `Host.set_back_enabled`
+ * (not called yet), so the preview does not appear today. There is no
+ * cross-screen predictive preview: the stack is Python-driven and pops
+ * only after the gesture commits.
+ *
+ * Viewport: `layout` is re-published on view size changes, window inset
+ * changes (which include the keyboard through [PNKeyboard]), and
+ * configuration changes such as font scale or rotation.
  */
 open class PNScreenFragment : Fragment() {
     /** The screen id assigned by [ScreenRegistry]. */
@@ -40,6 +57,18 @@ open class PNScreenFragment : Fragment() {
     private var created = false
     private var pendingRestore: String? = null
     private var lastLayout: String? = null
+    private var backCallback: OnBackPressedCallback? = null
+    private var removeKeyboardListener: (() -> Unit)? = null
+
+    /**
+     * Whether the screen intercepts the system back gesture. `true` by
+     * default so Python decides; set `false` (through `Host.set_back_enabled`)
+     * when Python has nothing to pop, which lets the system's predictive
+     * back-to-home animation play.
+     */
+    var backEnabled: Boolean
+        get() = backCallback?.isEnabled ?: true
+        set(value) { backCallback?.isEnabled = value }
 
     /** Screen path when the arguments carry none (apps return the entry module). */
     protected open fun defaultPath(): String? = null
@@ -53,16 +82,18 @@ open class PNScreenFragment : Fragment() {
         super.onCreate(savedInstanceState)
         screenId = ScreenRegistry.register(this)
         pendingRestore = savedInstanceState?.getString(STATE_KEY)
-        requireActivity().onBackPressedDispatcher.addCallback(
-            this,
-            object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    if (created) host("back_pressed", "{}")
-                    else requireActivity().finish()
-
-                }
-            },
-        )
+        val callback = object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (created) host("back_pressed", "{}")
+                else requireActivity().finish()
+            }
+            // Predictive back: no in-app preview to drive, so progress is ignored.
+            override fun handleOnBackStarted(backEvent: BackEventCompat) {}
+            override fun handleOnBackProgressed(backEvent: BackEventCompat) {}
+            override fun handleOnBackCancelled() {}
+        }
+        backCallback = callback
+        requireActivity().onBackPressedDispatcher.addCallback(this, callback)
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -89,7 +120,15 @@ open class PNScreenFragment : Fragment() {
             publishLayout(v, force = true)
             insets
         }
+        removeKeyboardListener?.invoke()
+        removeKeyboardListener = PNKeyboard.addListener { _, _, _ -> container?.let { publishLayout(it, force = true) } }
         publishLayout(view, force = true)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Font scale, orientation, and UI mode changes handled in-place.
+        container?.let { publishLayout(it, force = true) }
     }
 
     private fun publishLayout(view: View, force: Boolean = false) {
@@ -152,6 +191,8 @@ open class PNScreenFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        removeKeyboardListener?.invoke()
+        removeKeyboardListener = null
         container = null
     }
 

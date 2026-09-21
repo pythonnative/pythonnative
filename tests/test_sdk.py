@@ -1,48 +1,33 @@
 """Tests for the public extension SDK (``pythonnative.sdk``).
 
-Exercises the typed prop system (``Props``), the
-``@native_component`` decorator, the imperative ``register_component``
-helper, ``element_factory`` constructors, and the entry-point discovery
-hook used to import third-party PyPI plugins.
+Exercises the typed prop system (``Props``), ``define_component`` and the
+``element_factory`` constructors it returns, and the entry-point
+discovery hook used to import third-party PyPI plugins.
 """
 
-import itertools
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 import pytest
 
 import pythonnative as pn
 import pythonnative.sdk._components as nc_internals
 from pythonnative.element import Element
-from pythonnative.mutations import CreateOp
-from pythonnative.native_views import NativeViewRegistry, set_registry
 from pythonnative.sdk import (
     ENTRY_POINT_GROUP,
     Props,
-    ViewHandler,
+    define_component,
     element_factory,
     get_props_type,
-    get_test_handler,
-    install_into_registry,
     list_components,
-    native_component,
-    register_component,
     unregister_component,
 )
+from pythonnative.sdk.schema import COMPONENTS
+from pythonnative.testing import FakeBackend, render
 
 # ---------------------------------------------------------------------------
 # Test fixtures
 # ---------------------------------------------------------------------------
-
-_tags = itertools.count(1_000_000)
-
-
-def _create_view(reg: NativeViewRegistry, type_name: str, props: Dict[str, Any]) -> Any:
-    """Create one view through the batched commit channel and resolve it."""
-    tag = next(_tags)
-    reg.apply_mutations([CreateOp(tag, type_name, props)])
-    return reg.resolve_view(tag)
 
 
 @dataclass(frozen=True)
@@ -52,96 +37,70 @@ class BadgeProps(Props):
     style: pn.StyleProp = None
 
 
-class StubBadgeHandler(ViewHandler):
-    """ViewHandler whose native view is just a dict for assertions."""
-
-    def __init__(self) -> None:
-        self.created: list = []
-
-    def create(self, tag: int, props: Dict[str, Any]) -> Dict[str, Any]:
-        view = {"props": dict(props), "type": "badge", "tag": tag}
-        self.created.append(view)
-        return view
-
-    def update(self, view: Dict[str, Any], changed: Dict[str, Any]) -> None:
-        view["props"].update(changed)
-
-
 @pytest.fixture(autouse=True)
 def _clean_registry() -> Any:
     """Snapshot the SDK registry before each test, restore on teardown."""
     snapshot = dict(nc_internals._REGISTRY)
+    schemas = {name: COMPONENTS[name] for name in snapshot if name in COMPONENTS}
     nc_internals._REGISTRY.clear()
     nc_internals._reset_discovery_state_for_tests()
     yield
+    for name in list(nc_internals._REGISTRY):
+        if name not in snapshot:
+            COMPONENTS.pop(name, None)
     nc_internals._REGISTRY.clear()
     nc_internals._REGISTRY.update(snapshot)
+    COMPONENTS.update(schemas)
     nc_internals._reset_discovery_state_for_tests()
 
 
 # ---------------------------------------------------------------------------
-# native_component decorator
+# define_component
 # ---------------------------------------------------------------------------
 
 
-def test_native_component_registers_handler() -> None:
-    @native_component("Badge", props=BadgeProps)
-    class Badge(StubBadgeHandler):
-        pass
-
+def test_define_component_registers_schema_and_returns_factory() -> None:
+    Badge = define_component("Badge", BadgeProps)
     assert "Badge" in list_components()
     assert get_props_type("Badge") is BadgeProps
-    assert isinstance(get_test_handler("Badge"), Badge)
+    assert "Badge" in COMPONENTS
+    assert "text" in COMPONENTS["Badge"].props and "color" in COMPONENTS["Badge"].props
+    el = Badge(text="3", color="#0A84FF")
+    assert isinstance(el, Element)
+    assert el.type == "Badge"
+    assert el.props["text"] == "3"
+    assert el.props["color"] == "#0A84FF"
+    assert el.children == ()
 
 
-def test_native_component_without_props() -> None:
-    @native_component("Spinner")
-    class Spinner(StubBadgeHandler):
+def test_define_component_replaces_earlier_definition() -> None:
+    @dataclass(frozen=True)
+    class First(Props):
+        text: str = ""
+
+    @dataclass(frozen=True)
+    class Second(Props):
+        label: str = ""
+
+    define_component("Badge", First)
+    Badge = define_component("Badge", Second)
+    assert get_props_type("Badge") is Second
+    assert Badge(label="x").props["label"] == "x"
+    with pytest.raises(TypeError, match="Invalid props"):
+        Badge(text="old field")
+
+
+def test_define_component_rejects_non_dataclass_props() -> None:
+    class NotADataclass:
         pass
 
-    assert get_props_type("Spinner") is None
-    assert isinstance(get_test_handler("Spinner"), Spinner)
+    with pytest.raises(TypeError, match="must be a @dataclass type"):
+        define_component("Badge", NotADataclass)
 
 
-def test_native_component_replaces_handler() -> None:
-    @native_component("Badge", props=BadgeProps)
-    class FirstBadge(StubBadgeHandler):
-        pass
-
-    @native_component("Badge", props=BadgeProps)
-    class SecondBadge(StubBadgeHandler):
-        pass
-
-    assert isinstance(get_test_handler("Badge"), SecondBadge)
-
-
-def test_native_component_rejects_non_view_handler() -> None:
-    with pytest.raises(TypeError, match="ViewHandler subclass"):
-
-        @native_component("BadCoffee")
-        class NotAHandler:  # type: ignore[type-var]
-            pass
-
-
-# ---------------------------------------------------------------------------
-# register_component (imperative)
-# ---------------------------------------------------------------------------
-
-
-def test_register_component_basic() -> None:
-    handler = StubBadgeHandler()
-    register_component(name="Badge", props=BadgeProps, handler=handler)
-    assert get_props_type("Badge") is BadgeProps
-    assert get_test_handler("Badge") is handler
-
-
-def test_register_component_declares_without_handler() -> None:
-    """A component rendered only natively needs no Python handler."""
-    register_component(name="Badge", props=BadgeProps)
-    assert "Badge" in list_components()
-    assert get_test_handler("Badge") is None
-    Badge = element_factory("Badge")
-    assert Badge(text="1").type == "Badge"
+def test_define_component_records_platforms() -> None:
+    define_component("Badge", BadgeProps, platforms=("ios",))
+    assert COMPONENTS["Badge"].platforms == ("ios",)
 
 
 def test_custom_component_callbacks_cross_the_validated_bridge() -> None:
@@ -154,8 +113,7 @@ def test_custom_component_callbacks_cross_the_validated_bridge() -> None:
     class InteractiveBadgeProps:
         on_press: Callable[[int], Any] | None = None
 
-    register_component(name="InteractiveBadge", props=InteractiveBadgeProps)
-    Badge = element_factory("InteractiveBadge")
+    Badge = define_component("InteractiveBadge", InteractiveBadgeProps)
     received: list[int] = []
     transport = FakeTransport()
     reconciler = Reconciler(BridgeBackend(transport))
@@ -175,33 +133,14 @@ def test_custom_component_callbacks_cross_the_validated_bridge() -> None:
         unregister_component("InteractiveBadge")
 
 
-def test_register_component_merges_later_calls() -> None:
-    a = StubBadgeHandler()
-    register_component(name="Badge", handler=a)
-    register_component(name="Badge", props=BadgeProps)
-    assert get_test_handler("Badge") is a
-    # Late-arrived props get installed
-    assert get_props_type("Badge") is BadgeProps
-
-
-def test_register_component_invalid_props_raises() -> None:
-    class NotADataclass:
-        pass
-
-    with pytest.raises(TypeError, match="must be a @dataclass type"):
-        register_component(name="Badge", props=NotADataclass, handler=StubBadgeHandler())
-
-
-def test_register_component_invalid_handler_raises() -> None:
-    with pytest.raises(TypeError, match="ViewHandler instance"):
-        register_component(name="Badge", handler="not a handler")  # type: ignore[arg-type]
-
-
 def test_unregister_component() -> None:
-    register_component(name="Badge", handler=StubBadgeHandler())
+    define_component("Badge", BadgeProps)
     assert "Badge" in list_components()
     unregister_component("Badge")
     assert "Badge" not in list_components()
+    assert "Badge" not in COMPONENTS
+    with pytest.raises(KeyError, match="No component defined"):
+        element_factory("Badge")
 
 
 # ---------------------------------------------------------------------------
@@ -209,19 +148,8 @@ def test_unregister_component() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_element_factory_validates_kwargs_via_props() -> None:
-    register_component(name="Badge", props=BadgeProps, handler=StubBadgeHandler())
-    Badge = element_factory("Badge")
-    el = Badge(text="3", color="#0A84FF")
-    assert isinstance(el, Element)
-    assert el.type == "Badge"
-    assert el.props["text"] == "3"
-    assert el.props["color"] == "#0A84FF"
-    assert el.children == ()
-
-
 def test_element_factory_accepts_props_instance() -> None:
-    register_component(name="Badge", props=BadgeProps, handler=StubBadgeHandler())
+    define_component("Badge", BadgeProps)
     Badge = element_factory("Badge")
     el = Badge(props=BadgeProps(text="Hi", color="#FFFFFF"))
     assert el.props["text"] == "Hi"
@@ -229,8 +157,7 @@ def test_element_factory_accepts_props_instance() -> None:
 
 
 def test_element_factory_skips_none_default_fields() -> None:
-    register_component(name="Badge", props=BadgeProps, handler=StubBadgeHandler())
-    Badge = element_factory("Badge")
+    Badge = define_component("Badge", BadgeProps)
     el = Badge(props=BadgeProps())
     # ``style`` defaults to None and is dropped.
     assert "style" not in el.props
@@ -240,17 +167,32 @@ def test_element_factory_skips_none_default_fields() -> None:
 
 
 def test_element_factory_resolves_style_arg() -> None:
-    register_component(name="Badge", props=BadgeProps, handler=StubBadgeHandler())
-    Badge = element_factory("Badge")
+    Badge = define_component("Badge", BadgeProps)
     el = Badge(text="5", style=pn.style(padding=4, background_color="#000"))
     assert el.props["padding"] == 4
     assert el.props["background_color"] == "#000"
     assert el.props["text"] == "5"
 
 
+def test_element_factory_adds_style_to_signature_when_props_lack_it() -> None:
+    import inspect
+
+    @dataclass(frozen=True)
+    class Plain(Props):
+        text: str = ""
+
+    Badge = define_component("Badge", Plain)
+    assert "style" in inspect.signature(Badge).parameters
+    el = Badge(text="x", style=pn.style(padding=2))
+    assert el.props["padding"] == 2
+
+
 def test_element_factory_passes_children() -> None:
-    register_component(name="Container", handler=StubBadgeHandler())
-    Container = element_factory("Container")
+    @dataclass(frozen=True)
+    class ContainerProps(Props):
+        style: pn.StyleProp = None
+
+    Container = define_component("Container", ContainerProps)
     inner = pn.Text("inner")
     el = Container(inner, key="root")
     assert el.children == (inner,)
@@ -258,68 +200,26 @@ def test_element_factory_passes_children() -> None:
 
 
 def test_element_factory_unknown_name_raises() -> None:
-    with pytest.raises(KeyError, match="No component registered"):
+    with pytest.raises(KeyError, match="No component defined"):
         element_factory("DoesNotExist")
 
 
 def test_element_factory_kwargs_against_unknown_field_raises() -> None:
-    register_component(name="Badge", props=BadgeProps, handler=StubBadgeHandler())
-    Badge = element_factory("Badge")
+    Badge = define_component("Badge", BadgeProps)
     with pytest.raises(TypeError, match="Invalid props"):
         Badge(unknown_field=42)
 
 
 def test_element_factory_rejects_both_props_and_kwargs() -> None:
-    register_component(name="Badge", props=BadgeProps, handler=StubBadgeHandler())
-    Badge = element_factory("Badge")
+    Badge = define_component("Badge", BadgeProps)
     with pytest.raises(TypeError, match="Pass either props"):
         Badge(props=BadgeProps(text="a"), text="b")
 
 
-def test_element_factory_without_props_passes_kwargs_through() -> None:
-    register_component(name="Anything", handler=StubBadgeHandler())
-    Anything = element_factory("Anything")
-    el = Anything(arbitrary="value", number=42)
-    assert el.props == {"arbitrary": "value", "number": 42}
-
-
-# ---------------------------------------------------------------------------
-# install_into_registry
-# ---------------------------------------------------------------------------
-
-
-def test_install_copies_test_handlers() -> None:
-    handler = StubBadgeHandler()
-    register_component(name="Badge", props=BadgeProps, handler=handler)
-
-    reg = NativeViewRegistry()
-    install_into_registry(reg)
-
-    view = _create_view(reg, "Badge", {"text": "hi"})
-    assert view["type"] == "badge"
-    assert view["props"]["text"] == "hi"
-
-
-def test_install_skips_components_without_test_handler() -> None:
-    register_component(name="NativeOnly", props=BadgeProps)
-
-    reg = NativeViewRegistry()
-    install_into_registry(reg)
-
-    assert reg.handler_for("NativeOnly") is None
-    # A CreateOp for the missing type is isolated; no view materializes.
-    assert _create_view(reg, "NativeOnly", {}) is None
-
-
-def test_install_supports_multiple_components() -> None:
-    register_component(name="A", handler=StubBadgeHandler())
-    register_component(name="B", handler=StubBadgeHandler())
-
-    reg = NativeViewRegistry()
-    install_into_registry(reg)
-
-    assert _create_view(reg, "A", {}) is not None
-    assert _create_view(reg, "B", {}) is not None
+def test_element_factory_validates_field_types() -> None:
+    Badge = define_component("Badge", BadgeProps)
+    with pytest.raises(TypeError):
+        Badge(text=3)
 
 
 # ---------------------------------------------------------------------------
@@ -341,7 +241,7 @@ def test_entry_point_discovery_runs_once(monkeypatch: pytest.MonkeyPatch) -> Non
 
         def load(self) -> None:
             calls.append(self.name)
-            register_component(name=self.name, handler=StubBadgeHandler())
+            define_component(self.name, BadgeProps)
 
     class FakeEntryPoints:
         def select(self, group: str) -> Any:
@@ -353,9 +253,10 @@ def test_entry_point_discovery_runs_once(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(em, "entry_points", lambda *, group: FakeEntryPoints().select(group=group))
 
     nc_internals._reset_discovery_state_for_tests()
-    nc_internals._discover_entry_points()
+    nc_internals.discover_components()
     assert calls == ["FromPlugin"]
-    nc_internals._discover_entry_points()
+    assert "FromPlugin" in list_components()
+    nc_internals.discover_components()
     assert calls == ["FromPlugin"]  # second call is a no-op
 
 
@@ -376,7 +277,7 @@ def test_entry_point_failure_does_not_break_discovery(monkeypatch: pytest.Monkey
 
         def load(self) -> None:
             self.loaded = True
-            register_component(name="Good", handler=StubBadgeHandler())
+            define_component("Good", BadgeProps)
 
     good = GoodEP()
 
@@ -390,26 +291,9 @@ def test_entry_point_failure_does_not_break_discovery(monkeypatch: pytest.Monkey
     monkeypatch.setattr(em, "entry_points", lambda *, group: FakeEntryPoints().select(group=group))
 
     nc_internals._reset_discovery_state_for_tests()
-    nc_internals._discover_entry_points()
+    nc_internals.discover_components()
     assert good.loaded
     assert "Good" in list_components()
-
-
-def test_get_registry_runs_sdk_install() -> None:
-    """get_registry pulls SDK test handlers into the off-device registry."""
-    handler = StubBadgeHandler()
-    register_component(name="Badge", props=BadgeProps, handler=handler)
-
-    # Force the lazy registry to rebuild.
-    set_registry(None)
-    import pythonnative.native_views as nv
-
-    try:
-        reg = nv.get_registry()
-        view = _create_view(reg, "Badge", {"text": "hi"})
-        assert view["type"] == "badge"
-    finally:
-        set_registry(None)
 
 
 # ---------------------------------------------------------------------------
@@ -417,45 +301,24 @@ def test_get_registry_runs_sdk_install() -> None:
 # ---------------------------------------------------------------------------
 
 
-class RecordingHandler(ViewHandler):
-    def __init__(self) -> None:
-        self.creates: list = []
-        self.updates: list = []
-
-    def create(self, tag: int, props: Dict[str, Any]) -> Dict[str, Any]:
-        self.creates.append(dict(props))
-        return {"props": dict(props), "kids": []}
-
-    def update(self, view: Dict[str, Any], changed: Dict[str, Any]) -> None:
-        view["props"].update(changed)
-        self.updates.append(dict(changed))
-
-
-def test_sdk_component_drives_reconciler_end_to_end() -> None:
+def test_sdk_component_renders_through_the_reconciler() -> None:
     @dataclass(frozen=True)
-    class Props2(Props):
+    class GlassProps(Props):
         text: str = ""
         intensity: float = 0.5
         style: Optional[pn.StyleProp] = None
 
-    handler = RecordingHandler()
-    register_component(name="Glass", props=Props2, handler=handler)
-
-    Glass = element_factory("Glass")
-
-    reg = NativeViewRegistry()
-    install_into_registry(reg)
-
-    el = Glass(text="hi", intensity=0.8, style=pn.style(padding=8))
-
-    from pythonnative.reconciler import Reconciler
-
-    rec = Reconciler(reg)
-    view = rec.mount(el)
-    assert view["props"]["text"] == "hi"
-    assert view["props"]["intensity"] == 0.8
-    assert view["props"]["padding"] == 8
-    assert handler.creates == [view["props"]]
+    Glass = define_component("Glass", GlassProps)
+    backend = FakeBackend()
+    result = render(Glass(text="hi", intensity=0.8, style=pn.style(padding=8)), backend=backend)
+    view = result.get_by_type("Glass")
+    assert view.props["text"] == "hi"
+    assert view.props["intensity"] == 0.8
+    assert view.props["padding"] == 8
+    result.rerender(Glass(text="bye", intensity=0.8, style=pn.style(padding=8)))
+    assert result.get_by_type("Glass").props["text"] == "bye"
+    assert backend.last_update_changes == {"text": "bye"}
+    result.unmount()
 
 
 # ---------------------------------------------------------------------------
@@ -465,7 +328,8 @@ def test_sdk_component_drives_reconciler_end_to_end() -> None:
 
 def test_top_level_reexports() -> None:
     assert pn.Props is Props
-    assert pn.ViewHandler is ViewHandler
-    assert pn.native_component is native_component
-    assert pn.register_component is register_component
+    assert pn.define_component is define_component
     assert pn.element_factory is element_factory
+    for removed in ("ViewHandler", "native_component", "register_component"):
+        assert not hasattr(pn, removed), removed
+        assert not hasattr(pn.sdk, removed), removed

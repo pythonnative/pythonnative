@@ -95,6 +95,8 @@ abstract class ComponentManager {
             if (record.props.present("hit_slop") || record.state["hit_slop_active"] == true) {
                 ViewStyler.updateHitSlop(view)
             }
+            // A skew pivots on the view's center, so it follows the frame.
+            if (record.state.containsKey("skew")) ViewStyler.updateSkew(view)
         }
     }
 

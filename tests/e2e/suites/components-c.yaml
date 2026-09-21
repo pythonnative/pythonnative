@@ -12,6 +12,7 @@ appId: ${APP_ID}
 ---
 - runFlow: ../flows/components/section_list.yaml
 - runFlow: ../flows/components/web_view.yaml
+- runFlow: ../flows/components/web_view_handle.yaml
 - runFlow: ../flows/components/touchable_opacity.yaml
 - runFlow: ../flows/components/image_background.yaml
 - runFlow: ../flows/components/linear_gradient.yaml

@@ -46,6 +46,10 @@ dependencies {
     api 'androidx.security:security-crypto:1.1.0'
     api 'androidx.biometric:biometric:1.1.0'
     api 'androidx.dynamicanimation:dynamicanimation:1.0.0'
+    // Predictive back: OnBackPressedCallback progress hooks and BackEventCompat
+    // arrived in activity 1.8; its transitive requirements (core 1.8.0,
+    // lifecycle 2.6.1, savedstate 1.2.1) match what navigation already pulls.
+    api 'androidx.activity:activity:1.8.2'
     // Screen navigation (PNScreenFragment inside the app's NavHostFragment).
     api 'androidx.navigation:navigation-fragment-ktx:2.7.7'
     api 'androidx.navigation:navigation-ui-ktx:2.7.7'

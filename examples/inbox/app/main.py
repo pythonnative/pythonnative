@@ -187,14 +187,14 @@ def App() -> pn.Element:
     repository = pn.use_memo(Repository, [])
     pn.use_effect(repository.load, [])
     return RepositoryContext.Provider(
-        repository,
         ThemeContext.Provider(
-            "#FFFFFF",
             pn.NavigationContainer(
                 Stack.Navigator(
                     Stack.Screen("Inbox", Inbox, title="Inbox"),
                     Stack.Screen("Issue", Detail, title="Issue"),
                 )
             ),
+            value="#FFFFFF",
         ),
+        value=repository,
     )

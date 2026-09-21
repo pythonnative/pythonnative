@@ -69,8 +69,11 @@ Platform controls and fonts supply their own intrinsic sizes.
   [Browser preview guide](guides/browser-preview.md).
 - **An extension SDK.** [`pythonnative.sdk`](api/sdk.md) lets you
   wrap any platform widget as a first-class element with
-  type-checked props, and PyPI plugins auto-register through the
-  `pythonnative.handlers` entry-point group.
+  type-checked props through
+  [`define_component`][pythonnative.sdk.define_component], generates
+  the Swift and Kotlin contract from the same declaration, and PyPI
+  plugins auto-register through the `pythonnative.handlers` entry-point
+  group.
 - **A small surface.** A handful of element factories, a handful of
   hooks, and one navigation primitive.
 

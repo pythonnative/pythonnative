@@ -5,11 +5,11 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ArgbEvaluator
 import android.animation.TimeInterpolator
 import android.animation.ValueAnimator
+import android.view.Choreographer
 import android.view.View
 import android.view.animation.PathInterpolator
 import android.widget.TextView
 import androidx.dynamicanimation.animation.DynamicAnimation
-import androidx.dynamicanimation.animation.FlingAnimation
 import androidx.dynamicanimation.animation.FloatPropertyCompat
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
@@ -24,10 +24,14 @@ import org.json.JSONObject
 /**
  * Native driver for `animate` requests on the animatable props
  * (`opacity`, `background_color`, `translate_x`, `translate_y`,
- * `scale`, `scale_x`, `scale_y`, `rotate`, plus `color` for text).
+ * `scale`, `scale_x`, `scale_y`, `rotate`, `rotate_x`, `rotate_y`, plus
+ * `color` for text).
  *
  * `timing` runs on a `ValueAnimator`, `spring` on a `SpringAnimation`,
- * and `decay` on a `FlingAnimation`. Completion is reported with
+ * and `decay` on a `Choreographer` frame callback that evaluates React
+ * Native's closed form (`AnimationSpecs.Decay`) each frame, so flings
+ * travel exactly as far as the Python ticker and the browser preview.
+ * Completion is reported with
  * `callback("animation", 0, "", {"id": n, "finished": bool})`.
  */
 object PNAnimator {
@@ -82,6 +86,8 @@ object PNAnimator {
                 "scale_x" -> view.scaleX = JsonUtil.toDouble(value).toFloat()
                 "scale_y" -> view.scaleY = JsonUtil.toDouble(value).toFloat()
                 "rotate" -> view.rotation = ViewStyler.angleDegrees(value)
+                "rotate_x" -> view.rotationX = ViewStyler.angleDegrees(value)
+                "rotate_y" -> view.rotationY = ViewStyler.angleDegrees(value)
                 "background_color" -> ViewStyler.setAnimatedBackground(view, value)
                 "color" -> (view as? TextView)?.setTextColor(PNColor.parseOr(value, 0xFF000000.toInt()))
             }
@@ -98,6 +104,8 @@ object PNAnimator {
         "scale", "scale_x" -> view.scaleX.toDouble()
         "scale_y" -> view.scaleY.toDouble()
         "rotate" -> view.rotation.toDouble()
+        "rotate_x" -> view.rotationX.toDouble()
+        "rotate_y" -> view.rotationY.toDouble()
         else -> null
     }
 
@@ -161,7 +169,8 @@ object PNAnimator {
             animator.addUpdateListener { setProperty(view, prop, it.animatedValue as Float) }
         }
         animator.duration = timing.durationMs
-        animator.interpolator = interpolator(timing.easing)
+        // An easing this driver cannot evaluate exactly is left to the Python ticker.
+        animator.interpolator = interpolator(timing.easing) ?: return false
         var cancelled = false
         animator.addListener(object : AnimatorListenerAdapter() {
             override fun onAnimationCancel(animation: Animator) {
@@ -195,15 +204,30 @@ object PNAnimator {
 
     private fun startDecay(view: View, id: Long, prop: String, spec: JSONObject): Boolean {
         val params = AnimationSpecs.decay(spec)
-        val property = floatProperty(prop) ?: return false
-        val scale = unitScale(prop)
-        val anim = FlingAnimation(view, property)
-        anim.setStartValue((params.from * scale).toFloat())
-        anim.setStartVelocity((params.startVelocity * scale).toFloat())
-        anim.friction = params.friction.toFloat()
-        anim.addEndListener { _, canceled, _, _ -> complete(id, !canceled) }
-        running[id] = Running(view, prop) { anim.cancel() }
-        anim.start()
+        if (!isFloatProp(prop)) return false
+        val choreographer = Choreographer.getInstance()
+        var startNanos = -1L
+        var cancelled = false
+        lateinit var frame: Choreographer.FrameCallback
+        frame = Choreographer.FrameCallback { frameTimeNanos ->
+            if (cancelled) return@FrameCallback
+            if (startNanos < 0) startNanos = frameTimeNanos
+            val elapsedMs = (frameTimeNanos - startNanos) / 1_000_000.0
+            val finished = params.isFinished(elapsedMs)
+            setProperty(view, prop, if (finished) params.projectedFinal else params.valueAt(elapsedMs))
+            if (finished) complete(id, true) else choreographer.postFrameCallback(frame)
+        }
+        running[id] = Running(view, prop) {
+            cancelled = true
+            choreographer.removeFrameCallback(frame)
+        }
+        setProperty(view, prop, params.from)
+        if (params.isFinished(0.0)) {
+            setProperty(view, prop, params.projectedFinal)
+            complete(id, true)
+        } else {
+            choreographer.postFrameCallback(frame)
+        }
         return true
     }
 
@@ -214,7 +238,7 @@ object PNAnimator {
     private fun px(dp: Double): Float = (dp * PNBridge.density()).toFloat()
 
     private fun isFloatProp(prop: String): Boolean =
-        prop.startsWith("_pn_graph:") || prop in setOf("opacity", "translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate")
+        prop.startsWith("_pn_graph:") || prop in setOf("opacity", "translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate", "rotate_x", "rotate_y")
 
     /** Multiplier from spec units to native units (dp to px for translations). */
     private fun unitScale(prop: String): Double =
@@ -231,6 +255,8 @@ object PNAnimator {
         "scale_x" -> DynamicAnimation.SCALE_X
         "scale_y" -> DynamicAnimation.SCALE_Y
         "rotate" -> DynamicAnimation.ROTATION
+        "rotate_x" -> DynamicAnimation.ROTATION_X
+        "rotate_y" -> DynamicAnimation.ROTATION_Y
         "scale" -> object : FloatPropertyCompat<View>("pnScale") {
             override fun getValue(v: View): Float = v.scaleX
             override fun setValue(v: View, value: Float) {
@@ -242,8 +268,9 @@ object PNAnimator {
         else -> null
     }
 
-    private fun interpolator(easing: Any?): TimeInterpolator {
+    private fun interpolator(easing: Any?): TimeInterpolator? {
         return when (val resolved = AnimationSpecs.resolveEasing(easing)) {
+            null -> null
             is DoubleArray -> PathInterpolator(
                 resolved[0].toFloat(), resolved[1].toFloat(), resolved[2].toFloat(), resolved[3].toFloat(),
             )
