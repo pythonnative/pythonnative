@@ -21,12 +21,19 @@ path pattern (``"item/:id"``, where ``:name`` segments capture params
 and the query string supplies the rest) or a dict with ``path``,
 ``parse`` (per-param converters), and ``screens`` for a nested
 navigator.
+
+Captured path params arrive percent-decoded, once, before any ``parse``
+converter runs, so ``u/Ada%20Lovelace`` gives ``"Ada Lovelace"`` and an
+encoded ``%2F`` stays inside one value. A ``+`` in a path is a literal
+plus, unlike in the query string, where it means a space. Bytes that
+don't decode as UTF-8 are left as they arrived. Literal segments are
+compared exactly as written.
 """
 
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
-from urllib.parse import parse_qsl, quote, urlencode, urlsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit
 
 from .state import NavigationState, Route
 
@@ -56,7 +63,7 @@ class _Pattern:
         params: Dict[str, Any] = {}
         for pattern, actual in zip(self.segments, parts):
             if pattern.startswith(":"):
-                params[pattern[1:]] = actual
+                params[pattern[1:]] = _decode_segment(actual)
             elif pattern != actual:
                 return None
         return params
@@ -64,6 +71,11 @@ class _Pattern:
 
 class LinkingConfig:
     """URL <-> navigation state mapping for a navigator tree.
+
+    Captured path params are percent-decoded once, after the path is
+    split into segments and before ``parse`` converters run; ``+`` in a
+    path stays a literal plus, and undecodable bytes are left as-is.
+    Literal segments match exactly as configured.
 
     Args:
         prefixes: URL prefixes this app answers to (schemes such as
@@ -183,6 +195,30 @@ class LinkingConfig:
         joiner = "" if base.endswith("://") or not base else "/"
         url = f"{base}{joiner}{path}"
         return f"{url}?{query}" if query else url
+
+
+def _decode_segment(segment: str) -> str:
+    """Percent-decode one captured path segment, or return it unchanged.
+
+    Strict decoding with a fallback to the raw segment is deliberately
+    non-regressive: every valid encoding is fixed, and a segment that
+    isn't valid UTF-8 (``%FF``, Latin-1 ``caf%E9``) stays exactly what it
+    was before decoding existed. ``errors="replace"`` would instead turn
+    such a segment into U+FFFD, destroying information that survives
+    today. It uses ``unquote`` rather than ``unquote_plus`` because a
+    ``+`` is a literal character in a path.
+
+    Args:
+        segment: One path segment, already split on ``/``, so an encoded
+            ``%2F`` decodes to a slash inside the value.
+
+    Returns:
+        The decoded segment, or ``segment`` itself if it isn't valid UTF-8.
+    """
+    try:
+        return unquote(segment, errors="strict")
+    except UnicodeDecodeError:
+        return segment
 
 
 def _split_path(path: Optional[str]) -> Tuple[str, ...]:
