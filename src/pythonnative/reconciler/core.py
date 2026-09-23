@@ -37,6 +37,7 @@ this module holds the render/diff/commit pipeline,
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import contextmanager
 from functools import partial
 from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Set, Tuple
@@ -111,7 +112,9 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         self._effect_states: Dict[int, HookState] = JournalDict()
         self._native_children: Dict[int, List[int]] = JournalDict()
         self._publications: List[Callable[[], None]] = []
-        if hasattr(backend, "on_layout"):
+        if hasattr(backend, "subscribe_layout"):
+            backend.subscribe_layout(self._accept_native_layout)
+        elif hasattr(backend, "on_layout"):
             backend.on_layout = self._accept_native_layout
         self.on_render_requested: Optional[Callable[[], None]] = None
         self.on_back_registered: Optional[Callable[[], None]] = None
@@ -122,6 +125,15 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         self._created: List[VNode] = []
         self._rendering = False
         self._render_queued = False
+        self._pending_future: asyncio.Future[Any] | None = None
+        self._commit_iterator: Any = None
+        self._pending_journal: Journal | None = None
+        self._pending_inputs: list[Callable[[], None]] = []
+        self._queued_element: Element | None = None
+        self._unmount_requested = False
+        self.on_commit: Callable[[], None] | None = None
+        self.on_commit_error: Callable[[BaseException], None] | None = None
+        self._idle_waiters: list[asyncio.Future[None]] = []
         self._flush_scheduled = False
         # Drain iterations inside the current flush (the render-storm counter).
         self._storm = 0
@@ -161,8 +173,11 @@ class Reconciler(BoundaryMixin, LayoutMixin):
 
         Any previously mounted tree is unmounted first.
         """
-        if self.root is not None:
+        if self.root is not None or self.commit_pending:
             self.unmount()
+        if self.commit_pending:
+            self._queued_element = element
+            return self.root_view()
         diagnostics.log(f"reconciler: mount {element!r}")
         with self._pass():
             self._destroyed_tags.clear()
@@ -183,6 +198,9 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         only call this when the root element itself changed (new props
         from outside the tree).
         """
+        if self._pending_future is not None:
+            self._queued_element = element
+            return self.root_view()
         if self.root is None:
             return self.mount(element)
         with self._pass():
@@ -224,6 +242,10 @@ class Reconciler(BoundaryMixin, LayoutMixin):
 
     def unmount(self) -> None:
         """Tear down the mounted tree, running effect cleanups and destroying native views."""
+        if self._pending_future is not None:
+            self._unmount_requested = True
+            self._queued_element = None
+            return
         root = self.root
         if root is None:
             return
@@ -234,8 +256,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         self._dirty_suspense.clear()
         self._back_handlers.clear()
         self.transitions.clear()
-        self._flush_ops()
-        self._publish()
+        with self._pass():
+            self._commit()
 
     def dispatch_command(self, tag: Optional[int], name: str, args: Optional[Dict[str, Any]] = None) -> Any:
         """Run an imperative command against the view registered under ``tag``."""
@@ -295,6 +317,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     def _run_scheduled_flush(self) -> None:
         self._flush_scheduled = False
         if self.root is None or self._rendering or not self._has_dirty_work():
+            if not self._rendering:
+                self._settled()
             return
         if self.on_render_requested is not None:
             self.on_render_requested()
@@ -340,7 +364,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         journal.attribute(self, "root")
         try:
             yield
-            while self._render_queued and self.root is not None:
+            while self._pending_future is None and self._render_queued and self.root is not None:
                 self._render_queued = False
                 if not self._has_dirty_work():
                     continue
@@ -348,41 +372,135 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 self._drain_dirty()
                 self._commit()
         except BaseException:
-            if getattr(self.backend, "_failed", False):
-                rejected_nodes = list(self.walk())
-                rejected_states = list(self._effect_states.values())
-                journal.rollback()
-                retired_nodes = rejected_nodes + list(self.walk())
-                states = {id(state): state for state in rejected_states}
-                for node in retired_nodes:
-                    if node.hook_state is not None:
-                        states[id(node.hook_state)] = node.hook_state
-                    self._clear_ref(node.element.props.get("ref"))
-                    if node.tag is not None:
-                        self._events.clear(node.tag)
-                for state in states.values():
-                    state.cleanup_all_effects()
-                    state.detach()
-                self.transitions.clear()
-                self._back_handlers.clear()
-                self._native_children.clear()
-                self.root = None
-                self._tag_nodes.clear()
-                self._effect_states.clear()
-            else:
-                journal.rollback()
-            self._ops.clear()
-            self._created.clear()
-            self._publications.clear()
-            self._dirty_nodes.clear()
-            self._dirty_boundaries.clear()
-            self._dirty_suspense.clear()
+            self._abort_pass(journal)
             raise
         finally:
-            journal.active = False
             _journal.uninstall(token)
-            self._rendering = False
-            self._render_queued = False
+            if self._pending_future is None:
+                journal.active = False
+                self._rendering = False
+                self._render_queued = False
+            else:
+                self._pending_journal = journal
+
+    def _abort_pass(self, journal: Journal) -> None:
+        if getattr(self.backend, "_failed", False):
+            rejected_nodes = list(self.walk())
+            rejected_states = list(self._effect_states.values())
+            journal.rollback()
+            retired_nodes = rejected_nodes + list(self.walk())
+            states = {id(state): state for state in rejected_states}
+            for node in retired_nodes:
+                if node.hook_state is not None:
+                    states[id(node.hook_state)] = node.hook_state
+                self._clear_ref(node.element.props.get("ref"))
+                if node.tag is not None:
+                    self._events.clear(node.tag)
+            for state in states.values():
+                state.cleanup_all_effects()
+                state.detach()
+            self.transitions.clear()
+            self._back_handlers.clear()
+            self._native_children.clear()
+            self.root = None
+            self._tag_nodes.clear()
+            self._effect_states.clear()
+        else:
+            journal.rollback()
+        self._ops.clear()
+        self._created.clear()
+        self._publications.clear()
+        self._dirty_nodes.clear()
+        self._dirty_boundaries.clear()
+        self._dirty_suspense.clear()
+        self._commit_iterator = None
+        self._pending_future = None
+        self._pending_journal = None
+
+    @property
+    def commit_pending(self) -> bool:
+        """Whether native acknowledgement is holding the surface's next render."""
+        return self._pending_future is not None
+
+    def defer_input(self, callback: Callable[[], None]) -> bool:
+        """Queue state writes during mounting, preserving their functional order."""
+        if not self.commit_pending:
+            return False
+        self._pending_inputs.append(callback)
+        return True
+
+    async def wait_for_commit(self) -> None:
+        """Wait until mounting and its queued state updates have settled."""
+        while self.commit_pending or self._has_dirty_work() or self._flush_scheduled:
+            waiter = get_loop().create_future()
+            self._idle_waiters.append(waiter)
+            if not self.commit_pending:
+                self.request_render()
+            await waiter
+
+    def _settled(self, error: BaseException | None = None) -> None:
+        waiters, self._idle_waiters = self._idle_waiters, []
+        for waiter in waiters:
+            if not waiter.done():
+                if error is None:
+                    waiter.set_result(None)
+                else:
+                    waiter.set_exception(error)
+
+    def _drive_commit(self, iterator: Any) -> None:
+        for pending in iterator:
+            if pending is None:
+                continue
+            if pending.done():
+                pending.result()
+                continue
+            self._commit_iterator = iterator
+            self._pending_future = pending
+            self._pending_journal = _journal.current()
+            pending.add_done_callback(self._resume_commit, context=_journal.detached_context())
+            return
+        self._commit_iterator = None
+
+    def _resume_commit(self, future: asyncio.Future[Any]) -> None:
+        journal = self._pending_journal
+        assert journal is not None
+        iterator = self._commit_iterator
+        self._pending_future = None
+        token = _journal.install(journal)
+        error: BaseException | None = None
+        try:
+            future.result()
+            self._drive_commit(iterator)
+        except BaseException as exc:
+            error = exc
+            self._abort_pass(journal)
+        finally:
+            _journal.uninstall(token)
+        if self._pending_future is not None:
+            return
+        journal.active = False
+        self._pending_journal = None
+        self._rendering = False
+        self._render_queued = False
+        inputs, self._pending_inputs = self._pending_inputs, []
+        if error is not None:
+            if self.on_commit_error is not None:
+                self.on_commit_error(error)
+            elif not diagnostics.report_error(error, phase="native commit"):
+                get_loop().call_exception_handler({"message": "Native commit failed", "exception": error})
+            self._settled(error)
+        if self._unmount_requested:
+            self._unmount_requested = False
+            self.unmount()
+        if not self.commit_pending and self._queued_element is not None:
+            element, self._queued_element = self._queued_element, None
+            self.reconcile(element)
+        if not getattr(self.backend, "_failed", False):
+            for callback in inputs:
+                callback()
+            if self._has_dirty_work():
+                self.request_render()
+        self._settled()
 
     def _has_dirty_work(self) -> bool:
         return bool(self._dirty_nodes or self._dirty_boundaries or self._dirty_suspense)
@@ -454,15 +572,18 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         self._route_error(offender, exc)
 
     def _commit(self) -> None:
+        self._drive_commit(self._commit_steps())
+
+    def _commit_steps(self) -> Iterator[asyncio.Future[Any] | None]:
         """Apply the staged transaction and run the post-commit phases.
 
         Effects run per component; one that raises is routed to the
         nearest ``ErrorBoundary`` and the resulting fallback is committed
         in a nested commit, so the rest of the tree is unaffected.
         """
-        self._flush_ops()
+        yield self._flush_ops()
         self._run_layout()
-        self._flush_ops()
+        yield self._flush_ops()
         journal = _journal.current()
         if journal is not None:
             journal.accept()
@@ -470,11 +591,18 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         self._publish()
         self._dispatch_layout_events()
         routed = self._flush_layout_effects()
-        self._flush_ops()
+        yield self._flush_ops()
         routed = self._flush_passive_effects() or routed
-        self._flush_ops()
+        yield self._flush_ops()
         if routed:
-            self._commit()
+            yield from self._commit_steps()
+
+        if self.on_commit is not None:
+            self.on_commit()
+        release = getattr(self.backend, "release_events", None)
+        if release is not None:
+            release()
+        self._settled()
 
     def _publish(self) -> None:
         publications, self._publications = self._publications, []
@@ -482,7 +610,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             publish()
 
     @profiled("commit")
-    def _flush_ops(self) -> None:
+    def _flush_ops(self) -> asyncio.Future[Any] | None:
         """Send pending ops to the backend and resolve created views."""
         ops = self._ops
         created = self._created
@@ -491,11 +619,30 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             if prepare_layout is not None:
                 roots = [node.tag for node in self._native_roots(self.root)] if self.root is not None else []
                 prepare_layout(roots, *self._viewport_size)
-            self.backend.apply_mutations(ops)
+            pending = self.backend.apply_mutations(ops)
             self._ops = []
             self._created = []
+            if pending is not None:
+                done = get_loop().create_future()
+
+                def resolve(future: asyncio.Future[Any]) -> None:
+                    try:
+                        future.result()
+                        self._resolve_created(created)
+                        if not done.done():
+                            done.set_result(None)
+                    except BaseException as error:
+                        if not done.done():
+                            done.set_exception(error)
+
+                pending.add_done_callback(resolve, context=_journal.detached_context())
+                return done
         elif created:
             self._created = []
+        self._resolve_created(created)
+        return None
+
+    def _resolve_created(self, created: list[VNode]) -> None:
         for node in created:
             if not node.mounted or node.tag is None:
                 continue
@@ -673,7 +820,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     # Component bodies
     # ------------------------------------------------------------------
 
-    @profiled("component")
+    @profiled("component", lambda self, hook_state, element: {"component": element.type.display_name})
     def _render_component_body(self, hook_state: HookState, element: Element) -> List[Element]:
         """Render synchronously or suspend on a real, component-owned task.
 
@@ -1251,6 +1398,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         }
         if bindings:
             clean["_pn_animated_events"] = bindings
+        if props.get("ref") is not None or "on_layout" in events:
+            clean["_pn_layout"] = True
         return clean, events
 
     @staticmethod

@@ -48,6 +48,8 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # Type-only re-exports: statically checkable, no UI surface.
     # --------------------------------------------------------------
     "Element",
+    "Section",  # typed section record exercised by the SectionList flow
+    "ViewableItem",  # typed callback record exercised by the ListData flow
     "UnsetType",  # sentinel type; UNSET is exercised by the custom_component flow
     "ImageLoadEvent",  # typed callback record; real Image flow exercises delivery
     "ImageSize",  # typed record returned by Images.get_size; asserted in the image_size demo

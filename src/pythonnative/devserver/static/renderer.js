@@ -1,7 +1,8 @@
+import {ListStore} from "./list-store.js";
 import specification from "./schema.js";
 import {validateRemoval, validateProps, normalize, requiresRecreation, validateCommand} from "./contracts.js";
 import { AnimationGraph } from "./animation_graph.js";
-import {computeLayout, disposeLayout, stackHeaderHeight} from "./layout.js";
+import {computeLayout, disposeLayout, stackHeaderHeight, updateLayout, insertLayout} from "./layout.js";
 // The DOM "native runtime" for the browser preview.
 //
 // This module plays the role PythonNativeKit (Swift) and the pythonnative
@@ -2145,11 +2146,10 @@ class VirtualListManager extends ViewManager {
   create(view, props) {
     view.el = document.createElement("div"); view.el.className = "pn-view pn-vlist";
     view.spacer = document.createElement("div"); view.spacer.className = "pn-vlist-spacer";
-    view.el.appendChild(view.spacer); view.requested = new Set();
+    view.el.appendChild(view.spacer); view.listStore = new ListStore(); view.lastWindow = "";
     view.el.addEventListener("scroll", () => {
       this.childrenChanged(view);
-      // Like ScrollView: only apps that wired `on_scroll` pay for the stream.
-      if (view.hasEvent("on_scroll")) view.ctx.emit(view.tag, "on_scroll", [{...scrollPayload(view.el), first:view.first, last:view.last}]);
+      if (view.hasEvent("on_scroll")) view.ctx.emit(view.tag, "on_scroll", [scrollPayload(view.el)]);
     }, {passive:true});
     this.update(view, props);
   }
@@ -2157,36 +2157,46 @@ class VirtualListManager extends ViewManager {
   update(view, props) {
     super.update(view, props);
     view.el.style.overflow = "auto";
-    if ("revision" in props) view.requested.clear();
+    if (props.dataset) {
+      const horizontal = view.props.horizontal, offset = horizontal ? view.el.scrollLeft : view.el.scrollTop;
+      const store = view.listStore, index = store.indexAt(offset), key = store.keys[index], delta = offset - store.offset(index);
+      store.apply(props.dataset);
+      if (store.indices.has(key)) view.el[horizontal ? "scrollLeft" : "scrollTop"] = store.offset(store.indices.get(key)) + delta;
+    }
     this.childrenChanged(view);
   }
   measure(view, w, h) { return [w < 1e6 ? w : 0, h < 1e6 ? h : 0]; }
   childrenChanged(view) {
-    const keys = view.props.keys || [];
-    const roots = new Map(view.children.map(child => [child.props._pn_list_key, child]));
-    const horizontal = view.props.horizontal;
+    const store = view.listStore; if (!store) return;
+    const horizontal = !!view.props.horizontal;
     const offset = horizontal ? view.el.scrollLeft : view.el.scrollTop;
     const extent = (horizontal ? view.el.clientWidth : view.el.clientHeight) || 800;
-    let position = 0; view.first = 0; view.last = -1;
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i], child = roots.get(key);
-      const size = child?.frame?.[horizontal ? "w" : "h"] || view.props.row_heights?.[i] || 44;
-      const visible = position + size >= offset - extent && position <= offset + 2 * extent;
-      if (child) {
-        child.el.style.display = visible ? "" : "none";
-        child.el.style[horizontal ? "left" : "top"] = px(position);
+    const oldFirst = store.indexAt(offset), anchor = store.keys[oldFirst], anchorDelta = offset - store.offset(oldFirst);
+    for (const child of view.children) store.measure(child.props._pn_list_key, child.frame?.[horizontal ? "w" : "h"]);
+    const anchoredOffset = anchor == null ? offset : store.offset(store.indices.get(anchor)) + anchorDelta;
+    if (Math.abs(anchoredOffset - offset) > 0.5) view.el[horizontal ? "scrollLeft" : "scrollTop"] = anchoredOffset;
+    view.first = store.indexAt(anchoredOffset); view.last = store.keys.length ? store.indexAt(anchoredOffset + extent) : -1;
+    const sticky = horizontal ? -1 : store.sticky(view.first);
+    const nextSticky = store.stickyIndices.find(index => index > sticky);
+    for (const child of view.children) {
+      const index = store.indices.get(child.props._pn_list_key);
+      if (index == null) { child.el.style.display = "none"; continue; }
+      let position = store.offset(index);
+      if (index === sticky) {
+        const size = store.offset(index + 1) - position;
+        position = Math.min(anchoredOffset, nextSticky == null ? Infinity : store.offset(nextSticky) - size);
       }
-      if (visible) {
-        if (view.last < 0) view.first = i;
-        view.last = i;
-        if (!child && !view.requested.has(key)) {
-          view.requested.add(key);
-          view.ctx.emit(view.tag, "on_bind_row", [{key, index:i, revision:view.props.revision, width:view.el.clientWidth, extent}]);
-        }
-      }
-      position += size;
+      child.el.style.display = "";
+      child.el.style[horizontal ? "left" : "top"] = px(position);
+      child.el.style.zIndex = index === sticky ? "1024" : "";
     }
-    view.spacer.style[horizontal ? "width" : "height"] = px(position);
+    const range = store.offset(store.keys.length);
+    view.spacer.style[horizontal ? "width" : "height"] = px(range);
+    const identity = [store.revision, view.first, view.last, extent, sticky].join(":");
+    if (identity !== view.lastWindow) {
+      view.lastWindow = identity;
+      view.ctx.emit(view.tag, "on_window", [{...scrollPayload(view.el), first:view.first, last:view.last, extent, range, sticky, revision:store.revision}]);
+    }
   }
   command(view, name, args) {
     if (name === "get_scroll_offset") return {x:view.el.scrollLeft, y:view.el.scrollTop};
@@ -2194,7 +2204,7 @@ class VirtualListManager extends ViewManager {
     const horizontal = !!view.props.horizontal;
     let offset = args[horizontal ? "x" : "y"] || 0;
     if (name === "scroll_to_end") offset = horizontal ? view.el.scrollWidth : view.el.scrollHeight;
-    if (name === "scroll_to_index") offset = (view.props.row_heights || []).slice(0, args.index).reduce((a,b) => a+b, 0);
+    if (name === "scroll_to_index") offset = view.listStore.offset(args.index);
     view.el.scrollTo({[horizontal ? "left" : "top"]: offset, behavior: args.animated ? "smooth" : "instant"});
     return null;
   }
@@ -2693,6 +2703,8 @@ export class Renderer {
     this.animator = new Animator(this);
     this.graph = new AnimationGraph(this);
     this.dirtyContainers = new Set();
+    this.layoutDetached = new Set();
+    this.layoutObservers = new Set();
     for (const [name, Manager] of Object.entries(MANAGERS)) this.managers[name] = new Manager();
   }
 
@@ -2707,6 +2719,8 @@ export class Renderer {
       view.el.remove();
     }
     this.views.clear();
+    this.layoutDetached.clear();
+    this.layoutObservers.clear();
     this.animator.active.clear();
   }
 
@@ -2715,12 +2729,12 @@ export class Renderer {
   apply(envelope) {
     const {version, application, surface, revision, ops} = envelope || {};
     const fail = (error) => ({ok: false, application, surface, revision, error, failed: !!this.failed});
-    if (version !== 3 || typeof application !== "string" || !application || !Number.isSafeInteger(surface) || surface < 1 || !Array.isArray(ops)) return fail("invalid v3 commit");
+    if (version !== 4 || typeof application !== "string" || !application || !Number.isSafeInteger(surface) || surface < 1 || !Array.isArray(ops)) return fail("invalid v4 commit");
     const replacing = this.application !== application;
     if (revision !== (replacing ? 1 : this.revision + 1)) return fail("stale revision");
     if (!replacing && surface !== this.surface) return fail("wrong surface");
     if (this.failed && !replacing) return fail("failed surface requires remount");
-    const edited = new Map(), deleted = new Set();
+    const edited = new Map(), deleted = new Set(), listPatches = new Set();
     const get = tag => deleted.has(tag) ? null : edited.get(tag) || (replacing ? null : this.views.get(tag));
     const edit = tag => {
       if (!edited.has(tag)) {
@@ -2735,14 +2749,20 @@ export class Renderer {
       for (const op of ops) {
         if (!Array.isArray(op) || op.length !== {c:4,u:4,i:4,d:2,f:6}[op[0]] || !Number.isSafeInteger(op[1]) || op[1] <= 0) return fail("invalid operation");
         const [code, tag] = op;
+        if ((code === "c" ? op[2] : get(tag)?.type) === "VirtualList" && (code === "c" || code === "u") && Object.hasOwn(op[code === "c" ? 3 : 2], "dataset")) {
+          if (listPatches.has(tag)) return fail("multiple list patches in one commit");
+          listPatches.add(tag);
+        }
         if (code === "c") {
           if (get(tag) || !this.managers[op[2]] || !validateProps(specification, op[2], op[3])) return fail("invalid create");
+          if (op[2] === "VirtualList") new ListStore().prepare(op[3].dataset);
           deleted.delete(tag);
           edited.set(tag, {type: op[2], children: [], parentTag: null});
         } else {
           const view = get(tag);
           if (!view) return fail("unknown tag");
           if (code === "u" && (!validateProps(specification, view.type, op[2], true) || !validateRemoval(specification, view.type, op[2], op[3]))) return fail("invalid properties");
+          if (code === "u" && view.type === "VirtualList" && Object.hasOwn(op[2], "dataset")) this.views.get(tag).listStore.prepare(op[2].dataset);
           if (code === "i") {
             if (!get(op[2]) || !Number.isSafeInteger(op[3]) || op[3] < 0) return fail("invalid insertion");
             for (let ancestor = tag; ancestor; ancestor = parentOf(ancestor)) if (ancestor === op[2]) return fail("cycle");
@@ -2786,7 +2806,7 @@ export class Renderer {
   computeLayout(request) {
     const started = performance.now(), frames = computeLayout(this, request);
     return {application: this.application, surface: this.surface, revision: this.revision, frames,
-      metrics:{layout_ns:Math.round((performance.now()-started)*1e6), views:this.views.size}};
+      metrics:{layout_ns:Math.round((performance.now()-started)*1e6), visited:this.layoutVisited || 0}};
   }
 
   applyOne(op) {
@@ -2811,6 +2831,8 @@ export class Renderer {
         view.el.dataset.pnTag = String(tag);
         view.el.dataset.pnType = type;
         if (Array.isArray(view.props.gestures) && view.props.gestures.length) installGestureSource(view);
+        updateLayout(view, props);
+        if (props._pn_layout) this.layoutObservers.add(view);
         this.views.set(tag, view);
         return;
       }
@@ -2841,6 +2863,10 @@ export class Renderer {
           if (focused) view.el.focus();
           if (selection[0] != null && view.el.setSelectionRange) view.el.setSelectionRange(...selection);
         } else view.manager.update(view, normalized);
+        const fields = specification.components[view.type]?.props || {};
+        const affectsMeasurement = [...Object.keys(changed), ...removed].some(key => fields[key]?.native?.invalidates_layout !== false);
+        updateLayout(view, changed, removed, affectsMeasurement);
+        if (view.requestLayoutFrame) this.layoutObservers.add(view); else this.layoutObservers.delete(view);
         if ("gestures" in changed || removed.includes("gestures")) {
           if (Array.isArray(view.props.gestures) && view.props.gestures.length) installGestureSource(view);
           else this.ctx.gesture(tag, "clear", {});
@@ -2863,6 +2889,7 @@ export class Renderer {
         const at = Math.max(0, Math.min(index, parent.children.length));
         parent.children.splice(at, 0, child);
         child.parent = parent;
+        insertLayout(this, parent, child);
         const container = parent.manager.container(parent);
         const before = parent.children[at + 1] ? parent.children[at + 1].el : null;
         if (before && before.parentNode === container) container.insertBefore(child.el, before);
@@ -2895,6 +2922,8 @@ export class Renderer {
   }
 
   destroyView(view) {
+    this.layoutDetached.delete(view);
+    this.layoutObservers.delete(view);
     this.graph.forget(view.tag);
     this.animator.cancelForView(view);
     if (view.parent && view.parent.manager.childWillDetach) view.parent.manager.childWillDetach(view.parent, view);

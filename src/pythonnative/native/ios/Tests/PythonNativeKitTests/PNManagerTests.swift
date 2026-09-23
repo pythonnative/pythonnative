@@ -129,13 +129,13 @@ final class PNManagerTests: XCTestCase {
     func testVirtualListBindsRowsThroughRegistry() {
         try! PNTransaction.apply([.create(tag: 40, type: "View", props: ["background_color": "#123456"])])
         let manager = PNVirtualListManager()
-        guard let table = manager.createView(tag: 41, props: ["keys": ["a", "b", "c"], "revision": 1, "row_heights": [50.0, 50.0, 50.0]]) as? UICollectionView else {
+        guard let table = manager.createView(tag: 41, props: ["dataset": ["base": 0, "revision": 1, "changes": [["reset", [["a", 1, 50.0, false], ["b", 1, 50.0, false], ["c", 1, 50.0, false]]]]]]) as? UICollectionView else {
             return XCTFail("expected a collection view")
         }
         XCTAssertEqual(table.numberOfItems(inSection: 0), 3)
         let delegate = table.delegate as? UICollectionViewDelegateFlowLayout
         XCTAssertEqual(delegate?.collectionView?(table, layout: table.collectionViewLayout, sizeForItemAt: IndexPath(item: 1, section: 0)).height, 50)
-        manager.update(view: table, changed: ["row_heights": [10.0, 20.0, 30.0], "keys": ["a", "b", "c"], "revision": 2])
+        manager.update(view: table, changed: ["dataset": ["base": 1, "revision": 2, "changes": [["u", ["a", 2, 10.0, false]], ["u", ["b", 2, 20.0, false]], ["u", ["c", 2, 30.0, false]]]]])
         XCTAssertEqual(delegate?.collectionView?(table, layout: table.collectionViewLayout, sizeForItemAt: IndexPath(item: 2, section: 0)).height, 30)
         manager.destroy(view: table)
     }

@@ -8,8 +8,10 @@ in `src/pythonnative/native/android`. App templates stage and embed those librar
 
 ## Application and UI threads
 
-The application has an ordinary asyncio loop on its own thread. Calls into UIKit
-and Android synchronously marshal native operations to the platform UI thread.
+The application has an ordinary asyncio loop on its own thread. A commit's
+blocking transport call runs on a worker. Native JSON decoding
+happens there before operations are queued to the platform UI thread. Structural
+preflight, widget mutation, and native measurement retain UI-thread ownership.
 On iOS, the ctypes transport releases the GIL during this crossing. Native input
 is queued back to Python rather than waiting for a Python handler on the UI thread.
 
@@ -28,7 +30,7 @@ A surface commit has this shape:
 
 ```json
 {
-  "version": 3,
+  "version": 4,
   "application": "unique-application-id",
   "surface": 1,
   "revision": 1,
@@ -61,6 +63,31 @@ A failed surface rejects further incremental updates. A new application identity
 and a complete remount establish a clean surface; replaying a partial commit
 isn't a recovery strategy. The current app host uses one surface.
 
+The application loop keeps running while acknowledgement is pending. A reconciler
+queues state writes instead of rendering against an uncommitted tree. Shared
+backend transactions serialize; preparation uses the acknowledged revision when
+a transaction reaches the front. Refs, effects, and native events wait for
+publication. Cancelling a caller's wait doesn't cancel native mounting.
+
+### Incremental list packets
+
+`VirtualList.dataset` contains `base`, `revision`, and `changes`. Each revision
+advances by one. There may be one dataset patch per list per commit.
+
+| Change | Payload |
+| --- | --- |
+| `reset` | array of `[key, item_revision, extent, sticky]` records |
+| `i` | insertion index, row record |
+| `u` | replacement row record with the same key |
+| `d` | key to remove |
+| `m` | key, final index |
+
+A reset must be first. Keys are unique nonempty strings; extents are finite and
+positive. Validation stages edits before publishing them. Updating metadata
+preserves the order index; structural edits rebuild indexes as needed. Native
+window events include the active sticky header. Application scroll events keep
+the `ScrollEvent` shape and are emitted only when subscribed.
+
 ## Events and controlled input
 
 Events carry `application`, `surface`, `revision`, `sequence`, and an `args` list.
@@ -84,12 +111,16 @@ core, and the browser preview uses the corresponding Yoga WebAssembly package.
 
 The application sends styles as props. Native leaf managers measure text,
 controls, and images next to their widgets. When the viewport is known, a commit
-includes a `layout` object with `roots`, `width`, and `height`. Its acknowledgment
-includes the resulting frames, so mutation and required layout share one bridge
+includes a `layout` object with `roots`, `width`, `height`, and `selective: true`.
+Its acknowledgment includes changed frames for `_pn_layout` observers (refs or
+`on_layout`), so mutation and required layout share one bridge
 crossing. `Layout.compute` remains available for viewport changes without
 mutations. Both return frames with `application`, `surface`, and `revision`.
 Geometry from another surface or revision is ignored. Drawing-only prop updates
-skip a separate request. Yoga calculations reuse unchanged constraints, and
+skip a separate request. Changed styles update existing Yoga nodes; removal
+restores the property default or surviving shorthand. Diagnostic raw layout
+requests may omit `selective` to collect all changed frames. Yoga calculations
+reuse unchanged constraints, and
 frame collection visits only subtrees with new layout. Python doesn't make one
 measurement RPC per leaf.
 

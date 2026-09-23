@@ -81,7 +81,7 @@ class ScrollViewManager : ComponentManager() {
     private fun isHorizontal(outer: View): Boolean = outer is HorizontalScrollView
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = ScrollViewProps(props)
+        val typed = ScrollViewProps(props, validated = true)
         val sv = inner(view)
         ViewStyler.apply(sv, props)
         if (typed.has_shows_scroll_indicator) {

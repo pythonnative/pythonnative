@@ -29,7 +29,7 @@ import kotlin.math.roundToInt
  * records with `Canvas`. Coordinates are in `view_box` units and are
  * mapped into the view's bounds according to `preserve_aspect_ratio`.
  */
-class SvgManager : TypedComponentManager<SvgProps>({ values, partial -> SvgProps(values, partial) }) {
+class SvgManager : TypedComponentManager<SvgProps>({ values, partial, validated -> SvgProps(values, partial, validated) }) {
     override fun createView(context: Context, tag: Long, props: JSONObject): View = SvgView(context)
 
     override fun applyTyped(view: View, props: SvgProps, initial: Boolean) {

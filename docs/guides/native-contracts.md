@@ -146,7 +146,7 @@ hasn't changed.
 
 ## Missing values, nulls, and resets
 
-Protocol 3 separates setting a value from removing a property:
+Protocol 4 separates setting a value from removing a property:
 
 ```python
 import pythonnative as pn
@@ -183,7 +183,7 @@ a provider plugin if your application needs an Android image editor.
 `NativeModuleError("unsupported")` on Android, where remote push needs a
 provider extension.
 
-Only protocol 3 clients are supported. Rebuild the app after changing declarations,
+Only protocol 4 clients are supported. Rebuild the app after changing declarations,
 native sources, or native dependencies. Startup checks the exact contract
 fingerprint and Yoga version before mounting. Fast Refresh handles Python
 application changes within that compiled interface.

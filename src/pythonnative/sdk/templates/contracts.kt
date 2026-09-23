@@ -3,94 +3,58 @@ package com.pythonnative.generated
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Generated contract metadata shared by built-ins and extension managers. */
+/** Executable generated contracts; the mount path doesn't interpret schema JSON. */
 object PNContracts {
     const val fingerprint = "{{fingerprint}}"
-    private val document = JSONObject(listOf({{specification}}).joinToString(""))
-    private val components = document.getJSONObject("components")
-    private val modules = document.getJSONObject("modules")
-
+    private data class Field(val matches: (Any) -> Boolean, val allowed: Boolean, val layout: Boolean,
+                             val recreate: Boolean, val required: Boolean, val defaultValue: Any)
+    const val LAYOUT = 1
+    const val RECREATE = 2
+{{predicates}}
+{{fields}}
+    private val components: Map<String, Map<String, Field>> = mapOf(
+{{components}}
+    )
+    private val commands: Map<String, (Any) -> Boolean> = mapOf(
+{{commands}}
+    )
+    private val modules: Map<String, (Any) -> Boolean> = mapOf(
+{{modules}}
+    )
+    private fun isBoolean(value: Any): Boolean = value is Boolean
+    private fun isNumber(value: Any): Boolean = value is Number && value.toDouble().isFinite()
+    private fun isInteger(value: Any): Boolean = value is Number && value.toDouble().isFinite() &&
+        kotlin.math.abs(value.toDouble()) <= 9007199254740991.0 && value.toDouble() == value.toLong().toDouble()
     fun validate(name: String, props: JSONObject, partial: Boolean = false): Boolean {
-        val schema = components.optJSONObject(name) ?: return false
-        val fields = schema.getJSONObject("props")
-        val required = schema.optJSONArray("required") ?: JSONArray()
-        if (!partial) for (i in 0 until required.length()) if (!props.has(required.getString(i))) return false
-        for (key in props.keys()) {
-            val field = fields.optJSONObject(key) ?: return false
-            val platforms = field.optJSONObject("native")?.optJSONArray("platforms")
-            if (platforms != null && (0 until platforms.length()).none { platforms.getString(it) == "android" }) return false
-            if (!matches(props.get(key), field)) return false
+        val fields = components[name] ?: return false
+        if (!partial && fields.any { (key, field) -> field.required && !props.has(key) }) return false
+        return props.keys().asSequence().all { key -> fields[key]?.let { it.allowed && it.matches(props.get(key)) } ?: false }
+    }
+    fun changes(name: String, keys: Iterable<String>): Int {
+        val fields = components[name] ?: return LAYOUT or RECREATE
+        var mask = 0
+        for (key in keys) {
+            if (fields[key]?.layout != false) mask = mask or LAYOUT
+            if (fields[key]?.recreate == true) mask = mask or RECREATE
         }
-        return true
+        return mask
     }
-
-    fun invalidatesLayout(name: String, changed: JSONObject): Boolean {
-        val fields = components.optJSONObject(name)?.optJSONObject("props") ?: return true
-        return changed.keys().asSequence().any { fields.optJSONObject(it)?.optJSONObject("native")?.optBoolean("invalidates_layout", true) ?: true }
-    }
-
+    fun invalidatesLayout(name: String, changed: JSONObject): Boolean = changes(name, changed.keys().asSequence().asIterable()) and LAYOUT != 0
     fun validateRemoval(name: String, changed: JSONObject, removed: List<String>): Boolean {
-        val schema = components.optJSONObject(name) ?: return false
-        val fields = schema.getJSONObject("props")
-        val required = schema.optJSONArray("required") ?: JSONArray()
-        return removed.toSet().size == removed.size && removed.all { key ->
-            fields.has(key) && !changed.has(key) && (0 until required.length()).none { required.getString(it) == key }
-        }
+        val fields = components[name] ?: return false
+        return removed.toSet().size == removed.size && removed.all { key -> fields[key]?.let { !it.required && it.allowed && !changed.has(key) } ?: false }
     }
-
-    fun requiresRecreation(name: String, changed: JSONObject, removed: List<String> = emptyList()): Boolean {
-        val fields = components.optJSONObject(name)?.optJSONObject("props") ?: return true
-        return (changed.keys().asSequence().toSet() + removed).any { key ->
-            fields.optJSONObject(key)?.optJSONObject("native")?.optBoolean("recreate", false) == true
-        }
-    }
-
+    fun requiresRecreation(name: String, changed: JSONObject, removed: List<String> = emptyList()): Boolean =
+        changes(name, changed.keys().asSequence().asIterable() + removed) and RECREATE != 0
     fun normalize(name: String, changed: JSONObject, removed: List<String> = emptyList()): JSONObject {
-        val defaults = components.optJSONObject(name)?.optJSONObject("defaults") ?: JSONObject()
-        val result = JSONObject(changed.toString())
-        for (key in removed) result.put(key, defaults.opt(key) ?: JSONObject.NULL)
+        val result = JSONObject()
+        for (key in changed.keys()) result.put(key, changed.get(key))
+        for (key in removed) result.put(key, components[name]?.get(key)?.defaultValue ?: JSONObject.NULL)
         return result
     }
-
-    fun validateCommand(name: String, method: String, args: JSONObject): Boolean =
-        components.optJSONObject(name)?.optJSONObject("commands")?.optJSONObject(method)?.let { validateArguments(it, args) } ?: false
-
+    fun validateCommand(name: String, method: String, args: JSONObject): Boolean = commands["$name.$method"]?.invoke(args) ?: false
     fun validateModule(name: String, method: String, args: JSONObject): Boolean {
-        val module = modules.optJSONObject(name) ?: return name in setOf("Host", "Layout", "Runtime")
-        return module.optJSONObject("methods")?.optJSONObject(method)?.let { validateArguments(it, args) } ?: false
-    }
-
-    private fun validateArguments(command: JSONObject, args: JSONObject): Boolean = matches(args,
-        JSONObject().put("type", "object").put("properties", command.getJSONObject("arguments"))
-            .put("required", command.optJSONArray("required") ?: JSONArray(command.getJSONObject("arguments").keys().asSequence().toList()))
-            .put("additionalProperties", false))
-
-    fun matches(value: Any, schema: JSONObject): Boolean {
-        schema.optJSONArray("anyOf")?.let { alternatives ->
-            return (0 until alternatives.length()).any { matches(value, alternatives.getJSONObject(it)) }
-        }
-        schema.optJSONArray("enum")?.let { values -> return (0 until values.length()).any { val item = values.get(it); if (item is Number && value is Number) item.toDouble() == value.toDouble() else item == value } }
-        return when (schema.optString("type")) {
-            "null" -> value == JSONObject.NULL
-            "string" -> value is String
-            "boolean" -> value is Boolean
-            "integer" -> value is Number && value.toDouble().isFinite() && kotlin.math.abs(value.toDouble()) <= 9007199254740991.0 && value.toDouble() == value.toLong().toDouble()
-            "number" -> value is Number && value.toDouble().isFinite()
-            "array" -> value is JSONArray && (schema.optJSONArray("prefixItems")?.let { prefix ->
-                value.length() == prefix.length() && (0 until value.length()).all { matches(value.get(it), prefix.getJSONObject(it)) }
-            } ?: (0 until value.length()).all { matches(value.get(it), schema.optJSONObject("items") ?: JSONObject()) })
-            "object" -> {
-                if (value !is JSONObject) false else {
-                    val fields = schema.optJSONObject("properties") ?: JSONObject()
-                    val required = schema.optJSONArray("required") ?: JSONArray()
-                    (0 until required.length()).all { value.has(required.getString(it)) } && value.keys().asSequence().all { key ->
-                        val field = fields.optJSONObject(key) ?: schema.optJSONObject("additionalProperties")
-                        if (field != null) matches(value.get(key), field) else schema.opt("additionalProperties") != false
-                    }
-                }
-            }
-            "event" -> value is Boolean
-            else -> true
-        }
+        if (name in setOf("Host", "Layout", "Runtime")) return true
+        return modules["$name.$method"]?.invoke(args) ?: false
     }
 }

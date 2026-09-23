@@ -45,7 +45,7 @@ def IssueRow(issue: Issue) -> pn.Element:
     )
 
 
-def issue_key(issue: Issue, index: int) -> int:
+def issue_key(issue: Issue, index: int) -> str:
     return issue.id
 
 
@@ -135,8 +135,8 @@ def Inbox() -> pn.Element:
         pn.Text(status) if status else None,
         InboxBadge(count=len(snapshot.issues), on_press=cancel_preparation, style={"margin": 8}) if status else None,
         pn.FlatList(
-            data=query.data or [],
-            key_extractor=issue_key,
+            data=repository.issues if not deferred and not only_open else query.data or [],
+            key_extractor=None if not deferred and not only_open else issue_key,
             render_item=render_issue,
             estimated_item_height=130,
             refresh_control=pn.RefreshControl(refreshing=snapshot.loading, on_refresh=repository.load),

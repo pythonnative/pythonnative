@@ -8,6 +8,7 @@ screen roots through native navigation controllers and fragments.
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import json
 import sys
@@ -104,8 +105,8 @@ class ScreenHost:
         self._is_rendering = False
         self._render_queued = False
         self._render_scheduled = False
-        self._redbox_reconciler: Any = None
-        self._redbox_root: Any = None
+        self._redbox_visible = False
+        self._refresh_task: asyncio.Task[Any] | None = None
 
     # ------------------------------------------------------------------
     # Platform primitives (override)
@@ -124,6 +125,12 @@ class ScreenHost:
     def _schedule_render_async(self) -> bool:
         """Defer a render to the platform's next UI turn; ``False`` renders inline."""
         return False
+
+    def _show_error(self, payload: Dict[str, Any]) -> None:
+        """Show a host-owned diagnostic view (native hosts override)."""
+
+    def _dismiss_error(self) -> None:
+        """Dismiss the platform diagnostic view."""
 
     def _native_set_options(self, options: Dict[str, Any]) -> None:
         """Apply header options (``title`` at minimum) to the native chrome."""
@@ -172,8 +179,9 @@ class ScreenHost:
         persists, so an already-mounted tree is simply re-attached.
         """
         self._register_redbox_reporter()
-        if self.reconciler is not None and self.root_native_view is not None:
-            self._attach_root(self.root_native_view)
+        if self.reconciler is not None:
+            if self.root_native_view is not None:
+                self._attach_root(self.root_native_view)
             return
 
         self.reconciler = self._new_reconciler()
@@ -182,7 +190,8 @@ class ScreenHost:
             self._is_rendering = True
             try:
                 self.root_native_view = self.reconciler.mount(self._root_element())
-                self._attach_root(self.root_native_view)
+                if self.root_native_view is not None:
+                    self._attach_root(self.root_native_view)
                 self._drain_renders()
             finally:
                 self._is_rendering = False
@@ -259,8 +268,6 @@ class ScreenHost:
         if self.reconciler is None or width <= 0 or height <= 0:
             return
         self.reconciler.set_viewport_size(float(width), float(height))
-        if self._redbox_reconciler is not None:
-            self._redbox_reconciler.set_viewport_size(float(width), float(height))
         try:
             from .. import platform_metrics
 
@@ -284,6 +291,29 @@ class ScreenHost:
 
         reconciler = Reconciler(get_backend())
         reconciler.on_render_requested = self.request_render
+
+        def mounted() -> None:
+            if self.reconciler is not reconciler:
+                return
+            root = reconciler.root_view()
+            if root is not self.root_native_view:
+                if self.root_native_view is not None:
+                    self._detach_root(self.root_native_view)
+                self.root_native_view = root
+                if root is not None:
+                    self._attach_root(root)
+
+        reconciler.on_commit = mounted
+
+        def failed(error: BaseException) -> None:
+            if diagnostics.is_dev():
+                self.show_redbox(error, phase="native commit")
+            else:
+                from ..runtime import get_loop
+
+                get_loop().call_exception_handler({"message": "Native commit failed", "exception": error})
+
+        reconciler.on_commit_error = failed
         return reconciler
 
     def _seed_viewport(self) -> None:
@@ -376,51 +406,26 @@ class ScreenHost:
         except Exception:
             pass
 
-        def mount() -> None:
-            try:
-                self.clear_redbox(reattach=False)
-                from ..native_views import get_backend
-                from ..reconciler import Reconciler
-
-                redbox = Reconciler(get_backend())
-                element = _redbox_element(exc, phase, lambda: self.clear_redbox())
-                root = redbox.mount(element)
-                width, height = self.reconciler.viewport_size if self.reconciler is not None else (0.0, 0.0)
-                if width <= 0 or height <= 0:
-                    from .. import platform_metrics
-
-                    dims = platform_metrics.get_window_dimensions()
-                    width, height = dims.width, dims.height
-                if width > 0 and height > 0:
-                    redbox.set_viewport_size(width, height)
-                self._redbox_reconciler = redbox
-                self._redbox_root = root
-                if self.root_native_view is not None:
-                    self._detach_root(self.root_native_view)
-                self._attach_root(root)
-            except Exception:
-                print("[PN] RedBox failed to mount:", file=sys.stderr)
-                traceback.print_exc()
+        def show() -> None:
+            self._redbox_visible = True
+            payload = {
+                "screen": getattr(self, "screen_id", 0),
+                "title": f"{type(exc).__name__} in {phase}: {exc}",
+                "trace": "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+            }
+            self._show_error(payload)
 
         from ..runtime import call_on_application_thread
 
-        call_on_application_thread(mount)
+        call_on_application_thread(show)
 
     def clear_redbox(self, reattach: bool = True) -> None:
-        """Dismiss the dev error overlay, reattaching the app's root view unless ``reattach`` is ``False``."""
-        redbox, self._redbox_reconciler = self._redbox_reconciler, None
-        self._redbox_root = None
-        if redbox is None:
+        """Dismiss the host-owned error overlay without touching the surface."""
+        del reattach
+        if not self._redbox_visible:
             return
-        try:
-            redbox.unmount()
-        except Exception:
-            pass
-        if reattach and self.root_native_view is not None:
-            try:
-                self._attach_root(self.root_native_view)
-            except Exception:
-                pass
+        self._redbox_visible = False
+        self._dismiss_error()
 
     # ------------------------------------------------------------------
     # Hot reload
@@ -469,7 +474,14 @@ class ScreenHost:
         if self.reconciler is None:
             return "none"
         self.clear_redbox()
-        if not force_remount and self._try_fast_refresh(reloaded):
+        if self.reconciler.commit_pending:
+            self._schedule_refresh(reloaded, force_remount=force_remount)
+            return "remount" if force_remount else "fast_refresh"
+        if (
+            not force_remount
+            and not getattr(self.reconciler.backend, "_failed", False)
+            and self._try_fast_refresh(reloaded)
+        ):
             return "fast_refresh"
         try:
             self._full_remount(reloaded)
@@ -503,51 +515,61 @@ class ScreenHost:
         self._drain_renders()
         return True
 
+    def _schedule_refresh(self, reloaded: Sequence[str], *, force_remount: bool) -> None:
+        from ..runtime import get_loop
+
+        async def refresh_when_idle() -> None:
+            current = self.reconciler
+            try:
+                if current is not None:
+                    try:
+                        await current.wait_for_commit()
+                    except Exception:
+                        pass  # A failed surface is reset by the remount below.
+                if self.reconciler is current and current is not None:
+                    self.refresh(reloaded, force_remount=force_remount)
+            finally:
+                self._refresh_task = None
+
+        if self._refresh_task is not None:
+            self._refresh_task.cancel()
+        self._refresh_task = get_loop().create_task(refresh_when_idle())
+
     def _full_remount(self, reloaded_modules: Sequence[str]) -> None:
-        old_reconciler, old_root = self.reconciler, self.root_native_view
-        new_reconciler = self._new_reconciler()
-        self.reconciler = new_reconciler
-        self._is_rendering = True
-        try:
-            new_root = new_reconciler.mount(self._root_element())
-        except Exception:
-            self.reconciler = old_reconciler
-            raise
-        finally:
-            self._is_rendering = False
-        if old_reconciler is not None:
-            old_reconciler.unmount()
-        if old_root is not None:
-            self._detach_root(old_root)
-        self.root_native_view = new_root
-        self._attach_root(new_root)
-        self._drain_renders()
+        del reloaded_modules
+        old = self.reconciler
+        backend = old.backend
 
+        def mount() -> None:
+            if self.reconciler is not old:
+                return
+            if getattr(backend, "_failed", False):
+                backend.reset()
+            if self.root_native_view is not None:
+                self._detach_root(self.root_native_view)
+            self.root_native_view = None
+            self.reconciler = self._new_reconciler()
+            self._seed_viewport()
+            self.reconciler.mount(self._root_element())
+            self._drain_renders()
 
-def _redbox_element(exc: BaseException, phase: str, on_dismiss: Callable[[], None]) -> Element:
-    from ..components import Button, Column, ScrollView, Text
+        old.unmount()
+        if not old.commit_pending:
+            mount()
+            return
+        from ..runtime import get_loop
 
-    trace = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    message = str(exc) or "(no message)"
-    return Column(
-        Column(
-            Text(f"{type(exc).__name__} in {phase}", style={"color": "#FFD3DA", "font_size": 13, "bold": True}),
-            Text(message, style={"color": "#FFFFFF", "font_size": 17, "bold": True}),
-            style={"background_color": "#C4283C", "padding": 16, "padding_top": 56, "spacing": 6},
-        ),
-        ScrollView(
-            Text(trace, style={"color": "#FF9AA8", "font_size": 12}),
-            style={"flex": 1, "padding": 12},
-        ),
-        Column(
-            Button("Dismiss", on_press=on_dismiss, style={"color": "#FFFFFF"}),
-            Text(
-                "Fix the error and save to reload.", style={"color": "#8E8E93", "font_size": 12, "text_align": "center"}
-            ),
-            style={"padding": 12, "padding_bottom": 32, "spacing": 4},
-        ),
-        style={"flex": 1, "background_color": "#1C1C1E"},
-    )
+        async def remount() -> None:
+            try:
+                await old.wait_for_commit()
+                mount()
+            except Exception as error:
+                if diagnostics.is_dev():
+                    self.show_redbox(error, phase="hot reload")
+                else:
+                    raise
+
+        self._refresh_task = get_loop().create_task(remount())
 
 
 def flush_hosts(hosts: Sequence[ScreenHost]) -> None:

@@ -22,6 +22,11 @@ class HostModule : NativeModule {
 
     override fun call(method: String, args: JSONObject, promise: Promise) {
         when (method) {
+            "show_error" -> {
+                ErrorOverlay.show(args.optLong("screen"), args.optString("title"), args.optString("trace"))
+                promise.resolve(null)
+            }
+            "dismiss_error" -> { ErrorOverlay.dismiss(); promise.resolve(null) }
             "cache_state" -> {
                 screen(args)?.cachedStateJSON = args.str("state")
                 promise.resolve(null)

@@ -1,0 +1,94 @@
+{
+  "environment": {
+    "python": "3.13.15",
+    "system": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+    "renderer": "headless; timings include profiling"
+  },
+  "results": [
+    {
+      "source": "Sequence",
+      "rows": 100000,
+      "edits": 10,
+      "median_ms": 943.7821775,
+      "max_ms": 1225.572866,
+      "max_dataset_bytes": 74,
+      "mounted_views": 71,
+      "counters": {
+        "components.rendered": 30,
+        "list.snapshot_rows": 1000000,
+        "list.rows_validated": 10,
+        "list.patches": 10
+      },
+      "gauges": {},
+      "phases": {
+        "component": {
+          "samples": 30,
+          "p50_us": 356165.708,
+          "p95_us": 641423.355,
+          "max_us": 651569.446
+        },
+        "commit": {
+          "samples": 40,
+          "p50_us": 2.049,
+          "p95_us": 48.233,
+          "max_us": 60.304
+        },
+        "layout": {
+          "samples": 10,
+          "p50_us": 1.606,
+          "p95_us": 2.358,
+          "max_us": 2.358
+        },
+        "render": {
+          "samples": 10,
+          "p50_us": 4.304,
+          "p95_us": 5.155,
+          "max_us": 5.155
+        }
+      }
+    },
+    {
+      "source": "ListData",
+      "rows": 100000,
+      "edits": 10,
+      "median_ms": 12.912762,
+      "max_ms": 23.450992,
+      "max_dataset_bytes": 63,
+      "mounted_views": 71,
+      "counters": {
+        "components.rendered": 30,
+        "list.incremental_changes": 10,
+        "list.row_specs": 350,
+        "list.rows_validated": 10,
+        "list.patches": 10
+      },
+      "gauges": {},
+      "phases": {
+        "component": {
+          "samples": 30,
+          "p50_us": 321.241,
+          "p95_us": 3087.436,
+          "max_us": 3218.109
+        },
+        "commit": {
+          "samples": 40,
+          "p50_us": 3.534,
+          "p95_us": 68.601,
+          "max_us": 69.964
+        },
+        "layout": {
+          "samples": 10,
+          "p50_us": 2.741,
+          "p95_us": 3.012,
+          "max_us": 3.012
+        },
+        "render": {
+          "samples": 20,
+          "p50_us": 6.771,
+          "p95_us": 16038.269,
+          "max_us": 16038.269
+        }
+      }
+    }
+  ]
+}

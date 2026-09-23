@@ -93,7 +93,7 @@ def test_encode_transaction_shapes() -> None:
     render = lambda i: i  # noqa: E731
     ops: List[Mutation] = [
         CreateOp(1, "Column", {"flex": 1, "_pn_events": frozenset({"on_press"})}),
-        CreateOp(2, "VirtualList", {"count": 2, "on_bind_row": render}),
+        CreateOp(2, "VirtualList", {"horizontal": True, "on_bind_row": render}),
         UpdateOp(1, {"flex": UNSET, "padding": 4}),
         InsertOp(1, 2, 0),
         SetFrameOp(2, 0, 0, 100.5, math.nan),
@@ -103,7 +103,7 @@ def test_encode_transaction_shapes() -> None:
     decoded = codec.loads(text)
     assert decoded == [
         ["c", 1, "Column", {"flex": 1, "_pn_events": ["on_press"]}],
-        ["c", 2, "VirtualList", {"count": 2}],
+        ["c", 2, "VirtualList", {"horizontal": True}],
         ["u", 1, {"padding": 4}, ["flex"]],
         ["i", 1, 2, 0],
         ["f", 2, 0.0, 0.0, 100.5, 0.0],
@@ -235,12 +235,15 @@ def test_backend_measure_command_and_animation(backend: BridgeBackend, transport
 
 def test_backend_holds_callable_props_in_sidecar(backend: BridgeBackend, transport: FakeTransport) -> None:
     render = lambda i: Element("Text", {"text": str(i)}, [])  # noqa: E731
-    backend.apply_mutations([CreateOp(5, "VirtualList", {"count": 3, "on_bind_row": render})])
-    assert transport.views[5].props == {"count": 3}
+    packet = {"base": 0, "revision": 1, "changes": [["reset", []]]}
+    backend.apply_mutations(
+        [CreateOp(5, "VirtualList", {"horizontal": True, "dataset": packet, "on_bind_row": render})]
+    )
+    assert transport.views[5].props == {"horizontal": True, "dataset": packet}
     assert backend.python_props(5)["on_bind_row"] is render
     backend.apply_mutations([UpdateOp(5, {"on_bind_row": UNSET})])
     assert backend.python_props(5) == {}
-    assert transport.views[5].props == {"count": 3}
+    assert transport.views[5].props == {"horizontal": True, "dataset": packet}
 
 
 def test_reconciler_commits_through_bridge(transport: FakeTransport) -> None:
@@ -323,7 +326,9 @@ def test_animated_transform_shorthands_cross_the_bridge(name: str, transport: Fa
 def test_event_handler_return_value_is_returned_to_native(transport: FakeTransport) -> None:
     from pythonnative.events import get_event_registry
 
-    get_backend().apply_mutations([CreateOp(11, "VirtualList", {})])
+    get_backend().apply_mutations(
+        [CreateOp(11, "VirtualList", {"dataset": {"base": 0, "revision": 1, "changes": [["reset", []]]}})]
+    )
     get_event_registry().set_events(11, {"on_bind_row": lambda payload: {"root": payload["index"] * 2}})
     try:
         assert transport.fire(11, "on_bind_row", {"index": 21}) == {"root": 42}

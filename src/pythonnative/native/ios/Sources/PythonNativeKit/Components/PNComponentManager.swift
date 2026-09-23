@@ -187,16 +187,8 @@ open class PNTypedComponentManager<Props: PNViewProps>: PNComponentManager where
     public init(_ props: Props.Type) { super.init() }
 
     public final override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let decoded: Props
-        if let typed = try? Props(props, partial: true) {
-            decoded = typed
-        } else {
-            // The wire path already validated these props in `PNCommit`; a key
-            // the generated contract doesn't carry yet is applied from the raw
-            // dictionary by the manager while the typed view keeps the rest.
-            let known = props.filter { (try? Props([$0.key: $0.value], partial: true)) != nil }
-            decoded = try! Props(known, partial: true)
-        }
+        // PNCommit validated the complete transaction before entering managers.
+        let decoded = try! Props(props, partial: true, validated: true)
         applyTyped(view: view, props: decoded, raw: props, initial: initial)
     }
 

@@ -145,6 +145,16 @@ class NativeScreenHost(ScreenHost):
 
     # -- platform primitives -------------------------------------------
 
+    def _show_error(self, payload: Dict[str, Any]) -> None:
+        from ..bridge import get_transport
+
+        get_transport().call("Host", "show_error", codec.dumps({"call_id": 0, "args": payload}))
+
+    def _dismiss_error(self) -> None:
+        from ..bridge import get_transport
+
+        get_transport().call("Host", "dismiss_error", codec.dumps({"call_id": 0, "args": {}}))
+
     def _initial_viewport_size(self) -> Optional[Tuple[float, float]]:
         if self._pending_viewport is not None:
             return self._pending_viewport
@@ -235,6 +245,9 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
     host = _HOSTS.get(screen_id)
     if host is None:
         diagnostics.log(f"dispatch_host_event: no host for screen={screen_id} event={event!r}")
+        return None
+    if event == "reload":
+        host.reload()
         return None
     if event == "layout":
         host.apply_metrics(payload)

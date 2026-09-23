@@ -1,4 +1,4 @@
-"""Persistent offline data and optimistic immutable application state."""
+"""Persistent offline data and an incremental keyed collection."""
 
 import asyncio
 import json
@@ -29,6 +29,7 @@ class Repository:
 
     def __init__(self) -> None:
         self.snapshot = Snapshot()
+        self.issues: pn.ListData[Issue] = pn.ListData(key=lambda issue: issue.id)
         self.listeners: set[Callable[[], None]] = set()
         self._write_lock = asyncio.Lock()
 
@@ -59,6 +60,7 @@ class Repository:
                         )
                         for i in range(1, 2001)
                     )
+                self.issues = pn.ListData(issues, key=lambda issue: issue.id)
                 self.publish(issues=issues, loading=False)
         except Exception as error:
             import traceback
@@ -69,11 +71,12 @@ class Repository:
     async def update(self, issue: Issue) -> None:
         # Serialize persistence so older writes can't overwrite newer changes.
         async with self._write_lock:
-            previous = self.snapshot.issues
-            issues = tuple(issue if row.id == issue.id else row for row in previous)
-            self.publish(issues=issues, error="")
+            previous = self.issues.get(issue.id)
+            self.issues.update(issue.id, issue)
+            self.publish(issues=tuple(self.issues), error="")
             try:
-                await pn.AsyncStorage.set("inbox.issues", json.dumps([asdict(row) for row in issues]))
+                await pn.AsyncStorage.set("inbox.issues", json.dumps([asdict(row) for row in self.issues]))
             except Exception as error:
-                self.publish(issues=previous, error=f"Save failed: {error}")
+                self.issues.update(issue.id, previous)
+                self.publish(issues=tuple(self.issues), error=f"Save failed: {error}")
                 raise

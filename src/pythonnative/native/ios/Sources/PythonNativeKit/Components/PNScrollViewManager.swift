@@ -29,7 +29,7 @@ public final class PNScrollViewManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! ScrollViewProps(props)
+        let typed = try! ScrollViewProps(props, validated: true)
 
         guard let scroll = view as? UIScrollView, let state = PNViewState.existing(for: scroll) else { return }
         PNViewStyler.applyCommon(scroll, props)

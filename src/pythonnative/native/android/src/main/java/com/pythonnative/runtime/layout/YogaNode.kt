@@ -11,7 +11,6 @@ class YogaNode(val tag: Long) : AutoCloseable {
     private external fun create(): Long
     private external fun free(ptr: Long)
     external fun style(ptr: Long, key: String, value: String)
-    external fun resetStyle(ptr: Long)
     external fun measureLeaf(ptr: Long, enabled: Boolean)
     external fun insert(ptr: Long, child: Long, index: Int)
     external fun remove(ptr: Long, child: Long)

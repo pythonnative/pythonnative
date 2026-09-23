@@ -239,7 +239,7 @@ class RoundTwoRobolectricTest {
     }
 
     @Test fun virtualListScrollPayloadKeepsListWindowFields() {
-        applier.applyOp(Op.Create(38, "VirtualList", JSONObject().put("keys", JSONArray().put("a").put("b")).put("count", 2).put("revision", 1)))
+        applier.applyOp(Op.Create(38, "VirtualList", JSONObject("""{"dataset":{"base":0,"revision":1,"changes":[["reset",[["a",1,44,false],["b",1,44,false]]]]}}""")))
         val list = PNBridge.registry.get(38)!!.view
         val method = list.javaClass.getDeclaredMethod("scrollPayload").apply { isAccessible = true }
         val payload = method.invoke(list) as JSONObject

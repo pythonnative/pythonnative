@@ -136,7 +136,7 @@ class LayoutMixin:
         if self._viewport_size == (width, height):
             return
         self._viewport_size = (width, height)
-        if self.root is not None:
+        if self.root is not None and not getattr(self, "commit_pending", False):
             self._run_layout()
             self._flush_ops()
             self._dispatch_layout_events()

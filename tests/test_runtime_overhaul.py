@@ -117,7 +117,7 @@ def test_commit_overlay_work_depends_on_changed_records() -> None:
     untouched = state.views[2]
     with Profiler() as profiler:
         candidate = state.prepare(
-            {"version": 3, "application": "app", "surface": 1, "revision": 1, "ops": [["u", 1, {"text": "after"}, []]]}
+            {"version": 4, "application": "app", "surface": 1, "revision": 1, "ops": [["u", 1, {"text": "after"}, []]]}
         )
     assert state.views[1].props["text"] == "before"
     assert candidate.views[2] is untouched

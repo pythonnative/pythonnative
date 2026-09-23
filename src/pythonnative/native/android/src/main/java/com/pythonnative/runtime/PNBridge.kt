@@ -28,7 +28,7 @@ object PNBridge {
     const val TAG = "PythonNative"
 
     /** Protocol version compiled into this library. */
-    const val PROTOCOL_VERSION = 3
+    const val PROTOCOL_VERSION = 4
 
     private val pythonQueue = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "PythonNative-events").apply { isDaemon = true }
@@ -42,7 +42,7 @@ object PNBridge {
     val registry = ViewRegistry()
 
     private data class Message(val kind: String, val tag: Long, val name: String, val payload: String) {
-        val continuous get() = kind == "event" && (name in setOf("on_scroll", "on_selection_change", "on_gesture_update") ||
+        val continuous get() = kind == "event" && (name in setOf("on_scroll", "on_window", "on_selection_change", "on_gesture_update") ||
             name.startsWith("gesture:") && JSONObject(payload).optJSONArray("args")?.optJSONObject(0)?.optString("state") == "changed")
     }
     private val mailbox = java.util.ArrayDeque<Message>()
@@ -113,8 +113,16 @@ object PNBridge {
     /** Apply one serialized transaction (a JSON array of ops). */
     @JvmStatic
     fun apply(transactionJson: String): String {
-        if (!MainThread.isMain()) return MainThread.call { apply(transactionJson) }
-        return commits.apply(transactionJson, applier)
+        val started = System.nanoTime()
+        val envelope = try { JSONObject(transactionJson) } catch (_: Exception) { return "{\"ok\":false,\"failed\":false,\"error\":\"Invalid JSON\"}" }
+        val decoded = System.nanoTime()
+        return MainThread.call {
+            val mounted = System.nanoTime()
+            val reply = JSONObject(commits.apply(envelope, applier))
+            val metrics = reply.optJSONObject("metrics") ?: JSONObject()
+            metrics.put("decode_ns", decoded - started).put("queue_ns", mounted - decoded)
+            reply.put("metrics", metrics).toString()
+        }
     }
 
     /**
@@ -180,7 +188,7 @@ object PNBridge {
             return ModuleEnvelope.ok(null)
         }
         if (module == "Runtime") return JSONObject().put("ok", true).put("value", JSONObject()
-            .put("protocol", 3).put("yoga", "3.2.1").put("schema", com.pythonnative.generated.PNContracts.fingerprint)
+            .put("protocol", 4).put("yoga", "3.2.1").put("schema", com.pythonnative.generated.PNContracts.fingerprint)
             .put("animation_graph", true).put("logical_lists", true).put("native_layout", true)).toString()
         if (module == "Layout") {
             val started = System.nanoTime()

@@ -49,7 +49,7 @@ public final class PNButtonManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! ButtonProps(props)
+        let typed = try! ButtonProps(props, validated: true)
 
         guard let button = view as? UIButton else { return }
         if typed.has_title {
@@ -102,7 +102,7 @@ public final class PNCheckboxManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! CheckboxProps(props)
+        let typed = try! CheckboxProps(props, validated: true)
 
         guard let button = view as? UIButton, let state = PNViewState.existing(for: button) else { return }
         if initial {
@@ -171,7 +171,7 @@ public final class PNPickerManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! PickerProps(props)
+        let typed = try! PickerProps(props, validated: true)
 
         guard let button = view as? UIButton else { return }
         button.setTitle(PNPickerManager.title(for: mergedProps(button)), for: .normal)

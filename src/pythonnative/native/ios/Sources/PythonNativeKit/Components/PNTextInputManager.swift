@@ -32,7 +32,7 @@ public final class PNTextInputManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! TextInputProps(props)
+        let typed = try! TextInputProps(props, validated: true)
 
         guard let state = PNViewState.existing(for: view) else { return }
         let field = view as? UITextField

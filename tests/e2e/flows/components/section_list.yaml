@@ -21,7 +21,7 @@ appId: ${APP_ID}
     direction: UP
     duration: 400
 # Alpha row 1 has scrolled out, but the Alpha header is still pinned by
-# the sticky overlay (or Beta's header has taken over if the swipe went
+# native sticky layout (or Beta's header has taken over if the swipe went
 # far enough); either way a section header is on screen.
 - extendedWaitUntil:
     visible:

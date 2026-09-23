@@ -28,7 +28,7 @@ import org.json.JSONObject
  * either. `fade_duration` (ms) fades a newly decoded source in;
  * `headers` are sent with network requests.
  */
-class ImageManager : TypedComponentManager<ImageProps>({ values, partial -> ImageProps(values, partial) }) {
+class ImageManager : TypedComponentManager<ImageProps>({ values, partial, validated -> ImageProps(values, partial, validated) }) {
     private val assetViews = java.util.Collections.newSetFromMap(java.util.WeakHashMap<ImageView, Boolean>())
     private var unsubscribe: (() -> Unit)? = null
 

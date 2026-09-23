@@ -1,5 +1,5 @@
 {
-  "protocol": 3,
+  "protocol": 4,
   "yoga": "3.2.1",
   "components": {
     "InboxBadge": {
@@ -2844,6 +2844,12 @@
               "type": "null"
             }
           ]
+        },
+        "_pn_layout": {
+          "type": "boolean",
+          "native": {
+            "invalidates_layout": false
+          }
         },
         "_pn_events": {
           "type": "array",

@@ -14,6 +14,7 @@ from .types import NativeField, decode_value, encode_value, type_schema, validat
 
 # Runtime metadata crosses the bridge for built-in and third-party views alike.
 RUNTIME_PROPS: dict[str, dict[str, Any]] = {
+    "_pn_layout": {"type": "boolean", "native": {"invalidates_layout": False}},
     "_pn_events": {"type": "array", "items": {"type": "string"}},
     "_pn_animated_events": {"type": "object"},
     "_pn_list_key": {"type": "string"},
@@ -213,7 +214,7 @@ def register_schema(schema: ComponentSchema | ModuleSchema) -> None:
 def manifest() -> dict[str, Any]:
     """Return deterministic native metadata for code generation and tooling."""
     return {
-        "protocol": 3,
+        "protocol": 4,
         "yoga": "3.2.1",
         "components": {name: dataclasses.asdict(value) for name, value in sorted(COMPONENTS.items())},
         "modules": {name: dataclasses.asdict(value) for name, value in sorted(MODULES.items())},
@@ -227,8 +228,8 @@ def fingerprint() -> str:
 
 def load_manifest(document: Mapping[str, Any]) -> None:
     """Load declarative extension contracts without importing target binaries."""
-    if document.get("protocol") != 3 or document.get("yoga") != "3.2.1":
-        raise ValueError("Native contracts require protocol 3 and Yoga 3.2.1")
+    if document.get("protocol") != 4 or document.get("yoga") != "3.2.1":
+        raise ValueError("Native contracts require protocol 4 and Yoga 3.2.1")
     pending = []
     for group, constructor, registered in (
         ("components", ComponentSchema, COMPONENTS),
