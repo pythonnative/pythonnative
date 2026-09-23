@@ -237,10 +237,24 @@ PN_PROFILE=/tmp/pythonnative-trace.json pn preview
 ```
 
 Collection retains the latest 10,000 timing events and exports the trace at
-normal process exit. The trace includes render, layout, and commit phases,
-plus counters for rendered components and bridge operations and bytes. This
-command captures the preview's Python process; it doesn't configure an
-environment variable inside a connected mobile app.
+normal process exit. The trace identifies rendered components and separates
+Python preparation, acknowledgement, and native decode, queue, preflight,
+mutation, and layout durations. Counters cover bridge bytes/operations, list
+snapshot rows and patches, and mounted views. `Profiler.summary()` reports
+retained-sample p50/p95/max durations, work counters, and gauges.
+
+Setting `PN_PROFILE` here captures the preview's Python process; it doesn't
+configure an environment variable inside a connected mobile app.
+
+Run the reproducible headless work benchmark from the repository root:
+
+```bash
+python scripts/benchmark-rendering.py --rows 100000 --edits 20 > benchmark.json
+```
+
+It compares ordinary sequence replacement with `ListData`, asserts bounded
+metadata and mounted-view work, and emits JSON. Timings include profiling and
+aren't device frame-rate measurements or CI thresholds.
 
 For an explicit capture in a headless test:
 

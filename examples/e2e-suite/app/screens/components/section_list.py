@@ -2,7 +2,7 @@
 
 Two sections with stable headers and rows; the test verifies that the
 section header and the first row of each section render together, and
-that the ``sticky_section_headers`` overlay keeps a header pinned while
+that the ``sticky_section_headers`` native layout keeps a header pinned while
 the list is scrolled. Rows are separated by an ``item_separator``.
 """
 
@@ -20,14 +20,8 @@ def _separator() -> pn.Element:
 def SectionListDemo() -> pn.Element:
     """Render a 2-section SectionList with sticky headers and separators."""
     sections = [
-        {
-            "title": "Section Alpha",
-            "data": [{"name": f"Alpha row {i + 1}"} for i in range(8)],
-        },
-        {
-            "title": "Section Beta",
-            "data": [{"name": f"Beta row {i + 1}"} for i in range(8)],
-        },
+        pn.Section(key="Section Alpha", title="Section Alpha", data=[{"name": f"Alpha row {i + 1}"} for i in range(8)]),
+        pn.Section(key="Section Beta", title="Section Beta", data=[{"name": f"Beta row {i + 1}"} for i in range(8)]),
     ]
 
     def render_item(item: dict, _i: int, _s: int) -> pn.Element:
@@ -36,9 +30,9 @@ def SectionListDemo() -> pn.Element:
             style=pn.style(font_size=14, padding=8, background_color="#FFFFFF"),
         )
 
-    def render_header(s: dict, _i: int) -> pn.Element:
+    def render_header(s: pn.Section[dict], _i: int) -> pn.Element:
         return pn.Text(
-            s["title"],
+            s.title,
             style=pn.style(
                 font_size=15,
                 font_weight="700",

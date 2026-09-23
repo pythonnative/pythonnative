@@ -20,7 +20,7 @@ class ButtonManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = ButtonProps(props)
+        val typed = ButtonProps(props, validated = true)
 
         val button = view as Button
         if (typed.has_title) button.text = typed.title ?: ""

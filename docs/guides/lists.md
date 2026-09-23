@@ -2,7 +2,8 @@
 
 [`FlatList`][pythonnative.FlatList] and
 [`SectionList`][pythonnative.SectionList] are the two list components
-shipped with PythonNative. Both are **virtualized**: only the rows
+shipped with PythonNative. Sections use frozen `Section(key=..., data=..., title=...)` records; section keys
+are unique and independent of their positions. Both lists are **virtualized**: only the rows
 inside (and just beyond) the viewport are mounted as native views.
 On mobile, `RecyclerView` (Android) and `UICollectionView` (iOS) own physical
 cell recycling. Rows remain ordinary keyed components in the application's
@@ -34,6 +35,64 @@ def Big():
 
 The list never holds 10,000 native views; only the window around the
 viewport ever exists.
+
+## Incremental data
+
+Use `ListData[T]` for frequently edited lists. It owns stable string keys and
+notifies mounted lists when items change. Keep it in a repository or create it
+with `use_memo` on the application thread:
+
+```python
+from dataclasses import dataclass, replace
+import pythonnative as pn
+
+@dataclass(frozen=True)
+class Message:
+    id: str
+    title: str
+
+
+def render_message(message: Message, index: int):
+    return pn.Text(message.title)
+
+
+@pn.component
+def Messages():
+    messages = pn.use_memo(
+        lambda: pn.ListData([Message("a", "Hello")], key=lambda message: message.id),
+        [],
+    )
+
+    def edit():
+        new_key = f"message-{messages.revision}"
+        with messages.batch():
+            messages.update("a", replace(messages.get("a"), title="Edited"))
+            messages.append(Message(new_key, "New message"))
+            messages.move(new_key, 0)
+
+    return pn.Column(
+        pn.Button("Edit messages", on_press=edit),
+        pn.FlatList(data=messages, render_item=render_message, style={"flex": 1}),
+        style={"flex": 1},
+    )
+```
+
+Omit `key_extractor` when passing `ListData`; the source owns its keys. Mutate
+it on its creating thread. `update(key, replacement)` preserves identity;
+`insert(index, item)`, `append(item)`, `remove(key)`, `move(key, final_index)`,
+and `clear()` publish explicit edits. `batch()` combines notifications, including
+nested batches. It doesn't roll back successful edits if its body raises.
+
+A one-item update does constant metadata work and sends one row record, even
+with 100,000 items. Initial mounting and expired history require a full metadata
+snapshot. Structural edits shift indexed arrays, so insertion and reordering
+aren't constant-time operations. The bounded journal defaults to 1,024 changes;
+each mounted list tracks its own committed revision.
+
+The incremental path supports ordinary single-column lists with fixed or
+estimated heights. Grids and `get_item_height` use the sequence adapter below.
+Changing rendering callbacks or list decorations also invalidates the snapshot.
+Keep callbacks stable with module-level functions or `use_callback`.
 
 ## Data snapshots
 
@@ -129,7 +188,7 @@ pn.FlatList(
 ```
 
 `on_viewable_items_changed` reports the set of visible rows whenever
-it changes, as a list of `{"index", "key", "item"}` dicts; on a
+it changes, as a list of frozen `ViewableItem` records with `.index`, `.key`, and `.item`; on a
 `SectionList` the list covers items only, with flat indices.
 `on_scroll` receives a [`ScrollEvent`][pythonnative.ScrollEvent] as the
 list scrolls.
@@ -186,21 +245,21 @@ pn.FlatList(
 ## Section lists
 
 [`SectionList`][pythonnative.SectionList] flattens an iterable of
-`{"title": ..., "data": [...]}` sections into a single virtualized
+`Section` records into a single virtualized
 list, dispatching to either `render_section_header` or `render_item`
 depending on the row's kind.
 
 ```python
 sections = [
-    {"title": "A", "data": ["Apple", "Avocado"]},
-    {"title": "B", "data": ["Banana", "Blueberry"]},
+    pn.Section(key="a", title="A", data=["Apple", "Avocado"]),
+    pn.Section(key="b", title="B", data=["Banana", "Blueberry"]),
 ]
 
 pn.SectionList(
     sections=sections,
     item_height=44,
     section_header_height=32,
-    render_section_header=lambda s, _: pn.Text(s["title"]),
+    render_section_header=lambda s, _: pn.Text(s.title),
     render_item=lambda item, _i, _s: pn.Text(item),
 )
 ```
@@ -210,29 +269,27 @@ rows work exactly as in `FlatList` (exact via `get_item_height`, or
 estimated and measured). `inverted`, `item_separator`, and
 `on_viewable_items_changed` work as on `FlatList`.
 
-`sticky_section_headers=True` keeps the current section's header
-pinned at the top of the list while its items scroll by. Python
-renders the overlay (through `render_section_header`, absolutely
-positioned over the list) from the first visible native row and hides
-it exactly while the real header is itself at the top, so the two
-never show at once:
+`sticky_section_headers=True` keeps the current section's header pinned at the
+top of the native list and lets the next header push it away. Native layout
+owns this movement, including while Python is busy. Python retains the active
+header in its bounded mounted window. No application `on_scroll` handler is
+needed.
 
 ```python
 pn.SectionList(
     sections=sections,
     sticky_section_headers=True,
     section_header_height=32,
-    render_section_header=lambda s, _: pn.Text(s["title"], style={"background_color": "#FFF"}),
+    render_section_header=lambda s, _: pn.Text(s.title, style={"background_color": "#FFF"}),
     render_item=lambda item, _i, _s: pn.Text(item),
 )
 ```
 
-Give the header an opaque background so rows don't show through the
-overlay.
+Give the header an opaque background so rows don't show through it.
 
 ## Performance notes
 
-- Always provide a stable `key_extractor` so rows that stay inside
+- Use `ListData` keys or a stable `key_extractor` so rows that stay inside
   the window refresh in place rather than tearing down and rebuilding
   their subtree as the window shifts.
 - Provide real extents (`item_height` / `get_item_height`) when you

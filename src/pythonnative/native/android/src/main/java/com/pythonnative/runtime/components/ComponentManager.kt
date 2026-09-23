@@ -212,10 +212,10 @@ object PNEvents {
 
 /** Typed managers consume the same generated contracts as extension managers. */
 abstract class TypedComponentManager<P: com.pythonnative.generated.PNViewProps>(
-    private val decode: (org.json.JSONObject, Boolean) -> P
+    private val decode: (org.json.JSONObject, Boolean, Boolean) -> P
 ): ComponentManager() {
     final override fun applyProps(view: android.view.View, props: org.json.JSONObject, initial: Boolean) {
-        applyTyped(view, decode(props, true), initial)
+        applyTyped(view, decode(props, true, true), initial)
     }
     open fun applyTyped(view: android.view.View, props: P, initial: Boolean) {
         ViewStyler.apply(view, props.values)

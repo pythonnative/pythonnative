@@ -73,10 +73,10 @@ def TodoList():
         ),
         pn.FlatList(
             data=todos,
-            render_item=lambda t: TodoRow(
+            render_item=lambda t, index: TodoRow(
                 todo=t, on_toggle=toggle, on_delete=delete, key=t["id"]
             ),
-            key_extractor=lambda t: t["id"],
+            key_extractor=lambda t, index: t["id"],
             style={"flex": 1},
         ),
     )
@@ -85,10 +85,9 @@ def TodoList():
 ## Why keys matter
 
 The reconciler matches children by `key` first and by position only as
-a fallback. Without keys, a delete of the first row would update the
-remaining rows in place (showing the wrong text briefly) before
-unmounting the last row. With keys, identity flows from the data, so
-"todo 2" stays mounted as "todo 2" even when its index shifts.
+a fallback. Position-based keys can transfer a row's local state to another
+item after a deletion. With stable keys, "todo 2" keeps its identity even
+when its index shifts, as long as it remains in the mounted window.
 
 The `key_extractor` on `FlatList` and the `key=` on the rendered row
 both come from the same `todo["id"]`. When in doubt: use a stable
@@ -97,8 +96,8 @@ identifier that's part of the data, not the position.
 ## Performance notes
 
 - `FlatList` lazily mounts only the rows that are visible (or near
-  visible); off-screen rows are represented by spacers and the window
-  shifts as the user scrolls. For long lists it scales much better
+  visible); the native list owns scrolling, item geometry, and recycling.
+  For long lists it scales much better
   than wrapping a `Column` in a `ScrollView`.
 - Avoid recomputing `data` on every render. If you derive it from
   another piece of state, wrap it in
@@ -106,6 +105,10 @@ identifier that's part of the data, not the position.
 - For row callbacks that you pass deeply, consider
   [`use_callback`][pythonnative.use_callback] to keep references
   stable.
+- Ordinary sequences are convenient for small, derived collections. For large
+  collections with frequent edits, use [`ListData`][pythonnative.ListData] to
+  publish keyed changes without scanning every item. See the
+  [incremental list guide](../guides/lists.md).
 
 ## Sorting and filtering
 

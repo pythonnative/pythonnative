@@ -26,6 +26,7 @@ class IOSTransport:
     """Bind the ``pn_bridge_*`` symbols and expose them as Python methods."""
 
     name = "ios"
+    asynchronous_commits = True
 
     def __init__(self, lib: Any = None) -> None:
         self._lib = lib if lib is not None else ctypes.CDLL(None)

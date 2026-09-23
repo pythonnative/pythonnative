@@ -1,3 +1,4 @@
+import {ListStore} from "../../src/pythonnative/devserver/static/list-store.js";
 import {Renderer, transformToCSS, easingFor, decayFinalValue, decayAt, snapTarget, scrollPayload, keyPressName, screenTransition} from '../../src/pythonnative/devserver/static/renderer.js';
 import {PreviewHost, Screen, localeRecord, scriptResult} from '../../src/pythonnative/devserver/static/host.js';
 import {matches} from '../../src/pythonnative/devserver/static/contracts.js';
@@ -5,12 +6,20 @@ const assert = (condition, message) => { if (!condition) throw Error(message); }
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const fixtures = await (await fetch('../contracts/validation.json')).json();
 for (const item of fixtures) assert(matches(item.value, item.schema) === item.valid, item.name);
+const listTrace = await (await fetch('../contracts/list-trace.json')).json();
+const traceStore = new ListStore();
+for (const item of listTrace) {
+  let accepted = false;
+  try { traceStore.apply(item.packet); accepted = true; } catch (_) {}
+  assert(accepted === item.valid, item.name);
+  assert(JSON.stringify(traceStore.keys) === JSON.stringify(item.keys) && traceStore.revision === item.revision, `atomic ${item.name}`);
+}
 const events = [], gestures = [], overlay = document.createElement('div'); document.body.append(overlay);
 const renderer = new Renderer({emit: (...args) => events.push(args), gesture: (...args) => gestures.push(args), request() {},
   animationFinished() {}, scheme: () => 'light', overlays: () => overlay, bottomInset: () => 0,
   frameWidth: () => 390, pointInFrame: () => ({x:0, y:0}), statusBar() {}});
 let revision = 0;
-const envelope = ops => ({version:3, application:'browser-test', surface:1, revision:revision+1, ops});
+const envelope = ops => ({version:4, application:'browser-test', surface:1, revision:revision+1, ops});
 const commit = ops => { const result=renderer.apply(envelope(ops)); assert(result.ok, result.error); revision++; };
 commit([['c',1,'Column',{width:300}], ['c',2,'TextInput',{value:'hello', multiline:false, font_size:20,
   _pn_events:['on_change','on_selection_change']}], ['i',1,2,0], ['c',3,'Text',{text:'Label',color:'#ff0000'}], ['i',1,3,1]]);
@@ -304,13 +313,34 @@ assert(emitted(21, 'on_request_close').length === 1, 'dismiss_on_backdrop=False 
 commit([['d',22], ['d',21]]);
 
 // VirtualList: on_scroll only when wired.
-commit([['c',20,'VirtualList',{width:200, height:100, keys:['a','b'], count:2, revision:1, _pn_events:['on_bind_row']}]]);
+commit([['c',20,'VirtualList',{width:200, height:100, dataset:{base:0,revision:1,changes:[['reset',[['a',1,44,false],['b',1,44,false]]]]}, _pn_events:['on_bind_row']}]]);
 const list = renderer.views.get(20); stage.append(list.el);
 list.el.dispatchEvent(new Event('scroll'));
 assert(emitted(20, 'on_scroll').length === 0, 'unwired VirtualList on_scroll stays quiet');
 commit([['u',20,{_pn_events:['on_bind_row','on_scroll']},[]]]);
 list.el.dispatchEvent(new Event('scroll'));
-assert(emitted(20, 'on_scroll').length === 1 && 'first' in emitted(20, 'on_scroll')[0][0] && 'viewport_height' in emitted(20, 'on_scroll')[0][0], 'wired VirtualList on_scroll carries the window');
+assert(emitted(20, 'on_scroll').length === 1 && 'viewport_height' in emitted(20, 'on_scroll')[0][0], 'wired VirtualList on_scroll carries typed geometry');
+
+// One-row patches preserve order storage and native row identity.
+const order = list.listStore.keys;
+commit([['u',20,{dataset:{base:1,revision:2,changes:[['u',['a',2,55,false]]]}},[]]]);
+assert(list.listStore.keys === order && list.listStore.rows.get('a').extent === 55, 'one-row update keeps the order index');
+const patch = {base:2,revision:3,changes:[['u',['a',3,60,false]]]};
+assert(!renderer.apply(envelope([['u',20,{dataset:patch},[]],['u',20,{dataset:patch},[]]])).ok, 'duplicate patch rejects atomically');
+assert(list.listStore.revision === 2, 'rejected patch does not publish');
+
+// Selective geometry and removal of an override retain the shorthand.
+commit([['c',980,'Column',{width:300,padding:20,padding_left:30}], ['c',981,'Text',{text:'Observed',_pn_layout:true}], ['i',980,981,0]]);
+let selective = renderer.computeLayout({roots:[980],width:300,height:400,selective:true});
+assert(selective.frames.length === 1 && selective.frames[0][0] === 981 && selective.frames[0][1] === 30, 'only observed geometry crosses');
+commit([['u',980,{},['padding_left']]]);
+selective = renderer.computeLayout({roots:[980],width:300,height:400,selective:true});
+assert(selective.frames[0][1] === 20, 'shorthand survives removal of edge override');
+commit([['u',981,{color:'#ff0000'},[]]]);
+assert(renderer.computeLayout({roots:[980],width:300,height:400,selective:true}).frames.length === 0, 'paint has no layout work');
+commit([['u',980,{_pn_layout:true},[]]]);
+assert(renderer.computeLayout({roots:[980],width:300,height:400,selective:true}).frames[0][0] === 980, 'new observer receives cached frame');
+commit([['d',981],['d',980]]);
 
 // ScreenStack: presentation and animation.
 assert(screenTransition({}) === 'pn-screen-right' && screenTransition({presentation:'modal'}) === 'pn-screen-bottom', 'default transitions by presentation');
@@ -449,5 +479,14 @@ screen.detachRoot(renderer.views.get(65));
 assert(!screen.stackOwnsHeader && screen.header.style.display === '' && screen.contentTop() === topBefore, 'the host header returns with the stack gone');
 commit([['d',66], ['d',65]]);
 
+// Host diagnostics survive destruction of the rendering surface.
+await call('Host', 'show_error', {screen:99,title:'Renderer failed',trace:'Traceback: sample'});
+assert(document.getElementById('pn-error-overlay')?.textContent.includes('Traceback: sample'), 'host shows a traceback');
+renderer.reset();
+assert(document.getElementById('pn-error-overlay'), 'renderer reset preserves host diagnostics');
+document.querySelector('#pn-error-overlay button').click();
+assert(callbacks.some(([kind, tag, name]) => kind === 'host' && tag === 99 && name === 'reload'), 'host reload bypasses renderer events');
+await call('Host', 'dismiss_error');
+assert(!document.getElementById('pn-error-overlay'), 'host dismiss releases the overlay');
 const result=document.getElementById('result'); result.dataset.status='passed';
 result.textContent=`${fixtures.length} shared fixtures and renderer acceptance assertions passed`;

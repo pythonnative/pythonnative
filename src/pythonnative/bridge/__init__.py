@@ -199,7 +199,7 @@ def native_callback(kind: str, tag: int, name: str, payload: str) -> Optional[st
 
     loop = get_loop()
     if loop.is_running() and not _on_loop_thread(loop):
-        if kind == "event" and name in {"on_scroll", "on_selection_change", "on_gesture_update"}:
+        if kind == "event" and name in {"on_scroll", "on_window", "on_selection_change", "on_gesture_update"}:
             key = (tag, name)
             slot = _continuous.get(key)
             if slot is None:
@@ -252,7 +252,11 @@ def _on_event(tag: int, name: str, payload: str) -> Optional[str]:
     args = codec.loads(payload)
     from ..native_views import get_backend
 
-    accept = getattr(get_backend(), "accept_event", None)
+    backend = get_backend()
+    defer = getattr(backend, "defer_event", None)
+    if defer is not None and defer(tag, name, args):
+        return None
+    accept = getattr(backend, "accept_event", None)
     if accept is not None:
         if not accept(tag, name, args):
             return None

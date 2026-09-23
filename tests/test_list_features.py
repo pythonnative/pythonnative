@@ -85,7 +85,7 @@ def test_item_separator_factory_is_called_per_gap() -> None:
 def test_section_list_separators_stay_inside_each_section() -> None:
     result = render(
         pn.SectionList(
-            sections=[{"title": "A", "data": ["a1", "a2"]}, {"title": "B", "data": ["b1"]}],
+            sections=[pn.Section(key="A", title="A", data=["a1", "a2"]), pn.Section(key="B", title="B", data=["b1"])],
             item_separator=lambda: pn.View(test_id="sep"),
         )
     )
@@ -94,7 +94,7 @@ def test_section_list_separators_stay_inside_each_section() -> None:
     view = result.get_by_type("VirtualList")
     rows = _row_wrappers(view)
     with_sep = [row.props["_pn_list_key"] for row in rows if row.find_first(lambda v: v.test_id == "sep")]
-    assert with_sep == ["__pn_row_0_0__"]
+    assert with_sep == ["s1:A:i0"]
     result.unmount()
 
 
@@ -167,8 +167,8 @@ def test_horizontal_list_on_scroll_reports_x_axis_geometry() -> None:
 # ======================================================================
 
 _SECTIONS = [
-    {"title": "A", "data": [f"a{i}" for i in range(30)]},
-    {"title": "B", "data": [f"b{i}" for i in range(30)]},
+    pn.Section(key="A", title="A", data=[f"a{i}" for i in range(30)]),
+    pn.Section(key="B", title="B", data=[f"b{i}" for i in range(30)]),
 ]
 
 
@@ -176,45 +176,31 @@ def _sticky(result: Any) -> List[FakeView]:
     return result.get_all_by_test_id("sticky")
 
 
-def _overlay_texts(result: Any) -> List[str]:
-    return [h.props["text"] for h in _sticky(result) if h.parent and h.parent.props.get("position") == "absolute"]
-
-
 def _section_list(**kwargs: Any) -> pn.Element:
     return pn.SectionList(
         sections=_SECTIONS,
         item_height=40,
         section_header_height=40,
-        render_section_header=lambda section, _i: pn.Text(f"Header {section['title']}", test_id="sticky"),
+        render_section_header=lambda section, _i: pn.Text(f"Header {section.title}", test_id="sticky"),
         sticky_section_headers=True,
         **kwargs,
     )
 
 
-def test_sticky_header_overlay_shows_the_current_section_while_scrolled_into_it() -> None:
-    result = render(_section_list())
-    # Mounted at the top: section A's real header is the first row, so no overlay.
-    view = result.get_by_type("VirtualList")
-    assert view.parent is not None
-    assert _overlay_texts(result) == []
-    result.backend.request_list(view.tag, 5, extent=400.0)  # a4 at the top
-    result.settle()
-    assert _overlay_texts(result) == ["Header A"]
-    overlay = next(h.parent for h in _sticky(result) if h.parent and h.parent.props.get("position") == "absolute")
-    assert overlay.props["top"] == 0 and overlay.props["left"] == 0 and overlay.props["right"] == 0
-    assert overlay.parent is view.parent, "the overlay sits beside the list in the wrapper"
-    result.unmount()
-
-
-def test_sticky_header_switches_sections_and_hides_at_a_real_header() -> None:
+def test_sticky_header_stays_mounted_without_a_python_overlay() -> None:
     result = render(_section_list())
     view = result.get_by_type("VirtualList")
-    result.backend.request_list(view.tag, 40, extent=400.0)  # inside section B
+    store = result.backend.list_stores[view.tag]
+    assert [i for i, key in enumerate(store.keys) if store.rows[key].sticky] == [0, 31]
+    result.backend.request_list(view.tag, 25, extent=400)
     result.settle()
-    assert _overlay_texts(result) == ["Header B"]
-    result.backend.request_list(view.tag, 31, extent=400.0)  # B's real header at the top
+    assert result.get_by_text("Header A")
+    assert not [v for v in result.backend.views.values() if v.props.get("position") == "absolute"]
+    result.backend.request_list(view.tag, 55, extent=400)
     result.settle()
-    assert _overlay_texts(result) == []
+    assert result.get_by_text("Header B")
+    assert result.query_by_text("Header A") is None
+    assert len(result.get_all_by_type("Text")) < 60
     result.unmount()
 
 
@@ -237,8 +223,8 @@ def test_section_list_reports_viewable_items_without_headers() -> None:
     result.backend.request_list(view.tag, 0, extent=120.0)
     assert seen
     visible = seen[-1]
-    assert [entry["item"] for entry in visible] == ["a0", "a1"]
-    assert [entry["index"] for entry in visible] == [0, 1]
+    assert [entry.item for entry in visible] == ["a0", "a1"]
+    assert [entry.index for entry in visible] == [0, 1]
     result.unmount()
 
 

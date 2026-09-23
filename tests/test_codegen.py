@@ -44,7 +44,7 @@ def test_extension_manifests_keep_builtin_type_names(tmp_path: Path) -> None:
         "from pythonnative.sdk.codegen import generate; "
         "badge = json.loads(json.dumps(schema.manifest()['components']['View'], default=str)); "
         "badge['name'] = 'AaaBadge'; "
-        "schema.load_manifest({'protocol': 3, 'yoga': '3.2.1', 'components': {'AaaBadge': badge}}); "
+        "schema.load_manifest({'protocol': 4, 'yoga': '3.2.1', 'components': {'AaaBadge': badge}}); "
         "generate(sys.argv[1])"
     )
     subprocess.run([sys.executable, "-c", script, str(tmp_path)], check=True)

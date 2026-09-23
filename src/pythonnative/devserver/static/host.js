@@ -385,6 +385,22 @@ export class PreviewHost {
     const host = this;
     this._modules = {
       Host: {
+        show_error({screen, title, trace}) {
+          document.getElementById("pn-error-overlay")?.remove();
+          const panel = document.createElement("div"); panel.id = "pn-error-overlay";
+          panel.setAttribute("role", "alertdialog"); panel.setAttribute("aria-modal", "true");
+          panel.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#1c1c1e;color:white;padding:24px;display:flex;flex-direction:column;gap:12px";
+          const heading = document.createElement("h2"); heading.textContent = title;
+          const details = document.createElement("pre"); details.textContent = trace;
+          details.style.cssText = "overflow:auto;flex:1;white-space:pre-wrap;color:#ffa6b2";
+          const reload = document.createElement("button"); reload.textContent = "Reload";
+          reload.onclick = () => host.hostEvent(Number(screen), "reload", "{}");
+          const dismiss = document.createElement("button"); dismiss.textContent = "Dismiss";
+          dismiss.onclick = () => panel.remove();
+          panel.append(heading, details, reload, dismiss); document.body.appendChild(panel); reload.focus();
+          return null;
+        },
+        dismiss_error() { document.getElementById("pn-error-overlay")?.remove(); return null; },
         cache_state({ screen, state }) {
           const s = host.screenById(screen);
           if (s) s.cachedState = state;

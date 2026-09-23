@@ -3,7 +3,7 @@ import UIKit
 
 /// The version of the wire protocol compiled into this library. Python
 /// refuses to start when `pythonnative.bridge.PROTOCOL_VERSION` differs.
-public let PNProtocolVersion: Int32 = 3
+public let PNProtocolVersion: Int32 = 4
 
 /// The C signature Python registers through `pn_bridge_set_callback`.
 ///
@@ -23,7 +23,7 @@ public final class PNBridge {
         let kind: String; let tag: Int64; let name: String; let payload: String
         var continuous: Bool {
             guard kind == "event" else { return false }
-            if ["on_scroll", "on_selection_change", "on_gesture_update"].contains(name) { return true }
+            if ["on_scroll", "on_window", "on_selection_change", "on_gesture_update"].contains(name) { return true }
             if name.hasPrefix("gesture:"), let args = PNJSON.decodeObject(payload)["args"] as? [[String: Any]] {
                 return args.first?["state"] as? String == "changed"
             }
@@ -153,7 +153,17 @@ public final class PNBridge {
 public func pn_bridge_apply(_ transactionJSON: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>? {
     guard let transactionJSON = transactionJSON else { return nil }
     let json = String(cString: transactionJSON)
-    return PNBridge.onUI { PNBridge.duplicate(PNCommit.apply(json)) }
+    let started = DispatchTime.now().uptimeNanoseconds
+    let envelope = PNJSON.decodeObject(json)
+    let decoded = DispatchTime.now().uptimeNanoseconds
+    return PNBridge.onUI {
+        let mounted = DispatchTime.now().uptimeNanoseconds
+        var reply = PNJSON.decodeObject(PNCommit.apply(envelope))
+        var metrics = reply["metrics"] as? [String: Any] ?? [:]
+        metrics["decode_ns"] = decoded - started; metrics["queue_ns"] = mounted - decoded
+        reply["metrics"] = metrics
+        return PNBridge.duplicate(PNJSON.encode(reply))
+    }
 }
 
 /// Measure the view with `tag` under the given constraints (`1e6` means unconstrained).
@@ -222,7 +232,7 @@ public func pn_bridge_call(
     let envelope = PNJSON.decodeObject(argsJSON.map { String(cString: $0) })
     if String(cString: module) == "Runtime" {
         return PNBridge.duplicate(PNJSON.encode(["ok": true, "value": [
-            "protocol": 3, "yoga": "3.2.1", "schema": PNContracts.fingerprint,
+            "protocol": 4, "yoga": "3.2.1", "schema": PNContracts.fingerprint,
             "animation_graph": true, "logical_lists": true, "native_layout": true]]))
     }
     if String(cString: module) == "Layout" {

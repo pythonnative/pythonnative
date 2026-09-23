@@ -43,8 +43,12 @@ choice for shared snapshots.
 
 Swift and Kotlin component managers create widgets, apply props, measure native
 content, handle commands, and release resources. Yoga owns geometry. The platform
-UI thread owns every widget mutation and input callback. The bridge releases
-Python's execution lock while native applies synchronous requests.
+UI thread owns every widget mutation and input callback. A worker performs the
+blocking native commit crossing while the application
+loop remains available for input and asyncio tasks. One transaction mounts at a
+time; queued transactions prepare against the latest acknowledged revision.
+Refs, effects, and queued native events publish after acknowledgement. State
+writes during mounting coalesce into the following render.
 
 Navigation presents logical screen roots through a nested UIKit navigation
 controller or Android fragments. Pushing a screen doesn't create another Python
@@ -59,12 +63,16 @@ footers, empty states, grouped grids, and sections use the same ownership model.
 
 ## Contracts and tooling
 
-Protocol 3 validates commits before mutation and acknowledges exact revisions.
+Protocol 4 validates commits before mutation and acknowledges exact revisions.
 Events carry application and revision identities. Controlled inputs additionally
 acknowledge native edit revisions to avoid overwriting newer typing. Native
 animation graphs perform frame updates independently of Python callbacks.
 
-The SDK compiles dataclass props and protocol methods into portable contracts.
+The SDK compiles dataclass props and protocol methods into portable contracts
+and executable Swift/Kotlin predicates. Native prop wrappers cache decoded
+fields. Yoga applies touched styles directly and returns geometry only for
+observed refs and layout callbacks. `ListData` feeds revisioned keyed patches;
+ordinary sequences use a scanning adapter to that same protocol.
 Generated artifacts are checked in and tested for drift. Target-wheel plugin
 metadata is read as data, without importing a mobile binary on the development
 machine. Resources and registration code are staged into the native libraries.
@@ -77,7 +85,10 @@ run on a device. Test every supported deployment target.
 Fast Refresh preserves compatible component state. Changes to hook order or
 custom-hook signatures remount affected instances. Changes to helper classes or
 services remount the application to avoid retaining instances of old definitions.
-Native contract changes require rebuilding the dev client.
+Native contract changes require rebuilding the dev client. Development errors
+use a host-owned overlay with a traceback and reload/dismiss controls. It can
+report a poisoned renderer and reload a fresh surface without rendering an
+additional Python error tree.
 
 Python phase timings and bridge work counters can be captured in Chrome trace
 format. See [Profiling](../guides/dev-workflow.md#profiling) for collection and

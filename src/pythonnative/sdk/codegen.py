@@ -54,14 +54,14 @@ def generate(destination: str | Path) -> list[Path]:
             swift.extend(
                 [
                     f'    public var has_{key}: Bool {{ values["{key}"] != nil }}',
-                    f'    public var `{key}`: {st.rstrip("?")}? {{ guard let value = values["{key}"], !(value is NSNull) else {{ return nil }}; return try! PNValues.decode({st.rstrip("?")}.self, value) }}',  # noqa: E501
+                    f'    public private(set) lazy var `{key}`: {st.rstrip("?")}? = {{ guard let value = values["{key}"], !(value is NSNull) else {{ return nil }}; return try! PNValues.decode({st.rstrip("?")}.self, value) }}()',  # noqa: E501
                 ]
             )
             decoded = types.kotlin_decode(field, f'values.get("{key}")', hint + identifier(key))
             kotlin.extend(
                 [
                     f'    val has_{key}: Boolean get() = values.has("{key}")',
-                    f'    val `{key}`: {kt.rstrip("?")}? get() = if (PNValues.isNull(values.opt("{key}"))) null else {decoded}',  # noqa: E501
+                    f'    val `{key}`: {kt.rstrip("?")}? by lazy(LazyThreadSafetyMode.NONE) {{ if (PNValues.isNull(values.opt("{key}"))) null else {decoded} }}',  # noqa: E501
                 ]
             )
 
@@ -92,16 +92,17 @@ def generate(destination: str | Path) -> list[Path]:
         swift.extend(
             [
                 f"public final class {name}Props: PNViewProps, PNNativeProps {{",
-                "    public init(_ values: [String: Any], partial: Bool = true) throws {",
-                f'        guard PNContracts.validate("{name}", partial ? values.filter {{ !($0.value is NSNull) }} : values, partial: partial) else {{ throw NativeDecodeError.invalid("{name} props") }}',  # noqa: E501
+                "    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {",
+                f'        guard validated || PNContracts.validate("{name}", partial ? values.filter {{ !($0.value is NSNull) }} : values, partial: partial) else {{ throw NativeDecodeError.invalid("{name} props") }}',  # noqa: E501
                 "        super.init(values)",
                 "    }",
             ]
         )
         kotlin.extend(
             [
-                f"class {name}Props(values: JSONObject, partial: Boolean = true): PNViewProps(values) {{",
-                f'    init {{ require(PNContracts.validate("{name}", if (partial) PNValues.withoutNulls(values) else values, partial)) {{ "Invalid {name} props" }} }}',  # noqa: E501
+                f"class {name}Props(values: JSONObject, partial: Boolean = true, "
+                "validated: Boolean = false): PNViewProps(values) {",
+                f'    init {{ require(validated || PNContracts.validate("{name}", if (partial) PNValues.withoutNulls(values) else values, partial)) {{ "Invalid {name} props" }} }}',  # noqa: E501
             ]
         )
         parameters, values = [], []
@@ -223,18 +224,12 @@ def generate(destination: str | Path) -> list[Path]:
     outputs["modules.py"] = "\n".join(
         headers + ["from pythonnative.native_modules.registry import native_module", "", modules["modules.py"]]
     )
-    compact = json.dumps(spec, separators=(",", ":"), sort_keys=True)
+    from .contract_codegen import ContractCompiler
+
     for extension in ("swift", "kt"):
         template = (templates / f"contracts.{extension}").read_text(encoding="utf-8")
-        data = (
-            compact.replace("\\", "\\\\")
-            if extension == "swift"
-            else ",\n".join(
-                '"""' + compact[i : i + 8000].replace("$", "${'$'}") + '"""' for i in range(0, len(compact), 8000)
-            )
-        )
-        outputs[f"PNContracts.{extension}"] = template.replace("{{fingerprint}}", fingerprint()).replace(
-            "{{specification}}", data
+        outputs[f"PNContracts.{extension}"] = ContractCompiler(kotlin=extension == "kt").generate(
+            spec, fingerprint(), template
         )
     paths = []
     for name, contents in outputs.items():

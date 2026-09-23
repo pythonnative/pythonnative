@@ -176,7 +176,7 @@ def _install_app(monkeypatch: pytest.MonkeyPatch, name: str, root: Any) -> str:
 
 
 def test_apply_waits_for_revision_acknowledgement(web: Any) -> None:
-    envelope = {"version": 3, "application": "test", "surface": 1, "revision": 1, "ops": [["c", 1, "View", {}]]}
+    envelope = {"version": 4, "application": "test", "surface": 1, "revision": 1, "ops": [["c", 1, "View", {}]]}
     result = json.loads(web.transport.apply(codec.dumps(envelope)))
     assert result == {"ok": True, "application": "test", "surface": 1, "revision": 1}
     assert web.page.sent[-1][0] == "apply"
@@ -295,7 +295,9 @@ def test_requests_from_the_page_are_answered(web: Any) -> None:
     from pythonnative.events import get_event_registry
     from pythonnative.mutations import CreateOp
 
-    web.backend.apply_mutations([CreateOp(5, "VirtualList", {})])
+    web.backend.apply_mutations(
+        [CreateOp(5, "VirtualList", {"dataset": {"base": 0, "revision": 1, "changes": [["reset", []]]}})]
+    )
     get_event_registry().set_events(5, {"on_bind_row": lambda payload: {"root": 77}})
     web.page.request(3, "event", 5, "on_bind_row", [{"index": 0}])
     web.transport.drain_main()

@@ -52,7 +52,7 @@ class TabBarManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = TabBarProps(props)
+        val typed = TabBarProps(props, validated = true)
 
         val bnv = view as BottomNavigationView
         val merged = propsOf(bnv)
@@ -61,7 +61,7 @@ class TabBarManager : ComponentManager() {
             setActive(bnv, merged)
         }
         if (typed.has_tint_color || typed.has_inactive_tint_color || props.has("active_tint_color")) {
-            val mergedTyped = TabBarProps(merged)
+            val mergedTyped = TabBarProps(merged, validated = true)
             val a = PNColor.parse(mergedTyped.tint_color) ?: PNColor.parse(merged.value("active_tint_color")) ?: 0xFF1976D2.toInt()
             val i = PNColor.parse(mergedTyped.inactive_tint_color) ?: 0xFF757575.toInt()
             val list = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()), intArrayOf(a, i))

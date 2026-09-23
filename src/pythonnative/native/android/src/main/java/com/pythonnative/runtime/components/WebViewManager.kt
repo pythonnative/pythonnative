@@ -38,7 +38,7 @@ class WebViewManager : ComponentManager() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = WebViewProps(props)
+        val typed = WebViewProps(props, validated = true)
 
         val wv = view as WebView
         val merged = propsOf(wv)

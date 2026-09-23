@@ -1597,6 +1597,24 @@ data class PNContentSizeEvent(
     }
 }
 
+data class PNVirtualListDataset(
+    val `base`: Long,
+    val `revision`: Long,
+    val `changes`: List<List<PNJSONValue>>
+) : PNNativeValue {
+    override fun nativeValue(): Any = JSONObject().also { result ->
+        result.put("base", PNValues.encode(`base`))
+        result.put("revision", PNValues.encode(`revision`))
+        result.put("changes", PNValues.encode(`changes`))
+    }
+    companion object {
+        fun decode(value: Any?): PNVirtualListDataset {
+            val objectValue = PNValues.objectValue(value)
+            return PNVirtualListDataset(PNValues.integer((objectValue.get("base"))), PNValues.integer((objectValue.get("revision"))), PNValues.array((objectValue.get("changes"))).map { item -> PNValues.array(item).map { item -> PNJSONValue(item ?: JSONObject.NULL) } })
+        }
+    }
+}
+
 data class PNWebNavigationEvent(
     val `url`: String,
     val `loading`: Boolean,

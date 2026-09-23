@@ -47,3 +47,97 @@ data class PNNativeFixtureDefault(
         }
     }
 }
+
+object PNValidationFixtures {
+    private fun isBoolean(value: Any): Boolean = value is Boolean
+    private fun isNumber(value: Any): Boolean = value is Number && value.toDouble().isFinite()
+    private fun isInteger(value: Any): Boolean = value is Number && value.toDouble().isFinite() &&
+        kotlin.math.abs(value.toDouble()) <= 9007199254740991.0 && value.toDouble() == value.toLong().toDouble()
+
+    private fun match0(value: Any): Boolean {
+        return isInteger(value)
+    }
+    private fun match1(value: Any): Boolean {
+        return (isNumber(value) && (value as Number).toDouble() == 1.0) || (isNumber(value) && (value as Number).toDouble() == 2.0)
+    }
+    private fun match3(value: Any): Boolean {
+        return value is String
+    }
+    private fun match4(value: Any): Boolean {
+        return value == JSONObject.NULL
+    }
+    private fun match2(value: Any): Boolean {
+        return match3(value) || match4(value)
+    }
+    private fun match6(value: Any): Boolean {
+        return isNumber(value)
+    }
+    private fun match5(value: Any): Boolean {
+        if (value !is JSONArray) return false
+        return (0 until value.length()).all { match6(value.get(it)) }
+    }
+    private fun match8(value: Any): Boolean {
+        if (value !is JSONObject) return false
+        if (!value.has("x")) return false
+        for (key in value.keys()) {
+            val item = value.get(key)
+            val valid = when (key) {
+                "x" -> match6(item)
+                else -> false
+            }
+            if (!valid) return false
+        }
+        return true
+    }
+    private fun match7(value: Any): Boolean {
+        if (value !is JSONObject) return false
+        if (!value.has("point")) return false
+        for (key in value.keys()) {
+            val item = value.get(key)
+            val valid = when (key) {
+                "point" -> match8(item)
+                else -> false
+            }
+            if (!valid) return false
+        }
+        return true
+    }
+    private fun match9(value: Any): Boolean {
+        if (value !is JSONObject) return false
+        for (key in value.keys()) {
+            val item = value.get(key)
+            val valid = when (key) {
+                else -> match0(item)
+            }
+            if (!valid) return false
+        }
+        return true
+    }
+    private fun match10(value: Any): Boolean {
+        return isBoolean(value)
+    }
+    private fun match11(value: Any): Boolean {
+        return (isNumber(value) && (value as Number).toDouble() == 2.0)
+    }
+    fun matches(index: Int, value: Any): Boolean = when (index) {
+        0 -> match0(value)
+        1 -> match0(value)
+        2 -> match0(value)
+        3 -> match1(value)
+        4 -> match1(value)
+        5 -> match2(value)
+        6 -> match5(value)
+        7 -> match7(value)
+        8 -> match7(value)
+        9 -> match7(value)
+        10 -> match9(value)
+        11 -> match10(value)
+        12 -> match10(value)
+        13 -> match0(value)
+        14 -> match0(value)
+        15 -> match11(value)
+        else -> false
+    }
+}
+
+object PNListFixtures { val trace = "[{\"name\":\"initial snapshot\",\"packet\":{\"base\":0,\"revision\":1,\"changes\":[[\"reset\",[[\"a\",1,44,true],[\"b\",1,60,false],[\"c\",1,44,false]]]]},\"valid\":true,\"keys\":[\"a\",\"b\",\"c\"],\"revision\":1},{\"name\":\"changed row\",\"packet\":{\"base\":1,\"revision\":2,\"changes\":[[\"u\",[\"b\",2,80,false]]]},\"valid\":true,\"keys\":[\"a\",\"b\",\"c\"],\"revision\":2},{\"name\":\"stale snapshot\",\"packet\":{\"base\":0,\"revision\":1,\"changes\":[[\"reset\",[]]]},\"valid\":false,\"keys\":[\"a\",\"b\",\"c\"],\"revision\":2},{\"name\":\"rejected partial insertion\",\"packet\":{\"base\":2,\"revision\":3,\"changes\":[[\"i\",0,[\"x\",1,44,false]],[\"d\",\"missing\"]]},\"valid\":false,\"keys\":[\"a\",\"b\",\"c\"],\"revision\":2},{\"name\":\"duplicate key\",\"packet\":{\"base\":2,\"revision\":3,\"changes\":[[\"i\",0,[\"a\",1,44,false]]]},\"valid\":false,\"keys\":[\"a\",\"b\",\"c\"],\"revision\":2},{\"name\":\"mixed edits\",\"packet\":{\"base\":2,\"revision\":3,\"changes\":[[\"m\",\"c\",0],[\"d\",\"b\"],[\"i\",1,[\"d\",1,40,false]]]},\"valid\":true,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"reset after update\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"u\",[\"a\",2,44,true]],[\"reset\",[]]]},\"valid\":false,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"boolean extent\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"u\",[\"a\",2,true,true]]]},\"valid\":false,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"boolean index\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"m\",\"a\",true]]},\"valid\":false,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"unsafe revision\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"u\",[\"a\",9007199254740992,44,true]]]},\"valid\":false,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"negative extent\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"u\",[\"a\",2,-1,true]]]},\"valid\":false,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"invalid sticky flag\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"u\",[\"a\",2,44,1]]]},\"valid\":false,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"move to end\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"m\",\"c\",2]]},\"valid\":true,\"keys\":[\"d\",\"a\",\"c\"],\"revision\":4},{\"name\":\"delete and reinsert\",\"packet\":{\"base\":4,\"revision\":5,\"changes\":[[\"d\",\"a\"],[\"i\",0,[\"a\",1,44,false]]]},\"valid\":true,\"keys\":[\"a\",\"d\",\"c\"],\"revision\":5},{\"name\":\"reset with following edits\",\"packet\":{\"base\":5,\"revision\":6,\"changes\":[[\"reset\",[[\"fresh\",1,50,true]]],[\"i\",1,[\"last\",1,30,false]]]},\"valid\":true,\"keys\":[\"fresh\",\"last\"],\"revision\":6},{\"name\":\"clear\",\"packet\":{\"base\":6,\"revision\":7,\"changes\":[[\"reset\",[]]]},\"valid\":true,\"keys\":[],\"revision\":7}]" }

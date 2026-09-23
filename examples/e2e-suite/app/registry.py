@@ -56,6 +56,7 @@ from app.screens.components.image_background import ImageBackgroundDemo
 from app.screens.components.keyboard_avoiding_view import KeyboardAvoidingViewDemo
 from app.screens.components.lazy_component import LazyDemo
 from app.screens.components.linear_gradient import LinearGradientDemo
+from app.screens.components.list_data import ListDataDemo
 from app.screens.components.modal import ModalDemo
 from app.screens.components.picker import PickerDemo
 from app.screens.components.portal import PortalDemo
@@ -234,6 +235,7 @@ DEMOS: List[DemoEntry] = [
         "KeyboardAvoidingView",
         KeyboardAvoidingViewDemo,
     ),
+    DemoEntry("list_data", "Components", "ListData", "ListData", ListDataDemo),
     DemoEntry("flat_list", "Components", "FlatList", "FlatList", FlatListDemo),
     DemoEntry("section_list", "Components", "SectionList", "SectionList", SectionListDemo),
     DemoEntry("web_view", "Components", "WebView", "WebView", WebViewDemo),
