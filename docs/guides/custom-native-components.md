@@ -206,7 +206,7 @@ import com.pythonnative.runtime.components.TypedComponentManager
 import com.pythonnative.runtime.components.ViewStyler
 import org.json.JSONObject
 
-class BadgeManager : TypedComponentManager<BadgeProps>({ values, partial -> BadgeProps(values, partial) }) {
+class BadgeManager : TypedComponentManager<BadgeProps>({ values, partial, validated -> BadgeProps(values, partial, validated) }) {
     override fun createView(context: Context, tag: Long, props: JSONObject): View =
         TextView(context).apply {
             gravity = Gravity.CENTER
