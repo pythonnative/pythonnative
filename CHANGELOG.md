@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.47.0 (2026-09-29)
+
+### Features
+
+- **reconciler**: Add async commits and incremental lists
+  ([#107](https://github.com/pythonnative/pythonnative/pull/107),
+  [`9869499`](https://github.com/pythonnative/pythonnative/commit/9869499ca9bb83c6e900e9573189d373ecbbed60))
+
+
 ## v0.46.0 (2026-09-21)
 
 ### Features
