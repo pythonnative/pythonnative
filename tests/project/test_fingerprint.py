@@ -15,10 +15,11 @@ def _write_tree(root: Path, files: dict[str, bytes]) -> None:
 
 def test_identical_trees_under_different_roots_hash_equal(tmp_path: Path) -> None:
     files = {
-        "src/app.py": b"print('hello')
-",
-        "readme.txt": b"notes
-",
+        "src/app.py": b"print('hello')\n",
+        "src/util.py": b"HELPER = True\n",
+        "assets/icon.txt": b"icon\n",
+        "readme.txt": b"notes\n",
+        "license.txt": b"license\n",
     }
     a = tmp_path / "a"
     b = tmp_path / "b"
@@ -31,17 +32,13 @@ def test_identical_trees_under_different_roots_hash_equal(tmp_path: Path) -> Non
 
 def test_changing_bytes_or_renaming_changes_hash(tmp_path: Path) -> None:
     root = tmp_path / "proj"
-    _write_tree(root, {"src/app.py": b"one
-", "src/util.py": b"two
-"})
+    _write_tree(root, {"src/app.py": b"one\n", "src/util.py": b"two\n"})
     original = hash_tree(root)
 
-    (root / "src" / "app.py").write_bytes(b"changed
-")
+    (root / "src" / "app.py").write_bytes(b"changed\n")
     assert hash_tree(root) != original
 
-    (root / "src" / "app.py").write_bytes(b"one
-")
+    (root / "src" / "app.py").write_bytes(b"one\n")
     assert hash_tree(root) == original
 
     (root / "src" / "app.py").rename(root / "src" / "main.py")
@@ -51,8 +48,7 @@ def test_changing_bytes_or_renaming_changes_hash(tmp_path: Path) -> None:
 def test_mtime_change_does_not_change_hash(tmp_path: Path) -> None:
     root = tmp_path / "proj"
     target = root / "src" / "app.py"
-    _write_tree(root, {"src/app.py": b"stable
-"})
+    _write_tree(root, {"src/app.py": b"stable\n"})
     original = hash_tree(root)
 
     os.utime(target, (1_700_000_000, 1_700_000_000))
@@ -61,29 +57,22 @@ def test_mtime_change_does_not_change_hash(tmp_path: Path) -> None:
 
 def test_ignored_paths_do_not_change_hash(tmp_path: Path) -> None:
     root = tmp_path / "proj"
-    _write_tree(root, {"src/app.py": b"code
-"})
+    _write_tree(root, {"src/app.py": b"code\n"})
     original = hash_tree(root)
 
     _write_tree(
         root,
         {
-            "build/out.bin": b"artifact
-",
-            "__pycache__/app.cpython-313.pyc": b"bytecode
-",
-            ".git/HEAD": b"ref: refs/heads/main
-",
-            "src/app.pyc": b"bytecode-file
-",
-            "src/.DS_Store": b"finder
-",
+            "build/out.bin": b"artifact\n",
+            "__pycache__/app.cpython-313.pyc": b"bytecode\n",
+            ".git/HEAD": b"ref: refs/heads/main\n",
+            "src/app.pyc": b"bytecode-file\n",
+            "src/.DS_Store": b"finder\n",
         },
     )
     assert hash_tree(root) == original
 
-    (root / "src" / "extra.py").write_bytes(b"new
-")
+    (root / "src" / "extra.py").write_bytes(b"new\n")
     assert hash_tree(root) != original
 
 
@@ -98,14 +87,11 @@ def test_missing_root_and_empty_directory_share_empty_digest(tmp_path: Path) -> 
 def test_hashing_a_single_file(tmp_path: Path) -> None:
     file_a = tmp_path / "a.txt"
     file_b = tmp_path / "other" / "a.txt"
-    file_a.write_bytes(b"same-bytes
-")
+    file_a.write_bytes(b"same-bytes\n")
     file_b.parent.mkdir()
-    file_b.write_bytes(b"same-bytes
-")
+    file_b.write_bytes(b"same-bytes\n")
 
     assert hash_tree(file_a) == hash_tree(file_b)
 
-    file_b.write_bytes(b"different
-")
+    file_b.write_bytes(b"different\n")
     assert hash_tree(file_a) != hash_tree(file_b)
