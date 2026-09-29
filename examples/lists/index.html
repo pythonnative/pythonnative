@@ -3581,28 +3581,27 @@ then run <code>pn preview app.main.TodoList</code>.</p>
 </span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61" href="#__codelineno-0-61"></a>        <span class="p">),</span>
 </span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62" href="#__codelineno-0-62"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">FlatList</span><span class="p">(</span>
 </span><span id="__span-0-63"><a id="__codelineno-0-63" name="__codelineno-0-63" href="#__codelineno-0-63"></a>            <span class="n">data</span><span class="o">=</span><span class="n">todos</span><span class="p">,</span>
-</span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64" href="#__codelineno-0-64"></a>            <span class="n">render_item</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">TodoRow</span><span class="p">(</span>
+</span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64" href="#__codelineno-0-64"></a>            <span class="n">render_item</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n">TodoRow</span><span class="p">(</span>
 </span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65" href="#__codelineno-0-65"></a>                <span class="n">todo</span><span class="o">=</span><span class="n">t</span><span class="p">,</span> <span class="n">on_toggle</span><span class="o">=</span><span class="n">toggle</span><span class="p">,</span> <span class="n">on_delete</span><span class="o">=</span><span class="n">delete</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">t</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span>
 </span><span id="__span-0-66"><a id="__codelineno-0-66" name="__codelineno-0-66" href="#__codelineno-0-66"></a>            <span class="p">),</span>
-</span><span id="__span-0-67"><a id="__codelineno-0-67" name="__codelineno-0-67" href="#__codelineno-0-67"></a>            <span class="n">key_extractor</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">t</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span>
+</span><span id="__span-0-67"><a id="__codelineno-0-67" name="__codelineno-0-67" href="#__codelineno-0-67"></a>            <span class="n">key_extractor</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n">t</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span>
 </span><span id="__span-0-68"><a id="__codelineno-0-68" name="__codelineno-0-68" href="#__codelineno-0-68"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
 </span><span id="__span-0-69"><a id="__codelineno-0-69" name="__codelineno-0-69" href="#__codelineno-0-69"></a>        <span class="p">),</span>
 </span><span id="__span-0-70"><a id="__codelineno-0-70" name="__codelineno-0-70" href="#__codelineno-0-70"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <h2 id="why-keys-matter">Why keys matter<a class="headerlink" href="#why-keys-matter" title="Permanent link">&para;</a></h2>
 <p>The reconciler matches children by <code>key</code> first and by position only as
-a fallback. Without keys, a delete of the first row would update the
-remaining rows in place (showing the wrong text briefly) before
-unmounting the last row. With keys, identity flows from the data, so
-"todo 2" stays mounted as "todo 2" even when its index shifts.</p>
+a fallback. Position-based keys can transfer a row's local state to another
+item after a deletion. With stable keys, "todo 2" keeps its identity even
+when its index shifts, as long as it remains in the mounted window.</p>
 <p>The <code>key_extractor</code> on <code>FlatList</code> and the <code>key=</code> on the rendered row
 both come from the same <code>todo["id"]</code>. When in doubt: use a stable
 identifier that's part of the data, not the position.</p>
 <h2 id="performance-notes">Performance notes<a class="headerlink" href="#performance-notes" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>FlatList</code> lazily mounts only the rows that are visible (or near
-  visible); off-screen rows are represented by spacers and the window
-  shifts as the user scrolls. For long lists it scales much better
+  visible); the native list owns scrolling, item geometry, and recycling.
+  For long lists it scales much better
   than wrapping a <code>Column</code> in a <code>ScrollView</code>.</li>
 <li>Avoid recomputing <code>data</code> on every render. If you derive it from
   another piece of state, wrap it in
@@ -3610,6 +3609,10 @@ identifier that's part of the data, not the position.</p>
 <li>For row callbacks that you pass deeply, consider
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_callback&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_callback"><code>use_callback</code></a> to keep references
   stable.</li>
+<li>Ordinary sequences are convenient for small, derived collections. For large
+  collections with frequent edits, use <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ListData&lt;/span&gt;" href="../../api/components/#pythonnative.list_data.ListData"><code>ListData</code></a> to
+  publish keyed changes without scanning every item. See the
+  <a href="../../guides/lists/">incremental list guide</a>.</li>
 </ul>
 <h2 id="sorting-and-filtering">Sorting and filtering<a class="headerlink" href="#sorting-and-filtering" title="Permanent link">&para;</a></h2>
 <p>Sorting and filtering are pure functions over the <code>todos</code> array; do

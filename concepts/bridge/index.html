@@ -901,6 +901,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Commits">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#incremental-list-packets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Incremental list packets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3454,6 +3471,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Commits">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#incremental-list-packets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Incremental list packets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3540,8 +3574,10 @@ Native code owns widgets, measurement, input, scrolling, and animation frames.
 The Swift runtime lives in <code>src/pythonnative/native/ios</code>; the Kotlin runtime lives
 in <code>src/pythonnative/native/android</code>. App templates stage and embed those libraries.</p>
 <h2 id="application-and-ui-threads">Application and UI threads<a class="headerlink" href="#application-and-ui-threads" title="Permanent link">&para;</a></h2>
-<p>The application has an ordinary asyncio loop on its own thread. Calls into UIKit
-and Android synchronously marshal native operations to the platform UI thread.
+<p>The application has an ordinary asyncio loop on its own thread. A commit's
+blocking transport call runs on a worker. Native JSON decoding
+happens there before operations are queued to the platform UI thread. Structural
+preflight, widget mutation, and native measurement retain UI-thread ownership.
 On iOS, the ctypes transport releases the GIL during this crossing. Native input
 is queued back to Python rather than waiting for a Python handler on the UI thread.</p>
 <p>A callback must never depend on a synchronous Python answer. Navigation back
@@ -3555,7 +3591,7 @@ preserves order. Animation input bindings evaluate before the sample is queued.<
 <h2 id="commits">Commits<a class="headerlink" href="#commits" title="Permanent link">&para;</a></h2>
 <p>A surface commit has this shape:</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"application"</span><span class="p">:</span><span class="w"> </span><span class="s2">"unique-application-id"</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">"surface"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">"revision"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
@@ -3608,6 +3644,49 @@ validation failure before mutation and preserves the previous revision.
 A failed surface rejects further incremental updates. A new application identity
 and a complete remount establish a clean surface; replaying a partial commit
 isn't a recovery strategy. The current app host uses one surface.</p>
+<p>The application loop keeps running while acknowledgement is pending. A reconciler
+queues state writes instead of rendering against an uncommitted tree. Shared
+backend transactions serialize; preparation uses the acknowledged revision when
+a transaction reaches the front. Refs, effects, and native events wait for
+publication. Cancelling a caller's wait doesn't cancel native mounting.</p>
+<h3 id="incremental-list-packets">Incremental list packets<a class="headerlink" href="#incremental-list-packets" title="Permanent link">&para;</a></h3>
+<p><code>VirtualList.dataset</code> contains <code>base</code>, <code>revision</code>, and <code>changes</code>. Each revision
+advances by one. There may be one dataset patch per list per commit.</p>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>reset</code></td>
+<td>array of <code>[key, item_revision, extent, sticky]</code> records</td>
+</tr>
+<tr>
+<td><code>i</code></td>
+<td>insertion index, row record</td>
+</tr>
+<tr>
+<td><code>u</code></td>
+<td>replacement row record with the same key</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>key to remove</td>
+</tr>
+<tr>
+<td><code>m</code></td>
+<td>key, final index</td>
+</tr>
+</tbody>
+</table>
+<p>A reset must be first. Keys are unique nonempty strings; extents are finite and
+positive. Validation stages edits before publishing them. Updating metadata
+preserves the order index; structural edits rebuild indexes as needed. Native
+window events include the active sticky header. Application scroll events keep
+the <code>ScrollEvent</code> shape and are emitted only when subscribed.</p>
 <h2 id="events-and-controlled-input">Events and controlled input<a class="headerlink" href="#events-and-controlled-input" title="Permanent link">&para;</a></h2>
 <p>Events carry <code>application</code>, <code>surface</code>, <code>revision</code>, <code>sequence</code>, and an <code>args</code> list.
 The backend rejects callbacks from earlier applications, destroyed tags, future
@@ -3626,12 +3705,16 @@ provenance. Python tests build a host binding, iOS and Android compile the same
 core, and the browser preview uses the corresponding Yoga WebAssembly package.</p>
 <p>The application sends styles as props. Native leaf managers measure text,
 controls, and images next to their widgets. When the viewport is known, a commit
-includes a <code>layout</code> object with <code>roots</code>, <code>width</code>, and <code>height</code>. Its acknowledgment
-includes the resulting frames, so mutation and required layout share one bridge
+includes a <code>layout</code> object with <code>roots</code>, <code>width</code>, <code>height</code>, and <code>selective: true</code>.
+Its acknowledgment includes changed frames for <code>_pn_layout</code> observers (refs or
+<code>on_layout</code>), so mutation and required layout share one bridge
 crossing. <code>Layout.compute</code> remains available for viewport changes without
 mutations. Both return frames with <code>application</code>, <code>surface</code>, and <code>revision</code>.
 Geometry from another surface or revision is ignored. Drawing-only prop updates
-skip a separate request. Yoga calculations reuse unchanged constraints, and
+skip a separate request. Changed styles update existing Yoga nodes; removal
+restores the property default or surviving shorthand. Diagnostic raw layout
+requests may omit <code>selective</code> to collect all changed frames. Yoga calculations
+reuse unchanged constraints, and
 frame collection visits only subtrees with new layout. Python doesn't make one
 measurement RPC per leaf.</p>
 <p>Commit and required layout acknowledgments precede ref and effect publication.
