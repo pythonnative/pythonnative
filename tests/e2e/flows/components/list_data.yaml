@@ -1,0 +1,33 @@
+# A real row tap retains state through batched insert/update/move operations.
+# Native scrolling near the end exercises recycling over 10,000 keyed items.
+# Demo screen: examples/e2e-suite/app/screens/components/list_data.py
+# Source under test: src/pythonnative/list_data.py, components/lists.py
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: ListData
+- tapOn: "Live row 0: 0"
+- assertVisible: "Live row 0: 1"
+- tapOn: "Apply live edits"
+- assertVisible: "Edited row 0: 1"
+# Prepending preserves the old first visible key, so the new row is above
+# the viewport. Pull the actual list down to reveal it.
+- swipe:
+    from:
+      text: "Edited row 0: 1"
+    direction: DOWN
+    duration: 400
+- assertVisible: "Inserted row: 0"
+- tapOn: "Jump near end"
+- scrollUntilVisible:
+    element:
+      text: "Live row 9999: 0"
+    direction: DOWN
+    timeout: 30000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

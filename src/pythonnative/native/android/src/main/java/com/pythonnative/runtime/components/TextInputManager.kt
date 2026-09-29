@@ -109,7 +109,7 @@ class TextInputManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = TextInputProps(props)
+        val typed = TextInputProps(props, validated = true)
 
         val et = view as EditText
         val state = stateOf(et)
@@ -166,7 +166,7 @@ class TextInputManager : ComponentManager() {
         typed.text_content_type?.let { applyAutofill(et, it) }
         if (typed.has_clear_button) applyClearButton(et, (typed.clear_button ?: false))
         if (typed.has_return_key_type || typed.has_keyboard_type) {
-            val mergedTyped = TextInputProps(merged)
+            val mergedTyped = TextInputProps(merged, validated = true)
             val action = mergedTyped.return_key_type?.rawValue?.let { imeAction(it) }
                 ?: if (mergedTyped.keyboard_type?.rawValue == "web_search") EditorInfo.IME_ACTION_SEARCH else null
             if (action != null) et.imeOptions = action

@@ -26,6 +26,20 @@ For the visual and layout properties accepted by each component's
         - "!^_"
         - "!^(ContentSizeEvent|ImageLoadEvent|KeyPressEvent|LayoutEvent|ScrollEvent|SelectionEvent|WebNavigationEvent)$"
 
+## List data and records
+
+`ListData` publishes explicit keyed edits to `FlatList`. `Section` gives each
+section a stable identity, and `ViewableItem` describes a visible item. See the
+[list guide](../guides/lists.md) for ownership, batching, and performance details.
+
+::: pythonnative.list_data
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members: [ListData, Section, ViewableItem]
+      members_order: source
+      filters: ["!^_"]
+
 ## Typed event payloads
 
 Frozen dataclasses delivered to `on_layout`, `on_scroll` (and the drag

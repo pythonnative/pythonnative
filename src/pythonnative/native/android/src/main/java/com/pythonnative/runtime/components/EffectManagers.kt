@@ -28,7 +28,7 @@ import kotlin.math.roundToInt
  * coordinates in the view's box; the corner radius from the style props
  * clips the gradient.
  */
-class LinearGradientManager : TypedComponentManager<LinearGradientProps>({ values, partial -> LinearGradientProps(values, partial) }) {
+class LinearGradientManager : TypedComponentManager<LinearGradientProps>({ values, partial, validated -> LinearGradientProps(values, partial, validated) }) {
     override fun createView(context: Context, tag: Long, props: JSONObject): View = GradientView(context)
 
     override fun applyTyped(view: View, props: LinearGradientProps, initial: Boolean) {
@@ -120,7 +120,7 @@ class GradientView(context: Context) : PNFrameLayout(context) {
  * frame the root redraws, box-blurs it in two passes, and draws the result
  * under a tint chosen by `blur_type`. Children go on top.
  */
-class BlurViewManager : TypedComponentManager<BlurViewProps>({ values, partial -> BlurViewProps(values, partial) }) {
+class BlurViewManager : TypedComponentManager<BlurViewProps>({ values, partial, validated -> BlurViewProps(values, partial, validated) }) {
     override fun createView(context: Context, tag: Long, props: JSONObject): View = BlurView(context)
 
     override fun applyTyped(view: View, props: BlurViewProps, initial: Boolean) {

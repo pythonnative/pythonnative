@@ -6,7 +6,7 @@ final class PNTransactionTests: XCTestCase {
     private let application = UUID().uuidString
     private var revision = 0
     @discardableResult private func apply(_ operations: String, success: Bool = true) -> [String: Any] {
-        let result = PNJSON.decodeObject(PNCommit.apply("{\"version\":3,\"application\":\"\(application)\",\"surface\":1,\"revision\":\(revision + 1),\"ops\":\(operations)}"))
+        let result = PNJSON.decodeObject(PNCommit.apply("{\"version\":4,\"application\":\"\(application)\",\"surface\":1,\"revision\":\(revision + 1),\"ops\":\(operations)}"))
         XCTAssertEqual(result["ok"] as? Bool, success, String(describing: result))
         if success { revision += 1 }
         return result

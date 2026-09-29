@@ -10,11 +10,13 @@ import os
 import sys
 import types
 from pathlib import Path
-from typing import Any, Iterator, List, Optional
+from typing import Any, Iterator, List, Optional, cast
 
 import pytest
 
 from pythonnative import diagnostics
+from pythonnative.bridge import set_transport
+from pythonnative.bridge.fake import FakeTransport
 from pythonnative.component import component
 from pythonnative.element import Element
 from pythonnative.hooks import use_back_handler, use_effect, use_state
@@ -24,14 +26,30 @@ from pythonnative.testing import FakeBackend, FakeView, settle
 
 
 @pytest.fixture
-def backend() -> Iterator[FakeBackend]:
+def backend(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeBackend]:
     """Install a ``FakeBackend`` as the registry the host mounts into."""
     fake = FakeBackend()
     set_backend(fake)
+    transport = FakeTransport()
+    set_transport(transport)
+    from pythonnative.bridge import codec
+    from pythonnative.hosts.base import ScreenHost
+
+    monkeypatch.setattr(
+        ScreenHost,
+        "_show_error",
+        lambda self, payload: transport.call("Host", "show_error", codec.dumps({"call_id": 0, "args": payload})),
+    )
+    monkeypatch.setattr(
+        ScreenHost,
+        "_dismiss_error",
+        lambda self: transport.call("Host", "dismiss_error", codec.dumps({"call_id": 0, "args": {}})),
+    )
     try:
         yield fake
     finally:
         set_backend(None)
+        set_transport(None)
 
 
 def _install_app_module(monkeypatch: pytest.MonkeyPatch, name: str, root: Any) -> str:
@@ -288,14 +306,16 @@ def test_mount_error_shows_redbox_in_dev_mode(monkeypatch: pytest.MonkeyPatch, b
     host = create_screen(_install_app_module(monkeypatch, "redbox_app", Root))
     host.on_create()
 
-    assert host._redbox_reconciler is not None
-    overlay = _text_of(host._redbox_root)
-    assert "RuntimeError in mount" in overlay
-    assert "kaboom" in overlay
+    from pythonnative.bridge import get_transport
+
+    assert host._redbox_visible
+    payload = cast(FakeTransport, get_transport()).calls[-1][2]
+    assert "RuntimeError in mount: kaboom" == payload["title"]
+    assert "kaboom" in payload["trace"]
+    assert backend.live_view_count() == 0
 
     host.clear_redbox()
-    assert host._redbox_reconciler is None
-    assert host._redbox_root is None
+    assert not host._redbox_visible
     host.on_destroy()
 
 
@@ -315,18 +335,19 @@ def test_render_error_shows_redbox_and_dismiss_restores_tree(
 
     host = create_screen(_install_app_module(monkeypatch, "redbox_render_app", Root))
     host.on_create()
-    assert host._redbox_reconciler is None
+    assert not host._redbox_visible
     assert _text_of(host.root_native_view) == ["fine"]
 
     setter["set"](True)
     settle()
-    assert host._redbox_reconciler is not None
-    assert "RuntimeError in render" in _text_of(host._redbox_root)
+    from pythonnative.bridge import get_transport
 
-    dismiss = host._redbox_root.find_first("Button")
-    assert dismiss is not None and dismiss.text == "Dismiss"
+    assert host._redbox_visible
+    assert "RuntimeError in render" in cast(FakeTransport, get_transport()).calls[-1][2]["title"]
+    assert _text_of(host.root_native_view) == ["fine"]
+    assert backend.live_view_count() == 1
     host.clear_redbox()
-    assert host._redbox_reconciler is None
+    assert not host._redbox_visible
     host.on_destroy()
 
 
@@ -340,7 +361,7 @@ def test_mount_error_propagates_outside_dev_mode(monkeypatch: pytest.MonkeyPatch
     host = create_screen(_install_app_module(monkeypatch, "redbox_off_app", Root))
     with pytest.raises(RuntimeError, match="kaboom"):
         host.on_create()
-    assert host._redbox_reconciler is None
+    assert not host._redbox_visible
     host.on_destroy()
 
 

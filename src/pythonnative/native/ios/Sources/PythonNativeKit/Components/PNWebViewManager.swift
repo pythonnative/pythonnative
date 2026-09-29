@@ -36,7 +36,7 @@ public final class PNWebViewManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! WebViewProps(props)
+        let typed = try! WebViewProps(props, validated: true)
 
         guard let webView = view as? WKWebView else { return }
         if typed.has_inject_javascript,

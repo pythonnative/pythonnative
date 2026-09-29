@@ -32,7 +32,7 @@ class StatusBarManager : ComponentManager() {
     override fun measure(view: View, maxWidth: Double, maxHeight: Double): FloatArray = floatArrayOf(0f, 0f)
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = StatusBarProps(props)
+        val typed = StatusBarProps(props, validated = true)
 
         val activity = PNBridge.activity() ?: (view.context as? Activity) ?: return
         val window = activity.window ?: return

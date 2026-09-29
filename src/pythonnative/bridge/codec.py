@@ -131,15 +131,20 @@ def build_transaction(
     """
     from ..sdk.schema import COMPONENTS
 
-    names = dict(types or {})
+    names: dict[int, str] = {}
+    base_names = types or {}
+    fields_cache: dict[str, frozenset[str]] = {}
 
     def python_fields(name: str) -> frozenset[str]:
+        if name in fields_cache:
+            return fields_cache[name]
         schema = COMPONENTS.get(name)
-        return (
+        fields_cache[name] = (
             frozenset(key for key, field in schema.props.items() if field.get("native", {}).get("python_only"))
             if schema
             else frozenset()
         )
+        return fields_cache[name]
 
     encoded: List[Any] = []
     sidecar: List[Tuple[int, Dict[str, Any]]] = []
@@ -152,7 +157,7 @@ def build_transaction(
                 sidecar.append((op.tag, python))
         elif isinstance(op, UpdateOp):
             removed = [key for key, value in op.changed_props.items() if value is UNSET]
-            wire, python = split_props(op.changed_props, python_fields(names.get(op.tag, "")))
+            wire, python = split_props(op.changed_props, python_fields(names.get(op.tag) or base_names.get(op.tag, "")))
             encoded.append(["u", op.tag, wire, removed])
             if python:
                 sidecar.append((op.tag, python))

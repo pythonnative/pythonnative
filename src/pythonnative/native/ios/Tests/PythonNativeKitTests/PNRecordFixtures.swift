@@ -50,3 +50,106 @@ public struct PNNativeFixtureDefault: Codable {
         try container.encode(`nullable`, forKey: .`nullable`)
     }
 }
+
+import CoreFoundation
+enum PNValidationFixtures {
+    private static func isBoolean(_ value: Any) -> Bool {
+        (value as? NSNumber).map { CFGetTypeID($0) == CFBooleanGetTypeID() } ?? false
+    }
+    private static func isNumber(_ value: Any) -> Bool {
+        (value as? NSNumber).map { CFGetTypeID($0) != CFBooleanGetTypeID() && $0.doubleValue.isFinite } ?? false
+    }
+    private static func isInteger(_ value: Any) -> Bool {
+        guard isNumber(value), let number = value as? NSNumber else { return false }
+        return abs(number.doubleValue) <= 9_007_199_254_740_991 && number.doubleValue.rounded() == number.doubleValue
+    }
+
+    private static func match0(_ value: Any) -> Bool {
+        return isInteger(value)
+    }
+    private static func match1(_ value: Any) -> Bool {
+        return (isNumber(value) && (value as? NSNumber)?.doubleValue == 1.0) || (isNumber(value) && (value as? NSNumber)?.doubleValue == 2.0)
+    }
+    private static func match3(_ value: Any) -> Bool {
+        return value is String
+    }
+    private static func match4(_ value: Any) -> Bool {
+        return value is NSNull
+    }
+    private static func match2(_ value: Any) -> Bool {
+        return match3(value) || match4(value)
+    }
+    private static func match6(_ value: Any) -> Bool {
+        return isNumber(value)
+    }
+    private static func match5(_ value: Any) -> Bool {
+        guard let value = value as? [Any] else { return false }
+        return value.allSatisfy { match6($0) }
+    }
+    private static func match8(_ value: Any) -> Bool {
+        guard let value = value as? [String: Any] else { return false }
+        guard value["x"] != nil else { return false }
+        for (key, item) in value {
+            let valid: Bool
+            switch key {
+            case "x": valid = match6(item)
+            default: valid = false
+            }
+            if !valid { return false }
+        }
+        return true
+    }
+    private static func match7(_ value: Any) -> Bool {
+        guard let value = value as? [String: Any] else { return false }
+        guard value["point"] != nil else { return false }
+        for (key, item) in value {
+            let valid: Bool
+            switch key {
+            case "point": valid = match8(item)
+            default: valid = false
+            }
+            if !valid { return false }
+        }
+        return true
+    }
+    private static func match9(_ value: Any) -> Bool {
+        guard let value = value as? [String: Any] else { return false }
+        for (key, item) in value {
+            let valid: Bool
+            switch key {
+            default: valid = match0(item)
+            }
+            if !valid { return false }
+        }
+        return true
+    }
+    private static func match10(_ value: Any) -> Bool {
+        return isBoolean(value)
+    }
+    private static func match11(_ value: Any) -> Bool {
+        return (isNumber(value) && (value as? NSNumber)?.doubleValue == 2.0)
+    }
+    static func matches(_ index: Int, _ value: Any) -> Bool {
+        switch index {
+        case 0: return match0(value)
+        case 1: return match0(value)
+        case 2: return match0(value)
+        case 3: return match1(value)
+        case 4: return match1(value)
+        case 5: return match2(value)
+        case 6: return match5(value)
+        case 7: return match7(value)
+        case 8: return match7(value)
+        case 9: return match7(value)
+        case 10: return match9(value)
+        case 11: return match10(value)
+        case 12: return match10(value)
+        case 13: return match0(value)
+        case 14: return match0(value)
+        case 15: return match11(value)
+        default: return false
+        }
+    }
+}
+
+enum PNListFixtures { static let trace = "[{\"name\":\"initial snapshot\",\"packet\":{\"base\":0,\"revision\":1,\"changes\":[[\"reset\",[[\"a\",1,44,true],[\"b\",1,60,false],[\"c\",1,44,false]]]]},\"valid\":true,\"keys\":[\"a\",\"b\",\"c\"],\"revision\":1},{\"name\":\"changed row\",\"packet\":{\"base\":1,\"revision\":2,\"changes\":[[\"u\",[\"b\",2,80,false]]]},\"valid\":true,\"keys\":[\"a\",\"b\",\"c\"],\"revision\":2},{\"name\":\"stale snapshot\",\"packet\":{\"base\":0,\"revision\":1,\"changes\":[[\"reset\",[]]]},\"valid\":false,\"keys\":[\"a\",\"b\",\"c\"],\"revision\":2},{\"name\":\"rejected partial insertion\",\"packet\":{\"base\":2,\"revision\":3,\"changes\":[[\"i\",0,[\"x\",1,44,false]],[\"d\",\"missing\"]]},\"valid\":false,\"keys\":[\"a\",\"b\",\"c\"],\"revision\":2},{\"name\":\"duplicate key\",\"packet\":{\"base\":2,\"revision\":3,\"changes\":[[\"i\",0,[\"a\",1,44,false]]]},\"valid\":false,\"keys\":[\"a\",\"b\",\"c\"],\"revision\":2},{\"name\":\"mixed edits\",\"packet\":{\"base\":2,\"revision\":3,\"changes\":[[\"m\",\"c\",0],[\"d\",\"b\"],[\"i\",1,[\"d\",1,40,false]]]},\"valid\":true,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"reset after update\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"u\",[\"a\",2,44,true]],[\"reset\",[]]]},\"valid\":false,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"boolean extent\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"u\",[\"a\",2,true,true]]]},\"valid\":false,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"boolean index\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"m\",\"a\",true]]},\"valid\":false,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"unsafe revision\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"u\",[\"a\",9007199254740992,44,true]]]},\"valid\":false,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"negative extent\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"u\",[\"a\",2,-1,true]]]},\"valid\":false,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"invalid sticky flag\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"u\",[\"a\",2,44,1]]]},\"valid\":false,\"keys\":[\"c\",\"d\",\"a\"],\"revision\":3},{\"name\":\"move to end\",\"packet\":{\"base\":3,\"revision\":4,\"changes\":[[\"m\",\"c\",2]]},\"valid\":true,\"keys\":[\"d\",\"a\",\"c\"],\"revision\":4},{\"name\":\"delete and reinsert\",\"packet\":{\"base\":4,\"revision\":5,\"changes\":[[\"d\",\"a\"],[\"i\",0,[\"a\",1,44,false]]]},\"valid\":true,\"keys\":[\"a\",\"d\",\"c\"],\"revision\":5},{\"name\":\"reset with following edits\",\"packet\":{\"base\":5,\"revision\":6,\"changes\":[[\"reset\",[[\"fresh\",1,50,true]]],[\"i\",1,[\"last\",1,30,false]]]},\"valid\":true,\"keys\":[\"fresh\",\"last\"],\"revision\":6},{\"name\":\"clear\",\"packet\":{\"base\":6,\"revision\":7,\"changes\":[[\"reset\",[]]]},\"valid\":true,\"keys\":[],\"revision\":7}]" }

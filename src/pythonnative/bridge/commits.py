@@ -10,11 +10,12 @@ from __future__ import annotations
 import math
 from collections.abc import Iterator, MutableMapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from ..profiling import count, profiled
+from .list_store import ListStore
 
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = 4
 
 
 class CommitError(RuntimeError):
@@ -29,6 +30,7 @@ class ViewState:
     props: dict[str, Any]
     parent: int | None = None
     children: list[int] = field(default_factory=list)
+    list_store: ListStore | None = None
 
 
 class ViewOverlay(MutableMapping[int, ViewState]):
@@ -72,7 +74,9 @@ class ViewOverlay(MutableMapping[int, ViewState]):
         """Return a writable copy of this record, copying it at most once."""
         if tag not in self.changed:
             view = self[tag]
-            self.changed[tag] = ViewState(view.type_name, dict(view.props), view.parent, list(view.children))
+            self.changed[tag] = ViewState(
+                view.type_name, dict(view.props), view.parent, list(view.children), view.list_store
+            )
             count("commit.records_copied")
         return self.changed[tag]
 
@@ -93,11 +97,13 @@ class CommitState:
     revision: int = 0
     views: MutableMapping[int, ViewState] = field(default_factory=dict)
 
+    _list_publications: dict[int, Callable[[], None]] = field(default_factory=dict)
+
     @profiled("validation")
     def prepare(self, envelope: Any) -> CommitState:
         """Validate without mutating this state and return the candidate state."""
         if not isinstance(envelope, dict) or envelope.get("version") != PROTOCOL_VERSION:
-            raise CommitError("Expected a protocol v3 commit envelope; rebuild the native client")
+            raise CommitError("Expected a protocol v4 commit envelope; rebuild the native client")
         application, surface, revision = (envelope.get(k) for k in ("application", "surface", "revision"))
         if not isinstance(application, str) or not application or type(surface) is not int or surface <= 0:
             raise CommitError("Invalid application or surface identity")
@@ -120,6 +126,9 @@ class CommitState:
 
     def publish(self) -> CommitState:
         """Accept a successfully mounted candidate; the prior state is consumed."""
+        for publish in self._list_publications.values():
+            publish()
+        self._list_publications.clear()
         if isinstance(self.views, ViewOverlay):
             self.views = self.views.publish()
         return self
@@ -139,7 +148,11 @@ class CommitState:
             if tag in self.views or not isinstance(op[2], str) or not op[2] or not isinstance(op[3], dict):
                 raise ValueError("Invalid or duplicate create")
             self._validate_props(op[2], op[3], False)
-            self.views[tag] = ViewState(op[2], dict(op[3]))
+            view = ViewState(op[2], dict(op[3]))
+            self.views[tag] = view
+            if op[2] == "VirtualList":
+                view.list_store = ListStore()
+                self._prepare_list(tag, view, op[3])
             return
         view = self.views[tag] if code == "f" else self._edit(tag)
         if code == "u":
@@ -154,6 +167,8 @@ class CommitState:
             from ..mutations import UNSET
 
             self._validate_props(view.type_name, {name: UNSET for name in removed}, True)
+            if view.list_store is not None:
+                self._prepare_list(tag, view, op[2])
             view.props.update(op[2])
             for name in removed:
                 view.props.pop(name, None)
@@ -184,6 +199,13 @@ class CommitState:
                 raise ValueError("Frame values must be finite numbers")
             if op[4] < 0 or op[5] < 0:
                 raise ValueError("Frame sizes must be nonnegative")
+
+    def _prepare_list(self, tag: int, view: ViewState, props: dict[str, Any]) -> None:
+        if "dataset" in props:
+            if tag in self._list_publications:
+                raise ValueError("A list may receive only one dataset patch per commit")
+            assert view.list_store is not None
+            self._list_publications[tag] = view.list_store.prepare(props["dataset"])
 
     @staticmethod
     def _validate_props(name: str, props: dict[str, Any], partial: bool) -> None:

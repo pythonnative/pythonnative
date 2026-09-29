@@ -22,4 +22,5 @@ appId: ${APP_ID}
 - runFlow: ../flows/components/status_bar.yaml
 - runFlow: ../flows/components/keyboard_avoiding_view.yaml
 - runFlow: ../flows/components/flat_list.yaml
+- runFlow: ../flows/components/list_data.yaml
 - runFlow: ../flows/components/accessibility_props.yaml

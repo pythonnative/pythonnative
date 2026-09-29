@@ -640,7 +640,7 @@ pn.FlatList(data=items, render_item=render_fn, key_extractor=key_fn,
 ## SectionList
 
 ```python
-pn.SectionList(sections=[{"title": "A", "data": ["Apple"]}],
+pn.SectionList(sections=[pn.Section(key="a", title="A", data=["Apple"])],
                render_item=lambda item, i, s: pn.Text(item),
                render_section_header=lambda section, s: pn.Text(section["title"]),
                sticky_section_headers=True, inverted=False,

@@ -20,7 +20,7 @@ object InboxExtension: PNPlugin {
     }
 }
 
-private class InboxBadgeManager: TypedComponentManager<InboxBadgeProps>({ values, partial -> InboxBadgeProps(values, partial) }) {
+private class InboxBadgeManager: TypedComponentManager<InboxBadgeProps>({ values, partial, validated -> InboxBadgeProps(values, partial, validated) }) {
     override fun createView(context: Context, tag: Long, props: JSONObject): View = Button(context).apply {
         textSize = 12f
         setOnClickListener { PNComponentEvents.InboxBadge.on_press(this, InboxBadgeProps(propsOf(this)).count ?: 0L) }

@@ -31,7 +31,7 @@ class SegmentedControlManager : ComponentManager() {
     override fun removeChild(parent: View, child: View) {}
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = SegmentedControlProps(props)
+        val typed = SegmentedControlProps(props, validated = true)
 
         val ll = view as LinearLayout
         val state = stateOf(ll)

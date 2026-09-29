@@ -47,7 +47,7 @@ final class PNParityTests: XCTestCase {
 
     private func apply(_ ops: [[Any]]) {
         revision += 1
-        let json = PNJSON.encode(["version": 3, "application": application, "surface": 1, "revision": revision, "ops": ops])
+        let json = PNJSON.encode(["version": 4, "application": application, "surface": 1, "revision": revision, "ops": ops])
         let result = PNJSON.decodeObject(PNCommit.apply(json))
         XCTAssertEqual(result["ok"] as? Bool, true, String(describing: result))
     }
@@ -253,7 +253,7 @@ final class PNParityTests: XCTestCase {
     // MARK: - VirtualList
 
     func testVirtualListEmitsScrollOnlyWhenWired() throws {
-        try PNTransaction.apply([.create(tag: 5301, type: "VirtualList", props: ["keys": ["a", "b"], "revision": 1, "row_heights": [40.0, 40.0]])])
+        try PNTransaction.apply([.create(tag: 5301, type: "VirtualList", props: ["dataset": ["base": 0, "revision": 1, "changes": [["reset", [["a", 1, 40.0, false], ["b", 1, 40.0, false]]]]]])])
         let list = try XCTUnwrap(PNViewRegistry.shared.view(for: 5301) as? UICollectionView)
         list.frame = CGRect(x: 0, y: 0, width: 200, height: 50)
         list.delegate?.scrollViewDidScroll?(list)

@@ -43,7 +43,7 @@ class ModalManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = ModalProps(props)
+        val typed = ModalProps(props, validated = true)
 
         val state = stateOf(view)
         // Only react when `visible` itself changed; a re-render while the
@@ -123,7 +123,7 @@ class ModalManager : ComponentManager() {
             }
             PNColor.parse(props.value("status_bar_color"))?.let { window.statusBarColor = it }
         }
-        applyStatusBar(dialog, ModalProps(props).status_bar_translucent == true)
+        applyStatusBar(dialog, ModalProps(props, validated = true).status_bar_translucent == true)
         // Back and backdrop taps ask Python (`on_request_close`) instead of dismissing.
         dialog.setCanceledOnTouchOutside(false)
         dialog.setCancelable(false)

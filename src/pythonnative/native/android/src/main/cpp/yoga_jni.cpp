@@ -33,9 +33,6 @@ JNI(void) Java_com_pythonnative_runtime_layout_YogaNode_style(JNIEnv* e, jobject
     auto k = e->GetStringUTFChars(key, nullptr); auto v = e->GetStringUTFChars(value, nullptr);
     PNYogaSetStyle(node(ptr), k, v); e->ReleaseStringUTFChars(key, k); e->ReleaseStringUTFChars(value, v);
 }
-JNI(void) Java_com_pythonnative_runtime_layout_YogaNode_resetStyle(JNIEnv*, jobject, jlong ptr) {
-    auto fresh = YGNodeNew(); YGNodeCopyStyle(node(ptr), fresh); YGNodeFree(fresh);
-}
 JNI(void) Java_com_pythonnative_runtime_layout_YogaNode_measureLeaf(JNIEnv*, jobject, jlong ptr, jboolean enabled) {
     YGNodeSetMeasureFunc(node(ptr), enabled ? measure : nullptr);
     YGNodeSetBaselineFunc(node(ptr), enabled ? baseline : nullptr);

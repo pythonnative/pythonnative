@@ -18,7 +18,7 @@ next layout pass and never observed by application code.
 
 from __future__ import annotations
 
-from contextvars import ContextVar
+from contextvars import Context, ContextVar, copy_context
 from typing import Any, Callable
 
 __all__ = ["Journal", "JournalDict", "STRUCTURAL_FIELDS", "journal_active", "record_attribute"]
@@ -153,3 +153,10 @@ class JournalDict(dict):
         """Remove entries through the journal."""
         for key in tuple(self):
             self.pop(key)
+
+
+def detached_context() -> Context:
+    """Capture task context without inheriting a render's mutable undo journal."""
+    context = copy_context()
+    context.run(_current.set, None)
+    return context

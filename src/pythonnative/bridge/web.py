@@ -68,6 +68,7 @@ class WebTransport:
     """
 
     name = "web"
+    asynchronous_commits = True
 
     def __init__(self, *, log: Optional[Callable[[str], None]] = None) -> None:
         self._log = log or (lambda line: print(line, file=sys.stderr, flush=True))

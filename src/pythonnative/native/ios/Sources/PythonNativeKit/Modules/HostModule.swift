@@ -9,6 +9,12 @@ public final class HostModule: PNNativeModule {
 
     public func call(_ method: String, args: [String: Any], promise: PNPromise) {
         switch method {
+        case "show_error":
+            PNErrorOverlay.show(screen: Int64(PNProps.int(args["screen"]) ?? 0), title: args["title"] as? String ?? "Python error", trace: args["trace"] as? String ?? "")
+            promise.resolve(nil)
+        case "dismiss_error":
+            PNErrorOverlay.dismiss()
+            promise.resolve(nil)
         case "cache_state":
             guard let controller = screen(args, promise) else { return }
             controller.cachedStateJSON = args["state"] as? String

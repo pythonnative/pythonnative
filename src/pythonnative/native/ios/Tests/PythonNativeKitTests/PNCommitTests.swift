@@ -6,14 +6,14 @@ final class PNCommitTests: XCTestCase {
 
     private func commit(_ operations: [[Any]], revision: Int = 1) -> [String: Any] {
         PNJSON.decodeObject(PNCommit.apply(PNJSON.encode([
-            "version": 3, "application": app, "surface": 1,
+            "version": 4, "application": app, "surface": 1,
             "revision": revision, "ops": operations,
         ])))
     }
 
     override func tearDown() {
         _ = PNCommit.apply(PNJSON.encode([
-            "version": 3, "application": UUID().uuidString, "surface": 1,
+            "version": 4, "application": UUID().uuidString, "surface": 1,
             "revision": 1, "ops": [],
         ]))
         super.tearDown()
@@ -35,7 +35,7 @@ final class PNCommitTests: XCTestCase {
 
     func testHorizontalListMeasuresRowsAlongTheirWidth() {
         let result = commit([
-            ["c", 9601, "VirtualList", ["keys": ["one"], "revision": 1, "horizontal": true, "width": 300, "height": 100]],
+            ["c", 9601, "VirtualList", ["dataset": ["base": 0, "revision": 1, "changes": [["reset", [["one", 1, 80.0, false]]]]], "horizontal": true, "width": 300, "height": 100]],
             ["c", 9602, "View", ["_pn_list_key": "one", "width": 80, "height": 100]],
             ["i", 9601, 9602, 0],
         ])
@@ -88,7 +88,7 @@ final class PNCommitTests: XCTestCase {
                                   ["c", 9801, "Text", ["text": "Measured", "font_size": 20]], ["i", 9800, 9801, 0]]
         let request: [String: Any] = ["roots": [9800], "width": 320, "height": 640]
         let reply = PNJSON.decodeObject(PNCommit.apply(PNJSON.encode([
-            "version": 3, "application": app, "surface": 1, "revision": 1, "ops": operations, "layout": request,
+            "version": 4, "application": app, "surface": 1, "revision": 1, "ops": operations, "layout": request,
         ])))
         XCTAssertEqual(reply["ok"] as? Bool, true)
         let layout = reply["layout"] as? [String: Any]
@@ -115,4 +115,44 @@ final class PNCommitTests: XCTestCase {
         }
     }
 
+
+    func testSelectiveGeometryAndIncrementalStyleRemoval() throws {
+        let request: [String: Any] = ["roots": [Int64(9810)], "width": 300, "height": 400, "selective": true]
+        XCTAssertEqual(commit([
+            ["c", 9810, "Column", ["width": 300, "padding": 20, "padding_left": 30]],
+            ["c", 9811, "Text", ["text": "Measured", "_pn_layout": true]],
+            ["i", 9810, 9811, 0],
+        ])["ok"] as? Bool, true)
+        let first = PNLayout.compute(request)
+        XCTAssertEqual(first.map { $0[0] }, [9811])
+        XCTAssertEqual(first.first?[1], 30)
+        XCTAssertEqual(commit([["u", 9810, [:], ["padding_left"]]], revision: 2)["ok"] as? Bool, true)
+        XCTAssertEqual(PNLayout.compute(request).first?[1], 20, "removal restores the surviving shorthand")
+        XCTAssertEqual(commit([["u", 9811, ["color": "#ff0000"], []]], revision: 3)["ok"] as? Bool, true)
+        XCTAssertTrue(PNLayout.compute(request).isEmpty, "paint updates don't send geometry")
+        XCTAssertEqual(commit([["u", 9810, ["_pn_layout": true], []]], revision: 4)["ok"] as? Bool, true)
+        XCTAssertEqual(PNLayout.compute(request).first?[0], 9810, "a newly attached ref receives cached geometry")
+    }
+
+    func testNativeStickyLayoutDoesNotRequirePythonScrollCallbacks() throws {
+        let rows: [[Any]] = [["header", 1, 40, true]] + (0..<20).map { ["row\($0)", 1, 60, false] }
+        XCTAssertEqual(commit([["c", 9820, "VirtualList", ["dataset": ["base": 0, "revision": 1, "changes": [["reset", rows]]]]]])["ok"] as? Bool, true)
+        let list = try XCTUnwrap(PNViewRegistry.shared.view(for: 9820) as? UICollectionView)
+        list.frame = CGRect(x: 0, y: 0, width: 300, height: 200)
+        list.layoutIfNeeded()
+        list.contentOffset.y = 140
+        list.layoutIfNeeded()
+        let attributes = list.collectionViewLayout.layoutAttributesForElements(in: list.bounds)
+        let header = try XCTUnwrap(attributes?.first { $0.indexPath.item == 0 })
+        XCTAssertEqual(header.frame.minY, 140)
+        XCTAssertEqual(header.zIndex, 1024)
+    }
+
+    func testMultipleListPatchesRejectBeforeMutatingAnything() {
+        let initial: [String: Any] = ["base": 0, "revision": 1, "changes": [["reset", [["a", 1, 44, false]]]]]
+        XCTAssertEqual(commit([["c", 9830, "VirtualList", ["dataset": initial]]])["ok"] as? Bool, true)
+        let update: [String: Any] = ["base": 1, "revision": 2, "changes": [["u", ["a", 2, 80, false]]]]
+        XCTAssertEqual(commit([["u", 9830, ["dataset": update], []], ["u", 9830, ["dataset": update], []]], revision: 2)["ok"] as? Bool, false)
+        XCTAssertEqual(commit([["u", 9830, ["dataset": update], []]], revision: 2)["ok"] as? Bool, true)
+    }
 }

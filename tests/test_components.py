@@ -414,7 +414,7 @@ def test_flat_list_with_keys() -> None:
         key_extractor=lambda item, i: item["id"],
     )
     root, _rec, _backend = _mount(el)
-    assert root.props["keys"] == ["x", "y"]
+    assert _backend.list_stores[root.tag].keys == ["x", "y"]
 
 
 def test_flat_list_empty() -> None:

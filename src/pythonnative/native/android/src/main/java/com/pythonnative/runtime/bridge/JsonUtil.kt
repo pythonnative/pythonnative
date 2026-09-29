@@ -6,7 +6,7 @@ import org.json.JSONObject
 /**
  * Helpers for the JSON shapes the bridge exchanges with Python.
  *
- * Protocol 3 carries finite JSON values. Removals are separate from nulls;
+ * The wire protocol carries finite JSON values. Removals are separate from nulls;
  * physical setters receive resolved defaults or null for a platform reset.
  */
 object JsonUtil {

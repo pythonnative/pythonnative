@@ -32,7 +32,7 @@ public final class PNTabBarManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! TabBarProps(props)
+        let typed = try! TabBarProps(props, validated: true)
 
         guard let bar = view as? UITabBar else { return }
         let merged = mergedProps(bar)

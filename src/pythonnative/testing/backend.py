@@ -242,6 +242,7 @@ class FakeBackend:
         self.measure_calls: List[int] = []
         self.commands: List[Tuple[int, str, Dict[str, Any]]] = []
         self.animated: List[Tuple[int, str, Any]] = []
+        self.list_stores: dict[int, Any] = {}
         self.last_create_props: Dict[str, Any] = {}
         self.last_update_changes: Dict[str, Any] = {}
         self.focused_tag: Optional[int] = None
@@ -273,6 +274,12 @@ class FakeBackend:
                 raise AssertionError(f"create: tag {op.tag} already registered")
             view = FakeView(op.tag, op.type_name, op.props)
             self.views[op.tag] = view
+            if op.type_name == "VirtualList":
+                from ..bridge.list_store import ListStore
+
+                store = self.list_stores[op.tag] = ListStore()
+                if "dataset" in op.props:
+                    store.apply(op.props["dataset"])
             self.last_create_props = dict(op.props)
             return ("create", op.type_name, view.id)
 
@@ -285,6 +292,8 @@ class FakeBackend:
                     view.props.pop(key, None)
                 else:
                     view.props[key] = value
+            if view.type_name == "VirtualList" and "dataset" in op.changed_props:
+                self.list_stores[op.tag].apply(op.changed_props["dataset"])
             self.last_update_changes = dict(op.changed_props)
             return ("update", view.type_name, view.id, tuple(sorted(op.changed_props)))
 
@@ -307,6 +316,7 @@ class FakeBackend:
                 view.parent.children.remove(view)
                 view.parent = None
             view.destroyed = True
+            self.list_stores.pop(op.tag, None)
             self.selections.pop(op.tag, None)
             self.scroll_offsets.pop(op.tag, None)
             if self.focused_tag == op.tag:
@@ -369,7 +379,7 @@ class FakeBackend:
             if name == "scroll_to_index":
                 self.request_list(tag, int(arguments["index"]))
             elif name == "scroll_to_end":
-                self.request_list(tag, max(0, len(view.props["keys"]) - 1))
+                self.request_list(tag, max(0, len(self.list_stores[tag].keys) - 1))
             return None
         if view.type_name == "TextInput":
             return self._text_input_command(view, name, arguments)
@@ -459,8 +469,9 @@ class FakeBackend:
         view = self._require(tag, "request_list")
         if view.type_name != "VirtualList":
             raise TypeError("request_list requires a VirtualList tag")
-        keys = view.props["keys"]
-        heights = view.props["row_heights"]
+        store = self.list_stores[tag]
+        keys = store.keys
+        heights = [store.rows[key].extent for key in keys]
         first = max(0, min(first, len(keys) - 1))
         last, covered = first, 0.0
         while last < len(keys) and covered < extent:
@@ -469,10 +480,22 @@ class FakeBackend:
         offset = sum(heights[:first])
         dispatch_event(
             tag,
-            "on_scroll",
+            "on_window",
             {
+                "revision": store.revision,
+                "sticky": next((i for i in range(first, -1, -1) if keys and store.rows[keys[i]].sticky), -1),
                 "first": first,
                 "last": last - 1,
+                "extent": extent,
+                "range": sum(heights),
+                "x": offset if view.props.get("horizontal") else 0,
+                "y": 0 if view.props.get("horizontal") else offset,
+            },
+        )
+        dispatch_event(
+            tag,
+            "on_scroll",
+            {
                 "extent": extent,
                 "range": sum(heights),
                 "x": offset if view.props.get("horizontal") else 0,
@@ -484,9 +507,10 @@ class FakeBackend:
                 tag,
                 "on_bind_row",
                 {
+                    "sticky": next((i for i in range(first, -1, -1) if store.rows[keys[i]].sticky), -1),
                     "key": keys[first],
                     "index": first,
-                    "revision": view.props["revision"],
+                    "revision": store.revision,
                     "extent": extent,
                     "width": view.frame[2],
                 },

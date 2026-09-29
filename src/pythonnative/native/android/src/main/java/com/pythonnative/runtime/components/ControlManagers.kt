@@ -31,7 +31,7 @@ class SwitchManager : CheckedManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = SwitchProps(props)
+        val typed = SwitchProps(props, validated = true)
 
         val sw = view as Switch
         if (typed.has_value) {
@@ -65,7 +65,7 @@ class CheckboxManager : CheckedManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = CheckboxProps(props)
+        val typed = CheckboxProps(props, validated = true)
 
         val cb = view as CheckBox
         if (typed.has_label) cb.text = typed.label ?: ""
@@ -93,7 +93,7 @@ class ProgressBarManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = ProgressBarProps(props)
+        val typed = ProgressBarProps(props, validated = true)
 
         val pb = view as ProgressBar
         typed.value?.let { pb.progress = (it.coerceIn(0.0, 1.0) * 1000).toInt() }
@@ -113,7 +113,7 @@ class ActivityIndicatorManager : ComponentManager() {
     override fun createView(context: Context, tag: Long, props: JSONObject): View = ProgressBar(context)
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = ActivityIndicatorProps(props)
+        val typed = ActivityIndicatorProps(props, validated = true)
 
         val pb = view as ProgressBar
         if (typed.has_animating) {
@@ -154,8 +154,8 @@ class SliderManager : ComponentManager() {
 
     private fun range(view: View): Pair<Double, Double> {
         val merged = propsOf(view)
-        val mn = SliderProps(merged).min_value ?: 0.0
-        val mx = SliderProps(merged).max_value ?: 1.0
+        val mn = SliderProps(merged, validated = true).min_value ?: 0.0
+        val mx = SliderProps(merged, validated = true).max_value ?: 1.0
         return Pair(mn, mx)
     }
 
@@ -170,7 +170,7 @@ class SliderManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = SliderProps(props)
+        val typed = SliderProps(props, validated = true)
 
         val sb = view as SeekBar
         val (mn, mx) = range(sb)

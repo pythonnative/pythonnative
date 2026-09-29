@@ -184,21 +184,33 @@ def install(factories: dict[str, Any]) -> None:
         },
         "ScreenStack": {"on_native_back": {"type": "event", "arguments": [{"type": "integer"}]}},
         "VirtualList": {
-            "keys": {"type": "array"},
-            "revision": {"type": "integer"},
-            "count": {"type": "integer"},
-            "estimated_item_size": {"type": "number"},
+            "dataset": {
+                "type": "object",
+                "properties": {
+                    "base": {"type": "integer"},
+                    "revision": {"type": "integer"},
+                    "changes": {"type": "array", "items": {"type": "array"}},
+                },
+                "required": ["base", "revision", "changes"],
+                "additionalProperties": False,
+            },
             "on_bind_row": {"type": "event"},
+            "on_window": {"type": "event"},
             "on_scroll": {"type": "event"},
             "horizontal": {"type": "boolean"},
-            "row_heights": {"type": "array", "items": {"type": "number"}},
-            "item_revisions": {"type": "array", "items": {"type": "integer"}},
             "shows_scroll_indicator": {"type": "boolean"},
             "refresh_control": {"type": "object"},
         },
     }
     for name, extra in extras.items():
-        register_schema(ComponentSchema(name, base.props | extra, measurement="container"))
+        register_schema(
+            ComponentSchema(
+                name,
+                base.props | extra,
+                required=("dataset",) if name == "VirtualList" else (),
+                measurement="container",
+            )
+        )
 
     from ..navigation.screen import PYTHON_ONLY_OPTIONS, ScreenOptions
 

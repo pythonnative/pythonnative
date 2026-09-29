@@ -4,7 +4,7 @@
 - Author(s): Owen Carey, with Claude (Claude Code)
 - Created: 2026-09-17
 - Implemented in: this pull request
-- Supersedes / Superseded by: none
+- Supersedes / Superseded by: list transport and Python sticky headers replaced by [RFC 0003](0003-incremental-rendering-and-lists.md); other decisions remain implemented
 
 ## Summary
 

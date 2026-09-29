@@ -1,7 +1,7 @@
 """Revisioned native view backend.
 
 Each commit is built as wire operations once, validated once against the
-committed view state, serialized once, sent as a protocol-3 envelope, and
+committed view state, serialized once, sent as a protocol-4 envelope, and
 acknowledged before Python updates its native tag index. Rejected commits
 poison the surface until it is remounted. Native events carry application,
 revision, sequence, and text edit identities. NativeViewRef holds a live
@@ -10,8 +10,11 @@ native tag rather than a UI object.
 
 from __future__ import annotations
 
+import asyncio
 import math
+import time
 import uuid
+import weakref
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from ..bridge import codec, get_transport
@@ -55,6 +58,11 @@ class BridgeBackend:
         self._event_sequences: dict[tuple[int, str], int] = {}
         self._edit_revisions: dict[int, int] = {}
         self._failed = False
+        self._pending: asyncio.Future[None] | None = None
+        self._publishing = False
+        self._queued_commits: set[asyncio.Task[None]] = set()
+        self._layout_listeners: list[Any] = []
+        self._queued_events: list[tuple[int, str, dict[str, Any]]] = []
         self.on_layout: Any = None
         self._types: Dict[int, str] = {}
         self._refs: Dict[int, NativeViewRef] = {}
@@ -78,7 +86,7 @@ class BridgeBackend:
     def prepare_layout(self, roots: list[int], width: float, height: float) -> None:
         """Include geometry in the next native commit when a viewport is known."""
         if self.native_layout and roots and width > 0 and height > 0:
-            self._pending_layout_request = {"roots": roots, "width": width, "height": height}
+            self._pending_layout_request = {"roots": roots, "width": width, "height": height, "selective": True}
         else:
             self._pending_layout_request = None
 
@@ -91,7 +99,9 @@ class BridgeBackend:
 
         count("layout.requests")
         raw = self.transport.call(
-            "Layout", "compute", codec.dumps({"call_id": 0, "args": {"roots": roots, "width": width, "height": height}})
+            "Layout",
+            "compute",
+            codec.dumps({"call_id": 0, "args": {"roots": roots, "width": width, "height": height, "selective": True}}),
         )
         result = codec.loads(raw)
         if not isinstance(result, dict) or not result.get("ok"):
@@ -99,6 +109,10 @@ class BridgeBackend:
         self._layout_required = False
         self._layout_request = request
         self.accept_layout(result.get("value"))
+
+    def subscribe_layout(self, callback: Any) -> None:
+        """Observe geometry without retaining an unmounted reconciler."""
+        self._layout_listeners.append(weakref.WeakMethod(callback))
 
     def accept_layout(self, payload: Any) -> None:
         """Accept geometry only for this surface's current committed revision."""
@@ -120,6 +134,11 @@ class BridgeBackend:
                 native_sample("layout", duration, views=visited, changed_frames=len(frames))
         if self.on_layout is not None:
             self.on_layout(frames)
+        self._layout_listeners = [ref for ref in self._layout_listeners if ref() is not None]
+        for reference in self._layout_listeners:
+            callback = reference()
+            if callback is not None:
+                callback(frames)
 
     # ------------------------------------------------------------------
     # Tag table
@@ -145,7 +164,7 @@ class BridgeBackend:
     # Commit channel
     # ------------------------------------------------------------------
 
-    def apply_mutations(self, ops: Sequence[Mutation]) -> None:
+    def apply_mutations(self, ops: Sequence[Mutation]) -> asyncio.Future[None] | None:
         """Build, validate, serialize, and apply ``ops`` natively in one crossing.
 
         A ``TextInput`` value update echoes the last edit revision the
@@ -153,7 +172,39 @@ class BridgeBackend:
         raced a newer keystroke.
         """
         if not ops:
-            return
+            return None
+        if self._pending is not None:
+            # Hosts share the process surface. Prepare against the acknowledged
+            # revision only when this transaction reaches the front of the queue.
+            from ..journal import detached_context
+            from ..runtime import get_loop
+
+            layout = self._pending_layout_request
+            queued_ops = tuple(ops)
+
+            async def submit() -> None:
+                while self._pending is not None:
+                    try:
+                        await asyncio.shield(self._pending)
+                    except Exception:
+                        pass  # apply_mutations checks whether the surface survived.
+                self._pending_layout_request = layout
+                pending = self.apply_mutations(queued_ops)
+                if pending is not None:
+                    await asyncio.shield(pending)
+
+            task = get_loop().create_task(submit(), context=detached_context())
+            from ..profiling import gauge
+
+            self._queued_commits.add(task)
+            gauge("commit.queued", len(self._queued_commits))
+
+            def dequeued(finished: asyncio.Task[None]) -> None:
+                self._queued_commits.discard(finished)
+                gauge("commit.queued", len(self._queued_commits))
+
+            task.add_done_callback(dequeued, context=detached_context())
+            return task
         if self._failed:
             raise CommitError("Native surface failed; remount the application with a new backend")
         wire_ops, sidecar = codec.build_transaction(ops, self._types)
@@ -176,12 +227,64 @@ class BridgeBackend:
         count("bridge.commits")
         count("bridge.operations", len(ops))
         count("bridge.bytes", len(payload.encode("utf-8")))
+
+        def complete(raw: str) -> None:
+            self._accept_commit(codec.loads(raw), candidate, envelope, ops, sidecar)
+
+        from ..runtime import get_loop
+
+        loop = get_loop()
+        if getattr(self.transport, "asynchronous_commits", False) and loop.is_running():
+            from ..journal import detached_context
+
+            result: asyncio.Future[None] = loop.create_future()
+            self._pending = result
+            self._publishing = True
+            started = time.perf_counter_ns()
+            # The executor owns only the native crossing. All Python tree and
+            # publication work stays on the application loop.
+            worker = loop.run_in_executor(None, self.transport.apply, payload)
+
+            def acknowledged(future: asyncio.Future[str]) -> None:
+                self._pending = None
+                try:
+                    raw = future.result()
+                    with span("acknowledgement"):
+                        complete(raw)
+                    native_sample("commit_wait", time.perf_counter_ns() - started)
+                    if not result.cancelled():
+                        result.set_result(None)
+                    else:
+                        self._failed = True
+                except BaseException as error:
+                    if not isinstance(error, CommitError):
+                        self._failed = True
+                    self._publishing = False
+                    self._queued_events.clear()
+                    if not result.done():
+                        result.set_exception(error)
+
+            worker.add_done_callback(acknowledged, context=detached_context())
+            return result
         try:
             with span("transport.apply"):
-                ack = codec.loads(self.transport.apply(payload))
-        except Exception:
+                raw = self.transport.apply(payload)
+        except BaseException:
             self._failed = True
             raise
+        complete(raw)
+        return None
+
+    def _accept_commit(
+        self,
+        ack: Any,
+        candidate: CommitState,
+        envelope: dict[str, Any],
+        ops: Sequence[Mutation],
+        sidecar: list[tuple[int, dict[str, Any]]],
+    ) -> None:
+        from ..profiling import gauge, native_sample
+
         expected = candidate.acknowledgement()
         if not isinstance(ack, dict) or any(ack.get(key) != value for key, value in expected.items()):
             # An explicit pre-mutation rejection can be retried at the same
@@ -190,9 +293,10 @@ class BridgeBackend:
             raise CommitError(f"Native commit {candidate.revision} rejected: {ack!r}")
         metrics = ack.get("metrics", {})
         if isinstance(metrics, dict):
-            duration = metrics.get("mutation_ns")
-            if type(duration) is int and duration >= 0:
-                native_sample("mutation", duration, operations=len(ops))
+            for phase in ("decode", "queue", "prepare", "mutation"):
+                duration = metrics.get(phase + "_ns")
+                if type(duration) is int and duration >= 0:
+                    native_sample(phase, duration, operations=len(ops) if phase == "mutation" else 0)
         self._commit = candidate.publish()
         from ..reconciler.layout_pass import affects_layout
 
@@ -228,6 +332,33 @@ class BridgeBackend:
             self.accept_layout(ack.get("layout"))
             self._layout_request = (tuple(layout["roots"]), layout["width"], layout["height"])
             self._layout_required = False
+        gauge("native.views", self.live_view_count())
+
+    def defer_event(self, tag: int, name: str, envelope: Any) -> bool:
+        """Keep input ordered until its native commit and Python effects publish."""
+        if self._pending is None and not self._publishing:
+            return False
+        if isinstance(envelope, dict):
+            if len(self._queued_events) >= 4096:
+                self._failed = True
+                raise CommitError("Native input queue exceeded 4096 events while a commit was pending")
+            self._queued_events.append((tag, name, envelope))
+        return True
+
+    def release_events(self) -> None:
+        """Deliver events after refs and effects have observed a successful mount."""
+        if self._pending is not None:
+            return
+        self._publishing = False
+        events, self._queued_events = self._queued_events, []
+        if self._failed:
+            return
+        from ..bridge import _on_event
+        from ..journal import detached_context
+        from ..runtime import get_loop
+
+        for tag, name, envelope in events:
+            get_loop().call_soon(_on_event, tag, name, codec.dumps(envelope), context=detached_context())
 
     def accept_event(self, tag: int, name: str, envelope: Any) -> bool:
         """Reject events from destroyed views, earlier applications, and replayed input."""
@@ -329,6 +460,12 @@ class BridgeBackend:
 
     def reset(self) -> None:
         """Forget a disconnected surface before the host remounts its tree."""
+        if self._pending is not None:
+            raise CommitError("Wait for the in-flight commit before resetting its surface")
+        if any(not task.done() for task in self._queued_commits):
+            raise CommitError("Wait for queued commits before resetting the surface")
+        self._publishing = False
+        self._queued_events.clear()
         self._types.clear()
         self._refs.clear()
         self._python_props.clear()

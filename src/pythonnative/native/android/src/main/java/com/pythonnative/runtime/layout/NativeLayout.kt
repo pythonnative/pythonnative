@@ -21,6 +21,7 @@ object NativeLayout {
             constraints = next
         }
     }
+    private val requestedFrames = HashSet<Long>()
     private val nodes = HashMap<Long, Entry>()
     private val portals = HashSet<Long>()
     private val detachedRoots = HashSet<Long>()
@@ -46,6 +47,7 @@ object NativeLayout {
             nodes[parent]?.yoga?.let { it.remove(it.ptr, entry.yoga.ptr) }
         }
         for (entry in nodes.values) entry.yoga.close()
+        requestedFrames.clear()
         nodes.clear()
         portals.clear()
         detachedRoots.clear()
@@ -80,6 +82,7 @@ object NativeLayout {
                 } else detachedRoots.add(op.child)
             }
             is Op.Destroy -> nodes.remove(op.tag)?.let { child ->
+                requestedFrames.remove(op.tag)
                 portals.remove(op.tag)
                 detachedRoots.remove(op.tag)
                 child.parent?.let { old -> nodes[old]?.let { parent ->
@@ -99,15 +102,32 @@ object NativeLayout {
         for (key in removed) entry.props.remove(key)
         val yoga = entry.yoga
         val type = PNBridge.registry.get(yoga.tag)?.typeName
-        if (removed.isEmpty() && type != null && entry.frame.isNotEmpty() && !com.pythonnative.generated.PNContracts.invalidatesLayout(type, changed)) return
-        yoga.resetStyle(yoga.ptr)
-        for (key in entry.props.keys()) {
-            val value = entry.props.get(key)
-            if (value is JSONObject && key in setOf("margin", "padding")) {
-                for (edge in value.keys()) yoga.style(yoga.ptr, if (edge == "all") key else "${key}_$edge", value.get(edge).toString())
-            } else yoga.style(yoga.ptr, key, value.toString())
+        if (changed.optBoolean("_pn_layout", false)) requestedFrames.add(yoga.tag)
+        val touched = changed.keys().asSequence().toSet() + removed
+        if (type != null && entry.frame.isNotEmpty() && com.pythonnative.generated.PNContracts.changes(type, touched) and com.pythonnative.generated.PNContracts.LAYOUT == 0) return
+        val direct = touched.toMutableSet()
+        for (family in listOf("margin", "padding")) if (touched.any { it == family || it.startsWith("${family}_") }) {
+            val resolved = HashMap<String, Any>()
+            val value = entry.props.opt(family)
+            if (value is JSONObject) for (edge in value.keys()) resolved[if (edge == "all") family else "${family}_$edge"] = value.get(edge)
+            else if (value != null && value != JSONObject.NULL) resolved[family] = value
+            for (edge in listOf("left", "top", "right", "bottom", "start", "end", "horizontal", "vertical")) {
+                val key = "${family}_$edge"
+                entry.props.opt(key)?.let { resolved[key] = it }
+            }
+            for (suffix in listOf("", "_left", "_top", "_right", "_bottom", "_start", "_end", "_horizontal", "_vertical")) {
+                val key = family + suffix
+                yoga.style(yoga.ptr, key, resolved[key]?.toString() ?: "")
+                direct.remove(key)
+            }
         }
-        if (type in setOf("ScrollView", "VirtualList", "ScreenStack")) yoga.style(yoga.ptr, "flex_shrink", "1")
+        if ("gap" in touched || "spacing" in touched) {
+            val value = entry.props.opt("gap") ?: entry.props.opt("spacing")
+            yoga.style(yoga.ptr, "gap", value?.toString() ?: "")
+            direct.remove("gap"); direct.remove("spacing")
+        }
+        for (key in direct) yoga.style(yoga.ptr, key, entry.props.opt(key)?.toString() ?: "")
+        if (type in setOf("ScrollView", "VirtualList", "ScreenStack") && !entry.props.has("flex_shrink")) yoga.style(yoga.ptr, "flex_shrink", "1")
         yoga.measureLeaf(yoga.ptr, entry.children.isEmpty() && type !in containers)
     }
 
@@ -163,11 +183,19 @@ object NativeLayout {
                     record.manager.setFrame(record.view, frame[0].toDouble(), frame[1].toDouble(), frame[2].toDouble(), frame[3].toDouble())
                 }
                 com.pythonnative.runtime.components.VirtualListManager.measured(tag, frame[2].toDouble(), frame[3].toDouble())
-                frames.put(JSONArray().put(tag).put(frame[0]).put(frame[1]).put(frame[2]).put(frame[3]))
+                if (!request.optBoolean("selective", false) || entry.props.optBoolean("_pn_layout", false)) frames.put(JSONArray().put(tag).put(frame[0]).put(frame[1]).put(frame[2]).put(frame[3]))
+                requestedFrames.remove(tag)
             }
             for (child in entry.children) if (nodes[child]?.attached == true) collect(child)
         }
         for (tag in rootTags + portals + detachedRoots) collect(tag)
+        for (tag in requestedFrames) nodes[tag]?.let { entry ->
+            if (entry.frame.isNotEmpty() && entry.props.optBoolean("_pn_layout", false)) {
+                val frame = entry.frame
+                frames.put(JSONArray().put(tag).put(frame[0]).put(frame[1]).put(frame[2]).put(frame[3]))
+            }
+        }
+        requestedFrames.clear()
         layoutNanos = System.nanoTime() - started
         return frames
     }

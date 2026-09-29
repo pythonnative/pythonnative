@@ -18,7 +18,7 @@ public final class PNSwitchManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! SwitchProps(props)
+        let typed = try! SwitchProps(props, validated: true)
 
         guard let control = view as? UISwitch, let state = PNViewState.existing(for: control) else { return }
         if typed.has_value {
@@ -69,7 +69,7 @@ public final class PNSliderManager: PNComponentManager {
         if let slider = view as? UISlider {
             PNActionTarget.attach(slider, events: .valueChanged) { [weak slider] in
                 guard let slider = slider, PNViewState.existing(for: slider)?.flag("suppress") != true else { return }
-                let props = try! SliderProps(PNViewState.existing(for: slider)?.props ?? [:])
+                let props = try! SliderProps(PNViewState.existing(for: slider)?.props ?? [:], validated: true)
                 if let step = props.step, step > 0 {
                     let minimum = Double(slider.minimumValue)
                     slider.value = Float(minimum + ((Double(slider.value) - minimum) / step).rounded() * step)
@@ -89,7 +89,7 @@ public final class PNSliderManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! SliderProps(props)
+        let typed = try! SliderProps(props, validated: true)
 
         guard let slider = view as? UISlider, let state = PNViewState.existing(for: slider) else { return }
         if let min = typed.min_value { slider.minimumValue = Float(min) }
@@ -124,7 +124,7 @@ public final class PNActivityIndicatorManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! ActivityIndicatorProps(props)
+        let typed = try! ActivityIndicatorProps(props, validated: true)
 
         guard let indicator = view as? UIActivityIndicatorView else { return }
         if !initial, let size = typed.size?.rawValue {
@@ -157,7 +157,7 @@ public final class PNProgressBarManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! ProgressBarProps(props)
+        let typed = try! ProgressBarProps(props, validated: true)
         if let spinner = view as? UIActivityIndicatorView {
             if typed.has_color { spinner.color = typed.color.flatMap { PNColor.parse(PNValues.encode($0)) } }
             spinner.startAnimating()
@@ -197,7 +197,7 @@ public final class PNSegmentedControlManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! SegmentedControlProps(props)
+        let typed = try! SegmentedControlProps(props, validated: true)
 
         guard let control = view as? UISegmentedControl, let state = PNViewState.existing(for: control) else { return }
         let merged = state.props
@@ -266,7 +266,7 @@ public final class PNDatePickerManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! DatePickerProps(props)
+        let typed = try! DatePickerProps(props, validated: true)
 
         guard let picker = view as? UIDatePicker, let state = PNViewState.existing(for: picker) else { return }
         let mode = PNProps.string(PNProps.value(state.props, "mode")) ?? "date"

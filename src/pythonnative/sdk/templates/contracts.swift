@@ -1,108 +1,84 @@
 import Foundation
 import CoreFoundation
 
-/// Generated contract metadata; validation is shared by built-ins and plugins.
+/// Executable generated contracts. No schema JSON is interpreted on the mount path.
 public enum PNContracts {
     public static let fingerprint = "{{fingerprint}}"
-    private static let specification = """
-{{specification}}
-"""
-    private static let document = try! JSONSerialization.jsonObject(with: Data(specification.utf8)) as! [String: Any]
-    private static let components = document["components"] as! [String: [String: Any]]
-    private static let modules = document["modules"] as! [String: [String: Any]]
-
+    private struct Field {
+        let matches: (Any) -> Bool
+        let allowed: Bool
+        let layout: Bool
+        let recreate: Bool
+        let required: Bool
+        let defaultValue: Any
+        init(_ matches: @escaping (Any) -> Bool, _ allowed: Bool, _ layout: Bool, _ recreate: Bool, _ required: Bool, _ defaultValue: Any) {
+            self.matches = matches; self.allowed = allowed; self.layout = layout
+            self.recreate = recreate; self.required = required; self.defaultValue = defaultValue
+        }
+    }
+    public struct ChangeMask: OptionSet {
+        public let rawValue: Int
+        public init(rawValue: Int) { self.rawValue = rawValue }
+        public static let layout = ChangeMask(rawValue: 1)
+        public static let recreate = ChangeMask(rawValue: 2)
+    }
+{{predicates}}
+{{fields}}
+    private static let components: [String: [String: Field]] = [
+{{components}}
+    ]
+    private static let commands: [String: (Any) -> Bool] = [
+{{commands}}
+    ]
+    private static let modules: [String: (Any) -> Bool] = [
+{{modules}}
+    ]
+    private static func isBoolean(_ value: Any) -> Bool {
+        (value as? NSNumber).map { CFGetTypeID($0) == CFBooleanGetTypeID() } ?? false
+    }
+    private static func isNumber(_ value: Any) -> Bool {
+        (value as? NSNumber).map { CFGetTypeID($0) != CFBooleanGetTypeID() && $0.doubleValue.isFinite } ?? false
+    }
+    private static func isInteger(_ value: Any) -> Bool {
+        guard isNumber(value), let number = value as? NSNumber else { return false }
+        return abs(number.doubleValue) <= 9_007_199_254_740_991 && number.doubleValue.rounded() == number.doubleValue
+    }
     public static func validate(_ name: String, _ props: [String: Any], partial: Bool = false) -> Bool {
-        guard let schema = components[name], let fields = schema["props"] as? [String: [String: Any]] else { return false }
-        if !partial {
-            for key in schema["required"] as? [String] ?? [] where props[key] == nil { return false }
-        }
-        for (key, value) in props {
-            guard let field = fields[key] else { return false }
-            if let platforms = (field["native"] as? [String: Any])?["platforms"] as? [String], !platforms.contains("ios") { return false }
-            if !matches(value, field) { return false }
-        }
-        return true
+        guard let fields = components[name] else { return false }
+        if !partial && fields.contains(where: { $0.value.required && props[$0.key] == nil }) { return false }
+        return props.allSatisfy { key, value in fields[key].map { $0.allowed && $0.matches(value) } ?? false }
     }
-
+    public static func changes(_ name: String, _ keys: Set<String>) -> ChangeMask {
+        guard let fields = components[name] else { return [.layout, .recreate] }
+        var mask: ChangeMask = []
+        for key in keys {
+            if fields[key]?.layout ?? true { mask.insert(.layout) }
+            if fields[key]?.recreate ?? false { mask.insert(.recreate) }
+        }
+        return mask
+    }
     public static func invalidatesLayout(_ name: String, _ changed: [String: Any]) -> Bool {
-        guard let fields = components[name]?["props"] as? [String: [String: Any]] else { return true }
-        return changed.keys.contains { ((fields[$0]?["native"] as? [String: Any])?["invalidates_layout"] as? Bool) ?? true }
+        changes(name, Set(changed.keys)).contains(.layout)
     }
-
     public static func validateRemoval(_ name: String, _ changed: [String: Any], _ removed: [String]) -> Bool {
-        guard let schema = components[name], let fields = schema["props"] as? [String: [String: Any]] else { return false }
-        let required = Set(schema["required"] as? [String] ?? [])
-        return Set(removed).count == removed.count && removed.allSatisfy {
-            fields[$0] != nil && !required.contains($0) && changed[$0] == nil
+        guard let fields = components[name] else { return false }
+        return Set(removed).count == removed.count && removed.allSatisfy { key in
+            fields[key].map { !$0.required && $0.allowed && changed[key] == nil } ?? false
         }
     }
-
     public static func requiresRecreation(_ name: String, _ changed: [String: Any], removed: [String] = []) -> Bool {
-        let fields = components[name]?["props"] as? [String: [String: Any]] ?? [:]
-        return Set(changed.keys).union(removed).contains {
-            ((fields[$0]?["native"] as? [String: Any])?["recreate"] as? Bool) ?? false
-        }
+        changes(name, Set(changed.keys).union(removed)).contains(.recreate)
     }
-
     public static func normalize(_ name: String, _ changed: [String: Any], removed: [String] = []) -> [String: Any] {
-        let defaults = components[name]?["defaults"] as? [String: Any] ?? [:]
         var result = changed
-        for key in removed { result[key] = defaults[key] ?? NSNull() }
+        for key in removed { result[key] = components[name]?[key]?.defaultValue ?? NSNull() }
         return result
     }
-
     public static func validateCommand(_ name: String, _ method: String, _ args: [String: Any]) -> Bool {
-        guard let commands = components[name]?["commands"] as? [String: [String: Any]], let command = commands[method] else { return false }
-        return validateArguments(command, args)
+        commands[name + "." + method]?(args) ?? false
     }
-
     public static func validateModule(_ name: String, _ method: String, _ args: [String: Any]) -> Bool {
-        // Host, Layout, and Runtime are renderer control channels.
-        guard let module = modules[name] else { return ["Host", "Layout", "Runtime"].contains(name) }
-        guard let methods = module["methods"] as? [String: [String: Any]], let command = methods[method] else { return false }
-        return validateArguments(command, args)
-    }
-
-    private static func validateArguments(_ command: [String: Any], _ args: [String: Any]) -> Bool {
-        let fields = command["arguments"] as? [String: Any] ?? [:]
-        return matches(args, ["type": "object", "properties": fields, "required": command["required"] ?? Array(fields.keys), "additionalProperties": false])
-    }
-
-    public static func matches(_ value: Any, _ schema: [String: Any]) -> Bool {
-        if let alternatives = schema["anyOf"] as? [[String: Any]] { return alternatives.contains { matches(value, $0) } }
-        if let values = schema["enum"] as? [Any] {
-            return values.contains { candidate in
-                if let a = candidate as? NSNumber, let b = value as? NSNumber {
-                    return (CFGetTypeID(a) == CFBooleanGetTypeID()) == (CFGetTypeID(b) == CFBooleanGetTypeID()) && a == b
-                }
-                if let a = candidate as? String, let b = value as? String { return a == b }
-                return candidate is NSNull && value is NSNull
-            }
-        }
-        switch schema["type"] as? String {
-        case "null": return value is NSNull
-        case "string": return value is String
-        case "boolean": return (value as? NSNumber).map { CFGetTypeID($0) == CFBooleanGetTypeID() } ?? false
-        case "integer": return (value as? NSNumber).map { CFGetTypeID($0) != CFBooleanGetTypeID() && $0.doubleValue.isFinite && abs($0.doubleValue) <= 9_007_199_254_740_991 && $0.doubleValue.rounded() == $0.doubleValue } ?? false
-        case "number": return (value as? NSNumber).map { CFGetTypeID($0) != CFBooleanGetTypeID() && $0.doubleValue.isFinite } ?? false
-        case "array":
-            guard let array = value as? [Any] else { return false }
-            if let prefix = schema["prefixItems"] as? [[String: Any]] {
-                return array.count == prefix.count && zip(array, prefix).allSatisfy { matches($0, $1) }
-            }
-            return array.allSatisfy { matches($0, schema["items"] as? [String: Any] ?? [:]) }
-        case "object":
-            guard let object = value as? [String: Any] else { return false }
-            let fields = schema["properties"] as? [String: [String: Any]] ?? [:]
-            for key in schema["required"] as? [String] ?? [] where object[key] == nil { return false }
-            for (key, item) in object {
-                if let field = fields[key] { if !matches(item, field) { return false } }
-                else if let additional = schema["additionalProperties"] as? [String: Any] { if !matches(item, additional) { return false } }
-                else if schema["additionalProperties"] as? Bool == false { return false }
-            }
-            return true
-        case "event": return (value as? NSNumber).map { CFGetTypeID($0) == CFBooleanGetTypeID() } ?? false
-        default: return true
-        }
+        if ["Host", "Layout", "Runtime"].contains(name) { return true }
+        return modules[name + "." + method]?(args) ?? false
     }
 }

@@ -84,3 +84,4 @@ ceremony.
 | --- | --- | --- |
 | [0001](0001-assets-and-visual-primitives.md) | Assets and visual primitives | Implemented |
 | [0002](0002-core-parity-and-correctness.md) | Core parity and correctness | Implemented |
+| [0003](0003-incremental-rendering-and-lists.md) | Incremental rendering and lists | Implemented |

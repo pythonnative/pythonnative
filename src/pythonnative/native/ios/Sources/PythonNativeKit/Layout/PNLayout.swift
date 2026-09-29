@@ -63,7 +63,10 @@ enum PNLayout {
         }
     }
 
+    private static var requestedFrames: Set<Int64> = []
+
     static func reset() {
+        requestedFrames.removeAll()
         for entry in nodes.values { YGNodeRemoveAllChildren(entry.node) }
         nodes.removeAll()
         portals.removeAll()
@@ -98,6 +101,7 @@ enum PNLayout {
                     detachedRoots.remove(child)
                 } else { detachedRoots.insert(child) }
             case let .destroy(tag):
+                requestedFrames.remove(tag)
                 portals.remove(tag)
                 detachedRoots.remove(tag)
                 if let entry = nodes.removeValue(forKey: tag), let parent = entry.parent, let p = nodes[parent] {
@@ -116,22 +120,37 @@ enum PNLayout {
         }
         for key in removed { entry.props.removeValue(forKey: key) }
         let type = PNViewRegistry.shared.resolve(entry.tag)?.typeName ?? ""
-        guard PNContracts.invalidatesLayout(type, changed) || !removed.isEmpty || entry.frame.isEmpty else { return }
-        let fresh = YGNodeNew()!
-        for (key, value) in entry.props {
-            if let edges = value as? [String: Any], key == "margin" || key == "padding" {
-                for (edge, amount) in edges {
-                    let name = edge == "all" ? key : "\(key)_\(edge)"
-                    _ = PNYogaSetStyle(fresh, name, String(describing: amount))
-                }
-            } else { _ = PNYogaSetStyle(fresh, key, String(describing: value)) }
+        if changed["_pn_layout"] as? Bool == true { requestedFrames.insert(entry.tag) }
+        let touched = Set(changed.keys).union(removed)
+        guard PNContracts.changes(type, touched).contains(.layout) || entry.frame.isEmpty else { return }
+        var direct = touched
+        for family in ["margin", "padding"] where touched.contains(where: { $0 == family || $0.hasPrefix(family + "_") }) {
+            var resolved: [String: Any] = [:]
+            if let edges = entry.props[family] as? [String: Any] {
+                for (edge, amount) in edges { resolved[edge == "all" ? family : family + "_" + edge] = amount }
+            } else if let value = entry.props[family] { resolved[family] = value }
+            for edge in ["left", "top", "right", "bottom", "start", "end", "horizontal", "vertical"] {
+                let key = family + "_" + edge
+                if let value = entry.props[key] { resolved[key] = value }
+            }
+            for suffix in ["", "_left", "_top", "_right", "_bottom", "_start", "_end", "_horizontal", "_vertical"] {
+                let key = family + suffix
+                _ = PNYogaSetStyle(entry.node, key, resolved[key].map { String(describing: $0) } ?? "")
+                direct.remove(key)
+            }
+        }
+        if !touched.isDisjoint(with: ["gap", "spacing"]) {
+            let value = entry.props["gap"] ?? entry.props["spacing"]
+            _ = PNYogaSetStyle(entry.node, "gap", value.map { String(describing: $0) } ?? "")
+            direct.remove("gap"); direct.remove("spacing")
+        }
+        for key in direct {
+            _ = PNYogaSetStyle(entry.node, key, entry.props[key].map { String(describing: $0) } ?? "")
         }
         if ["ScrollView", "VirtualList", "ScreenStack"].contains(type) {
-            YGNodeStyleSetOverflow(fresh, YGOverflow(rawValue: 1)!)
-            YGNodeStyleSetFlexShrink(fresh, 1)
+            YGNodeStyleSetOverflow(entry.node, YGOverflow(rawValue: 1)!)
+            if entry.props["flex_shrink"] == nil { YGNodeStyleSetFlexShrink(entry.node, 1) }
         }
-        YGNodeCopyStyle(entry.node, fresh)
-        YGNodeFree(fresh)
         if YGNodeGetChildCount(entry.node) == 0 && !["View", "Column", "Row", "ScrollView", "Modal", "Portal", "ScreenStack"].contains(type) {
             YGNodeSetMeasureFunc(entry.node, measureLeaf)
             YGNodeSetBaselineFunc(entry.node, baselineLeaf)
@@ -200,7 +219,8 @@ enum PNLayout {
                     record.manager.setFrame(view: record.view, x: frame[0], y: frame[1], w: frame[2], h: frame[3])
                 }
                 PNVirtualListManager.measured(entry.tag, CGSize(width: frame[2], height: frame[3]))
-                frames.append([Double(entry.tag)] + frame)
+                if request["selective"] as? Bool != true || entry.props["_pn_layout"] as? Bool == true { frames.append([Double(entry.tag)] + frame) }
+                requestedFrames.remove(entry.tag)
             }
             for tag in entry.children {
                 if let child = nodes[tag], YGNodeGetParent(child.node) == entry.node { collect(child) }
@@ -209,6 +229,10 @@ enum PNLayout {
         for tag in rootTags.union(portals).union(detachedRoots) {
             if let entry = nodes[tag] { collect(entry) }
         }
+        for tag in requestedFrames {
+            if let entry = nodes[tag], !entry.frame.isEmpty, entry.props["_pn_layout"] as? Bool == true { frames.append([Double(tag)] + entry.frame) }
+        }
+        requestedFrames.removeAll()
         return frames
     }
 

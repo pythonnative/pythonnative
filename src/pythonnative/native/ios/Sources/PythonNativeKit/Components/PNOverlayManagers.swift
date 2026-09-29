@@ -278,7 +278,7 @@ public final class PNStatusBarManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! StatusBarProps(props)
+        let typed = try! StatusBarProps(props, validated: true)
 
         if let hidden = typed.hidden {
             PNStatusBarState.hidden = hidden

@@ -651,6 +651,9 @@ def _state_setter(ctx: HookState, idx: int) -> Callable[[Any], None]:
         deferred = in_transition() and ctx.owner is not None
 
         def apply() -> None:
+            defer = getattr(ctx.owner, "defer_input", None)
+            if defer is not None and defer(apply):
+                return
             if ctx.task_scope.closed:
                 if diagnostics.is_dev():
                     diagnostics.warn_once(
@@ -692,6 +695,9 @@ def _state_setter(ctx: HookState, idx: int) -> Callable[[Any], None]:
         call_on_application_thread(apply)
 
     def flush() -> None:
+        defer = getattr(ctx.owner, "defer_input", None)
+        if defer is not None and defer(flush):
+            return
         queued = ctx._state_queues.pop(idx, None)
         if queued is None or ctx.task_scope.closed:
             return

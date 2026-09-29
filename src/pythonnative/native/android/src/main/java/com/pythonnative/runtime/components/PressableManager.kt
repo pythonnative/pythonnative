@@ -44,7 +44,7 @@ class PressableManager : ViewManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = PressableProps(props)
+        val typed = PressableProps(props, validated = true)
         // Press handling owns the touch listener; gesture specs are fed from inside it.
         stateOf(view)["gestures_bound"] = true
         super.applyProps(view, props, initial)
@@ -57,7 +57,7 @@ class PressableManager : ViewManager() {
 
     private fun applyRipple(view: View, merged: JSONObject) {
         val state = stateOf(view)
-        val ripple = runCatching { PressableProps(merged).android_ripple }.getOrNull()
+        val ripple = runCatching { PressableProps(merged, validated = true).android_ripple }.getOrNull()
         val legacy = merged.value("ripple")
         // Undo a background-mode ripple so the styled background can be re-wrapped or restored.
         (view.background as? RippleDrawable)?.let { existing ->
