@@ -5,25 +5,27 @@ public enum PNAlertPresenter {
     /// Show an alert or action sheet. `buttons` are
     /// `{"label", "style": "default"|"cancel"|"destructive"}` dicts;
     /// `completion` receives the tapped index, or `-1` on dismissal.
+    @discardableResult
     public static func present(
         title: String?, message: String?, buttons: [[String: Any]], style: String,
         completion: @escaping (Int) -> Void
-    ) {
+    ) -> (() -> Void)? {
         guard let top = PNWindow.topViewController() else {
             completion(-1)
-            return
+            return nil
         }
         let preferred: UIAlertController.Style = style == "action_sheet" ? .actionSheet : .alert
         let alert = UIAlertController(title: title, message: message, preferredStyle: preferred)
         var settled = false
-        let finish: (Int) -> Void = { index in
+        let finish: (Int) -> Void = { [weak alert] index in
             if settled { return }
             settled = true
+            if let alert = alert { PNAlertDismissWatcher.forget(alert) }
             completion(index)
         }
         let list = buttons.isEmpty ? [["label": "OK"]] : buttons
         for (index, button) in list.enumerated() {
-            let label = PNProps.string(button["label"]) ?? PNProps.string(button["title"]) ?? "OK"
+            let label = PNProps.string(button["label"]) ?? "OK"
             let actionStyle: UIAlertAction.Style
             switch PNProps.string(button["style"]) {
             case "cancel": actionStyle = .cancel
@@ -41,6 +43,11 @@ public enum PNAlertPresenter {
         // A sheet dismissed by tapping outside (iPad popover) never runs
         // an action; report -1 once it disappears.
         PNAlertDismissWatcher.watch(alert) { finish(-1) }
+        return {
+            settled = true
+            PNAlertDismissWatcher.forget(alert)
+            alert.dismiss(animated: true)
+        }
     }
 }
 
@@ -59,6 +66,8 @@ final class PNAlertDismissWatcher: NSObject, UIPopoverPresentationControllerDele
         alert.popoverPresentationController?.delegate = watcher
     }
 
+    static func forget(_ alert: UIAlertController) { watchers.removeValue(forKey: ObjectIdentifier(alert)) }
+
     func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
         onDismiss()
         PNAlertDismissWatcher.watchers.removeValue(forKey: ObjectIdentifier(presentationController.presentedViewController))
@@ -66,27 +75,14 @@ final class PNAlertDismissWatcher: NSObject, UIPopoverPresentationControllerDele
 }
 
 /// `Alert`: `present` (async, resolves the tapped index) and `show` (fire-and-forget).
-public final class AlertModule: PNNativeModule {
-    public static let name = "Alert"
-
+public final class AlertModule: AlertImplementation {
     public init() {}
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        switch method {
-        case "present", "show":
-            let buttons = ((args["buttons"] as? [Any]) ?? []).compactMap { $0 as? [String: Any] }
-            let fireAndForget = method == "show"
-            if fireAndForget { promise.resolve(nil) }
-            PNAlertPresenter.present(
-                title: PNProps.string(args["title"]),
-                message: PNProps.string(args["message"]),
-                buttons: buttons,
-                style: PNProps.string(args["style"]) ?? "alert"
-            ) { index in
-                if !fireAndForget { promise.resolve(index) }
-            }
-        default:
-            promise.reject("Alert has no method '\(method)'", code: "unknown_method")
-        }
+    public func show(title: String, message: String?, buttons: [[String: PNJSONValue]], style: String) {
+        PNAlertPresenter.present(title: title, message: message, buttons: buttons.map { $0.mapValues { PNValues.encode($0) } }, style: style) { _ in }
+    }
+
+    public func present(title: String, message: String?, buttons: [[String: PNJSONValue]], style: String, completion: @escaping (Result<Int64, Error>) -> Void) -> (() -> Void)? {
+        PNAlertPresenter.present(title: title, message: message, buttons: buttons.map { $0.mapValues { PNValues.encode($0) } }, style: style) { completion(.success(Int64($0))) }
     }
 }

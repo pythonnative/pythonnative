@@ -3,8 +3,8 @@
 Five record types describe every change to the native view tree:
 create, update, insert, destroy, and set frame. The
 [`Reconciler`][pythonnative.reconciler.Reconciler] emits them; the
-[`NativeViewRegistry`][pythonnative.native_views.NativeViewRegistry]
-applies them.
+view backend from [`get_backend`][pythonnative.native_views.get_backend]
+applies them in one `apply_mutations` call per commit.
 
 ::: pythonnative.mutations
     options:
@@ -19,7 +19,7 @@ applies them.
   [Events](events.md).
 - See how each op is applied to a concrete widget in
   [Native views](native_views.md).
-- Read what handlers size themselves against in
+- Read what component managers size themselves against in
   [Platform metrics](platform_metrics.md).
 - Read the diffing pass that produces these lists in
   [Reconciliation](../concepts/reconciliation.md).

@@ -1,6 +1,6 @@
 """Development server and browser preview.
 
-The browser is a protocol-2 renderer with Yoga WebAssembly layout. Python runs
+The browser is a protocol-4 renderer with Yoga WebAssembly layout. Python runs
 on the standard application asyncio loop; the transport's coordinator and
 network threads forward messages to their owners. The dev server watches app
 sources, synchronizes mobile clients, and applies compatible Fast Refresh.
@@ -109,16 +109,26 @@ class PreviewSession:
 
     def _on_sources_changed(self, change: Any, snapshot: Any) -> None:
         """Watcher thread: schedule a reload of the preview's own app."""
+        from .assets import bump_generation, manifest_for_sync
         from .devserver.watcher import modules_for_paths
 
-        modules = modules_for_paths(list(change.changed) + list(change.removed))
-        if not modules:
+        paths = list(change.changed) + list(change.removed)
+        modules = modules_for_paths(paths)
+        assets_changed = bool(manifest_for_sync(paths))
+        if not modules and not assets_changed:
             return
 
         def _apply() -> None:
             from .hosts import live_hosts
             from .hot_reload import apply_reload
 
+            if assets_changed:
+                # The page re-reads the manifest and font CSS, then reloads
+                # every ``asset://`` image it shows.
+                bump_generation()
+                self.transport.send_dev({"type": "assets"})
+            if not modules:
+                return
             hosts = list(live_hosts())
             started = time.monotonic()
             result = apply_reload(modules, hosts)
@@ -170,14 +180,14 @@ class PreviewSession:
     def _destroy_hosts(self) -> None:
         """Unmount every screen the page created (it is gone, so are its views)."""
         from .hosts.native import live_hosts
-        from .native_views import get_registry
+        from .native_views import get_backend
 
         for host in list(live_hosts()):
             try:
                 host.on_destroy()
             except Exception:
                 traceback.print_exc()
-        backend = get_registry()
+        backend = get_backend()
         reset = getattr(backend, "reset", None)
         if callable(reset):
             reset()

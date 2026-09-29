@@ -1,0 +1,27 @@
+# Tests AccessibilityInfo readers report no screen reader / reduce motion on
+# the stock emulator, and that announce() and set_accessibility_focus(ref)
+# run without raising.
+#
+# Demo screen: examples/e2e-suite/app/screens/device/accessibility_info.py
+# Source under test: src/pythonnative/native_modules/accessibility_info.py :: AccessibilityInfo
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Device
+      DEMO_TITLE: AccessibilityInfo
+- assertVisible: "Screen reader: no"
+# CI's Android emulator runs with animations disabled, which Android
+# reports as Reduce Motion, so either answer is valid here.
+- assertVisible: "Reduce motion: (yes|no)"
+- assertVisible: "Announcements: 0"
+- tapOn: "Announce"
+- assertVisible: "Announcements: 1"
+- tapOn: "Focus target"
+- assertVisible: "Focus calls: 1"
+- assertVisible: "a11y-focus-target"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Device

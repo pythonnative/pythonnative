@@ -1,7 +1,8 @@
-# Tests borders + shadow card renders with its label.
+# Tests border / radius / shadow styling renders and border_style draws
+# solid, dashed, and dotted boxes.
 #
 # Demo screen: examples/e2e-suite/app/screens/styling/borders_shadows.py
-# Source under test: src/pythonnative/style.py, native handlers
+# Source under test: src/pythonnative/style.py :: border_*, shadow_*, border_style
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -10,6 +11,9 @@ appId: ${APP_ID}
       CATEGORY: Styling
       DEMO_TITLE: Borders & shadows
 - assertVisible: "border-shadow-card"
+- assertVisible: "solid-border"
+- assertVisible: "dashed-border"
+- assertVisible: "dotted-border"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

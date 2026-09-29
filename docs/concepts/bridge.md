@@ -8,14 +8,19 @@ in `src/pythonnative/native/android`. App templates stage and embed those librar
 
 ## Application and UI threads
 
-The application has an ordinary asyncio loop on its own thread. Calls into UIKit
-and Android synchronously marshal native operations to the platform UI thread.
+The application has an ordinary asyncio loop on its own thread. A commit's
+blocking transport call runs on a worker. Native JSON decoding
+happens there before operations are queued to the platform UI thread. Structural
+preflight, widget mutation, and native measurement retain UI-thread ownership.
 On iOS, the ctypes transport releases the GIL during this crossing. Native input
 is queued back to Python rather than waiting for a Python handler on the UI thread.
 
 A callback must never depend on a synchronous Python answer. Navigation back
 requests and recycled-row requests are asynchronous. Platforms cache restoration
-state as Python publishes it, so lifecycle saves don't wait for Python.
+state as Python publishes it, so the `save_state` and `restore_state` lifecycle
+callbacks are acknowledged without calling into Python. Viewport metrics
+(size, insets, keyboard height, color scheme, scale, and font scale) travel on
+the `layout` and `resume` host events.
 Adjacent continuous scroll and gesture samples can be coalesced. Discrete input
 preserves order. Animation input bindings evaluate before the sample is queued.
 
@@ -25,7 +30,7 @@ A surface commit has this shape:
 
 ```json
 {
-  "version": 2,
+  "version": 4,
   "application": "unique-application-id",
   "surface": 1,
   "revision": 1,
@@ -40,13 +45,16 @@ A surface commit has this shape:
 | Operation | Fields |
 | --- | --- |
 | `c` | tag, component type, props |
-| `u` | tag, changed props; `null` removes a prop |
+| `u` | tag, changed props, removed property names; `null` remains a value |
 | `i` | parent tag, child tag, insertion index |
 | `d` | tag; children must already be destroyed |
 | `f` | tag, x, y, width, height |
 
-The renderer validates the entire operation sequence before mutation: operation
-arity, live tags, insertion bounds, cycles, typed values, and finite geometry.
+Python builds the wire operations once, validates them once against the
+generated contract, and serializes the envelope once per commit; there is no
+encode-decode-patch round trip. The renderer then validates the entire
+operation sequence before mutation: operation arity, live tags, insertion
+bounds, cycles, typed values, and finite geometry.
 An accepted commit returns `ok`, `application`, `surface`, and the exact
 `revision`, plus optional native timing metrics. Python advances its bookkeeping
 only after that acknowledgment. A rejection with `failed: false` reports
@@ -55,11 +63,39 @@ A failed surface rejects further incremental updates. A new application identity
 and a complete remount establish a clean surface; replaying a partial commit
 isn't a recovery strategy. The current app host uses one surface.
 
+The application loop keeps running while acknowledgement is pending. A reconciler
+queues state writes instead of rendering against an uncommitted tree. Shared
+backend transactions serialize; preparation uses the acknowledged revision when
+a transaction reaches the front. Refs, effects, and native events wait for
+publication. Cancelling a caller's wait doesn't cancel native mounting.
+
+### Incremental list packets
+
+`VirtualList.dataset` contains `base`, `revision`, and `changes`. Each revision
+advances by one. There may be one dataset patch per list per commit.
+
+| Change | Payload |
+| --- | --- |
+| `reset` | array of `[key, item_revision, extent, sticky]` records |
+| `i` | insertion index, row record |
+| `u` | replacement row record with the same key |
+| `d` | key to remove |
+| `m` | key, final index |
+
+A reset must be first. Keys are unique nonempty strings; extents are finite and
+positive. Validation stages edits before publishing them. Updating metadata
+preserves the order index; structural edits rebuild indexes as needed. Native
+window events include the active sticky header. Application scroll events keep
+the `ScrollEvent` shape and are emitted only when subscribed.
+
 ## Events and controlled input
 
 Events carry `application`, `surface`, `revision`, `sequence`, and an `args` list.
 The backend rejects callbacks from earlier applications, destroyed tags, future
-revisions, and replayed sequences. A ref addresses a live native tag; commands
+revisions, and replayed sequences. Event payloads for `on_layout`, `on_scroll`,
+`on_selection_change`, `on_key_press`, and `on_content_size_change` are
+reconstructed into the frozen dataclasses in `pythonnative.components.events`
+before the callback runs. A ref's handle addresses a live native tag; commands
 against a destroyed tag raise an error.
 
 Text changes also carry an edit revision. Python echoes the latest revision it
@@ -74,10 +110,19 @@ provenance. Python tests build a host binding, iOS and Android compile the same
 core, and the browser preview uses the corresponding Yoga WebAssembly package.
 
 The application sends styles as props. Native leaf managers measure text,
-controls, and images next to their widgets. One `Layout.compute` request returns
-a batch of changed frames with `application`, `surface`, and `revision`.
+controls, and images next to their widgets. When the viewport is known, a commit
+includes a `layout` object with `roots`, `width`, `height`, and `selective: true`.
+Its acknowledgment includes changed frames for `_pn_layout` observers (refs or
+`on_layout`), so mutation and required layout share one bridge
+crossing. `Layout.compute` remains available for viewport changes without
+mutations. Both return frames with `application`, `surface`, and `revision`.
 Geometry from another surface or revision is ignored. Drawing-only prop updates
-skip the request entirely. Python doesn't make one measurement RPC per leaf.
+skip a separate request. Changed styles update existing Yoga nodes; removal
+restores the property default or surviving shorthand. Diagnostic raw layout
+requests may omit `selective` to collect all changed frames. Yoga calculations
+reuse unchanged constraints, and
+frame collection visits only subtrees with new layout. Python doesn't make one
+measurement RPC per leaf.
 
 Commit and required layout acknowledgments precede ref and effect publication.
 Native navigation animations and later platform layout changes may continue after
@@ -91,7 +136,12 @@ UIKit collection views and Android recycler views own physical cells; a bounded
 window of ordinary keyed Python row components supplies their contents. Headless
 tests simulate the same viewport and row requests. Dataset revisions change when
 data or rendering inputs change; per-item revisions avoid reloading unchanged
-cells. Global and section headers don't change public item indices. Row instances
+cells. Dataset indexing is memoized separately from viewport changes. Stable
+sequence identity, callbacks, and `data_revision` reuse that index even when a
+parent rerenders. Replace an edited sequence or increment `data_revision` after
+in-place edits. Native prefetch requests warm the bounded row window. Native
+containers preserve the first visible key and its offset across dataset changes;
+iOS also preserves it as measured row heights replace estimates. Global and section headers don't change public item indices. Row instances
 can unmount outside the window, so persistent item state belongs in app data.
 
 ## Modules, contracts, and animations

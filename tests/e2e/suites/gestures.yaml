@@ -6,3 +6,4 @@ appId: ${APP_ID}
 ---
 - runFlow: ../flows/gestures/gestures.yaml
 - runFlow: ../flows/gestures/gesture_composition.yaml
+- runFlow: ../flows/gestures/pan_gesture.yaml

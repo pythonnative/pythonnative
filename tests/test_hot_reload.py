@@ -363,12 +363,12 @@ def _texts(view: Any) -> list:
 
 @pytest.fixture
 def _screen_backend(monkeypatch: pytest.MonkeyPatch) -> Any:
-    from pythonnative.native_views import set_registry
+    from pythonnative.native_views import set_backend
 
     backend = _MockBackend()
-    set_registry(backend)
+    set_backend(backend)
     yield backend
-    set_registry(None)
+    set_backend(None)
 
 
 def _mount_screen(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pkg: str, text: str) -> Any:

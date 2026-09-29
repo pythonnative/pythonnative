@@ -5,3 +5,8 @@ appId: ${APP_ID}
 - runFlow: ../flows/navigation/drawer_navigator.yaml
 - runFlow: ../flows/navigation/params_passing.yaml
 - runFlow: ../flows/navigation/focus_effect.yaml
+- runFlow: ../flows/navigation/navigation_theme.yaml
+- runFlow: ../flows/navigation/navigation_ref.yaml
+- runFlow: ../flows/navigation/stack_options.yaml
+- runFlow: ../flows/navigation/tab_options.yaml
+- runFlow: ../flows/navigation/presentation.yaml

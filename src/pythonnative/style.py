@@ -13,10 +13,9 @@ are still ignored, so third-party handlers may extend the palette
 without modifying core types.
 
 The runtime helpers ([`resolve_style`][pythonnative.style.resolve_style],
-[`StyleSheet`][pythonnative.StyleSheet]) accept either a ``Style``
-TypedDict, a regular ``Dict[str, Any]`` (for forward-compat or
-unrestricted use), or a list of either kind of dict, and always
-return a fresh, flat dict.
+[`StyleSheet`][pythonnative.StyleSheet]) accept a ``Style`` TypedDict or
+a sequence of them (``None`` entries are skipped) and always return a
+fresh, flat dict with the ``inset*`` shorthands resolved to edges.
 
 Example:
     ```python
@@ -37,7 +36,20 @@ Example:
 import dataclasses
 import difflib
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union, get_args
+from typing import (
+    Any,
+    Dict,
+    List,
+    Literal,
+    NotRequired,
+    Optional,
+    Sequence,
+    Tuple,
+    TypedDict,
+    Union,
+    Unpack,
+    get_args,
+)
 
 from . import diagnostics
 from .hooks import Context, create_context, use_color_scheme, use_context
@@ -46,11 +58,25 @@ from .hooks import Context, create_context, use_color_scheme, use_context
 # Atomic value types
 # ======================================================================
 
-Color = str
-"""Color value: ``"#RRGGBB"``, ``"#AARRGGBB"``, or any string a platform
-handler recognizes (e.g., ``"red"``). Stored verbatim and parsed by the
-handler at apply-time, so palettes from third-party libraries pass through
-unchanged."""
+
+class DynamicColor(TypedDict):
+    """A color pair resolved against the current color scheme.
+
+    Every renderer (iOS, Android, and the browser preview) picks
+    ``light`` or ``dark`` when the style is applied and switches when
+    the appearance changes.
+    """
+
+    light: str
+    dark: str
+
+
+Color = Union[str, DynamicColor]
+"""Color value: ``"#RRGGBB"``, ``"#AARRGGBB"``, any string a platform
+handler recognizes (e.g., ``"red"``), or a
+[`DynamicColor`][pythonnative.DynamicColor] ``{"light": ..., "dark": ...}``
+pair. Strings are stored verbatim and parsed by the handler at apply-time,
+so palettes from third-party libraries pass through unchanged."""
 
 Dimension = Union[int, float, str]
 """A length value. Numbers are points/dp; strings ending in ``"%"`` are
@@ -102,6 +128,52 @@ class AccessibilityState(TypedDict, total=False):
     expanded: bool
 
 
+class AccessibilityValue(TypedDict, total=False):
+    """The current value of a range-like or text-valued widget, for assistive technology.
+
+    Passed via ``accessibility_value=`` (a plain string is also
+    accepted and equivalent to ``{"text": ...}``). Use ``min``, ``max``,
+    and ``now`` for sliders and progress indicators, ``text`` for
+    everything else.
+
+    Attributes:
+        min: Lower bound of the range.
+        max: Upper bound of the range.
+        now: Current value within the range.
+        text: Spoken description of the current value.
+    """
+
+    min: float
+    max: float
+    now: float
+    text: str
+
+
+class AccessibilityAction(TypedDict):
+    """One custom action a screen reader may invoke on a view.
+
+    Passed via ``accessibility_actions=[...]``; the view's
+    ``on_accessibility_action`` callback receives the action ``name``.
+    The standard names ``"activate"``, ``"increment"``, ``"decrement"``,
+    ``"longpress"``, ``"magicTap"``, and ``"escape"`` map to the
+    platform's built-in actions; any other name is a custom action
+    announced with ``label``.
+
+    Attributes:
+        name: Identifier reported to ``on_accessibility_action``.
+        label: Spoken description of a custom action.
+    """
+
+    name: str
+    label: NotRequired[str]
+
+
+ImportantForAccessibility = Literal["auto", "yes", "no", "no_hide_descendants"]
+"""``important_for_accessibility`` value: whether assistive technology
+sees the view (``"yes"``), skips it (``"no"``), skips it and its subtree
+(``"no_hide_descendants"``), or decides itself (``"auto"``)."""
+
+
 class ShadowOffset(TypedDict):
     """Shadow displacement in points."""
 
@@ -120,9 +192,27 @@ ShadowOffsetValue = Union[ShadowOffset, Tuple[float, float], List[float]]
 
 
 class TransformRotate(TypedDict):
-    """Rotation transform in degrees (numeric) or with explicit unit suffix."""
+    """Rotation around the z axis in degrees (numeric) or with an explicit unit suffix."""
 
     rotate: Union[float, str]
+
+
+class TransformRotateX(TypedDict):
+    """Rotation around the x axis (a 3D tilt) in degrees or with a unit suffix."""
+
+    rotate_x: Union[float, str]
+
+
+class TransformRotateY(TypedDict):
+    """Rotation around the y axis (a 3D flip) in degrees or with a unit suffix."""
+
+    rotate_y: Union[float, str]
+
+
+class TransformRotateZ(TypedDict):
+    """Rotation around the z axis; an explicit spelling of ``rotate``."""
+
+    rotate_z: Union[float, str]
 
 
 class TransformScale(TypedDict):
@@ -150,15 +240,40 @@ class TransformTranslate(TypedDict, total=False):
     translate_y: float
 
 
+class TransformSkewX(TypedDict):
+    """Horizontal skew in degrees or with a unit suffix."""
+
+    skew_x: Union[float, str]
+
+
+class TransformSkewY(TypedDict):
+    """Vertical skew in degrees or with a unit suffix."""
+
+    skew_y: Union[float, str]
+
+
+class TransformPerspective(TypedDict):
+    """Perspective distance for the 3D rotations that follow it in the list."""
+
+    perspective: float
+
+
 TransformEntry = Union[
     TransformRotate,
+    TransformRotateX,
+    TransformRotateY,
+    TransformRotateZ,
     TransformScale,
     TransformScaleX,
     TransformScaleY,
     TransformTranslate,
+    TransformSkewX,
+    TransformSkewY,
+    TransformPerspective,
     Dict[str, Any],
 ]
-"""A single transform operation."""
+"""A single transform operation. Every renderer supports the whole set;
+iOS composes them into a ``CATransform3D``."""
 
 TransformSpec = Union[TransformEntry, List[TransformEntry]]
 """``transform`` style value: a single operation or an ordered list."""
@@ -237,6 +352,8 @@ FontWeight = Literal[
     "900",
 ]
 ScaleType = Literal["cover", "contain", "stretch", "center"]
+BorderStyle = Literal["solid", "dashed", "dotted"]
+"""``border_style`` style value, drawn the same way on every renderer."""
 KeyboardType = Literal[
     "default",
     "email_address",
@@ -244,7 +361,15 @@ KeyboardType = Literal[
     "decimal_pad",
     "phone_pad",
     "url",
+    "ascii",
+    "numbers_and_punctuation",
+    "web_search",
+    "visible_password",
 ]
+"""``keyboard_type`` value. ``"ascii"``, ``"numbers_and_punctuation"``,
+and ``"web_search"`` are iOS keyboards (Android and the browser fall back
+to the closest input type); ``"visible_password"`` is Android's
+unmasked password keyboard."""
 AutoCapitalize = Literal["none", "sentences", "words", "characters"]
 ReturnKeyType = Literal["default", "done", "go", "next", "send", "search"]
 PointerEvents = Literal["auto", "none", "box_none", "box_only"]
@@ -321,6 +446,11 @@ class Style(TypedDict, total=False):
     left: Dimension
     start: Dimension
     end: Dimension
+    # Shorthands resolved by ``resolve_style`` into the four edges above;
+    # explicit ``top`` / ``right`` / ``bottom`` / ``left`` keys win.
+    inset: Dimension
+    inset_horizontal: Dimension
+    inset_vertical: Dimension
 
     # --- Layout: spacing ---
     padding: EdgeValue
@@ -358,6 +488,7 @@ class Style(TypedDict, total=False):
 
     # --- Visual: borders ---
     border_width: float
+    border_style: BorderStyle
     border_radius: float
     border_top_left_radius: float
     border_top_right_radius: float
@@ -389,6 +520,9 @@ class Style(TypedDict, total=False):
     text_shadow_radius: float
 
     # --- Visual: shadows / effects ---
+    # Shadows follow React Native's platform split: the ``shadow_*``
+    # keys draw on iOS and in the browser preview, ``elevation`` draws
+    # Android's material shadow. Each platform ignores the other's keys.
     shadow_color: Color
     shadow_offset: ShadowOffsetValue
     shadow_opacity: float
@@ -402,12 +536,13 @@ class Style(TypedDict, total=False):
     pointer_events: PointerEvents
 
 
-StyleProp = Union[Style, Dict[str, Any], List[Optional[Union[Style, Dict[str, Any]]]], None]
+StyleProp = Union[Style, Sequence[Optional[Style]], None]
 """Public type for the ``style`` parameter on every component factory.
 
-Accepts a [`Style`][pythonnative.Style] TypedDict (recommended), a
-plain ``Dict[str, Any]`` (forward-compat / unrestricted), a list of
-either with ``None`` entries skipped, or ``None``."""
+Accepts a [`Style`][pythonnative.Style] TypedDict, a sequence of them
+with ``None`` entries skipped, or ``None``. ``Style`` is a ``TypedDict``,
+so a plain dict literal type-checks against it and still works at
+runtime."""
 
 
 # ======================================================================
@@ -415,21 +550,20 @@ either with ``None`` entries skipped, or ``None``."""
 # ======================================================================
 
 
-def style(**properties: Any) -> Style:
+def style(**properties: Unpack[Style]) -> Style:
     """Construct a [`Style`][pythonnative.Style] from keyword arguments.
 
-    Equivalent to ``Style(...)`` but works with any Python version
-    (``TypedDict.__init__`` is fragile prior to 3.11) and reads more
-    naturally inside expressions:
+    Equivalent to ``Style(...)`` but reads more naturally inside
+    expressions, and typed with ``Unpack[Style]`` so a type checker
+    rejects a misspelled key such as ``pn.style(colour="red")``:
 
     ```python
     pn.View(child, style=pn.style(padding=16, background_color="#fff"))
     ```
 
-    Unknown keys are accepted at runtime to keep the door open for
-    third-party styling extensions; static type checkers will still
-    reject them when this helper's return type is annotated as
-    ``Style``.
+    At runtime the keys aren't checked here; the factories warn once
+    per unknown key in dev mode through
+    [`validate_style_keys`][pythonnative.style.validate_style_keys].
 
     Args:
         **properties: Style key/value pairs.
@@ -437,15 +571,45 @@ def style(**properties: Any) -> Style:
     Returns:
         A fresh ``Style`` dict containing the supplied entries.
     """
-    return properties  # type: ignore[return-value]
+    return properties
+
+
+_INSET_SHORTHANDS: Dict[str, Tuple[str, ...]] = {
+    "inset": ("top", "right", "bottom", "left"),
+    "inset_horizontal": ("left", "right"),
+    "inset_vertical": ("top", "bottom"),
+}
+"""Position shorthands and the edges each one fills, least specific first."""
+
+
+def _expand_insets(result: Dict[str, Any]) -> None:
+    """Replace ``inset*`` shorthands with the four edge keys, in place.
+
+    Mirrors the padding vocabulary: ``inset`` fills every edge, the axis
+    shorthands override it, and an explicit ``top`` / ``right`` /
+    ``bottom`` / ``left`` wins over both, regardless of key order. The
+    wire only ever carries the four edges.
+    """
+    explicit: Dict[str, Any] = {edge: result[edge] for edge in ("top", "right", "bottom", "left") if edge in result}
+    for shorthand, edges in _INSET_SHORTHANDS.items():
+        if shorthand not in result:
+            continue
+        value = result.pop(shorthand)
+        if value is None:
+            continue
+        for edge in edges:
+            result[edge] = value
+    result.update(explicit)
 
 
 def resolve_style(value: StyleProp) -> Dict[str, Any]:
     """Flatten a `style` prop into a single dict.
 
-    Accepts ``None``, a single dict (``Style`` or untyped), or a list of
-    dicts (later entries override earlier ones, mirroring React Native's
-    array-style pattern). Used by every built-in element factory in
+    Accepts ``None``, a single dict, or a sequence of dicts (later
+    entries override earlier ones, mirroring React Native's array-style
+    pattern), then resolves the ``inset``, ``inset_horizontal``, and
+    ``inset_vertical`` shorthands into ``top`` / ``right`` / ``bottom``
+    / ``left``. Used by every built-in element factory in
     `pythonnative.components`.
 
     Args:
@@ -458,11 +622,14 @@ def resolve_style(value: StyleProp) -> Dict[str, Any]:
     if value is None:
         return {}
     if isinstance(value, dict):
-        return dict(value)
-    result: Dict[str, Any] = {}
-    for entry in value:
-        if entry:
-            result.update(entry)
+        result: Dict[str, Any] = dict(value)
+    else:
+        result = {}
+        for entry in value:
+            if entry:
+                result.update(entry)
+    if result.keys() & _INSET_SHORTHANDS.keys():
+        _expand_insets(result)
     return result
 
 
@@ -476,6 +643,7 @@ _STYLE_VALUE_CHOICES: Dict[str, frozenset] = {
     "text_decoration": frozenset(get_args(TextDecoration)),
     "text_transform": frozenset(get_args(TextTransform)),
     "pointer_events": frozenset(get_args(PointerEvents)),
+    "border_style": frozenset(get_args(BorderStyle)),
 }
 """Keys whose string values are checked against their ``Literal`` choices
 in dev mode. Only keys whose handlers accept exactly the declared
@@ -524,7 +692,7 @@ def validate_style_keys(style_dict: Dict[str, Any], owner: str = "") -> None:
 
     A small set of enum-shaped keys (``display``, ``position``,
     ``direction``, ``text_decoration``, ``text_transform``,
-    ``pointer_events``) and the ``text_shadow_*`` keys also have their
+    ``pointer_events``, ``border_style``) and the ``text_shadow_*`` keys also have their
     values checked; a bad value warns once per key/value pair and is
     otherwise passed through (the engine and handlers ignore values
     they don't recognize).
@@ -746,7 +914,7 @@ Without a provider, [`use_theme`][pythonnative.use_theme] resolves to
 [`DEFAULT_LIGHT_THEME`][pythonnative.style.DEFAULT_LIGHT_THEME] or
 [`DEFAULT_DARK_THEME`][pythonnative.style.DEFAULT_DARK_THEME] based on
 the current appearance. Wrap a subtree in
-[`ThemeContext.Provider(my_theme, ...)`][pythonnative.hooks.Context.Provider] to
+[`ThemeContext.Provider(..., value=my_theme)`][pythonnative.hooks.Context.Provider] to
 pin an explicit theme for that subtree, then read it inside
 descendants via [`use_theme`][pythonnative.use_theme] (or
 [`use_context(ThemeContext)`][pythonnative.use_context]).
@@ -761,7 +929,7 @@ def default_theme(scheme: str) -> Theme:
 def use_theme() -> Theme:
     """Return the active [`Theme`][pythonnative.Theme], following the system appearance by default.
 
-    If an ancestor mounted a ``ThemeContext.Provider(...)``, that
+    If an ancestor mounted a ``ThemeContext.Provider(..., value=theme)``, that
     theme is returned as-is. Otherwise the built-in light or dark
     theme is selected from the effective color scheme (via
     [`use_color_scheme`][pythonnative.use_color_scheme], so the
@@ -796,18 +964,24 @@ def use_theme() -> Theme:
 
 
 __all__ = [
+    "AccessibilityAction",
+    "AccessibilityState",
+    "AccessibilityValue",
     "AlignItems",
     "AlignSelf",
     "AutoCapitalize",
+    "BorderStyle",
     "Color",
     "DEFAULT_DARK_THEME",
     "DEFAULT_LIGHT_THEME",
     "Dimension",
     "Display",
+    "DynamicColor",
     "EdgeInsets",
     "EdgeValue",
     "FlexDirection",
     "FontWeight",
+    "ImportantForAccessibility",
     "JustifyContent",
     "KeyboardType",
     "MarginValue",
@@ -827,10 +1001,16 @@ __all__ = [
     "Theme",
     "ThemeContext",
     "TransformEntry",
+    "TransformPerspective",
     "TransformRotate",
+    "TransformRotateX",
+    "TransformRotateY",
+    "TransformRotateZ",
     "TransformScale",
     "TransformScaleX",
     "TransformScaleY",
+    "TransformSkewX",
+    "TransformSkewY",
     "TransformSpec",
     "TransformTranslate",
     "default_theme",

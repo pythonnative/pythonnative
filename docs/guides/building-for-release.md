@@ -30,12 +30,29 @@ pn doctor ios
 ```
 
 `pn doctor` validates `pythonnative.toml` and checks the platform
-toolchain: for Android, `adb`, a JDK, and whether release signing is
-configured; for iOS, macOS, Xcode, `simctl`, and a development team. It
+toolchain: Android needs JDK 17 through 23, the configured SDK (36 by
+default), NDK 28.2.13676358, and `adb`. iOS needs macOS, Xcode 26 or
+later, and `simctl`. The doctor also reports signing, lockfile, and
+privacy-manifest configuration. It
 exits non-zero on anything that will block a build, so you can gate CI
 on it.
 
 ---
+
+## Frozen dependencies
+
+Release builds with Python dependencies require a current `pn.lock` covering
+all build targets. Resolve and review the lock before building:
+
+```bash
+pn deps android --lock
+pn deps ios --lock
+```
+
+Commit the lock with your application. Changing requirements or replacing a
+local wheel requires refreshing it. Releases reject missing or stale locks;
+development builds can still resolve unlocked requirements. Native extension
+manifests pin SwiftPM and Maven dependencies to exact versions.
 
 ## Android
 
@@ -47,6 +64,21 @@ the build and live under the staged project:
 build/android/android_template/app/build/outputs/apk/release/app-release.apk
 build/android/android_template/app/build/outputs/bundle/release/app-release.aab
 ```
+
+### Toolchain and packaged binaries
+
+The template uses compile/target SDK 36, Gradle 8.13, Android Gradle Plugin
+8.11.1, Kotlin 2.2.21, and NDK 28.2.13676358. Release builds reject a target
+SDK below 36. These are PythonNative's supported build defaults, independent
+of store submission deadlines.
+
+After Gradle builds, PythonNative inspects the APK and AAB. Every packaged
+64-bit ELF library must have 16 KB aligned LOAD segments, including Python
+extensions inside Chaquopy assets. Uncompressed APK libraries must also be
+ZIP aligned, and the AAB must request compatible generated APK alignment.
+An error names the offending dependency. Rebuild or replace that dependency;
+upgrading your app's NDK can't repair a prebuilt wheel. See Android's
+[16 KB page-size guidance](https://developer.android.com/guide/practices/page-sizes).
 
 ### Signing
 
@@ -109,6 +141,24 @@ pn build ios --upload
 The upload uses the App Store Connect credentials Xcode has stored; in
 CI, provide an ASC API key through Xcode's standard mechanisms or
 upload the exported `.ipa` with `xcrun altool`/Transporter instead.
+
+### Privacy manifests
+
+The template includes an app `PrivacyInfo.xcprivacy`. Supply your app's own
+manifest with a path relative to the project:
+
+```toml
+[ios]
+privacy_manifest = "assets/PrivacyInfo.xcprivacy"
+```
+
+PythonNativeKit ships its own resource-bundle manifest for preferences and
+cache-file timestamps. Archive validation checks that the app and runtime
+manifests are present and structurally valid before export or upload. It also
+parses manifests supplied by bundled dependencies. This check doesn't infer
+your application's data collection, tracking, or required-reason API usage.
+Declare those from your actual behavior using Apple's
+[privacy-manifest documentation](https://developer.apple.com/documentation/bundleresources/privacy-manifest-files).
 
 ### Bytecode-only bundles
 

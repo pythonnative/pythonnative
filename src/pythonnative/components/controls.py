@@ -5,18 +5,28 @@
 ``RefreshControl``, and ``StatusBar``.
 """
 
-from typing import Any, Callable, Dict, List, Literal, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Union
 
 from ..element import Element
 from ..hooks import Ref
-from ..style import AccessibilityState, Color, StyleProp
-from ._base import REFRESH_CONTROL_TYPE, _make_element
+from ..style import (
+    AccessibilityAction,
+    AccessibilityState,
+    AccessibilityValue,
+    Color,
+    ImportantForAccessibility,
+    StyleProp,
+)
+from ._base import REFRESH_CONTROL_TYPE, _accessibility_actions, _accessibility_value, _make_element
 
 
 def Switch(
     *,
     value: bool = False,
     on_change: Optional[Callable[[bool], Any]] = None,
+    disabled: bool = False,
+    on_tint_color: Optional[Color] = None,
+    thumb_color: Optional[Color] = None,
     accessibility_label: Optional[str] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
@@ -26,6 +36,9 @@ def Switch(
     Args:
         value: Current on/off state.
         on_change: Callback invoked with the new boolean state.
+        disabled: Prevent changes while keeping the switch visible.
+        on_tint_color: Track color when the switch is on.
+        thumb_color: Thumb color, or the platform default.
         accessibility_label: Label exposed to assistive technology (and
             UI test drivers) for the switch.
         style: Style dict (or list of dicts).
@@ -40,6 +53,9 @@ def Switch(
         key=key,
         value=value,
         on_change=on_change,
+        disabled=disabled,
+        on_tint_color=on_tint_color,
+        thumb_color=thumb_color,
         accessibility_label=accessibility_label,
     )
 
@@ -50,6 +66,13 @@ def Slider(
     min_value: float = 0.0,
     max_value: float = 1.0,
     on_change: Optional[Callable[[float], Any]] = None,
+    disabled: bool = False,
+    step: float = 0.0,
+    minimum_track_color: Optional[Color] = None,
+    maximum_track_color: Optional[Color] = None,
+    thumb_color: Optional[Color] = None,
+    on_sliding_start: Optional[Callable[[float], Any]] = None,
+    on_sliding_complete: Optional[Callable[[float], Any]] = None,
     accessibility_label: Optional[str] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
@@ -62,6 +85,13 @@ def Slider(
         max_value: Upper bound.
         on_change: Callback invoked with the new value as the user
             drags.
+        disabled: Prevent dragging the slider.
+        step: Snap values to this increment, or zero for continuous movement.
+        minimum_track_color: Filled track color.
+        maximum_track_color: Unfilled track color.
+        thumb_color: Thumb color, or the platform default.
+        on_sliding_start: Callback when the user starts dragging.
+        on_sliding_complete: Callback when the user finishes dragging.
         accessibility_label: Label exposed to assistive technology (and
             UI test drivers) for the slider.
         style: Style dict (or list of dicts).
@@ -78,6 +108,13 @@ def Slider(
         min_value=min_value,
         max_value=max_value,
         on_change=on_change,
+        disabled=disabled,
+        step=step,
+        minimum_track_color=minimum_track_color,
+        maximum_track_color=maximum_track_color,
+        thumb_color=thumb_color,
+        on_sliding_start=on_sliding_start,
+        on_sliding_complete=on_sliding_complete,
         accessibility_label=accessibility_label,
     )
 
@@ -164,7 +201,11 @@ def Checkbox(
     accessibility_hint: Optional[str] = None,
     accessible: Optional[bool] = None,
     accessibility_state: Optional[AccessibilityState] = None,
+    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
+    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
+    on_accessibility_action: Optional[Callable[[str], Any]] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    important_for_accessibility: Optional[ImportantForAccessibility] = None,
     test_id: Optional[str] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -182,15 +223,23 @@ def Checkbox(
         color: Tint applied to the checked box.
         style: Style dict (or list of dicts).
         accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail (iOS only).
+        accessibility_hint: Spoken extra detail. iOS reads it after the
+            label; Android appends it to the content description.
         accessible: Override whether the element is exposed to AT.
         accessibility_state: Current widget state for assistive tech,
             e.g. ``{"disabled": True, "selected": False}``. Recognized
             keys: ``disabled``, ``selected``, ``checked``, ``busy``,
             ``expanded``.
+        accessibility_value: The widget's current value for assistive
+            tech (a string or an
+            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
+        accessibility_actions: Custom screen-reader actions, each an
+            [`AccessibilityAction`][pythonnative.AccessibilityAction].
+        on_accessibility_action: Callback invoked with the action name.
         accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``
-            (Android only).
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
+        important_for_accessibility: Whether AT sees this view and its
+            subtree.
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
@@ -212,7 +261,11 @@ def Checkbox(
         accessibility_hint=accessibility_hint,
         accessible=accessible,
         accessibility_state=accessibility_state,
+        accessibility_value=_accessibility_value(accessibility_value),
+        accessibility_actions=_accessibility_actions(accessibility_actions),
+        on_accessibility_action=on_accessibility_action,
         accessibility_live_region=accessibility_live_region,
+        important_for_accessibility=important_for_accessibility,
         test_id=test_id,
         _defaults={"accessibility_role": "checkbox"},
     )
@@ -229,7 +282,11 @@ def SegmentedControl(
     accessibility_label: Optional[str] = None,
     accessible: Optional[bool] = None,
     accessibility_state: Optional[AccessibilityState] = None,
+    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
+    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
+    on_accessibility_action: Optional[Callable[[str], Any]] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    important_for_accessibility: Optional[ImportantForAccessibility] = None,
     test_id: Optional[str] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -251,9 +308,16 @@ def SegmentedControl(
             e.g. ``{"disabled": True, "selected": False}``. Recognized
             keys: ``disabled``, ``selected``, ``checked``, ``busy``,
             ``expanded``.
+        accessibility_value: The widget's current value for assistive
+            tech (a string or an
+            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
+        accessibility_actions: Custom screen-reader actions, each an
+            [`AccessibilityAction`][pythonnative.AccessibilityAction].
+        on_accessibility_action: Callback invoked with the action name.
         accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``
-            (Android only).
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
+        important_for_accessibility: Whether AT sees this view and its
+            subtree.
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
@@ -275,7 +339,11 @@ def SegmentedControl(
         accessibility_label=accessibility_label,
         accessible=accessible,
         accessibility_state=accessibility_state,
+        accessibility_value=_accessibility_value(accessibility_value),
+        accessibility_actions=_accessibility_actions(accessibility_actions),
+        on_accessibility_action=on_accessibility_action,
         accessibility_live_region=accessibility_live_region,
+        important_for_accessibility=important_for_accessibility,
         test_id=test_id,
     )
 
@@ -292,7 +360,11 @@ def DatePicker(
     accessibility_label: Optional[str] = None,
     accessible: Optional[bool] = None,
     accessibility_state: Optional[AccessibilityState] = None,
+    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
+    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
+    on_accessibility_action: Optional[Callable[[str], Any]] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    important_for_accessibility: Optional[ImportantForAccessibility] = None,
     test_id: Optional[str] = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -320,9 +392,16 @@ def DatePicker(
             e.g. ``{"disabled": True, "selected": False}``. Recognized
             keys: ``disabled``, ``selected``, ``checked``, ``busy``,
             ``expanded``.
+        accessibility_value: The widget's current value for assistive
+            tech (a string or an
+            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
+        accessibility_actions: Custom screen-reader actions, each an
+            [`AccessibilityAction`][pythonnative.AccessibilityAction].
+        on_accessibility_action: Callback invoked with the action name.
         accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``
-            (Android only).
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
+        important_for_accessibility: Whether AT sees this view and its
+            subtree.
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
@@ -344,7 +423,11 @@ def DatePicker(
         accessibility_label=accessibility_label,
         accessible=accessible,
         accessibility_state=accessibility_state,
+        accessibility_value=_accessibility_value(accessibility_value),
+        accessibility_actions=_accessibility_actions(accessibility_actions),
+        on_accessibility_action=on_accessibility_action,
         accessibility_live_region=accessibility_live_region,
+        important_for_accessibility=important_for_accessibility,
         test_id=test_id,
         _defaults={"accessibility_role": "button"},
     )
@@ -362,7 +445,11 @@ def Picker(
     accessibility_hint: Optional[str] = None,
     accessible: Optional[bool] = None,
     accessibility_state: Optional[AccessibilityState] = None,
+    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
+    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
+    on_accessibility_action: Optional[Callable[[str], Any]] = None,
     accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
+    important_for_accessibility: Optional[ImportantForAccessibility] = None,
     test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
@@ -386,15 +473,23 @@ def Picker(
         placeholder: Label shown when no item matches ``value``.
         style: Style dict applied to the trigger.
         accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail (iOS only).
+        accessibility_hint: Spoken extra detail. iOS reads it after the
+            label; Android appends it to the content description.
         accessible: Override whether the element is exposed to AT.
         accessibility_state: Current widget state for assistive tech,
             e.g. ``{"disabled": True, "selected": False}``. Recognized
             keys: ``disabled``, ``selected``, ``checked``, ``busy``,
             ``expanded``.
+        accessibility_value: The widget's current value for assistive
+            tech (a string or an
+            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
+        accessibility_actions: Custom screen-reader actions, each an
+            [`AccessibilityAction`][pythonnative.AccessibilityAction].
+        on_accessibility_action: Callback invoked with the action name.
         accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``
-            (Android only).
+            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
+        important_for_accessibility: Whether AT sees this view and its
+            subtree.
         test_id: Stable identifier for UI tests; exposed as
             ``resource-id`` on Android and ``accessibilityIdentifier``
             on iOS.
@@ -418,7 +513,11 @@ def Picker(
         accessibility_hint=accessibility_hint,
         accessible=accessible,
         accessibility_state=accessibility_state,
+        accessibility_value=_accessibility_value(accessibility_value),
+        accessibility_actions=_accessibility_actions(accessibility_actions),
+        on_accessibility_action=on_accessibility_action,
         accessibility_live_region=accessibility_live_region,
+        important_for_accessibility=important_for_accessibility,
         test_id=test_id,
         _defaults={"accessibility_role": "button"},
     )
@@ -486,6 +585,8 @@ def StatusBar(
     bar_style: Optional[Literal["light", "dark", "default"]] = None,
     background_color: Optional[Color] = None,
     hidden: Optional[bool] = None,
+    translucent: bool = False,
+    animated: bool = False,
     key: Optional[str] = None,
 ) -> Element:
     """Configure the device's status bar appearance.
@@ -506,6 +607,10 @@ def StatusBar(
         background_color: Color of the status-bar background (Android
             only; iOS draws the bar transparent over your content).
         hidden: When ``True``, the status bar is hidden.
+        translucent: Draw your content under the status bar instead of
+            below it (Android only; iOS always draws underneath).
+        animated: Animate ``bar_style`` and ``hidden`` changes (iOS
+            only).
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -518,4 +623,8 @@ def StatusBar(
         props["background_color"] = background_color
     if hidden is not None:
         props["hidden"] = hidden
+    if translucent:
+        props["translucent"] = True
+    if animated:
+        props["animated"] = True
     return Element("StatusBar", props, [], key=key)

@@ -26,19 +26,19 @@ jobs:
     needs: coverage
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # GitHub-hosted Android emulators grow unstable after ~15 minutes of
-    # sustained Maestro driving and start reporting "device offline" /
-    # "device not found" mid-run (the emulator VM, not the app, dies).
-    # The full suite reliably crosses that threshold around the ~35th
-    # flow. Sharding the run into a few balanced groups, each on its
-    # own freshly booted emulator, keeps every session well under the
+    # GitHub-hosted Android emulators grow unstable after roughly ten
+    # minutes of sustained Maestro driving and start reporting "device
+    # offline" / "device not found" mid-run (the emulator VM, not the
+    # app, dies). Sharding the run into a few balanced groups, each on
+    # its own freshly booted emulator, keeps every session under the
     # limit, and parallelizes the Android pass as a bonus. Groups are
-    # sized so none exceeds ~15 flows; ``components`` (28 flows after
-    # the gesture/animated additions) crossed the ceiling at ~flow 26,
-    # so it runs as two halves, and ``hooks`` (22 flows after the async
-    # hook additions) now takes ~10 minutes of driving on its own, so
-    # it gets a dedicated emulator. ``fail-fast: false`` so one shard's
-    # failure still lets the others report.
+    # sized to about nine minutes of driving or less: ``components``
+    # (39 flows) runs as three parts; ``hooks`` (26 flows) dropped
+    # offline at ~11.5 minutes in one session, so it runs as two parts;
+    # the remaining categories pair up to similar totals, and ``misc``
+    # (14 flows) runs alone.
+    # ``fail-fast: false`` so one shard's failure still lets the others
+    # report.
     strategy:
       fail-fast: false
       matrix:
@@ -47,12 +47,20 @@ jobs:
             suites: components-a
           - name: components-b
             suites: components-b
-          - name: hooks
-            suites: hooks
-          - name: nav-gestures-layout-styling
-            suites: navigation gestures layout styling
-          - name: anim-misc
-            suites: animations misc
+          - name: components-c
+            suites: components-c
+          - name: hooks-a
+            suites: hooks-a
+          - name: hooks-b
+            suites: hooks-b
+          - name: nav-gestures
+            suites: navigation gestures
+          - name: layout-styling
+            suites: layout styling
+          - name: anim-assets
+            suites: animations assets
+          - name: misc
+            suites: misc
           - name: inbox
             suites: inbox
 
@@ -134,6 +142,8 @@ jobs:
     # alerts present twice, pickers reopen after selecting. This suite
     # ran green on the macos-15 image for months.
     runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     # Budget for the worst case: ~8 min build/boot plus two full suite
     # attempts (run-e2e.sh retries the whole suite once after a driver
     # flake). The test step gets its own, shorter timeout so a hung
@@ -160,12 +170,14 @@ jobs:
             suites: components-a
           - name: components-b
             suites: components-b
+          - name: components-c
+            suites: components-c
           - name: hooks
             suites: hooks
           - name: nav-gestures-layout-styling
             suites: navigation gestures layout styling
           - name: anim-misc
-            suites: animations misc
+            suites: animations assets misc
           - name: inbox
             suites: inbox
 

@@ -1,0 +1,17 @@
+# Tests use_locales returns the device's preferred locales.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_locales.py
+# Source under test: src/pythonnative/native_modules/localization.py :: use_locales
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_locales
+- assertVisible: "Hook has locale: yes"
+- assertVisible: "Hook tag has language: yes"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

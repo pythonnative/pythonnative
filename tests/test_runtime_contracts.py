@@ -181,7 +181,10 @@ def test_invalid_tree_commit_has_no_partial_effect() -> None:
         backend.apply_mutations([CreateOp(1, "View", {}), InsertOp(1, 1, 0)])
     assert transport.views == {}
     backend.apply_mutations([CreateOp(1, "View", {})])
-    envelope = backend._commit.acknowledgement() | {"sequence": 1, "args": []}
+    envelope = backend._commit.acknowledgement() | {
+        "sequence": 1,
+        "args": [{"x": 0, "y": 0, "width": 10, "height": 10}],
+    }
     envelope.pop("ok")
     assert backend.accept_event(1, "on_layout", envelope)
     assert not backend.accept_event(1, "on_layout", envelope)
@@ -224,7 +227,7 @@ def test_animation_graph_orders_dependencies_and_retains_keyed_bindings() -> Non
 def test_replacing_derived_bindings_keeps_a_running_graph_owned() -> None:
     from typing import Any
 
-    from pythonnative.native_views import set_registry
+    from pythonnative.native_views import set_backend
     from pythonnative.testing import FakeBackend, render
 
     class GraphBackend(FakeBackend):
@@ -236,12 +239,12 @@ def test_replacing_derived_bindings_keeps_a_running_graph_owned() -> None:
             self.bindings.append(graph["bindings"])
 
     backend = GraphBackend()
-    set_registry(backend)
+    set_backend(backend)
     value = pn.Animated.Value(0)
 
     @pn.component
     def Box(factor: float) -> pn.Element:
-        return pn.Animated.View(style=pn.style(opacity=value * factor))
+        return pn.Animated.View(style={"opacity": value * factor})
 
     result = render(Box(0.5), backend=backend)
     try:
@@ -251,7 +254,7 @@ def test_replacing_derived_bindings_keeps_a_running_graph_owned() -> None:
         assert all(backend.bindings), "Replacing bindings must never release the entire graph"
     finally:
         result.unmount()
-        set_registry(None)
+        set_backend(None)
     assert backend.bindings[-1] == []
 
 

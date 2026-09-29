@@ -12,24 +12,28 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationManagerCompat
 import com.pythonnative.runtime.PNBridge
-import com.pythonnative.runtime.bridge.str
-import org.json.JSONObject
+import com.pythonnative.generated.NotificationsImplementation
 
 /** Local notifications scheduled by the OS, independent of the Python process. */
-class NotificationsModule : NativeModule {
-    override val name = "Notifications"
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        val context = PNBridge.context()
-        when (method) {
-            "request_permission" -> {
-                if (Build.VERSION.SDK_INT < 33) promise.resolve(NotificationManagerCompat.from(context).areNotificationsEnabled())
-                else BuiltinModules.permissions.request("notifications") { promise.resolve(it == PermissionsModule.GRANTED) }
-            }
-            "schedule" -> promise.resolve(NotificationScheduler.schedule(context, args))
-            "cancel" -> { NotificationScheduler.cancel(context, args.str("identifier") ?: "default"); promise.resolve(null) }
-            "get_device_token" -> promise.resolve(null)
-            else -> promise.rejectUnknownMethod(method)
+class NotificationsModule : NotificationsImplementation {
+    override fun request_permission(completion: (Result<Boolean>) -> Unit): (() -> Unit)? {
+        if (Build.VERSION.SDK_INT < 33) {
+            completion(Result.success(NotificationManagerCompat.from(PNBridge.context()).areNotificationsEnabled()))
+            return null
         }
+        return BuiltinModules.permissions.requestStatus("notifications") { completion(Result.success(it == PermissionsModule.GRANTED)) }
+    }
+    override fun schedule(title: String, body: String, delay_seconds: Double, identifier: String, completion: (Result<Boolean>) -> Unit): (() -> Unit)? {
+        completion(runCatching { NotificationScheduler.schedule(PNBridge.context(), title, body, delay_seconds, identifier) })
+        return null
+    }
+    override fun cancel(identifier: String, completion: (Result<Unit>) -> Unit): (() -> Unit)? {
+        completion(runCatching { NotificationScheduler.cancel(PNBridge.context(), identifier) })
+        return null
+    }
+    override fun get_device_token(completion: (Result<String?>) -> Unit): (() -> Unit)? {
+        completion(Result.failure(UnsupportedOperationException("Remote push requires a configured provider plugin")))
+        return null
     }
 }
 
@@ -49,14 +53,10 @@ internal object NotificationScheduler {
         .setAction(ACTION).setData(Uri.Builder().scheme("pythonnative").authority("notification").appendPath(identifier).build())
         .putExtra("identifier", identifier)
 
-    fun schedule(context: Context, args: JSONObject): Boolean {
+    fun schedule(context: Context, title: String, body: String, delay: Double, identifier: String): Boolean {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
-        val identifier = args.str("identifier") ?: "default"
-        val delay = args.optDouble("delay_seconds", 0.0)
         require(delay.isFinite() && delay >= 0) { "delay_seconds must be finite and nonnegative" }
         cancel(context, identifier)
-        val title = args.str("title") ?: ""
-        val body = args.str("body") ?: ""
         if (delay == 0.0) return post(context, title, body, identifier)
         val operation = PendingIntent.getBroadcast(context, 0, intent(context, identifier).putExtra("title", title).putExtra("body", body),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)

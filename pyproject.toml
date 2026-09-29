@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pythonnative"
-version = "0.43.0"
+version = "0.47.0"
 description = "Cross-platform native UI toolkit for Android and iOS"
 authors = [
   { name = "Owen Carey" }
@@ -26,9 +26,7 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Topic :: Software Development :: User Interfaces",
 ]
-dependencies = [
-  "requests>=2.31.0",
-]
+dependencies = []
 
 [project.optional-dependencies]
 build = [
@@ -64,6 +62,9 @@ docs = [
 [project.scripts]
 pn = "pythonnative.cli.pn:main"
 
+[project.entry-points.pytest11]
+pythonnative = "pythonnative.testing.pytest_plugin"
+
 [project.urls]
 Homepage = "https://github.com/pythonnative/pythonnative"
 Repository = "https://github.com/pythonnative/pythonnative"
@@ -97,6 +98,7 @@ pythonnative = [
   "py.typed",
   "templates/**", "native/**", "sdk/templates/**",
   "devserver/static/**",
+  "icons/_lucide.json", "icons/LICENSE-lucide.txt",
 ]
 
 [tool.setuptools.exclude-package-data]

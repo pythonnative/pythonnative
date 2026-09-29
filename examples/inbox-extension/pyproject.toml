@@ -15,4 +15,4 @@ inbox = "inbox_extension.native"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"inbox_extension.native" = ["*.json", "ios/*.swift", "android/**/*.kt"]
+"inbox_extension.native" = ["*.json", "ios/*.swift", "android/**/*.kt", "ios/resources/*.json", "android/assets/*.json"]

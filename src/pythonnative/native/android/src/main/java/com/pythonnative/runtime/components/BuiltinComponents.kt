@@ -14,6 +14,9 @@ object BuiltinComponents {
         registry.registerComponent("Button") { ButtonManager() }
         registry.registerComponent("TextInput") { TextInputManager() }
         registry.registerComponent("Image") { ImageManager() }
+        registry.registerComponent("Svg") { SvgManager() }
+        registry.registerComponent("LinearGradient") { LinearGradientManager() }
+        registry.registerComponent("BlurView") { BlurViewManager() }
         registry.registerComponent("Switch") { SwitchManager() }
         registry.registerComponent("Checkbox") { CheckboxManager() }
         registry.registerComponent("ProgressBar") { ProgressBarManager() }

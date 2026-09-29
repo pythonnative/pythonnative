@@ -1,0 +1,22 @@
+# Tests define_component returns a typed element factory that validates its
+# dataclass props and registers the component schema.
+#
+# Demo screen: examples/e2e-suite/app/screens/sdk/define_component_demo.py
+# Source under test: src/pythonnative/sdk/_components.py :: define_component
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: SDK
+      DEMO_TITLE: define_component
+- assertVisible: "Factory type: E2EBadge"
+- assertVisible: "Label prop: hello"
+- assertVisible: "Count prop: 3"
+- assertVisible: "Style accepted: yes"
+- assertVisible: "Rejects unknown prop: yes"
+- assertVisible: "Registered: yes"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: SDK

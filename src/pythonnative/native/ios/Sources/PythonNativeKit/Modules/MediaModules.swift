@@ -2,46 +2,40 @@ import CoreLocation
 import UIKit
 
 /// `Camera`: `take_photo` / `pick_from_gallery` through `UIImagePickerController`.
-public final class CameraModule: PNNativeModule {
-    public static let name = "Camera"
-
+public final class CameraModule: CameraImplementation {
     private var activePicker: PNImagePickerSession?
-
     public init() {}
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        let source: UIImagePickerController.SourceType
-        switch method {
-        case "take_photo": source = .camera
-        case "pick_from_gallery": source = .photoLibrary
-        default:
-            promise.reject("Camera has no method '\(method)'", code: "unknown_method")
-            return
-        }
+    public func take_photo(quality: Double, allow_editing: Bool, completion: @escaping (Result<String?, Error>) -> Void) -> (() -> Void)? {
+        launch(.camera, quality: quality, editing: allow_editing, completion: completion)
+    }
+
+    public func pick_from_gallery(quality: Double, allow_editing: Bool, completion: @escaping (Result<String?, Error>) -> Void) -> (() -> Void)? {
+        launch(.photoLibrary, quality: quality, editing: allow_editing, completion: completion)
+    }
+
+    private func launch(_ source: UIImagePickerController.SourceType, quality: Double, editing: Bool, completion: @escaping (Result<String?, Error>) -> Void) -> (() -> Void)? {
         guard UIImagePickerController.isSourceTypeAvailable(source), let top = PNWindow.topViewController() else {
-            promise.resolve(nil)
-            return
+            completion(.success(nil)); return nil
         }
-        if activePicker != nil {
-            promise.reject("a picker is already open", code: "busy")
-            return
+        guard activePicker == nil else {
+            completion(.failure(NSError(domain: "busy", code: 1, userInfo: [NSLocalizedDescriptionKey: "A picker is already open"]))); return nil
         }
-        let quality = PNProps.double(args["quality"]) ?? 0.9
         let session = PNImagePickerSession(quality: CGFloat(max(0, min(1, quality)))) { [weak self] path in
             self?.activePicker = nil
-            promise.resolve(path)
+            completion(.success(path))
         }
         activePicker = session
         let picker = UIImagePickerController()
         picker.sourceType = source
-        picker.allowsEditing = PNProps.bool(args["allow_editing"]) ?? false
+        picker.allowsEditing = editing
         picker.delegate = session
-        promise.onCancel { [weak self, weak picker] in
+        top.present(picker, animated: true)
+        return { [weak self, weak picker] in
             picker?.delegate = nil
             picker?.dismiss(animated: true)
             self?.activePicker = nil
         }
-        top.present(picker, animated: true)
     }
 }
 
@@ -82,55 +76,37 @@ final class PNImagePickerSession: NSObject, UIImagePickerControllerDelegate, UIN
 }
 
 /// `Location`: one-shot `get_current` fix via `CLLocationManager`.
-public final class LocationModule: PNNativeModule {
-    public static let name = "Location"
-
-    private var sessions: [PNLocationSession] = []
-
+public final class LocationModule: LocationImplementation {
+    private var sessions: [UUID: PNLocationSession] = [:]
     public init() {}
 
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        guard method == "get_current" else {
-            promise.reject("Location has no method '\(method)'", code: "unknown_method")
-            return
+    public func get_current(accuracy: PNLocationGetCurrentAccuracy, timeout: Double, completion: @escaping (Result<[String: Double]?, Error>) -> Void) -> (() -> Void)? {
+        let id = UUID()
+        let session = PNLocationSession(accuracy: accuracy.rawValue, timeout: timeout) { [weak self] fix in
+            self?.sessions.removeValue(forKey: id)
+            completion(.success(fix))
         }
-        let timeout = PNProps.double(args["timeout"]) ?? 15
-        var session: PNLocationSession?
-        session = PNLocationSession(accuracy: PNProps.string(args["accuracy"]), timeout: timeout) { [weak self] fix in
-            if let finished = session {
-                self?.sessions.removeAll { $0 === finished }
-            }
-            promise.resolve(fix)
-            session = nil
-        }
-        guard let started = session else { return }
-        sessions.append(started)
-        promise.onCancel { [weak self, weak started] in
-            guard let started = started else { return }
-            started.cancel()
-            self?.sessions.removeAll { $0 === started }
-            session = nil
-        }
-        started.start()
+        sessions[id] = session
+        session.start()
+        return { [weak self] in self?.sessions.removeValue(forKey: id)?.cancel() }
     }
 }
 
 /// One location request: authorization, a single fix, and a timeout.
 final class PNLocationSession: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
-    private let done: ([String: Any]?) -> Void
+    private let done: ([String: Double]?) -> Void
     private let timeout: TimeInterval
     private var finished = false
     private var timer: Timer?
 
-    init(accuracy: String?, timeout: TimeInterval, done: @escaping ([String: Any]?) -> Void) {
+    init(accuracy: String?, timeout: TimeInterval, done: @escaping ([String: Double]?) -> Void) {
         self.done = done
         self.timeout = max(1, timeout)
         super.init()
         manager.delegate = self
         switch accuracy {
-        case "high", "best": manager.desiredAccuracy = kCLLocationAccuracyBest
-        case "low", "coarse": manager.desiredAccuracy = kCLLocationAccuracyKilometer
+        case "high": manager.desiredAccuracy = kCLLocationAccuracyBest
         default: manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         }
     }
@@ -162,7 +138,7 @@ final class PNLocationSession: NSObject, CLLocationManagerDelegate {
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
-        var fix: [String: Any] = [
+        var fix: [String: Double] = [
             "latitude": location.coordinate.latitude,
             "longitude": location.coordinate.longitude,
             "accuracy": location.horizontalAccuracy,
@@ -187,7 +163,7 @@ final class PNLocationSession: NSObject, CLLocationManagerDelegate {
         manager.delegate = nil
     }
 
-    private func finish(_ fix: [String: Any]?) {
+    private func finish(_ fix: [String: Double]?) {
         if finished { return }
         cancel()
         done(fix)

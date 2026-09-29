@@ -1,4 +1,4 @@
-# Tests the SDK surface loaded and Props subclassing works.
+# Tests generated contract support and a live native property reset with UNSET.
 #
 # Demo screen: examples/e2e-suite/app/screens/sdk/custom_component.py
 # Source under test: src/pythonnative/sdk/__init__.py, src/pythonnative/sdk/_components.py
@@ -11,6 +11,10 @@ appId: ${APP_ID}
       DEMO_TITLE: Custom component
 - assertVisible: "Props subclass works: yes"
 - assertVisible: "SDK module loaded: yes"
+- assertVisible: "Native text supported: yes"
+- tapOn: "Reset native property"
+- assertVisible: "Property removed: yes"
+- assertVisible: "Contract reset target"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

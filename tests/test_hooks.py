@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from typing import Any, Iterator
 
+from pythonnative import runtime
 from pythonnative.component import Component, component, memo
 from pythonnative.element import Element
 from pythonnative.hooks import (
@@ -23,6 +24,11 @@ from pythonnative.reconciler import Reconciler
 from pythonnative.scheduler import batch_updates
 from pythonnative.testing import FakeBackend as MockBackend
 from pythonnative.testing import render, render_hook
+
+
+def _pump() -> None:
+    """Run the application loop until the flush a state setter scheduled has run."""
+    runtime.drain(0.2)
 
 
 @contextmanager
@@ -170,6 +176,8 @@ def test_use_reducer_in_reconciler() -> None:
     dispatch_fn = captured_dispatch[0]
     assert dispatch_fn is not None
     dispatch_fn("increment")
+    assert re_rendered == [], "a setter never renders inline"
+    _pump()
     assert len(re_rendered) == 1
 
     rec.flush_dirty()
@@ -306,7 +314,25 @@ def test_batch_updates_defers_render() -> None:
         set_b(2)
         assert result.render_count == 1, "Render should be deferred inside batch"
 
+    result.settle()
     assert result.render_count == 2, "Exactly one render after batch exits"
+    assert result.current[0][0] == 1
+    assert result.current[1][0] == 2
+
+
+def test_setters_in_one_handler_render_once_without_batch_updates() -> None:
+    """Automatic batching: every setter call in one callback lands in one render pass."""
+    result = render_hook(lambda: (use_state(0), use_state(0)))
+    (_, set_a), (_, set_b) = result.current
+    assert result.render_count == 1
+
+    def handler() -> None:
+        set_a(1)
+        set_b(2)
+        assert result.render_count == 1, "setters never render inline"
+
+    result.act(handler)
+    assert result.render_count == 2, "exactly one render pass for two setters"
     assert result.current[0][0] == 1
     assert result.current[1][0] == 2
 
@@ -322,6 +348,7 @@ def test_batch_updates_nested() -> None:
             assert result.render_count == 1
         assert result.render_count == 1, "Nested batch should not trigger render"
 
+    result.settle()
     assert result.render_count == 2
 
 
@@ -332,6 +359,7 @@ def test_batch_updates_no_render_when_unchanged() -> None:
     with batch_updates():
         set_a(5)
 
+    result.settle()
     assert result.render_count == 1
 
 
@@ -466,7 +494,7 @@ def test_use_context_reads_current() -> None:
         seen.append(use_context(my_ctx))
         return None
 
-    result = render(my_ctx.Provider("active", reader()))
+    result = render(my_ctx.Provider(reader(), value="active"))
     assert seen == ["active"]
     assert my_ctx.current() == "fallback", "Provider value is scoped to the render"
     result.unmount()
@@ -588,6 +616,7 @@ def test_function_component_use_state() -> None:
     setter_fn = captured_setter[0]
     assert setter_fn is not None
     setter_fn(5)
+    _pump()
     assert len(re_rendered) == 1
     assert render_count[0] == 1, "host callback defers the actual render"
 
@@ -633,7 +662,7 @@ def test_provider_in_reconciler() -> None:
 
     backend = MockBackend()
     rec = Reconciler(backend)
-    el = theme.Provider("dark", themed())
+    el = theme.Provider(themed(), value="dark")
     root = rec.mount(el)
     assert root.props["text"] == "dark"
 
@@ -649,7 +678,7 @@ def test_provider_with_multiple_children_kept_flat() -> None:
     child_a = Element("Text", {"text": "a"}, [])
     child_b = Element("Text", {"text": "b"}, [])
 
-    el = theme.Provider("dark", child_a, child_b)
+    el = theme.Provider(child_a, child_b, value="dark")
     assert el.type is theme
     assert el.props == {"value": "dark"}
     assert el.children == (child_a, child_b)
@@ -659,7 +688,7 @@ def test_provider_with_single_child_no_fragment_wrap() -> None:
     theme = create_context("light")
     child = Element("Text", {"text": "single"}, [])
 
-    el = theme.Provider("dark", child)
+    el = theme.Provider(child, value="dark")
     assert el.type is theme
     assert el.children == (child,)
 

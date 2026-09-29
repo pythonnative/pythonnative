@@ -29,9 +29,8 @@ def CollapsingHeaderDemo() -> pn.Element:
     clamped = pn.Animated.diff_clamp(scroll_y, 0.0, HEADER_HEIGHT)
     header_shift = clamped.interpolate([0.0, HEADER_HEIGHT], [0.0, -HEADER_HEIGHT])
 
-    def on_scroll(payload: dict) -> None:
-        y = float(payload.get("y", 0.0))
-        state = "collapsed" if y > 80.0 else "expanded"
+    def on_scroll(event: pn.ScrollEvent) -> None:
+        state = "collapsed" if event.y > 80.0 else "expanded"
         if state != header_state:
             set_header_state(state)
 

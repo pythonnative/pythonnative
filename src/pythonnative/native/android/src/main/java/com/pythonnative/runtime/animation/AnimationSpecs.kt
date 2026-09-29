@@ -2,29 +2,51 @@ package com.pythonnative.runtime.animation
 
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.pow
 import kotlin.math.sqrt
 
 /**
  * Pure-Kotlin decoding of animation specs (`pn.Animated.timing`,
  * `spring`, `decay`) and their mapping to Android animator parameters.
- * Kept free of Android types so the math is unit-testable.
+ * Kept free of Android types so the math is unit-testable. `decay`
+ * follows React Native's model and is evaluated in closed form by
+ * [Decay] so the Choreographer-driven animator reproduces the Python
+ * ticker and the browser preview exactly.
  */
 object AnimationSpecs {
-    /** `FlingAnimation` scales `friction` by this constant internally (`DragForce`). */
-    const val FLING_FRICTION_SCALE = 4.2
+    /** React Native's default `deceleration` for `Animated.decay`. */
+    const val DEFAULT_DECELERATION = 0.998
 
-    /** Easing curves identical to the Python ticker's `_EASINGS`. */
+    /** A decay stops once its velocity drops below this many points per millisecond. */
+    const val DECAY_REST_VELOCITY = 0.001
+
+    /** A decay also stops once its value sits within this distance of the projected final value. */
+    const val DECAY_REST_DISTANCE = 0.1
+
+    /**
+     * Cubic-bezier control points for the named CSS-style curves, shared
+     * with the Python ticker (`animated._NAMED_EASING_BEZIERS`) and the
+     * browser preview.
+     */
+    val NAMED_BEZIERS: Map<String, DoubleArray> = mapOf(
+        "ease" to doubleArrayOf(0.42, 0.0, 1.0, 1.0),
+        "ease_in" to doubleArrayOf(0.42, 0.0, 1.0, 1.0),
+        "ease_out" to doubleArrayOf(0.0, 0.0, 0.58, 1.0),
+        "ease_in_out" to doubleArrayOf(0.42, 0.0, 0.58, 1.0),
+    )
+
+    /** Polynomial and bounce easings evaluated directly (`t` in `0..1`). */
     val EASINGS: Map<String, (Float) -> Float> = mapOf(
         "linear" to { t -> t },
-        "ease" to { t -> 3f * t * t - 2f * t * t * t },
-        "ease_in" to { t -> t * t },
-        "ease_out" to { t -> 1f - (1f - t) * (1f - t) },
-        "ease_in_out" to { t -> 3f * t * t - 2f * t * t * t },
-        "ease_in_quad" to { t -> t * t },
-        "ease_out_quad" to { t -> 1f - (1f - t) * (1f - t) },
+        "quad" to { t -> t * t },
+        "cubic" to { t -> t * t * t },
         "bounce" to { t -> bounceOut(t) },
     )
+
+    /** Every easing name `Animated.timing` may send. */
+    val EASING_NAMES: Set<String> = EASINGS.keys + NAMED_BEZIERS.keys
 
     /** Decoded `timing` parameters. */
     data class Timing(val from: Double, val to: Double, val durationMs: Long, val easing: Any?)
@@ -41,16 +63,39 @@ object AnimationSpecs {
         val initialVelocity: Double,
     )
 
-    /** Decoded `decay` parameters mapped to `FlingAnimation` terms. */
+    /**
+     * Decoded `decay` parameters in React Native's model.
+     *
+     * Velocity is in spec units per millisecond and decays as
+     * `v(t) = v0 * deceleration^t` (`t` in milliseconds), so the value is
+     * `x(t) = from + v0 * (1 - deceleration^t) / (1 - deceleration)` and
+     * the animation settles at `from + v0 / (1 - deceleration)`.
+     */
     data class Decay(
         val from: Double,
-        /** Units per second (Python specs use units per millisecond). */
-        val startVelocity: Double,
-        /** `FlingAnimation.setFriction` value reproducing `v(t) = v0 * exp(-k * 1000 * t)`. */
-        val friction: Double,
-        /** Where the value settles: `from + v0 / (k * 1000)`. */
-        val projectedFinal: Double,
-    )
+        /** Initial velocity in units per millisecond. */
+        val velocity: Double,
+        /** Per-millisecond velocity multiplier in `(0, 1)`; `0.998` by default. */
+        val deceleration: Double,
+    ) {
+        /** Where the value settles: `from + v0 / (1 - deceleration)`. */
+        val projectedFinal: Double get() = from + velocity / (1.0 - deceleration)
+
+        /** Velocity after `elapsedMs` milliseconds. */
+        fun velocityAt(elapsedMs: Double): Double = velocity * deceleration.pow(max(0.0, elapsedMs))
+
+        /** Value after `elapsedMs` milliseconds. */
+        fun valueAt(elapsedMs: Double): Double =
+            from + velocity * (1.0 - deceleration.pow(max(0.0, elapsedMs))) / (1.0 - deceleration)
+
+        /**
+         * Whether the decay has come to rest after `elapsedMs`: the velocity
+         * fell below [DECAY_REST_VELOCITY] or the value is within
+         * [DECAY_REST_DISTANCE] of [projectedFinal].
+         */
+        fun isFinished(elapsedMs: Double): Boolean =
+            abs(velocityAt(elapsedMs)) < DECAY_REST_VELOCITY || abs(projectedFinal - valueAt(elapsedMs)) < DECAY_REST_DISTANCE
+    }
 
     fun kind(spec: JSONObject): String = spec.optString("kind", "")
 
@@ -78,45 +123,34 @@ object AnimationSpecs {
     fun dampingRatio(stiffness: Double, damping: Double, mass: Double): Double =
         damping / (2.0 * sqrt(max(1e-12, stiffness * mass)))
 
-    fun decay(spec: JSONObject): Decay {
-        val v0PerMs = spec.optDouble("velocity", 0.0)
-        val k = max(1e-6, spec.optDouble("deceleration", 0.997))
-        val from = spec.optDouble("from", 0.0)
-        return Decay(
-            from = from,
-            startVelocity = v0PerMs * 1000.0,
-            friction = decayFriction(k),
-            projectedFinal = from + v0PerMs / (k * 1000.0),
-        )
-    }
+    fun decay(spec: JSONObject): Decay = Decay(
+        from = spec.optDouble("from", 0.0),
+        velocity = spec.optDouble("velocity", 0.0).takeIf { it.isFinite() } ?: 0.0,
+        deceleration = spec.optDouble("deceleration", DEFAULT_DECELERATION).takeIf { it.isFinite() }?.coerceIn(1e-6, 1.0 - 1e-6)
+            ?: DEFAULT_DECELERATION,
+    )
 
     /**
-     * The Python ticker decays velocity as `exp(-k * dt_ms)`, that is
-     * `exp(-k * 1000 * t_s)`. `FlingAnimation` decays as
-     * `exp(-4.2 * friction * t_s)`, so `friction = k * 1000 / 4.2`.
+     * Resolve an easing value: a name from [EASING_NAMES] or a bare
+     * four-number array of cubic-bezier control points. Beziers (named or
+     * literal) come back as a `DoubleArray` for a `PathInterpolator`; the
+     * polynomial curves as a `(Float) -> Float`. Anything else, including
+     * the Python ticker's `"custom"` marker, yields `null` so the caller
+     * declines the native drive and Python ticks the animation instead;
+     * there is no silent fallback curve.
      */
-    fun decayFriction(deceleration: Double): Double = deceleration * 1000.0 / FLING_FRICTION_SCALE
-
-    /**
-     * Resolve an easing value. Names map to [EASINGS]; a four-number
-     * array is returned as cubic-bezier control points (`DoubleArray`)
-     * for the caller to build a `PathInterpolator`. Unknown names fall
-     * back to `ease_in_out` like the Python ticker.
-     */
-    fun resolveEasing(easing: Any?): Any {
+    fun resolveEasing(easing: Any?): Any? {
+        if (easing == null || easing == JSONObject.NULL) return NAMED_BEZIERS.getValue("ease_in_out")
         if (easing is JSONArray && easing.length() == 4) {
-            return DoubleArray(4) { easing.optDouble(it, 0.0) }
+            val points = DoubleArray(4) { easing.optDouble(it, Double.NaN) }
+            return if (points.all { it.isFinite() } && points[0] in 0.0..1.0 && points[2] in 0.0..1.0) points else null
         }
         if (easing is String) {
-            val trimmed = easing.trim()
-            if (trimmed.startsWith("cubic-bezier(") || trimmed.startsWith("cubic_bezier(")) {
-                val inner = trimmed.substringAfter('(').substringBeforeLast(')')
-                val parts = inner.split(',').mapNotNull { it.trim().toDoubleOrNull() }
-                if (parts.size == 4) return parts.toDoubleArray()
-            }
-            return EASINGS[trimmed] ?: EASINGS.getValue("ease_in_out")
+            val name = easing.trim()
+            NAMED_BEZIERS[name]?.let { return it }
+            return EASINGS[name]
         }
-        return EASINGS.getValue("ease_in_out")
+        return null
     }
 
     private fun bounceOut(t: Float): Float {

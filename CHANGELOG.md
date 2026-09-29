@@ -1,6 +1,65 @@
 # CHANGELOG
 
 
+## v0.47.0 (2026-09-29)
+
+### Features
+
+- **reconciler**: Add async commits and incremental lists
+  ([#107](https://github.com/pythonnative/pythonnative/pull/107),
+  [`9869499`](https://github.com/pythonnative/pythonnative/commit/9869499ca9bb83c6e900e9573189d373ecbbed60))
+
+
+## v0.46.0 (2026-09-21)
+
+### Features
+
+- Close React Native parity gaps, and fix correctness bugs
+  ([#104](https://github.com/pythonnative/pythonnative/pull/104),
+  [`66f486e`](https://github.com/pythonnative/pythonnative/commit/66f486e560c7a71787e92ce8f6b463a77e45fc5a))
+
+
+## v0.45.0 (2026-09-18)
+
+### Features
+
+- Add asset pipeline, fonts, icons, svg, and effects
+  ([#103](https://github.com/pythonnative/pythonnative/pull/103),
+  [`ef02cac`](https://github.com/pythonnative/pythonnative/commit/ef02cac218b314a466b31b60b88ffbe89bc54093))
+
+
+## v0.44.0 (2026-09-14)
+
+### Features
+
+- Overhaul native contracts, rendering, and extension builds
+  ([#101](https://github.com/pythonnative/pythonnative/pull/101),
+  [`9cb4ebb`](https://github.com/pythonnative/pythonnative/commit/9cb4ebb165bd66f15a5a4deaf7c9d49460c7e78d))
+
+
+## v0.43.1 (2026-09-12)
+
+### Bug Fixes
+
+- **net**: Preserve custom content type regardless of header casing
+  ([#97](https://github.com/pythonnative/pythonnative/pull/97),
+  [`d902e5e`](https://github.com/pythonnative/pythonnative/commit/d902e5e293b72eb2d6b38d922f5a796e51f272e7))
+
+Refs: #87
+
+Co-authored-by: Owen Carey <37121709+owenthcarey@users.noreply.github.com>
+
+### Documentation
+
+- **mkdocs**: Cover IS_WEB in the platform-specific code FAQ
+  ([#85](https://github.com/pythonnative/pythonnative/pull/85),
+  [`8da8fd6`](https://github.com/pythonnative/pythonnative/commit/8da8fd63edc086ed10016643bc1060d83cc4a117))
+
+Refs: #59
+
+Co-authored-by: Owen Carey <37121709+owenthcarey@users.noreply.github.com>
+
+
 ## v0.43.0 (2026-09-09)
 
 ### Features

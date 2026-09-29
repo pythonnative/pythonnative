@@ -47,12 +47,13 @@ Yes. Two patterns:
 
 ## How do I add a new widget?
 
-Implement a [`ViewHandler`][pythonnative.native_views.base.ViewHandler]
-for each platform you support, register it on
-[`get_registry()`][pythonnative.native_views.get_registry], and write
-a small Python factory that returns
-`Element(<type>, props, children)`. Step-by-step instructions live in
-[Native views (concept)](../concepts/native-views.md#custom-widgets).
+Declare a frozen [`Props`][pythonnative.sdk.Props] dataclass, call
+[`define_component(name, props)`][pythonnative.sdk.define_component]
+to get a typed element factory, generate the native contract, and
+implement a Swift `PNComponentManager` and a Kotlin `ComponentManager`
+under the same name. Headless tests and the browser preview need no
+extra Python code. Step-by-step instructions live in
+[Custom native components](../guides/custom-native-components.md).
 
 ## Does PythonNative work on the desktop or the web?
 

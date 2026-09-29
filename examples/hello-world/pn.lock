@@ -1,0 +1,100 @@
+{
+  "indexes": [],
+  "python": "3.13",
+  "requirements": [
+    "emoji"
+  ],
+  "targets": {
+    "android:3.13:arm64_v8a::24": {
+      "packages": [
+        {
+          "filename": "emoji-2.15.0-py3-none-any.whl",
+          "name": "emoji",
+          "sha256": "205296793d66a89d88af4688fa57fd6496732eb48917a87175a023c8138995eb",
+          "url": "https://files.pythonhosted.org/packages/e1/5e/4b5aaaabddfacfe36ba7768817bd1f71a7a810a43705e531f3ae4c690767/emoji-2.15.0-py3-none-any.whl",
+          "version": "2.15.0"
+        }
+      ],
+      "target": {
+        "arch": "arm64_v8a",
+        "os_version": "24",
+        "platform": "android",
+        "python_version": "3.13",
+        "sdk": ""
+      }
+    },
+    "android:3.13:x86_64::24": {
+      "packages": [
+        {
+          "filename": "emoji-2.15.0-py3-none-any.whl",
+          "name": "emoji",
+          "sha256": "205296793d66a89d88af4688fa57fd6496732eb48917a87175a023c8138995eb",
+          "url": "https://files.pythonhosted.org/packages/e1/5e/4b5aaaabddfacfe36ba7768817bd1f71a7a810a43705e531f3ae4c690767/emoji-2.15.0-py3-none-any.whl",
+          "version": "2.15.0"
+        }
+      ],
+      "target": {
+        "arch": "x86_64",
+        "os_version": "24",
+        "platform": "android",
+        "python_version": "3.13",
+        "sdk": ""
+      }
+    },
+    "ios:3.13:arm64:iphoneos:13.0": {
+      "packages": [
+        {
+          "filename": "emoji-2.15.0-py3-none-any.whl",
+          "name": "emoji",
+          "sha256": "205296793d66a89d88af4688fa57fd6496732eb48917a87175a023c8138995eb",
+          "url": "https://files.pythonhosted.org/packages/e1/5e/4b5aaaabddfacfe36ba7768817bd1f71a7a810a43705e531f3ae4c690767/emoji-2.15.0-py3-none-any.whl",
+          "version": "2.15.0"
+        }
+      ],
+      "target": {
+        "arch": "arm64",
+        "os_version": "13.0",
+        "platform": "ios",
+        "python_version": "3.13",
+        "sdk": "iphoneos"
+      }
+    },
+    "ios:3.13:arm64:iphonesimulator:13.0": {
+      "packages": [
+        {
+          "filename": "emoji-2.15.0-py3-none-any.whl",
+          "name": "emoji",
+          "sha256": "205296793d66a89d88af4688fa57fd6496732eb48917a87175a023c8138995eb",
+          "url": "https://files.pythonhosted.org/packages/e1/5e/4b5aaaabddfacfe36ba7768817bd1f71a7a810a43705e531f3ae4c690767/emoji-2.15.0-py3-none-any.whl",
+          "version": "2.15.0"
+        }
+      ],
+      "target": {
+        "arch": "arm64",
+        "os_version": "13.0",
+        "platform": "ios",
+        "python_version": "3.13",
+        "sdk": "iphonesimulator"
+      }
+    },
+    "ios:3.13:x86_64:iphonesimulator:13.0": {
+      "packages": [
+        {
+          "filename": "emoji-2.15.0-py3-none-any.whl",
+          "name": "emoji",
+          "sha256": "205296793d66a89d88af4688fa57fd6496732eb48917a87175a023c8138995eb",
+          "url": "https://files.pythonhosted.org/packages/e1/5e/4b5aaaabddfacfe36ba7768817bd1f71a7a810a43705e531f3ae4c690767/emoji-2.15.0-py3-none-any.whl",
+          "version": "2.15.0"
+        }
+      ],
+      "target": {
+        "arch": "x86_64",
+        "os_version": "13.0",
+        "platform": "ios",
+        "python_version": "3.13",
+        "sdk": "iphonesimulator"
+      }
+    }
+  },
+  "version": 1
+}

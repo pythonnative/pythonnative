@@ -32,13 +32,15 @@ public final class PNTextInputManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! TextInputProps(props, validated: true)
+
         guard let state = PNViewState.existing(for: view) else { return }
         let field = view as? UITextField
         let textView = view as? UITextView
-        if PNProps.has(props, "max_length") {
-            state.extras["max_length"] = PNProps.int(PNProps.value(props, "max_length")) as Any? ?? NSNull()
+        if typed.has_max_length {
+            state.extras["max_length"] = typed.max_length.map { Int($0) } as Any? ?? NSNull()
         }
-        if let value = PNProps.string(PNProps.value(props, "value")) {
+        if let value = typed.value {
             let current = field?.text ?? textView?.text ?? ""
             let acknowledged = PNProps.int(props["_pn_edit_revision"]) ?? 0
             let edited = state.extras["edit_revision"] as? Int ?? 0
@@ -52,15 +54,15 @@ public final class PNTextInputManager: PNComponentManager {
             }
         }
         if let field = field {
-            if PNProps.has(props, "placeholder") {
-                field.placeholder = PNProps.string(PNProps.value(props, "placeholder")) ?? ""
+            if typed.has_placeholder {
+                field.placeholder = typed.placeholder ?? ""
             }
             if let color = PNColor.parse(PNProps.value(props, "placeholder_color")) {
                 let placeholder = PNProps.string(PNProps.value(state.props, "placeholder")) ?? ""
                 field.attributedPlaceholder = NSAttributedString(string: placeholder, attributes: [.foregroundColor: color])
             }
-            if PNProps.has(props, "clear_button") {
-                field.clearButtonMode = PNProps.bool(PNProps.value(props, "clear_button")) == true ? .whileEditing : .never
+            if typed.has_clear_button {
+                field.clearButtonMode = typed.clear_button == true ? .whileEditing : .never
             }
         }
         if initial || PNTextManager.fontKeys.contains(where: { PNProps.has(props, $0) }) {
@@ -77,27 +79,50 @@ public final class PNTextInputManager: PNComponentManager {
         if let color = PNColor.parse(PNProps.value(props, "background_color")) {
             view.backgroundColor = color
         }
-        if PNProps.has(props, "secure") {
-            let secure = PNProps.bool(PNProps.value(props, "secure")) ?? false
+        if typed.has_secure {
+            let secure = typed.secure ?? false
             field?.isSecureTextEntry = secure
             textView?.isSecureTextEntry = secure
         }
-        if let keyboard = PNProps.string(PNProps.value(props, "keyboard_type")) {
+        if let keyboard = typed.keyboard_type?.rawValue {
             let type = PNTextInputManager.keyboardType(keyboard)
             field?.keyboardType = type
             textView?.keyboardType = type
+            if keyboard == "visible_password" {
+                // A visible password is the default keyboard with masking off.
+                field?.isSecureTextEntry = false
+                textView?.isSecureTextEntry = false
+            }
         }
-        if let cap = PNProps.string(PNProps.value(props, "auto_capitalize")) {
+        if let appearance = typed.keyboard_appearance?.rawValue {
+            let value = PNTextInputManager.keyboardAppearance(appearance)
+            field?.keyboardAppearance = value
+            textView?.keyboardAppearance = value
+        }
+        if typed.has_selection {
+            // Controlled selection: apply the requested range once per change
+            // and let the user move the caret freely afterwards.
+            if let selection = typed.selection {
+                let start = Int(selection.start), end = Int(max(selection.start, selection.end))
+                if PNTextInputManager.currentSelection(view).map({ $0 != (start, end) }) ?? true {
+                    PNTextInputManager.setSelection(view, start: start, end: end)
+                }
+                state.extras["controlled_selection"] = [start, end]
+            } else {
+                state.extras.removeValue(forKey: "controlled_selection")
+            }
+        }
+        if let cap = typed.auto_capitalize?.rawValue {
             let type = PNTextInputManager.capitalization(cap)
             field?.autocapitalizationType = type
             textView?.autocapitalizationType = type
         }
-        if PNProps.has(props, "auto_correct") {
-            let type: UITextAutocorrectionType = PNProps.bool(PNProps.value(props, "auto_correct")) == true ? .yes : .no
+        if typed.has_auto_correct {
+            let type: UITextAutocorrectionType = typed.auto_correct == true ? .yes : .no
             field?.autocorrectionType = type
             textView?.autocorrectionType = type
         }
-        if let key = PNProps.string(PNProps.value(props, "return_key_type")) {
+        if let key = typed.return_key_type?.rawValue {
             let type = PNTextInputManager.returnKey(key)
             field?.returnKeyType = type
             textView?.returnKeyType = type
@@ -105,17 +130,17 @@ public final class PNTextInputManager: PNComponentManager {
         if let color = PNColor.parse(PNProps.value(props, "selection_color")) {
             view.tintColor = color
         }
-        if PNProps.has(props, "text_content_type") {
-            let type = PNProps.string(PNProps.value(props, "text_content_type")).flatMap(PNTextInputManager.contentType)
+        if typed.has_text_content_type {
+            let type = typed.text_content_type.flatMap(PNTextInputManager.contentType)
             field?.textContentType = type
             textView?.textContentType = type
         }
-        if PNProps.has(props, "editable") {
-            let editable = PNProps.bool(PNProps.value(props, "editable")) ?? true
+        if typed.has_editable {
+            let editable = typed.editable ?? true
             field?.isEnabled = editable
             textView?.isEditable = editable
         }
-        if PNProps.bool(PNProps.value(props, "auto_focus")) == true {
+        if typed.auto_focus == true {
             view.becomeFirstResponder()
         }
         PNViewStyler.applyDecoration(view, props)
@@ -134,6 +159,9 @@ public final class PNTextInputManager: PNComponentManager {
             view.resignFirstResponder()
         case "clear":
             PNTextInputManager.setText(view, "")
+            // `clear()` is an edit: report it so a controlled value follows,
+            // as Android's text watcher and the browser do.
+            PNEvents.emitIfWired(view, "on_change", [""])
         case "get_value":
             return (view as? UITextField)?.text ?? (view as? UITextView)?.text ?? ""
         case "select_all":
@@ -223,8 +251,47 @@ public final class PNTextInputManager: PNComponentManager {
         case "email_address", "email": return .emailAddress
         case "decimal_pad", "decimal": return .decimalPad
         case "web_search": return .webSearch
+        case "visible_password": return .default
         default: return .default
         }
+    }
+
+    static func keyboardAppearance(_ name: String) -> UIKeyboardAppearance {
+        switch name {
+        case "light": return .light
+        case "dark": return .dark
+        default: return .default
+        }
+    }
+
+    /// The current `(start, end)` selection in UTF-16 offsets.
+    static func currentSelection(_ view: UIView) -> (Int, Int)? {
+        guard let input = view as? UITextInput, let range = input.selectedTextRange else { return nil }
+        return (input.offset(from: input.beginningOfDocument, to: range.start), input.offset(from: input.beginningOfDocument, to: range.end))
+    }
+
+    /// `blur_on_submit` resolved against its default: single-line inputs
+    /// blur on return, multiline ones insert a newline.
+    static func blursOnSubmit(_ props: [String: Any], multiline: Bool) -> Bool {
+        if let explicit = PNProps.bool(PNProps.value(props, "blur_on_submit")) { return explicit }
+        return !multiline
+    }
+
+    /// `on_key_press` key name for replacing `range` with `replacement`,
+    /// or `nil` when the change isn't a keystroke. UIKit sends an empty
+    /// replacement over an empty range when it commits or unmarks text
+    /// (for example as the field ends editing); only an empty replacement
+    /// that deletes something is a Backspace.
+    static func keyName(for replacement: String, range: NSRange) -> String? {
+        if replacement.isEmpty { return range.length > 0 ? "Backspace" : nil }
+        return keyName(for: replacement)
+    }
+
+    /// `on_key_press` key name for a non-empty replacement string.
+    static func keyName(for replacement: String) -> String {
+        if replacement.isEmpty { return "Backspace" }
+        if replacement == "\n" || replacement == "\r" { return "Enter" }
+        return replacement
     }
 
     static func capitalization(_ name: String) -> UITextAutocapitalizationType {
@@ -294,11 +361,42 @@ final class PNTextInputDelegate: NSObject, UITextFieldDelegate, UITextViewDelega
 
     private func emitSelection() {
         guard let view = view, let state = PNViewState.existing(for: view), state.hasEvent("on_selection_change"),
-              let input = view as? UITextInput, let range = input.selectedTextRange
+              let (start, end) = PNTextInputManager.currentSelection(view)
         else { return }
-        let start = input.offset(from: input.beginningOfDocument, to: range.start)
-        let end = input.offset(from: input.beginningOfDocument, to: range.end)
-        PNEvents.emit(view, "on_selection_change", [["start": start, "end": end]])
+        if let last = state.extras["last_selection"] as? [Int], last == [start, end] { return }
+        state.extras["last_selection"] = [start, end]
+        PNComponentEvents.TextInput.on_selection_change(view, PNSelectionEvent(start: Int64(start), end: Int64(end)))
+    }
+
+    private func emitKeyPress(_ replacement: String, range: NSRange) {
+        guard let view = view, let state = PNViewState.existing(for: view), state.hasEvent("on_key_press") else { return }
+        // Pasting several characters reports each one, like React Native.
+        if replacement.isEmpty || replacement.count == 1 || replacement == "\r\n" {
+            guard let key = PNTextInputManager.keyName(for: replacement, range: range) else { return }
+            PNComponentEvents.TextInput.on_key_press(view, PNKeyPressEvent(key: key))
+        } else {
+            for character in replacement {
+                PNComponentEvents.TextInput.on_key_press(view, PNKeyPressEvent(key: PNTextInputManager.keyName(for: String(character))))
+            }
+        }
+    }
+
+    private func emitContentSize(_ textView: UITextView) {
+        guard let view = view, let state = PNViewState.existing(for: view), state.hasEvent("on_content_size_change") else { return }
+        let size = textView.contentSize
+        let rounded = [Double(size.width), Double(size.height)]
+        if let last = state.extras["last_content_size"] as? [Double], last == rounded { return }
+        state.extras["last_content_size"] = rounded
+        PNComponentEvents.TextInput.on_content_size_change(view, PNContentSizeEvent(width: rounded[0], height: rounded[1]))
+    }
+
+    private func selectAllIfRequested() {
+        guard let view = view, let props = PNViewState.existing(for: view)?.props,
+              PNProps.bool(PNProps.value(props, "select_text_on_focus")) == true else { return }
+        DispatchQueue.main.async { [weak view] in
+            (view as? UITextField)?.selectAll(nil)
+            (view as? UITextView)?.selectAll(nil)
+        }
     }
 
     // MARK: UITextField
@@ -313,12 +411,23 @@ final class PNTextInputDelegate: NSObject, UITextFieldDelegate, UITextViewDelega
     }
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        textField.resignFirstResponder()
+        // A single-line field never sees Return as a replacement string;
+        // report it here like the multiline, Android, and browser inputs do.
+        emitKeyPress("\n", range: NSRange(location: textField.text?.utf16.count ?? 0, length: 0))
+        if PNTextInputManager.blursOnSubmit(PNViewState.existing(for: textField)?.props ?? [:], multiline: false) {
+            textField.resignFirstResponder()
+        }
+        return true
+    }
+
+    func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+        emitKeyPress(string, range: range)
         return true
     }
 
     func textFieldDidBeginEditing(_ textField: UITextField) {
         if let view = view { PNEvents.emit(view, "on_focus") }
+        selectAllIfRequested()
     }
 
     func textFieldDidEndEditing(_ textField: UITextField) {
@@ -334,10 +443,23 @@ final class PNTextInputDelegate: NSObject, UITextFieldDelegate, UITextViewDelega
 
     func textViewDidChange(_ textView: UITextView) {
         emitChange()
+        emitContentSize(textView)
+    }
+
+    func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+        emitKeyPress(text, range: range)
+        if text == "\n", let view = view,
+           PNTextInputManager.blursOnSubmit(PNViewState.existing(for: view)?.props ?? [:], multiline: true) {
+            PNComponentEvents.TextInput.on_submit(view, textView.text ?? "")
+            textView.resignFirstResponder()
+            return false
+        }
+        return true
     }
 
     func textViewDidBeginEditing(_ textView: UITextView) {
         if let view = view { PNEvents.emit(view, "on_focus") }
+        selectAllIfRequested()
     }
 
     func textViewDidEndEditing(_ textView: UITextView) {

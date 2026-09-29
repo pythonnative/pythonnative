@@ -1,6 +1,5 @@
-# Tests Text element renders multiple variants, including rich text
-# built from nested spans (SpannableString / NSAttributedString), scrolling
-# to the rich-text section on smaller viewports.
+# Tests Text renders plain/bold/sized/rich variants, truncates with
+# ellipsize_mode, and routes on_press on a label and on a nested span.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/text.py
 # Source under test: src/pythonnative/components/text.py :: Text
@@ -14,6 +13,26 @@ appId: ${APP_ID}
 - assertVisible: "Plain text line"
 - assertVisible: "Bold text line"
 - assertVisible: "Sized and colored line"
+# Truncated label: the accessibility label is stable even though the
+# drawn text is elided in the middle.
+- scrollUntilVisible:
+    element:
+      text: "Selectable text line"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "truncated-middle"
+- assertVisible: "Selectable text line"
+# Pressable label and pressable span.
+- scrollUntilVisible:
+    element:
+      text: "Tap this span"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "Label presses: 0"
+- tapOn: "Tap this whole label"
+- assertVisible: "Label presses: 1"
+- tapOn: "Tap this span"
+- assertVisible: "Span presses: 1"
 # Rich text: three nested spans flatten into one native label whose
 # plain text is the concatenation of the parts.
 - scrollUntilVisible:
@@ -22,7 +41,7 @@ appId: ${APP_ID}
     direction: DOWN
     timeout: 20000
 - assertVisible: "Rich start bold middle red end"
-# The rich-text section pushes "Back to list" below the fold on the
+# The extra sections push "Back to list" below the fold on the
 # shorter emulator viewports; close_demo taps it without scrolling,
 # so surface it first (no-ops when it's already visible).
 - scrollUntilVisible:

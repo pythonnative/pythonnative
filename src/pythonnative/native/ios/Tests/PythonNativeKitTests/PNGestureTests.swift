@@ -82,11 +82,12 @@ final class PNGestureTests: XCTestCase {
 
     func testAnimatorTimingParameters() {
         let timing = PNAnimator.timingParameters(kind: "timing", spec: ["duration_ms": 250, "easing": "linear"])
-        XCTAssertEqual(timing.duration, 0.25, accuracy: 0.0001)
+        XCTAssertEqual(timing?.duration ?? 0, 0.25, accuracy: 0.0001)
         let spring = PNAnimator.timingParameters(kind: "spring", spec: ["stiffness": 100, "damping": 10, "mass": 1, "from": 0, "to": 1])
-        XCTAssertGreaterThan(spring.duration, 0.15)
-        XCTAssertTrue(spring.parameters is UISpringTimingParameters)
+        XCTAssertGreaterThan(spring?.duration ?? 0, 0.15)
+        XCTAssertTrue(spring?.parameters is UISpringTimingParameters)
         XCTAssertTrue(PNAnimator.curve(for: [0.1, 0.2, 0.3, 0.4]) is UICubicTimingParameters)
+        XCTAssertNil(PNAnimator.timingParameters(kind: "timing", spec: ["easing": "wobble"]), "unknown easing names never fall back")
     }
 
     func testAnimatorSetAppliesImmediately() {

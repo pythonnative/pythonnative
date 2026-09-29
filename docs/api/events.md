@@ -14,10 +14,13 @@ commit; platform handlers read from it when a native widget fires.
 
 ## Next steps
 
+- The dataclasses those callbacks receive (`LayoutEvent`,
+  `ScrollEvent`, `KeyPressEvent`, ...) are documented under
+  [Typed event payloads](components.md#typed-event-payloads).
 - See what carries the remaining, non-callable props in
   [Mutation ops](mutations.md).
-- See how handlers wire a platform listener once, at creation, in
-  [Native views](native_views.md).
+- See how component managers wire a platform listener once, at
+  creation, in [Native views](native_views.md).
 - Read the other Python-side store the native layer reads on demand in
   [Platform metrics](platform_metrics.md).
 - Follow a full commit end to end in

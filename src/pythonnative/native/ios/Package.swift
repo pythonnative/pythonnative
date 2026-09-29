@@ -7,12 +7,21 @@ let package = Package(
     products: [
         .library(name: "PythonNativeKit", targets: ["PythonNativeKit"]),
     ],
-    dependencies: [.package(path: "../yoga")],
+    dependencies: [
+        .package(path: "../yoga"),
+        // pn:packages
+        // pn:end-packages
+    ],
     targets: [
         .target(
             name: "PythonNativeKit",
-            dependencies: [.product(name: "YogaCore", package: "yoga")],
-            path: "Sources/PythonNativeKit"
+            dependencies: [
+                .product(name: "YogaCore", package: "yoga"),
+                // pn:products
+                // pn:end-products
+            ],
+            path: "Sources/PythonNativeKit",
+            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "PythonNativeKitTests",

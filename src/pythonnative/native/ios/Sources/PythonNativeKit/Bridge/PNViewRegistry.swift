@@ -37,6 +37,11 @@ public final class PNViewRegistry {
     /// Number of live records (used by tests and diagnostics).
     public var count: Int { records.count }
 
+    /// Every live record whose element type is `typeName`.
+    public func records(ofType typeName: String) -> [PNViewRecord] {
+        records.values.filter { $0.typeName == typeName }
+    }
+
     func register(_ record: PNViewRecord) {
         records[record.tag] = record
     }

@@ -40,6 +40,7 @@ import time
 import traceback
 from typing import Any, Callable, Dict, List, Optional
 
+from .assets import configure_native, manifest_for_sync
 from .devserver import ws
 from .devserver.watcher import is_synced_file, modules_for_paths
 
@@ -470,15 +471,22 @@ class DevClient:
             return
         self._log(f"[pn dev] synced {len(written)} file(s) from {self.url}")
         modules = modules_for_paths(written)
-        if modules:
-            self._schedule_reload(modules, version)
+        assets_changed = bool(manifest_for_sync(written))
+        if modules or assets_changed:
+            self._schedule_reload(modules, version, assets_changed=assets_changed)
 
-    def _schedule_reload(self, modules: List[str], version: str) -> None:
+    def _schedule_reload(self, modules: List[str], version: str, *, assets_changed: bool = False) -> None:
         from .runtime import call_on_application_thread
 
         def _apply() -> None:
             from .hot_reload import apply_reload
 
+            if assets_changed:
+                # Push the overlay manifest first so reloaded components
+                # (and the native image views) resolve the new files.
+                configure_native()
+            if not modules:
+                return
             result = apply_reload(modules)
             if result.mode == "error":
                 self.send({"type": "error", "phase": "hot reload", "text": result.error or "unknown error"})

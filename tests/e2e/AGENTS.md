@@ -29,10 +29,12 @@ examples/e2e-suite/
 │       ├── layout/            # Layout demos
 │       ├── styling/           # Styling demos
 │       ├── animations/        # Animated.* demos
+│       ├── assets/            # Bundled image, font, and Images module demos
 │       ├── alerts/            # Alert.show / Alert.confirm demos
 │       ├── storage/           # AsyncStorage demos
 │       ├── runtime/           # run_async demo
 │       ├── platform/          # Platform info demo
+│       ├── device/            # Keyboard, Dimensions, PixelRatio, Device, Localization, AccessibilityInfo demos
 │       ├── packages/          # PyPI packages demo ([requirements].packages on device)
 │       └── sdk/               # SDK surface demo
 └── pythonnative.toml
@@ -72,7 +74,7 @@ scripts/
 ./scripts/run-e2e.sh ios components
 ```
 
-Available category suites: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `gestures`, `misc`. The components category also has `components-a` / `components-b` halves: CI's Android shards use them because a GitHub-hosted emulator session degrades and drops offline before all 28 component flows finish in one run (`components.yaml` just chains the two halves).
+Available category suites: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `gestures`, `assets`, `misc`. The `Device` category's flows (`flows/device/`) run as part of `misc` alongside alerts, storage, runtime, platform, packages, and SDK. The components category also has `components-a` / `components-b` / `components-c` parts, and the hooks category has `hooks-a` / `hooks-b` parts: CI's Android shards use them because a GitHub-hosted emulator session degrades and drops offline after roughly ten minutes of driving, before either category finishes in one run (`components.yaml` and `hooks.yaml` just chain their parts).
 
 You can also run a single flow directly. Useful when iterating on one demo:
 

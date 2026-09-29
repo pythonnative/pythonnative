@@ -1,4 +1,4 @@
-# Alerts / storage / runtime / platform / packages / SDK category suite.
+# Alerts / storage / runtime / platform / device / packages / SDK category suite.
 appId: ${APP_ID}
 ---
 - runFlow: ../flows/alerts/simple_alert.yaml
@@ -6,5 +6,12 @@ appId: ${APP_ID}
 - runFlow: ../flows/storage/async_storage.yaml
 - runFlow: ../flows/runtime/run_async.yaml
 - runFlow: ../flows/platform/platform_info.yaml
+- runFlow: ../flows/device/keyboard.yaml
+- runFlow: ../flows/device/dimensions.yaml
+- runFlow: ../flows/device/pixel_ratio.yaml
+- runFlow: ../flows/device/device_info.yaml
+- runFlow: ../flows/device/localization.yaml
+- runFlow: ../flows/device/accessibility_info.yaml
 - runFlow: ../flows/packages/pypi_packages.yaml
 - runFlow: ../flows/sdk/custom_component.yaml
+- runFlow: ../flows/sdk/define_component.yaml

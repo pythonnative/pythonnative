@@ -33,6 +33,7 @@ import compileall
 import json
 import os
 import platform as platform_module
+import re
 import shutil
 import subprocess
 import sys
@@ -41,8 +42,9 @@ from importlib import resources
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Union
 
+from .. import assets
 from . import android as android_config
-from . import deps, runtime_assets
+from . import artifacts, deps, runtime_assets
 from . import ios as ios_config
 from . import plugins as native_plugins
 from .android import AndroidLayout
@@ -286,7 +288,7 @@ def _stage_runtime(name: str, destination: Path) -> None:
         output = destination / runtime_name / "src/main/java/com/pythonnative/generated"
         extension = "kt"
     output.mkdir(parents=True, exist_ok=True)
-    for name in ("PNContracts", "NativeProps", "NativeModules"):
+    for name in ("PNContracts", "NativeProps", "NativeModules", "NativeValues"):
         shutil.copy2(generated / f"{name}.{extension}", output / f"{name}.{extension}")
 
 
@@ -361,12 +363,25 @@ class Builder:
         if platform not in _TEMPLATE_NAMES:
             raise BuildError(f"Unknown platform: {platform!r} (expected 'android' or 'ios').")
 
-        build_dir = self.build_root / platform
-        build_dir.mkdir(parents=True, exist_ok=True)
-        project_dir = stage_template(_TEMPLATE_NAMES[platform], build_dir)
         targets = (
             deps.android_targets(self.config) if platform == "android" else deps.ios_targets(self.config, sdks=ios_sdks)
         )
+        if release:
+            if platform == "android" and self.config.android.target_sdk < 36:
+                raise BuildError("Android release builds require target_sdk >= 36.")
+            if self.config.requirements:
+                from .lockfile import requirements
+
+                try:
+                    locked = requirements(self.config, targets)
+                except deps.DependencyError as error:
+                    raise BuildError(str(error)) from error
+                if locked is None:
+                    raise BuildError(f"Release dependencies need pn.lock. Run 'pn deps {platform} --lock' first.")
+
+        build_dir = self.build_root / platform
+        build_dir.mkdir(parents=True, exist_ok=True)
+        project_dir = stage_template(_TEMPLATE_NAMES[platform], build_dir)
         plugins = self._discover_plugins(targets)
 
         if platform == "android":
@@ -428,7 +443,7 @@ class Builder:
                 else "pythonnative/src/main/java/com/pythonnative/generated"
             )
             extension = "swift" if platform == "ios" else "kt"
-            for name in ("PNContracts", "NativeProps", "NativeModules"):
+            for name in ("PNContracts", "NativeProps", "NativeModules", "NativeValues"):
                 shutil.copy2(generated / f"{name}.{extension}", output / f"{name}.{extension}")
             for root in python_roots:
                 root.mkdir(parents=True, exist_ok=True)
@@ -482,7 +497,11 @@ class Builder:
         app_src = self.config.project_root / "app"
         if not app_src.is_dir():
             raise BuildError(f"No app/ directory found at {app_src}; nothing to bundle.")
-        shutil.copytree(app_src, app_dir)
+        shutil.copytree(app_src, app_dir, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".*"))
+        # ``app/`` is a folder reference in the Xcode project, so
+        # ``app/assets/`` lands in the bundle as is; the manifest lets the
+        # runtime resolve density variants and register fonts.
+        assets.write_manifest(app_dir / assets.ASSETS_DIR, log=self.log)
 
         slices: List[Path] = []
         for target in deps.ios_targets(self.config, sdks=sdks):
@@ -599,7 +618,16 @@ class Builder:
         candidates = list(outputs.rglob("*-release.apk")) + list(outputs.rglob("*-release.aab"))
         if not config_has_android_signing(self.config):
             candidates += list(outputs.rglob("*-release-unsigned.apk"))
-        return BuildArtifacts(paths=_existing(candidates))
+        paths = _existing(candidates)
+        if not paths:
+            raise BuildError("Gradle succeeded but produced no release artifacts")
+        try:
+            for path in paths:
+                checked = artifacts.android(path)
+                self.log(f"Verified {checked} native libraries in {path.name} for 16 KB pages.")
+        except artifacts.ArtifactError as exc:
+            raise BuildError(str(exc)) from exc
+        return BuildArtifacts(paths=paths)
 
     def _gradlew(self, prepared: PreparedProject, tasks: Sequence[str]) -> None:
         gradlew = prepared.project_dir / "gradlew"
@@ -736,6 +764,10 @@ class Builder:
         Raises:
             BuildError: If archiving or export fails.
         """
+        version = self.runner.run(["xcodebuild", "-version"], capture=True)
+        major = re.search(r"Xcode (\d+)", version.stdout)
+        if not version.ok or major is None or int(major.group(1)) < 26:
+            raise BuildError("iOS release archives require Xcode 26 or later. Run 'pn doctor ios'.")
         archive_path = prepared.build_dir / "ios_template.xcarchive"
         settings = ios_config.build_settings(self.config, for_archive=True)
         result = self.runner.run(
@@ -759,6 +791,12 @@ class Builder:
         )
         if not result.ok:
             raise BuildError("xcodebuild archive failed. See output above.")
+
+        try:
+            count = artifacts.ios_archive(archive_path)
+            self.log(f"Verified {count} bundled privacy manifests.")
+        except artifacts.ArtifactError as exc:
+            raise BuildError(str(exc)) from exc
 
         export_dir = prepared.build_dir / "export"
         options = ios_config.write_export_options(

@@ -8,6 +8,8 @@ mounts or its props change. Positional arguments are children; keyword
 arguments are props. [`memo`][pythonnative.memo] skips re-rendering
 when props are unchanged.
 
+[](){ #pythonnative.Component.keyed }
+
 ::: pythonnative.component
     options:
       show_root_heading: false

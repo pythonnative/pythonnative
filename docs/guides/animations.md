@@ -14,9 +14,18 @@ without re-rendering the component tree on every frame.
    `Animated.Text`, or `Animated.Image`.
 3. Drive the value with `Animated.timing`, `Animated.spring`, or
    `Animated.decay`. Each driver returns a handle with two faces:
-   - `handle.start()` is fire-and-forget (returns `self`).
-   - `await handle` runs the animation and suspends until it
-     completes. Cancelling the awaiting task stops the animation.
+   - `handle.start(callback=None)` is fire-and-forget (returns `self`);
+     the optional callback receives an
+     [`AnimationResult`][pythonnative.AnimationResult].
+   - `await handle` runs the animation, suspends until it settles, and
+     returns the same `AnimationResult`. Cancelling the awaiting task
+     stops the animation.
+
+   `AnimationResult.finished` is `True` when the animation ran to
+   completion and `False` when it was stopped, superseded by another
+   animation on the same value, or interrupted by the platform.
+   Composites (`sequence`, `parallel`, `stagger`, `loop`) are finished
+   only if every child finished.
 
 The animated component attaches the value to its native view's
 animation bindings after mount. From there, the **native driver**
@@ -107,9 +116,20 @@ def Bouncy():
 ```
 
 Available transform shortcuts inside `style`: `scale`, `scale_x`,
-`scale_y`, `translate_x`, `translate_y`, `rotate`. Each accepts an
-`AnimatedValue` and the runtime maps them to the underlying native
-animation property.
+`scale_y`, `translate_x`, `translate_y`, `rotate`, `rotate_x`, and
+`rotate_y`. Each accepts an `AnimatedValue` and the runtime maps them
+to the underlying native animation property; iOS keeps each animated
+channel separately and composes them with the static `transform` prop,
+so binding `translate_x` and `translate_y` together works.
+
+The full set of style keys an animated node may drive is
+[`ANIMATABLE_PROPS`][pythonnative.ANIMATABLE_PROPS]: `opacity`,
+`background_color`, `color`, and the eight transform channels above.
+These are the properties every renderer can animate on its UI thread
+without a layout pass. Binding a node to any other key (`width`,
+`margin`, `padding`, `top`, `skew_x`, ...) raises `ValueError` naming
+the animatable set when the element is constructed, so an animation
+never silently degrades to a re-render per frame.
 
 ## Sequencing and parallel composition
 
@@ -255,17 +275,43 @@ demo under Animations.
 
 ## Easing
 
-`Animated.timing` accepts an `easing` argument: `"linear"`,
-`"ease_in"`, `"ease_out"`, `"ease_in_out"`, or `"bounce"`.
+`Animated.timing(easing=...)` takes a curve from the
+[`Easing`][pythonnative.Easing] namespace, which mirrors React
+Native's: `Easing.linear`, `Easing.ease`, `Easing.ease_in`,
+`Easing.ease_out`, `Easing.ease_in_out` (the default), `Easing.quad`,
+`Easing.cubic`, `Easing.bounce`, and `Easing.bezier(x1, y1, x2, y2)`
+for a CSS-style cubic bezier:
+
+```python
+pn.Animated.timing(opacity, to=1.0, easing=pn.Easing.ease_out)
+pn.Animated.timing(x, to=200, easing=pn.Easing.bezier(0.2, 0.8, 0.2, 1.0))
+pn.Animated.timing(y, to=0, easing="bounce")   # the names also work as strings
+```
+
+Each curve is a serializable [`EasingSpec`][pythonnative.EasingSpec],
+so it crosses the bridge as data and the native drivers run it on the
+UI thread; bezier control points travel as numbers, not as a string.
+A misspelled easing name raises `ValueError` instead of falling back
+silently. `Easing.ease` follows React Native (the same curve as
+`ease_in`), not CSS `ease`. A plain callable `progress -> eased` is
+still accepted for custom curves, at the cost of ticking in Python.
 
 ## Decay (fling)
 
-`Animated.decay` decelerates a value from an initial velocity,
-the standard ending for a pan gesture:
+`Animated.decay` decelerates a value from an initial velocity, the
+standard ending for a pan gesture. It uses React Native's model on
+every platform: with `t` in milliseconds, the velocity decays as
+`v0 * deceleration ** t`, and the value comes to rest at
+`start + v0 / (1 - deceleration)`. `velocity` is in points per
+millisecond; gesture events report points per second, so divide by
+1000. `deceleration` defaults to `0.998`; `0.99` stops quickly, and a
+value outside `(0, 1)` raises `ValueError`:
 
 ```python
 def on_pan_end(event):
     pn.Animated.decay(tx, velocity=event.velocity_x / 1000.0).start()
+
+pn.Animated.decay(offset, velocity=2.0, deceleration=0.99).start()
 ```
 
 See the [Gestures guide](gestures.md) for the full drag-and-release
@@ -275,8 +321,10 @@ pattern.
 
 `start()` returns the handle you started with, and the handle exposes
 `.stop()`. A common pattern is to keep the handle in a `use_ref` so
-you can cancel a long-running animation when the user interrupts. If
-you're awaiting the animation instead, cancelling the awaiting task
+you can cancel a long-running animation when the user interrupts. A
+stopped animation resolves with `AnimationResult(finished=False)`;
+a `sequence` whose step is stopped stops too, with `finished=False`.
+If you're awaiting the animation instead, cancelling the awaiting task
 stops the animation:
 
 ```python

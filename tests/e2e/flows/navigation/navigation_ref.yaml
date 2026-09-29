@@ -1,0 +1,29 @@
+# Tests create_navigation_ref: the ref bound to the root container is ready,
+# reports the current route, and navigates to another root screen with
+# params from plain module code.
+#
+# Demo screen: examples/e2e-suite/app/screens/navigation/navigation_ref.py
+# Source under test: src/pythonnative/navigation/ref.py :: create_navigation_ref
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Navigation
+      DEMO_TITLE: Navigation ref
+- assertVisible: "Ref ready: yes"
+- assertVisible: "Current route: navigation_ref"
+- assertVisible: "Can go back: yes"
+- tapOn: "Navigate via ref"
+- extendedWaitUntil:
+    visible: "Param 'value': from-ref"
+    timeout: 10000
+# The Route Params demo's own back button pops back to this demo.
+- tapOn: "Back to list"
+- extendedWaitUntil:
+    visible: "Demo: Navigation ref"
+    timeout: 10000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Navigation

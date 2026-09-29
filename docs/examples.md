@@ -94,8 +94,8 @@ def Header():
 @pn.component
 def App():
     return pn.ThemeContext.Provider(
-        BRAND,
         pn.Column(Header(), style={"padding": 16}),
+        value=BRAND,
     )
 ```
 

@@ -36,7 +36,7 @@ def UseContextDemo() -> pn.Element:
         section(
             "Theme context",
             result_text("Current theme", theme),
-            _ThemeContext.Provider(theme, _Consumer()),
+            _ThemeContext.Provider(_Consumer(), value=theme),
             buttons_row(
                 pn.Button("Set light", on_press=lambda: set_theme("light")),
                 pn.Button("Set dark", on_press=lambda: set_theme("dark")),

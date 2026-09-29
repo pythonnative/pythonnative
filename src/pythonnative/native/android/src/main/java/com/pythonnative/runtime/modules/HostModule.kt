@@ -22,6 +22,11 @@ class HostModule : NativeModule {
 
     override fun call(method: String, args: JSONObject, promise: Promise) {
         when (method) {
+            "show_error" -> {
+                ErrorOverlay.show(args.optLong("screen"), args.optString("title"), args.optString("trace"))
+                promise.resolve(null)
+            }
+            "dismiss_error" -> { ErrorOverlay.dismiss(); promise.resolve(null) }
             "cache_state" -> {
                 screen(args)?.cachedStateJSON = args.str("state")
                 promise.resolve(null)
@@ -55,6 +60,18 @@ class HostModule : NativeModule {
                 promise.resolve(payload)
             }
             "active_screen" -> promise.resolve(ScreenRegistry.activeId())
+            // Predictive back: `false` when Python has nothing to pop, so the
+            // system plays its back-to-home preview; see PNScreenFragment.
+            "set_back_enabled" -> {
+                val enabled = args.value("enabled") != false
+                val target = screen(args) ?: ScreenRegistry.get(ScreenRegistry.activeId())
+                target?.backEnabled = enabled
+                promise.resolve(null)
+            }
+            "keyboard" -> promise.resolve(
+                JSONObject().put("height", com.pythonnative.runtime.screens.PNKeyboard.heightDp)
+                    .put("visible", com.pythonnative.runtime.screens.PNKeyboard.isVisible),
+            )
             else -> promise.rejectUnknownMethod(method)
         }
     }

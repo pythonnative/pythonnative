@@ -69,6 +69,9 @@ open class PNViewController: UIViewController {
             return
         }
         isScreenCreated = true
+        // Keyboard height is part of the viewport payload, so every screen
+        // keeps the observer running.
+        PNKeyboardObserver.shared.start()
         var payload: [String: Any] = [
             "path": requestedScreenPath ?? defaultScreenPath,
             "args": requestedScreenArgsJSON ?? NSNull(),
@@ -120,6 +123,16 @@ open class PNViewController: UIViewController {
         if previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle {
             lastLayoutPayload = nil
             view.setNeedsLayout()
+        }
+    }
+
+    /// Re-send `layout` when the keyboard frame changed the viewport.
+    func keyboardDidChange() {
+        guard isViewLoaded else { return }
+        let payload = viewportJSON()
+        if payload != lastLayoutPayload {
+            lastLayoutPayload = payload
+            forward("layout", payload)
         }
     }
 
@@ -194,12 +207,15 @@ open class PNViewController: UIViewController {
         }
     }
 
-    /// The `{"width","height","insets","color_scheme"}` payload shared by
-    /// `layout`, `resume`, and `Host.viewport`.
+    /// The viewport payload shared by `layout`, `resume`, and
+    /// `Host.viewport`: `width`, `height`, `insets`, `color_scheme`,
+    /// `scale`, `font_scale`, `screen_width`, `screen_height`, and
+    /// `keyboard_height`.
     public func viewport() -> [String: Any] {
         var frame = rootFrame
+        let screen = PNWindow.screenBounds()
         if frame.width <= 0 || frame.height <= 0 {
-            frame = PNWindow.screenBounds()
+            frame = screen
         }
         let insets = view.safeAreaInsets
         return [
@@ -212,6 +228,11 @@ open class PNViewController: UIViewController {
                 "right": Double(insets.right),
             ],
             "color_scheme": PNWindow.colorScheme(for: view),
+            "scale": Double(PNWindow.screenScale()),
+            "font_scale": PNWindow.fontScale(),
+            "screen_width": Double(screen.width),
+            "screen_height": Double(screen.height),
+            "keyboard_height": Double(PNKeyboardObserver.shared.height),
         ]
     }
 

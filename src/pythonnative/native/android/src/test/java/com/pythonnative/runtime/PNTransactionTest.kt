@@ -17,7 +17,7 @@ class PNTransactionTest {
         val json = """
             [
               ["c", 1, "View", {"background_color": "#fff"}],
-              ["u", 1, {"opacity": 0.5, "background_color": null}],
+              ["u", 1, {"opacity": 0.5}, ["background_color"]],
               ["i", 1, 2, 0],
               ["f", 2, 10, 20.5, 100, 40],
               ["d", 2]
@@ -31,7 +31,7 @@ class PNTransactionTest {
         assertEquals("#fff", create.props.getString("background_color"))
         val update = ops[1] as Op.Update
         assertEquals(0.5, update.changed.getDouble("opacity"), 1e-9)
-        assertTrue(update.changed.isNull("background_color"))
+        assertEquals(listOf("background_color"), update.removed)
         assertEquals(Op.Insert(1, 2, 0), ops[2])
         assertEquals(Op.Frame(2, 10.0, 20.5, 100.0, 40.0), ops[3])
         assertEquals(Op.Destroy(2), ops[4])
@@ -54,5 +54,33 @@ class PNTransactionTest {
         assertEquals("true", JsonUtil.encode(true))
         assertEquals("""{"x":1.5}""", JsonUtil.encode(mapOf("x" to 1.5)))
         assertEquals("[1,2]", JsonUtil.encode(listOf(1, 2)))
+    }
+
+    @Test
+    fun eventsEmittedWhileACommitAppliesCarryThatCommitsIdentity() {
+        val state = com.pythonnative.runtime.bridge.CommitState()
+        // A view that emits during its own creation (an image starting to
+        // load) is born in the applying revision; Python drops events that
+        // claim an older one.
+        val during = state.stampedAs("app-1", 1, 1) { org.json.JSONObject(state.event(org.json.JSONArray())) }
+        assertEquals("app-1", during.getString("application"))
+        assertEquals(1, during.getInt("surface"))
+        assertEquals(1, during.getInt("revision"))
+        val after = org.json.JSONObject(state.event(org.json.JSONArray()))
+        assertEquals("", after.getString("application"))
+        assertEquals(0, after.getInt("revision"))
+        assertEquals(during.getInt("sequence") + 1, after.getInt("sequence"))
+    }
+
+    @Test
+    fun webViewScriptResultsAreStringifiedLikeIosAndTheBrowser() {
+        val stringify = com.pythonnative.runtime.components.WebViewsModule::stringify
+        assertEquals("", stringify(null))
+        assertEquals("", stringify("null"))
+        assertEquals("hi", stringify("\"hi\""))
+        assertEquals("42", stringify("42"))
+        assertEquals("4.5", stringify("4.5"))
+        assertEquals("true", stringify("true"))
+        assertEquals("[1,2]", stringify("[1,2]"))
     }
 }

@@ -6,6 +6,7 @@ from typing import Any, Tuple
 
 import pytest
 
+from pythonnative import Section
 from pythonnative.components import (
     FlatList,
     KeyboardAvoidingView,
@@ -184,10 +185,8 @@ def test_flatlist_small_list_mounts_every_row() -> None:
         render_item=lambda item, _i: Text(item["name"]),
         key_extractor=lambda item, _i: str(item["id"]),
     )
-    rows = el.props["rows"]
-    assert [r.key for r in rows] == ["0", "1", "2"]
-
     root, _rec, _backend = _mount(el)
+    assert [row[0] for row in root.props["dataset"]["changes"][0][1]] == ["0", "1", "2"]
     assert root.type_name == "VirtualList"
     texts = [v.props["text"] for v in root.find_all("Text")]
     assert texts == ["Item 0", "Item 1", "Item 2"]
@@ -201,11 +200,9 @@ def test_flatlist_windows_large_lists() -> None:
         render_item=lambda item, _i: Text(f"row-{item}"),
         key_extractor=lambda item, _i: str(item),
     )
-    rows = el.props["rows"]
-    assert len(rows) == 1000
-    assert rows[0].extent == 44.0
-
     root, _rec, _backend = _mount(el)
+    assert len(root.props["dataset"]["changes"][0][1]) == 1000
+    assert [row[2] for row in root.props["dataset"]["changes"][0][1]][0] == 44.0
     mounted = root.find_all("Text")
     # Only the initial window (plus overscan) is mounted, not all 1000.
     assert 0 < len(mounted) < 200
@@ -243,8 +240,8 @@ def test_flatlist_separator_adds_to_row_extent() -> None:
         item_height=20,
         separator_height=4,
     )
-    assert [r.extent for r in el.props["rows"]] == [24.0, 24.0, 24.0]
-    assert el.props["estimated_row_extent"] == 24.0
+    root, _rec, _backend = _mount(el)
+    assert [row[2] for row in root.props["dataset"]["changes"][0][1]] == [24.0, 24.0, 24.0]
 
 
 def test_flatlist_with_refresh_control() -> None:
@@ -261,25 +258,25 @@ def test_flatlist_with_refresh_control() -> None:
 
 def test_flatlist_scroll_controller_attached_to_ref() -> None:
     from pythonnative.hooks import Ref
-    from pythonnative.native_views import set_registry
 
     ref: Ref = Ref()
     el = FlatList(data=[1, 2, 3], item_height=20, ref=ref)
-    _root, _rec, backend = _mount(el)
+    root, _rec, backend = _mount(el)
 
     controller = ref.current
     assert controller is not None, "mount must publish a ListController on the ref"
 
-    # Imperative scroll commands resolve through the process registry.
-    set_registry(backend)
-    try:
-        controller.scroll_to_index(2, animated=False)
-    finally:
-        set_registry(None)
+    # Imperative scroll commands go through the VirtualList's handle to the backend.
+    controller.scroll_to_index(2, animated=False)
     assert backend.commands, "scroll_to_index must dispatch a native command"
-    _tag, name, args = backend.commands[-1]
+    tag, name, args = backend.commands[-1]
+    assert tag == root.tag
     assert name == "scroll_to_index"
-    assert args["index"] == 2
+    assert args == {"index": 2, "animated": False}
+    controller.scroll_to_offset(120.0)
+    assert backend.commands[-1][1:] == ("scroll_to_offset", {"y": 120.0, "animated": True})
+    controller.scroll_to_end(animated=False)
+    assert backend.commands[-1][1:] == ("scroll_to_end", {"animated": False})
 
 
 # ======================================================================
@@ -289,30 +286,27 @@ def test_flatlist_scroll_controller_attached_to_ref() -> None:
 
 def test_section_list_flattens_headers_and_items() -> None:
     sections = [
-        {"title": "A", "data": ["a1", "a2"]},
-        {"title": "B", "data": ["b1"]},
+        Section(key="A", title="A", data=["a1", "a2"]),
+        Section(key="B", title="B", data=["b1"]),
     ]
     el = SectionList(sections=sections)
     # 2 headers + 3 items = 5 rows.
-    assert len(el.props["rows"]) == 5
-
     root, _rec, _backend = _mount(el)
+    assert len(root.props["dataset"]["changes"][0][1]) == 5
     texts = [v.props["text"] for v in root.find_all("Text")]
     assert texts == ["A", "a1", "a2", "B", "b1"]
 
 
 def test_section_list_header_and_item_extents() -> None:
     sections = [
-        {"title": "X", "data": list(range(50))},
-        {"title": "Y", "data": list(range(50))},
+        Section(key="X", title="X", data=list(range(50))),
+        Section(key="Y", title="Y", data=list(range(50))),
     ]
     el = SectionList(sections=sections, item_height=30, section_header_height=40)
-    rows = el.props["rows"]
-    # 2 headers + 100 items.
-    assert len(rows) == 102
-    assert rows[0].extent == 40.0  # header
-    assert rows[1].extent == 30.0  # item
-
-    # Large flattened list still windows.
     root, _rec, _backend = _mount(el)
+    # 2 headers + 100 items.
+    assert len(root.props["dataset"]["changes"][0][1]) == 102
+    assert [row[2] for row in root.props["dataset"]["changes"][0][1]][0] == 40.0  # header
+    assert [row[2] for row in root.props["dataset"]["changes"][0][1]][1] == 30.0  # item
+    # Large flattened list still windows.
     assert 0 < len(root.find_all("Text")) < 102

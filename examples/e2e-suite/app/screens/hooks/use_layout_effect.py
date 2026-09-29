@@ -25,11 +25,12 @@ def UseLayoutEffectDemo() -> pn.Element:
 
     def on_layout() -> None:
         phases.current.append("layout")
-        frame = box_ref._pn_frame
+        handle = box_ref.current
+        frame = handle.frame if handle is not None else None
         if frame is not None:
-            _x, _y, w, h = frame
-            if measured != f"{w:.0f}x{h:.0f}":
-                set_measured(f"{w:.0f}x{h:.0f}")
+            label = f"{frame.width:.0f}x{frame.height:.0f}"
+            if measured != label:
+                set_measured(label)
 
     def on_passive() -> None:
         phases.current.append("passive")

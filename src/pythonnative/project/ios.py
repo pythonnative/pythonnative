@@ -29,6 +29,7 @@ Python sources into the project before invoking ``xcodebuild``.
 from __future__ import annotations
 
 import plistlib
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -101,6 +102,14 @@ def configure(project_dir: Path, config: AppConfig, *, log: Optional[Logger] = N
     project_dir = Path(project_dir)
     info_plist = project_dir / "ios_template" / "Info.plist"
 
+    from .artifacts import privacy_manifest
+
+    manifest_path = project_dir / "ios_template" / "PrivacyInfo.xcprivacy"
+    if config.ios.privacy_manifest:
+        source = config.resolve_path(config.ios.privacy_manifest)
+        privacy_manifest(source)
+        shutil.copy2(source, manifest_path)
+    privacy_manifest(manifest_path)
     configure_info_plist(info_plist, config)
     write_entitlements(project_dir, config)
     _apply_branding(project_dir, config, emit)

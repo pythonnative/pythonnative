@@ -249,11 +249,23 @@ reload. Restart the app to clear `sys.modules`.
 
 ## Tests
 
-### Tests fail with `RuntimeError: No handler registered for type ...`
+### Tests fail with `RuntimeError: No view backend is available off device`
 
-Install the fake backend from the
-[Testing guide](../guides/testing.md) before
-the first render. A session-scoped fixture is the easiest place.
+Render through [`render`][pythonnative.testing.render], which installs a
+[`FakeBackend`][pythonnative.testing.FakeBackend], or install one
+yourself with [`set_backend`][pythonnative.native_views.set_backend]
+before the first commit. If you disabled the shipped pytest plugin with
+`-p no:pythonnative`, the runtime is no longer reset between tests;
+re-enable it or reset it in your own fixture.
+
+### `RuntimeError: Too many re-renders`
+
+A component kept re-dirtying itself for more than fifty passes in one
+flush: an effect that sets state unconditionally (give it a `deps`
+list), or a setter called during the component's own render (move it
+into an effect or a handler). The error names the component and is
+routed through the nearest `ErrorBoundary`; in dev mode the RedBox
+shows it.
 
 ### `mkdocs build --strict` fails on PR with autorefs warnings
 

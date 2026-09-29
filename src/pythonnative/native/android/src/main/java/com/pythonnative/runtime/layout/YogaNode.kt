@@ -11,10 +11,11 @@ class YogaNode(val tag: Long) : AutoCloseable {
     private external fun create(): Long
     private external fun free(ptr: Long)
     external fun style(ptr: Long, key: String, value: String)
-    external fun resetStyle(ptr: Long)
     external fun measureLeaf(ptr: Long, enabled: Boolean)
     external fun insert(ptr: Long, child: Long, index: Int)
     external fun remove(ptr: Long, child: Long)
+    external fun isDirty(ptr: Long): Boolean
+    external fun takeNewLayout(ptr: Long): Boolean
     external fun calculate(ptr: Long, width: Float, height: Float)
     external fun frame(ptr: Long): FloatArray
     fun measure(width: Float, height: Float): FloatArray {

@@ -82,6 +82,7 @@ nav:
     - Browser Preview: guides/browser-preview.md
     - Navigation: guides/navigation.md
     - Styling: guides/styling.md
+    - Assets, Fonts, Icons & SVG: guides/assets.md
     - Animations: guides/animations.md
     - Gestures: guides/gestures.md
     - Lists: guides/lists.md
@@ -111,6 +112,7 @@ nav:
     - Component: api/component.md
     - Components: api/components.md
     - Hooks: api/hooks.md
+    - Handles: api/handles.md
     - Animated: api/animated.md
     - Gestures: api/gestures.md
     - Alerts: api/alerts.md
@@ -118,6 +120,8 @@ nav:
     - Suspense: api/suspense.md
     - Appearance: api/appearance.md
     - Images: api/images.md
+    - Assets: api/assets.md
+    - Graphics: api/graphics.md
     - Network: api/net.md
     - Storage: api/storage.md
     - Platform: api/platform.md

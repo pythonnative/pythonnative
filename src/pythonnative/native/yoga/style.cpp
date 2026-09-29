@@ -2,8 +2,70 @@
 #include <string>
 #include <cstdlib>
 #include <cmath>
+// Empty values reset only the addressed Yoga field to its default.
+static bool resetField(YGNodeRef node, const std::string& key) {
+    if (key == "direction") { YGNodeStyleSetDirection(node, static_cast<YGDirection>(0)); return true; }
+    if (key == "flex_direction") { YGNodeStyleSetFlexDirection(node, static_cast<YGFlexDirection>(0)); return true; }
+    if (key == "justify_content") { YGNodeStyleSetJustifyContent(node, static_cast<YGJustify>(0)); return true; }
+    if (key == "align_items") { YGNodeStyleSetAlignItems(node, static_cast<YGAlign>(4)); return true; }
+    if (key == "align_self") { YGNodeStyleSetAlignSelf(node, static_cast<YGAlign>(0)); return true; }
+    if (key == "align_content") { YGNodeStyleSetAlignContent(node, static_cast<YGAlign>(1)); return true; }
+    if (key == "position") { YGNodeStyleSetPositionType(node, static_cast<YGPositionType>(1)); return true; }
+    if (key == "flex_wrap") { YGNodeStyleSetFlexWrap(node, static_cast<YGWrap>(0)); return true; }
+    if (key == "display") { YGNodeStyleSetDisplay(node, static_cast<YGDisplay>(0)); return true; }
+    if (key == "width") { YGNodeStyleSetWidthAuto(node); return true; }
+    if (key == "height") { YGNodeStyleSetHeightAuto(node); return true; }
+    if (key == "flex_basis") { YGNodeStyleSetFlexBasisAuto(node); return true; }
+    if (key == "min_width") { YGNodeStyleSetMinWidth(node, YGUndefined); return true; }
+    if (key == "min_height") { YGNodeStyleSetMinHeight(node, YGUndefined); return true; }
+    if (key == "max_width") { YGNodeStyleSetMaxWidth(node, YGUndefined); return true; }
+    if (key == "max_height") { YGNodeStyleSetMaxHeight(node, YGUndefined); return true; }
+    if (key == "flex") { YGNodeStyleSetFlex(node, YGUndefined); return true; }
+    if (key == "flex_grow") { YGNodeStyleSetFlexGrow(node, YGUndefined); return true; }
+    if (key == "flex_shrink") { YGNodeStyleSetFlexShrink(node, YGUndefined); return true; }
+    if (key == "aspect_ratio") { YGNodeStyleSetAspectRatio(node, YGUndefined); return true; }
+    if (key == "margin_left") { YGNodeStyleSetMargin(node, static_cast<YGEdge>(0), YGUndefined); return true; }
+    if (key == "margin_top") { YGNodeStyleSetMargin(node, static_cast<YGEdge>(1), YGUndefined); return true; }
+    if (key == "margin_right") { YGNodeStyleSetMargin(node, static_cast<YGEdge>(2), YGUndefined); return true; }
+    if (key == "margin_bottom") { YGNodeStyleSetMargin(node, static_cast<YGEdge>(3), YGUndefined); return true; }
+    if (key == "margin_start") { YGNodeStyleSetMargin(node, static_cast<YGEdge>(4), YGUndefined); return true; }
+    if (key == "margin_end") { YGNodeStyleSetMargin(node, static_cast<YGEdge>(5), YGUndefined); return true; }
+    if (key == "margin_horizontal") { YGNodeStyleSetMargin(node, static_cast<YGEdge>(6), YGUndefined); return true; }
+    if (key == "margin_vertical") { YGNodeStyleSetMargin(node, static_cast<YGEdge>(7), YGUndefined); return true; }
+    if (key == "margin") { YGNodeStyleSetMargin(node, static_cast<YGEdge>(8), YGUndefined); return true; }
+    if (key == "padding_left") { YGNodeStyleSetPadding(node, static_cast<YGEdge>(0), YGUndefined); return true; }
+    if (key == "padding_top") { YGNodeStyleSetPadding(node, static_cast<YGEdge>(1), YGUndefined); return true; }
+    if (key == "padding_right") { YGNodeStyleSetPadding(node, static_cast<YGEdge>(2), YGUndefined); return true; }
+    if (key == "padding_bottom") { YGNodeStyleSetPadding(node, static_cast<YGEdge>(3), YGUndefined); return true; }
+    if (key == "padding_start") { YGNodeStyleSetPadding(node, static_cast<YGEdge>(4), YGUndefined); return true; }
+    if (key == "padding_end") { YGNodeStyleSetPadding(node, static_cast<YGEdge>(5), YGUndefined); return true; }
+    if (key == "padding_horizontal") { YGNodeStyleSetPadding(node, static_cast<YGEdge>(6), YGUndefined); return true; }
+    if (key == "padding_vertical") { YGNodeStyleSetPadding(node, static_cast<YGEdge>(7), YGUndefined); return true; }
+    if (key == "padding") { YGNodeStyleSetPadding(node, static_cast<YGEdge>(8), YGUndefined); return true; }
+    if (key == "border_left_width") { YGNodeStyleSetBorder(node, static_cast<YGEdge>(0), YGUndefined); return true; }
+    if (key == "border_top_width") { YGNodeStyleSetBorder(node, static_cast<YGEdge>(1), YGUndefined); return true; }
+    if (key == "border_right_width") { YGNodeStyleSetBorder(node, static_cast<YGEdge>(2), YGUndefined); return true; }
+    if (key == "border_bottom_width") { YGNodeStyleSetBorder(node, static_cast<YGEdge>(3), YGUndefined); return true; }
+    if (key == "border_start_width") { YGNodeStyleSetBorder(node, static_cast<YGEdge>(4), YGUndefined); return true; }
+    if (key == "border_end_width") { YGNodeStyleSetBorder(node, static_cast<YGEdge>(5), YGUndefined); return true; }
+    if (key == "border_horizontal_width") { YGNodeStyleSetBorder(node, static_cast<YGEdge>(6), YGUndefined); return true; }
+    if (key == "border_vertical_width") { YGNodeStyleSetBorder(node, static_cast<YGEdge>(7), YGUndefined); return true; }
+    if (key == "border_width") { YGNodeStyleSetBorder(node, static_cast<YGEdge>(8), YGUndefined); return true; }
+    if (key == "left") { YGNodeStyleSetPosition(node, static_cast<YGEdge>(0), YGUndefined); return true; }
+    if (key == "top") { YGNodeStyleSetPosition(node, static_cast<YGEdge>(1), YGUndefined); return true; }
+    if (key == "right") { YGNodeStyleSetPosition(node, static_cast<YGEdge>(2), YGUndefined); return true; }
+    if (key == "bottom") { YGNodeStyleSetPosition(node, static_cast<YGEdge>(3), YGUndefined); return true; }
+    if (key == "start") { YGNodeStyleSetPosition(node, static_cast<YGEdge>(4), YGUndefined); return true; }
+    if (key == "end") { YGNodeStyleSetPosition(node, static_cast<YGEdge>(5), YGUndefined); return true; }
+    if (key == "gap") { YGNodeStyleSetGap(node, static_cast<YGGutter>(2), YGUndefined); return true; }
+    if (key == "spacing") { YGNodeStyleSetGap(node, static_cast<YGGutter>(2), YGUndefined); return true; }
+    if (key == "row_gap") { YGNodeStyleSetGap(node, static_cast<YGGutter>(1), YGUndefined); return true; }
+    if (key == "column_gap") { YGNodeStyleSetGap(node, static_cast<YGGutter>(0), YGUndefined); return true; }
+    return false;
+}
 extern "C" bool PNYogaSetStyle(YGNodeRef node, const char* rawKey, const char* rawValue) {
     std::string key(rawKey), value(rawValue);
+    if (value.empty()) return resetField(node, key);
     bool percent = !value.empty() && value.back() == '%';
     char* end = nullptr;
     float number = std::strtof(rawValue, &end);

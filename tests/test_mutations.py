@@ -127,7 +127,7 @@ def test_callback_identity_change_never_crosses_the_bridge() -> None:
     assert hits == ["second"]
 
 
-def test_removed_prop_signaled_with_none() -> None:
+def test_removed_prop_is_absent_after_commit() -> None:
     rec, backend = _mounted(_text("a", color="#ff0000"))
     marker = len(backend.ops)
 
@@ -136,7 +136,7 @@ def test_removed_prop_signaled_with_none() -> None:
     new_ops = _ops_since(backend, marker)
     assert len(new_ops) == 1
     assert new_ops[0][0] == "update" and new_ops[0][3] == ("color",)
-    assert backend.views[rec.root_tag].props["color"] is None
+    assert "color" not in backend.views[rec.root_tag].props
 
 
 def test_frame_diffing_suppresses_unchanged_frames() -> None:

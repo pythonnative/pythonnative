@@ -1,7 +1,8 @@
-# Tests transform styles (translate, rotate, scale) render their labels.
+# Tests the transform style renders translate / rotate / scale boxes and the
+# 3D operations (perspective + rotate_x / rotate_y, skew_x / skew_y).
 #
 # Demo screen: examples/e2e-suite/app/screens/styling/transform.py
-# Source under test: src/pythonnative/style.py :: TransformSpec, native handlers
+# Source under test: src/pythonnative/style.py :: TransformSpec
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -12,6 +13,9 @@ appId: ${APP_ID}
 - assertVisible: "translate"
 - assertVisible: "rotate"
 - assertVisible: "scale"
+- assertVisible: "rotate_x"
+- assertVisible: "rotate_y"
+- assertVisible: "skew"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

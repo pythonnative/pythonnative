@@ -1,0 +1,22 @@
+# Tests Localization.get_locales / get_timezone / is_rtl return a primary
+# locale and a time zone on the running device.
+#
+# Demo screen: examples/e2e-suite/app/screens/device/localization.py
+# Source under test: src/pythonnative/native_modules/localization.py :: Localization
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Device
+      DEMO_TITLE: Localization
+- assertVisible: "Has locale: yes"
+- assertVisible:
+    text: "Primary tag: [A-Za-z]+.*"
+- assertVisible: "Has timezone: yes"
+- assertVisible:
+    text: "Layout RTL: (yes|no)"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Device

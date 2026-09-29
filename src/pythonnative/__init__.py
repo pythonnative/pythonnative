@@ -42,12 +42,10 @@ Key building blocks:
   [`Rotation`][pythonnative.gestures.Rotation]).
 - **Custom native components** can be authored with the
   ``pythonnative.sdk`` package: define a typed
-  [`Props`][pythonnative.sdk.Props] dataclass, implement a
-  [`ViewHandler`][pythonnative.native_views.base.ViewHandler] for each
-  platform, and register it via
-  [`@native_component`][pythonnative.sdk.native_component] (or expose
-  it from a PyPI package via the ``pythonnative.handlers`` entry-point
-  group).
+  [`Props`][pythonnative.sdk.Props] dataclass and declare the component
+  with [`define_component`][pythonnative.sdk.define_component], which
+  returns its element factory (or expose it from a PyPI package via the
+  ``pythonnative.handlers`` entry-point group).
 
 Example:
     ```python
@@ -64,51 +62,69 @@ Example:
     ```
 """
 
-__version__ = "0.43.0"
+__version__ = "0.47.0"
 
-from . import appearance, diagnostics, gestures, runtime, sdk
+from . import appearance, diagnostics, gestures, icons, runtime, sdk, svg
 from .alerts import Alert
-from .animated import Animated, AnimatedValue, use_animated_value
+from .animated import ANIMATABLE_PROPS, Animated, AnimatedValue, AnimationResult, Easing, EasingSpec, use_animated_value
+from .assets import Asset, asset
 from .component import Component, component, memo
 from .components import (
     ActivityIndicator,
+    BlurView,
     Button,
     Checkbox,
     Column,
+    ContentSizeEvent,
     DatePicker,
     ErrorBoundary,
     FlatList,
     Fragment,
     Image,
     ImageBackground,
+    ImageLoadEvent,
+    ImageSource,
     KeyboardAvoidingView,
+    KeyPressEvent,
+    LayoutEvent,
+    LinearGradient,
     ListController,
     Modal,
     Picker,
     Portal,
     Pressable,
+    PressState,
     ProgressBar,
     RefreshControl,
+    Ripple,
     Row,
     SafeAreaView,
+    ScrollEvent,
     ScrollView,
     SectionList,
     SegmentedControl,
+    SelectionEvent,
     Slider,
     Spacer,
     StatusBar,
     Suspense,
+    Svg,
     Switch,
     Text,
     TextInput,
     TouchableOpacity,
     View,
+    WebNavigationEvent,
     WebView,
 )
 from .diagnostics import HookOrderError
 from .element import Element
+from .gestures import GestureSpec, SwipeDirection
+from .handles import ScrollOffset, ScrollViewHandle, TextInputHandle, ViewHandle, WebViewHandle
 from .hooks import (
+    ColorScheme,
     Context,
+    Deps,
     MutationCall,
     MutationState,
     QueryResult,
@@ -136,63 +152,89 @@ from .hooks import (
     use_window_dimensions,
 )
 from .hosts import create_screen
+from .icons import Icon, IconName
+from .mutations import UNSET, UnsetType
 from .native_modules import (
+    AccessibilityEvent,
+    AccessibilityInfo,
     AppState,
     Battery,
     Biometrics,
     Camera,
     Clipboard,
+    Device,
+    DeviceInfo,
+    Dimensions,
+    DimensionsEvent,
     FileSystem,
     Haptics,
+    Images,
+    ImageSize,
+    Keyboard,
+    KeyboardEvent,
     Linking,
+    Locale,
+    Localization,
     Location,
     NetInfo,
     Notifications,
     Permissions,
+    PixelRatio,
     SecureStore,
     Share,
     Vibration,
     use_app_state,
+    use_locales,
     use_net_info,
+    use_reduce_motion,
+    use_screen_reader_enabled,
 )
 from .navigation import (
+    DARK_NAVIGATION_THEME,
+    DEFAULT_NAVIGATION_THEME,
     LinkingConfig,
     Navigation,
+    NavigationColors,
     NavigationContainer,
+    NavigationRef,
     NavigationState,
+    NavigationTheme,
     Route,
+    ScreenGroup,
     ScreenOptions,
+    TabBarStyle,
     create_drawer_navigator,
+    create_navigation_ref,
     create_stack_navigator,
     create_tab_navigator,
     use_focus_effect,
     use_is_focused,
     use_navigation,
+    use_navigation_theme,
     use_route,
 )
 from .net import HTTPError, Response, fetch
 from .platform import Platform, get_platform
+from .platform_metrics import WindowDimensions
 from .runtime import run_async, run_blocking
 from .scheduler import batch_updates
-from .sdk import (
-    Props,
-    ViewHandler,
-    element_factory,
-    native_component,
-    register_component,
-)
+from .sdk import Props, define_component, element_factory
 from .storage import AsyncStorage, use_persisted_state
 from .style import (
     DEFAULT_DARK_THEME,
     DEFAULT_LIGHT_THEME,
+    AccessibilityAction,
     AccessibilityState,
+    AccessibilityValue,
     AlignContent,
     AlignItems,
     AlignSelf,
     AutoCapitalize,
+    BorderStyle,
     Color,
     Dimension,
     Display,
+    DynamicColor,
     EdgeInsets,
     FlexDirection,
     FlexWrap,
@@ -223,25 +265,39 @@ from .style import (
 from .suspense import Resource, lazy, start_resource
 
 __all__ = [
+    "UNSET",
+    "UnsetType",
     # Components
     "ActivityIndicator",
+    "BlurView",
     "Button",
     "Checkbox",
     "Column",
     "DatePicker",
     "ErrorBoundary",
     "FlatList",
+    "ListData",
+    "Section",
+    "ViewableItem",
     "Fragment",
+    "Icon",
+    "IconName",
     "Image",
     "ImageBackground",
+    "ImageLoadEvent",
+    "ImageSource",
+    "WebNavigationEvent",
     "KeyboardAvoidingView",
+    "LinearGradient",
     "ListController",
     "Modal",
     "Picker",
     "Portal",
     "Pressable",
+    "PressState",
     "ProgressBar",
     "RefreshControl",
+    "Ripple",
     "Row",
     "SafeAreaView",
     "ScrollView",
@@ -251,12 +307,30 @@ __all__ = [
     "Spacer",
     "StatusBar",
     "Suspense",
+    "Svg",
     "Switch",
     "Text",
     "TextInput",
     "TouchableOpacity",
     "View",
     "WebView",
+    # Typed events
+    "ContentSizeEvent",
+    "KeyPressEvent",
+    "LayoutEvent",
+    "ScrollEvent",
+    "SelectionEvent",
+    # Imperative handles
+    "ScrollOffset",
+    "ScrollViewHandle",
+    "TextInputHandle",
+    "ViewHandle",
+    "WebViewHandle",
+    # Assets and graphics
+    "Asset",
+    "asset",
+    "icons",
+    "svg",
     # Core
     "Component",
     "Element",
@@ -264,6 +338,8 @@ __all__ = [
     "create_screen",
     "memo",
     # Hooks
+    "ColorScheme",
+    "Deps",
     "Context",
     "MutationCall",
     "MutationState",
@@ -297,12 +373,21 @@ __all__ = [
     "lazy",
     "start_resource",
     # Navigation
+    "DARK_NAVIGATION_THEME",
+    "DEFAULT_NAVIGATION_THEME",
     "LinkingConfig",
     "Navigation",
+    "NavigationColors",
     "NavigationContainer",
+    "NavigationRef",
     "NavigationState",
+    "NavigationTheme",
     "Route",
+    "ScreenGroup",
     "ScreenOptions",
+    "TabBarStyle",
+    "create_navigation_ref",
+    "use_navigation_theme",
     "create_drawer_navigator",
     "create_stack_navigator",
     "create_tab_navigator",
@@ -311,16 +396,20 @@ __all__ = [
     "use_navigation",
     "use_route",
     # Styling - typed primitives
+    "AccessibilityAction",
     "AccessibilityState",
+    "AccessibilityValue",
     "AlignContent",
     "AlignItems",
     "AlignSelf",
     "AutoCapitalize",
+    "BorderStyle",
     "Color",
     "DEFAULT_DARK_THEME",
     "DEFAULT_LIGHT_THEME",
     "Dimension",
     "Display",
+    "DynamicColor",
     "EdgeInsets",
     "FlexDirection",
     "FlexWrap",
@@ -349,16 +438,36 @@ __all__ = [
     "use_theme",
     # Appearance
     "appearance",
-    # Image pipeline
     # Animation
+    "ANIMATABLE_PROPS",
     "Animated",
     "AnimatedValue",
+    "AnimationResult",
+    "Easing",
+    "EasingSpec",
     "use_animated_value",
     # Gestures
+    "GestureSpec",
+    "SwipeDirection",
     "gestures",
     # Imperative
     "Alert",
     # Native modules
+    "AccessibilityEvent",
+    "AccessibilityInfo",
+    "Device",
+    "DeviceInfo",
+    "Dimensions",
+    "DimensionsEvent",
+    "Keyboard",
+    "KeyboardEvent",
+    "Locale",
+    "Localization",
+    "PixelRatio",
+    "WindowDimensions",
+    "use_locales",
+    "use_reduce_motion",
+    "use_screen_reader_enabled",
     "AppState",
     "Battery",
     "Biometrics",
@@ -366,6 +475,8 @@ __all__ = [
     "Clipboard",
     "FileSystem",
     "Haptics",
+    "ImageSize",
+    "Images",
     "Linking",
     "Location",
     "NetInfo",
@@ -393,9 +504,9 @@ __all__ = [
     "get_platform",
     # Custom-component SDK
     "Props",
-    "ViewHandler",
+    "define_component",
     "element_factory",
-    "native_component",
-    "register_component",
     "sdk",
 ]
+
+from .list_data import ListData, Section, ViewableItem

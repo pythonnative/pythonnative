@@ -13,10 +13,12 @@ from pythonnative import platform_metrics as pm
 def _reset() -> Generator[None, None, None]:
     pm.reset_safe_area_insets()
     pm.reset_window_dimensions()
+    pm.reset_screen_dimensions()
     pm.reset_keyboard_height()
     yield
     pm.reset_safe_area_insets()
     pm.reset_window_dimensions()
+    pm.reset_screen_dimensions()
     pm.reset_keyboard_height()
 
 
@@ -43,6 +45,64 @@ def test_set_window_dimensions_updates() -> None:
     dims = pm.get_window_dimensions()
     assert dims.width == 390.0
     assert dims.height == 844.0
+
+
+def test_window_dimensions_default_density() -> None:
+    dims = pm.get_window_dimensions()
+    assert dims.scale == 1.0
+    assert dims.font_scale == 1.0
+    assert dims == pm.WindowDimensions(0.0, 0.0)
+
+
+def test_set_window_dimensions_records_scale_and_font_scale() -> None:
+    pm.set_window_dimensions(390.0, 844.0, scale=3.0, font_scale=1.3)
+    dims = pm.get_window_dimensions()
+    assert (dims.scale, dims.font_scale) == (3.0, 1.3)
+
+
+def test_set_window_dimensions_keeps_density_when_omitted() -> None:
+    pm.set_window_dimensions(390.0, 844.0, scale=2.0, font_scale=1.5)
+    pm.set_window_dimensions(844.0, 390.0)
+    dims = pm.get_window_dimensions()
+    assert (dims.width, dims.height, dims.scale, dims.font_scale) == (844.0, 390.0, 2.0, 1.5)
+
+
+def test_set_window_dimensions_treats_zero_density_as_one() -> None:
+    pm.set_window_dimensions(390.0, 844.0, scale=0, font_scale=-1)
+    dims = pm.get_window_dimensions()
+    assert (dims.scale, dims.font_scale) == (1.0, 1.0)
+
+
+def test_reset_window_dimensions_clears_density() -> None:
+    pm.set_window_dimensions(390.0, 844.0, scale=3.0, font_scale=2.0)
+    pm.reset_window_dimensions()
+    assert pm.get_window_dimensions() == pm.WindowDimensions(0.0, 0.0, 1.0, 1.0)
+
+
+# ======================================================================
+# Screen dimensions
+# ======================================================================
+
+
+def test_screen_dimensions_fall_back_to_window_until_published() -> None:
+    assert pm.get_screen_dimensions() == pm.WindowDimensions(0.0, 0.0)
+    pm.set_window_dimensions(390.0, 700.0, scale=2.0)
+    assert pm.get_screen_dimensions() == pm.get_window_dimensions()
+    pm.set_screen_dimensions(390.0, 844.0, scale=2.0)
+    assert pm.get_screen_dimensions().height == 844.0
+    assert pm.get_window_dimensions().height == 700.0
+
+
+def test_set_screen_dimensions_notifies_and_dedupes() -> None:
+    received: list = []
+    pm.subscribe(lambda: received.append("tick"))
+    pm.set_screen_dimensions(390.0, 844.0)
+    pm.set_screen_dimensions(390.0, 844.0)
+    assert received == ["tick"]
+    pm.set_screen_dimensions(390.0, 844.0, font_scale=1.2)
+    assert received == ["tick", "tick"]
+    pm.reset_screen_dimensions()
+    assert pm.get_screen_dimensions() == pm.WindowDimensions(0.0, 0.0)
 
 
 # ======================================================================

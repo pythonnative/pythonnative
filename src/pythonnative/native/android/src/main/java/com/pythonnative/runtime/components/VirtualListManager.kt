@@ -1,12 +1,12 @@
 package com.pythonnative.runtime.components
 
+import com.pythonnative.generated.*
+
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.pythonnative.runtime.PNBridge
@@ -16,28 +16,30 @@ import kotlin.math.roundToInt
 
 /** Keyed native recycling; Python prepares logical children asynchronously. */
 class VirtualListManager : ComponentManager() {
-    private data class Item(val key: String, val revision: Int, val estimate: Double)
     private class Holder(val container: FrameLayout) : RecyclerView.ViewHolder(container) { var key = "" }
     private inner class ListView(context: Context) : SwipeRefreshLayout(context) {
         val recycler = RecyclerView(context)
+        val content = FrameLayout(context)
+        val stickyContainer = FrameLayout(context)
+        val store = ListStore()
+        private var pinnedKey: String? = null
+        private var lastWindow = emptyList<Long>()
         val roots = HashMap<String, View>()
         val heights = HashMap<String, Double>()
         val holders = HashMap<String, Holder>()
         var horizontal = false
         val manager = LinearLayoutManager(context)
-        val rows = object : ListAdapter<Item, Holder>(object : DiffUtil.ItemCallback<Item>() {
-            override fun areItemsTheSame(a: Item, b: Item) = a.key == b.key
-            override fun areContentsTheSame(a: Item, b: Item) = a == b
-        }) {
+        val rows = object : RecyclerView.Adapter<Holder>() {
+            override fun getItemCount() = store.keys.size
             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder = Holder(FrameLayout(context))
             override fun onBindViewHolder(holder: Holder, position: Int) {
                 holders.remove(holder.key)
-                val item = getItem(position)
+                val item = store.rows.getValue(store.keys[position])
                 holder.key = item.key
                 holders[item.key] = holder
                 attach(holder, item)
-                fire(this@ListView, "on_bind_row", JSONObject().put("index", position).put("key", item.key)
-                    .put("revision", PNBridge.registry.recordFor(this@ListView)?.props?.optInt("revision") ?: 0).put("extent", height / PNBridge.density()).put("width", width / PNBridge.density()))
+                if (item.key !in roots && !item.sticky) fire(this@ListView, "on_bind_row", JSONObject().put("index", position).put("key", item.key)
+                    .put("revision", store.revision).put("extent", height / PNBridge.density()).put("width", width / PNBridge.density()).put("sticky", store.sticky(position)))
             }
             override fun onViewRecycled(holder: Holder) {
                 holders.remove(holder.key)
@@ -45,7 +47,11 @@ class VirtualListManager : ComponentManager() {
             }
         }
         init {
-            addView(recycler, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            content.addView(recycler, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            content.addView(stickyContainer, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0))
+            addView(content, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            manager.initialPrefetchItemCount = 12
+            manager.isItemPrefetchEnabled = true
             recycler.layoutManager = manager
             recycler.adapter = rows
             recycler.itemAnimator = null
@@ -53,16 +59,76 @@ class VirtualListManager : ComponentManager() {
             setOnRefreshListener { fire(this, "on_refresh") }
             recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
                 override fun onScrolled(view: RecyclerView, dx: Int, dy: Int) {
-                    fire(this@ListView, "on_scroll", JSONObject().put("x", recycler.computeHorizontalScrollOffset() / PNBridge.density())
-                        .put("y", recycler.computeVerticalScrollOffset() / PNBridge.density())
-                        .put("extent", (if (horizontal) width else height) / PNBridge.density())
-                        .put("range", (if (horizontal) recycler.computeHorizontalScrollRange() else recycler.computeVerticalScrollRange()) / PNBridge.density())
-                        .put("first", manager.findFirstVisibleItemPosition()).put("last", manager.findLastVisibleItemPosition()))
+                    updateSticky()
+                    emitWindow()
+                    // App scroll callbacks are independent of window requests.
+                    if (!hasEvent(this@ListView, "on_scroll")) return
+                    fire(this@ListView, "on_scroll", scrollPayload())
                 }
             })
         }
-        fun attach(holder: Holder, item: Item) {
-            val size = ((heights[item.key] ?: item.estimate) * PNBridge.density()).roundToInt().coerceAtLeast(1)
+        /**
+         * The `ScrollEvent` fields in dp plus the list-window fields the
+         * Python `FlatList` layer reads (`first`/`last` visible positions,
+         * `extent` and `range` along the scroll axis).
+         */
+        fun scrollPayload(): JSONObject {
+            val density = PNBridge.density()
+            val extent = (if (horizontal) width else height) / density
+            val range = (if (horizontal) recycler.computeHorizontalScrollRange() else recycler.computeVerticalScrollRange()) / density
+            return JSONObject()
+                .put("x", recycler.computeHorizontalScrollOffset() / density)
+                .put("y", recycler.computeVerticalScrollOffset() / density)
+                .put("content_width", if (horizontal) range else width / density)
+                .put("content_height", if (horizontal) height / density else range)
+                .put("viewport_width", width / density)
+                .put("viewport_height", height / density)
+                .put("extent", extent)
+                .put("range", range)
+                .put("first", manager.findFirstVisibleItemPosition())
+                .put("last", manager.findLastVisibleItemPosition())
+        }
+        fun emitWindow() {
+            val first = manager.findFirstVisibleItemPosition().coerceAtLeast(0)
+            val last = manager.findLastVisibleItemPosition()
+            val extent = (if (horizontal) width else height) / PNBridge.density()
+            val sticky = store.sticky(first)
+            val identity = listOf(first.toLong(), last.toLong(), extent.toLong(), sticky.toLong(), store.revision)
+            if (identity == lastWindow) return
+            lastWindow = identity
+            fire(this, "on_window", scrollPayload().put("revision", store.revision).put("sticky", sticky))
+        }
+        override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+            super.onLayout(changed, left, top, right, bottom)
+            updateSticky(); emitWindow()
+        }
+        fun updateSticky() {
+            val first = manager.findFirstVisibleItemPosition()
+            val index = if (horizontal) -1 else store.sticky(first)
+            val key = store.keys.getOrNull(index)
+            val natural = if (index >= 0) manager.findViewByPosition(index)?.top else null
+            val wanted = key?.takeIf { natural == null || natural < 0 }
+            if (wanted != pinnedKey) {
+                val old = pinnedKey
+                pinnedKey = null
+                stickyContainer.removeAllViews()
+                if (old != null) holders[old]?.let { holder -> store.rows[old]?.let { attach(holder, it) } }
+                pinnedKey = wanted
+            }
+            val root = wanted?.let { roots[it] }
+            if (root == null) { stickyContainer.visibility = View.GONE; return }
+            if (root.parent !== stickyContainer) {
+                (root.parent as? ViewGroup)?.removeView(root)
+                stickyContainer.addView(root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            }
+            stickyContainer.visibility = View.VISIBLE
+            val extent = ((heights[wanted] ?: store.rows[wanted]?.extent ?: 44.0) * PNBridge.density()).roundToInt()
+            if (stickyContainer.layoutParams.height != extent) stickyContainer.layoutParams = stickyContainer.layoutParams.apply { height = extent }
+            val next = store.stickyIndices.firstOrNull { it > index }?.let { manager.findViewByPosition(it)?.top }
+            stickyContainer.translationY = if (next == null) 0f else (next - extent).coerceAtMost(0).toFloat()
+        }
+        fun attach(holder: Holder, item: ListStore.Row) {
+            val size = ((heights[item.key] ?: item.extent) * PNBridge.density()).roundToInt().coerceAtLeast(1)
             // Preserve RecyclerView.LayoutParams, which retain the holder identity.
             val params = holder.container.layoutParams as? RecyclerView.LayoutParams
                 ?: RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, size)
@@ -70,6 +136,7 @@ class VirtualListManager : ComponentManager() {
             params.height = if (horizontal) ViewGroup.LayoutParams.MATCH_PARENT else size
             holder.container.layoutParams = params
             holder.container.removeAllViews()
+            if (item.key == pinnedKey) return
             roots[item.key]?.let { root ->
                 (root.parent as? ViewGroup)?.removeView(root)
                 holder.container.addView(root, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
@@ -84,25 +151,31 @@ class VirtualListManager : ComponentManager() {
         list.horizontal = all.optBoolean("horizontal", false)
         list.manager.orientation = if (list.horizontal) RecyclerView.HORIZONTAL else RecyclerView.VERTICAL
         list.recycler.isVerticalScrollBarEnabled = all.optBoolean("shows_scroll_indicator", true)
+        list.recycler.isHorizontalScrollBarEnabled = list.recycler.isVerticalScrollBarEnabled
         val refresh = all.optJSONObject("refresh_control")
         list.isEnabled = refresh != null && !list.horizontal
         list.isRefreshing = refresh?.optBoolean("refreshing", false) == true
         refresh?.optString("tint_color")?.takeIf { it.isNotEmpty() }?.let { color -> PNColor.parse(color)?.let { list.setColorSchemeColors(it) } }
-        if (initial || props.has("keys") || props.has("revision") || props.has("row_heights")) {
-            val keys = all.optJSONArray("keys")
-            val heights = all.optJSONArray("row_heights")
-            val items = (0 until (keys?.length() ?: 0)).map { Item(keys!!.getString(it), all.optJSONArray("item_revisions")?.optInt(it) ?: 0, heights?.optDouble(it, 44.0) ?: 44.0) }
+        props.optJSONObject("dataset")?.let { packet ->
+            val patch = list.store.prepare(packet)
             val first = list.manager.findFirstVisibleItemPosition()
-            val anchor = list.rows.currentList.getOrNull(first)?.key
+            val anchor = list.store.keys.getOrNull(first)
             val anchorView = list.manager.findViewByPosition(first)
             val offset = (if (list.horizontal) anchorView?.left else anchorView?.top) ?: 0
-            list.rows.submitList(items) {
-                val position = items.indexOfFirst { it.key == anchor }
-                if (position >= 0) list.manager.scrollToPositionWithOffset(position, offset)
+            list.store.publish(patch)
+            if (patch.reset) list.heights.clear() else patch.deleted.forEach { list.heights.remove(it) }
+            if (patch.reset) list.rows.notifyDataSetChanged()
+            else for (edit in patch.edits) when (edit.code) {
+                "i" -> list.rows.notifyItemInserted(edit.to)
+                "d" -> list.rows.notifyItemRemoved(edit.from)
+                "m" -> list.rows.notifyItemMoved(edit.from, edit.to)
             }
-            list.heights.keys.retainAll(items.map { it.key }.toSet())
+            for ((key, item) in patch.changed) list.holders[key]?.let { list.attach(it, item) }
+            if (patch.order != null) list.store.indices[anchor]?.let { list.manager.scrollToPositionWithOffset(it, offset) }
+            list.post { list.updateSticky(); list.emitWindow() }
         }
     }
+
     override fun insertChild(parent: View, child: View, index: Int) {
         val list = parent as ListView
         val record = PNBridge.registry.recordFor(child) ?: return
@@ -112,10 +185,14 @@ class VirtualListManager : ComponentManager() {
             val extent = if (list.horizontal) width else height
             if (extent > 0 && list.heights[key] != extent) {
                 list.heights[key] = extent
-                list.holders[key]?.let { holder -> list.rows.currentList.find { it.key == key }?.let { list.attach(holder, it) } }
+                list.post {
+                    list.holders[key]?.let { holder -> list.store.rows[key]?.let { list.attach(holder, it) } }
+                    list.updateSticky()
+                }
             }
         }
-        list.holders[key]?.let { holder -> list.rows.currentList.find { it.key == key }?.let { list.attach(holder, it) } }
+        list.holders[key]?.let { holder -> list.store.rows[key]?.let { list.attach(holder, it) } }
+        list.updateSticky()
     }
     override fun removeChild(parent: View, child: View) {
         val list = parent as ListView
@@ -157,6 +234,13 @@ class VirtualListManager : ComponentManager() {
         return null
     }
     companion object {
+        fun validateDataset(tag: Long, props: JSONObject, initial: Boolean): Boolean = try {
+            val packet = props.optJSONObject("dataset")
+            if (packet == null) !initial && !props.has("dataset") else {
+                val store = if (initial) ListStore() else (PNBridge.registry.get(tag)?.view as? ListView)?.store
+                store?.prepare(packet) != null
+            }
+        } catch (_: Exception) { false }
         private val rowOwners = HashMap<Long, (Double, Double) -> Unit>()
         fun measured(tag: Long, width: Double, height: Double) { rowOwners[tag]?.invoke(width, height) }
     }

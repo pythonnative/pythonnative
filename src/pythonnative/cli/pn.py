@@ -462,12 +462,7 @@ def start_command(args: argparse.Namespace, *, open_browser: bool = False) -> No
         entry = entry or "app.main"
     missing = _missing_requirements(requirements)
     if missing:
-        print(f"Warning: {', '.join(missing)} from [requirements] is not installed in this Python environment.")
-        print(
-            "         The browser preview imports your app here, so install it first (e.g. `pip install "
-            + " ".join(missing)
-            + "`)."
-        )
+        print(_missing_requirements_message(missing), flush=True)
     if not (project_dir / "app").is_dir():
         print(f"Error: no app/ directory in {project_dir}. Run 'pn init' first or cd into a PythonNative project.")
         sys.exit(1)
@@ -495,24 +490,51 @@ def start_command(args: argparse.Namespace, *, open_browser: bool = False) -> No
         sys.exit(1)
 
 
-def _missing_requirements(requirements: Sequence[str]) -> List[str]:
-    """Names from ``[requirements]`` that aren't installed in this interpreter.
+def _requirement_distribution(requirement: str) -> str:
+    """Return the distribution name a ``[requirements]`` entry installs.
 
-    Requirement strings may carry version specifiers or extras
-    (``"httpx[http2]>=0.27"``); only the distribution name is checked.
+    Entries are PEP 508 strings (``"httpx[http2]>=0.27"``) or paths to
+    local wheels (``"vendor/pkg-0.1.0-py3-none-any.whl"``), whose name is
+    the wheel filename's first component.
+    """
+    text = requirement.strip()
+    if text.endswith(".whl"):
+        return Path(text).name.split("-", 1)[0]
+    return re.split(r"[\s\[<>=!~;@(]", text, maxsplit=1)[0]
+
+
+def _missing_requirements(requirements: Sequence[str]) -> List[str]:
+    """``[requirements]`` entries that aren't installed in this interpreter.
+
+    Only the distribution name is checked, so version specifiers and
+    extras don't cause false reports; the entries are returned unchanged
+    so the install hint reproduces them exactly.
     """
     import importlib.metadata as metadata
 
     missing: List[str] = []
     for requirement in requirements:
-        name = re.split(r"[\s\[<>=!~;@]", requirement.strip(), maxsplit=1)[0]
+        name = _requirement_distribution(requirement)
         if not name:
             continue
         try:
             metadata.distribution(name)
         except metadata.PackageNotFoundError:
-            missing.append(name)
+            missing.append(requirement.strip())
     return missing
+
+
+def _missing_requirements_message(missing: Sequence[str]) -> str:
+    """The warning ``pn start`` prints, ending in a command that installs ``missing`` here."""
+    import shlex
+
+    command = " ".join([shlex.quote(sys.executable), "-m", "pip", "install", *(shlex.quote(m) for m in missing)])
+    names = ", ".join(_requirement_distribution(m) for m in missing)
+    return (
+        f"Warning: [requirements] lists {names}, which this Python environment doesn't have.\n"
+        "The browser preview imports your app in this interpreter, so the first import of a missing\n"
+        f"package fails. Install them here with:\n\n    {command}\n"
+    )
 
 
 def preview_command(args: argparse.Namespace) -> None:

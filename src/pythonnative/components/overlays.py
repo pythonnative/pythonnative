@@ -12,11 +12,13 @@ def Modal(
     visible: bool = False,
     on_dismiss: Optional[Callable[[], Any]] = None,
     on_show: Optional[Callable[[], Any]] = None,
+    on_request_close: Optional[Callable[[], Any]] = None,
     title: Optional[str] = None,
     animation_type: Literal["slide", "fade", "none"] = "slide",
     transparent: bool = False,
     presentation_style: Literal["page_sheet", "form_sheet", "full_screen", "overlay"] = "page_sheet",
     dismiss_on_backdrop: bool = True,
+    status_bar_translucent: bool = False,
     style: StyleProp = None,
     key: Optional[str] = None,
 ) -> Element:
@@ -34,10 +36,15 @@ def Modal(
     Args:
         *children: Modal content.
         visible: Controls whether the modal is presented.
-        on_dismiss: Callback invoked when the user dismisses the modal
-            via system gesture.
+        on_dismiss: Callback invoked once the modal has closed after
+            ``visible`` became ``False``.
         on_show: Callback invoked once the modal has finished
             presenting.
+        on_request_close: Callback invoked when the user asks to close
+            the modal from outside your content: the Android back
+            button, an iOS sheet pull-down, or a tap on an overlay's
+            backdrop. Set ``visible=False`` in response; when unset the
+            modal stays open.
         title: Optional title-bar text.
         animation_type: ``"slide"`` (default), ``"fade"``, or ``"none"``.
         transparent: When ``True``, the underlying view is dimmed
@@ -47,9 +54,13 @@ def Modal(
             ``"full_screen"``, or ``"overlay"`` (custom dimmed
             overlay). On Android, ``"overlay"`` keeps the dialog
             non-fullscreen.
-        dismiss_on_backdrop: When ``True`` (default) and
-            ``transparent`` / ``"overlay"``, tapping the dimmed
-            backdrop dismisses the modal.
+        dismiss_on_backdrop: When ``True`` (default), a tap on the
+            dimmed backdrop of a ``transparent`` / ``"overlay"`` modal
+            (outside its content) calls ``on_request_close``. ``False``
+            ignores those taps and also locks an iOS sheet against the
+            pull-down.
+        status_bar_translucent: Draw the modal under a translucent
+            status bar (Android only).
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
 
@@ -66,8 +77,10 @@ def Modal(
         transparent=transparent,
         presentation_style=presentation_style,
         dismiss_on_backdrop=False if dismiss_on_backdrop is False else None,
+        status_bar_translucent=status_bar_translucent or None,
         on_dismiss=on_dismiss,
         on_show=on_show,
+        on_request_close=on_request_close,
         title=title,
     )
 

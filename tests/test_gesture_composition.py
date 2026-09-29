@@ -85,6 +85,42 @@ def test_routers_cover_all_leaves() -> None:
     assert set(events) == {"gesture:0", "gesture:1", "gesture:2"}
 
 
+def test_disabled_members_are_left_out_of_relationships() -> None:
+    specs, _ = serialize_gestures(
+        [Exclusive(Tap(n_taps=2, enabled=False), Tap()), Race(Pan(enabled=False), LongPress())]
+    )
+    # The single tap no longer waits for the disabled double tap.
+    assert specs[1]["wait_for"] == []
+    # Top-level simultaneity skips the disabled leaves too.
+    assert specs[1]["simultaneous"] == [3]
+    assert specs[3]["simultaneous"] == [1]
+    assert specs[0] == {**specs[0], "enabled": False, "simultaneous": [], "wait_for": []}
+    assert specs[2]["enabled"] is False and specs[2]["simultaneous"] == [] and specs[2]["wait_for"] == []
+
+
+# ======================================================================
+# Disabled gestures in arbitration
+# ======================================================================
+
+
+def test_exclusive_skips_disabled_higher_priority_member() -> None:
+    arbiter, emitted, _ = _compose(Exclusive(Tap(n_taps=2, enabled=False), Tap()))
+    arbiter.pointer_down(1, 5.0, 5.0, t=0.0)
+    arbiter.pointer_up(1, 5.0, 5.0, t=0.05)
+    # No double-tap window to wait out: the single tap fires immediately.
+    assert [(i, p["state"]) for i, p in emitted] == [(1, "ended")]
+
+
+def test_race_ignores_disabled_competitor() -> None:
+    arbiter, emitted, _ = _compose(
+        Race(Pan(min_distance=10.0, enabled=False), LongPress(min_duration_ms=100.0, max_distance=50.0))
+    )
+    arbiter.pointer_down(1, 0.0, 0.0, t=0.0)
+    arbiter.pointer_move(1, 30.0, 0.0, t=0.05)  # would have won as a pan
+    arbiter.poll(t=0.2)
+    assert [(i, p["state"]) for i, p in emitted] == [(1, "began")]
+
+
 # ======================================================================
 # Race arbitration
 # ======================================================================

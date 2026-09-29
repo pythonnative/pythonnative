@@ -335,6 +335,7 @@ mkdir -p \"$CODESIGNING_FOLDER_PATH/app_packages\"
 rsync -au --delete \"$PROJECT_DIR/$PACKAGES_SLICE/\" \"$CODESIGNING_FOLDER_PATH/app_packages/\"
 source \"$PROJECT_DIR/Python.xcframework/build/utils.sh\"
 install_python Python.xcframework app app_packages
+cp \"$PROJECT_DIR/ios_template/PrivacyInfo.xcprivacy\" \"$CODESIGNING_FOLDER_PATH/PrivacyInfo.xcprivacy\"
 ";
 			showEnvVarsInLog = 0;
 		};

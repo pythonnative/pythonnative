@@ -4,14 +4,21 @@ Both boundaries are transparent wrappers whose children are swapped
 for a fallback subtree when something goes wrong beneath them:
 
 - an **error boundary** catches exceptions raised while rendering its
-  subtree, mounts its ``fallback`` (optionally receiving the error and
-  a ``reset`` callable), and rebuilds the content when ``reset`` runs;
+  subtree or running its effects, mounts its ``fallback`` (optionally
+  receiving the error and a ``reset`` callable), and rebuilds the
+  content when ``reset`` runs;
 - a **Suspense** boundary catches [`Suspend`][pythonnative.suspense.Suspend]
   signals (an ``async`` body or a [`use_resource`][pythonnative.use_resource]
-  read that isn't ready), shows its ``fallback``, and retries the
-  content once the awaited work completes. Hook states of components
-  that had already rendered are preserved across the retry so cached
-  resources aren't refetched.
+  read that isn't ready) and shows its ``fallback``. On the initial
+  mount the content is built from scratch once the awaited work
+  completes, with the hook states of components that had already
+  rendered preserved across the retry so cached resources aren't
+  refetched. When a boundary that already has committed content
+  suspends because a newly mounted descendant suspended, the content
+  stays mounted and is hidden (``display: "none"`` on its native roots)
+  while the fallback shows beside it, then reconciled in place when the
+  work settles. Hook state, native views, focus, and scroll position of
+  the siblings survive.
 """
 
 from __future__ import annotations
@@ -22,6 +29,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 from .. import diagnostics
 from ..element import Element
 from ..hooks import HookState
+from ..mutations import UNSET, Mutation, UpdateOp
 from ..suspense import Suspend
 from .vnode import VNode, normalize_children
 
@@ -39,6 +47,8 @@ class BoundaryMixin:
     _dirty_suspense: Dict[int, VNode]
     _hydration: Optional[HydrationMap]
     _suspense_salvage: Optional[HydrationMap]
+    _ops: List[Mutation]
+    _publications: List[Callable[[], None]]
     transitions: "TransitionQueue"
 
     # Methods provided by the concrete reconciler.
@@ -49,6 +59,14 @@ class BoundaryMixin:
     def _destroy_tree(self, node: VNode, salvage: Optional[HydrationMap] = None) -> None: ...  # pragma: no cover
 
     def _refresh_identity(self, node: VNode) -> None: ...  # pragma: no cover
+
+    def _native_roots(self, node: VNode) -> List[VNode]: ...  # pragma: no cover
+
+    def _create_wrapper(self, element: Element, owner: str) -> VNode: ...  # pragma: no cover
+
+    # ``_mark_layout_dirty`` comes from the layout mixin; it is not stubbed
+    # here because a stub would shadow it in the reconciler's MRO.
+    _mark_layout_dirty: Callable[[VNode], None]
 
     def request_render(self) -> None:  # pragma: no cover
         """Ask for another render pass (provided by the concrete reconciler)."""
@@ -165,21 +183,19 @@ class BoundaryMixin:
     def _reconcile_suspense(self, old: VNode, new_el: Element) -> VNode:
         previous = old.element
         old.element = new_el
-        if old.suspense_showing_fallback and previous.children != new_el.children:
-            if old.suspense_hydration:
-                self._dispose_hydration(old.suspense_hydration)
-            old.suspense_hydration = None
-            old.suspense_waits = None
-            self._attempt_suspense_content(old)
-            return old
         if old.suspense_showing_fallback:
+            if previous.children != new_el.children:
+                if old.suspense_hidden is None:
+                    if old.suspense_hydration:
+                        self._dispose_hydration(old.suspense_hydration)
+                    old.suspense_hydration = None
+                    old.suspense_waits = None
+                self._attempt_suspense_content(old)
+                return old
             # Fallback showing; keep it in sync with the latest fallback
             # prop. Content retries are driven by waitable completions,
             # not by parent re-renders.
-            old.children = self._reconcile_child_list(old.children, self._suspense_fallback_elements(old))
-            for child in old.children:
-                child.parent = old
-            self._refresh_identity(old)
+            self._refresh_suspense_fallback(old)
             return old
         try:
             children = self._reconcile_child_list(old.children, normalize_children(new_el.children, owner="Suspense"))
@@ -188,19 +204,23 @@ class BoundaryMixin:
                 child.parent = old
             self._refresh_identity(old)
         except Suspend as signal:
-            self._teardown_suspense_content(old)
-            self._suspend_boundary(old, signal)
+            self._hide_suspense_content(old, signal)
         return old
 
     def _attempt_suspense_content(self, node: VNode) -> None:
-        """Build a boundary's content from scratch (initial mount or retry).
+        """Build or retry a boundary's content (initial mount, retry, or content change).
 
         Components re-adopt hook states preserved from the previous
         attempt (the hydration map), so cached resources resolve
-        instead of refetching. On success any still-showing fallback
-        is swapped out for the content; on suspension the fallback
-        mounts (or stays) and a retry is wired to the pending work.
+        instead of refetching. A boundary with hidden committed content
+        reconciles it in place; otherwise the content is built from
+        scratch. On success any still-showing fallback is swapped out
+        for the content; on suspension the fallback mounts (or stays)
+        and a retry is wired to the pending work.
         """
+        if node.suspense_hidden is not None:
+            self._retry_hidden_suspense_content(node)
+            return
         # Claim states from a candidate map. A later render failure must leave
         # the committed boundary's buckets available for its original retry.
         hydration: HydrationMap = {key: list(states) for key, states in (node.suspense_hydration or {}).items()}
@@ -233,54 +253,137 @@ class BoundaryMixin:
         node.suspense_waits = None
         self._refresh_identity(node)
 
-    def _teardown_suspense_content(self, node: VNode) -> None:
-        """Destroy a boundary's live content, salvaging its hook states.
+    def _retry_hidden_suspense_content(self, node: VNode) -> None:
+        """Reconcile a boundary's hidden content in place and reveal it if it settles."""
+        hidden = node.suspense_hidden or []
+        fallback = node.children[len(hidden) :]
+        hydration: HydrationMap = {key: list(states) for key, states in (node.suspense_hydration or {}).items()}
+        node.suspense_hydration = None
+        saved_hydration = self._hydration
+        saved_salvage = self._suspense_salvage
+        self._hydration = hydration
+        self._suspense_salvage = None
+        try:
+            children = self._reconcile_child_list(hidden, normalize_children(node.element.children, owner="Suspense"))
+        except Suspend as signal:
+            merged = {key: states for key, states in hydration.items() if states}
+            node.suspense_hydration = merged or None
+            self._fold_suspended_state(node, signal)
+            # Slots whose node was replaced mid-list are rebuilt on the next retry.
+            still = [child for child in hidden if child.mounted]
+            node.suspense_hidden = still
+            node.children = [*still, *fallback]
+            self._apply_suspense_hide(node)
+            self._refresh_identity(node)
+            self._watch_waitable(node, signal.waitable)
+            return
+        finally:
+            self._hydration = saved_hydration
+            self._suspense_salvage = saved_salvage
 
-        Used when an *update* under the boundary suspends: the content
-        components' hook states move into the boundary's hydration map,
-        so when the retry re-mounts them their state, caches, and
-        effect bookkeeping carry over (the fallback round-trip doesn't
-        reset the subtree).
-        """
-        salvage: HydrationMap = {}
-        for child in node.children:
-            self._destroy_tree(child, salvage=salvage)
-        node.children = []
+        self._dispose_hydration(hydration)
+        for child in fallback:
+            self._destroy_tree(child)
+        for child in children:
+            child.parent = node
+        node.children = children
+        node.suspense_hidden = None
         node.suspense_showing_fallback = False
+        node.suspense_waits = None
+        self._reveal_suspense_content(node)
+        self._refresh_identity(node)
+
+    def _hide_suspense_content(self, node: VNode, signal: Suspend) -> None:
+        """Keep a boundary's committed content mounted but hidden, and show the fallback beside it.
+
+        Called when an update under a boundary with committed content
+        suspends. Hook states salvaged while the ``Suspend`` unwound
+        move into the boundary's hydration map so the retry re-adopts
+        them. A boundary without a fallback is transparent and re-raises.
+        """
+        if node.element.props.get("fallback") is None:
+            raise signal
+        self._fold_suspended_state(node, signal)
+        if not node.suspense_showing_fallback:
+            node.suspense_hidden = list(node.children)
+            self._apply_suspense_hide(node)
+            fallback = self._create_child_list(self._suspense_fallback_elements(node))
+            for child in fallback:
+                child.parent = node
+            node.children = [*node.children, *fallback]
+            node.suspense_showing_fallback = True
+            self._refresh_identity(node)
+        elif node.suspense_hidden is not None:
+            self._apply_suspense_hide(node)
+        self._watch_waitable(node, signal.waitable)
+
+    def _apply_suspense_hide(self, node: VNode) -> None:
+        """Set ``display: "none"`` on every native root of the boundary's hidden content."""
+        for child in node.suspense_hidden or ():
+            for root in self._native_roots(child):
+                if root.hidden_by_suspense:
+                    continue
+                root.hidden_by_suspense = True
+                if root.tag is not None:
+                    self._ops.append(UpdateOp(root.tag, {"display": "none"}))
+                self._mark_layout_dirty(root)
+
+    def _reveal_suspense_content(self, node: VNode) -> None:
+        """Lift the ``display`` override from the boundary's content roots."""
+        for child in node.children:
+            for root in self._native_roots(child):
+                if not root.hidden_by_suspense:
+                    continue
+                root.hidden_by_suspense = False
+                if root.tag is not None:
+                    self._ops.append(UpdateOp(root.tag, {"display": root.clean_props.get("display", UNSET)}))
+                self._mark_layout_dirty(root)
+
+    def _refresh_suspense_fallback(self, node: VNode) -> None:
+        """Reconcile a showing fallback against the latest ``fallback`` prop."""
+        hidden = node.suspense_hidden or []
+        fallback = self._reconcile_child_list(node.children[len(hidden) :], self._suspense_fallback_elements(node))
+        for child in fallback:
+            child.parent = node
+        node.children = [*hidden, *fallback]
+        self._refresh_identity(node)
+
+    def _fold_suspended_state(self, node: VNode, signal: Suspend) -> None:
+        """Move salvaged hook states and the suspender's own state into the boundary's hydration map.
+
+        A suspender whose node is still mounted (a component re-rendered
+        in place under hidden content) keeps its state on the node; only
+        states that lost their node are preserved through hydration.
+        """
+        salvage = self._suspense_salvage
+        self._suspense_salvage = None
+        suspender = signal.hook_state
+        if suspender is not None and suspender.vnode is not None and suspender.vnode.mounted:
+            suspender = None
+        if not salvage and (suspender is None or signal.key is None):
+            return
+        hydration = node.suspense_hydration
+        if hydration is None:
+            hydration = node.suspense_hydration = {}
         if salvage:
-            hydration = node.suspense_hydration
-            if hydration is None:
-                hydration = node.suspense_hydration = {}
             for key, states in salvage.items():
                 hydration.setdefault(key, []).extend(states)
+        if suspender is not None and signal.key is not None:
+            bucket = hydration.setdefault(signal.key, [])
+            if suspender not in bucket:
+                bucket.append(suspender)
 
     def _suspend_boundary(self, node: VNode, signal: Suspend) -> None:
         """Show a boundary's fallback and schedule a retry for ``signal``.
 
-        A boundary without a fallback is transparent: the suspension
-        propagates to the next Suspense ancestor (mirroring how an
-        ErrorBoundary without a fallback re-raises).
+        Used when the content is being built from scratch (initial mount
+        or a retry). A boundary without a fallback is transparent: the
+        suspension propagates to the next Suspense ancestor (mirroring
+        how an ErrorBoundary without a fallback re-raises).
         """
         if node.element.props.get("fallback") is None:
             raise signal
-
-        # Fold in hook states salvaged while the Suspend unwound
-        # (already-rendered siblings of the suspender), plus the
-        # suspender's own state carried on the signal.
-        salvage = self._suspense_salvage
-        self._suspense_salvage = None
-        if salvage or (signal.hook_state is not None and signal.key is not None):
-            hydration = node.suspense_hydration
-            if hydration is None:
-                hydration = node.suspense_hydration = {}
-            if salvage:
-                for key, states in salvage.items():
-                    hydration.setdefault(key, []).extend(states)
-            if signal.hook_state is not None and signal.key is not None:
-                bucket = hydration.setdefault(signal.key, [])
-                if signal.hook_state not in bucket:
-                    bucket.append(signal.hook_state)
-
+        self._fold_suspended_state(node, signal)
         if not node.suspense_showing_fallback:
             children = self._create_child_list(self._suspense_fallback_elements(node))
             for child in children:
@@ -288,7 +391,6 @@ class BoundaryMixin:
             node.children = children
             node.suspense_showing_fallback = True
             self._refresh_identity(node)
-
         self._watch_waitable(node, signal.waitable)
 
     @staticmethod

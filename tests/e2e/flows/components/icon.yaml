@@ -1,0 +1,32 @@
+# Tests Icon renders bundled Lucide icons and the name lookup helpers agree.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/icon.py
+# Source under test: src/pythonnative/icons/__init__.py :: Icon
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: Icon
+- assertVisible: "Icons rendered: 6"
+- assertVisible:
+    id: "bold-heart"
+    optional: true
+- scrollUntilVisible:
+    element:
+      text: "'house' is an icon: yes"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "'house' is an icon: yes"
+- assertVisible: "'not-an-icon' is an icon: no"
+- assertVisible: "Icons available: 1000+"
+- scrollUntilVisible:
+    element:
+      text: "Back to list"
+    direction: DOWN
+    timeout: 20000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

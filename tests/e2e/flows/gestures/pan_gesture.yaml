@@ -1,0 +1,46 @@
+# Tests gestures.Pan activation offsets, absolute coordinates, and
+# enabled=False: a horizontal swipe activates the pan, a disabled pan
+# ignores the next swipe.
+#
+# Demo screen: examples/e2e-suite/app/screens/gestures/pan_gesture.py
+# Source under test: src/pythonnative/gestures.py :: Pan
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Gestures
+      DEMO_TITLE: Pan gesture
+- assertVisible: "Pan begins: 0"
+- assertVisible: "Pan enabled: yes"
+# Horizontal so the page ScrollView doesn't steal the motion and the
+# fail_offset_y rule doesn't cancel the pan.
+- swipe:
+    from:
+      text: "Pan target"
+    direction: LEFT
+    duration: 400
+- extendedWaitUntil:
+    visible: "Pan begins: 1"
+    timeout: 5000
+- assertVisible: "Pan ends: 1"
+- assertVisible: "Moved left: yes"
+- assertVisible: "Absolute point: inside window"
+- tapOn: "Disable pan"
+- assertVisible: "Pan enabled: no"
+- swipe:
+    from:
+      text: "Pan target"
+    direction: LEFT
+    duration: 400
+# Give a stray event time to arrive before asserting nothing changed.
+- extendedWaitUntil:
+    visible: "Pan enabled: no"
+    timeout: 2000
+- assertVisible: "Pan begins: 1"
+- tapOn: "Enable pan"
+- assertVisible: "Pan enabled: yes"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Gestures

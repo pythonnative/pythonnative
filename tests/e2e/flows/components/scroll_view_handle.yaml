@@ -1,0 +1,38 @@
+# Tests ScrollViewHandle on ref.current: scroll_to_end() / scroll_to(y=0) move
+# the native content and get_scroll_offset() reads the offset back.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/scroll_view_handle.py
+# Source under test: src/pythonnative/handles.py :: ScrollViewHandle
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: ScrollViewHandle
+- assertVisible: "HandleRow 1"
+- assertVisible: "Offset: unread"
+- tapOn: "Handle scroll to end"
+- assertVisible: "Last call: scroll_to_end"
+- assertVisible: "Handle attached: yes"
+- extendedWaitUntil:
+    visible: "HandleRow 40"
+    timeout: 10000
+- tapOn: "Read offset"
+- extendedWaitUntil:
+    visible: "Offset: scrolled"
+    timeout: 5000
+- tapOn: "Handle scroll to top"
+- extendedWaitUntil:
+    visible: "HandleRow 1"
+    timeout: 10000
+- tapOn: "Read offset"
+- extendedWaitUntil:
+    visible: "Offset: top"
+    timeout: 5000
+- tapOn: "Flash indicators"
+- assertVisible: "Last call: flash_scroll_indicators"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

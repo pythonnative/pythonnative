@@ -1,5 +1,7 @@
 package com.pythonnative.runtime.components
 
+import android.content.res.Configuration
+import com.pythonnative.runtime.PNBridge
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -9,10 +11,24 @@ import org.json.JSONObject
  * Accepts `#RGB`, `#RGBA`, `#RRGGBB`, `#AARRGGBB` (the Android/Python
  * convention used by `parse_color_int`), `rgb(r, g, b)`,
  * `rgba(r, g, b, a)` with `a` in `0..1`, CSS named colors, packed
- * integers (`0xRRGGBB` gains full alpha), and `[r, g, b(, a)]` arrays.
+ * integers (`0xRRGGBB` gains full alpha), `[r, g, b(, a)]` arrays, and
+ * dynamic `{"light": color, "dark": color}` dictionaries resolved
+ * against the current UI mode (matching iOS and the browser preview).
  * Results are signed 32-bit ARGB ints suitable for Android APIs.
  */
 object PNColor {
+    /**
+     * Whether dynamic colors resolve to their `dark` variant. Defaults to
+     * the attached activity's `Configuration.uiMode`; tests replace it.
+     */
+    var darkModeProvider: () -> Boolean = {
+        val configuration = PNBridge.activity()?.resources?.configuration
+        configuration != null && configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+    }
+
+    /** Whether the current UI mode is dark (see [darkModeProvider]). */
+    fun isDarkMode(): Boolean = try { darkModeProvider() } catch (_: Exception) { false }
+
     private val named: Map<String, Int> = mapOf(
         "transparent" to 0x00000000,
         "clear" to 0x00000000,
@@ -82,7 +98,14 @@ object PNColor {
     )
 
     /** Parse `value` into a signed ARGB int, or `null` when unparseable. */
-    fun parse(value: Any?): Int? {
+    fun parse(value: Any?): Int? = parse(value, isDarkMode())
+
+    /**
+     * Parse `value` resolving dynamic colors for the given scheme. A
+     * dynamic dictionary falls back to whichever variant is present when
+     * the requested one is missing.
+     */
+    fun parse(value: Any?, dark: Boolean): Int? {
         return when (value) {
             null, JSONObject.NULL -> null
             is Boolean -> null
@@ -95,8 +118,24 @@ object PNColor {
             is String -> parseString(value)
             is JSONArray -> parseArray((0 until value.length()).map { value.opt(it) })
             is List<*> -> parseArray(value)
+            is JSONObject -> parseDynamic(value.opt("light"), value.opt("dark"), dark)
+            is Map<*, *> -> parseDynamic(value["light"], value["dark"], dark)
             else -> null
         }
+    }
+
+    /** Whether `value` is a `{"light": ..., "dark": ...}` dynamic color. */
+    fun isDynamic(value: Any?): Boolean = when (value) {
+        is JSONObject -> value.has("light") || value.has("dark")
+        is Map<*, *> -> value.containsKey("light") || value.containsKey("dark")
+        else -> false
+    }
+
+    private fun parseDynamic(light: Any?, dark: Any?, isDark: Boolean): Int? {
+        val preferred = if (isDark) dark else light
+        val fallback = if (isDark) light else dark
+        if (preferred is JSONObject || preferred is Map<*, *>) return null
+        return parse(preferred, isDark) ?: parse(fallback, isDark)
     }
 
     /** Parse `value`, falling back to `default` when unparseable. */

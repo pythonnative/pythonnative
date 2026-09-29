@@ -1,8 +1,12 @@
 package com.pythonnative.runtime.screens
 
+import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Point
+import android.os.Build
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.pythonnative.runtime.PNBridge
@@ -48,13 +52,19 @@ object ScreenRegistry {
 /** Builds the viewport payload shared by `layout`, `resume`, and `Host.viewport`. */
 object Viewport {
     /**
-     * `{width, height, insets{top,left,bottom,right}, color_scheme, keyboard_height}`
+     * `{width, height, insets{top,left,bottom,right}, color_scheme,
+     * keyboard_height, scale, font_scale, screen_width, screen_height}`
      * in dp, measured from `view` (falling back to display metrics when
-     * the view has not been laid out yet).
+     * the view has not been laid out yet). `scale` is the display
+     * density, `font_scale` the user's text scaling, and
+     * `screen_width`/`screen_height` the physical display size in dp
+     * (`Dimensions.get("screen")`), as opposed to the window the view
+     * occupies.
      */
     fun describe(view: View): JSONObject {
         val density = PNBridge.density()
         val metrics = view.resources.displayMetrics
+        val screen = screenSize(view.context)
         val w = if (view.width > 0) view.width else metrics.widthPixels
         val h = if (view.height > 0) view.height else metrics.heightPixels
         val insets = ViewCompat.getRootWindowInsets(view)
@@ -76,5 +86,28 @@ object Viewport {
             )
             .put("color_scheme", if (night == Configuration.UI_MODE_NIGHT_YES) "dark" else "light")
             .put("keyboard_height", keyboard.toDouble())
+            .put("scale", density.toDouble())
+            .put("font_scale", view.resources.configuration.fontScale.toDouble())
+            .put("screen_width", screen.x / density.toDouble())
+            .put("screen_height", screen.y / density.toDouble())
+    }
+
+    /** The full display size in pixels (including system bars). */
+    fun screenSize(context: Context): Point {
+        val fallback = context.resources.displayMetrics.let { Point(it.widthPixels, it.heightPixels) }
+        val manager = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager ?: return fallback
+        return try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                val bounds = manager.maximumWindowMetrics.bounds
+                if (bounds.width() > 0 && bounds.height() > 0) Point(bounds.width(), bounds.height()) else fallback
+            } else {
+                val point = Point()
+                @Suppress("DEPRECATION")
+                manager.defaultDisplay.getRealSize(point)
+                if (point.x > 0 && point.y > 0) point else fallback
+            }
+        } catch (_: Exception) {
+            fallback
+        }
     }
 }

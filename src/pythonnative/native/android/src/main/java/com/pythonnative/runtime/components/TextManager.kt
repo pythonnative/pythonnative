@@ -1,21 +1,31 @@
 package com.pythonnative.runtime.components
 
+import com.pythonnative.generated.*
+
 import android.content.Context
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.text.Selection
+import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.TextPaint
 import android.text.TextUtils
+import android.text.method.LinkMovementMethod
 import android.text.style.AbsoluteSizeSpan
 import android.text.style.BackgroundColorSpan
+import android.text.style.ClickableSpan
 import android.text.style.ForegroundColorSpan
+import android.text.style.MetricAffectingSpan
 import android.text.style.StrikethroughSpan
 import android.text.style.StyleSpan
-import android.text.style.TypefaceSpan
 import android.text.style.UnderlineSpan
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
+import com.pythonnative.runtime.R
+import com.pythonnative.runtime.assets.PNAssets
 import com.pythonnative.runtime.bridge.JsonUtil
 import com.pythonnative.runtime.bridge.PNLog
 import com.pythonnative.runtime.bridge.num
@@ -82,8 +92,12 @@ object TextStyle {
         }
     }
 
-    /** Build a spannable from a rich-text span list, applying `transform` per span. */
-    fun buildSpannable(spans: JSONArray, transform: String?): SpannableStringBuilder {
+    /**
+     * Build a spannable from a rich-text span list, applying `transform` per
+     * span. Span font sizes are `sp` unless `fontScaling` is `false`
+     * (`allow_font_scaling=False`), in which case they are `dp`.
+     */
+    fun buildSpannable(spans: JSONArray, transform: String?, fontScaling: Boolean = true, onSpanPress: ((Int) -> Unit)? = null): SpannableStringBuilder {
         val builder = SpannableStringBuilder()
         for (i in 0 until spans.length()) {
             val span = spans.optJSONObject(i) ?: continue
@@ -93,16 +107,24 @@ object TextStyle {
             builder.append(text)
             val end = builder.length
             fun set(obj: Any) = builder.setSpan(obj, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            if (onSpanPress != null && JsonUtil.truthy(span.value("pressable"))) set(PNPressableSpan(i, onSpanPress))
             try {
                 PNColor.parse(span.value("color"))?.let { set(ForegroundColorSpan(it)) }
                 PNColor.parse(span.value("background_color"))?.let { set(BackgroundColorSpan(it)) }
-                span.num("font_size")?.let { set(AbsoluteSizeSpan(android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, it.toFloat(), com.pythonnative.runtime.PNBridge.context().resources.displayMetrics).toInt(), false)) }
+                span.num("font_size")?.let {
+                    val unit = if (fontScaling) android.util.TypedValue.COMPLEX_UNIT_SP else android.util.TypedValue.COMPLEX_UNIT_DIP
+                    set(AbsoluteSizeSpan(android.util.TypedValue.applyDimension(unit, it.toFloat(), com.pythonnative.runtime.PNBridge.context().resources.displayMetrics).toInt(), false))
+                }
                 var bold = JsonUtil.truthy(span.value("bold"))
                 val weight = span.value("font_weight")
                 if (!bold && weight != null) bold = isBold(weight)
                 val italic = JsonUtil.truthy(span.value("italic"))
-                if (bold || italic) set(StyleSpan(typefaceStyle(if (bold) "bold" else null, italic)))
-                span.str("font_family")?.takeIf { it.isNotEmpty() }?.let { set(TypefaceSpan(it)) }
+                val family = span.str("font_family")?.takeIf { it.isNotEmpty() }
+                if (family != null) {
+                    set(PNTypefaceSpan(typeface(family, weight ?: if (bold) "bold" else null, italic)))
+                } else if (bold || italic) {
+                    set(StyleSpan(typefaceStyle(if (bold) "bold" else null, italic)))
+                }
                 when (span.str("text_decoration")) {
                     "underline" -> set(UnderlineSpan())
                     "line_through" -> set(StrikethroughSpan())
@@ -114,44 +136,208 @@ object TextStyle {
         return builder
     }
 
+    /** `weight` (a name or number) as a 100-900 numeric weight. */
+    fun numericWeight(weight: Any?): Int = when (weight) {
+        is Number -> weight.toInt().coerceIn(100, 900)
+        is String -> weight.toIntOrNull()?.coerceIn(100, 900) ?: when (weight.lowercase()) {
+            "thin", "ultralight", "ultra_light" -> 100
+            "extralight", "extra_light" -> 200
+            "light" -> 300
+            "medium" -> 500
+            "semibold", "semi_bold" -> 600
+            "bold" -> 700
+            "extrabold", "extra_bold", "heavy" -> 800
+            "black" -> 900
+            else -> 400
+        }
+        else -> 400
+    }
+
+    /**
+     * The typeface for `family`/`weight`/`italic`: a bundled face from
+     * `app/assets/` when the family is bundled, otherwise a system family.
+     */
+    fun typeface(family: String?, weight: Any?, italic: Boolean): Typeface {
+        val style = typefaceStyle(weight, italic)
+        if (family.isNullOrEmpty()) return Typeface.defaultFromStyle(style)
+        val bundled = PNAssets.typeface(family, numericWeight(weight), italic)
+        if (bundled != null) {
+            // Synthesize bold/italic only when the closest face lacks them.
+            val face = PNAssets.fontFace(family, numericWeight(weight), italic)
+            val needBold = isBold(weight) && (face == null || face.weight < 600)
+            val needItalic = italic && (face == null || !face.italic)
+            val synth = when {
+                needBold && needItalic -> Typeface.BOLD_ITALIC
+                needBold -> Typeface.BOLD
+                needItalic -> Typeface.ITALIC
+                else -> Typeface.NORMAL
+            }
+            return if (synth == Typeface.NORMAL) bundled else Typeface.create(bundled, synth)
+        }
+        return Typeface.create(family, style)
+    }
+
     /** Apply font props (`font_family`, `font_weight`, `bold`, `italic`) from merged props. */
     fun applyTypeface(tv: TextView, merged: JSONObject) {
         val family = merged.str("font_family")
         val weight = merged.value("font_weight") ?: if (JsonUtil.truthy(merged.value("bold"))) "bold" else null
         val italic = JsonUtil.truthy(merged.value("italic"))
-        val style = typefaceStyle(weight, italic)
-        if (!family.isNullOrEmpty()) {
-            tv.setTypeface(Typeface.create(family, style))
-        } else {
-            tv.setTypeface(tv.typeface, style)
-        }
+        tv.typeface = typeface(family, weight, italic)
     }
 }
 
-/** `Text` element: a `TextView` with rich spans, transforms, shadows, and line limits. */
+/**
+ * A pressable rich-text span (`Text` child with `on_press`). Reports the
+ * span index and leaves the text's own styling alone: no link color or
+ * underline, unlike `URLSpan`.
+ */
+class PNPressableSpan(val index: Int, private val onPress: (Int) -> Unit) : ClickableSpan() {
+    override fun onClick(widget: View) = onPress(index)
+    override fun updateDrawState(ds: TextPaint) {}
+}
+
+/**
+ * Link movement bounded by the glyphs, matching iOS and React Native: a
+ * tap activates a [PNPressableSpan] only when it lands inside the line's
+ * laid-out text. Stock `LinkMovementMethod` also fires the last span for
+ * taps past the end of a line. A tap that activates a span is recorded on
+ * the view so the label's own `on_press` listener skips it; a tap that
+ * misses every span falls through to that listener.
+ */
+object PNSpanMovementMethod : LinkMovementMethod() {
+    private val spanTapKey = R.id.pn_span_tap
+
+    override fun onTouchEvent(widget: TextView, buffer: Spannable, event: MotionEvent): Boolean {
+        val action = event.actionMasked
+        if (action == MotionEvent.ACTION_DOWN) widget.setTag(spanTapKey, null)
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_DOWN) {
+            val span = spanAt(widget, buffer, event.x, event.y)
+            if (span == null) {
+                Selection.removeSelection(buffer)
+                return false
+            }
+            if (action == MotionEvent.ACTION_UP) {
+                widget.setTag(spanTapKey, true)
+                span.onClick(widget)
+            }
+            return true
+        }
+        return super.onTouchEvent(widget, buffer, event)
+    }
+
+    /** The pressable span under (`x`, `y`) in view coordinates, or `null` off the glyphs. */
+    fun spanAt(widget: TextView, buffer: Spanned, x: Float, y: Float): PNPressableSpan? {
+        val layout = widget.layout ?: return null
+        val localX = x - widget.totalPaddingLeft + widget.scrollX
+        val localY = y - widget.totalPaddingTop + widget.scrollY
+        if (localY < 0f || localY > layout.height) return null
+        val line = layout.getLineForVertical(localY.toInt())
+        if (localX < layout.getLineLeft(line) || localX > layout.getLineRight(line)) return null
+        return spanAtOffset(buffer, layout.getOffsetForHorizontal(line, localX))
+    }
+
+    /**
+     * The pressable span covering character `offset`. A tap on the right
+     * half of a span's last glyph resolves to the offset just past it, so a
+     * span ending exactly at `offset` counts when no span starts there.
+     */
+    fun spanAtOffset(buffer: Spanned, offset: Int): PNPressableSpan? {
+        // A zero-length query returns every span containing or touching `offset`.
+        val candidates = buffer.getSpans(offset, offset, PNPressableSpan::class.java)
+        return candidates.firstOrNull { buffer.getSpanStart(it) <= offset && offset < buffer.getSpanEnd(it) }
+            ?: candidates.firstOrNull { buffer.getSpanEnd(it) == offset && offset > buffer.getSpanStart(it) }
+    }
+
+    /** Whether the gesture that just ended activated a span; clears the mark. */
+    fun consumeSpanTap(widget: View): Boolean {
+        val consumed = widget.getTag(spanTapKey) == true
+        widget.setTag(spanTapKey, null)
+        return consumed
+    }
+}
+
+/** Span applying a concrete `Typeface` (API 24 compatible; `TypefaceSpan(Typeface)` needs 28). */
+class PNTypefaceSpan(private val typeface: Typeface) : MetricAffectingSpan() {
+    override fun updateDrawState(paint: TextPaint) = apply(paint)
+    override fun updateMeasureState(paint: TextPaint) = apply(paint)
+
+    private fun apply(paint: TextPaint) {
+        val old = paint.typeface
+        val oldStyle = old?.style ?: 0
+        val fake = oldStyle and typeface.style.inv()
+        if (fake and Typeface.BOLD != 0) paint.isFakeBoldText = true
+        if (fake and Typeface.ITALIC != 0) paint.textSkewX = -0.25f
+        paint.typeface = typeface
+    }
+}
+
+/**
+ * `Text` element: a `TextView` with rich spans, transforms, shadows, and
+ * line limits.
+ *
+ * `ellipsize_mode` maps `head`/`middle`/`tail` onto `TextUtils.TruncateAt`;
+ * `clip` disables ellipsizing and, for a single line, turns off wrapping
+ * so the text is clipped horizontally. `allow_font_scaling=false` sizes
+ * text in `dp` instead of `sp`, opting out of the user's font scale.
+ * `on_press` makes the whole label clickable; spans flagged `pressable`
+ * become [PNPressableSpan]s driven by a `LinkMovementMethod` and report
+ * `on_span_press(index)`. `selectable` enables the platform selection
+ * handles (a label with pressable spans keeps the click movement method).
+ */
 class TextManager : ComponentManager() {
     private val shadowKeys = listOf("text_shadow_color", "text_shadow_offset", "text_shadow_radius")
 
     override fun createView(context: Context, tag: Long, props: JSONObject): View = TextView(context)
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        val typed = TextProps(props, validated = true)
+
         val tv = view as TextView
         val merged = propsOf(tv)
-        if (props.has("spans") || props.has("text") || props.has("text_transform")) {
+        val mergedTyped = TextProps(merged, validated = true)
+        val fontScaling = mergedTyped.allow_font_scaling != false
+        if (typed.has_spans || typed.has_text || typed.has_text_transform || typed.has_allow_font_scaling || typed.has_selectable) {
             val transform = merged.str("text_transform")
             val spans = merged.value("spans") as? JSONArray
+            var pressableSpans = false
             if (spans != null && spans.length() > 0) {
                 try {
-                    tv.text = TextStyle.buildSpannable(spans, transform)
+                    tv.text = TextStyle.buildSpannable(spans, transform, fontScaling) { index -> PNComponentEvents.Text.on_span_press(tv, index.toLong()) }
+                    pressableSpans = (0 until spans.length()).any { JsonUtil.truthy(spans.optJSONObject(it)?.value("pressable")) }
                 } catch (e: Exception) {
                     tv.text = TextStyle.transform(merged.str("text"), transform)
                 }
             } else {
                 tv.text = TextStyle.transform(merged.str("text"), transform)
             }
+            val selectable = mergedTyped.selectable == true
+            if (pressableSpans) {
+                tv.setTextIsSelectable(false)
+                tv.movementMethod = PNSpanMovementMethod
+                tv.highlightColor = android.graphics.Color.TRANSPARENT
+            } else if (selectable) {
+                tv.setTextIsSelectable(true)
+            } else {
+                tv.setTextIsSelectable(false)
+                tv.movementMethod = null
+            }
         }
-        props.num("font_size")?.let { tv.textSize = it.toFloat() }
-        PNColor.parse(props.value("color"))?.let { tv.setTextColor(it) }
+        // Events travel in `_pn_events`, not as props: re-check the label's
+        // own press whenever the wired event list changes.
+        if (initial || props.has("_pn_events")) {
+            if (hasEvent(tv, "on_press")) {
+                tv.setOnClickListener { if (!PNSpanMovementMethod.consumeSpanTap(tv)) PNComponentEvents.Text.on_press(tv) }
+            }
+            else {
+                tv.setOnClickListener(null)
+                tv.isClickable = false
+            }
+        }
+        if (typed.has_font_size || typed.has_allow_font_scaling) {
+            val unit = if (fontScaling) android.util.TypedValue.COMPLEX_UNIT_SP else android.util.TypedValue.COMPLEX_UNIT_DIP
+            tv.setTextSize(unit, (merged.num("font_size") ?: 17.0).toFloat())
+        }
+        if (typed.has_color) tv.setTextColor(PNColor.parse(props.value("color")) ?: defaultTextColor(tv))
         if (listOf("font_family", "font_weight", "italic", "bold").any { props.has(it) }) {
             try {
                 TextStyle.applyTypeface(tv, merged)
@@ -159,40 +345,28 @@ class TextManager : ComponentManager() {
                 PNLog.swallowed("TextManager.typeface", e)
             }
         }
-        if (props.has("max_lines") || props.has("number_of_lines")) {
-            val lines = merged.num("number_of_lines") ?: merged.num("max_lines")
-            if (lines != null && lines > 0) {
-                tv.maxLines = lines.toInt()
-                tv.ellipsize = ellipsizeMode(merged.str("ellipsize_mode") ?: merged.str("ellipsize"))
-            } else {
-                tv.maxLines = Int.MAX_VALUE
-                tv.ellipsize = null
-            }
-        }
-        if (props.has("ellipsize_mode") || props.has("ellipsize")) {
-            if (tv.maxLines != Int.MAX_VALUE) tv.ellipsize = ellipsizeMode(merged.str("ellipsize_mode") ?: merged.str("ellipsize"))
-        }
-        if (props.has("selectable")) tv.setTextIsSelectable(JsonUtil.truthy(props.value("selectable")))
-        if (props.has("text_align")) {
-            tv.gravity = when (props.str("text_align")) {
+        if (typed.has_max_lines || typed.has_ellipsize_mode) applyLines(tv, merged.num("max_lines"), mergedTyped.ellipsize_mode?.rawValue)
+        if (typed.has_text_align) {
+            tv.gravity = when (typed.text_align?.rawValue) {
                 "center" -> Gravity.CENTER
                 "right", "end" -> Gravity.END
                 "justify" -> Gravity.START
                 else -> Gravity.START
             }
         }
-        props.num("letter_spacing")?.let {
+        if (typed.has_letter_spacing) {
+            val spacing = typed.letter_spacing ?: 0.0
             // Android takes letter spacing in ems (a ratio of the font size).
             val size = merged.num("font_size") ?: 16.0
-            tv.letterSpacing = (it / max(size, 1.0)).toFloat()
+            tv.letterSpacing = (spacing / max(size, 1.0)).toFloat()
         }
-        props.num("line_height")?.let {
-            val size = merged.num("font_size") ?: 16.0
-            tv.setLineSpacing(0f, (it / max(size, 1.0)).toFloat())
+        if (typed.has_line_height) {
+            val size = merged.num("font_size") ?: 17.0
+            tv.setLineSpacing(0f, ((typed.line_height ?: size) / max(size, 1.0)).toFloat())
         }
-        if (props.has("text_decoration")) {
+        if (typed.has_text_decoration) {
             var flags = tv.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv() and Paint.STRIKE_THRU_TEXT_FLAG.inv()
-            when (props.str("text_decoration")) {
+            when (typed.text_decoration?.rawValue) {
                 "underline" -> flags = flags or Paint.UNDERLINE_TEXT_FLAG
                 "line_through" -> flags = flags or Paint.STRIKE_THRU_TEXT_FLAG
             }
@@ -202,10 +376,35 @@ class TextManager : ComponentManager() {
         ViewStyler.apply(tv, props)
     }
 
-    private fun ellipsizeMode(mode: String?): TextUtils.TruncateAt = when (mode) {
+    private fun defaultTextColor(view: TextView): Int {
+        val value = android.util.TypedValue()
+        view.context.theme.resolveAttribute(android.R.attr.textColorPrimary, value, true)
+        return if (value.resourceId != 0) view.context.getColor(value.resourceId) else value.data
+    }
+
+    /**
+     * Apply `max_lines` and `ellipsize_mode`. `clip` ellipsizes nothing; with
+     * one line it also disables wrapping so overflow is clipped instead of
+     * wrapped onto hidden lines.
+     */
+    private fun applyLines(tv: TextView, maxLines: Double?, mode: String?) {
+        val lines = maxLines?.takeIf { it > 0 }?.toInt()
+        if (lines == null) {
+            tv.maxLines = Int.MAX_VALUE
+            tv.ellipsize = null
+            tv.setHorizontallyScrolling(false)
+            return
+        }
+        tv.maxLines = lines
+        tv.ellipsize = ellipsizeMode(mode)
+        tv.setHorizontallyScrolling(mode == "clip" && lines == 1)
+    }
+
+    /** `TruncateAt` for an `ellipsize_mode`; `clip` yields `null` (no ellipsis). */
+    fun ellipsizeMode(mode: String?): TextUtils.TruncateAt? = when (mode) {
         "head" -> TextUtils.TruncateAt.START
         "middle" -> TextUtils.TruncateAt.MIDDLE
-        "clip" -> TextUtils.TruncateAt.END
+        "clip" -> null
         "marquee" -> TextUtils.TruncateAt.MARQUEE
         else -> TextUtils.TruncateAt.END
     }

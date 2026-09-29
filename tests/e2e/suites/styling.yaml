@@ -6,3 +6,4 @@ appId: ${APP_ID}
 - runFlow: ../flows/styling/transform.yaml
 - runFlow: ../flows/styling/stylesheet.yaml
 - runFlow: ../flows/styling/interaction_props.yaml
+- runFlow: ../flows/styling/dynamic_color.yaml

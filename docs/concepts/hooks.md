@@ -92,7 +92,7 @@ def Counter():
     )
 ```
 
-The reducer receives the current state and an action, and returns the new state. Actions can be any value (strings, dicts, etc.). The component only re-renders when the reducer returns a different state.
+The reducer receives the current state and an action, and returns the new state. Actions can be any value (strings, dicts, etc.). The component only re-renders when the reducer returns a different state. The hook is generic over the state type and the action type, so with an annotated reducer (`def reducer(state: int, action: Action) -> int`) a type checker rejects `dispatch("typo")`.
 
 ### use_effect
 
@@ -124,11 +124,18 @@ automatically** when the effect re-runs or the component unmounts, so
 the sleeping tick above never fires against an unmounted component.
 See the [Async + data guide](../guides/async.md).
 
-Dependency control:
+Dependency control (`deps` is any [`Deps`][pythonnative.Deps] sequence,
+a list or a tuple):
 
 - `pn.use_effect(fn, None)`: run on every render.
-- `pn.use_effect(fn, [])`: run on mount only.
-- `pn.use_effect(fn, [a, b])`: run when `a` or `b` change.
+- `pn.use_effect(fn, [])` or `pn.use_effect(fn, ())`: run on mount only.
+- `pn.use_effect(fn, [a, b])`: run when `a` or `b` change (compared by
+  identity, then `==`).
+
+An exception raised inside an effect is routed to the nearest
+[`ErrorBoundary`][pythonnative.ErrorBoundary], exactly like an
+exception raised during render. In dev mode the reconciler also warns
+once per site when a dependency list changes length between renders.
 
 ### use_layout_effect
 
@@ -242,17 +249,58 @@ render_count = pn.use_ref(0)
 render_count.current += 1
 ```
 
-Pass a ref to a built-in element via the `ref=` prop and the
-reconciler populates `ref.current` with the underlying native view
-after commit (and clears it on unmount). The layout pass also mirrors
-the committed frame, so Python code can read measured geometry without
-a native round-trip:
+`use_ref(0)` is a `Ref[int]`; `use_ref()` with no argument is a
+`Ref[Any]` meant to be filled in later (by a handle, a timer, a task).
+
+### Refs and handles
+
+Pass a ref to a built-in element via the `ref=` prop and the reconciler
+publishes a typed imperative **handle** on `ref.current` after commit,
+chosen by element type, and clears it back to `None` on unmount:
+
+| Element | `ref.current` |
+|---|---|
+| `TextInput` | [`TextInputHandle`][pythonnative.TextInputHandle]: `focus()`, `blur()`, `clear()`, `select_all()`, `set_selection(start, end=None)`, `await get_value()` |
+| `ScrollView` | [`ScrollViewHandle`][pythonnative.ScrollViewHandle]: `scroll_to(x=None, y=None, animated=True)`, `scroll_to_end(animated=True)`, `flash_scroll_indicators()`, `await get_scroll_offset()` (a [`ScrollOffset`][pythonnative.ScrollOffset]) |
+| `WebView` | [`WebViewHandle`][pythonnative.WebViewHandle]: `reload()`, `go_back()`, `go_forward()`, `stop_loading()`, `load_url(url)`, `inject_javascript(script)`, `await eval_js(script)`, `await can_go_back()`, `await can_go_forward()`, `await get_url()` |
+| `FlatList`, `SectionList` | [`ListController`][pythonnative.ListController]: `scroll_to_index`, `scroll_to_offset`, `scroll_to_end` |
+| everything else | [`ViewHandle`][pythonnative.ViewHandle] |
+
+Every handle exposes `tag`, `type_name`, and `frame`, the last committed
+[`LayoutEvent`][pythonnative.LayoutEvent] written by the layout pass, so
+Python code can read measured geometry without a native round-trip.
+Methods that act on the view are plain calls; methods that need an
+answer from the native view are `async`:
 
 ```python
-box_ref = pn.use_ref()
-pn.View(ref=box_ref, style={"height": 48})
-# after commit: box_ref.current is the native view
+@pn.component
+def Search():
+    field = pn.use_ref()
+
+    def focus_field():
+        if field.current is not None:
+            field.current.focus()
+
+    pn.use_effect(focus_field, [])
+    return pn.TextInput(placeholder="Search", ref=field)
+
+
+@pn.component
+def MeasuredBox():
+    box = pn.use_ref()
+
+    def report():
+        if box.current is not None and box.current.frame is not None:
+            print(box.current.frame.width, box.current.frame.height)
+
+    pn.use_layout_effect(report)
+    return pn.View(ref=box, style={"height": 48})
 ```
+
+A custom native component's own commands go through
+[`ViewHandle.command`][pythonnative.handles.ViewHandle.command]; see
+the [Custom native components guide](../guides/custom-native-components.md#commands).
+The full reference is on the [Handles](../api/handles.md) page.
 
 ### use_imperative_handle
 
@@ -280,9 +328,9 @@ def Screen():
 
 ### use_back_handler
 
-Intercept the system back action (the Android hardware back button and
-predictive back gesture; Escape in the browser preview). Return `True`
-to consume the event, `False` to pass it along:
+Intercept the system back action (the Android back button or back
+gesture; Escape in the browser preview). Return `True` to consume the
+event, `False` to pass it along:
 
 ```python
 @pn.component
@@ -350,13 +398,16 @@ user_context = pn.create_context({"name": "Guest"})
 
 @pn.component
 def App():
-    return user_context.Provider({"name": "Alice"}, UserProfile())
+    return user_context.Provider(UserProfile(), value={"name": "Alice"})
 
 @pn.component
 def UserProfile():
     user = pn.use_context(user_context)
     return pn.Text(f"Welcome, {user['name']}")
 ```
+
+Like every other container, `Provider` takes its children positionally
+and the value as the keyword-only `value=` argument.
 
 Context is **reactive**: when a `Provider`'s value changes, every
 component that read the context re-renders, even when a memoized
@@ -366,10 +417,10 @@ theme or session values.
 
 ## Batching state updates
 
-By default, each state setter call triggers a re-render. When you
-need to update multiple pieces of state at once, use
-[`batch_updates`][pythonnative.scheduler.batch_updates] to coalesce them into a
-single render pass:
+State setters never render inline. Every setter call made during one
+callback, effect, or task step is coalesced into a single render pass
+scheduled on the application loop, on every host, including headless
+tests:
 
 ```python
 @pn.component
@@ -378,10 +429,9 @@ def Form():
     email, set_email = pn.use_state("")
 
     def on_submit():
-        with pn.batch_updates():
-            set_name("Alice")
-            set_email("alice@example.com")
-        # single re-render here
+        set_name("Alice")
+        set_email("alice@example.com")
+        # one re-render, after on_submit returns
 
     return pn.Column(
         pn.Text(f"{name} <{email}>"),
@@ -389,10 +439,32 @@ def Form():
     )
 ```
 
-State updates triggered by effects during a render pass are
-automatically batched; the framework drains any pending re-renders
-after effect flushing completes, so you don't need `batch_updates()`
-inside effects.
+Automatic batching stops at an `await`: each step of a task is its own
+batch. Use [`batch_updates`][pythonnative.scheduler.batch_updates] when
+you want setters on both sides of an `await` to land in one pass:
+
+```python
+async def load():
+    with pn.batch_updates():
+        set_loading(True)
+        data = await fetch_data()
+        set_items(data)
+        set_loading(False)
+```
+
+A component that keeps dirtying itself (an effect that sets state
+unconditionally, or a setter called during its own render) is stopped
+after fifty passes with `RuntimeError("Too many re-renders")`, raised
+from that component and routed through the nearest
+[`ErrorBoundary`][pythonnative.ErrorBoundary] (or the RedBox in dev
+mode). In dev mode the reconciler also warns once per site for a
+setter called after unmount, a setter called during render, and a
+setter handed the identical `list`, `dict`, or `set` object it already
+holds (in-place mutation never re-renders; replace the object).
+
+[`use_color_scheme`][pythonnative.use_color_scheme] returns a
+[`ColorScheme`][pythonnative.hooks.ColorScheme] (`"light"` or `"dark"`) and
+re-renders when it changes.
 
 ## Memoizing function components
 

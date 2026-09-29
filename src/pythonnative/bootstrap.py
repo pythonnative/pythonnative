@@ -73,9 +73,9 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
             diagnostics.set_dev_mode(True)
         # Import the view backend eagerly: on a slow device the first
         # commit shouldn't also pay for importing the reconciler.
-        from .native_views import get_registry
+        from .native_views import get_backend
 
-        get_registry()
+        get_backend()
         if dev_mode:
             # Debug builds are dev clients: connect to `pn start` when
             # the build (or a remembered connection) names a server.
@@ -83,6 +83,11 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
 
             client = devclient.start_if_configured()
             status_["dev_server"] = client.url if client is not None else None
+            # An overlay from the last session may already hold assets the
+            # bundle doesn't; point the native resolver at it right away.
+            from .assets import configure_native
+
+            configure_native()
     except Exception as exc:
         status_["error"] = f"{type(exc).__name__}: {exc}"
         print(f"[pn.bootstrap] start failed: {exc!r}", file=sys.stderr)

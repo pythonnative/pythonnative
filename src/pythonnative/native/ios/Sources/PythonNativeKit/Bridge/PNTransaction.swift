@@ -5,7 +5,7 @@ import UIKit
 /// A transaction is a JSON array of ops:
 ///
 /// - `["c", tag, "Type", {props}]` create a view
-/// - `["u", tag, {changed}]` apply changed props (`null` removes a prop)
+/// - `["u", tag, {changed}, [removed]]` set values and explicitly remove properties
 /// - `["i", parent, child, index]` ensure `child` is at `index` under `parent`
 /// - `["d", tag]` destroy the view
 /// - `["f", tag, x, y, w, h]` set the frame in points
@@ -15,7 +15,7 @@ public enum PNTransaction {
     /// A decoded op.
     public enum Op: Equatable {
         case create(tag: Int64, type: String, props: [String: Any])
-        case update(tag: Int64, changed: [String: Any])
+        case update(tag: Int64, changed: [String: Any], removed: [String] = [])
         case insert(parent: Int64, child: Int64, index: Int)
         case destroy(tag: Int64)
         case frame(tag: Int64, x: Double, y: Double, w: Double, h: Double)
@@ -24,8 +24,8 @@ public enum PNTransaction {
             switch (lhs, rhs) {
             case let (.create(t1, ty1, p1), .create(t2, ty2, p2)):
                 return t1 == t2 && ty1 == ty2 && NSDictionary(dictionary: p1).isEqual(to: p2)
-            case let (.update(t1, p1), .update(t2, p2)):
-                return t1 == t2 && NSDictionary(dictionary: p1).isEqual(to: p2)
+            case let (.update(t1, p1, r1), .update(t2, p2, r2)):
+                return t1 == t2 && r1 == r2 && NSDictionary(dictionary: p1).isEqual(to: p2)
             case let (.insert(p1, c1, i1), .insert(p2, c2, i2)):
                 return p1 == p2 && c1 == c2 && i1 == i2
             case let (.destroy(t1), .destroy(t2)):
@@ -69,9 +69,9 @@ public enum PNTransaction {
             let props = (PNJSON.resolveInfinity(parts[3]) as? [String: Any]) ?? [:]
             return .create(tag: try tag(1), type: type, props: props)
         case "u":
-            guard parts.count >= 3 else { throw DecodeError.malformedOp(index: index) }
+            guard parts.count == 4, let removed = parts[3] as? [String] else { throw DecodeError.malformedOp(index: index) }
             let changed = (PNJSON.resolveInfinity(parts[2]) as? [String: Any]) ?? [:]
-            return .update(tag: try tag(1), changed: changed)
+            return .update(tag: try tag(1), changed: changed, removed: removed)
         case "i":
             guard parts.count >= 4 else { throw DecodeError.malformedOp(index: index) }
             return .insert(parent: try tag(1), child: try tag(2), index: Int(try number(3)))
@@ -105,15 +105,19 @@ public enum PNTransaction {
                 registry.register(PNViewRecord(tag: tag, typeName: type, view: view, manager: manager))
                 manager.didCreate(view: view, tag: tag, props: props)
 
-            case let .update(tag, changed):
+            case let .update(tag, changed, removed):
                 guard let record = registry.resolve(tag) else {
                     throw MountError.missingTag(tag)
                 }
-                let normalized = PNContracts.normalize(record.typeName, changed)
-                if PNContracts.requiresRecreation(record.typeName, changed) {
-                    recreate(record, changed: normalized)
+                let normalized = PNContracts.normalize(record.typeName, changed, removed: removed)
+                if PNContracts.requiresRecreation(record.typeName, changed, removed: removed) {
+                    recreate(record, changed: changed, removed: removed)
                 } else {
+                    var target = PNViewState.existing(for: record.view)?.props ?? [:]
+                    for (key, value) in changed { target[key] = value }
+                    for key in removed { target.removeValue(forKey: key) }
                     record.manager.update(view: record.view, changed: normalized)
+                    PNViewState.existing(for: record.view)?.props = target
                 }
 
             case let .insert(parent, child, index):
@@ -144,13 +148,14 @@ public enum PNTransaction {
         }
     }
     /// Replace a physical widget while retaining its logical tag and children.
-    private static func recreate(_ record: PNViewRecord, changed: [String: Any]) {
+    private static func recreate(_ record: PNViewRecord, changed: [String: Any], removed: [String]) {
         let registry = PNViewRegistry.shared
         let old = record.view
         var props = PNViewState.existing(for: old)?.props ?? [:]
         for (key, value) in changed {
-            if value is NSNull { props.removeValue(forKey: key) } else { props[key] = value }
+            props[key] = value
         }
+        for key in removed { props.removeValue(forKey: key) }
         let parent = PNLayout.nodes[record.tag]?.parent.flatMap { registry.resolve($0) }
         let siblings = parent.flatMap { PNLayout.nodes[$0.tag]?.children } ?? []
         let index = siblings.firstIndex(of: record.tag) ?? 0

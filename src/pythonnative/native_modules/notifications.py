@@ -16,8 +16,8 @@ capability in ``pythonnative.toml`` and call
 ``Notifications.get_device_token()`` to register with APNs and receive
 the device token your server needs. Android remote push requires
 Firebase Cloud Messaging, which needs a per-app ``google-services.json``
-and is not wired up by the built-in module; ``get_device_token`` returns
-``None`` there.
+and is not wired up by the built-in module; ``get_device_token`` raises
+``NativeModuleError`` with ``code == "unsupported"`` there.
 
 Example:
     ```python
@@ -114,11 +114,13 @@ class Notifications:
         a real device (the simulator has no APNs connection).
 
         Returns:
-            The APNs token, or ``None`` on platforms without built-in
-            remote push support (Android and off device).
+            The APNs token, or ``None`` off device (the fallback has no
+            push service to register with).
 
         Raises:
-            NativeModuleError: If APNs registration fails; ``code`` is
+            NativeModuleError: On Android, where the built-in module
+                has no push registration; ``code`` is ``"unsupported"``.
+                On iOS, if APNs registration fails; ``code`` is
                 ``"apns"`` and the message carries the system's error.
         """
         token = await native_module("Notifications").call_async("get_device_token")

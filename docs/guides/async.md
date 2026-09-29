@@ -67,21 +67,29 @@ def ProfileScreen():
 ```
 
 No `loading` flag, no conditional render, no effect that copies data
-into state. Two timing rules, matching React:
+into state. Three timing rules, matching React:
 
 - **Initial mount**: the fallback shows until the content is ready.
 - **Updates**: a component that's already on screen and suspends again
   (its inputs changed) keeps its previous content visible and
   re-renders when the new data arrives; there's no fallback flash.
+- **A new descendant suspends**: when a boundary with committed content
+  gains a child that suspends, the boundary keeps its content mounted
+  and hidden (`display: "none"`) while the fallback shows, then lifts
+  the override when the data arrives. Hook state, native views, focus,
+  and scroll position of the siblings survive, so a `TextInput` next to
+  the loading widget keeps its text and its keyboard.
 
 Boundaries nest: each `Suspense` covers exactly the subtree it wraps,
 so one slow widget doesn't blank the whole screen. A boundary without
 a `fallback` is transparent and lets the suspension propagate to the
 next boundary up.
 
-Awaits on already-resolved values complete inline during the render
-pass, so a re-render of an async component whose data is cached costs
-no event-loop round trips.
+The reconciler steps an `async def` body once synchronously and only
+schedules a task (and suspends) if the first `await` is actually
+pending. Awaits on already-resolved values therefore complete inline
+during the render pass: a re-render of an async component whose data
+is cached costs no event-loop round trip and shows no fallback.
 
 ## Fetch-during-render: `use_resource`
 
@@ -171,10 +179,12 @@ pn.use_effect(subscribe, [])
 
 ## Keeping the UI responsive: `use_transition` and `use_deferred_value`
 
-State updates are urgent by default: they render synchronously so
-taps and typing feel immediate. When an update drives *expensive*
-work (filtering a large list, re-rendering a chart), mark it as a
-**transition** so urgent updates queued in the meantime render first:
+State updates are urgent by default: every setter call in one
+handler is batched into a single render pass that runs as soon as the
+handler returns, so taps and typing feel immediate. When an update
+drives *expensive* work (filtering a large list, re-rendering a
+chart), mark it as a **transition** so urgent updates queued in the
+meantime render first:
 
 ```python
 @pn.component
@@ -428,5 +438,5 @@ def PostsScreen(user_id: int):
 ```
 
 Each piece (fetch, animation, persistence, mutation) is its own
-hook with its own lifecycle, and `asyncio` is the glue, running right
-on the UI thread.
+hook with its own lifecycle, and `asyncio` is the glue, running on the
+application thread.

@@ -1,4 +1,6 @@
-# Tests ScrollView reveals rows that started off-screen after scrolling.
+# Tests ScrollView reveals rows that started off-screen after scrolling, that
+# on_scroll delivers a ScrollEvent, and that a horizontal ScrollView with
+# content_container_style / snap_to_interval reports on_scroll_begin_drag.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/scroll_view.py
 # Source under test: src/pythonnative/components/layout.py :: ScrollView
@@ -32,31 +34,51 @@ appId: ${APP_ID}
 # their content-coordinate accessibility frames, and Maestro treats
 # anything within the screen bounds as visible, so the demo renders 60
 # rows to push the last one past every simulator's screen height.
+# Reaching row 60 takes several slow swipes, and each visibility check
+# snapshots the whole hierarchy; allow a slow simulator the time.
 - scrollUntilVisible:
     element: "ScrollRow 60"
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     visibilityPercentage: 100
     centerElement: false
 - assertVisible: "ScrollRow 60"
-# on_scroll fired during the swipe(s), flipping the outer readout.
-- assertVisible: "Scrolled: ON"
-# The inner scroll's height plus the "Scrolled" readout push the demo's
-# "Back to list" button (rendered below the card by demo_screen) below the
-# fold on Android's shorter emulator viewport. close_demo taps it without
-# scrolling, so surface it first here. Android's NestedScrollView bubbles
-# the over-scroll to the outer page once the inner list bottoms out. iOS
-# keeps the button on-screen (its UIScrollView doesn't bubble to the parent,
-# and close_demo already worked there), so this is scoped to Android only.
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - scrollUntilVisible:
-          element:
-            text: "Back to list"
-          direction: DOWN
-          timeout: 20000
+# on_scroll fired during the swipe(s): the ScrollEvent carried a positive y
+# offset (the readout under the box), and the readout above the box
+# flipped. Android hands the end of an inner scroll to the page, which can
+# push that upper readout off-screen, so scroll back up to it; "Scrolled"
+# stays ON once set.
+- assertVisible: "Offset y positive: yes"
+- scrollUntilVisible:
+    element: "Scrolled: ON"
+    direction: UP
+    timeout: 60000
+    centerElement: false
+# Horizontal section: surface the tiles, then swipe *from a tile* so the
+# gesture lands inside the horizontal box rather than the page. The swipes
+# may have to carry the inner box back to its end first.
+- scrollUntilVisible:
+    element:
+      text: "HRow 1"
+    direction: DOWN
+    timeout: 60000
+- assertVisible: "Drag: OFF"
+- swipe:
+    from:
+      text: "HRow 2"
+    direction: LEFT
+    duration: 400
+- extendedWaitUntil:
+    visible: "Drag: ON"
+    timeout: 5000
+# The inner scroll's height plus the readouts push the demo's "Back to
+# list" button below the fold; close_demo taps it without scrolling, so
+# surface it first here (no-op when it's already visible).
+- scrollUntilVisible:
+    element:
+      text: "Back to list"
+    direction: DOWN
+    timeout: 20000
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

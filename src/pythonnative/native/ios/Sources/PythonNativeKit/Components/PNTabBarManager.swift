@@ -32,19 +32,24 @@ public final class PNTabBarManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! TabBarProps(props, validated: true)
+
         guard let bar = view as? UITabBar else { return }
         let merged = mergedProps(bar)
         let items = PNTabBarManager.items(merged)
-        if PNProps.has(props, "items") {
+        if typed.has_items || typed.has_shows_labels {
+            let showsLabels = PNProps.bool(PNProps.value(merged, "shows_labels")) ?? true
             bar.setItems(items.enumerated().map { index, item in
                 let title = PNProps.string(item["title"]) ?? PNProps.string(item["name"]) ?? ""
                 let icon = PNTabBarManager.icon(item["icon"])
-                let barItem = UITabBarItem(title: title, image: icon, tag: index)
+                let barItem = UITabBarItem(title: showsLabels ? title : nil, image: icon, tag: index)
+                if !showsLabels { barItem.imageInsets = UIEdgeInsets(top: 6, left: 0, bottom: -6, right: 0) }
+                barItem.accessibilityLabel = title
                 if let badge = PNProps.string(PNProps.value(item, "badge")) { barItem.badgeValue = badge }
                 return barItem
             }, animated: false)
         }
-        if PNProps.has(props, "active_tab") || PNProps.has(props, "active_index") || PNProps.has(props, "items") {
+        if typed.has_active_tab || PNProps.has(props, "active_index") || typed.has_items {
             let activeName = PNProps.string(PNProps.value(merged, "active_tab"))
             var index = PNProps.int(PNProps.value(merged, "active_index"))
             if index == nil, let activeName = activeName {
@@ -54,11 +59,11 @@ public final class PNTabBarManager: PNComponentManager {
                 bar.selectedItem = barItems[index]
             }
         }
-        if let color = PNColor.parse(PNProps.value(props, "active_color") ?? PNProps.value(props, "tint_color")) {
-            bar.tintColor = color
+        if typed.has_tint_color {
+            bar.tintColor = PNColor.parse(PNProps.value(props, "tint_color"))
         }
-        if let color = PNColor.parse(PNProps.value(props, "inactive_color")) {
-            bar.unselectedItemTintColor = color
+        if typed.has_inactive_tint_color {
+            bar.unselectedItemTintColor = PNColor.parse(PNProps.value(props, "inactive_tint_color"))
         }
         if let color = PNColor.parse(PNProps.value(props, "background_color")) {
             bar.barTintColor = color
@@ -71,8 +76,8 @@ public final class PNTabBarManager: PNComponentManager {
                 bar.scrollEdgeAppearance = appearance
             }
         }
-        if PNProps.has(props, "translucent") {
-            bar.isTranslucent = PNProps.bool(PNProps.value(props, "translucent")) ?? true
+        if typed.has_translucent {
+            bar.isTranslucent = typed.translucent ?? true
         }
         PNViewStyler.applyAccessibility(bar, props)
     }
@@ -81,26 +86,36 @@ public final class PNTabBarManager: PNComponentManager {
         ((PNProps.value(props, "items") as? [Any]) ?? []).compactMap { $0 as? [String: Any] }
     }
 
-    /// Resolve an icon spec (SF Symbol name or `{"ios": name}`) to an image.
+    /// The size tab bar icons are rasterized at, in points.
+    static let iconSize = CGSize(width: 25, height: 25)
+
+    /// Resolve an icon spec to a template image.
+    ///
+    /// `{"shapes": [...], "view_box": "..."}` is drawn with the SVG
+    /// renderer (Lucide icons resolved by Python); `{"uri": "asset://..."}`
+    /// loads a bundled image. Anything else yields no icon.
     static func icon(_ spec: Any?) -> UIImage? {
-        var name: String?
-        if let text = spec as? String {
-            name = text
-        } else if let dict = spec as? [String: Any] {
-            name = PNProps.string(dict["ios"])
+        guard let dict = spec as? [String: Any] else { return nil }
+        if let raw = dict["shapes"] as? [Any], !raw.isEmpty {
+            let shapes = raw.compactMap { try? PNValues.decode(PNSvgShape.self, $0) }
+            let viewBox = PNSvgView.parseViewBox(PNProps.string(dict["view_box"])) ?? CGRect(x: 0, y: 0, width: 24, height: 24)
+            let paint = PNSvgPaint(fill: "none", stroke: "currentColor", strokeWidth: 2, lineCap: "round", lineJoin: "round")
+            return PNSvgRenderer.image(shapes, viewBox: viewBox, size: iconSize, root: paint)
         }
-        guard let name = name, !name.isEmpty else { return nil }
-        return UIImage(systemName: name) ?? UIImage(named: name)
+        if let uri = PNProps.string(dict["uri"]), !uri.isEmpty,
+           let image = PNImageManager.loadLocal(uri, targetSize: iconSize) {
+            return image.withRenderingMode(.alwaysTemplate)
+        }
+        return nil
     }
 }
 
-/// Forwards `tabBar(_:didSelect:)` as `on_tab_select(name)` (plus `on_select(index)`).
+/// Forwards `tabBar(_:didSelect:)` as `on_tab_select(name)`.
 final class PNTabBarDelegate: NSObject, UITabBarDelegate {
     func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
         let index = item.tag
         let items = PNTabBarManager.items(PNViewState.existing(for: tabBar)?.props ?? [:])
         guard index >= 0, index < items.count else { return }
-        PNEvents.emit(tabBar, "on_tab_select", [PNProps.string(items[index]["name"]) ?? ""])
-        PNEvents.emitIfWired(tabBar, "on_select", [index])
+        PNComponentEvents.TabBar.on_tab_select(tabBar, PNProps.string(items[index]["name"]) ?? "")
     }
 }

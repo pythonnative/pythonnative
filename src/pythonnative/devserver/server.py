@@ -9,6 +9,9 @@ loop. It exposes:
 - ``GET /static/<name>``: preview assets (JS, CSS).
 - ``GET /manifest``: ``{"version", "entry", "files": {path: sha256}}``.
 - ``GET /file/<path>``: raw bytes of one synced source file.
+- ``GET /assets/<path>``: a file under ``app/assets/``; ``/assets/pn_assets.json``
+  is the asset manifest and ``/assets/fonts.css`` declares the bundled
+  fonts for the browser preview.
 - ``GET /status``: server, project, and connected-peer information.
 - ``WS /ws?role=client``: the dev-client protocol (see below).
 - ``WS /ws?role=preview``: the browser preview's bridge channel; the
@@ -525,7 +528,51 @@ class DevServer:
                 return
             _respond(writer, 200, data, mimetypes.guess_type(rel)[0] or "application/octet-stream")
             return
+        if path.startswith("/assets/"):
+            self._serve_asset(writer, path[len("/assets/") :])
+            return
         _respond(writer, 404, b"not found", "text/plain")
+
+    def _serve_asset(self, writer: asyncio.StreamWriter, rel: str) -> None:
+        """Serve ``app/assets/<rel>``, the manifest, or the generated font CSS.
+
+        The browser preview resolves ``asset://`` URIs against this
+        route: ``/assets/pn_assets.json`` is the
+        [`AssetManifest`][pythonnative.assets.AssetManifest] of the
+        current tree, ``/assets/fonts.css`` declares one ``@font-face``
+        per bundled font so ``font_family`` names work in the page, and
+        anything else is the file itself.
+        """
+        from .. import assets as assets_module
+
+        root = os.path.join(self.snapshot.root, "app", assets_module.ASSETS_DIR)
+        if rel == assets_module.MANIFEST_NAME:
+            _respond_json(writer, assets_module.scan(root).to_dict())
+            return
+        if rel == "fonts.css":
+            css = "\n".join(
+                "@font-face {\n"
+                f'  font-family: "{face.family}";\n'
+                f"  font-weight: {face.weight};\n"
+                f"  font-style: {'italic' if face.italic else 'normal'};\n"
+                f'  src: url("/assets/{face.path}");\n'
+                "}"
+                for face in assets_module.scan(root).fonts
+            )
+            _respond(writer, 200, css.encode("utf-8"), "text/css; charset=utf-8")
+            return
+        try:
+            normalized = assets_module.normalize_path(unquote(rel))
+        except ValueError:
+            _respond(writer, 404, b"not found", "text/plain")
+            return
+        snap = self.snapshot
+        key = f"app/{assets_module.ASSETS_DIR}/{normalized}"
+        data = snap.read(key) if key in snap.files else None
+        if data is None:
+            _respond(writer, 404, b"not found", "text/plain")
+            return
+        _respond(writer, 200, data, mimetypes.guess_type(normalized)[0] or "application/octet-stream")
 
     async def _serve_websocket(
         self,

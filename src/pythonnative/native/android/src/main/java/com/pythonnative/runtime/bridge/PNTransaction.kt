@@ -9,8 +9,8 @@ sealed class Op {
     /** `["c", tag, "Type", {props}]` */
     data class Create(val tag: Long, val typeName: String, val props: JSONObject) : Op()
 
-    /** `["u", tag, {changed}]` (a `null` value means the prop was removed) */
-    data class Update(val tag: Long, val changed: JSONObject) : Op()
+    /** `["u", tag, {changed}, [removed]]`; null is an explicit value */
+    data class Update(val tag: Long, val changed: JSONObject, val removed: List<String> = emptyList()) : Op()
 
     /** `["i", parent, child, index]` (move-aware) */
     data class Insert(val parent: Long, val child: Long, val index: Int) : Op()
@@ -33,7 +33,9 @@ object PNTransaction {
                 raw.optString(2, ""),
                 raw.optJSONObject(3) ?: JSONObject(),
             )
-            "u" -> Op.Update(tag(raw, 1), raw.optJSONObject(2) ?: JSONObject())
+            "u" -> Op.Update(tag(raw, 1), raw.getJSONObject(2), raw.getJSONArray(3).let { removed ->
+                (0 until removed.length()).map { removed.getString(it) }
+            })
             "i" -> Op.Insert(tag(raw, 1), tag(raw, 2), JsonUtil.toInt(raw.opt(3), 0))
             "d" -> Op.Destroy(tag(raw, 1))
             "f" -> Op.Frame(

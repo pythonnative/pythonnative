@@ -21,6 +21,7 @@ class AndroidTransport:
     """Thin wrapper over the static ``PNBridge`` methods."""
 
     name = "android"
+    asynchronous_commits = True
 
     def __init__(self, bridge_class: Any = None) -> None:
         if bridge_class is None:

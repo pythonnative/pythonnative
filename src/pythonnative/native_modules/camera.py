@@ -5,7 +5,9 @@ the saved image path (a ``str``) or ``None`` if the user cancels. The
 native ``Camera`` module presents ``UIImagePickerController`` (iOS) or
 launches ``MediaStore.ACTION_IMAGE_CAPTURE`` / ``ACTION_PICK``
 (Android) and resolves the call when the picker finishes; Python only
-awaits the promise.
+awaits the promise. On both platforms the path points at the full-size
+capture: Android hands the camera app a ``FileProvider`` URI as
+``EXTRA_OUTPUT`` rather than reading the thumbnail from the result.
 
 Example:
     ```python
@@ -39,8 +41,9 @@ class Camera:
             allow_editing: Present the iOS crop editor before saving.
 
         Returns:
-            The saved image path, or ``None`` if the user cancelled (or
-            there is no camera to present, as in the browser preview).
+            The saved full-size image path on iOS and Android alike, or
+            ``None`` if the user cancelled (or there is no camera to
+            present, as in the browser preview).
 
         Raises:
             NativeModuleError: If the picker can't be presented, for

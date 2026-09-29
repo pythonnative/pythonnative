@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Rounded tile -->
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#1E293B"/>
+  <!-- Two-tone "snake" strokes drawn as paths -->
+  <g stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 22 h16 a8 8 0 0 1 0 16 h-8" stroke="#38BDF8"/>
+    <path d="M44 42 h-16 a8 8 0 0 1 0 -16 h8" stroke="#FACC15" transform="translate(0 0)"/>
+  </g>
+  <circle cx="24" cy="46" r="3" fill="#FACC15"/>
+  <circle cx="40" cy="18" r="3" fill="#38BDF8"/>
+</svg>

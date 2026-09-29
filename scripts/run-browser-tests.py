@@ -109,8 +109,21 @@ def main() -> None:
                         log.seek(0)
                         raise RuntimeError("Chrome didn't start: " + log.read()[-5000:])
                     port = int(port_file.read_text().splitlines()[0])
-                    with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=5) as response:
-                        target = next(item for item in json.load(response) if item.get("type") == "page")
+                    # Chrome writes the port file before DevTools reliably answers on slow CI runners.
+                    target = None
+                    deadline = time.monotonic() + 30
+                    while target is None:
+                        try:
+                            with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=5) as response:
+                                targets = json.load(response)
+                            target = next((item for item in targets if item.get("type") == "page"), None)
+                        except OSError:
+                            if process.poll() is not None or time.monotonic() >= deadline:
+                                raise
+                        if target is None:
+                            if time.monotonic() >= deadline:
+                                raise RuntimeError("Chrome DevTools didn't list a page target")
+                            time.sleep(0.5)
                     with connect(target["webSocketDebuggerUrl"], open_timeout=5) as socket:
                         request_id = 0
 

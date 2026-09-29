@@ -57,7 +57,9 @@ jobs:
   # The Swift half of the rendering core: decoders, component managers,
   # gestures, and module promises run under XCTest on a simulator.
   native-ios:
-    runs-on: macos-14
+    runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
       - name: Checkout
         uses: actions/checkout@v4

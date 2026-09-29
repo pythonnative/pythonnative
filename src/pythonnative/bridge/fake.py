@@ -109,13 +109,11 @@ class FakeTransport:
                 raise AssertionError(f"create: tag {tag} already exists")
             self.views[tag] = FakeNativeView(tag, type_name, props)
         elif code == "u":
-            _, tag, changed = op
+            _, tag, changed, removed = op
             view = self._require(tag, "update")
-            for key, value in changed.items():
-                if value is None:
-                    view.props.pop(key, None)
-                else:
-                    view.props[key] = value
+            view.props.update(changed)
+            for key in removed:
+                view.props.pop(key, None)
         elif code == "i":
             _, parent_tag, child_tag, index = op
             parent = self._require(parent_tag, "insert")

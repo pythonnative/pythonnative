@@ -1,0 +1,50 @@
+# Tests Tab.Navigator(tab_bar_style=...) renders, tab_bar_visible=False hides
+# the bar while that tab is focused, and freeze_on_blur keeps a blurred tab
+# from re-rendering until it regains focus.
+#
+# Demo screen: examples/e2e-suite/app/screens/navigation/tab_options.py
+# Source under test: src/pythonnative/navigation/navigators.py :: TabNavigator
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Navigation
+      DEMO_TITLE: Tab options
+- extendedWaitUntil:
+    visible: "TabA body"
+    timeout: 30000
+- assertVisible: "TabA last tick: 0"
+- assertVisible: "TabB last tick: 0"
+# Drive the tab bar itself once so the styled native bar is exercised.
+- tapOn: "TabB"
+- extendedWaitUntil:
+    visible: "TabB body"
+    timeout: 10000
+- tapOn: "Advance tick"
+- assertVisible: "Tick: 1"
+# The focused plain tab follows the tick; the frozen, blurred TabA does not.
+- extendedWaitUntil:
+    visible: "TabB last tick: 1"
+    timeout: 10000
+- assertVisible: "TabA last tick: 0"
+- tapOn: "Jump to TabA"
+- extendedWaitUntil:
+    visible: "TabA last tick: 1"
+    timeout: 10000
+# tab_bar_visible=False: the bar (and its "TabB" item) disappears while
+# the Hidden tab is focused, then comes back.
+- tapOn: "Jump to Hidden"
+- extendedWaitUntil:
+    visible: "Hidden body"
+    timeout: 10000
+- assertNotVisible: "TabB"
+- tapOn: "Jump to TabA"
+- extendedWaitUntil:
+    visible: "TabA body"
+    timeout: 10000
+- assertVisible: "TabB"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Navigation

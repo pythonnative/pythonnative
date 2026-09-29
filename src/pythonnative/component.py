@@ -34,12 +34,18 @@ positional parameters, so ``Greeting("World")`` works for
 Keys
 ----
 
-Every component accepts ``key=`` at the call site for keyed
-reconciliation. ``key`` is consumed by the framework and is not passed
-to the function unless the function declares a ``key`` parameter
-itself. Declaring it (``key: str | None = None``) is the way to keep
-strict type checkers happy when a component is rendered in a list;
-otherwise use [`Element.with_key`][pythonnative.element.Element.with_key].
+Elements rendered in a list need a stable ``key``. Use
+[`Component.keyed`][pythonnative.component.Component.keyed], which returns a
+callable with the component's own signature whose result carries the
+key, so the call site type-checks:
+
+```python
+pn.Column(*[Row.keyed(item.id)(item) for item in items])
+```
+
+``key=`` is also accepted at every component call site at runtime and
+consumed by the framework (it reaches the function only when the
+function declares a ``key`` parameter itself).
 """
 
 from __future__ import annotations
@@ -87,6 +93,11 @@ class Component(Generic[P]):
         "_is_async",
         "refresh_signature",
         "__wrapped__",
+        # ``functools.update_wrapper`` copies ``__module__`` and
+        # ``__qualname__`` from the render function so Fast Refresh can
+        # find a component's replacement by module and name; those two
+        # names can't be slots (they conflict with the class attributes),
+        # so instances keep a ``__dict__`` for them.
         "__dict__",
     )
 
@@ -134,6 +145,24 @@ class Component(Generic[P]):
             else:
                 props[name] = value
         return Element(self, props, children, key=key if isinstance(key, str) or key is None else str(key))
+
+    def keyed(self, key: object) -> Callable[P, Element]:
+        """Return this component's call signature with ``key`` attached to the result.
+
+        The returned callable accepts exactly the component's own
+        parameters, so ``[Row.keyed(item.id)(item) for item in items]``
+        type-checks without declaring ``key`` in ``Row``'s signature.
+        Non-string keys are converted with ``str``.
+
+        Args:
+            key: Stable identity for keyed reconciliation.
+        """
+        text = None if key is None else (key if isinstance(key, str) else str(key))
+
+        def call(*args: P.args, **kwargs: P.kwargs) -> Element:
+            return self(*args, **kwargs).with_key(text)
+
+        return call
 
     # ------------------------------------------------------------------
     # Rendering (used by the reconciler)

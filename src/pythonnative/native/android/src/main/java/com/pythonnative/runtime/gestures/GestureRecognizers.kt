@@ -22,16 +22,43 @@ data class Point(val x: Double, val y: Double)
 /** Output channel of recognizers and the arbiter: `(gesture_index, payload)`. */
 typealias EmitFn = (Int, Map<String, Any?>) -> Unit
 
-/** Configuration for one leaf gesture, decoded from the serialized `gestures` prop. */
+/**
+ * A `[negative_bound, positive_bound]` activation or failure offset;
+ * either side may be `null` for "unbounded". Crossing is strict:
+ * `delta < negative` or `delta > positive`.
+ */
+data class Offset(val negative: Double?, val positive: Double?) {
+    fun crosses(delta: Double): Boolean =
+        (negative != null && delta < negative) || (positive != null && delta > positive)
+}
+
+/**
+ * Configuration for one leaf gesture, decoded from the serialized
+ * `gestures` prop. Pan activation follows React Native Gesture Handler:
+ * `minDistance` is `null` when Python supplied offset or velocity
+ * criteria without an explicit distance, `direction` is `null` for
+ * "any", and `minVelocity` is `null` unless the pan should activate on
+ * speed alone.
+ */
 data class GestureConfig(
     val kind: String,
+    val enabled: Boolean = true,
     val nTaps: Int = 1,
     val maxDistance: Double = 12.0,
     val minDurationMs: Double = 500.0,
-    val minDistance: Double = 10.0,
+    /** Pan: travel that activates; `null` disables the distance criterion. */
+    val minDistance: Double? = 10.0,
     val minPointers: Int = 1,
-    val direction: String = "any",
-    val minVelocity: Double = 300.0,
+    /** Pan: more pointers than this fail an inactive pan and cancel an active one; `null` for no limit. */
+    val maxPointers: Int? = null,
+    val activeOffsetX: Offset? = null,
+    val activeOffsetY: Offset? = null,
+    val failOffsetX: Offset? = null,
+    val failOffsetY: Offset? = null,
+    /** Pan: activation speed (dp/s), `null` to ignore; swipe/fling: required speed, `null` for the 300 dp/s default. */
+    val minVelocity: Double? = null,
+    /** Swipe: `left`, `right`, `up`, `down`, or `null` for any direction. */
+    val direction: String? = null,
     val nPointers: Int = 1,
     /** Indices this gesture may be active alongside; `null` means everything. */
     val simultaneous: Set<Int>? = null,
@@ -259,18 +286,19 @@ class LongPressRecognizer(index: Int, config: GestureConfig, emit: EmitFn) : Rec
 }
 
 class PanRecognizer(index: Int, config: GestureConfig, emit: EmitFn) : Recognizer(index, config, emit) {
-    private val minDistance = config.minDistance
     private val minPointers = max(1, config.minPointers)
     private var origin: Point? = null
     private var anchor: Point? = null
     private val velocity = VelocityEstimator()
     private var lastTranslation = Point(0.0, 0.0)
+    private var failed = false
 
     /** Whether the pan has activated (hosts use this to block parent interception). */
     var active = false
         private set
 
     override fun down(pointers: Map<Int, Point>, t: Double) {
+        if (exceedsMaxPointers(pointers)) return
         if (pointers.size < minPointers) return
         if (origin == null) {
             val c = centroid(pointers)
@@ -284,14 +312,23 @@ class PanRecognizer(index: Int, config: GestureConfig, emit: EmitFn) : Recognize
 
     override fun move(pointers: Map<Int, Point>, t: Double) {
         val o = origin ?: return
-        if (pointers.size < minPointers) return
+        if (failed || pointers.size < minPointers) return
         val c = centroid(pointers)
         velocity.add(c.x, c.y, t)
         if (!active) {
-            if (hypot(c.x - o.x, c.y - o.y) < minDistance) return
-            active = true
-            anchor = c
-            emit(GestureState.BEGAN, "x" to c.x, "y" to c.y, "pointer_count" to pointers.size)
+            val v = velocity.velocity()
+            when (activation(config, c.x - o.x, c.y - o.y, hypot(v.x, v.y))) {
+                Verdict.FAIL -> {
+                    failed = true
+                    fail()
+                }
+                Verdict.ACTIVATE -> {
+                    active = true
+                    anchor = c
+                    emit(GestureState.BEGAN, "x" to c.x, "y" to c.y, "pointer_count" to pointers.size)
+                }
+                Verdict.WAIT -> {}
+            }
             return
         }
         val a = anchor ?: return
@@ -325,7 +362,7 @@ class PanRecognizer(index: Int, config: GestureConfig, emit: EmitFn) : Recognize
             )
             reset()
         } else if (pointers.isEmpty()) {
-            if (!active && origin != null) fail()
+            if (!active && origin != null && !failed) fail()
             reset()
         } else if (active) {
             rebase(pointers)
@@ -335,6 +372,21 @@ class PanRecognizer(index: Int, config: GestureConfig, emit: EmitFn) : Recognize
     override fun cancel(t: Double) {
         if (active) emit(GestureState.CANCELLED)
         reset()
+    }
+
+    /** `max_pointers` exceeded: an inactive pan fails, an active one is cancelled. Returns `true` when handled. */
+    private fun exceedsMaxPointers(pointers: Map<Int, Point>): Boolean {
+        val limit = config.maxPointers ?: return false
+        if (pointers.size <= limit) return false
+        if (active) {
+            emit(GestureState.CANCELLED)
+            reset()
+            failed = true
+        } else if (!failed) {
+            failed = true
+            fail()
+        }
+        return true
     }
 
     private fun rebase(pointers: Map<Int, Point>) {
@@ -351,15 +403,38 @@ class PanRecognizer(index: Int, config: GestureConfig, emit: EmitFn) : Recognize
         origin = null
         anchor = null
         active = false
+        failed = false
         velocity.reset()
         lastTranslation = Point(0.0, 0.0)
+    }
+
+    /** Outcome of the activation rules for one pointer sample. */
+    enum class Verdict { WAIT, ACTIVATE, FAIL }
+
+    companion object {
+        /**
+         * React Native Gesture Handler's pan activation rules for travel
+         * `(dx, dy)` from the touch-down point at pointer `speed` (dp/s):
+         * crossing a fail offset fails; otherwise crossing an active offset,
+         * travelling at least `minDistance` (when set), or moving at least
+         * `minVelocity` (when set) activates; anything else keeps waiting.
+         */
+        fun activation(config: GestureConfig, dx: Double, dy: Double, speed: Double): Verdict {
+            if (config.failOffsetX?.crosses(dx) == true || config.failOffsetY?.crosses(dy) == true) return Verdict.FAIL
+            if (config.activeOffsetX?.crosses(dx) == true || config.activeOffsetY?.crosses(dy) == true) return Verdict.ACTIVATE
+            val distance = config.minDistance
+            if (distance != null && hypot(dx, dy) >= distance) return Verdict.ACTIVATE
+            val velocity = config.minVelocity
+            if (velocity != null && speed >= velocity) return Verdict.ACTIVATE
+            return Verdict.WAIT
+        }
     }
 }
 
 /** Directional flick recognizer; also serves `fling` (adds a pointer-count requirement). */
 class SwipeRecognizer(index: Int, config: GestureConfig, emit: EmitFn) : Recognizer(index, config, emit) {
-    private val direction = config.direction
-    private val minVelocity = config.minVelocity
+    private val direction = config.direction?.takeIf { it != "any" }
+    private val minVelocity = config.minVelocity ?: 300.0
     private val nPointers = max(1, config.nPointers)
     private val velocity = VelocityEstimator()
     private var tracking = false
@@ -398,7 +473,7 @@ class SwipeRecognizer(index: Int, config: GestureConfig, emit: EmitFn) : Recogni
         } else {
             if (v.y > 0) "down" else "up"
         }
-        if (direction != "any" && direction != resolved) {
+        if (direction != null && direction != resolved) {
             fail()
             return
         }

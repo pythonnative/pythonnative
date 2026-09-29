@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Paths served by the PythonNative FileProvider
+     (`${applicationId}.pythonnative.fileprovider`). The camera module
+     hands the system camera a URI under the app's cache directory. -->
+<paths>
+    <cache-path name="pn_cache" path="." />
+    <external-cache-path name="pn_external_cache" path="." />
+    <files-path name="pn_files" path="." />
+</paths>

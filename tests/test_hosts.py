@@ -10,28 +10,46 @@ import os
 import sys
 import types
 from pathlib import Path
-from typing import Any, Iterator, List, Optional
+from typing import Any, Iterator, List, Optional, cast
 
 import pytest
 
 from pythonnative import diagnostics
+from pythonnative.bridge import set_transport
+from pythonnative.bridge.fake import FakeTransport
 from pythonnative.component import component
 from pythonnative.element import Element
 from pythonnative.hooks import use_back_handler, use_effect, use_state
-from pythonnative.hosts import ScreenHost, create_screen, import_component
-from pythonnative.native_views import set_registry
-from pythonnative.testing import FakeBackend, FakeView
+from pythonnative.hosts import create_screen, import_component
+from pythonnative.native_views import set_backend
+from pythonnative.testing import FakeBackend, FakeView, settle
 
 
 @pytest.fixture
-def backend() -> Iterator[FakeBackend]:
+def backend(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeBackend]:
     """Install a ``FakeBackend`` as the registry the host mounts into."""
     fake = FakeBackend()
-    set_registry(fake)
+    set_backend(fake)
+    transport = FakeTransport()
+    set_transport(transport)
+    from pythonnative.bridge import codec
+    from pythonnative.hosts.base import ScreenHost
+
+    monkeypatch.setattr(
+        ScreenHost,
+        "_show_error",
+        lambda self, payload: transport.call("Host", "show_error", codec.dumps({"call_id": 0, "args": payload})),
+    )
+    monkeypatch.setattr(
+        ScreenHost,
+        "_dismiss_error",
+        lambda self: transport.call("Host", "dismiss_error", codec.dumps({"call_id": 0, "args": {}})),
+    )
     try:
         yield fake
     finally:
-        set_registry(None)
+        set_backend(None)
+        set_transport(None)
 
 
 def _install_app_module(monkeypatch: pytest.MonkeyPatch, name: str, root: Any) -> str:
@@ -190,33 +208,6 @@ def test_screen_host_on_back_pressed_routes_to_handlers(monkeypatch: pytest.Monk
     assert host.on_back_pressed() is False, "destroyed host must decline back events"
 
 
-def test_every_host_class_exposes_on_layout() -> None:
-    """Regression: every host class must accept an ``on_layout`` callback.
-
-    The iOS template forwards ``viewDidLayoutSubviews`` as
-    ``on_layout`` so the screen host can re-push the safe-area-aware
-    viewport size; missing the method on the base or native classes
-    would raise ``AttributeError`` at runtime.
-    """
-    from pythonnative.hosts.native import NativeScreenHost
-
-    for host_class in (ScreenHost, NativeScreenHost):
-        assert callable(getattr(host_class, "on_layout", None))
-
-
-def test_screen_host_on_layout_is_idempotent(monkeypatch: pytest.MonkeyPatch, backend: FakeBackend) -> None:
-    @component
-    def Root() -> Element:
-        return Element("Text", {"text": "hi"}, [])
-
-    host = create_screen(_install_app_module(monkeypatch, "layout_app", Root))
-    host.on_create()
-    host.on_layout()
-    host.on_layout()
-    assert _text_of(host.root_native_view) == ["hi"]
-    host.on_destroy()
-
-
 # ======================================================================
 # Viewport
 # ======================================================================
@@ -244,6 +235,62 @@ def test_set_viewport_size_forwards_to_reconciler(monkeypatch: pytest.MonkeyPatc
     host.on_destroy()
 
 
+@pytest.fixture
+def _metrics() -> Iterator[None]:
+    from pythonnative import platform_metrics
+
+    def reset() -> None:
+        platform_metrics.reset_window_dimensions()
+        platform_metrics.reset_screen_dimensions()
+        platform_metrics.reset_keyboard_height()
+        platform_metrics.reset_safe_area_insets()
+
+    reset()
+    yield
+    reset()
+
+
+def test_native_viewport_payload_publishes_density_and_screen(_metrics: None) -> None:
+    """The host payload's scale, font_scale, screen_width, and screen_height land in platform_metrics."""
+    from pythonnative import platform_metrics
+    from pythonnative.hosts.native import _publish_metrics
+
+    assert _publish_metrics(
+        {
+            "width": 390,
+            "height": 700,
+            "scale": 3,
+            "font_scale": 1.25,
+            "screen_width": 390,
+            "screen_height": 844,
+            "keyboard_height": 144,
+        }
+    ) == (390.0, 700.0)
+    window = platform_metrics.get_window_dimensions()
+    assert (window.width, window.height, window.scale, window.font_scale) == (390.0, 700.0, 3.0, 1.25)
+    screen = platform_metrics.get_screen_dimensions()
+    assert (screen.width, screen.height, screen.scale, screen.font_scale) == (390.0, 844.0, 3.0, 1.25)
+    assert platform_metrics.get_keyboard_height() == 144.0
+
+
+def test_native_viewport_payload_falls_back_without_density_or_screen(_metrics: None) -> None:
+    """A payload with only width and height keeps scale 1.0 and reports the window as the screen."""
+    from pythonnative import platform_metrics
+    from pythonnative.hosts.native import _publish_metrics
+
+    _publish_metrics({"width": 360, "height": 800, "scale": "3", "font_scale": None})
+    window = platform_metrics.get_window_dimensions()
+    assert window == platform_metrics.WindowDimensions(360.0, 800.0, 1.0, 1.0)
+    assert platform_metrics.get_screen_dimensions() == window
+
+    # A later payload without density keeps the density an earlier one reported.
+    _publish_metrics({"width": 360, "height": 800, "scale": 2.625, "font_scale": 1.1})
+    _publish_metrics({"width": 800, "height": 360})
+    window = platform_metrics.get_window_dimensions()
+    assert (window.width, window.scale, window.font_scale) == (800.0, 2.625, 1.1)
+    assert _publish_metrics("not a dict") == (0.0, 0.0)
+
+
 # ======================================================================
 # RedBox
 # ======================================================================
@@ -259,14 +306,16 @@ def test_mount_error_shows_redbox_in_dev_mode(monkeypatch: pytest.MonkeyPatch, b
     host = create_screen(_install_app_module(monkeypatch, "redbox_app", Root))
     host.on_create()
 
-    assert host._redbox_reconciler is not None
-    overlay = _text_of(host._redbox_root)
-    assert "RuntimeError in mount" in overlay
-    assert "kaboom" in overlay
+    from pythonnative.bridge import get_transport
+
+    assert host._redbox_visible
+    payload = cast(FakeTransport, get_transport()).calls[-1][2]
+    assert "RuntimeError in mount: kaboom" == payload["title"]
+    assert "kaboom" in payload["trace"]
+    assert backend.live_view_count() == 0
 
     host.clear_redbox()
-    assert host._redbox_reconciler is None
-    assert host._redbox_root is None
+    assert not host._redbox_visible
     host.on_destroy()
 
 
@@ -286,17 +335,19 @@ def test_render_error_shows_redbox_and_dismiss_restores_tree(
 
     host = create_screen(_install_app_module(monkeypatch, "redbox_render_app", Root))
     host.on_create()
-    assert host._redbox_reconciler is None
+    assert not host._redbox_visible
     assert _text_of(host.root_native_view) == ["fine"]
 
     setter["set"](True)
-    assert host._redbox_reconciler is not None
-    assert "RuntimeError in render" in _text_of(host._redbox_root)
+    settle()
+    from pythonnative.bridge import get_transport
 
-    dismiss = host._redbox_root.find_first("Button")
-    assert dismiss is not None and dismiss.text == "Dismiss"
+    assert host._redbox_visible
+    assert "RuntimeError in render" in cast(FakeTransport, get_transport()).calls[-1][2]["title"]
+    assert _text_of(host.root_native_view) == ["fine"]
+    assert backend.live_view_count() == 1
     host.clear_redbox()
-    assert host._redbox_reconciler is None
+    assert not host._redbox_visible
     host.on_destroy()
 
 
@@ -310,7 +361,7 @@ def test_mount_error_propagates_outside_dev_mode(monkeypatch: pytest.MonkeyPatch
     host = create_screen(_install_app_module(monkeypatch, "redbox_off_app", Root))
     with pytest.raises(RuntimeError, match="kaboom"):
         host.on_create()
-    assert host._redbox_reconciler is None
+    assert not host._redbox_visible
     host.on_destroy()
 
 

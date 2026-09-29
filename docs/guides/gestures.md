@@ -30,8 +30,9 @@ def TapCard():
 
 Every callback receives a
 [`GestureEvent`][pythonnative.gestures.GestureEvent] snapshot with
-position, translation, velocity, scale, and rotation populated as
-appropriate for the gesture kind.
+position (`x`, `y` in the view; `absolute_x`, `absolute_y` in the
+window), translation, velocity, scale, rotation, and `direction`
+populated as appropriate for the gesture kind.
 
 ## How recognition works
 
@@ -144,9 +145,39 @@ def Draggable():
 ```
 
 `Pan` activates once the pointer travels `min_distance` points (10 by
-default), reports `on_change` with translation measured from the
-activation point, and `on_end` with release velocity, ready to feed
-into [`Animated.decay`][pythonnative.Animated] for a fling.
+default, unless another activation criterion is set), reports
+`on_change` with translation measured from the activation point, and
+`on_end` with release velocity, ready to feed into
+[`Animated.decay`][pythonnative.Animated] for a fling.
+
+### Activation offsets
+
+Inside a scrolling list a plain `Pan` fights the scroll view. `Pan`
+adds React Native Gesture Handler's activation criteria, applied the
+same way on iOS, Android, and in the browser preview:
+
+```python
+# A horizontal swipe-to-dismiss row inside a vertical list.
+gestures.Pan(
+    active_offset_x=(-20, 20),   # activate once the finger moves 20 pt left or right
+    fail_offset_y=(-15, 15),     # give up if it moves 15 pt up or down first
+    max_pointers=1,
+    on_change=drag,
+)
+```
+
+Before activation, with `dx` and `dy` the travel from where the finger
+touched down: crossing `fail_offset_x` or `fail_offset_y` fails the
+pan for the rest of the interaction; otherwise the pan activates as
+soon as `dx` crosses `active_offset_x`, `dy` crosses `active_offset_y`,
+the straight-line travel reaches `min_distance`, or the pointer speed
+reaches `min_velocity` (points per second). Each offset is a single
+number (`20` means `dx > 20`, `-20` means `dx < -20`) or a
+`(negative_bound, positive_bound)` pair. The default 10-point
+`min_distance` applies only when no offset or velocity criterion is
+given; pass it explicitly to combine it with them. `min_pointers` and
+`max_pointers` bound how many fingers may take part: too many fingers
+fail a pending pan and cancel an active one.
 
 ## Callback slots
 
@@ -160,8 +191,12 @@ Continuous gestures (`Pan`, `Pinch`, `Rotation`) expose three slots:
 
 Discrete gestures add a dedicated shortcut: `Tap(on_tap=...)`,
 `LongPress(on_long_press=...)` (fires at activation time, like
-`UILongPressGestureRecognizer`), and `Swipe(on_swipe=...)` (fires on
-release with the resolved `direction`).
+`UILongPressGestureRecognizer`), and `Swipe(on_swipe=...)` /
+`Fling(on_fling=...)` (fire on release with the resolved `direction`).
+`direction` is a [`SwipeDirection`][pythonnative.SwipeDirection]
+(`"left"`, `"right"`, `"up"`, or `"down"`) or `None` for other gesture
+kinds; `Swipe(direction=None)` and `Fling(direction=None)` accept any
+direction.
 
 ## Configuration
 
@@ -170,7 +205,14 @@ gestures.Tap(n_taps=2)                      # double-tap
 gestures.LongPress(min_duration_ms=350)     # quicker activation
 gestures.Pan(min_distance=4, min_pointers=2)
 gestures.Swipe(direction="left", min_velocity=200)
+gestures.Pan(on_change=drag, enabled=can_drag)   # keep the slot, stop recognizing
 ```
+
+Every descriptor accepts `enabled=False`. A disabled gesture stays in
+the list, so sibling indices and composition nodes are unchanged, but
+it never recognizes and is skipped by `Race` and `Exclusive`
+arbitration, so a later `Exclusive` member doesn't wait for it. Toggle
+`enabled` from state instead of rebuilding the `gestures=` list.
 
 `GestureEvent.state` is a
 [`GestureState`][pythonnative.gestures.GestureState] enum member

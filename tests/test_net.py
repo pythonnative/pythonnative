@@ -11,7 +11,7 @@ from typing import Generator
 
 import pytest
 
-from pythonnative.net import HTTPError, Response, fetch
+from pythonnative.net import HTTPError, Response, _build_request, fetch
 
 # ======================================================================
 # Mini HTTP server fixture
@@ -198,3 +198,37 @@ def test_unreachable_host_raises_oserror() -> None:
 
     with pytest.raises(OSError):
         asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "header_name",
+    ["Content-Type", "content-type", "CONTENT-TYPE", "Content-type"],
+)
+def test_custom_content_type_is_preserved_regardless_of_casing(header_name: str) -> None:
+    original_headers = {header_name: "application/merge-patch+json"}
+    request = _build_request(
+        url="https://example.com/users",
+        method="POST",
+        headers=original_headers,
+        body={"name": "Ada"},
+        params=None,
+    )
+    content_types = [value for name, value in request.header_items() if name.lower() == "content-type"]
+    assert content_types == ["application/merge-patch+json"]
+    assert original_headers == {header_name: "application/merge-patch+json"}
+    assert isinstance(request.data, bytes)
+    assert json.loads(request.data.decode("utf-8")) == {"name": "Ada"}
+
+
+def test_mapping_body_defaults_to_application_json() -> None:
+    request = _build_request(
+        url="https://example.com/users",
+        method="POST",
+        headers=None,
+        body={"name": "Ada"},
+        params=None,
+    )
+    content_types = [value for name, value in request.header_items() if name.lower() == "content-type"]
+    assert content_types == ["application/json"]
+    assert isinstance(request.data, bytes)
+    assert json.loads(request.data.decode("utf-8")) == {"name": "Ada"}

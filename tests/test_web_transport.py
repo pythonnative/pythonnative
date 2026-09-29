@@ -23,7 +23,7 @@ from pythonnative.bridge.web import BROWSER_MODULES, WebTransport
 from pythonnative.component import component
 from pythonnative.element import Element
 from pythonnative.native_modules import registry as modules
-from pythonnative.native_views import set_registry
+from pythonnative.native_views import set_backend
 from pythonnative.native_views.bridge_backend import BridgeBackend
 
 
@@ -65,7 +65,15 @@ class FakePage:
             from pythonnative.bridge.commits import CommitState
 
             self.commit = getattr(self, "commit", CommitState()).prepare(message[2]).publish()
-            return self.commit.acknowledgement()
+            reply = self.commit.acknowledgement()
+            if "layout" in message[2]:
+                reply["layout"] = {
+                    "application": self.commit.application,
+                    "surface": self.commit.surface,
+                    "revision": self.commit.revision,
+                    "frames": [],
+                }
+            return reply
         if kind == "measure":
             return list(self.measure_size)
         if kind == "command":
@@ -138,7 +146,7 @@ def web() -> Generator[Any, None, None]:
     transport = WebTransport(log=lambda line: None)
     bridge.set_transport(transport)
     backend = BridgeBackend(transport)
-    set_registry(backend)
+    set_backend(backend)
     modules._reset_for_tests()
     hosts._reset_for_tests()
     page = FakePage(transport)
@@ -149,7 +157,7 @@ def web() -> Generator[Any, None, None]:
     transport.drain_main()
     hosts._reset_for_tests()
     modules._reset_for_tests()
-    set_registry(None)
+    set_backend(None)
     bridge._reset_for_tests()
 
 
@@ -168,7 +176,7 @@ def _install_app(monkeypatch: pytest.MonkeyPatch, name: str, root: Any) -> str:
 
 
 def test_apply_waits_for_revision_acknowledgement(web: Any) -> None:
-    envelope = {"version": 2, "application": "test", "surface": 1, "revision": 1, "ops": [["c", 1, "View", {}]]}
+    envelope = {"version": 4, "application": "test", "surface": 1, "revision": 1, "ops": [["c", 1, "View", {}]]}
     result = json.loads(web.transport.apply(codec.dumps(envelope)))
     assert result == {"ok": True, "application": "test", "surface": 1, "revision": 1}
     assert web.page.sent[-1][0] == "apply"
@@ -287,7 +295,9 @@ def test_requests_from_the_page_are_answered(web: Any) -> None:
     from pythonnative.events import get_event_registry
     from pythonnative.mutations import CreateOp
 
-    web.backend.apply_mutations([CreateOp(5, "VirtualList", {})])
+    web.backend.apply_mutations(
+        [CreateOp(5, "VirtualList", {"dataset": {"base": 0, "revision": 1, "changes": [["reset", []]]}})]
+    )
     get_event_registry().set_events(5, {"on_bind_row": lambda payload: {"root": 77}})
     web.page.request(3, "event", 5, "on_bind_row", [{"index": 0}])
     web.transport.drain_main()
@@ -337,15 +347,31 @@ def test_gesture_stream_drives_the_python_arbiter(web: Any) -> None:
     t = web.transport
 
     def _pointer(phase: str, x: float, y: float) -> None:
-        t.on_preview_message(web.page, json.dumps(["gesture", 9, phase, {"id": 1, "x": x, "y": y, "specs": specs}]))
+        # The page sends window coordinates beside the view-local point.
+        info = {"id": 1, "x": x, "y": y, "absolute_x": x + 100, "absolute_y": y + 200, "specs": specs}
+        t.on_preview_message(web.page, json.dumps(["gesture", 9, phase, info]))
 
     _pointer("down", 10, 10)
     _pointer("up", 11, 10)
     t.drain_main(timeout=0.5)
     assert len(taps) == 1
+    # The arbiter reports the window-relative point the page sent alongside the local one.
+    assert taps[0]["absolute_x"] - taps[0]["x"] == 100.0
+    assert taps[0]["absolute_y"] - taps[0]["y"] == 200.0
     _pointer("clear", 0, 0)
     t.drain_main()
     assert 9 not in t._gestures
+
+
+def test_new_device_modules_are_served_by_the_page(web: Any) -> None:
+    for name in ("Keyboard", "AccessibilityInfo", "Localization", "Device"):
+        assert name in BROWSER_MODULES
+    web.page.module_results[("Keyboard", "is_visible")] = {"ok": True, "value": True}
+    web.page.module_results[("Localization", "get_timezone")] = {"ok": True, "value": "Europe/Paris"}
+    assert modules.native_module("Keyboard").call("is_visible") is True
+    assert modules.native_module("Localization").call("get_timezone") == "Europe/Paris"
+    assert ("Keyboard", "is_visible", {}) in web.page.calls
+    assert ("Localization", "get_timezone", {}) in web.page.calls
 
 
 # ----------------------------------------------------------------------
@@ -385,9 +411,13 @@ def test_screen_mounts_through_the_page(web: Any, monkeypatch: pytest.MonkeyPatc
     assert "Text" in created.values() and "Button" in created.values()
     assert ("Host", "attach_root", {"screen": 1, "tag": root_tag}) in web.page.calls
     # Children get frames (the root fills the viewport), and the Text was measured by the page.
-    assert any(module == "Layout" and method == "compute" for module, method, _ in web.page.calls)
+    assert any(
+        message[0] == "apply" and message[2].get("layout", {}).get("roots") == [root_tag] for message in web.page.sent
+    )
+    assert not any(module == "Layout" for module, _, _ in web.page.calls)
     assert not any(m[0] == "measure" for m in web.page.sent)
-    assert platform_metrics.get_window_dimensions() == (390.0, 800.0)
+    window = platform_metrics.get_window_dimensions()
+    assert (window.width, window.height) == (390.0, 800.0)
 
     host = hosts.host_for_screen(1)
     assert host is not None

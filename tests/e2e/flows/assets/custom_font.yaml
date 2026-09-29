@@ -1,0 +1,29 @@
+# Tests a .ttf under app/assets/ registers and its family name resolves for font_family.
+#
+# Demo screen: examples/e2e-suite/app/screens/assets/custom_font.py
+# Source under test: src/pythonnative/assets/fonts.py :: read_font_face, native font registration
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Assets
+      DEMO_TITLE: Custom font
+- assertVisible: "Hello from a bundled font"
+- scrollUntilVisible:
+    element:
+      text: "Bundled families: Pacifico"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "Bundled families: Pacifico"
+- assertVisible: "Face count: 1"
+- assertVisible: "Pacifico weight: 400"
+- scrollUntilVisible:
+    element:
+      text: "Back to list"
+    direction: DOWN
+    timeout: 20000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Assets

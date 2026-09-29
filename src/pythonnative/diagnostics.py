@@ -35,6 +35,7 @@ __all__ = [
     "HookOrderError",
     "set_dev_mode",
     "is_dev",
+    "log",
     "warn",
     "warn_once",
     "swallowed",
@@ -89,6 +90,29 @@ def is_dev() -> bool:
     if _dev_mode is not None:
         return _dev_mode
     return os.environ.get("PN_DEV", "").lower() in {"1", "true", "yes", "on"}
+
+
+# ======================================================================
+# Trace logging
+# ======================================================================
+
+
+def log(message: str) -> None:
+    """Print a framework trace line (``[PN] message``) in dev mode.
+
+    The reconciler and screen hosts call this at phase boundaries
+    (mount, re-render, RedBox) so a dev console shows what the runtime
+    is doing. No-op in production.
+
+    Args:
+        message: The trace text.
+    """
+    if not is_dev():
+        return
+    try:
+        print(f"[PN] {message}", flush=True)
+    except Exception:
+        pass
 
 
 # ======================================================================

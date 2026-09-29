@@ -11,7 +11,7 @@ import time
 from collections import Counter, deque
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 _session: Profiler | None = None
 
@@ -26,6 +26,7 @@ class Profiler:
             raise ValueError("Profiler capacity must be positive")
         self.events: deque[dict[str, Any]] = deque(maxlen=capacity)
         self.counters: Counter[str] = Counter()
+        self.gauges: dict[str, int] = {}
         self._token: Any = None
 
     def __enter__(self) -> Profiler:
@@ -37,11 +38,26 @@ class Profiler:
         """Restore the previous profiling context."""
         _active.reset(self._token)
 
+    def summary(self) -> dict[str, Any]:
+        """Summarize retained samples; durations are microseconds, not CI budgets."""
+        samples: dict[str, list[float]] = {}
+        for event in self.events:
+            if event["ph"] == "X":
+                samples.setdefault(event["name"], []).append(event["dur"])
+        phases = {}
+        for name, values in samples.items():
+            values.sort()
+            phases[name] = {
+                "samples": len(values),
+                "p50_us": values[(len(values) - 1) // 2],
+                "p95_us": values[min(len(values) - 1, int(len(values) * 0.95))],
+                "max_us": values[-1],
+            }
+        return {"counters": dict(self.counters), "gauges": dict(self.gauges), "phases": phases}
+
     def export(self, path: str | Path) -> None:
         """Write a trace suitable for Perfetto or Chrome's trace viewer."""
-        Path(path).write_text(
-            json.dumps({"traceEvents": list(self.events), "counters": self.counters}), encoding="utf-8"
-        )
+        Path(path).write_text(json.dumps({"traceEvents": list(self.events), **self.summary()}), encoding="utf-8")
 
 
 def count(name: str, value: int = 1) -> None:
@@ -49,6 +65,13 @@ def count(name: str, value: int = 1) -> None:
     profiler = _active.get() or _session
     if profiler is not None:
         profiler.counters[name] += value
+
+
+def gauge(name: str, value: int) -> None:
+    """Record the latest bounded runtime quantity, such as live views or backlog."""
+    profiler = _active.get() or _session
+    if profiler is not None:
+        profiler.gauges[name] = value
 
 
 @contextmanager
@@ -75,13 +98,13 @@ def span(name: str, **details: Any) -> Iterator[None]:
         )
 
 
-def profiled(name: str) -> Any:
+def profiled(name: str, details: Callable[..., dict[str, Any]] | None = None) -> Any:
     """Measure a synchronous runtime phase when profiling is enabled."""
 
     def decorate(function: Any) -> Any:
         @functools.wraps(function)
         def run(*args: Any, **kwargs: Any) -> Any:
-            with span(name):
+            with span(name, **(details(*args, **kwargs) if details and (_active.get() or _session) else {})):
                 return function(*args, **kwargs)
 
         return run

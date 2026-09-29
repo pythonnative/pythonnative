@@ -1,0 +1,28 @@
+# Tests use_navigation_theme mirrors the root NavigationContainer theme and
+# that switching to DARK_NAVIGATION_THEME repaints the themed chrome.
+#
+# Demo screen: examples/e2e-suite/app/screens/navigation/navigation_theme.py
+# Source under test: src/pythonnative/navigation/theme.py :: use_navigation_theme
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Navigation
+      DEMO_TITLE: Navigation theme
+- assertVisible: "Theme: light"
+- assertVisible: "Matches preset: yes"
+- assertVisible: "themed-card"
+- tapOn: "Use dark theme"
+- assertVisible: "Theme: dark"
+- assertVisible: "Preset: dark"
+- assertVisible: "Matches preset: yes"
+- assertVisible: "themed-card"
+# Restore the light preset before leaving so later flows see the default
+# header colors (the demo also resets on unmount).
+- tapOn: "Use light theme"
+- assertVisible: "Theme: light"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Navigation

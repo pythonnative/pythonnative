@@ -1,4 +1,5 @@
-# Tests Image renders without crashing alongside its labels.
+# Tests Image renders and its load lifecycle (on_load_start / on_load /
+# on_load_end) reaches Python for an inline data-URI source.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/image.py
 # Source under test: src/pythonnative/components/media.py :: Image
@@ -10,6 +11,11 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: Image
 - assertVisible: "Tiles rendered: 3"
+- extendedWaitUntil:
+    visible: "Load ended: yes"
+    timeout: 10000
+- assertVisible: "Load started: yes"
+- assertVisible: "Loaded size: 1x1"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

@@ -1,0 +1,17 @@
+# Tests use_screen_reader_enabled reports no screen reader on the emulator.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_screen_reader_enabled.py
+# Source under test: src/pythonnative/native_modules/accessibility_info.py :: use_screen_reader_enabled
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_screen_reader_enabled
+- assertVisible: "Screen reader: no"
+- assertVisible: "Visual layout in use"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

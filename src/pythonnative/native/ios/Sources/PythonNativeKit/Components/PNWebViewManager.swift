@@ -36,20 +36,22 @@ public final class PNWebViewManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        let typed = try! WebViewProps(props, validated: true)
+
         guard let webView = view as? WKWebView else { return }
-        if PNProps.has(props, "inject_javascript"),
+        if typed.has_inject_javascript,
            let delegate = PNViewState.existing(for: webView)?.retained.compactMap({ $0 as? PNWebViewDelegate }).first
         {
-            delegate.injectJavaScript = PNProps.string(PNProps.value(props, "inject_javascript"))
+            delegate.injectJavaScript = typed.inject_javascript
         }
-        if let html = PNProps.string(PNProps.value(props, "html")), !html.isEmpty {
+        if let html = typed.html, !html.isEmpty {
             let base = PNProps.string(PNProps.value(mergedProps(webView), "base_url")).flatMap { URL(string: $0) }
             webView.loadHTMLString(html, baseURL: base)
-        } else if let url = PNProps.string(PNProps.value(props, "url")), !url.isEmpty, let target = URL(string: url) {
+        } else if let url = typed.url, !url.isEmpty, let target = URL(string: url) {
             webView.load(URLRequest(url: target))
         }
-        if PNProps.has(props, "scroll_enabled") {
-            webView.scrollView.isScrollEnabled = PNProps.bool(PNProps.value(props, "scroll_enabled")) ?? true
+        if typed.has_scroll_enabled {
+            webView.scrollView.isScrollEnabled = typed.scroll_enabled ?? true
         }
         if PNProps.has(props, "allows_back_forward_gestures") {
             webView.allowsBackForwardNavigationGestures = PNProps.bool(PNProps.value(props, "allows_back_forward_gestures")) ?? false
@@ -60,8 +62,8 @@ public final class PNWebViewManager: PNComponentManager {
     public override func command(view: UIView, name: String, args: [String: Any]) -> Any? {
         guard let webView = view as? WKWebView else { return nil }
         switch name {
-        case "eval_js", "inject_javascript":
-            webView.evaluateJavaScript(PNProps.string(args["source"]) ?? PNProps.string(args["script"]) ?? "") { _, _ in }
+        case "inject_javascript":
+            webView.evaluateJavaScript(PNProps.string(args["script"]) ?? "") { _, _ in }
         case "reload": webView.reload()
         case "go_back": webView.goBack()
         case "go_forward": webView.goForward()
@@ -95,12 +97,12 @@ final class PNWebViewDelegate: NSObject, WKNavigationDelegate, WKScriptMessageHa
             webView.evaluateJavaScript(js) { _, _ in }
         }
         PNEvents.emit(webView, "on_load", [currentURL()])
-        PNEvents.emitIfWired(webView, "on_navigation_state_change", [["url": currentURL(), "loading": false, "can_go_back": webView.canGoBack, "can_go_forward": webView.canGoForward, "title": webView.title ?? ""]])
+        PNComponentEvents.WebView.on_navigation_state_change(webView, PNWebNavigationEvent(url: currentURL(), loading: false, can_go_back: webView.canGoBack, can_go_forward: webView.canGoForward, title: webView.title ?? ""))
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         PNEvents.emitIfWired(webView, "on_load_start", [currentURL()])
-        PNEvents.emitIfWired(webView, "on_navigation_state_change", [["url": currentURL(), "loading": true, "can_go_back": webView.canGoBack, "can_go_forward": webView.canGoForward, "title": webView.title ?? ""]])
+        PNComponentEvents.WebView.on_navigation_state_change(webView, PNWebNavigationEvent(url: currentURL(), loading: true, can_go_back: webView.canGoBack, can_go_forward: webView.canGoForward, title: webView.title ?? ""))
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -120,5 +122,52 @@ final class PNWebViewDelegate: NSObject, WKNavigationDelegate, WKScriptMessageHa
             body = PNJSON.encode(message.body)
         }
         PNEvents.emit(webView, "on_message", [body])
+    }
+}
+
+/// `WebViews`: asynchronous questions for a mounted `WebView`. WebKit
+/// answers `evaluateJavaScript` later on the main thread, so the result
+/// settles a promise instead of returning from a synchronous view command.
+public final class WebViewsModule: WebViewsImplementation {
+    public init() {}
+
+    public func eval_js(tag: Int64, script: String, completion: @escaping (Result<String, Error>) -> Void) -> (() -> Void)? {
+        DispatchQueue.main.async {
+            guard let webView = PNViewRegistry.shared.view(for: tag) as? WKWebView else {
+                completion(.failure(NSError(domain: "WebViews", code: 1, userInfo: [NSLocalizedDescriptionKey: "no WebView with tag \(tag)"])))
+                return
+            }
+            webView.evaluateJavaScript(script) { value, error in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(WebViewsModule.stringify(value)))
+                }
+            }
+        }
+        return nil
+    }
+
+    /// A script result as a string: strings as-is, `null` and `undefined`
+    /// as `""`, booleans and numbers in their JavaScript spelling, and
+    /// arrays and objects as JSON.
+    public static func stringify(_ value: Any?) -> String {
+        switch value {
+        case nil, is NSNull:
+            return ""
+        case let string as String:
+            return string
+        case let number as NSNumber:
+            if CFGetTypeID(number) == CFBooleanGetTypeID() { return number.boolValue ? "true" : "false" }
+            let double = number.doubleValue
+            if double.isFinite, double == double.rounded(), abs(double) < 1e15 { return String(Int64(double)) }
+            return number.stringValue
+        default:
+            if let value = value, JSONSerialization.isValidJSONObject(value),
+               let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) {
+                return String(decoding: data, as: UTF8.self)
+            }
+            return String(describing: value!)
+        }
     }
 }

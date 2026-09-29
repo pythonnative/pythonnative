@@ -5,6 +5,7 @@ import { Bridge } from "./bridge.js";
 import { Renderer } from "./renderer.js";
 import { PreviewHost } from "./host.js";
 import { color as parseColor } from "./colors.js";
+import { assets } from "./assets.js";
 
 const DEVICES = [
   { id: "iphone-15", name: "iPhone 15", width: 393, height: 852, bottom: 34, notch: true },
@@ -49,6 +50,8 @@ class Shell {
       screensEl: this.screens,
       overlaysEl: this.overlays,
       frameMetrics: () => this.frameMetrics(),
+      deviceName: () => this.device.name,
+      projectName: () => this.project,
       scheme: () => this.scheme,
       color: (value) => parseColor(value, this.scheme),
       log: (level, text) => this.logLine(level, text),
@@ -152,11 +155,17 @@ class Shell {
       gesture: (tag, phase, info) => this.bridge.send(["gesture", tag, phase, info]),
       animationFinished: (id, finished) => this.bridge.callback("animation", 0, "", JSON.stringify({ id, finished })),
       scheme: () => this.scheme,
+      nativeStackChanged: () => this.host?.nativeStackChanged(),
       overlays: () => this.overlays,
       bottomInset: () => this.frameMetrics().bottomInset,
       frameWidth: () => this.frameMetrics().width,
       pointInFrame: (event) => {
         const rect = event.currentTarget.getBoundingClientRect();
+        return { x: (event.clientX - rect.left) / this.scale, y: (event.clientY - rect.top) / this.scale };
+      },
+      // Window coordinates for `absolute_x` / `absolute_y`: the device frame is the app window.
+      pointInWindow: (event) => {
+        const rect = this.screens.getBoundingClientRect();
         return { x: (event.clientX - rect.left) / this.scale, y: (event.clientY - rect.top) / this.scale };
       },
       statusBar: (opts) => {
@@ -223,6 +232,7 @@ class Shell {
         document.title = `${this.project || "PythonNative"} preview`;
         this.entry = payload.entry || null;
         this.renderer.reset();
+        await assets.ready;
         await this.host.start(this.entry);
         this.logLine("ok", `mounted ${this.entry}`);
         break;
@@ -254,6 +264,10 @@ class Shell {
         }
         break;
       }
+      case "assets":
+        await assets.refresh();
+        this.logLine("ok", "assets refreshed");
+        break;
       case "superseded":
         this.bridge.close();
         this.setConnected(false);

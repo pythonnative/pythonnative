@@ -1,14 +1,9 @@
-# Tests Modal opens and closes on demand.
+# Tests Modal opens and closes, shows its content again when reopened,
+# on_show and on_dismiss fire once per presentation, and on_request_close
+# fires once for the Android back button or the iOS sheet pull-down.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/modal.py
 # Source under test: src/pythonnative/components/overlays.py :: Modal
-#
-# The intermediate ``Modal: open`` text from the outer screen is
-# *not* asserted while the modal is presented; on iOS the modal
-# sheet covers the outer screen so its accessibility elements are
-# offscreen for the duration. Instead we verify the toggle by
-# checking that ``Modal body text`` becomes / stops being visible
-# and that the outer state returns to ``Modal: closed`` after dismiss.
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -18,6 +13,8 @@ appId: ${APP_ID}
       DEMO_TITLE: Modal
 - assertVisible: "Modal: closed"
 - assertVisible: "Show count: 0"
+- assertVisible: "Dismiss count: 0"
+- assertVisible: "Request close: 0"
 - tapOn: "Open modal"
 - extendedWaitUntil:
     visible: "Modal body text"
@@ -27,8 +24,45 @@ appId: ${APP_ID}
     notVisible: "Modal body text"
     timeout: 10000
 - assertVisible: "Modal: closed"
-# on_show fired exactly once during the presentation above.
+# on_show and on_dismiss fired exactly once for the presentation above.
 - assertVisible: "Show count: 1"
+- assertVisible: "Dismiss count: 1"
+# A reopened modal shows its content again.
+- tapOn: "Open modal"
+- extendedWaitUntil:
+    visible: "Modal body text"
+    timeout: 10000
+- tapOn: "Close modal"
+- extendedWaitUntil:
+    notVisible: "Modal body text"
+    timeout: 10000
+- assertVisible: "Show count: 2"
+- assertVisible: "Dismiss count: 2"
+# on_request_close: the Android back button and the iOS sheet pull-down
+# each ask once; the demo answers by closing the modal.
+- tapOn: "Open modal"
+- extendedWaitUntil:
+    visible: "Modal body text"
+    timeout: 10000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - swipe:
+          start: "50%, 12%"
+          end: "50%, 85%"
+          duration: 900
+- extendedWaitUntil:
+    notVisible: "Modal body text"
+    timeout: 10000
+- assertVisible: "Request close: 1"
+- assertVisible: "Show count: 3"
+- assertVisible: "Dismiss count: 3"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

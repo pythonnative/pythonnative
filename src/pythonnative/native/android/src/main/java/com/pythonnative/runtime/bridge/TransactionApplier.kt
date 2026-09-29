@@ -37,22 +37,24 @@ class TransactionApplier(private val registry: ViewRegistry) {
 
     private fun update(op: Op.Update) {
         val record = registry.get(op.tag) ?: throw IllegalStateException("update: unknown tag ${op.tag}")
-        val changed = com.pythonnative.generated.PNContracts.normalize(record.typeName, op.changed)
-        if (com.pythonnative.generated.PNContracts.requiresRecreation(record.typeName, op.changed)) {
-            recreate(record, changed)
+        val changed = com.pythonnative.generated.PNContracts.normalize(record.typeName, op.changed, op.removed)
+        if (com.pythonnative.generated.PNContracts.requiresRecreation(record.typeName, op.changed, op.removed)) {
+            recreate(record, op.changed, op.removed)
             return
         }
-        JsonUtil.merge(record.props, changed)
+        JsonUtil.merge(record.props, op.changed)
+        for (key in op.removed) record.props.remove(key)
         record.manager.update(record.view, changed)
-        if (op.changed.has("gestures")) {
-            GestureCoordinator.bind(record, op.changed.opt("gestures"))
+        if (op.changed.has("gestures") || "gestures" in op.removed) {
+            GestureCoordinator.bind(record, record.props.opt("gestures"))
         }
     }
 
-    private fun recreate(record: ViewRecord, changed: JSONObject) {
+    private fun recreate(record: ViewRecord, changed: JSONObject, removed: List<String>) {
         val old = record.view
         val props = JSONObject(record.props.toString())
         JsonUtil.merge(props, changed)
+        for (key in removed) props.remove(key)
         val parent = record.parent?.let { registry.get(it) }
         val index = parent?.children?.indexOf(record.tag) ?: 0
         val children = record.children.mapNotNull { registry.get(it) }

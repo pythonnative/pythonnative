@@ -12,10 +12,12 @@ first screen) bubble to the parent navigator, so a stack nested in a
 tab still pops correctly and ``navigate("Settings")`` from deep inside
 one tab can switch to another.
 
-When the core belongs to the **root stack of a native host** it
-mutates its own state for pushes and pops: it asks the host to push or
-pop a real native screen carrying the serialized next state, and the
-new screen's navigator boots from that state.
+Every route removal (``pop``, ``pop_to``, ``navigate`` back to an
+existing route, ``replace``, and ``reset``) first emits
+``before_remove`` for each route that would leave the state; a
+listener that calls ``prevent_default()`` cancels the whole
+operation. On a native host the stack navigator re-synchronizes the
+native screen stack after a vetoed back gesture.
 """
 
 from __future__ import annotations
@@ -23,8 +25,9 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, List, Literal, Mapping, Optional, Protocol, Sequence, Tuple, Union
 
 from .. import diagnostics
+from ..element import Element, Node
 from ..hooks import Context, create_context
-from .screen import ScreenDef
+from .screen import OptionsLike, ScreenDef, resolve_options, validate_screen_options
 from .state import NavigationState, Route
 
 __all__ = [
@@ -36,11 +39,25 @@ __all__ = [
     "NavigationEvent",
     "NavigatorCore",
     "TabNavigation",
+    "provide",
 ]
 
 NavigatorKind = Literal["stack", "tab", "drawer"]
 EventName = Literal["focus", "blur", "before_remove", "state"]
 Listener = Callable[["NavigationEvent"], None]
+
+CONTAINER_ROUTE_KEY = "__container__"
+"""Route key of the navigator-level handle bound to a ``NavigationRef``; it always resolves to the active route."""
+
+
+def provide(context: Context[Any], value: Any, *children: Node, key: Optional[str] = None) -> Element:
+    """Return a provider element for ``context`` carrying ``value`` over ``children``.
+
+    Equivalent to ``context.Provider(...)``; navigation builds the
+    element directly so it doesn't depend on the ``Provider`` call
+    signature.
+    """
+    return Element(context, {"value": value}, list(children), key=key)
 
 
 class HostNavigator(Protocol):
@@ -107,6 +124,9 @@ class NavigatorCore:
         parent: Optional["Navigation"] = None,
         host: Optional[HostNavigator] = None,
         request_render: Optional[Callable[[], None]] = None,
+        *,
+        screen_options: OptionsLike = None,
+        group_options: Optional[Mapping[str, OptionsLike]] = None,
     ) -> None:
         self.kind = kind
         self.screens: Dict[str, ScreenDef] = dict(screens)
@@ -115,10 +135,14 @@ class NavigatorCore:
         self.parent = parent
         self.host = host
         self._request_render = request_render
+        # ``Navigator(screen_options=...)`` and ``Group(screen_options=...)`` layers (the latter keyed by screen name).
+        self.screen_options: OptionsLike = screen_options
+        self.group_options: Dict[str, OptionsLike] = dict(group_options or {})
         self._listeners: Dict[Tuple[str, str], List[Listener]] = {}
         # ``set_options`` results, keyed by route key.
         self.runtime_options: Dict[str, Dict[str, Any]] = {}
         self._handles: Dict[str, Navigation] = {}
+        self._container_handle: Optional[Navigation] = None
         self.drawer_open = False
         self._set_drawer_open: Optional[Callable[[bool], None]] = None
         self.on_state_change: Optional[Callable[[NavigationState], None]] = None
@@ -134,6 +158,9 @@ class NavigatorCore:
         set_state: Callable[[Any], None],
         parent: Optional["Navigation"],
         host: Optional[HostNavigator],
+        *,
+        screen_options: OptionsLike = None,
+        group_options: Optional[Mapping[str, OptionsLike]] = None,
     ) -> None:
         """Sync the core with the owning component's latest render.
 
@@ -144,6 +171,8 @@ class NavigatorCore:
         self._set_state = set_state
         self.parent = parent
         self.host = host
+        self.screen_options = screen_options
+        self.group_options = dict(group_options or {})
         live = {r.key for r in state.routes}
         for key in list(self._handles):
             if key not in live:
@@ -173,10 +202,19 @@ class NavigatorCore:
                 return route
         return self.state.current
 
+    def container_handle(self) -> "Navigation":
+        """The navigator-level handle bound to a ``NavigationRef``; its ``route`` is always the active route."""
+        if self._container_handle is None:
+            self._container_handle = Navigation(self, CONTAINER_ROUTE_KEY)
+        return self._container_handle
+
     def options_for(self, route: Route) -> Dict[str, Any]:
-        """Static screen options merged with any ``set_options`` overrides."""
+        """Effective options for ``route``: navigator, then group, then screen options, then ``set_options``."""
+        options = resolve_options(self.screen_options, route)
+        options.update(resolve_options(self.group_options.get(route.name), route))
         screen = self.screens.get(route.name)
-        options = screen.resolve_options(route) if screen is not None else {}
+        if screen is not None:
+            options.update(screen.resolve_options(route))
         options.update(self.runtime_options.get(route.key, {}))
         return options
 
@@ -188,14 +226,27 @@ class NavigatorCore:
         """Subscribe ``listener`` to ``event`` for the route with ``route_key``; returns an unsubscribe callable."""
         bucket = self._listeners.setdefault((route_key, event), [])
         bucket.append(listener)
+        if event == "before_remove" and len(bucket) == 1:
+            self._guard_changed()
 
         def remove() -> None:
             try:
                 bucket.remove(listener)
             except ValueError:
-                pass
+                return
+            if event == "before_remove" and not bucket:
+                self._guard_changed()
 
         return remove
+
+    def has_listeners(self, route_key: str, event: str) -> bool:
+        """Whether any listener is registered for ``event`` on the route with ``route_key``."""
+        return bool(self._listeners.get((route_key, event)))
+
+    def _guard_changed(self) -> None:
+        """A route gained or lost its last ``before_remove`` listener: re-render so ``Screen.guarded`` follows."""
+        if self._request_render is not None:
+            self._request_render()
 
     def emit(self, route: Route, event: str, data: Optional[Mapping[str, Any]] = None) -> NavigationEvent:
         """Deliver ``event`` to the listeners registered for ``route`` and return the event.
@@ -211,6 +262,14 @@ class NavigatorCore:
                     raise
         return evt
 
+    def _removal_allowed(self, routes: Sequence[Route], action: str) -> bool:
+        """Emit ``before_remove`` for ``routes`` (topmost first); ``False`` if any listener vetoed."""
+        for route in reversed(list(routes)):
+            evt = self.emit(route, "before_remove", {"action": action})
+            if evt.default_prevented:
+                return False
+        return True
+
     # ------------------------------------------------------------------
     # State transitions
     # ------------------------------------------------------------------
@@ -218,6 +277,9 @@ class NavigatorCore:
     def _commit(self, new_state: NavigationState) -> None:
         if new_state == self.state:
             return
+        # Reflect the commit at once so handles (and the native back path)
+        # see the new state before the owning component re-renders.
+        self.state = new_state
         self._set_state(new_state)
         if self.on_state_change is not None:
             self.on_state_change(new_state)
@@ -255,6 +317,8 @@ class NavigatorCore:
                 if new_state is not self.state:
                     self._commit(new_state)
                 return
+            if not self._removal_allowed(self.state.routes[existing + 1 :], "navigate"):
+                return
             new_state = self.state.pop_to(name, params, nested)
             self._commit(new_state)
             return
@@ -286,20 +350,23 @@ class NavigatorCore:
         if self.kind != "stack":
             self.navigate(name, params, nested)
             return
+        if not self._removal_allowed([self.state.current], "replace"):
+            return
         new_state = self.state.replace(name, self._with_initial_params(name, params), nested)
         self._commit(new_state)
 
     def pop(self, count: int = 1, *, source: str = "pop") -> bool:
-        """Pop ``count`` screens. Returns whether anything was popped here or by a parent."""
+        """Pop ``count`` screens. Returns whether anything was popped here or by a parent.
+
+        A ``before_remove`` veto counts as handled (``True``) while leaving the state unchanged.
+        """
         if self.kind != "stack" or len(self.state) <= 1:
             if self.parent is not None:
                 return self.parent.pop(count)
             return False
         count = max(1, min(count, len(self.state) - 1))
-        for route in reversed(self.state.routes[len(self.state) - count :]):
-            evt = self.emit(route, "before_remove", {"action": source})
-            if evt.default_prevented:
-                return True
+        if not self._removal_allowed(self.state.routes[len(self.state) - count :], source):
+            return True
         self._commit(self.state.pop(count))
         return True
 
@@ -308,14 +375,47 @@ class NavigatorCore:
         if len(self.state) > 1:
             self.pop(len(self.state) - 1, source="pop_to_top")
 
+    def pop_to(self, name: str, params: Mapping[str, Any], nested: Optional[NavigationState] = None) -> None:
+        """Pop back to the most recent ``name``, merging ``params`` into it.
+
+        When ``name`` isn't in the history the active screen is replaced by
+        a fresh ``name`` instead (React Navigation's ``popTo`` semantics).
+        Unknown routes bubble to the parent navigator; non-stack navigators
+        fall back to ``navigate``.
+        """
+        if not self._validate(name):
+            if self.parent is not None:
+                self.parent._core.pop_to(name, params, nested)
+                return
+            raise ValueError(f"Unknown route {name!r}. Known routes: {list(self.screens)}")
+        if self.kind != "stack":
+            self.navigate(name, params, nested)
+            return
+        existing = self.state.find(name)
+        if existing is None:
+            self.replace(name, params, nested)
+            return
+        if existing == self.state.index:
+            self.navigate(name, params, nested)
+            return
+        if not self._removal_allowed(self.state.routes[existing + 1 :], "pop_to"):
+            return
+        self._commit(self.state.pop_to(name, params, nested))
+
     def reset(self, routes: Sequence[Route], index: Optional[int] = None) -> None:
         """Replace the whole history with ``routes``, activating ``index`` (the last route by default).
 
-        Raises ``ValueError`` if any route name is unknown to this navigator.
+        ``before_remove`` fires for every current route whose key isn't in
+        ``routes``; a veto leaves the state untouched. Raises ``ValueError``
+        if any route name is unknown to this navigator.
         """
         for route in routes:
             if not self._validate(route.name):
                 raise ValueError(f"Unknown route {route.name!r}. Known routes: {list(self.screens)}")
+        kept = {route.key for route in routes}
+        removed = [route for route in self.state.routes if route.key not in kept]
+        if not self._removal_allowed(removed, "reset"):
+            return
         new_state = NavigationState(routes, index)
         self._commit(new_state)
 
@@ -329,7 +429,11 @@ class NavigatorCore:
                 return
 
     def set_options(self, route_key: str, options: Mapping[str, Any]) -> None:
-        """Merge runtime ``options`` for the route with ``route_key`` and request a render if anything changed."""
+        """Merge runtime ``options`` for the route with ``route_key`` and request a render if anything changed.
+
+        Raises ``ValueError`` for an unknown ``presentation`` or ``animation`` value.
+        """
+        validate_screen_options(options)
         current = self.runtime_options.setdefault(route_key, {})
         if all(current.get(k) == v for k, v in options.items()) and all(k in current for k in options):
             return
@@ -355,6 +459,7 @@ class Navigation:
     nav.push("Detail", id=43)
     nav.replace("Login")
     nav.pop()
+    nav.pop_to("Home")
     nav.pop_to_top()
     nav.set_params(id=44)
     nav.set_options(title="Edited")
@@ -448,6 +553,14 @@ class Navigation:
         """Pop every screen above the first one."""
         self._core.pop_to_top()
 
+    def pop_to(self, route: str, /, *, screen: Optional[str] = None, **params: Any) -> None:
+        """Pop back to the most recent ``route``, merging ``params`` into it.
+
+        If ``route`` isn't in the history, the active screen is replaced by
+        a fresh ``route``. ``before_remove`` fires for every screen popped.
+        """
+        self._core.pop_to(route, *_split_nested(screen, params))
+
     def reset(self, *routes: Union[str, Route], index: Optional[int] = None, **params: Any) -> None:
         """Replace the whole history.
 
@@ -477,11 +590,15 @@ class Navigation:
     def add_listener(self, event: EventName, listener: Listener) -> Callable[[], None]:
         """Subscribe to ``"focus"``, ``"blur"``, ``"before_remove"``, or ``"state"`` for this route.
 
-        Returns an unsubscribe callable. ``before_remove`` listeners may
-        call ``event.prevent_default()`` to keep the screen (useful for
-        unsaved-changes prompts). Native back gestures on iOS can't be
-        intercepted this way; use ``gesture_enabled=False`` to disable
-        them for such screens.
+        Returns an unsubscribe callable. ``before_remove`` fires for
+        every removal (``pop``, ``pop_to``, ``navigate`` back to an
+        existing route, ``replace``, ``reset``, and the system back
+        gesture) and its ``data["action"]`` names the cause. Listeners
+        may call ``event.prevent_default()`` to keep the screen (useful
+        for unsaved-changes prompts); after a vetoed native back the
+        stack restores the native screens to match. Set
+        ``gesture_enabled=False`` (iOS only) to disable the swipe
+        gesture outright instead of animating it out and back.
         """
         return self._core.add_listener(self._route_key, event, listener)
 

@@ -5,7 +5,8 @@ plugins {
 
 android {
     namespace 'com.pythonnative.runtime'
-    compileSdk 34
+    compileSdk 36
+    ndkVersion '28.2.13676358'
 
     defaultConfig {
         minSdk 24
@@ -35,6 +36,8 @@ android {
 }
 
 dependencies {
+    // pn:dependencies
+    // pn:end-dependencies
     api 'androidx.core:core-ktx:1.8.0'
     api 'androidx.appcompat:appcompat:1.4.1'
     api 'com.google.android.material:material:1.5.0'
@@ -43,6 +46,10 @@ dependencies {
     api 'androidx.security:security-crypto:1.1.0'
     api 'androidx.biometric:biometric:1.1.0'
     api 'androidx.dynamicanimation:dynamicanimation:1.0.0'
+    // Predictive back: OnBackPressedCallback progress hooks and BackEventCompat
+    // arrived in activity 1.8; its transitive requirements (core 1.8.0,
+    // lifecycle 2.6.1, savedstate 1.2.1) match what navigation already pulls.
+    api 'androidx.activity:activity:1.8.2'
     // Screen navigation (PNScreenFragment inside the app's NavHostFragment).
     api 'androidx.navigation:navigation-fragment-ktx:2.7.7'
     api 'androidx.navigation:navigation-ui-ktx:2.7.7'

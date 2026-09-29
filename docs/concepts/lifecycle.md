@@ -17,7 +17,10 @@ A render pass is triggered by:
 
 A `use_state` / `use_reducer` setter re-renders **locally**: only the
 component that owns the changed state (and the subtree it returns) is
-re-run. Sibling and ancestor components retain their native views and hook
+re-run. Setters never render inline: every setter call made during one
+callback, effect, or task step lands in the same flush, scheduled on the
+application loop (automatic batching), on every host including headless
+tests. Sibling and ancestor components retain their native views and hook
 state unless their own inputs or context change. Screens and mounted list
 rows belong to the same logical tree. Navigation updates that tree, and
 Fast Refresh preserves compatible component instances.
@@ -30,10 +33,11 @@ The phases:
    so this phase is cheap and pure (modulo `use_state` updates).
 2. **Commit**. The
    [`Reconciler`][pythonnative.reconciler.Reconciler] diffs the
-   re-rendered subtree against the previous one, applies the smallest
-   set of native mutations through the registered
-   [`ViewHandler`][pythonnative.native_views.base.ViewHandler]s, and
-   runs the layout pass.
+   re-rendered subtree against the previous one, hands the smallest
+   set of native mutations to the view backend in one
+   `apply_mutations` call (the Swift and Kotlin component managers
+   apply them; see [Native views](native-views.md)), and runs the
+   layout pass.
 3. **Layout effects**.
    [`use_layout_effect`][pythonnative.use_layout_effect] callbacks run
    on the application thread after committed geometry is available,
@@ -41,10 +45,15 @@ The phases:
    the platform UI thread owns presentation.
 4. **Passive effects**. Cleanup callbacks from the *previous* render
    run first; new [`use_effect`][pythonnative.use_effect] callbacks
-   run after, in depth-first order so children run before parents.
+   run after, in depth-first order so children run before parents. An
+   exception raised by a layout or passive effect is routed to the
+   nearest [`ErrorBoundary`][pythonnative.ErrorBoundary] exactly like a
+   render error; it never fails the native surface.
 5. **Drain**. If any effect set state, another render pass is queued
-   immediately. The screen host caps the loop to prevent runaway
-   re-renders.
+   immediately. A flush that keeps re-scheduling itself more than
+   fifty times raises `RuntimeError("Too many re-renders")` from the
+   component that keeps dirtying itself, routed through the nearest
+   `ErrorBoundary` (or the RedBox in dev mode).
 
 ```text
 [render] -> [commit + layout] -> [layout effects] -> [passive effects] -> drain? -> [render] ...
@@ -105,8 +114,12 @@ The screen host forwards the platform's app-level lifecycle to navigators
 and effects:
 
 - **Resume / `viewWillAppear`**: the active screen's `use_focus_effect`
-  is re-armed.
+  is re-armed, and the event carries fresh viewport metrics.
 - **Pause / `viewWillDisappear`**: focus cleanups run.
+- **Save / restore instance state**: acknowledged without calling into
+  Python. The host caches navigation restoration state as Python
+  publishes it, so platform state-saving never waits on the
+  application thread.
 - **Destroy / `dealloc`**: every effect cleanup runs and the
   reconciler tears down its native tree.
 

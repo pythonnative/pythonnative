@@ -1,13 +1,7 @@
-"""Demo screen for [`pn.sdk`][pythonnative.sdk] surface inspection.
+"""Exercise SDK props, platform capabilities, and a live native reset.
 
-Registering a real cross-platform custom native component requires
-``ViewHandler`` implementations for iOS and Android, which is more
-than a screen-level demo can do safely. The demo limits itself to
-exercising the SDK surface: it confirms the headline exports are
-importable, builds a frozen [`Props`][pythonnative.sdk.Props]
-subclass, and reads back the registry. If any of those break, this
-screen will fail to import and the flow will error out during boot,
-which is exactly what we want.
+The separately packaged Inbox extension covers generated native components,
+services, events, resources, and cancellation on both platforms.
 """
 
 from __future__ import annotations
@@ -28,6 +22,7 @@ class _DemoProps(pn.Props):
 @pn.component
 def CustomComponentDemo() -> pn.Element:
     """Inspect the SDK surface without registering a new platform handler."""
+    removed, set_removed = pn.use_state(False)
     custom_registered = pn.sdk.list_components()
     props_instance = _DemoProps(label="hello")
 
@@ -36,11 +31,15 @@ def CustomComponentDemo() -> pn.Element:
         "SDK surface check: Props subclass + registry inspection.",
         section(
             "SDK status",
+            pn.Element("Text", {"text": "Contract reset target", "font_size": pn.UNSET if removed else 24}),
+            pn.Button("Reset native property", on_press=lambda: set_removed(True)),
+            result_text("Property removed", "yes" if removed else "no"),
+            result_text("Native text supported", "yes" if pn.Platform.supports("Text", "text") else "no"),
             result_text("Props subclass works", "yes" if props_instance.label == "hello" else "no"),
             result_text("SDK module loaded", "yes" if hasattr(pn.sdk, "Props") else "no"),
             result_text("Custom components registered", len(custom_registered)),
             hint(
-                "Both 'yes' lines must render. The count is 0 in a stock "
+                "The status lines must render. The count is 0 in a stock "
                 "install (no third-party native components present)."
             ),
         ),

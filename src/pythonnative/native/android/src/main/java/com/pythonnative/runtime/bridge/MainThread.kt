@@ -15,6 +15,9 @@ object MainThread {
         return task.get()
     }
 
+    /** The main-looper handler (for observers that need one). */
+    fun handler(): Handler = handler
+
     /** Whether the current thread is the main thread. */
     fun isMain(): Boolean = Looper.myLooper() == Looper.getMainLooper()
 

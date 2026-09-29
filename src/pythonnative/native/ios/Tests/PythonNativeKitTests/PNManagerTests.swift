@@ -2,9 +2,49 @@ import XCTest
 @testable import PythonNativeKit
 
 final class PNManagerTests: XCTestCase {
+    func testBoxedIntegerColorsRemainDistinctFromBooleans() {
+        XCTAssertEqual(PNColor.parse(PNValues.encode(Int64(0))).map(PNColor.hexString), "#00000000")
+        XCTAssertEqual(PNColor.parse(PNValues.encode(Int64(1))).map(PNColor.hexString), "#00000001")
+        XCTAssertNil(PNColor.parse(PNValues.encode(true)))
+    }
     override func tearDown() {
         PNViewRegistry.shared.removeAll()
         super.tearDown()
+    }
+
+    func testTypedSliderStepsAndResetsColors() {
+        let manager = PNSliderManager()
+        let slider = manager.createView(tag: 70, props: ["value": 0.63, "min_value": 0, "max_value": 1,
+            "step": 0.2, "minimum_track_color": "#ff0000", "thumb_color": "#00ff00"]) as! UISlider
+        XCTAssertNotNil(slider.minimumTrackTintColor)
+        slider.sendActions(for: .valueChanged)
+        XCTAssertEqual(slider.value, 0.6, accuracy: 0.001)
+        manager.update(view: slider, changed: ["minimum_track_color": NSNull(), "thumb_color": NSNull()])
+        XCTAssertNil(slider.minimumTrackTintColor)
+        XCTAssertNil(slider.thumbTintColor)
+    }
+
+    func testImageDecoderBoundsBitmapAllocation() {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 2000, height: 1000), format: format)
+        let data = renderer.pngData { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 2000, height: 1000))
+        }
+        let image = PNImageManager.decode(data, targetSize: CGSize(width: 50, height: 50))
+        XCTAssertNotNil(image)
+        // The bitmap is downsampled to bound memory...
+        XCTAssertLessThanOrEqual(image!.cgImage!.width, 150)
+        XCTAssertLessThanOrEqual(image!.cgImage!.height, 75)
+        // ...while the logical size still reports the source dimensions so
+        // intrinsic layout doesn't depend on the decode pass.
+        XCTAssertEqual(image!.size.width, 2000, accuracy: 1)
+        XCTAssertEqual(image!.size.height, 1000, accuracy: 1)
+        // Density variants divide the logical size by their scale.
+        let dense = PNImageManager.decode(data, targetSize: .zero, assetScale: 2)
+        XCTAssertEqual(dense!.size.width, 1000, accuracy: 1)
+        XCTAssertNil(PNImageManager.decode(Data([1, 2, 3]), targetSize: .zero))
     }
 
     func testViewManagerAppliesCommonProps() {
@@ -28,7 +68,8 @@ final class PNManagerTests: XCTestCase {
         manager.update(view: view, changed: ["opacity": 1, "background_color": NSNull(), "display": "none"])
         XCTAssertEqual(view.alpha, 1, accuracy: 0.001)
         XCTAssertTrue(view.isHidden)
-        XCTAssertNil(PNViewState.existing(for: view)?.props["background_color"])
+        XCTAssertTrue(PNViewState.existing(for: view)?.props["background_color"] is NSNull)
+        XCTAssertNil(view.backgroundColor)
         XCTAssertEqual(PNProps.double(PNViewState.existing(for: view)?.props["opacity"]), 1)
     }
 
@@ -88,13 +129,13 @@ final class PNManagerTests: XCTestCase {
     func testVirtualListBindsRowsThroughRegistry() {
         try! PNTransaction.apply([.create(tag: 40, type: "View", props: ["background_color": "#123456"])])
         let manager = PNVirtualListManager()
-        guard let table = manager.createView(tag: 41, props: ["keys": ["a", "b", "c"], "revision": 1, "row_heights": [50.0, 50.0, 50.0]]) as? UICollectionView else {
+        guard let table = manager.createView(tag: 41, props: ["dataset": ["base": 0, "revision": 1, "changes": [["reset", [["a", 1, 50.0, false], ["b", 1, 50.0, false], ["c", 1, 50.0, false]]]]]]) as? UICollectionView else {
             return XCTFail("expected a collection view")
         }
         XCTAssertEqual(table.numberOfItems(inSection: 0), 3)
         let delegate = table.delegate as? UICollectionViewDelegateFlowLayout
         XCTAssertEqual(delegate?.collectionView?(table, layout: table.collectionViewLayout, sizeForItemAt: IndexPath(item: 1, section: 0)).height, 50)
-        manager.update(view: table, changed: ["row_heights": [10.0, 20.0, 30.0], "keys": ["a", "b", "c"], "revision": 2])
+        manager.update(view: table, changed: ["dataset": ["base": 1, "revision": 2, "changes": [["u", ["a", 2, 10.0, false]], ["u", ["b", 2, 20.0, false]], ["u", ["c", 2, 30.0, false]]]]])
         XCTAssertEqual(delegate?.collectionView?(table, layout: table.collectionViewLayout, sizeForItemAt: IndexPath(item: 2, section: 0)).height, 30)
         manager.destroy(view: table)
     }
@@ -105,8 +146,10 @@ final class PNManagerTests: XCTestCase {
         scroll.contentOffset = CGPoint(x: 0, y: 40)
         let payload = PNScrollPayload.make(scroll)
         XCTAssertEqual(payload["y"] as? Double, 40)
-        XCTAssertEqual(payload["extent"] as? Double, 200)
-        XCTAssertEqual(payload["range"] as? Double, 800)
+        XCTAssertEqual(payload["viewport_height"] as? Double, 200)
+        XCTAssertEqual(payload["content_height"] as? Double, 800)
+        XCTAssertEqual(Set(payload.keys), ["x", "y", "content_width", "content_height", "viewport_width", "viewport_height"],
+                       "ScrollEvent rejects extra keys")
     }
 
     func testRegistryKnowsEveryBuiltinType() {
