@@ -470,8 +470,8 @@ class BridgeBackend:
         self._refs.clear()
         self._python_props.clear()
         self._commit = CommitState(str(uuid.uuid4()), 1)
-        self._births: dict[int, int] = {}
-        self._event_sequences: dict[tuple[int, str], int] = {}
+        self._births = {}
+        self._event_sequences = {}
         self._failed = False
         self._edit_revisions.clear()
         self._layout_required = True

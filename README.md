@@ -35,7 +35,8 @@ PythonNative is a cross-platform toolkit for building native Android and iOS app
 - **Native widgets and layout:** Swift and Kotlin component managers own UIKit and Android widgets. The shared Yoga C++ engine computes layout beside the controls, using platform measurements for text and intrinsic sizes.
 - **Standard asyncio:** Components, effects, event handlers, and tasks run on a dedicated Python application thread. Native UI threads handle widgets, scrolling, and animation frames. Component-owned tasks are canceled on unmount.
 - **Incremental reconciliation:** State changes update affected component subtrees. Versioned bridge commits validate operations and acknowledge revisions; events and controlled text inputs carry identities that prevent stale updates.
-- **Native lists and navigation:** UIKit collection views and Android recycler views recycle cells for fixed or variable row sizes, grids, sections, and horizontal lists. Native navigation containers present logical screen roots at every nesting level while providers and component state remain in the shared Python tree; navigators take screen options, groups, themes, tab-bar styles, and a navigation ref usable outside components.
+- **Typed, Pythonic authoring:** Components return `pn.Node` and their signatures are their props, so a strict type checker verifies element trees and conditional children. Screens are components whose parameters are their route params (`nav.push(ItemScreen(id=42))`), navigators are module-level values with deep links derived from each screen's `path`, one `Theme` dataclass styles the app and its navigators, `StyleSheet` namespaces give styles typed names, and `pn.Store` holds app state with selector-based re-renders. `pn lint` checks the rules of hooks.
+- **Native lists and navigation:** UIKit collection views and Android recycler views recycle cells for fixed or variable row sizes, grids, sections, and horizontal lists. Native navigation containers present logical screen roots at every nesting level while providers and component state remain in the shared Python tree; navigators take screen options, groups, tab-bar styles, and a navigation ref usable outside components.
 - **Animation and gestures:** Serialized animation graphs support timing with named or bezier easing, springs, React Native's decay model, arithmetic, interpolation, and native scroll and gesture bindings. Swift and Kotlin recognize mobile gestures with Gesture Handler-style activation offsets and update supported animation bindings without Python work on every frame.
 - **Assets and graphics:** Drop images, fonts, and SVGs under `app/assets/` and reference them by path. Density variants, bundled fonts, a vector `Icon` set, `Svg` drawing, gradients, and blur render natively on both platforms and in the browser preview.
 - **Device APIs:** Python facades expose camera, location, notifications, storage, permissions, keyboard, dimensions and pixel ratio, device info, localization, accessibility settings, and other native services, with a Python fallback for headless tests. Test permissions and platform behavior on your deployment targets.
@@ -62,7 +63,7 @@ import pythonnative as pn
 
 
 @pn.component
-def App():
+def App() -> pn.Node:
     count, set_count = pn.use_state(0)
     return pn.Column(
         pn.Text(f"Count: {count}", style=pn.style(font_size=24, bold=True)),
@@ -70,7 +71,7 @@ def App():
             "Tap me",
             on_press=lambda: set_count(count + 1),
         ),
-        style=pn.style(spacing=12, padding=16),
+        style=pn.style(gap=12, padding=16),
     )
 ```
 

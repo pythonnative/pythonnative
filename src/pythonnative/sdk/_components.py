@@ -46,7 +46,7 @@ Example:
 from dataclasses import dataclass, fields, is_dataclass
 from typing import Any, Callable, Dict, List, Optional
 
-from ..element import Element
+from ..element import Element, Node
 
 ENTRY_POINT_GROUP = "pythonnative.handlers"
 """Entry-point group used by PyPI packages to define native components.
@@ -253,7 +253,7 @@ def element_factory(name: str) -> Callable[..., Element]:
     if name not in _REGISTRY:
         raise KeyError(f"No component defined under name {name!r}. Call define_component(name, props) first.")
 
-    def factory(*children: Element, key: Optional[str] = None, props: Any = None, **kwargs: Any) -> Element:
+    def factory(*children: Node, key: Optional[str] = None, props: Any = None, **kwargs: Any) -> Element:
         from ..mutations import UNSET
 
         explicit_style = kwargs.pop("style", UNSET)
@@ -299,7 +299,7 @@ def element_factory(name: str) -> Callable[..., Element]:
                     inspect.Parameter("style", inspect.Parameter.KEYWORD_ONLY, default=None, annotation=StyleProp),
                 ]
             )
-        factory.__signature__ = signature
+        factory.__signature__ = signature  # type: ignore[attr-defined]
     factory.__name__ = name
     factory.__doc__ = f"Construct an Element of type {name!r}."
     return factory

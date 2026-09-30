@@ -13,11 +13,11 @@ sheet down on iOS and asserts the request-close counter.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def ModalDemo() -> pn.Element:
+def ModalDemo() -> pn.Node:
     """Render a button that opens a Modal containing a dismiss button."""
     visible, set_visible = pn.use_state(False)
     show_count, set_show_count = pn.use_state(0)
@@ -28,21 +28,21 @@ def ModalDemo() -> pn.Element:
         set_request_close_count(lambda n: n + 1)
         set_visible(False)
 
-    return demo_screen(
+    return DemoScreen(
         "Modal",
         "Open the modal, then dismiss it from inside.",
-        section(
+        DemoSection(
             "Modal toggle",
-            result_text("Modal", "open" if visible else "closed"),
+            ResultText("Modal", "open" if visible else "closed"),
             # ``on_show`` fires once per presentation. We surface its
             # count on the *outer* screen (asserted after the modal
             # closes) because on iOS the presented sheet covers the
             # outer view, so a readout inside the modal can't be checked.
-            result_text("Show count", show_count),
-            result_text("Dismiss count", dismiss_count),
-            result_text("Request close", request_close_count),
+            ResultText("Show count", show_count),
+            ResultText("Dismiss count", dismiss_count),
+            ResultText("Request close", request_close_count),
             pn.Button("Open modal", on_press=lambda: set_visible(True)),
-            hint("Maestro asserts 'Modal body text' appears after tap."),
+            Hint("Maestro asserts 'Modal body text' appears after tap."),
         ),
         pn.Modal(
             pn.Column(
@@ -55,7 +55,7 @@ def ModalDemo() -> pn.Element:
                     style=pn.style(font_size=13, color="#374151"),
                 ),
                 pn.Button("Close modal", on_press=lambda: set_visible(False)),
-                style=pn.style(spacing=12, padding=20),
+                style=pn.style(gap=12, padding=20),
             ),
             visible=visible,
             title="Demo modal",

@@ -13,12 +13,12 @@ import pythonnative as pn
 
 
 @pn.component
-def Counter(initial: int = 0):
+def Counter(initial: int = 0) -> pn.Node:
     count, set_count = pn.use_state(initial)
     return pn.Column(
         pn.Text(f"Count: {count}", style=pn.style(font_size=24, bold=True)),
         pn.Button("+", on_press=lambda: set_count(count + 1)),
-        style=pn.style(spacing=12, padding=16),
+        style=pn.style(gap=12, padding=16),
     )
 ```
 
@@ -42,17 +42,28 @@ Platform controls and fonts supply their own intrinsic sizes.
   the body, with [`Suspense`][pythonnative.Suspense] providing the
   loading state declaratively. See the
   [Async + data guide](guides/async.md).
-- **Typed styling.** [`pn.Style`][pythonnative.style.Style] is a
-  `TypedDict` with `Literal` enums for every fixed-value field, so
-  mypy and your editor catch typos in `align_items` or
-  `font_weight` before the app ever runs. The
-  [`pn.style(...)`][pythonnative.style.style] helper makes the
-  call sites tidy.
-- **Native-backed navigation.** The root `Stack.Navigator` drives
-  the platform's real navigation controller (Android Navigation
-  Component fragments on Android, `UINavigationController` on iOS),
-  so transitions, back gestures, and state preservation are exactly
-  what users expect from a first-class native app.
+- **Typed from end to end.** A component's signature is its prop
+  list and it returns a [`pn.Node`][pythonnative.element.Node], so a
+  strict type checker verifies element trees, props, and conditional
+  children. [`pn.Style`][pythonnative.style.Style] is a `TypedDict`
+  with `Literal` enums for every fixed-value field, so mypy and your
+  editor catch typos in `align_items` or `font_weight` before the app
+  ever runs.
+- **Screens are components.** A screen's parameters are its route
+  params, so `nav.push(ItemScreen(id=42))` is a checked call.
+  Navigators are module-level values, and deep links come from each
+  screen's `path`. See [Navigation](guides/navigation.md).
+- **Native-backed navigation.** Every stack drives the platform's real
+  navigation controller (fragments on Android, `UINavigationController`
+  on iOS), so transitions, back gestures, and state preservation are
+  exactly what users expect from a first-class native app.
+- **One theme, typed style sheets, and stores.** A
+  [`Theme`][pythonnative.Theme] dataclass styles the app and its
+  navigators and follows dark mode;
+  [`StyleSheet`][pythonnative.StyleSheet] namespaces give styles typed
+  names; and a [`Store`][pythonnative.Store] holds app state with
+  targeted re-renders. See [Styling](guides/styling.md) and
+  [Managing state](guides/state.md).
 - **A Metro-style dev loop.** `pn start` runs one dev server for the
   browser preview and every connected debug build. Save a file and
   each client Fast Refreshes in place, preserving component state;
@@ -60,8 +71,11 @@ Platform controls and fonts supply their own intrinsic sizes.
   [Development workflow](guides/dev-workflow.md).
 - **Dev-mode diagnostics.** Uncaught errors show a full-screen RedBox
   with the traceback instead of crashing; typos in style keys and
-  duplicate list keys print "did you mean" warnings; conditional
-  hooks raise at the source. Every check is skipped in production.
+  duplicate list keys print "did you mean" warnings; props that don't
+  match a component's annotations warn; conditional hooks raise at the
+  source. Every check is skipped in production, and
+  [`pn lint`](guides/linting.md) catches hook mistakes before you run
+  the app.
 - **Browser preview.** `pn preview` renders your app in a browser tab
   inside a phone frame, through the same bridge protocol the Swift and
   Kotlin runtimes speak, so you can iterate on UI, state, and
@@ -75,7 +89,7 @@ Platform controls and fonts supply their own intrinsic sizes.
   plugins auto-register through the `pythonnative.handlers` entry-point
   group.
 - **A small surface.** A handful of element factories, a handful of
-  hooks, and one navigation primitive.
+  hooks, and three navigators.
 
 ## Quick links
 

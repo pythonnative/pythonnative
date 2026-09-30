@@ -208,6 +208,7 @@ def test_callback_routed_through_event_registry_on_mount() -> None:
     # The callable never reaches the backend; only the event-name set does.
     assert "on_press" not in root.props
     assert "on_press" in root.props["_pn_events"]
+    assert tag is not None
     get_event_registry().dispatch(tag, "on_press")
     assert calls == [1]
 
@@ -219,6 +220,7 @@ def test_event_registry_cleared_on_destroy() -> None:
     rec = Reconciler(backend)
     rec.mount(Element("Button", {"title": "x", "on_press": lambda: None}, []))
     tag = rec.root_tag
+    assert tag is not None
     assert get_event_registry().has(tag, "on_press")
 
     rec.reconcile(Element("Text", {"text": "replaced"}, []))
@@ -284,6 +286,7 @@ def test_keyed_children_preserve_identity() -> None:
         ],
     )
     root = rec.mount(el1)
+    assert rec.root is not None
     view_a = rec.root.children[0].native_view
     view_b = rec.root.children[1].native_view
     view_c = rec.root.children[2].native_view
@@ -335,6 +338,7 @@ def test_keyed_children_remove_by_key() -> None:
     )
     rec.reconcile(el2)
 
+    assert rec.root is not None
     assert len(rec.root.children) == 2
     assert rec.root.children[0].element.key == "a"
     assert rec.root.children[1].element.key == "c"
@@ -365,6 +369,7 @@ def test_keyed_children_insert_new() -> None:
     )
     rec.reconcile(el2)
 
+    assert rec.root is not None
     assert len(rec.root.children) == 3
     assert rec.root.children[1].element.key == "b"
 
@@ -566,7 +571,7 @@ def test_layout_pass_runs_after_mount_when_viewport_set() -> None:
 
     el = Element(
         "Column",
-        {"width": 320, "height": 480, "spacing": 4},
+        {"width": 320, "height": 480, "gap": 4},
         [
             Element("View", {"height": 50}, []),
             Element("View", {"height": 80}, []),
@@ -799,7 +804,7 @@ def test_layout_pass_uses_intrinsic_button_size() -> None:
         [
             Element(
                 "Row",
-                {"flex_direction": "row", "spacing": 8},
+                {"flex_direction": "row", "gap": 8},
                 [
                     Element("Button", {"title": "Tap me"}, []),
                     Element("Button", {"title": "Reset"}, []),

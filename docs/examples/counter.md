@@ -14,7 +14,7 @@ import pythonnative as pn
 
 
 @pn.component
-def Counter(initial: int = 0):
+def Counter(initial: int = 0) -> pn.Node:
     count, set_count = pn.use_state(initial)
 
     inc = lambda: set_count(count + 1)
@@ -31,11 +31,11 @@ def Counter(initial: int = 0):
         pn.Row(
             pn.Button("-", on_press=dec, style={"flex": 1}),
             pn.Button("+", on_press=inc, style={"flex": 1}),
-            style={"spacing": 8},
+            style={"gap": 8},
         ),
         pn.Button("Reset", on_press=reset),
         style={
-            "spacing": 12,
+            "gap": 12,
             "padding": 16,
             "align_items": "stretch",
         },
@@ -48,7 +48,7 @@ def Counter(initial: int = 0):
   `initial`. They are recreated on every render but the reconciler
   doesn't care; only behavior, not identity, matters here.
 - `style` arguments are plain dicts. Layout properties (`flex`,
-  `spacing`, `padding`, `align_items`) sit beside visual properties
+  `gap`, `padding`, `align_items`) sit beside visual properties
   (`color`, `font_size`, `bold`).
 - The `Row` uses `flex: 1` on its children to split space evenly. The
   same `flex` knob works inside `Column`s for vertical layouts.
@@ -73,32 +73,37 @@ For more complex counters (with bounds, multipliers, history), reach
 for [`use_reducer`][pythonnative.use_reducer]:
 
 ```python
-def reducer(state, action):
+from typing import Literal
+
+
+def reducer(state: int, action: Literal["inc", "dec", "reset"]) -> int:
     if action == "inc":
         return state + 1
     if action == "dec":
         return state - 1
-    if action == "reset":
-        return 0
-    raise ValueError(f"unknown action: {action!r}")
+    return 0
 
 
 @pn.component
-def Counter():
+def Counter() -> pn.Node:
     state, dispatch = pn.use_reducer(reducer, 0)
     return pn.Column(
         pn.Text(str(state), style={"font_size": 28}),
         pn.Row(
             pn.Button("-", on_press=lambda: dispatch("dec")),
             pn.Button("+", on_press=lambda: dispatch("inc")),
-            style={"spacing": 8},
+            style={"gap": 8},
         ),
         pn.Button("Reset", on_press=lambda: dispatch("reset")),
-        style={"spacing": 12, "padding": 16, "align_items": "stretch"},
+        style={"gap": 12, "padding": 16, "align_items": "stretch"},
     )
 ```
 
-The reducer is a plain function: easy to test, easy to read.
+The reducer is a plain function: easy to test, easy to read, and
+typed, so `dispatch("increment")` is a static error. When several
+screens need the same counter, move it into a
+[`Store`][pythonnative.Store]; see
+[Managing state](../guides/state.md).
 
 ## Next steps
 

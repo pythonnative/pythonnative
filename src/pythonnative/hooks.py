@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import weakref
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field, replace
 from typing import (
@@ -95,7 +96,7 @@ _providers: ContextVar[Dict[int, Tuple[Any, ...]]] = ContextVar("pn_providers", 
 
 def provider_environment() -> Dict[int, Any]:
     """Return the current immutable provider environment for render identity."""
-    return {key: stack[-1] for key, stack in _providers.get().items()}
+    return {key: stack[-1][0] for key, stack in _providers.get().items()}
 
 
 # The component whose body is currently executing. A ContextVar (not a
@@ -156,7 +157,7 @@ class Ref(Generic[T]):
 
     __slots__ = ("current",)
 
-    def __init__(self, initial: T = None) -> None:
+    def __init__(self, initial: T = None) -> None:  # type: ignore[assignment]
         self.current: T = initial
 
     def __setattr__(self, name: str, value: Any) -> None:
@@ -226,6 +227,7 @@ class HookState:
         "_async_task",
         "_async_inputs",
         "task_scope",
+        "__weakref__",
     )
 
     def __init__(self) -> None:
@@ -1144,7 +1146,7 @@ def use_transition() -> Tuple[bool, Callable[[Callable[[], None]], None]]:
         run_in_transition(fn)
         owner.transitions.on_complete(lambda: set_pending(False))
 
-    start = use_callback(start_transition, [])
+    start = use_callback(start_transition, [])  # pn: ignore[PN103] ctx is this component's own hook state
     return is_pending, start
 
 
@@ -1250,8 +1252,14 @@ def use_query(
     if key is None:
         key = local_key
     snapshot = use_subscription(
-        use_callback(lambda notify: cache.subscribe(key, fetcher, notify), [cache, key]),
-        use_callback(lambda: cache.snapshot(key, initial), [cache, key]),
+        use_callback(
+            lambda notify: cache.subscribe(key, fetcher, notify),
+            [cache, key],  # pn: ignore[PN103] the query key identifies the fetcher, as in React Query
+        ),
+        use_callback(
+            lambda: cache.snapshot(key, initial),
+            [cache, key],  # pn: ignore[PN103] the query key identifies the initial value
+        ),
     )
     refetch = use_callback(lambda: cache.invalidate(key), [cache, key])
     return QueryResult(data=snapshot.data, loading=snapshot.loading, error=snapshot.error, refetch=refetch)
@@ -1427,7 +1435,9 @@ def use_subscription(subscribe: Callable[[Callable[[], None]], Callable[[], None
                 observed.current = current
                 set_tick(lambda n: n + 1)
 
-        remove = subscribe(changed)
+        # Stores may notify from any thread; compare and re-render on the
+        # application thread, like every other state update.
+        remove = subscribe(lambda: call_on_application_thread(changed))
         # Account for a store change between rendering and subscribing.
         changed()
         return remove
@@ -1574,7 +1584,12 @@ class Context(Generic[T]):
     def current(self) -> T:
         """Return the innermost provided value, or ``default``."""
         stack = _providers.get().get(id(self), ())
-        return stack[-1] if stack else self.default
+        return stack[-1][0] if stack else self.default
+
+    def _consumers(self) -> Optional["weakref.WeakSet[HookState]"]:
+        """The consumer registry of the innermost provider, or ``None`` without one."""
+        stack = _providers.get().get(id(self), ())
+        return stack[-1][1] if stack else None
 
     def __repr__(self) -> str:
         return f"<Context {self.name or id(self):x}>" if self.name is None else f"<Context {self.name}>"
@@ -1582,9 +1597,9 @@ class Context(Generic[T]):
     # Rendering support: the reconciler pushes/pops provided values
     # while it walks a Provider's subtree.
 
-    def _push(self, value: T) -> None:
+    def _push(self, value: T, consumers: Optional["weakref.WeakSet[HookState]"] = None) -> None:
         env = _providers.get()
-        _providers.set({**env, id(self): (*env.get(id(self), ()), value)})
+        _providers.set({**env, id(self): (*env.get(id(self), ()), (value, consumers))})
 
     def _pop(self) -> None:
         env = dict(_providers.get())
@@ -1636,6 +1651,9 @@ def use_context(context: Context[T]) -> T:
     ctx.record_hook("use_context")
     value = context.current()
     ctx.context_deps[id(context)] = value
+    consumers = context._consumers()
+    if consumers is not None:
+        consumers.add(ctx)
     return value
 
 
@@ -1702,7 +1720,7 @@ def use_back_handler(handler: Callable[[], bool]) -> None:
 
         return owner.register_back_handler(_trampoline)
 
-    use_effect(_register, [])
+    use_effect(_register, [])  # pn: ignore[PN103] ctx is this component's own hook state
 
 
 __all__ = [

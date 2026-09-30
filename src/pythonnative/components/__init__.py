@@ -20,7 +20,7 @@ Example:
     pn.Column(
         pn.Text("Hello", style=pn.style(font_size=18)),
         pn.Button("Tap", on_press=lambda: print("tapped")),
-        style=pn.style(spacing=12, padding=16),
+        style=pn.style(gap=12, padding=16),
     )
     ```
 """

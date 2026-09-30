@@ -24,7 +24,7 @@ items = [{"id": i, "title": f"Row {i}"} for i in range(10_000)]
 
 
 @pn.component
-def Big():
+def Big() -> pn.Node:
     return pn.FlatList(
         data=items,
         item_height=44,
@@ -52,18 +52,18 @@ class Message:
     title: str
 
 
-def render_message(message: Message, index: int):
+def render_message(message: Message, index: int) -> pn.Element:
     return pn.Text(message.title)
 
 
 @pn.component
-def Messages():
+def Messages() -> pn.Node:
     messages = pn.use_memo(
         lambda: pn.ListData([Message("a", "Hello")], key=lambda message: message.id),
         [],
     )
 
-    def edit():
+    def edit() -> None:
         new_key = f"message-{messages.revision}"
         with messages.batch():
             messages.update("a", replace(messages.get("a"), title="Edited"))
@@ -141,10 +141,10 @@ either `FlatList` or [`ScrollView`][pythonnative.ScrollView]:
 
 ```python
 @pn.component
-def Pullable():
+def Pullable() -> pn.Node:
     refreshing, set_refreshing = pn.use_state(False)
 
-    def reload():
+    def reload() -> None:
         set_refreshing(True)
         # ... fetch data ...
         set_refreshing(False)
@@ -165,7 +165,7 @@ Wrap the row in a [`Pressable`][pythonnative.Pressable] inside
 `render_item`:
 
 ```python
-def render_row(item, index):
+def render_row(item: dict[str, Any], index: int) -> pn.Element:
     return pn.Pressable(
         pn.Text(item["title"]),
         on_press=lambda: open_detail(item["id"]),
@@ -201,7 +201,7 @@ publishes a [`ListController`][pythonnative.ListController] on
 
 ```python
 @pn.component
-def JumpableList():
+def JumpableList() -> pn.Node:
     list_ref = pn.use_ref()
 
     return pn.Column(

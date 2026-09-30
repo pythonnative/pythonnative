@@ -1,14 +1,18 @@
-"""Distribution validation and partial-upload recovery regressions."""
+"""Distribution validation, partial-upload recovery, and release app-bundle contents."""
 
+import ast
 import importlib.util
 import io
 import json
+import os
+import shutil
 import subprocess
+import sys
 import tarfile
 import zipfile
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, Iterator, List, Optional, Set, Tuple
 
 import pytest
 
@@ -158,3 +162,157 @@ def test_recovery_reuses_original_bytes_after_partial_upload(tmp_path: Path, mon
     assert remote[second.name] == b"original source"
     assets.sync_assets("v0.40.0", tmp_path)
     assert first.read_bytes() == b"original wheel"
+
+
+# ======================================================================
+# Release app bundles: development modules stay out
+# ======================================================================
+
+PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "src" / "pythonnative"
+
+# Function-local imports of development modules that remain in release
+# bundles. Each runs only on a development path, so a release app never
+# executes it: ``(importing module, enclosing function, imported module)``.
+DEV_ONLY_LAZY_IMPORTS = {
+    # `start(dev=True)` starts the dev client; release templates pass False.
+    ("pythonnative.bootstrap", "start", "pythonnative.devclient"),
+    # Fast Refresh fingerprint; guarded by `except ImportError` for release.
+    ("pythonnative.component", "_hook_signature", "pythonnative.refresh"),
+    # Hot reload entry points, called only by the dev client and preview.
+    ("pythonnative.hosts.base", "ScreenHost.reload", "pythonnative.hot_reload"),
+    ("pythonnative.hosts.base", "ScreenHost._try_fast_refresh", "pythonnative.hot_reload"),
+}
+
+
+def _module_name(root: Path, path: Path) -> str:
+    parts = list(path.relative_to(root.parent).with_suffix("").parts)
+    if parts[-1] == "__init__":
+        parts.pop()
+    return ".".join(parts)
+
+
+def _is_type_checking(node: ast.AST) -> bool:
+    test = node.test if isinstance(node, ast.If) else None
+    return (isinstance(test, ast.Name) and test.id == "TYPE_CHECKING") or (
+        isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING"
+    )
+
+
+def _imports(root: Path, path: Path) -> Iterator[Tuple[str, Optional[str], Set[str]]]:
+    """Yield ``(module, enclosing function or None, imported names)`` for each import in ``path``.
+
+    Imported names include ``package.name`` for ``from package import name``,
+    since ``name`` may be a submodule. Imports under ``if TYPE_CHECKING:`` are skipped.
+    """
+    module = _module_name(root, path)
+    package = module if path.name == "__init__.py" else module.rpartition(".")[0]
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+    def visit(node: ast.AST, scope: List[str], in_function: bool) -> Iterator[Tuple[str, Optional[str], Set[str]]]:
+        for child in ast.iter_child_nodes(node):
+            if _is_type_checking(child):
+                continue
+            if isinstance(child, ast.Import):
+                yield module, ".".join(scope) if in_function else None, {alias.name for alias in child.names}
+            elif isinstance(child, ast.ImportFrom):
+                if child.level:
+                    base = package.split(".")[: len(package.split(".")) - (child.level - 1)]
+                    target = ".".join(base + ([child.module] if child.module else []))
+                else:
+                    target = child.module or ""
+                names = {target} | {f"{target}.{alias.name}" for alias in child.names}
+                yield module, ".".join(scope) if in_function else None, names
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                yield from visit(child, scope + [child.name], True)
+            elif isinstance(child, ast.ClassDef):
+                yield from visit(child, scope + [child.name], in_function)
+            else:
+                yield from visit(child, scope, in_function)
+
+    yield from visit(tree, [], False)
+
+
+@pytest.fixture(scope="module")
+def release_bundle(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    from pythonnative.project.bundle import copy_library
+
+    destination = tmp_path_factory.mktemp("release") / "pythonnative"
+    copy_library(PACKAGE_ROOT, destination, release=True)
+    return destination
+
+
+def _modules(root: Path) -> Set[str]:
+    return {_module_name(root, path) for path in root.rglob("*.py")}
+
+
+def test_release_bundle_omits_development_modules(release_bundle: Path) -> None:
+    from pythonnative.project.bundle import DEV_ONLY_PATHS
+
+    for rel in DEV_ONLY_PATHS:
+        assert (PACKAGE_ROOT / rel).exists(), f"stale entry in DEV_ONLY_PATHS: {rel}"
+        assert not (release_bundle / rel).exists(), rel
+    shipped = _modules(release_bundle)
+    for name in ("pythonnative", "pythonnative.bootstrap", "pythonnative.component", "pythonnative.sdk.schema"):
+        assert name in shipped
+    assert not any(path.suffix in (".so", ".pyc") or path.name == "__pycache__" for path in release_bundle.rglob("*"))
+
+
+def test_release_bundle_never_imports_development_modules(release_bundle: Path) -> None:
+    excluded = _modules(PACKAGE_ROOT) - _modules(release_bundle)
+    assert "pythonnative.devclient" in excluded and "pythonnative.cli.pn" in excluded
+
+    def is_excluded(name: str) -> bool:
+        return any(name == module or name.startswith(module + ".") for module in excluded)
+
+    top_level: List[str] = []
+    lazy: Set[Tuple[str, str, str]] = set()
+    for path in sorted(release_bundle.rglob("*.py")):
+        for module, function, names in _imports(release_bundle, path):
+            for name in sorted(n for n in names if is_excluded(n)):
+                if function is None:
+                    top_level.append(f"{module} imports {name}")
+                else:
+                    lazy.add((module, function, name))
+    # Collapse `from pkg import name` pairs onto the module actually imported.
+    lazy = {entry for entry in lazy if not any(entry[2].startswith(other[2] + ".") for other in lazy if other != entry)}
+    assert top_level == [], "release bundles would fail to import:\n" + "\n".join(top_level)
+    unexpected = lazy - DEV_ONLY_LAZY_IMPORTS
+    assert not unexpected, f"new lazy imports of development modules (allowlist them only if dev-only): {unexpected}"
+    stale = DEV_ONLY_LAZY_IMPORTS - lazy
+    assert not stale, f"stale DEV_ONLY_LAZY_IMPORTS entries: {stale}"
+
+
+def test_debug_bundle_keeps_development_modules(tmp_path: Path) -> None:
+    from pythonnative.project.bundle import copy_library
+
+    destination = tmp_path / "pythonnative"
+    (destination / "stale.py").parent.mkdir(parents=True)
+    (destination / "stale.py").write_text("")
+    copy_library(PACKAGE_ROOT, destination, release=False)
+    assert not (destination / "stale.py").exists()
+    for rel in ("devclient.py", "hot_reload.py", "refresh.py", "devserver/ws.py", "devserver/static/index.html"):
+        assert (destination / rel).exists(), rel
+    assert not (destination / "templates").exists()
+    assert not (destination / "native").exists()
+
+
+def test_release_runtime_imports_without_development_modules(release_bundle: Path, tmp_path: Path) -> None:
+    """The runtime (and a component definition) imports from a release bundle in a fresh interpreter."""
+    site = tmp_path / "site"
+    site.mkdir()
+    shutil.copytree(release_bundle, site / "pythonnative")
+    script = (
+        "import sys; sys.path.insert(0, sys.argv[1]);"
+        "import pythonnative as pn, pythonnative.bootstrap, pythonnative.sdk.schema;"
+        "assert pn.__file__.startswith(sys.argv[1]), pn.__file__;"
+        "Hello = pn.component(lambda: pn.Text('hi'));"
+        "assert Hello.refresh_signature is None;"
+        "import importlib.util as u;"
+        "assert u.find_spec('pythonnative.devclient') is None;"
+        "assert u.find_spec('pythonnative.hot_reload') is None"
+    )
+    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PN_PLATFORM")}
+    result = subprocess.run(
+        [sys.executable, "-I", "-S", "-c", script, str(site)], capture_output=True, text=True, env=env, cwd=tmp_path
+    )
+    assert result.returncode == 0, result.stderr

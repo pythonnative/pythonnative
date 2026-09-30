@@ -12,28 +12,29 @@ start from the system default.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 _DYNAMIC_BACKGROUND: pn.DynamicColor = {"light": "#0EA5E9", "dark": "#1E3A8A"}
 _DYNAMIC_TEXT: pn.DynamicColor = {"light": "#0F172A", "dark": "#F8FAFC"}
 
 
+def _follow_system() -> None:
+    pn.appearance.set_color_scheme(None)
+
+
 @pn.component
-def DynamicColorDemo() -> pn.Element:
+def DynamicColorDemo() -> pn.Node:
     """Render a scheme-aware box and an inset-positioned child."""
     scheme = pn.use_color_scheme()
 
-    def reset_scheme() -> None:
-        return pn.appearance.set_color_scheme(None)
+    pn.use_effect(lambda: _follow_system, [])
 
-    pn.use_effect(lambda: reset_scheme, [])
-
-    return demo_screen(
+    return DemoScreen(
         "Dynamic color",
         "Light/dark color pairs resolve against the current scheme.",
-        section(
+        DemoSection(
             "DynamicColor",
-            result_text("Scheme", scheme),
+            ResultText("Scheme", scheme),
             pn.View(
                 pn.Text(
                     "dynamic-color-box",
@@ -48,13 +49,13 @@ def DynamicColorDemo() -> pn.Element:
                     align_items="center",
                 ),
             ),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Use dark scheme", on_press=lambda: pn.appearance.set_color_scheme("dark")),
                 pn.Button("Use light scheme", on_press=lambda: pn.appearance.set_color_scheme("light")),
             ),
-            hint("The box repaints from the pair when the scheme flips."),
+            Hint("The box repaints from the pair when the scheme flips."),
         ),
-        section(
+        DemoSection(
             "inset shorthand",
             pn.View(
                 pn.View(
@@ -70,6 +71,6 @@ def DynamicColorDemo() -> pn.Element:
                 ),
                 style=pn.style(height=90, background_color="#E2E8F0", border_radius=8),
             ),
-            hint("inset=10 pins the orange child 10dp from every edge of the grey box."),
+            Hint("inset=10 pins the orange child 10dp from every edge of the grey box."),
         ),
     )

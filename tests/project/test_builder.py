@@ -134,6 +134,7 @@ def test_prepare_ios_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert prepared.app_id == "com.acme.cool"
     import plistlib
 
+    assert prepared.ios is not None
     plist = plistlib.loads(prepared.ios.info_plist.read_bytes())
     assert plist["CFBundleDisplayName"] == "Cool App"
 
@@ -294,3 +295,43 @@ def test_release_preflight_requires_current_target_and_frozen_dependencies(tmp_p
     with pytest.raises(BuildError, match="pn.lock"):
         builder.prepare("android", release=True)
     assert not (root / "build/android/android_template").exists()
+
+
+_DEV_ONLY = ("devclient.py", "hot_reload.py", "refresh.py", "devserver", "cli", "project", "testing")
+
+
+def test_prepare_ios_release_omits_development_modules(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import plistlib
+
+    _fake_ios_runtime(tmp_path, monkeypatch)
+    cfg = AppConfig.load(_project(tmp_path, _TOML))
+    builder = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None)
+    debug = builder.prepare("ios", ios_sdks=("iphonesimulator",))
+    lib = debug.project_dir / "app_packages.iphonesimulator" / "pythonnative"
+    assert all((lib / name).exists() for name in _DEV_ONLY)
+    assert debug.ios is not None
+    assert "NSLocalNetworkUsageDescription" in plistlib.loads(debug.ios.info_plist.read_bytes())
+
+    release = builder.prepare("ios", release=True, ios_sdks=("iphoneos",))
+    lib = release.project_dir / "app_packages.iphoneos" / "pythonnative"
+    assert (lib / "bootstrap.py").exists() or (lib / "bootstrap.pyc").exists()
+    for name in (*_DEV_ONLY, "sdk/codegen.py"):
+        assert not (lib / name).exists() and not (lib / name.replace(".py", ".pyc")).exists(), name
+    assert release.ios is not None
+    assert "NSLocalNetworkUsageDescription" not in plistlib.loads(release.ios.info_plist.read_bytes())
+
+
+def test_prepare_android_release_omits_development_modules(tmp_path: Path) -> None:
+    cfg = AppConfig.load(_project(tmp_path, _TOML))
+    cfg.android.target_sdk = 36
+    builder = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None)
+    lib = tmp_path / "build" / "android" / "android_template" / "app" / "src" / "main" / "python" / "pythonnative"
+
+    builder.prepare("android")
+    assert all((lib / name).exists() for name in _DEV_ONLY)
+    # A release build staged over a debug build doesn't inherit its dev modules.
+    builder.prepare("android", release=True)
+    assert (lib / "bootstrap.py").exists()
+    assert (lib / "_native_contracts.json").exists()
+    for name in (*_DEV_ONLY, "sdk/codegen.py"):
+        assert not (lib / name).exists(), name

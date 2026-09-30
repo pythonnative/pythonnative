@@ -1,16 +1,20 @@
 # Navigation
 
-A React Navigation-style API: a
-[`NavigationContainer`][pythonnative.NavigationContainer] holds one or
-more navigators (stack, tab, or drawer), and any descendant component
-can navigate through the [`Navigation`][pythonnative.Navigation] handle
-from [`use_navigation`][pythonnative.use_navigation] or read its
-current [`Route`][pythonnative.navigation.Route] with
-[`use_route`][pythonnative.use_route]. Code outside the tree navigates
-through a [`NavigationRef`][pythonnative.NavigationRef] from
-[`create_navigation_ref`][pythonnative.create_navigation_ref]. Navigators
-accept `screen_options`, group screens with `Group`, and draw their
-chrome with a [`NavigationTheme`][pythonnative.NavigationTheme].
+Typed stack, tab, and drawer navigators. Screens are components whose
+parameters are their route params, listed in module-level
+[`StackNavigator`][pythonnative.StackNavigator],
+[`TabNavigator`][pythonnative.TabNavigator], and
+[`DrawerNavigator`][pythonnative.DrawerNavigator] values with
+[`Screen`][pythonnative.Screen] and [`Group`][pythonnative.Group]. A
+[`NavigationContainer`][pythonnative.NavigationContainer] renders the
+root navigator and derives deep links from each screen's `path`.
+Screens navigate through the [`Navigation`][pythonnative.Navigation]
+handle from [`use_navigation`][pythonnative.use_navigation]
+(`nav.push(ItemScreen(id=42))`) and set their options with
+[`use_screen_options`][pythonnative.use_screen_options]. Code outside
+the tree navigates through a
+[`NavigationRef`][pythonnative.NavigationRef]. Navigator chrome takes
+its colors from the app [`Theme`][pythonnative.Theme].
 
 ::: pythonnative.navigation
     options:
@@ -39,20 +43,11 @@ chrome with a [`NavigationTheme`][pythonnative.NavigationTheme].
     options:
       show_root_heading: false
       show_root_toc_entry: false
-      members: ["LinkingConfig"]
+      members: ["LinkTable"]
 
 ## Navigation ref
 
 ::: pythonnative.navigation.ref
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      members_order: source
-      filters: ["!^_"]
-
-## Themes
-
-::: pythonnative.navigation.theme
     options:
       show_root_heading: false
       show_root_toc_entry: false

@@ -124,28 +124,39 @@ and controls can have different intrinsic sizes. See
 
 ## How is state shared across screens?
 
-Two main options:
+Every screen is part of one component tree, so the usual tools work
+across screens:
 
+- A [`pn.Store`][pythonnative.Store] for app-wide, long-lived state.
+  Define it at module level, change it with plain functions that call
+  `store.update(...)`, and read it with
+  [`use_store`][pythonnative.use_store]. A selector
+  (`pn.use_store(store, lambda s: s.unread)`) re-renders a component
+  only when the value it reads changes. It fills the role of Zustand
+  or Redux in a React Native app.
 - [`use_context`][pythonnative.use_context] /
-  [`Context.Provider`][pythonnative.hooks.Context.Provider] for tree-scoped values
-  (themes, current user). The provider sits at the top of the
-  navigator and descendants subscribe.
-- A plain Python module-level object (a "store") for app-wide,
-  long-lived state. Subscribe to changes via your own event bus and
-  call `set_state` on a hook to trigger re-renders.
+  [`Context.Provider`][pythonnative.hooks.Context.Provider] for
+  tree-scoped values (the current user, a repository object). Place
+  the provider above the `NavigationContainer` so every screen can
+  read it.
+- Screen params for the data a screen needs to show: pass an id as a
+  parameter (`nav.push(ItemScreen(id=42))`) and look the record up in
+  the screen.
 
-PythonNative doesn't ship a Redux-style store; the
-[`use_reducer`][pythonnative.use_reducer] hook covers most cases
-without one.
+See [Managing state](../guides/state.md) for when to use each, and for
+persisting state across launches.
 
 ## How do I navigate between screens?
 
-Use [`NavigationContainer`][pythonnative.NavigationContainer] plus one
-of [`create_stack_navigator`][pythonnative.create_stack_navigator],
-[`create_tab_navigator`][pythonnative.create_tab_navigator], or
-[`create_drawer_navigator`][pythonnative.create_drawer_navigator].
-From a screen, call [`use_navigation`][pythonnative.use_navigation]
-to get an imperative handle (`navigate`, `go_back`, etc.). See the
+Define your screens as components, list them in a module-level
+[`StackNavigator`][pythonnative.StackNavigator],
+[`TabNavigator`][pythonnative.TabNavigator], or
+[`DrawerNavigator`][pythonnative.DrawerNavigator], and render it with
+[`NavigationContainer`][pythonnative.NavigationContainer]. From a
+screen, call [`use_navigation`][pythonnative.use_navigation] and pass
+the destination as a call to its component:
+`nav.push(ItemScreen(id=42))`. The screen's parameters are its route
+params, so the type checker verifies them. See the
 [Navigation guide](../guides/navigation.md).
 
 ## Why hooks instead of class components?

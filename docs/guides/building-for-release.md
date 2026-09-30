@@ -54,6 +54,32 @@ local wheel requires refreshing it. Releases reject missing or stale locks;
 development builds can still resolve unlocked requirements. Native extension
 manifests pin SwiftPM and Maven dependencies to exact versions.
 
+## What a release bundle leaves out
+
+Every build bundles a copy of the `pythonnative` package. Debug builds
+are dev clients, so their copy is complete. Release builds leave out the
+modules that exist only for development:
+
+- the `pn` CLI and build tooling (`pythonnative/cli`, `pythonnative/project`);
+- the dev server and browser preview (`pythonnative/devserver`,
+  `pythonnative/preview.py`, `pythonnative/bridge/web.py`);
+- the dev client and Fast Refresh (`pythonnative/devclient.py`,
+  `pythonnative/hot_reload.py`, `pythonnative/refresh.py`);
+- the test helpers (`pythonnative/testing`);
+- the SDK code generators (`pythonnative/sdk/codegen.py`,
+  `contract_codegen.py`, `module_codegen.py`, and their templates).
+
+The runtime never imports them, and the test suite checks that it stays
+that way, so a release app behaves exactly like a debug build that isn't
+connected to `pn start`. If your own code imports one of these modules,
+it works in debug builds but fails with `ModuleNotFoundError` in a
+release build; keep such imports in development-only code paths.
+
+iOS release builds also omit the `NSLocalNetworkUsageDescription` that
+debug builds add so they can reach `pn start` over Wi-Fi. If your app
+uses the local network itself, declare the key with your own wording in
+`[ios].extra_info_plist`.
+
 ## Android
 
 `pn build android` runs `assembleRelease` and `bundleRelease`, producing

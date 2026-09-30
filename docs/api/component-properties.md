@@ -39,9 +39,8 @@ All components accept these layout properties in their `style` dict:
 - `margin`: outer spacing. Accepts a number (all sides), or a dict with any
   of `horizontal`, `vertical`, `left`, `top`, `right`, `bottom`.
 - `padding`: inner spacing on container elements. Same shape as `margin`.
-- `spacing`: gap between children of a flex container (applied along the
-  main axis).
-- `gap`: alias for `spacing`.
+- `gap`: space between children of a flex container. `row_gap` and
+  `column_gap` set one axis.
 
 ### Position
 
@@ -92,7 +91,7 @@ pn.View(*children, style={
     "justify_content": "center",
     "align_items": "center",
     "overflow": "hidden",
-    "spacing": 8,
+    "gap": 8,
     "padding": 16,
     "background_color": "#F5F5F5",
 })
@@ -106,7 +105,7 @@ Flex container properties (inside `style`):
 - `justify_content`: `"flex_start"`, `"center"`, `"flex_end"`, `"space_between"`, `"space_around"`, `"space_evenly"`
 - `align_items`: `"stretch"`, `"flex_start"`, `"center"`, `"flex_end"`
 - `overflow`: `"visible"` (default), `"hidden"`
-- `spacing`, `padding`, `background_color`
+- `gap`, `padding`, `background_color`
 
 Containers also fully support absolute positioning for their children:
 
@@ -165,8 +164,8 @@ pn.Button(title, on_press=handler, style={"color": "#FFF", "background_color": "
 ## Column / Row
 
 ```python
-pn.Column(*children, style={"spacing": 12, "padding": 16, "align_items": "center"})
-pn.Row(*children, style={"spacing": 8, "justify_content": "space_between"})
+pn.Column(*children, style={"gap": 12, "padding": 16, "align_items": "center"})
+pn.Row(*children, style={"gap": 8, "justify_content": "space_between"})
 ```
 
 Convenience wrappers for `View` with fixed `flex_direction`:
@@ -176,7 +175,7 @@ Convenience wrappers for `View` with fixed `flex_direction`:
 
 - `*children`: child elements (positional)
 - Style properties:
-  - `spacing`: gap between children (dp / pt)
+  - `gap`: space between children (dp / pt)
   - `padding`: inner padding (int for all sides, or dict with `horizontal`, `vertical`, `left`, `top`, `right`, `bottom`)
   - `align_items`: cross-axis alignment: `"stretch"`, `"flex_start"`, `"center"`, `"flex_end"`, `"leading"`, `"trailing"`
   - `justify_content`: main-axis distribution: `"flex_start"`, `"center"`, `"flex_end"`, `"space_between"`, `"space_around"`, `"space_evenly"`
@@ -303,7 +302,7 @@ pn.Image(source="https://example.com/photo.jpg",
          on_load_start=lambda: ..., on_load=lambda e: ..., on_load_end=lambda: ...,
          on_error=lambda message: ...,
          fade_duration=200, headers={"Authorization": f"Bearer {token}"},
-         style={"width": 200, "height": 150, "scale_type": "cover"})
+         scale_type="cover", style={"width": 200, "height": 150})
 ```
 
 - `source`: a bundled [`Asset`][pythonnative.Asset], an image URL
@@ -586,7 +585,8 @@ pn.Element("TabBar", {
 })
 ```
 
-Native tab bar, typically created automatically by `Tab.Navigator`.
+Native tab bar, typically created automatically by a
+[`TabNavigator`][pythonnative.TabNavigator].
 
 | Platform | Native view              |
 |----------|--------------------------|
@@ -642,7 +642,7 @@ pn.FlatList(data=items, render_item=render_fn, key_extractor=key_fn,
 ```python
 pn.SectionList(sections=[pn.Section(key="a", title="A", data=["Apple"])],
                render_item=lambda item, i, s: pn.Text(item),
-               render_section_header=lambda section, s: pn.Text(section["title"]),
+               render_section_header=lambda section, s: pn.Text(section.title),
                sticky_section_headers=True, inverted=False,
                item_separator=lambda: pn.View(style={"height": 1, "background_color": "#EEE"}),
                on_viewable_items_changed=handler)

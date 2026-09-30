@@ -29,52 +29,74 @@ a letter, so the directory name and the `name` field in the generated
 config stay identical. Run `pn init` without a name to scaffold into the
 current directory instead, named after it; that name is used as-is.
 
-A minimal `app/main.py` looks like:
+The generated `app/main.py` is a small, typed app with two screens:
 
 ```python
 import pythonnative as pn
 
-Stack = pn.create_stack_navigator()
+
+class Styles:
+    def __init__(self, theme: pn.Theme) -> None:
+        self.screen = pn.style(padding=theme.spacing.md, gap=theme.spacing.md, align_items="stretch")
+        self.title: pn.Style = {**theme.typography.title, "color": theme.colors.text}
+        self.body: pn.Style = {**theme.typography.body, "color": theme.colors.text}
 
 
 @pn.component
-def HomeScreen():
-    nav = pn.use_navigation()
+def HomeScreen() -> pn.Node:
     count, set_count = pn.use_state(0)
-    return pn.Column(
-        pn.Text(f"Count: {count}", style={"font_size": 24}),
-        pn.Button("Tap me", on_press=lambda: set_count(count + 1)),
-        pn.Button("Open details", on_press=lambda: nav.navigate("Detail", count=count)),
-        style={"spacing": 12, "padding": 16},
-    )
-
-
-@pn.component
-def DetailScreen():
-    route = pn.use_route()
-    return pn.Text(f"Count was {route.params.get('count', 0)}", style={"padding": 16})
-
-
-@pn.component
-def App():
-    return pn.NavigationContainer(
-        Stack.Navigator(
-            Stack.Screen("Home", HomeScreen, title="Home"),
-            Stack.Screen("Detail", DetailScreen, title="Detail"),
+    nav = pn.use_navigation()
+    styles = pn.use_styles(Styles)
+    return pn.ScrollView(
+        pn.Column(
+            pn.Text("Hello from PythonNative!", style=styles.title),
+            pn.Text(f"Tapped {count} times", style=styles.body),
+            pn.Button("Tap me", on_press=lambda: set_count(count + 1)),
+            pn.Button("Open detail", on_press=lambda: nav.push(DetailScreen(count=count))),
+            style=styles.screen,
         )
     )
+
+
+@pn.component
+def DetailScreen(count: int) -> pn.Node:
+    nav = pn.use_navigation()
+    styles = pn.use_styles(Styles)
+    return pn.Column(
+        pn.Text(f"The count was {count}", style=styles.body),
+        pn.Button("Back", on_press=nav.go_back),
+        style=styles.screen,
+    )
+
+
+Root = pn.StackNavigator(
+    pn.Screen(HomeScreen, title="Home"),
+    pn.Screen(DetailScreen, title="Detail"),
+)
+
+
+@pn.component
+def App() -> pn.Node:
+    return pn.NavigationContainer(Root)
 ```
 
 Key ideas:
 
-- **`@pn.component`** marks a function as a PythonNative component. The function returns an element tree describing the UI. PythonNative creates and updates native views automatically.
+- **`@pn.component`** marks a function as a PythonNative component. The function returns an element tree (a `pn.Node`) describing the UI, and PythonNative creates and updates native views to match. Its parameters are its props, so your type checker verifies every call.
 - **`pn.use_state(initial)`** creates local component state. Call the setter to update it and the UI re-renders automatically.
-- **`pn.create_stack_navigator()`** returns a `Stack` with `.Navigator` and `.Screen` factories. Wrap them in `pn.NavigationContainer` to enable [`pn.use_navigation()`][pythonnative.use_navigation] and [`pn.use_route()`][pythonnative.use_route] anywhere below.
+- **Screens are components.** `DetailScreen(count: int)` declares its route params as ordinary parameters, and `nav.push(DetailScreen(count=count))` navigates to it with a checked call. See [Navigation](guides/navigation.md).
+- **`pn.StackNavigator(...)`** is a module-level value listing the screens. `pn.NavigationContainer(Root)` renders it and makes [`pn.use_navigation()`][pythonnative.use_navigation] available in every screen.
+- **The `Styles` class** derives styles from the active [`Theme`][pythonnative.Theme]'s tokens. [`pn.use_styles(Styles)`][pythonnative.use_styles] builds it once per theme, so the app follows the system's light and dark appearance. See [Styling](guides/styling.md).
 - **The `App` function** is the entry point. The Android and iOS templates import `app.main`, look up its top-level `App` attribute, and start rendering. If you'd rather expose a differently-named component, configure your templates to load an explicit dotted path like `"app.main.RootScreen"`.
-- **`style={...}`** passes visual and layout properties as a dict (or list of dicts) to any component.
-- Element functions like `pn.Text(...)`, `pn.Button(...)`, `pn.Column(...)` create lightweight descriptions, not native objects.
+- Element functions like `pn.Text(...)`, `pn.Button(...)`, and `pn.Column(...)` create lightweight descriptions, not native objects.
 
-When the root `Stack.Navigator` is rendered inside the host's first screen, `navigate(...)` and `go_back()` drive the **native** navigation controller (UINavigationController on iOS, AndroidX Navigation Component on Android). Each pushed screen runs in its own reconciler host, so state on the previous screen is preserved by the platform stack.
+On a device, the root stack drives the **native** navigation controller (`UINavigationController` on iOS, fragments on Android). Every screen stays part of one Python component tree, so providers and state above the navigator are shared, and the previous screen keeps its state while another is pushed on top.
+
+The scaffold passes strict type checking and `pn lint`, which checks the [rules of hooks](concepts/hooks.md#rules-of-hooks):
+
+```bash
+pn lint
+```
 
 ## Configure your app
 
@@ -114,7 +136,8 @@ pn preview
 ```
 
 `pn preview` starts the server, opens `http://localhost:8765/` in your
-browser, and mounts your project's `App` in a phone frame. It **Fast
+browser (the URL carries your per-user
+[dev token](guides/dev-workflow.md#the-dev-token) once), and mounts your project's `App` in a phone frame. It **Fast
 Refreshes on every save**: edit a component, save, and the page updates
 in place while keeping component state (counters, form input, scroll
 position, the navigation stack). Your components, hooks, async work, and
@@ -146,8 +169,8 @@ pn run ios
 
 `pn run` stages the bundled native template, copies your `app/` in,
 builds a debug app, installs it, and launches it. The CLI finds the
-dev server on `localhost:8765`, bakes its URL into the build, and the
-app connects on startup. From then on it's a **dev client**: every save
+dev server on `localhost:8765`, passes its URL and your dev token to
+the app, and the app connects on startup. From then on it's a **dev client**: every save
 under `app/` syncs to the device and Fast Refreshes the running screens,
 and the app's `print` output and tracebacks stream back into the
 `pn start` terminal.
@@ -167,7 +190,7 @@ pn run ios --prepare-only
 This stages files under `build/` so you can open them in Android Studio or Xcode.
 
 Physical iPhones on the same Wi-Fi work the same way (`pn run ios
---device "My iPhone"`); the CLI bakes in your Mac's LAN address instead
+--device "My iPhone"`); the CLI passes your Mac's LAN address instead
 of `localhost`. See the [Development workflow](guides/dev-workflow.md)
 for the details, including the reusable `--dev-client` shell app.
 
@@ -188,7 +211,7 @@ import pythonnative as pn
 
 
 @pn.component
-def App():
+def App() -> pn.Node:
     count, set_count = pn.use_state(0)
     print(f"[App] render count={count}")
     return pn.Column(

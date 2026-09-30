@@ -11,7 +11,7 @@ import pythonnative as pn
 pn.Row(
     pn.Icon("heart", size=20, color="#E11D48"),
     pn.Text("Favorites"),
-    style=pn.style(spacing=8, align_items="center"),
+    style=pn.style(gap=8, align_items="center"),
 )
 ```
 
@@ -30,13 +30,14 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Unpack, cast
 
 from ..element import Element
 from ..style import Color, Style, StyleProp
 from ._names import ICON_NAMES, LUCIDE_VERSION, IconName
 
 if TYPE_CHECKING:
+    from ..components.props import AccessibilityProps
     from ..svg import SvgShape
 
 __all__ = [
@@ -117,9 +118,8 @@ def Icon(
     stroke_width: float = 2,
     fill: Optional[Color] = None,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    test_id: Optional[str] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """Render a bundled vector icon.
 
@@ -136,11 +136,9 @@ def Icon(
         fill: Optional fill color for a solid look.
         style: Extra styles (margins, opacity, transforms). ``width`` and
             ``height`` in ``style`` override ``size``.
-        accessibility_label: Spoken description. Icons without a label are
-            hidden from assistive technology, since a decorative icon next
-            to text shouldn't be read twice.
-        test_id: Stable identifier for UI tests.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Svg"``.
@@ -155,12 +153,13 @@ def Icon(
         ```
     """
     from ..components.graphics import Svg
-    from ..style import StyleSheet
+    from ..style import resolve_style
 
     # Icon records are already flattened wire dicts; ``Svg`` passes them through.
     shapes = cast("List[SvgShape]", list(icon_shapes(name)))
+    props.setdefault("accessible", bool(props.get("accessibility_label")))
     merged: Style = {"width": size, "height": size}
-    merged.update(StyleSheet.flatten(style))
+    merged.update(cast(Style, resolve_style(style)))
     return Svg(
         shapes=shapes,
         view_box=ICON_VIEW_BOX,
@@ -170,10 +169,8 @@ def Icon(
         stroke_linecap="round",
         stroke_linejoin="round",
         style=merged,
-        accessibility_label=accessibility_label,
-        accessible=True if accessibility_label else False,
-        test_id=test_id,
         key=key,
+        **props,
     )
 
 

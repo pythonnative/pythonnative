@@ -1,65 +1,77 @@
-"""Demo screen for [`pn.use_navigation_theme`][pythonnative.use_navigation_theme].
+"""Demo screen for [`pn.ThemeProvider`][pythonnative.ThemeProvider] driving navigator chrome.
 
-The root container's theme comes from :mod:`app.app_theme`; this demo
-flips it between [`DEFAULT_NAVIGATION_THEME`][pythonnative.DEFAULT_NAVIGATION_THEME]
-and [`DARK_NAVIGATION_THEME`][pythonnative.DARK_NAVIGATION_THEME] and
-mirrors what ``use_navigation_theme()`` returns: the ``dark`` flag and the
-[`NavigationColors`][pythonnative.NavigationColors] the native header and
-Python-drawn chrome use. A card painted from the theme colors shows the
-palette on screen. The theme is restored to the light preset when the
-demo unmounts so later flows see the default chrome.
+``main.py`` wraps the app in a ``ThemeProvider`` with the suite's light
+and dark [`Theme`][pythonnative.Theme]s from :mod:`app.app_theme`, and
+the navigators draw their headers, tab bars, and drawer panels from the
+same tokens. This demo flips the effective color scheme with
+[`appearance.set_color_scheme`][pythonnative.appearance.set_color_scheme],
+so the provider switches presets, and mirrors what
+``use_theme(SuiteTheme)`` returns: the ``dark`` flag and the
+[`Colors`][pythonnative.Colors] the chrome uses. A card painted from
+the theme colors shows the palette on screen. The scheme override is
+cleared when the demo unmounts so later flows see the default chrome.
 """
 
 from __future__ import annotations
 
 import pythonnative as pn
-from app.app_theme import ThemeSwitchContext
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.app_theme import SUITE_DARK, SUITE_LIGHT, SuiteTheme, preset_name
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
+
+
+def _follow_system() -> None:
+    pn.appearance.set_color_scheme(None)
+
+
+class _CardStyles:
+    """The themed card, derived once per theme with ``use_styles``."""
+
+    def __init__(self, theme: SuiteTheme) -> None:
+        colors = theme.colors
+        self.card = pn.style(
+            padding=14,
+            border_radius=theme.radii.md,
+            background_color=colors.surface,
+            border_width=2,
+            border_color=colors.border,
+            gap=4,
+        )
+        self.title = pn.style(color=colors.text, font_weight="700")
+        self.accent = pn.style(color=colors.primary)
 
 
 @pn.component
-def NavigationThemeDemo() -> pn.Element:
-    """Render the active navigation theme and switch the root preset."""
-    theme = pn.use_navigation_theme()
-    switch = pn.use_context(ThemeSwitchContext)
-    local_name, set_local_name = pn.use_state("light")
-    name, set_name = switch if switch is not None else (local_name, set_local_name)
+def NavigationThemeDemo() -> pn.Node:
+    """Render the active app theme and switch the color scheme the provider follows."""
+    theme = pn.use_theme(SuiteTheme)
+    styles = pn.use_styles(_CardStyles)
+    scheme = pn.use_color_scheme()
+    pn.use_effect(lambda: _follow_system, [])
 
-    def restore_light():
-        return lambda: set_name("light")
-
-    pn.use_effect(restore_light, [])
-
-    preset = pn.DARK_NAVIGATION_THEME if theme.dark else pn.DEFAULT_NAVIGATION_THEME
+    preset = SUITE_DARK if theme.dark else SUITE_LIGHT
     colors = theme.colors
 
-    return demo_screen(
+    return DemoScreen(
         "Navigation theme",
-        "use_navigation_theme mirrors the NavigationContainer theme.",
-        section(
+        "One app Theme styles the screens and the navigator chrome.",
+        DemoSection(
             "Active theme",
-            result_text("Theme", "dark" if theme.dark else "light"),
-            result_text("Preset", name),
-            result_text("Matches preset", "yes" if theme == preset else "no"),
-            result_text("Primary", colors.primary),
-            result_text("Card", colors.card),
-            result_text("Text", colors.text),
+            ResultText("Theme", "dark" if theme.dark else "light"),
+            ResultText("Preset", preset_name(theme)),
+            ResultText("Scheme", scheme),
+            ResultText("Matches preset", "yes" if theme == preset else "no"),
+            ResultText("Primary", colors.primary),
+            ResultText("Surface", colors.surface),
+            ResultText("Text", colors.text),
             pn.View(
-                pn.Text("themed-card", style=pn.style(color=colors.text, font_weight="700")),
-                pn.Text(colors.notification, style=pn.style(color=colors.primary)),
-                style=pn.style(
-                    padding=14,
-                    border_radius=10,
-                    background_color=colors.card,
-                    border_width=2,
-                    border_color=colors.border,
-                    spacing=4,
-                ),
+                pn.Text("themed-card", style=styles.title),
+                pn.Text(colors.error, style=styles.accent),
+                style=styles.card,
             ),
-            buttons_row(
-                pn.Button("Use dark theme", on_press=lambda: set_name("dark")),
-                pn.Button("Use light theme", on_press=lambda: set_name("light")),
+            ButtonsRow(
+                pn.Button("Use dark theme", on_press=lambda: pn.appearance.set_color_scheme("dark")),
+                pn.Button("Use light theme", on_press=lambda: pn.appearance.set_color_scheme("light")),
             ),
-            hint("Switching repaints the native header and this card from the theme colors."),
+            Hint("Switching repaints the native header and this card from the theme colors."),
         ),
     )

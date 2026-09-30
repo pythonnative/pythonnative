@@ -10,55 +10,61 @@ then run `pn preview app.main.TodoList`.
 ## The code
 
 ```python
+from collections.abc import Callable
+from dataclasses import dataclass, replace
+
 import pythonnative as pn
 
 
+@dataclass(frozen=True)
+class Todo:
+    id: str
+    title: str
+    done: bool = False
+
+
+INITIAL_TODOS: tuple[Todo, ...] = (
+    Todo("1", "Try PythonNative", done=True),
+    Todo("2", "Build a real app"),
+    Todo("3", "Profit"),
+)
+
+
 @pn.component
-def TodoRow(todo, on_toggle, on_delete):
+def TodoRow(todo: Todo, on_toggle: Callable[[str], None], on_delete: Callable[[str], None]) -> pn.Node:
     return pn.Row(
-        pn.Switch(value=todo["done"], on_change=lambda v: on_toggle(todo["id"])),
+        pn.Switch(value=todo.done, on_change=lambda value: on_toggle(todo.id)),
         pn.Text(
-            todo["title"],
+            todo.title,
             style={
                 "flex": 1,
                 "font_size": 16,
-                "color": "#888" if todo["done"] else "#000",
+                "color": "#888888" if todo.done else "#000000",
             },
         ),
-        pn.Button("Delete", on_press=lambda: on_delete(todo["id"])),
-        style={"spacing": 12, "padding": 8, "align_items": "center"},
+        pn.Button("Delete", on_press=lambda: on_delete(todo.id)),
+        style={"gap": 12, "padding": 8, "align_items": "center"},
     )
 
 
 @pn.component
-def TodoList():
-    todos, set_todos = pn.use_state(
-        [
-            {"id": "1", "title": "Try PythonNative", "done": True},
-            {"id": "2", "title": "Build a real app", "done": False},
-            {"id": "3", "title": "Profit", "done": False},
-        ]
-    )
+def TodoList() -> pn.Node:
+    todos, set_todos = pn.use_state(INITIAL_TODOS)
     draft, set_draft = pn.use_state("")
 
-    def add():
+    def add() -> None:
         title = draft.strip()
         if not title:
             return
-        new_id = str(max(int(t["id"]) for t in todos) + 1) if todos else "1"
-        set_todos([*todos, {"id": new_id, "title": title, "done": False}])
+        new_id = str(max(int(t.id) for t in todos) + 1) if todos else "1"
+        set_todos((*todos, Todo(new_id, title)))
         set_draft("")
 
-    def toggle(todo_id):
-        set_todos(
-            [
-                {**t, "done": not t["done"]} if t["id"] == todo_id else t
-                for t in todos
-            ]
-        )
+    def toggle(todo_id: str) -> None:
+        set_todos(tuple(replace(t, done=not t.done) if t.id == todo_id else t for t in todos))
 
-    def delete(todo_id):
-        set_todos([t for t in todos if t["id"] != todo_id])
+    def delete(todo_id: str) -> None:
+        set_todos(tuple(t for t in todos if t.id != todo_id))
 
     return pn.Column(
         pn.Row(
@@ -69,14 +75,12 @@ def TodoList():
                 style={"flex": 1},
             ),
             pn.Button("Add", on_press=add),
-            style={"spacing": 8, "padding": 16},
+            style={"gap": 8, "padding": 16},
         ),
         pn.FlatList(
             data=todos,
-            render_item=lambda t, index: TodoRow(
-                todo=t, on_toggle=toggle, on_delete=delete, key=t["id"]
-            ),
-            key_extractor=lambda t, index: t["id"],
+            render_item=lambda t, index: TodoRow(todo=t, on_toggle=toggle, on_delete=delete),
+            key_extractor=lambda t, index: t.id,
             style={"flex": 1},
         ),
     )
@@ -89,8 +93,11 @@ a fallback. Position-based keys can transfer a row's local state to another
 item after a deletion. With stable keys, "todo 2" keeps its identity even
 when its index shifts, as long as it remains in the mounted window.
 
-The `key_extractor` on `FlatList` and the `key=` on the rendered row
-both come from the same `todo["id"]`. When in doubt: use a stable
+`FlatList` keys each row with `key_extractor`, which reads the same
+`todo.id` the row's callbacks use. When you render rows yourself (in a
+`Column`, say), key your own components with `.with_key()`:
+`pn.Column(*(TodoRow(t, toggle, delete).with_key(t.id) for t in todos))`.
+Built-in elements take `key=` directly. When in doubt: use a stable
 identifier that's part of the data, not the position.
 
 ## Performance notes
@@ -112,20 +119,18 @@ identifier that's part of the data, not the position.
 
 ## Sorting and filtering
 
-Sorting and filtering are pure functions over the `todos` array; do
+Sorting and filtering are pure functions over the `todos` tuple; do
 them at render time:
 
 ```python
-visible = [t for t in todos if not hide_done or not t["done"]]
-visible.sort(key=lambda t: t["title"])
+visible = sorted((t for t in todos if not hide_done or not t.done), key=lambda t: t.title)
 ```
 
 If the input list is large, memoize the result:
 
 ```python
 visible = pn.use_memo(
-    lambda: sorted([t for t in todos if not hide_done or not t["done"]],
-                   key=lambda t: t["title"]),
+    lambda: sorted((t for t in todos if not hide_done or not t.done), key=lambda t: t.title),
     [todos, hide_done],
 )
 ```

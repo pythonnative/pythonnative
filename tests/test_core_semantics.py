@@ -468,6 +468,7 @@ def test_portal_state_and_events_stay_wired() -> None:
     root = rec.mount(App())
     overlay = backend.detached_views("Portal")[0]
     button = overlay.find_first("Button")
+    assert button is not None
     handled = dispatch_event(button.tag, "on_press")
     assert handled, "portal button press must reach the Python handler"
     rec.flush_dirty()

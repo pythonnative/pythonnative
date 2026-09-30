@@ -15,16 +15,9 @@ pushed screen the full history it belongs to.
 from __future__ import annotations
 
 import itertools
-from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence, Tuple
 
-__all__ = ["NavigationState", "Route", "RouteParams"]
-
-type RouteParams = Mapping[str, Any]
-"""Bound for the ``P`` type parameter of [`Route`][pythonnative.navigation.Route].
-
-Declare a screen's params as a ``TypedDict`` and read them with
-``use_route(MyParams)`` for a fully typed ``route.params``.
-"""
+__all__ = ["NavigationState", "Route"]
 
 _route_keys = itertools.count(1)
 
@@ -33,33 +26,23 @@ def _new_key(name: str) -> str:
     return f"{name}-{next(_route_keys)}"
 
 
-class Route[P: RouteParams = Dict[str, Any]]:
+class Route:
     """One entry in a navigator's state.
 
-    ``Route`` is generic in its params type. Bare ``Route`` is
-    ``Route[dict[str, Any]]``; pass a ``TypedDict`` to
-    [`use_route`][pythonnative.use_route] to get ``Route[MyParams]``
-    with a typed ``params`` attribute:
-
-    ```python
-    class DetailParams(TypedDict):
-        id: int
-
-    route = pn.use_route(DetailParams)
-    route.params["id"]  # int
-    ```
+    A screen receives its route's params as component arguments, so
+    most code never reads a ``Route``. Use
+    [`use_route`][pythonnative.use_route] when a screen needs its
+    identity (``key``) or its route name.
 
     Attributes:
-        name: The screen name this route renders.
-        params: Parameters passed to the screen (read with
-            [`use_route`][pythonnative.use_route]). Always a plain
-            ``dict`` at runtime.
+        name: The route name of the screen this route renders.
+        params: The screen component's arguments, as a plain ``dict``.
         key: Stable identity for this particular visit to the screen,
             unique per process. Two pushes of the same screen have
             different keys, so their component state never mixes.
-        state: Seed state for a navigator rendered by this screen
-            (set by ``navigate("Tabs", screen="Profile")`` and by deep
-            links). ``None`` for ordinary screens.
+        state: Seed state for a navigator rendered by this screen (set
+            when navigating to a screen inside a nested navigator, and
+            by deep links). ``None`` for ordinary screens.
     """
 
     __slots__ = ("name", "params", "key", "state")
@@ -72,16 +55,16 @@ class Route[P: RouteParams = Dict[str, Any]]:
         state: Optional["NavigationState"] = None,
     ) -> None:
         self.name = name
-        self.params: P = cast(P, dict(params or {}))
+        self.params: Dict[str, Any] = dict(params or {})
         self.key = key or _new_key(name)
         self.state = state
 
-    def with_params(self, params: Mapping[str, Any], *, merge: bool = True) -> "Route[P]":
+    def with_params(self, params: Mapping[str, Any], *, merge: bool = True) -> "Route":
         """Return a copy carrying ``params`` (merged over the current ones by default)."""
         merged = {**self.params, **params} if merge else dict(params)
         return Route(self.name, merged, key=self.key, state=self.state)
 
-    def with_state(self, state: Optional["NavigationState"]) -> "Route[P]":
+    def with_state(self, state: Optional["NavigationState"]) -> "Route":
         """Return a copy carrying a nested navigator seed ``state``."""
         return Route(self.name, self.params, key=self.key, state=state)
 
@@ -93,7 +76,7 @@ class Route[P: RouteParams = Dict[str, Any]]:
         return out
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "Route[Dict[str, Any]]":
+    def from_dict(cls, data: Mapping[str, Any]) -> "Route":
         """Rebuild a route from ``to_dict`` output, keeping its ``key`` so component state carries over."""
         params = data.get("params")
         nested = data.get("state")

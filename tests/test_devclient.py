@@ -22,6 +22,11 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _url(server: DevServer) -> str:
+    """The device URL ``pn start`` prints for ``server``, dev token included."""
+    return server.info.preview_url("127.0.0.1")
+
+
 def _wait(predicate: Any, timeout: float = 5.0) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -65,6 +70,12 @@ def server(project: Path) -> Iterator[DevServer]:
         ("ws://10.0.2.2:8765/ws?role=client", "ws://10.0.2.2:8765/ws?role=client"),
         ("ws://10.0.2.2:8765/ws", "ws://10.0.2.2:8765/ws?role=client"),
         ("  localhost:8765  ", "ws://localhost:8765/ws?role=client"),
+        # The device URL `pn start` prints, and the forms a developer might type from it.
+        ("http://192.168.1.20:8765/?token=abc-_1", "ws://192.168.1.20:8765/ws?role=client&token=abc-_1"),
+        ("192.168.1.20:8765/?token=abc", "ws://192.168.1.20:8765/ws?role=client&token=abc"),
+        ("192.168.1.20?token=abc", "ws://192.168.1.20:8765/ws?role=client&token=abc"),
+        ("ws://10.0.2.2:8765/ws?role=client&token=abc", "ws://10.0.2.2:8765/ws?role=client&token=abc"),
+        ("ws://10.0.2.2:8765/ws?token=abc&role=preview", "ws://10.0.2.2:8765/ws?role=client&token=abc"),
     ],
 )
 def test_normalize_server_url(typed: str, expected: str) -> None:
@@ -74,6 +85,51 @@ def test_normalize_server_url(typed: str, expected: str) -> None:
 def test_normalize_server_url_rejects_empty() -> None:
     with pytest.raises(ValueError):
         devclient.normalize_server_url("   ")
+
+
+def test_normalize_server_url_rejects_other_schemes() -> None:
+    with pytest.raises(ValueError):
+        devclient.normalize_server_url("ftp://192.168.1.20:8765")
+
+
+@pytest.mark.parametrize(
+    "url, shown",
+    [
+        ("ws://192.168.1.20:8765/ws?role=client&token=abc", "192.168.1.20:8765/?token=abc"),
+        ("ws://192.168.1.20:8765/ws?role=client", "192.168.1.20:8765"),
+    ],
+)
+def test_display_server_url_round_trips_through_normalize(url: str, shown: str) -> None:
+    assert devclient.display_server_url(url) == shown
+    assert devclient.normalize_server_url(shown) == url
+
+
+def test_client_without_the_token_is_refused_with_a_clear_message(server: DevServer, tmp_path: Path) -> None:
+    logs: List[str] = []
+    client = devclient.DevClient(
+        server.info.url("127.0.0.1"), str(tmp_path / "overlay"), forward_logs=False, log=logs.append
+    )
+    client.start()
+    try:
+        _wait(lambda: any("refused the connection" in line for line in logs))
+        assert client.state == "disconnected"
+        assert not client.synced_once.is_set()
+    finally:
+        client.stop()
+
+
+def test_client_logs_never_include_the_token(server: DevServer, tmp_path: Path) -> None:
+    logs: List[str] = []
+    details: List[str] = []
+    client = devclient.DevClient(_url(server), str(tmp_path / "overlay"), forward_logs=False, log=logs.append)
+    client.add_listener(lambda state, detail: details.append(detail))
+    client.start()
+    try:
+        assert client.synced_once.wait(5.0)
+    finally:
+        client.stop()
+    assert client.server_label == f"127.0.0.1:{server.info.port}"
+    assert not any(server.token in line for line in logs + details)
 
 
 def test_saved_server_url_round_trips_through_the_overlay(tmp_path: Path) -> None:
@@ -100,7 +156,7 @@ def test_client_syncs_the_tree_into_the_overlay_and_reports_state(
         devclient.DevClient, "_schedule_reload", lambda self, modules, version, **kw: reloads.append(modules)
     )
     client = devclient.DevClient(
-        server.info.url("127.0.0.1"), str(overlay), entry_module="app.main", forward_logs=False, log=lambda _: None
+        _url(server), str(overlay), entry_module="app.main", forward_logs=False, log=lambda _: None
     )
     client.add_listener(lambda state, detail: states.append(state))
     client.start()
@@ -128,7 +184,7 @@ def test_client_hello_advertises_existing_overlay_so_only_changes_flow(server: D
     overlay = tmp_path / "overlay"
     # Pre-seed the overlay with the current main.py so the server has nothing new to send for it.
     _write(overlay / "app" / "main.py", "VALUE = 1\n")
-    client = devclient.DevClient(server.info.url("127.0.0.1"), str(overlay), forward_logs=False, log=lambda _: None)
+    client = devclient.DevClient(_url(server), str(overlay), forward_logs=False, log=lambda _: None)
     manifest = client._overlay_manifest()
     assert set(manifest) == {"app/main.py"}
     assert manifest["app/main.py"] == server.snapshot.files["app/main.py"]
@@ -152,7 +208,7 @@ def test_first_hello_seeds_the_overlay_from_the_bundled_sources(
         devclient.DevClient, "_schedule_reload", lambda self, modules, version, **kw: reloads.append(modules)
     )
     client = devclient.DevClient(
-        server.info.url("127.0.0.1"), str(overlay), entry_module="app.main", forward_logs=False, log=lambda _: None
+        _url(server), str(overlay), entry_module="app.main", forward_logs=False, log=lambda _: None
     )
     hello = client._hello()
     # Seeded from the bundle: the whole tree, minus caches, hashed like the server does.
@@ -197,7 +253,7 @@ def test_updates_are_applied_and_reloads_scheduled(
     monkeypatch.setattr(
         devclient.DevClient, "_schedule_reload", lambda self, modules, version, **kw: reloads.append(modules)
     )
-    client = devclient.DevClient(server.info.url("127.0.0.1"), str(overlay), forward_logs=False, log=lambda _: None)
+    client = devclient.DevClient(_url(server), str(overlay), forward_logs=False, log=lambda _: None)
     client.start()
     try:
         assert client.synced_once.wait(5.0)
@@ -247,7 +303,7 @@ def test_client_retries_when_the_server_is_down(tmp_path: Path) -> None:
 
 
 def test_log_forwarding_tees_stdout_to_the_server(server: DevServer, tmp_path: Path, capsys: Any) -> None:
-    client = devclient.DevClient(server.info.url("127.0.0.1"), str(tmp_path / "overlay"), forward_logs=True)
+    client = devclient.DevClient(_url(server), str(tmp_path / "overlay"), forward_logs=True)
     logs: List[str] = []
     server.log = logs.append
     client.start()
@@ -268,12 +324,10 @@ def test_log_forwarding_tees_stdout_to_the_server(server: DevServer, tmp_path: P
 
 
 def test_start_if_configured_needs_an_overlay_and_a_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from pythonnative import hot_reload
-
     monkeypatch.delenv(devclient.SERVER_URL_ENV, raising=False)
-    monkeypatch.setattr(hot_reload, "overlay_root", lambda: None)
+    monkeypatch.setattr(devclient, "overlay_root", lambda: None)
     assert devclient.start_if_configured() is None
-    monkeypatch.setattr(hot_reload, "overlay_root", lambda: str(tmp_path))
+    monkeypatch.setattr(devclient, "overlay_root", lambda: str(tmp_path))
     assert devclient.start_if_configured() is None  # overlay but no URL anywhere
 
     started: List[Any] = []
@@ -290,11 +344,9 @@ def test_start_if_configured_needs_an_overlay_and_a_url(tmp_path: Path, monkeypa
 
 
 def test_start_if_configured_falls_back_to_the_saved_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from pythonnative import hot_reload
-
     monkeypatch.delenv(devclient.SERVER_URL_ENV, raising=False)
     monkeypatch.delenv("PN_ENTRY_MODULE", raising=False)
-    monkeypatch.setattr(hot_reload, "overlay_root", lambda: str(tmp_path))
+    monkeypatch.setattr(devclient, "overlay_root", lambda: str(tmp_path))
     devclient._save_server_url(str(tmp_path), "ws://192.168.1.9:8765/ws?role=client")
     started: List[Any] = []
 

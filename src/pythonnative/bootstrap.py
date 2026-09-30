@@ -79,10 +79,11 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
         if dev_mode:
             # Debug builds are dev clients: connect to `pn start` when
             # the build (or a remembered connection) names a server.
+            # Release bundles omit this module; they never pass dev=True.
             from . import devclient
 
             client = devclient.start_if_configured()
-            status_["dev_server"] = client.url if client is not None else None
+            status_["dev_server"] = client.server_label if client is not None else None
             # An overlay from the last session may already hold assets the
             # bundle doesn't; point the native resolver at it right away.
             from .assets import configure_native

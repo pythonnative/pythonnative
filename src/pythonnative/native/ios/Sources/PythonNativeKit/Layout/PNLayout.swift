@@ -139,11 +139,6 @@ enum PNLayout {
                 direct.remove(key)
             }
         }
-        if !touched.isDisjoint(with: ["gap", "spacing"]) {
-            let value = entry.props["gap"] ?? entry.props["spacing"]
-            _ = PNYogaSetStyle(entry.node, "gap", value.map { String(describing: $0) } ?? "")
-            direct.remove("gap"); direct.remove("spacing")
-        }
         for key in direct {
             _ = PNYogaSetStyle(entry.node, key, entry.props[key].map { String(describing: $0) } ?? "")
         }

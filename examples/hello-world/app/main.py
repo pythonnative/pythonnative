@@ -1,24 +1,27 @@
-"""Hello-world demo: native-backed stack + tab navigation.
+"""Hello-world demo: native stack and tab navigation, a theme with dark mode, and persisted settings.
 
-This module is the app's navigation map. It defines:
+This module is the app's map. Navigators are module-level values:
 
-- A root [`Stack`][pythonnative.create_stack_navigator] with three
-  routes (``Tabs`` -> ``Showcase`` -> ``Forms``).
-- A nested [`Tab`][pythonnative.create_tab_navigator] navigator
-  that holds the four home tabs (Home, Layout, List, Settings).
+- ``Tabs`` holds the four home tabs (Home, Layout, List, Settings).
+- ``Root`` is a stack whose first screen is ``Tabs``; the Showcase,
+  Forms, and Async Demo screens push on top of it.
 
-Each screen lives in its own file under ``screens/`` so this file
-stays focused on the navigation structure. When the user taps
-"View Showcase" from inside a tab, the root stack pushes a real
-``UIViewController`` / ``Fragment`` so they get system-grade slide
-transitions and swipe-back. Each push reuses this Python
-interpreter; only the reconciler tree for the new screen is created.
+Because ``Tabs`` is listed as a screen of ``Root`` (static nesting),
+``nav.push(ShowcaseScreen(...))`` works from inside any tab: the tab
+navigator doesn't know that screen, so it hands the push to the stack.
+Each push creates a real ``UIViewController`` or ``Fragment`` with
+system transitions and swipe-back, all driven by this one Python
+interpreter.
 
-The native templates load this module by path (``"app.main"``) and
-look up the top-level ``App`` attribute.
+Each screen lives in its own file under ``screens/``; ``theme.py``
+holds the light and dark themes and the shared styles, and
+``preferences.py`` holds the saved appearance setting. The native
+templates load this module by path (``"app.main"``) and render its
+top-level ``App``.
 """
 
 import pythonnative as pn
+from app.preferences import AppearanceContext, use_saved_appearance
 from app.screens.data import DataScreen
 from app.screens.forms import FormsScreen
 from app.screens.home import HomeScreen
@@ -26,73 +29,37 @@ from app.screens.layout import LayoutScreen
 from app.screens.list import ListScreen
 from app.screens.settings import SettingsScreen
 from app.screens.showcase import ShowcaseScreen
+from app.theme import DARK_THEME, LIGHT_THEME
 
-print("[hello-world] main module imported")
+# Tab icons are bundled vector icons (the names ``pn.Icon`` accepts), so the
+# tab bar looks the same on iOS and Android. Pass ``pn.asset("images/x.png")``
+# instead for a custom bitmap.
+Tabs = pn.TabNavigator(
+    pn.Screen(HomeScreen, title="Home", tab_bar_icon="house"),
+    pn.Screen(LayoutScreen, title="Layout", tab_bar_icon="layout-grid"),
+    pn.Screen(ListScreen, title="List", tab_bar_icon="list"),
+    pn.Screen(SettingsScreen, title="Settings", tab_bar_icon="settings"),
+    name="Tabs",
+)
 
-Stack = pn.create_stack_navigator()
-Tab = pn.create_tab_navigator()
-
-
-@pn.component
-def MainTabs() -> pn.Element:
-    """Tabbed root screen: Home, Layout, List, Settings.
-
-    Each tab names a bundled vector icon via ``tab_bar_icon``. The
-    names are the same ones ``pn.Icon`` accepts, so the tab bar looks
-    identical on iOS and Android and there is nothing to configure per
-    platform. Pass ``pn.asset("images/x.png")`` instead to use a custom
-    bitmap.
-    """
-    return Tab.Navigator(
-        Tab.Screen(
-            "Home",
-            component=HomeScreen,
-            options={
-                "title": "Home",
-                "tab_bar_icon": "house",
-            },
-        ),
-        Tab.Screen(
-            "Layout",
-            component=LayoutScreen,
-            options={
-                "title": "Layout",
-                "tab_bar_icon": "layout-grid",
-            },
-        ),
-        Tab.Screen(
-            "List",
-            component=ListScreen,
-            options={
-                "title": "List",
-                "tab_bar_icon": "list",
-            },
-        ),
-        Tab.Screen(
-            "Settings",
-            component=SettingsScreen,
-            options={
-                "title": "Settings",
-                "tab_bar_icon": "settings",
-            },
-        ),
-    )
+Root = pn.StackNavigator(
+    pn.Screen(Tabs, title="Hello World"),
+    pn.Screen(ShowcaseScreen, title="Showcase"),
+    pn.Screen(FormsScreen, title="Forms"),
+    pn.Screen(DataScreen, title="Async Demo"),
+)
 
 
 @pn.component
-def App() -> pn.Element:
-    """Root component for the hello-world demo.
+def App() -> pn.Node:
+    """Root component: the saved appearance, the theme, and the navigators.
 
-    A [`Stack`][pythonnative.create_stack_navigator] wraps the tabbed
-    home screen so the demo can push the showcase / forms screens onto
-    the native navigation stack. ``options["title"]`` is mirrored to
-    the platform navigation bar.
+    ``ThemeProvider`` picks ``LIGHT_THEME`` or ``DARK_THEME`` from the
+    effective color scheme (the system's, unless the Settings tab
+    overrides it), and the navigators draw their bars from it too.
     """
-    return pn.NavigationContainer(
-        Stack.Navigator(
-            Stack.Screen("Tabs", component=MainTabs, options={"title": "Hello World"}),
-            Stack.Screen("Showcase", component=ShowcaseScreen, options={"title": "Showcase"}),
-            Stack.Screen("Forms", component=FormsScreen, options={"title": "Forms"}),
-            Stack.Screen("Data", component=DataScreen, options={"title": "Async Demo"}),
-        )
+    appearance = use_saved_appearance()
+    return AppearanceContext.Provider(
+        pn.ThemeProvider(pn.NavigationContainer(Root), light=LIGHT_THEME, dark=DARK_THEME),
+        value=appearance,
     )

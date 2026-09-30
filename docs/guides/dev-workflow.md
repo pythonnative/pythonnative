@@ -36,8 +36,8 @@ pn run android
 ```
 
 `pn run` finds the dev server on `localhost:8765` (`--port` to change
-it), bakes the server's URL into the debug build, installs it, and
-launches. The app connects on startup, pulls any sources newer than
+it), hands the server's URL and your [dev token](#the-dev-token) to the
+debug build, installs it, and launches. The app connects on startup, pulls any sources newer than
 what it shipped with, and from then on Fast Refreshes on every save.
 Its `print()` output, tracebacks, and reload notices stream back to the
 `pn start` terminal, so you can leave `pn run` and keep working from one
@@ -73,14 +73,19 @@ the source: `[ios iPhone 15]`, `[android Pixel 8]`, `[browser]`, and
 
 Endpoints, for scripting and curiosity:
 
-| Path | Purpose |
-|---|---|
-| `GET /` | Browser preview page |
-| `GET /status` | Server, project, and connected-peer info (JSON) |
-| `GET /manifest` | `{"version", "entry", "files": {path: sha256}}` |
-| `GET /file/<path>` | Raw bytes of one synced source file |
-| `WS /ws?role=client` | Dev-client protocol |
-| `WS /ws?role=preview` | Browser preview bridge channel |
+| Path | Purpose | Token |
+|---|---|---|
+| `GET /` | Browser preview page | No |
+| `GET /static/<name>` | The preview's scripts and styles | No |
+| `GET /status` | Server, project, and connected-peer info (JSON) | Yes |
+| `GET /manifest` | `{"version", "entry", "files": {path: sha256}}` | Yes |
+| `GET /file/<path>` | Raw bytes of one synced source file | Yes |
+| `GET /assets/<path>` | A file under `app/assets/`, plus the asset manifest and font CSS | Yes |
+| `WS /ws?role=client` | Dev-client protocol | Yes |
+| `WS /ws?role=preview` | Browser preview bridge channel | Yes |
+
+For example, `curl -H "X-PN-Token: $(cat ~/.pythonnative/dev-token)"
+localhost:8765/status` prints the server's status.
 
 ### Flags
 
@@ -94,6 +99,38 @@ example `app.screens.settings` to mount one screen's `App`). The server
 binds to all interfaces by default so phones on your network can reach
 it; pass `--host 127.0.0.1` to keep it local.
 
+### The dev token
+
+The dev server hands out your application's source code, so it only
+answers clients that present your **dev token**. `pn start` generates
+the token the first time it runs, stores it in
+`~/.pythonnative/dev-token` (readable only by you, mode `0600`), and
+reuses it after every restart, so debug builds that `pn run` installed
+keep connecting.
+
+- The URLs `pn start` prints carry it as `?token=...`. When you open the
+  preview URL, the page trades the token for an `HttpOnly`,
+  `SameSite=Strict` cookie and drops it from the address bar. Opening
+  the bare `http://localhost:8765/` in a browser that has never seen the
+  token leaves the preview waiting; open the printed URL once instead.
+- `pn run` reads the same file and passes the token to the app inside
+  its dev-server URL.
+- Scripts can send it in an `X-PN-Token` header or a `token` query
+  parameter.
+
+The server also rejects WebSocket connections from other web pages: a
+browser's upgrade request must come from the server's own origin
+(its `Origin` host and port must match the `Host` header). Native dev
+clients send no `Origin`, so they only need the token.
+
+To issue a new token (for example, after sharing a URL you shouldn't
+have), stop `pn start`, delete `~/.pythonnative/dev-token`, and start it
+again. Installed debug builds then need a fresh `pn run`, and the
+browser preview needs the newly printed URL. Two environment variables
+override the file: `PN_DEV_TOKEN` supplies the token itself, and
+`PN_DEV_TOKEN_FILE` points at another file. Set them the same way for
+`pn start` and `pn run`.
+
 ## Dev clients
 
 A **dev client** is a debug build of your app. On launch,
@@ -101,8 +138,8 @@ A **dev client** is a debug build of your app. On launch,
 [`devclient.start_if_configured`][pythonnative.devclient.start_if_configured],
 which:
 
-- reads the server URL the CLI baked in (`PN_DEV_SERVER`), or the one
-  saved from the last session;
+- reads the server URL, including the dev token, that `pn run` passed
+  in (`PN_DEV_SERVER`), or the one saved from the last session;
 - connects over WebSocket on a daemon thread and says `hello` with a
   hash of every source it holds in its writable **overlay**. On the
   first launch the overlay is seeded from the sources bundled in the
@@ -116,7 +153,10 @@ which:
 - reports every reload (`fast_refresh` or `remount`, and which modules).
 
 Release builds never include any of this: `pn build` produces a
-standalone app with your sources bundled and no dev client.
+standalone app with your sources bundled and no dev client. Its copy of
+`pythonnative` leaves out the development modules entirely (the dev
+client, Fast Refresh, the dev server, the CLI, and the test helpers);
+see [Building for release](building-for-release.md#what-a-release-bundle-leaves-out).
 
 ### Simulators and emulators
 
@@ -128,13 +168,13 @@ emulator (or a USB-attached phone) reaches the server.
 ### Physical iPhones
 
 A physical iOS device is on your Wi-Fi rather than your loopback, so
-`pn run ios --device <name>` bakes in the Mac's first LAN address
+`pn run ios --device <name>` passes the Mac's first LAN address
 instead. Both machines must be on the same network and the port must
 not be firewalled. If auto-detection picks the wrong interface, pass
-the URL explicitly:
+the device URL that `pn start` printed, token included:
 
 ```bash
-pn run ios --device "Owen's iPhone" --dev-server ws://192.168.1.20:8765/ws?role=client
+pn run ios --device "Owen's iPhone" --dev-server "http://192.168.1.20:8765/?token=..."
 ```
 
 Fast Refresh works the same over Wi-Fi; there's no longer a USB-only
@@ -152,7 +192,8 @@ pn run android --dev-client
 
 The shell has no app of its own. It opens a
 [`ConnectScreen`][pythonnative.devclient.ConnectScreen] where you type
-a dev server URL (the last one used is prefilled). After the first sync the real
+the device URL that `pn start` printed, such as
+`192.168.1.20:8765/?token=...` (the last one used is prefilled). After the first sync the real
 `app.main` from the overlay shadows the placeholder and the screen
 remounts into your app. The URL is remembered for next launch, so a
 shell built once keeps working across projects as long as their native
@@ -194,7 +235,7 @@ Start `pn start` and relaunch to connect it.
 | Anything touching device APIs (camera, location, haptics, biometrics) | Simulator or device |
 | Text rendering, fonts, platform chrome, gesture feel | Simulator or device |
 | Performance | A physical device |
-| Demoing to someone at a desk | Browser preview (`--host` and share the URL) |
+| Demoing to someone at a desk | Browser preview on your own screen |
 
 The browser preview runs your real Python in the `pn start` process and
 shares Python reconciliation, hooks, and logical navigation with device
@@ -265,7 +306,7 @@ from pythonnative.testing import render
 
 
 @pn.component
-def App():
+def App() -> pn.Node:
     return pn.Text("Profiled render")
 
 

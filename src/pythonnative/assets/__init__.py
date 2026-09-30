@@ -44,6 +44,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
+from ..utils import overlay_root
 from .fonts import FontFace, FontParseError, read_font_face, weight_from_name
 
 __all__ = [
@@ -437,8 +438,6 @@ def assets_roots() -> List[Path]:
     back to the native ``Assets`` module.
     """
     roots: List[Path] = []
-    from ..hot_reload import overlay_root
-
     overlay = overlay_root()
     if overlay:
         roots.append(Path(overlay) / "app" / ASSETS_DIR)
@@ -560,7 +559,6 @@ def configure_native(paths: Optional[Iterable[str]] = None) -> bool:
     if paths is not None and not any(_is_asset_path(path) for path in paths):
         return False
     from ..bridge import has_transport
-    from ..hot_reload import overlay_root
 
     overlay = overlay_root()
     if not overlay or not has_transport():

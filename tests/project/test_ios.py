@@ -138,4 +138,20 @@ def test_write_entitlements_for_remote_notifications(tmp_path: Path) -> None:
 def test_no_entitlements_without_capabilities(tmp_path: Path) -> None:
     cfg = _config(tmp_path, permissions={"camera": "Scan"})
     assert ios.write_entitlements(tmp_path, cfg) is None
+
+
+def test_debug_info_plist_declares_local_network_use(tmp_path: Path) -> None:
+    plist_path = _write_plist(tmp_path)
+    ios.configure_info_plist(plist_path, _config(tmp_path))
+    assert "NSLocalNetworkUsageDescription" in plistlib.loads(plist_path.read_bytes())
+
+
+def test_release_info_plist_omits_the_dev_server_local_network_string(tmp_path: Path) -> None:
+    plist_path = _write_plist(tmp_path)
+    ios.configure_info_plist(plist_path, _config(tmp_path), release=True)
+    assert "NSLocalNetworkUsageDescription" not in plistlib.loads(plist_path.read_bytes())
+    # An app that needs the local network itself still declares it.
+    cfg = _config(tmp_path, ios={"extra_info_plist": {"NSLocalNetworkUsageDescription": "Find printers"}})
+    ios.configure_info_plist(plist_path, cfg, release=True)
+    assert plistlib.loads(plist_path.read_bytes())["NSLocalNetworkUsageDescription"] == "Find printers"
     assert not any(s.startswith("CODE_SIGN_ENTITLEMENTS=") for s in ios.build_settings(cfg))

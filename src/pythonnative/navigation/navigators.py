@@ -1,12 +1,28 @@
-"""Stack, tab, and drawer navigators built on one shared core.
+"""Stack, tab, and drawer navigators: immutable values rendered by one shared core.
 
-All three navigators are ordinary components. Each owns a
+A navigator is a module-level value listing its screens:
+
+```python
+Root = pn.StackNavigator(
+    pn.Screen(HomeScreen, title="Home"),
+    pn.Screen(ItemScreen, path="items/{id}"),
+    pn.Group(pn.Screen(ComposeScreen), presentation="modal"),
+)
+```
+
+Calling a navigator (``Root()``) returns the element that renders it,
+so a navigator is a zero-argument component: pass it to
+[`NavigationContainer`][pythonnative.NavigationContainer], list it as a
+screen of another navigator to nest it, or render it from a component.
+Navigators listed as screens are *statically* nested: deep links and
+``navigate`` resolve screens inside them without rendering anything.
+
+Each rendered navigator owns a
 [`NavigationState`][pythonnative.navigation.NavigationState] in
 ``use_state``, wraps it in a
 [`NavigatorCore`][pythonnative.navigation.handle.NavigatorCore], and
-renders its screens under a
-[`Navigation`][pythonnative.Navigation] provider. Only the *rendering*
-differs:
+renders its screens under a [`Navigation`][pythonnative.Navigation]
+provider. Only the *rendering* differs:
 
 - **Stack**: keeps every route mounted (hidden below the top one) so
   popping back restores the previous screen's state. When a native host
@@ -19,53 +35,51 @@ differs:
 - **Tabs**: keeps visited tabs alive and hidden (``lazy`` mounts them
   on first focus; ``unmount_on_blur`` opts out; ``freeze_on_blur``
   stops re-rendering them while hidden), and renders the native
-  ``TabBar`` styled by ``tab_bar_style`` and the navigation theme.
+  ``TabBar`` styled by ``tab_bar_style`` and the theme.
 - **Drawer**: like tabs, with a Python-drawn, themed slide-in menu
   instead of a tab bar.
 
-Every navigator accepts ``screen_options`` (a dict or ``(route) ->
-dict``) applied to all of its screens, and ``Group(...)`` adds a layer
-for a subset of them. Inactive screens read ``False`` from
+Navigator chrome takes its colors from [`use_theme`][pythonnative.use_theme].
+Inactive screens read ``False`` from
 [`use_is_focused`][pythonnative.use_is_focused]; ``focus`` and ``blur``
 listeners fire as the active route changes.
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Unpack
 
-from ..component import component, memo
+from ..component import Component, component
 from ..element import Element, Node
 from ..hooks import use_back_handler, use_context, use_effect, use_memo, use_ref, use_state
 from ..icons import tab_icon_spec
 from ..style import Style, StyleProp
+from ..theme import Theme, use_theme
 from .container import ContainerContext
-from .handle import FocusContext, Navigation, NavigationContext, NavigatorCore, provide
+from .handle import FocusContext, Navigation, NavigationContext, NavigatorCore, provide, split_target
 from .host import HostContext
 from .screen import (
     PYTHON_ONLY_OPTIONS,
-    OptionsLike,
-    ScreenDef,
-    ScreenGroup,
+    Screen,
+    ScreenLike,
     ScreenOptions,
+    ScreenTarget,
     TabBarStyle,
-    Unpack,
+    find_screen,
     flatten_screens,
 )
 from .state import NavigationState, Route
-from .theme import NavigationTheme, use_navigation_theme
 
 __all__ = [
     "DrawerNavigator",
+    "Navigator",
     "StackNavigator",
     "TabNavigator",
-    "create_drawer_navigator",
-    "create_stack_navigator",
-    "create_tab_navigator",
+    "navigator_of",
+    "use_screen_options",
 ]
 
 NavigatorKind = Literal["stack", "tab", "drawer"]
-NavigatorItem = Union[ScreenDef, ScreenGroup]
 
 _HEADER_HEIGHT = 44.0
 _DRAWER_WIDTH = 280.0
@@ -73,48 +87,289 @@ _TRANSPARENT = "#00000000"
 
 
 # ======================================================================
+# Navigator values
+# ======================================================================
+
+
+class Navigator:
+    """A navigator definition: its screens, initial screen, and shared options.
+
+    Create one with [`StackNavigator`][pythonnative.StackNavigator],
+    [`TabNavigator`][pythonnative.TabNavigator], or
+    [`DrawerNavigator`][pythonnative.DrawerNavigator]. Navigators are
+    immutable values, usually defined at module level. Calling one
+    returns the element that renders it.
+
+    Attributes:
+        kind: ``"stack"``, ``"tab"``, or ``"drawer"``.
+        screens: The flattened [`Screen`][pythonnative.Screen]s, in order.
+        name: Route name used when this navigator is a screen of
+            another navigator.
+        screen_options: Options applied to every screen.
+        group_options: Options contributed by ``Group``s, keyed by route name.
+        initial_name: Route name of the screen shown first.
+        initial_params: Params of the screen shown first.
+    """
+
+    kind: NavigatorKind = "stack"
+
+    __slots__ = ("screens", "group_options", "name", "screen_options", "initial_name", "initial_params")
+
+    def __init__(
+        self,
+        *screens: ScreenLike,
+        name: Optional[str] = None,
+        initial: Optional[ScreenTarget] = None,
+        screen_options: Optional[ScreenOptions] = None,
+    ) -> None:
+        from .screen import validate_screen_options
+
+        flat, groups = flatten_screens(screens)
+        if not flat:
+            raise ValueError(f"{type(self).__name__} needs at least one screen")
+        options: Dict[str, Any] = dict(screen_options or {})
+        validate_screen_options(options)
+        self.screens: Tuple[Screen, ...] = flat
+        self.group_options: Dict[str, Dict[str, Any]] = groups
+        self.name = name
+        self.screen_options = options
+        self.initial_name, self.initial_params = self._resolve_initial(initial)
+        self._check_screens()
+
+    def _resolve_initial(self, initial: Optional[ScreenTarget]) -> Tuple[str, Dict[str, Any]]:
+        if initial is None:
+            screen, params = self.screens[0], dict[str, Any]()
+        else:
+            component, params = split_target(initial)
+            found = find_screen(self.screens, component)
+            if found is None:
+                raise ValueError(f"initial={initial!r} isn't one of this navigator's screens")
+            screen = found
+        missing = [name for name in screen.required_params() if name not in params]
+        if missing:
+            raise TypeError(
+                f"The initial screen {screen.name!r} requires {missing}; "
+                f"pass initial={screen.name}(...) with those arguments"
+            )
+        return screen.name, params
+
+    def _check_screens(self) -> None:
+        """Stacks only need their initial screen to be renderable without params."""
+
+    def path_to(self, target: Any) -> Optional[List[Screen]]:
+        """The chain of screens from this navigator to the one rendering ``target``, or ``None``.
+
+        Direct screens win over screens of nested navigators; nested
+        navigators are searched in order. The identical component
+        anywhere in the tree wins over a Fast Refresh name match.
+        """
+        return self._path_to(target, exact=True) or self._path_to(target, exact=False)
+
+    def _path_to(self, target: Any, *, exact: bool) -> Optional[List[Screen]]:
+        for screen in self.screens:
+            if screen.matches(target, exact=exact):
+                return [screen]
+        for screen in self.screens:
+            nested = screen.navigator
+            if nested is not None:
+                chain = nested._path_to(target, exact=exact)
+                if chain is not None:
+                    return [screen, *chain]
+        return None
+
+    def __call__(self) -> Element:
+        """Return the element that renders this navigator."""
+        return _IMPLEMENTATIONS[self.kind](navigator=self)
+
+    def __repr__(self) -> str:
+        label = f" {self.name!r}" if self.name else ""
+        return f"<{type(self).__name__}{label} {[screen.name for screen in self.screens]}>"
+
+
+class _KeepAliveNavigator(Navigator):
+    """Tabs and drawers create every route up front, so every screen must be renderable without params."""
+
+    __slots__ = ()
+
+    def _check_screens(self) -> None:
+        for screen in self.screens:
+            if screen.name == self.initial_name:
+                continue  # its params come from ``initial``
+            missing = screen.required_params()
+            if missing:
+                raise TypeError(
+                    f"{type(self).__name__} screen {screen.name!r} requires {missing}; tab and drawer screens "
+                    "must be callable without arguments (give the parameters defaults)"
+                )
+
+
+class StackNavigator(Navigator):
+    """A stack of screens with history, native transitions, and a native navigation bar.
+
+    Stacks use native screen containers at every nesting level on
+    mobile: ``UINavigationController`` on iOS and fragments on Android
+    draw the navigation bar and run the transitions. Without a native
+    host (tests, headless rendering) the stack draws a themed header
+    itself.
+
+    Args:
+        *screens: [`Screen`][pythonnative.Screen]s, [`Group`][pythonnative.Group]s,
+            bare components, or nested navigators.
+        name: Route name when this navigator is nested as a screen.
+        initial: The screen shown first: a component, or an element
+            carrying its params (``initial=ItemScreen(id=1)``). Defaults
+            to the first screen.
+        screen_options: [`ScreenOptions`][pythonnative.ScreenOptions]
+            for every screen; groups and screens layer on top.
+
+    Example:
+        ```python
+        Root = pn.StackNavigator(
+            pn.Screen(HomeScreen, title="Home"),
+            pn.Screen(ItemScreen, path="items/{id}"),
+            pn.Group(pn.Screen(ComposeScreen), presentation="modal"),
+            screen_options=pn.ScreenOptions(header_large_title=True),
+        )
+        ```
+    """
+
+    kind: NavigatorKind = "stack"
+    __slots__ = ()
+
+
+class TabNavigator(_KeepAliveNavigator):
+    """Sibling screens behind a native tab bar.
+
+    Tabs stay mounted once visited (hidden while inactive) so switching
+    back restores scroll position and state. Use ``lazy=False`` on a
+    screen to mount it eagerly, ``unmount_on_blur=True`` to tear it
+    down when it loses focus, and ``freeze_on_blur=True`` to stop
+    re-rendering it while hidden. ``tab_bar_visible=False`` hides the
+    bar while that tab is focused.
+
+    Args:
+        *screens: The tabs (see [`StackNavigator`][pythonnative.StackNavigator]).
+        name: Route name when this navigator is nested as a screen.
+        initial: The tab selected first. Defaults to the first tab.
+        screen_options: Options for every tab.
+        tab_bar_style: A [`TabBarStyle`][pythonnative.TabBarStyle];
+            unset keys fall back to the theme.
+
+    Example:
+        ```python
+        Tabs = pn.TabNavigator(
+            pn.Screen(FeedScreen, title="Feed", tab_bar_icon="house"),
+            pn.Screen(SettingsScreen, title="Settings", tab_bar_icon="settings"),
+            name="Main",
+        )
+        ```
+    """
+
+    kind: NavigatorKind = "tab"
+    __slots__ = ("tab_bar_style",)
+
+    def __init__(
+        self,
+        *screens: ScreenLike,
+        name: Optional[str] = None,
+        initial: Optional[ScreenTarget] = None,
+        screen_options: Optional[ScreenOptions] = None,
+        tab_bar_style: Optional[TabBarStyle] = None,
+    ) -> None:
+        super().__init__(*screens, name=name, initial=initial, screen_options=screen_options)
+        self.tab_bar_style: Optional[TabBarStyle] = tab_bar_style
+
+
+class DrawerNavigator(_KeepAliveNavigator):
+    """Sibling screens behind a slide-in menu.
+
+    The drawer is drawn in Python on every platform and styled by the
+    theme. The handle returned by
+    [`use_navigation`][pythonnative.use_navigation] inside a drawer
+    screen is a [`DrawerNavigation`][pythonnative.navigation.DrawerNavigation]
+    with ``open_drawer()``, ``close_drawer()``, and ``toggle_drawer()``.
+
+    Args:
+        *screens: The drawer's screens.
+        name: Route name when this navigator is nested as a screen.
+        initial: The screen shown first. Defaults to the first screen.
+        screen_options: Options for every screen.
+        drawer_width: Width of the menu panel, in points.
+    """
+
+    kind: NavigatorKind = "drawer"
+    __slots__ = ("drawer_width",)
+
+    def __init__(
+        self,
+        *screens: ScreenLike,
+        name: Optional[str] = None,
+        initial: Optional[ScreenTarget] = None,
+        screen_options: Optional[ScreenOptions] = None,
+        drawer_width: float = _DRAWER_WIDTH,
+    ) -> None:
+        super().__init__(*screens, name=name, initial=initial, screen_options=screen_options)
+        self.drawer_width = drawer_width
+
+
+def navigator_of(element: Element) -> Optional[Navigator]:
+    """The navigator an element renders, when it was produced by calling a navigator."""
+    if element.type in _IMPLEMENTATION_TYPES:
+        navigator = element.props.get("navigator")
+        if isinstance(navigator, Navigator):
+            return navigator
+    return None
+
+
+# ======================================================================
 # Shared core hook
 # ======================================================================
 
 
-def _use_navigator(
-    kind: NavigatorKind,
-    screens: Sequence[ScreenDef],
-    initial_route: Optional[str],
-    screen_options: OptionsLike = None,
-    group_options: Optional[Dict[str, OptionsLike]] = None,
-) -> Tuple[NavigatorCore, NavigationState, bool]:
+def _restorable(navigator: Navigator, state: NavigationState) -> bool:
+    screens = {screen.name: screen for screen in navigator.screens}
+    for route in state.routes:
+        screen = screens.get(route.name)
+        if screen is None or any(name not in route.params for name in screen.required_params()):
+            return False
+    return True
+
+
+def _use_navigator(navigator: Navigator) -> Tuple[NavigatorCore, NavigationState, bool]:
     """Create (once) and refresh the navigator core for the calling component.
 
     Returns ``(core, state, parent_focused)``.
     """
-    screen_map: Dict[str, ScreenDef] = {s.name: s for s in screens}
     parent = use_context(NavigationContext)
     host = use_context(HostContext)
     parent_focused = use_context(FocusContext)
-    container = use_context(ContainerContext) if parent is None else None
-    is_native_root = kind == "stack" and parent is None and host is not None
-    first = initial_route if initial_route in screen_map else next(iter(screen_map))
+    enclosing_container = use_context(ContainerContext)
+    container = enclosing_container if parent is None else None
+    is_native_root = navigator.kind == "stack" and parent is None and host is not None
 
     def default_state() -> NavigationState:
-        if kind == "stack":
-            return NavigationState([Route(first, screen_map[first].initial_params)])
-        routes = [Route(s.name, s.initial_params) for s in screens]
-        return NavigationState(routes, [s.name for s in screens].index(first))
+        first = navigator.initial_name
+        if navigator.kind == "stack":
+            return NavigationState([Route(first, navigator.initial_params)])
+        routes = [
+            Route(screen.name, navigator.initial_params if screen.name == first else {}) for screen in navigator.screens
+        ]
+        return NavigationState(routes, [screen.name for screen in navigator.screens].index(first))
 
     def initial_state() -> NavigationState:
         if is_native_root:
+            assert host is not None
             serialized = host.initial_navigation_state()
             if serialized:
                 try:
-                    restored = NavigationState.from_dict(serialized)
-                except Exception:
+                    restored: Optional[NavigationState] = NavigationState.from_dict(serialized)
+                except (AttributeError, KeyError, TypeError, ValueError, IndexError):
                     restored = None
-                if restored is not None and all(r.name in screen_map for r in restored.routes):
+                if restored is not None and _restorable(navigator, restored):
                     return restored
         seed = parent.route.state if parent is not None else (container.initial_state if container else None)
         if seed is not None:
-            seeded = _apply_seed(kind, screen_map, default_state(), seed)
+            seeded = _apply_seed(navigator, default_state(), seed)
             if seeded is not None:
                 return seeded
         return default_state()
@@ -123,40 +378,32 @@ def _use_navigator(
     _version, set_version = use_state(0)
     core: NavigatorCore = use_memo(
         lambda: NavigatorCore(
-            kind,
-            screen_map,
+            navigator,
             state,
             set_state,
             parent,
             host,
             request_render=lambda: set_version(lambda v: v + 1),
-            screen_options=screen_options,
-            group_options=group_options,
         ),
-        [],
+        [],  # pn: ignore[PN103] the core is created once; ``update`` refreshes it every render
     )
-    core.update(screen_map, state, set_state, parent, host, screen_options=screen_options, group_options=group_options)
+    core.update(navigator, state, set_state, parent, host)
     _use_focus_events(core, state, parent_focused)
     _use_seed_updates(core, parent)
     _use_container(core, state, container)
     return core, state, parent_focused
 
 
-def _apply_seed(
-    kind: NavigatorKind,
-    screen_map: Dict[str, ScreenDef],
-    base: NavigationState,
-    seed: NavigationState,
-) -> Optional[NavigationState]:
-    """Merge a seed state (deep link, ``navigate(screen=...)``) into ``base``.
+def _apply_seed(navigator: Navigator, base: NavigationState, seed: NavigationState) -> Optional[NavigationState]:
+    """Merge a seed state (a deep link, or navigating into a nested navigator) into ``base``.
 
     Stacks keep their initial route underneath so back works; tabs and
     drawers switch to the seeded route and merge its params. Unknown
-    route names make the seed invalid (``None``).
+    route names or missing params make the seed invalid (``None``).
     """
-    if any(r.name not in screen_map for r in seed.routes):
+    if not _restorable(navigator, seed):
         return None
-    if kind == "stack":
+    if navigator.kind == "stack":
         routes = list(seed.routes)
         if routes[0].name != base.routes[0].name:
             routes.insert(0, base.routes[0])
@@ -166,7 +413,7 @@ def _apply_seed(
 
 
 def _use_seed_updates(core: NavigatorCore, parent: Optional[Navigation]) -> None:
-    """Follow later ``navigate("Nested", screen=...)`` calls made on the parent."""
+    """Follow later navigation into this nested navigator made through the parent."""
     seed = parent.route.state if parent is not None else None
     applied: Any = use_ref(seed)
 
@@ -178,7 +425,7 @@ def _use_seed_updates(core: NavigatorCore, parent: Optional[Navigation]) -> None
         if target.name in core.screens:
             core.navigate(target.name, target.params, target.state)
 
-    use_effect(run, [seed])
+    use_effect(run, [core, seed])
 
 
 def _use_container(core: NavigatorCore, state: NavigationState, container: Any) -> None:
@@ -187,20 +434,20 @@ def _use_container(core: NavigatorCore, state: NavigationState, container: Any) 
     def attach() -> Any:
         return container.attach_root(core) if container is not None else None
 
-    use_effect(attach, [container])
+    use_effect(attach, [core, container])
 
     def report() -> None:
         if container is not None and container.on_state_change is not None:
             container.on_state_change(state)
 
-    use_effect(report, [state])
+    use_effect(report, [container, state])
 
     def cache() -> None:
         publish = getattr(core.host, "cache_navigation_state", None)
         if core.is_native_root and publish is not None:
             publish(state.to_dict())
 
-    use_effect(cache, [state])
+    use_effect(cache, [core, state])
 
 
 def _use_focus_events(core: NavigatorCore, state: NavigationState, parent_focused: bool) -> None:
@@ -218,12 +465,12 @@ def _use_focus_events(core: NavigatorCore, state: NavigationState, parent_focuse
             core.emit(active, "focus")
         last.current = active
 
-    use_effect(run, [state.current.key, parent_focused])
+    use_effect(run, [core, state.current.key, parent_focused])
 
     def emit_state() -> None:
         core.emit(state.current, "state", {"state": state})
 
-    use_effect(emit_state, [state])
+    use_effect(emit_state, [core, state])
 
 
 # ======================================================================
@@ -231,21 +478,13 @@ def _use_focus_events(core: NavigatorCore, state: NavigationState, parent_focuse
 # ======================================================================
 
 
-def _screen_body(core: NavigatorCore, route: Route, theme: NavigationTheme) -> Node:
-    """The element for ``route``'s component, or a themed fallback for an unknown route."""
-    screen = core.screens.get(route.name)
-    if screen is None:
+def _screen_body(core: NavigatorCore, route: Route, theme: Theme) -> Node:
+    """The element for ``route``'s screen, or a themed fallback for an unknown route."""
+    if route.name not in core.screens:
         from ..components import Text
 
         return Text(f"Unknown route: {route.name}", style={"color": theme.colors.text})
-    return screen.component()
-
-
-@memo(equal=lambda old, new: old.get("body") is new.get("body"))
-@component
-def _FrozenScreen(*, body: Any) -> Any:
-    """Memo wrapper: re-renders only when handed a new ``body`` element object (see ``freeze_on_blur``)."""
-    return body
+    return core.body_for(route)
 
 
 def _screen_element(
@@ -271,28 +510,27 @@ def _screen_element(
 
 
 @component
-def _NativeHeaderSlot(*, value: Any, side: str) -> Element:
-    body = value() if callable(value) and not isinstance(value, Element) else value
-    return Element("View", {"_pn_header_slot": side, "height": 44, "justify_content": "center"}, [body])
+def _NativeHeaderSlot(*, value: Element, side: str) -> Element:
+    return Element("View", {"_pn_header_slot": side, "height": 44, "justify_content": "center"}, [value])
 
 
-def _native_screen_props(options: Dict[str, Any], theme: NavigationTheme) -> Dict[str, Any]:
+def _native_screen_props(options: Dict[str, Any], theme: Theme) -> Dict[str, Any]:
     """Wire props for a native ``Screen``: the options native reads, with theme colors filled in as defaults."""
     props = {key: value for key, value in options.items() if key not in PYTHON_ONLY_OPTIONS}
     props.setdefault("header_tint_color", theme.colors.primary)
     header_style = dict(options.get("header_style") or {})
-    header_style.setdefault("background_color", theme.colors.card)
+    header_style.setdefault("background_color", theme.colors.surface)
     props["header_style"] = header_style
     title_style = dict(options.get("header_title_style") or {})
     title_style.setdefault("color", theme.colors.text)
     props["header_title_style"] = title_style
+    props.setdefault("title", "")
     return props
 
 
-def _native_screen(
-    core: NavigatorCore, route: Route, active: bool, parent_focused: bool, theme: NavigationTheme
-) -> Element:
+def _native_screen(core: NavigatorCore, route: Route, active: bool, parent_focused: bool, theme: Theme) -> Element:
     options = core.options_for(route)
+    options.setdefault("title", route.name)
     # ``guarded`` is an internal wire prop, recomputed every render: while
     # the route has a ``before_remove`` listener, iOS refuses the pop or
     # dismiss synchronously and reports ``on_native_back`` for Python to
@@ -302,6 +540,10 @@ def _native_screen(
         "Screen",
         {
             "flex": 1,
+            # A transparent modal shows the screen below it through its own background.
+            "background_color": (
+                _TRANSPARENT if options.get("presentation") == "transparent_modal" else theme.colors.background
+            ),
             "active": active,
             "route_key": route.key,
             "guarded": guarded,
@@ -321,8 +563,8 @@ def _native_screen(
     )
 
 
-def _hidden_style(active: bool) -> Style:
-    return {"flex": 1, "display": "flex" if active else "none"}
+def _hidden_style(active: bool, theme: Theme) -> Style:
+    return {"flex": 1, "display": "flex" if active else "none", "background_color": theme.colors.background}
 
 
 # ======================================================================
@@ -331,9 +573,7 @@ def _hidden_style(active: bool) -> Style:
 
 
 @component
-def _StackHeader(
-    *, core: NavigatorCore, route: Route, options: Dict[str, Any], theme: NavigationTheme
-) -> Optional[Element]:
+def _StackHeader(*, core: NavigatorCore, route: Route, options: Dict[str, Any], theme: Theme) -> Optional[Element]:
     from ..components import Pressable, Text, View
 
     if options.get("header_shown", True) is False:
@@ -345,7 +585,7 @@ def _StackHeader(
             "flex_direction": "row",
             "align_items": "center",
             "padding_horizontal": 8,
-            "background_color": theme.colors.card,
+            "background_color": theme.colors.surface,
             "border_bottom_width": 0.5,
             "border_color": theme.colors.border,
         },
@@ -362,13 +602,7 @@ def _StackHeader(
         },
         options.get("header_title_style"),
     ]
-
-    def slot(value: Any) -> Optional[Element]:
-        if value is None:
-            return None
-        return value() if callable(value) and not isinstance(value, Element) else value
-
-    left = slot(options.get("header_left"))
+    left: Optional[Element] = options.get("header_left")
     if left is None and handle.can_go_back() and options.get("header_back_visible", True):
         back_title = options.get("header_back_title") or "Back"
         left = Pressable(
@@ -376,7 +610,7 @@ def _StackHeader(
             on_press=handle.go_back,
             accessibility_label="Back",
         )
-    right = slot(options.get("header_right"))
+    right: Optional[Element] = options.get("header_right")
     return View(
         View(left, style={"min_width": 60, "align_items": "flex_start"}),
         Text(str(options.get("title", route.name)), style=title_style),
@@ -386,19 +620,11 @@ def _StackHeader(
 
 
 @component
-def _StackNavigatorImpl(
-    *,
-    screens: Tuple[ScreenDef, ...],
-    initial_route: Optional[str] = None,
-    screen_options: OptionsLike = None,
-    group_options: Optional[Dict[str, OptionsLike]] = None,
-) -> Element:
+def _StackNavigatorImpl(*, navigator: StackNavigator) -> Element:
     from ..components import View
 
-    theme = use_navigation_theme()
-    if not screens:
-        return View(style={"flex": 1})
-    core, state, parent_focused = _use_navigator("stack", screens, initial_route, screen_options, group_options)
+    theme = use_theme()
+    core, state, parent_focused = _use_navigator(navigator)
 
     def on_back() -> bool:
         if parent_focused and len(state) > 1:
@@ -436,79 +662,8 @@ def _StackNavigatorImpl(
         body = _screen_element(
             core, route, _screen_body(core, route, theme), active=active, parent_focused=parent_focused
         )
-        layers.append(View(header, View(body, style={"flex": 1}), style=_hidden_style(active), key=route.key))
+        layers.append(View(header, View(body, style={"flex": 1}), style=_hidden_style(active, theme), key=route.key))
     return View(*layers, style={"flex": 1})
-
-
-class StackNavigator:
-    """Factory returned by [`create_stack_navigator`][pythonnative.create_stack_navigator]."""
-
-    __slots__ = ()
-
-    @staticmethod
-    def Screen(
-        name: str,
-        component: Callable[[], Any],
-        *,
-        options: Any = None,
-        initial_params: Optional[Dict[str, Any]] = None,
-        **option_kwargs: Unpack[ScreenOptions],
-    ) -> ScreenDef:
-        """Define a screen. ``options`` may be a dict or ``(route) -> dict``; keywords merge on top."""
-        return ScreenDef(name, component, options=options, initial_params=initial_params, **option_kwargs)
-
-    @staticmethod
-    def Group(*screens: ScreenDef, screen_options: OptionsLike = None) -> ScreenGroup:
-        """Group screens that share ``screen_options`` (layered between the navigator's and each screen's own)."""
-        return ScreenGroup(screens, screen_options)
-
-    @staticmethod
-    def Navigator(
-        *screens: NavigatorItem,
-        screen_options: OptionsLike = None,
-        initial_route: Optional[str] = None,
-        key: Optional[str] = None,
-    ) -> Element:
-        """Render the stack with the given screens and groups (the first screen, or ``initial_route``, shows first).
-
-        ``screen_options`` (a dict or ``(route) -> dict``) applies to every
-        screen; group and screen options layer on top, then ``set_options``.
-        """
-        flat, groups = flatten_screens(screens)
-        return _StackNavigatorImpl(
-            screens=flat, initial_route=initial_route, screen_options=screen_options, group_options=groups
-        ).with_key(key)
-
-
-def create_stack_navigator() -> StackNavigator:
-    """Create a stack navigator: push and pop screens with history.
-
-    Stacks use native screen containers at every nesting level on mobile:
-    ``UINavigationController`` on iOS and fragments on Android draw the
-    navigation bar and run the transitions. Without a native host (tests,
-    headless rendering) the stack draws a themed header itself.
-
-    Example:
-        ```python
-        import pythonnative as pn
-
-        Stack = pn.create_stack_navigator()
-
-        @pn.component
-        def App():
-            return pn.NavigationContainer(
-                Stack.Navigator(
-                    Stack.Screen("Home", HomeScreen, title="Home"),
-                    Stack.Group(
-                        Stack.Screen("Compose", ComposeScreen),
-                        screen_options={"presentation": "modal"},
-                    ),
-                    screen_options=lambda route: {"title": route.name.title()},
-                )
-            )
-        ```
-    """
-    return StackNavigator()
 
 
 # ======================================================================
@@ -545,7 +700,7 @@ def _render_keep_alive(
     parent_focused: bool,
     visited: Any,
     frozen: Dict[str, Node],
-    theme: NavigationTheme,
+    theme: Theme,
 ) -> List[Element]:
     from ..components import View
 
@@ -559,22 +714,16 @@ def _render_keep_alive(
             if options.get("lazy", True) and route.key not in visited:
                 continue
         body: Node
-        if options.get("freeze_on_blur", False):
-            if active:
-                frozen.pop(route.key, None)
-                inner: Node = _screen_body(core, route, theme)
-            else:
-                inner = frozen.get(route.key)
-                if inner is None:
-                    inner = _screen_body(core, route, theme)
-                    frozen[route.key] = inner
-            body = _FrozenScreen(body=inner)
+        if options.get("freeze_on_blur", False) and not active and route.key in frozen:
+            # The identical element makes the reconciler skip the screen.
+            body = frozen[route.key]
         else:
             body = _screen_body(core, route, theme)
+            frozen[route.key] = body
         out.append(
             View(
                 _screen_element(core, route, body, active=active, parent_focused=parent_focused),
-                style=_hidden_style(active),
+                style=_hidden_style(active, theme),
                 key=route.key,
             )
         )
@@ -586,12 +735,12 @@ def _render_keep_alive(
 # ======================================================================
 
 
-def _tab_bar_props(style: Optional[TabBarStyle], theme: NavigationTheme) -> Dict[str, Any]:
+def _tab_bar_props(style: Optional[TabBarStyle], theme: Theme) -> Dict[str, Any]:
     """Translate ``TabBarStyle`` plus theme defaults into the native ``TabBar`` props."""
     resolved: Dict[str, Any] = dict(style or {})
     props: Dict[str, Any] = {
         "tint_color": resolved.get("active_tint_color", theme.colors.primary),
-        "background_color": resolved.get("background_color", theme.colors.card),
+        "background_color": resolved.get("background_color", theme.colors.surface),
     }
     if "inactive_tint_color" in resolved:
         props["inactive_tint_color"] = resolved["inactive_tint_color"]
@@ -603,20 +752,11 @@ def _tab_bar_props(style: Optional[TabBarStyle], theme: NavigationTheme) -> Dict
 
 
 @component
-def _TabNavigatorImpl(
-    *,
-    screens: Tuple[ScreenDef, ...],
-    initial_route: Optional[str] = None,
-    screen_options: OptionsLike = None,
-    group_options: Optional[Dict[str, OptionsLike]] = None,
-    tab_bar_style: Optional[TabBarStyle] = None,
-) -> Element:
+def _TabNavigatorImpl(*, navigator: TabNavigator) -> Element:
     from ..components import View
 
-    theme = use_navigation_theme()
-    if not screens:
-        return View(style={"flex": 1})
-    core, state, parent_focused = _use_navigator("tab", screens, initial_route, screen_options, group_options)
+    theme = use_theme()
+    core, state, parent_focused = _use_navigator(navigator)
     visited = _use_visited(state)
     frozen = _use_frozen(state)
 
@@ -649,7 +789,7 @@ def _TabNavigatorImpl(
                     "items": items,
                     "active_tab": state.current.name,
                     "on_tab_select": on_tab_select,
-                    **_tab_bar_props(tab_bar_style, theme),
+                    **_tab_bar_props(navigator.tab_bar_style, theme),
                 },
                 [],
                 key="__tab_bar__",
@@ -658,95 +798,17 @@ def _TabNavigatorImpl(
     return View(*children, style={"flex": 1, "flex_direction": "column"})
 
 
-class TabNavigator:
-    """Factory returned by [`create_tab_navigator`][pythonnative.create_tab_navigator]."""
-
-    __slots__ = ()
-
-    @staticmethod
-    def Screen(
-        name: str,
-        component: Callable[[], Any],
-        *,
-        options: Any = None,
-        initial_params: Optional[Dict[str, Any]] = None,
-        **option_kwargs: Unpack[ScreenOptions],
-    ) -> ScreenDef:
-        """Define a tab. ``options`` may be a dict or ``(route) -> dict``; keywords merge on top."""
-        return ScreenDef(name, component, options=options, initial_params=initial_params, **option_kwargs)
-
-    @staticmethod
-    def Group(*screens: ScreenDef, screen_options: OptionsLike = None) -> ScreenGroup:
-        """Group tabs that share ``screen_options`` (layered between the navigator's and each tab's own)."""
-        return ScreenGroup(screens, screen_options)
-
-    @staticmethod
-    def Navigator(
-        *screens: NavigatorItem,
-        screen_options: OptionsLike = None,
-        initial_route: Optional[str] = None,
-        tab_bar_style: Optional[TabBarStyle] = None,
-        key: Optional[str] = None,
-    ) -> Element:
-        """Render the tab bar with the given tabs and groups (the first, or ``initial_route``, is selected first).
-
-        ``tab_bar_style`` is a [`TabBarStyle`][pythonnative.TabBarStyle];
-        unset keys fall back to the navigation theme.
-        """
-        flat, groups = flatten_screens(screens)
-        return _TabNavigatorImpl(
-            screens=flat,
-            initial_route=initial_route,
-            screen_options=screen_options,
-            group_options=groups,
-            tab_bar_style=tab_bar_style,
-        ).with_key(key)
-
-
-def create_tab_navigator() -> TabNavigator:
-    """Create a tab navigator with a native tab bar.
-
-    Tabs stay mounted once visited (hidden while inactive) so switching
-    back restores scroll position and state. Use ``lazy=False`` on a
-    screen to mount it eagerly, ``unmount_on_blur=True`` to tear it
-    down when it loses focus, and ``freeze_on_blur=True`` to stop
-    re-rendering it while hidden. ``tab_bar_visible=False`` hides the
-    bar while that tab is focused.
-
-    Example:
-        ```python
-        Tab = pn.create_tab_navigator()
-
-        Tab.Navigator(
-            Tab.Screen("Home", HomeScreen, title="Home", tab_bar_icon="house"),
-            Tab.Screen("Settings", SettingsScreen, title="Settings"),
-            tab_bar_style={"active_tint_color": "#FF2D55", "show_labels": False},
-        )
-        ```
-    """
-    return TabNavigator()
-
-
 # ======================================================================
 # Drawer
 # ======================================================================
 
 
 @component
-def _DrawerNavigatorImpl(
-    *,
-    screens: Tuple[ScreenDef, ...],
-    initial_route: Optional[str] = None,
-    screen_options: OptionsLike = None,
-    group_options: Optional[Dict[str, OptionsLike]] = None,
-    drawer_width: float = _DRAWER_WIDTH,
-) -> Element:
+def _DrawerNavigatorImpl(*, navigator: DrawerNavigator) -> Element:
     from ..components import Pressable, Text, View
 
-    theme = use_navigation_theme()
-    if not screens:
-        return View(style={"flex": 1})
-    core, state, parent_focused = _use_navigator("drawer", screens, initial_route, screen_options, group_options)
+    theme = use_theme()
+    core, state, parent_focused = _use_navigator(navigator)
     visited = _use_visited(state)
     frozen = _use_frozen(state)
     drawer_open, set_drawer_open = use_state(False)
@@ -795,8 +857,8 @@ def _DrawerNavigatorImpl(
     panel = View(
         *rows,
         style={
-            "width": drawer_width,
-            "background_color": colors.card,
+            "width": navigator.drawer_width,
+            "background_color": colors.surface,
             "padding_top": 24,
             "border_right_width": 0.5,
             "border_color": colors.border,
@@ -817,54 +879,45 @@ def _DrawerNavigatorImpl(
     )
 
 
-class DrawerNavigator:
-    """Factory returned by [`create_drawer_navigator`][pythonnative.create_drawer_navigator]."""
-
-    __slots__ = ()
-
-    @staticmethod
-    def Screen(
-        name: str,
-        component: Callable[[], Any],
-        *,
-        options: Any = None,
-        initial_params: Optional[Dict[str, Any]] = None,
-        **option_kwargs: Unpack[ScreenOptions],
-    ) -> ScreenDef:
-        """Define a drawer screen. ``options`` may be a dict or ``(route) -> dict``; keywords merge on top."""
-        return ScreenDef(name, component, options=options, initial_params=initial_params, **option_kwargs)
-
-    @staticmethod
-    def Group(*screens: ScreenDef, screen_options: OptionsLike = None) -> ScreenGroup:
-        """Group drawer screens that share ``screen_options``."""
-        return ScreenGroup(screens, screen_options)
-
-    @staticmethod
-    def Navigator(
-        *screens: NavigatorItem,
-        screen_options: OptionsLike = None,
-        initial_route: Optional[str] = None,
-        drawer_width: float = _DRAWER_WIDTH,
-        key: Optional[str] = None,
-    ) -> Element:
-        """Render the drawer with the given screens and groups (the first, or ``initial_route``, shows first)."""
-        flat, groups = flatten_screens(screens)
-        return _DrawerNavigatorImpl(
-            screens=flat,
-            initial_route=initial_route,
-            screen_options=screen_options,
-            group_options=groups,
-            drawer_width=drawer_width,
-        ).with_key(key)
+_IMPLEMENTATIONS: Dict[str, Component[...]] = {
+    "stack": _StackNavigatorImpl,
+    "tab": _TabNavigatorImpl,
+    "drawer": _DrawerNavigatorImpl,
+}
+_IMPLEMENTATION_TYPES = frozenset(_IMPLEMENTATIONS.values())
 
 
-def create_drawer_navigator() -> DrawerNavigator:
-    """Create a drawer navigator: sibling screens behind a slide-in menu.
+def use_screen_options(**options: Unpack[ScreenOptions]) -> None:
+    """Set the calling screen's options from its render.
 
-    The drawer is drawn in Python on every platform and styled by the
-    navigation theme. The handle returned by
-    [`use_navigation`][pythonnative.use_navigation] inside a drawer
-    screen is a [`DrawerNavigation`][pythonnative.navigation.DrawerNavigation]
-    with ``open_drawer()``, ``close_drawer()``, and ``toggle_drawer()``.
+    Options set here layer over the screen's static options and follow
+    the screen's props and state, so dynamic titles and header buttons
+    live next to the code that computes them:
+
+    ```python
+    @pn.component
+    def ItemScreen(id: int) -> pn.Node:
+        item = use_item(id)
+        pn.use_screen_options(
+            title=item.title,
+            header_right=pn.Button("Share", on_press=lambda: share(item)),
+        )
+        return ItemDetails(item)
+    ```
+
+    The navigator re-renders only when the options actually change, and
+    it doesn't re-render the screen in response.
+
+    Raises:
+        RuntimeError: If the calling component isn't inside a navigator.
+        TypeError: For an unknown option key.
     """
-    return DrawerNavigator()
+    from ..hooks import use_layout_effect
+    from .hooks import use_navigation
+
+    navigation = use_navigation()
+
+    def apply() -> None:
+        navigation.set_options(**options)
+
+    use_layout_effect(apply)

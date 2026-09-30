@@ -2180,7 +2180,10 @@ def use_animated_value(initial: float = 0.0) -> AnimatedValue:
     """
     from .hooks import use_memo
 
-    return use_memo(lambda: AnimatedValue(initial), [])
+    return use_memo(
+        lambda: AnimatedValue(initial),
+        [],  # pn: ignore[PN103] the initial value is read once, like use_state
+    )
 
 
 __all__ = [

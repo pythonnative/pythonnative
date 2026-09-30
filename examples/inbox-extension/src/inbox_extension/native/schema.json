@@ -1289,21 +1289,6 @@
             "python_only": false
           }
         },
-        "spacing": {
-          "type": "number",
-          "native": {
-            "invalidates_layout": true,
-            "recreate": false,
-            "animated": false,
-            "platforms": [
-              "ios",
-              "android",
-              "web"
-            ],
-            "description": "",
-            "python_only": false
-          }
-        },
         "gap": {
           "type": "number",
           "native": {
@@ -3675,9 +3660,6 @@
                     }
                   ]
                 },
-                "spacing": {
-                  "type": "number"
-                },
                 "gap": {
                   "type": "number"
                 },
@@ -5433,9 +5415,6 @@
                             ]
                           }
                         ]
-                      },
-                      "spacing": {
-                        "type": "number"
                       },
                       "gap": {
                         "type": "number"

@@ -3,7 +3,9 @@
 Installing ``pythonnative`` activates it in every pytest session. It
 provides:
 
-- an autouse fixture that resets the framework between tests: the
+- an autouse fixture that turns on development diagnostics for each
+  test (prop and style validation, hook-order checks, and warnings, as
+  in a debug build), then resets the framework afterwards: the
   headless asyncio loop is shut down (cancelling leaked tasks), and the
   event registry, default query client, and recorded diagnostics
   warnings are cleared, so one test's leftovers never reach the next;
@@ -28,10 +30,13 @@ __all__ = ["pn_clock"]
 
 @pytest.fixture(autouse=True)
 def _pn_fresh_runtime() -> Iterator[None]:
-    """Reset the framework after every test so loops, listeners, caches, and warnings never leak."""
-    yield
+    """Run each test in dev mode, then reset the framework so loops, listeners, caches, and warnings never leak."""
     from .. import diagnostics, query, runtime
     from ..events import get_event_registry
+
+    diagnostics.set_dev_mode(True)
+    yield
+    diagnostics._dev_mode = None
 
     runtime._shutdown_for_tests()
     get_event_registry().reset()

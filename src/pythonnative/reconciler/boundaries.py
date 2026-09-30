@@ -52,17 +52,23 @@ class BoundaryMixin:
     transitions: "TransitionQueue"
 
     # Methods provided by the concrete reconciler.
-    def _create_child_list(self, elements: List[Element]) -> List[VNode]: ...  # pragma: no cover
+    def _create_child_list(self, elements: List[Element]) -> List[VNode]:
+        raise NotImplementedError  # pragma: no cover
 
-    def _reconcile_child_list(self, old: List[VNode], new: List[Element]) -> List[VNode]: ...  # pragma: no cover
+    def _reconcile_child_list(self, old: List[VNode], new: List[Element]) -> List[VNode]:
+        raise NotImplementedError  # pragma: no cover
 
-    def _destroy_tree(self, node: VNode, salvage: Optional[HydrationMap] = None) -> None: ...  # pragma: no cover
+    def _destroy_tree(self, node: VNode, salvage: Optional[HydrationMap] = None) -> None:
+        raise NotImplementedError  # pragma: no cover
 
-    def _refresh_identity(self, node: VNode) -> None: ...  # pragma: no cover
+    def _refresh_identity(self, node: VNode) -> None:
+        raise NotImplementedError  # pragma: no cover
 
-    def _native_roots(self, node: VNode) -> List[VNode]: ...  # pragma: no cover
+    def _native_roots(self, node: VNode) -> List[VNode]:
+        raise NotImplementedError  # pragma: no cover
 
-    def _create_wrapper(self, element: Element, owner: str) -> VNode: ...  # pragma: no cover
+    def _create_wrapper(self, element: Element, owner: str) -> VNode:
+        raise NotImplementedError  # pragma: no cover
 
     # ``_mark_layout_dirty`` comes from the layout mixin; it is not stubbed
     # here because a stub would shadow it in the reconciler's MRO.

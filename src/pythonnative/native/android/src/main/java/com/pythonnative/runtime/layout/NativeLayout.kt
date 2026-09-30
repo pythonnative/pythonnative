@@ -121,11 +121,6 @@ object NativeLayout {
                 direct.remove(key)
             }
         }
-        if ("gap" in touched || "spacing" in touched) {
-            val value = entry.props.opt("gap") ?: entry.props.opt("spacing")
-            yoga.style(yoga.ptr, "gap", value?.toString() ?: "")
-            direct.remove("gap"); direct.remove("spacing")
-        }
         for (key in direct) yoga.style(yoga.ptr, key, entry.props.opt(key)?.toString() ?: "")
         if (type in setOf("ScrollView", "VirtualList", "ScreenStack") && !entry.props.has("flex_shrink")) yoga.style(yoga.ptr, "flex_shrink", "1")
         yoga.measureLeaf(yoga.ptr, entry.children.isEmpty() && type !in containers)

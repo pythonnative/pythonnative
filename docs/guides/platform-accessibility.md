@@ -30,7 +30,7 @@ platform-published metrics in `pythonnative.platform_metrics`:
 
 ```python
 @pn.component
-def Responsive():
+def Responsive() -> pn.Node:
     dims = pn.use_window_dimensions()
     insets = pn.use_safe_area_insets()
     keyboard = pn.use_keyboard_height()
@@ -39,7 +39,7 @@ def Responsive():
         pn.Text(f"{dims.width:.0f} × {dims.height:.0f}"),
         pn.Text(f"Bottom inset: {insets.bottom:.0f}"),
         pn.Text(f"Keyboard: {keyboard:.0f}"),
-        style={"padding": 16, "spacing": 8},
+        style={"padding": 16, "gap": 8},
     )
 ```
 
@@ -194,7 +194,7 @@ re-render when the setting changes:
 
 ```python
 @pn.component
-def Toast(message: str):
+def Toast(message: str) -> pn.Node:
     reduce_motion = pn.use_reduce_motion()
     pn.use_effect(lambda: pn.AccessibilityInfo.announce(message), [message])
     return pn.Text(
@@ -205,7 +205,7 @@ def Toast(message: str):
 
 
 @pn.component
-def Chart(points):
+def Chart(points: list[float]) -> pn.Node:
     if pn.use_screen_reader_enabled():
         return DataTable(points=points)   # a readable alternative to the drawing
     return pn.Svg(...)
@@ -225,7 +225,7 @@ carries `language_tag`, `language_code`, `region_code`, and `is_rtl`:
 
 ```python
 @pn.component
-def Greeting():
+def Greeting() -> pn.Node:
     locale = pn.use_locales()[0]
     text = "Hola" if locale.language_code == "es" else "Hello"
     return pn.Text(text, style=pn.style(text_align="right" if locale.is_rtl else "left"))

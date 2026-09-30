@@ -27,10 +27,11 @@ the documented behavior never drifts from the code.
   satisfied. See [PyPI packages](../guides/pypi-packages.md).
 - `pn start [entry]`: run the dev server. It watches `app/`, syncs
   every save to each connected debug build with Fast Refresh, relays
-  their logs, and serves the browser preview page. Flags: `--port`
-  (default 8765), `--host` (default `0.0.0.0`), `--open` to also open
-  the browser preview. See the
-  [Development workflow](../guides/dev-workflow.md).
+  their logs, and serves the browser preview page. Every client needs
+  your dev token from `~/.pythonnative/dev-token`, which the printed URLs
+  carry. Flags: `--port` (default 8765), `--host` (default `0.0.0.0`),
+  `--open` to also open the browser preview. See the
+  [Development workflow](../guides/dev-workflow.md#the-dev-token).
 - `pn preview [entry]`: `pn start` plus opening the browser preview in
   your default browser. Flags: `--port`, `--host`, `--no-open`. See the
   [Browser preview guide](../guides/browser-preview.md).
@@ -45,7 +46,7 @@ the documented behavior never drifts from the code.
   reinstalled. Flags: `--device` (target a specific device by
   identifier or name), `--prepare-only`, `--no-logs`, `--rebuild`
   (force the toolchain), `--dev-server URL` (override the server URL
-  baked into the app), `--port` (where `pn start` listens),
+  passed to the app; include the `?token=` from `pn start`), `--port` (where `pn start` listens),
   `--dev-client` (build a shell app with a connect screen that loads
   any project from a dev server).
 - `pn logs android|ios`: stream logs from the running app without
@@ -62,6 +63,13 @@ the documented behavior never drifts from the code.
   scripting; the config
   error goes to stderr instead, and a missing config still exits 1.
 - `pn clean`: remove the local `build/` directory.
+- `pn lint [paths...]`: check the rules of hooks without running the
+  code. With no paths it lints `app/`, or the current directory if
+  there's no `app/`. Each finding prints as `path:line:col: CODE
+  message`. Flag: `--json` to print a JSON array of findings to stdout
+  for scripting; the summary line goes to stderr instead. Exits 1 when
+  there are findings and 2 when a path doesn't exist. See the
+  [Linting guide](../guides/linting.md).
 - `pn --version` (`-V`): print the installed PythonNative version.
 
 ::: pythonnative.cli.pn

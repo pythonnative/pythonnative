@@ -70,7 +70,6 @@ def test_layout_style_keys_includes_flex_props() -> None:
         "align_content",
         "padding",
         "margin",
-        "spacing",
         "gap",
         "position",
         "top",
@@ -81,6 +80,7 @@ def test_layout_style_keys_includes_flex_props() -> None:
         "display",
     ):
         assert key in LAYOUT_STYLE_KEYS
+    assert "spacing" not in LAYOUT_STYLE_KEYS  # removed in favor of ``gap``
 
 
 # ======================================================================

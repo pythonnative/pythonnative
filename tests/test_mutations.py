@@ -73,6 +73,7 @@ def test_layout_pass_flushes_frames_as_followup_batch() -> None:
     assert new_ops, "viewport arrival must trigger a layout flush"
     assert {op[0] for op in new_ops} == {"set_frame"}
     # The root's frame is host-owned and never framed by layout.
+    assert rec.root_tag is not None
     root = backend.views[rec.root_tag]
     assert root.frame == (0.0, 0.0, 0.0, 0.0)
     # Children got real frames (FakeBackend reports 60x16 Text intrinsics).
@@ -136,6 +137,7 @@ def test_removed_prop_is_absent_after_commit() -> None:
     new_ops = _ops_since(backend, marker)
     assert len(new_ops) == 1
     assert new_ops[0][0] == "update" and new_ops[0][3] == ("color",)
+    assert rec.root_tag is not None
     assert "color" not in backend.views[rec.root_tag].props
 
 
@@ -159,6 +161,7 @@ def test_frame_diffing_suppresses_unchanged_frames() -> None:
 
 def test_keyed_reorder_moves_views_without_recreating() -> None:
     rec, backend = _mounted(_column(_text("a", key="a"), _text("b", key="b"), _text("c", key="c")))
+    assert rec.root_tag is not None
     root = backend.views[rec.root_tag]
     ids_before = [c.id for c in root.children]
     marker = len(backend.ops)
@@ -186,6 +189,7 @@ def test_dropping_a_child_destroys_only_that_child() -> None:
 def test_subtree_replacement_destroys_children_first() -> None:
     inner = Element("Row", {}, [_text("deep")])
     rec, backend = _mounted(_column(inner))
+    assert rec.root_tag is not None
     root = backend.views[rec.root_tag]
     row = root.find_first("Row")
     deep = root.find_first("Text")

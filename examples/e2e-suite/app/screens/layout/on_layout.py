@@ -12,11 +12,11 @@ from its [`ViewHandle`][pythonnative.ViewHandle].
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def OnLayoutDemo() -> pn.Element:
+def OnLayoutDemo() -> pn.Node:
     """Render a measurable box whose frame is mirrored via on_layout."""
     wide, set_wide = pn.use_state(False)
     measured, set_measured = pn.use_state("none")
@@ -30,13 +30,13 @@ def OnLayoutDemo() -> pn.Element:
         if frame is not None:
             set_handle_frame(f"{round(frame.width)}x{round(frame.height)}")
 
-    return demo_screen(
+    return DemoScreen(
         "on_layout",
         "Mirror a box's computed frame through the on_layout callback.",
-        section(
+        DemoSection(
             "on_layout demo",
-            result_text("Measured", measured),
-            result_text("Handle frame", handle_frame),
+            ResultText("Measured", measured),
+            ResultText("Handle frame", handle_frame),
             pn.View(
                 pn.Text("measured-box", style=pn.style(color="#FFFFFF", font_weight="700")),
                 on_layout=handle_layout,
@@ -50,10 +50,10 @@ def OnLayoutDemo() -> pn.Element:
                     justify_content="center",
                 ),
             ),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Widen box", on_press=lambda: set_wide(True)),
                 pn.Button("Shrink box", on_press=lambda: set_wide(False)),
             ),
-            hint("Maestro widens the box and asserts 'Measured: 200x60'."),
+            Hint("Maestro widens the box and asserts 'Measured: 200x60'."),
         ),
     )

@@ -59,10 +59,10 @@ def test_search_edit_back_and_persistence(inbox: tuple[types.ModuleType, dict[st
         assert "Reviewed issue 2000" in storage["inbox.issues"]
     finally:
         result.unmount()
-    repository = app.Repository()
-    runtime.run_blocking(repository.load())
-    assert repository.snapshot.issues[-1].title == "Reviewed issue 2000"
-    assert repository.snapshot.issues[-1].closed
+    reloaded = app.Repository()
+    runtime.run_blocking(reloaded.load())
+    assert reloaded.store.get().issues[-1].title == "Reviewed issue 2000"
+    assert reloaded.store.get().issues[-1].closed
 
 
 def test_failed_persistence_rolls_back_shared_snapshot(
@@ -71,16 +71,17 @@ def test_failed_persistence_rolls_back_shared_snapshot(
     app, _ = inbox
     repository = app.Repository()
     runtime.run_blocking(repository.load())
-    before = repository.snapshot
-    observed = []
-    repository.subscribe(lambda: observed.append(repository.snapshot))
+    before = repository.store.get()
+    observed: list[Any] = []
+    repository.store.subscribe(lambda: observed.append(repository.store.get()))
 
     async def fail(key: str, value: Any) -> None:
         raise OSError("disk unavailable")
 
     monkeypatch.setattr(pn.AsyncStorage, "set", fail)
     with pytest.raises(OSError, match="disk unavailable"):
-        runtime.run_blocking(repository.update(replace(before.issues[0], title="Optimistic")))
+        runtime.run_blocking(repository.save(replace(before.issues[0], title="Optimistic")))
     assert observed[0].issues[0].title == "Optimistic"
-    assert repository.snapshot.issues == before.issues
-    assert "disk unavailable" in repository.snapshot.error
+    assert repository.store.get().issues == before.issues
+    assert list(repository.issues) == list(before.issues)
+    assert "disk unavailable" in repository.store.get().error

@@ -139,17 +139,25 @@ class TransitionQueue:
         self._triggers = []
         self._callbacks = []
         token = _transition_var.set(False)
+        errors: list[Exception] = []
         try:
+            # One failing trigger must not drop the remaining deferred updates.
             with batch_updates():
                 for fn in triggers:
-                    fn()
+                    try:
+                        fn()
+                    except Exception as exc:
+                        errors.append(exc)
             for callback in callbacks:
-                callback()
-        except Exception as exc:
-            if not diagnostics.report_error(exc, phase="transition"):
-                raise
+                try:
+                    callback()
+                except Exception as exc:
+                    errors.append(exc)
         finally:
             _transition_var.reset(token)
+        for error in errors:
+            if not diagnostics.report_error(error, phase="transition"):
+                raise error
 
     def clear(self) -> None:
         """Drop queued work (used on unmount)."""

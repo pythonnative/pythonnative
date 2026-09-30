@@ -107,6 +107,9 @@ class LayoutMixin:
     backend: Any
     root: Optional[VNode]
     _ops: List[Mutation]
+    _rendering: bool
+    _tag_nodes: Dict[int, VNode]
+    _native_roots: Callable[[VNode], List[VNode]]
 
     def _init_layout_state(self) -> None:
         self._viewport_size: Tuple[float, float] = (0.0, 0.0)

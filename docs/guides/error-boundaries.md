@@ -28,14 +28,14 @@ content you actually want to recover) defeat the purpose.
 import pythonnative as pn
 
 @pn.component
-def UserCard(user):
+def UserCard(user: dict[str, str]) -> pn.Node:
     return pn.Column(
         pn.Text(user["name"]),
         pn.Text(user["email"]),
     )
 
 @pn.component
-def App(users):
+def App(users: list[dict[str, str]]) -> pn.Node:
     return pn.Column(
         *[
             pn.ErrorBoundary(
@@ -53,7 +53,10 @@ callable that receives the exception, or a callable that receives the
 exception *and* a `reset` function:
 
 ```python
-def render_error(exc: BaseException, reset):
+from collections.abc import Callable
+
+
+def render_error(exc: BaseException, reset: Callable[[], None]) -> pn.Node:
     return pn.Column(
         pn.Text("Something went wrong", style={"font_size": 18, "bold": True}),
         pn.Text(repr(exc), style={"color": "#888"}),

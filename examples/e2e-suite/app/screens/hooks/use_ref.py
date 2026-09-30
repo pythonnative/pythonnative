@@ -10,11 +10,11 @@ state value.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UseRefDemo() -> pn.Element:
+def UseRefDemo() -> pn.Node:
     """Render a ref-driven counter and a render-trigger counter."""
     silent = pn.use_ref(0)
     renders, set_renders = pn.use_state(0)
@@ -25,18 +25,18 @@ def UseRefDemo() -> pn.Element:
     def force_render() -> None:
         set_renders(renders + 1)
 
-    return demo_screen(
+    return DemoScreen(
         "use_ref",
         "Compare a silent ref counter to a re-render-driving state counter.",
-        section(
+        DemoSection(
             "Counters",
-            result_text("Silent ref value", silent.current),
-            result_text("Renders", renders),
-            buttons_row(
+            ResultText("Silent ref value", silent.current),
+            ResultText("Renders", renders),
+            ButtonsRow(
                 pn.Button("Bump silent", on_press=bump_silent),
                 pn.Button("Force render", on_press=force_render),
             ),
-            hint(
+            Hint(
                 "Bump silent N times: 'Silent ref value' stays 0 until a "
                 "render happens. Tap 'Force render' to surface the new value."
             ),

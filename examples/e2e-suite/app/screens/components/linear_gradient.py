@@ -8,18 +8,18 @@ themselves aren't inspected.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint
 
 LABEL = pn.style(color="#FFFFFF", font_weight="700")
 
 
 @pn.component
-def LinearGradientDemo() -> pn.Element:
+def LinearGradientDemo() -> pn.Node:
     """Render vertical, horizontal, and multi-stop gradients with content on top."""
-    return demo_screen(
+    return DemoScreen(
         "LinearGradient",
         "A container whose background is a linear color gradient.",
-        section(
+        DemoSection(
             "Directions",
             pn.Row(
                 pn.LinearGradient(
@@ -38,10 +38,10 @@ def LinearGradientDemo() -> pn.Element:
                         width=140, height=90, border_radius=12, align_items="center", justify_content="center"
                     ),
                 ),
-                style=pn.style(spacing=12),
+                style=pn.style(gap=12),
             ),
         ),
-        section(
+        DemoSection(
             "Stops",
             pn.LinearGradient(
                 pn.Text("Three colors, weighted stops", style=LABEL),
@@ -51,6 +51,6 @@ def LinearGradientDemo() -> pn.Element:
                 end_point=(1, 1),
                 style=pn.style(height=90, border_radius=12, align_items="center", justify_content="center"),
             ),
-            hint("locations places each color along the start_point to end_point line."),
+            Hint("locations places each color along the start_point to end_point line."),
         ),
     )

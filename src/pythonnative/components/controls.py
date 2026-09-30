@@ -5,19 +5,16 @@
 ``RefreshControl``, and ``StatusBar``.
 """
 
-from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Unpack
 
 from ..element import Element
 from ..hooks import Ref
 from ..style import (
-    AccessibilityAction,
-    AccessibilityState,
-    AccessibilityValue,
     Color,
-    ImportantForAccessibility,
     StyleProp,
 )
-from ._base import REFRESH_CONTROL_TYPE, _accessibility_actions, _accessibility_value, _make_element
+from ._base import REFRESH_CONTROL_TYPE, _make_element
+from .props import AccessibilityProps
 
 
 def Switch(
@@ -27,9 +24,9 @@ def Switch(
     disabled: bool = False,
     on_tint_color: Optional[Color] = None,
     thumb_color: Optional[Color] = None,
-    accessibility_label: Optional[str] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """Display a toggle switch.
 
@@ -39,10 +36,10 @@ def Switch(
         disabled: Prevent changes while keeping the switch visible.
         on_tint_color: Track color when the switch is on.
         thumb_color: Thumb color, or the platform default.
-        accessibility_label: Label exposed to assistive technology (and
-            UI test drivers) for the switch.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Switch"``.
@@ -56,7 +53,7 @@ def Switch(
         disabled=disabled,
         on_tint_color=on_tint_color,
         thumb_color=thumb_color,
-        accessibility_label=accessibility_label,
+        **props,
     )
 
 
@@ -73,9 +70,9 @@ def Slider(
     thumb_color: Optional[Color] = None,
     on_sliding_start: Optional[Callable[[float], Any]] = None,
     on_sliding_complete: Optional[Callable[[float], Any]] = None,
-    accessibility_label: Optional[str] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """Continuous-value slider between ``min_value`` and ``max_value``.
 
@@ -92,10 +89,10 @@ def Slider(
         thumb_color: Thumb color, or the platform default.
         on_sliding_start: Callback when the user starts dragging.
         on_sliding_complete: Callback when the user finishes dragging.
-        accessibility_label: Label exposed to assistive technology (and
-            UI test drivers) for the slider.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Slider"``.
@@ -115,7 +112,7 @@ def Slider(
         thumb_color=thumb_color,
         on_sliding_start=on_sliding_start,
         on_sliding_complete=on_sliding_complete,
-        accessibility_label=accessibility_label,
+        **props,
     )
 
 
@@ -197,17 +194,8 @@ def Checkbox(
     disabled: bool = False,
     color: Optional[Color] = None,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_hint: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
-    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
-    on_accessibility_action: Optional[Callable[[str], Any]] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    important_for_accessibility: Optional[ImportantForAccessibility] = None,
-    test_id: Optional[str] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """A boolean checkbox with an optional inline label.
 
@@ -222,28 +210,9 @@ def Checkbox(
         disabled: When ``True``, the control is greyed out and inert.
         color: Tint applied to the checked box.
         style: Style dict (or list of dicts).
-        accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail. iOS reads it after the
-            label; Android appends it to the content description.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_value: The widget's current value for assistive
-            tech (a string or an
-            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
-        accessibility_actions: Custom screen-reader actions, each an
-            [`AccessibilityAction`][pythonnative.AccessibilityAction].
-        on_accessibility_action: Callback invoked with the action name.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
-        important_for_accessibility: Whether AT sees this view and its
-            subtree.
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Checkbox"``.
@@ -257,17 +226,8 @@ def Checkbox(
         label=label,
         disabled=disabled or None,
         color=color,
-        accessibility_label=accessibility_label,
-        accessibility_hint=accessibility_hint,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_value=_accessibility_value(accessibility_value),
-        accessibility_actions=_accessibility_actions(accessibility_actions),
-        on_accessibility_action=on_accessibility_action,
-        accessibility_live_region=accessibility_live_region,
-        important_for_accessibility=important_for_accessibility,
-        test_id=test_id,
         _defaults={"accessibility_role": "checkbox"},
+        **props,
     )
 
 
@@ -279,16 +239,8 @@ def SegmentedControl(
     disabled: bool = False,
     tint_color: Optional[Color] = None,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
-    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
-    on_accessibility_action: Optional[Callable[[str], Any]] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    important_for_accessibility: Optional[ImportantForAccessibility] = None,
-    test_id: Optional[str] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """A horizontal multi-choice control (one selected segment at a time).
 
@@ -302,26 +254,9 @@ def SegmentedControl(
         disabled: When ``True``, the control is disabled.
         tint_color: Accent color for the selected segment.
         style: Style dict (or list of dicts).
-        accessibility_label: Spoken description for screen readers.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_value: The widget's current value for assistive
-            tech (a string or an
-            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
-        accessibility_actions: Custom screen-reader actions, each an
-            [`AccessibilityAction`][pythonnative.AccessibilityAction].
-        on_accessibility_action: Callback invoked with the action name.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
-        important_for_accessibility: Whether AT sees this view and its
-            subtree.
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type
@@ -336,15 +271,7 @@ def SegmentedControl(
         on_change=on_change,
         disabled=disabled or None,
         tint_color=tint_color,
-        accessibility_label=accessibility_label,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_value=_accessibility_value(accessibility_value),
-        accessibility_actions=_accessibility_actions(accessibility_actions),
-        on_accessibility_action=on_accessibility_action,
-        accessibility_live_region=accessibility_live_region,
-        important_for_accessibility=important_for_accessibility,
-        test_id=test_id,
+        **props,
     )
 
 
@@ -357,16 +284,8 @@ def DatePicker(
     maximum: Optional[str] = None,
     disabled: bool = False,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
-    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
-    on_accessibility_action: Optional[Callable[[str], Any]] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    important_for_accessibility: Optional[ImportantForAccessibility] = None,
-    test_id: Optional[str] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """A native date / time picker.
 
@@ -386,26 +305,9 @@ def DatePicker(
         maximum: Latest selectable value (ISO-8601), if any.
         disabled: When ``True``, the picker is disabled.
         style: Style dict (or list of dicts).
-        accessibility_label: Spoken description for screen readers.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_value: The widget's current value for assistive
-            tech (a string or an
-            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
-        accessibility_actions: Custom screen-reader actions, each an
-            [`AccessibilityAction`][pythonnative.AccessibilityAction].
-        on_accessibility_action: Callback invoked with the action name.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
-        important_for_accessibility: Whether AT sees this view and its
-            subtree.
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"DatePicker"``.
@@ -420,16 +322,8 @@ def DatePicker(
         minimum=minimum,
         maximum=maximum,
         disabled=disabled or None,
-        accessibility_label=accessibility_label,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_value=_accessibility_value(accessibility_value),
-        accessibility_actions=_accessibility_actions(accessibility_actions),
-        on_accessibility_action=on_accessibility_action,
-        accessibility_live_region=accessibility_live_region,
-        important_for_accessibility=important_for_accessibility,
-        test_id=test_id,
         _defaults={"accessibility_role": "button"},
+        **props,
     )
 
 
@@ -441,18 +335,9 @@ def Picker(
     on_change: Optional[Callable[[Any], Any]] = None,
     placeholder: str = "Select…",
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_hint: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
-    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
-    on_accessibility_action: Optional[Callable[[str], Any]] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    important_for_accessibility: Optional[ImportantForAccessibility] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """A real native dropdown / select widget.
 
@@ -472,29 +357,10 @@ def Picker(
         on_change: Callback invoked with the new value.
         placeholder: Label shown when no item matches ``value``.
         style: Style dict applied to the trigger.
-        accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail. iOS reads it after the
-            label; Android appends it to the content description.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_value: The widget's current value for assistive
-            tech (a string or an
-            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
-        accessibility_actions: Custom screen-reader actions, each an
-            [`AccessibilityAction`][pythonnative.AccessibilityAction].
-        on_accessibility_action: Callback invoked with the action name.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
-        important_for_accessibility: Whether AT sees this view and its
-            subtree.
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Picker"``.
@@ -509,17 +375,8 @@ def Picker(
         items=list(items) if items is not None else [],
         on_change=on_change,
         placeholder=placeholder,
-        accessibility_label=accessibility_label,
-        accessibility_hint=accessibility_hint,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_value=_accessibility_value(accessibility_value),
-        accessibility_actions=_accessibility_actions(accessibility_actions),
-        on_accessibility_action=on_accessibility_action,
-        accessibility_live_region=accessibility_live_region,
-        important_for_accessibility=important_for_accessibility,
-        test_id=test_id,
         _defaults={"accessibility_role": "button"},
+        **props,
     )
 
 

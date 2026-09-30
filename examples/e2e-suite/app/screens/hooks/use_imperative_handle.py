@@ -11,11 +11,11 @@ the end and back to the top.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def _Row(item: object = None, index: int = 0) -> pn.Element:
+def _Row(item: object = None, index: int = 0) -> pn.Node:
     return pn.Row(
         pn.Text(f"Row {index}", style=pn.style(font_size=15)),
         style=pn.style(padding=12, background_color="#FFFFFF"),
@@ -23,7 +23,7 @@ def _Row(item: object = None, index: int = 0) -> pn.Element:
 
 
 @pn.component
-def UseImperativeHandleDemo() -> pn.Element:
+def UseImperativeHandleDemo() -> pn.Node:
     """Scroll a FlatList imperatively through its published controller."""
     list_ref = pn.use_ref(None)
     last_action, set_last_action = pn.use_state("none")
@@ -40,20 +40,20 @@ def UseImperativeHandleDemo() -> pn.Element:
             controller.scroll_to_offset(0, animated=False)
             set_last_action("scroll_to_top")
 
-    return demo_screen(
+    return DemoScreen(
         "use_imperative_handle",
         "Publish a controller on a ref and drive a list imperatively.",
-        section(
+        DemoSection(
             "Controller",
-            result_text("Handle attached", "yes" if list_ref.current is not None else "no"),
-            result_text("Last action", last_action),
-            buttons_row(
+            ResultText("Handle attached", "yes" if list_ref.current is not None else "no"),
+            ResultText("Last action", last_action),
+            ButtonsRow(
                 pn.Button("Scroll to end", on_press=scroll_to_end),
                 pn.Button("Scroll to top", on_press=scroll_to_top),
             ),
-            hint("The buttons live outside the list and act through ref.current."),
+            Hint("The buttons live outside the list and act through ref.current."),
         ),
-        section(
+        DemoSection(
             "List",
             pn.View(
                 pn.FlatList(

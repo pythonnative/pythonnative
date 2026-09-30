@@ -37,7 +37,7 @@ function property(node, key, value) {
     node[`set${name}`](index);
   } else if (["width", "height", "min_width", "min_height", "max_width", "max_height", "flex", "flex_grow", "flex_shrink", "flex_basis", "aspect_ratio"].includes(key)) {
     node["set" + key.split("_").map(p => p[0].toUpperCase() + p.slice(1)).join("")](value ?? (["width", "height", "flex_basis"].includes(key) ? "auto" : NaN));
-  } else if (["gap", "spacing", "row_gap", "column_gap"].includes(key)) node.setGap({row_gap:1, column_gap:0}[key] ?? 2, value ?? NaN);
+  } else if (["gap", "row_gap", "column_gap"].includes(key)) node.setGap({row_gap:1, column_gap:0}[key] ?? 2, value ?? NaN);
   else if (["left", "right", "top", "bottom", "start", "end"].includes(key)) node.setPosition(edges[key], value ?? NaN);
   else if (key.startsWith("border_") && key.endsWith("width")) node.setBorder(edges[key.split("_")[1]] ?? 8, value ?? NaN);
 }
@@ -64,10 +64,6 @@ export function updateLayout(view, changed, removed = [], affectsMeasurement = t
       view.yoga[family === "margin" ? "setMargin" : "setPadding"](index, values[edge] ?? NaN);
       touched.delete(edge === "all" ? family : `${family}_${edge}`);
     }
-  }
-  if (touched.has("gap") || touched.has("spacing")) {
-    property(view.yoga, "gap", view.props.gap ?? view.props.spacing);
-    touched.delete("gap"); touched.delete("spacing");
   }
   for (const key of touched) property(view.yoga, key, view.props[key]);
   if (["ScrollView", "VirtualList", "ScreenStack"].includes(view.type)) {

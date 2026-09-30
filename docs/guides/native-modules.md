@@ -86,8 +86,8 @@ import pythonnative as pn
 
 
 @pn.component
-def CameraScreen():
-    photo, set_photo = pn.use_state(None)
+def CameraScreen() -> pn.Node:
+    photo, set_photo = pn.use_state("")
 
     async def take():
         path = await pn.Camera.take_photo()
@@ -121,7 +121,7 @@ import pythonnative as pn
 
 
 @pn.component
-def WhereAmI():
+def WhereAmI() -> pn.Node:
     q = pn.use_query(pn.Location.get_current, [])
     if q.loading:
         return pn.Text("Acquiring location...")
@@ -294,7 +294,7 @@ lifecycle phase (`"active"`, `"inactive"`, `"background"`). Use the
 
 ```python
 @pn.component
-def Status():
+def Status() -> pn.Node:
     state = pn.use_app_state()
     return pn.Text(f"App is {state}")
 ```
@@ -313,7 +313,7 @@ the [`use_net_info`][pythonnative.use_net_info] hook re-renders on change.
 
 ```python
 @pn.component
-def Banner():
+def Banner() -> pn.Node:
     net = pn.use_net_info()
     if not net["is_connected"]:
         return pn.Text("You are offline", style=pn.style(color="#B91C1C"))

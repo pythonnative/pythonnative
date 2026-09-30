@@ -38,6 +38,7 @@ from typing import Callable, List, Optional
 
 from ..assets import ASSETS_DIR, write_manifest
 from . import icons
+from .bundle import copy_library
 from .config import AppConfig
 
 TEMPLATE_PACKAGE = "com.pythonnative.android_template"
@@ -85,9 +86,11 @@ def configure(
         config: The validated app configuration.
         dev_lib_root: Path to an in-repo ``pythonnative`` package to
             bundle (dev checkout); ``None`` to rely on the PyPI install.
-        release: Ship bytecode only (Chaquopy ``pyc.src``). Debug builds
-            keep the ``.py`` sources in the APK so tracebacks show code
-            and the dev client can tell what the app already runs.
+        release: Ship bytecode only (Chaquopy ``pyc.src``) and leave the
+            development modules out of the bundled library (see
+            ``pythonnative.project.bundle``). Debug builds keep the
+            ``.py`` sources in the APK so tracebacks show code and the dev
+            client can tell what the app already runs.
         log: Optional progress logger.
 
     Returns:
@@ -106,7 +109,7 @@ def configure(
 
     _apply_branding(project_dir, config, emit)
 
-    python_root = stage_python_sources(project_dir, config, dev_lib_root=dev_lib_root)
+    python_root = stage_python_sources(project_dir, config, dev_lib_root=dev_lib_root, release=release)
     emit(f"Configured Android project ({config.application_id}).")
     return AndroidLayout(project_dir=project_dir, application_id=config.application_id, python_root=python_root)
 
@@ -465,6 +468,7 @@ def stage_python_sources(
     config: AppConfig,
     *,
     dev_lib_root: Optional[Path] = None,
+    release: bool = False,
 ) -> Path:
     """Copy the user's ``app/`` and (optionally) the in-repo library.
 
@@ -473,6 +477,7 @@ def stage_python_sources(
         config: The validated app configuration.
         dev_lib_root: Path to an in-repo ``pythonnative`` package to
             bundle, or ``None``.
+        release: Leave the development-only modules out of the library.
 
     Returns:
         The Chaquopy Python source root (``app/src/main/python``).
@@ -488,18 +493,9 @@ def stage_python_sources(
         stage_assets(project_dir, config)
 
     if dev_lib_root and dev_lib_root.is_dir():
-        shutil.copytree(
-            dev_lib_root,
-            python_root / "pythonnative",
-            dirs_exist_ok=True,
-            ignore=LIB_IGNORE,
-        )
+        copy_library(dev_lib_root, python_root / "pythonnative", release=release)
 
     return python_root
-
-
-LIB_IGNORE = shutil.ignore_patterns("templates", "native", "*.so", "__pycache__", "*.pyc", "*.pyo")
-"""Ignore rules for bundling the ``pythonnative`` package (skips templates)."""
 
 
 def _ignore_top_level_assets(app_src: Path) -> Callable[[str, List[str]], List[str]]:

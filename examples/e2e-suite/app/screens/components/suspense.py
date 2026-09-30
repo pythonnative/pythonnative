@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 async def _fetch_greeting(round_number: int) -> str:
@@ -20,27 +20,27 @@ async def _fetch_greeting(round_number: int) -> str:
 
 
 @pn.component
-async def _Greeting(round_number: int = 1) -> pn.Element:
+async def _Greeting(round_number: int = 1) -> pn.Node:
     """Async component: the body awaits data before returning its tree."""
     value = await _fetch_greeting(round_number)
-    return result_text("Data", value)
+    return ResultText("Data", value)
 
 
 @pn.component
-def SuspenseDemo() -> pn.Element:
+def SuspenseDemo() -> pn.Node:
     """Show a Suspense fallback while an async component loads."""
     round_number, set_round = pn.use_state(1)
 
-    return demo_screen(
+    return DemoScreen(
         "Suspense",
         "An async def component suspends until its data arrives; Suspense shows the fallback meanwhile.",
-        section(
+        DemoSection(
             "Async content",
             pn.Suspense(
-                _Greeting(round_number=round_number, key=str(round_number)),
-                fallback=result_text("Data", "loading"),
+                _Greeting(round_number=round_number).with_key(round_number),
+                fallback=ResultText("Data", "loading"),
             ),
             pn.Button("Reload", on_press=lambda: set_round(round_number + 1)),
-            hint("Maestro waits for 'Data: hello-1', taps Reload, then waits for 'Data: hello-2'."),
+            Hint("Maestro waits for 'Data: hello-1', taps Reload, then waits for 'Data: hello-2'."),
         ),
     )

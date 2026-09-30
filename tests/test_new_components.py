@@ -226,6 +226,7 @@ def test_flatlist_window_shifts_on_scroll() -> None:
     # Simulate the native scroll event landing deep in the list, then
     # flush the dirty component to re-render the shifted window.
     scroll_tag = rec.root_tag
+    assert scroll_tag is not None
     _backend.request_list(scroll_tag, 300)
     rec.flush_dirty()
 

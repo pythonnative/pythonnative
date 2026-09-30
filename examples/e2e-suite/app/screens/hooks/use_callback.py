@@ -8,11 +8,11 @@ returned function across renders.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UseCallbackDemo() -> pn.Element:
+def UseCallbackDemo() -> pn.Node:
     """Render a stable-identity callback compared across renders."""
     dep, set_dep = pn.use_state(0)
     other, set_other = pn.use_state(0)
@@ -27,18 +27,18 @@ def UseCallbackDemo() -> pn.Element:
         changes.current += 1
         last_id.current = id(cb)
 
-    return demo_screen(
+    return DemoScreen(
         "use_callback",
         "Function identity stays stable until dep changes.",
-        section(
+        DemoSection(
             "Identity tracking",
-            result_text("Identity changes", changes.current),
-            result_text("Dep value", dep),
-            result_text("Other value", other),
-            buttons_row(
+            ResultText("Identity changes", changes.current),
+            ResultText("Dep value", dep),
+            ResultText("Other value", other),
+            ButtonsRow(
                 pn.Button("Change dep", on_press=lambda: set_dep(dep + 1)),
                 pn.Button("Change other", on_press=lambda: set_other(other + 1)),
             ),
-            hint("Tapping 'Change other' must NOT bump 'Identity changes'. Tapping 'Change dep' bumps it by 1."),
+            Hint("Tapping 'Change other' must NOT bump 'Identity changes'. Tapping 'Change dep' bumps it by 1."),
         ),
     )

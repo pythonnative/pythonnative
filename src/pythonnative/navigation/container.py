@@ -1,27 +1,28 @@
 """``NavigationContainer``: the root of a navigator tree.
 
-The container wires the root navigator to the outside world: deep links
-(via [`LinkingConfig`][pythonnative.LinkingConfig]), a caller-supplied
-initial state, ``on_state_change`` / ``on_ready`` callbacks, a
-[`NavigationRef`][pythonnative.NavigationRef] for navigating from
-outside the tree, and the
-[`NavigationTheme`][pythonnative.NavigationTheme] every navigator below
-draws with. Every app with navigation renders exactly one container at
-the top.
+The container renders the root navigator and wires it to the outside
+world: deep links derived from the navigators' screen paths, a
+caller-supplied initial state, ``on_state_change`` / ``on_ready``
+callbacks, and a [`NavigationRef`][pythonnative.NavigationRef] for
+navigating from outside the tree. Navigator chrome takes its colors
+from the app [`Theme`][pythonnative.Theme]. Every app with navigation
+renders exactly one container at the top.
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, Mapping, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional, Sequence, Union
 
 from ..component import component
-from ..element import Element, Node
+from ..element import Element
 from ..hooks import Context, create_context, use_effect, use_memo, use_ref
 from .handle import provide
-from .linking import LinkingConfig
+from .linking import LinkTable
 from .ref import NavigationRef
 from .state import NavigationState
-from .theme import NavigationTheme, NavigationThemeContext
+
+if TYPE_CHECKING:
+    from .navigators import Navigator
 
 __all__ = ["ContainerContext", "NavigationContainer"]
 
@@ -82,28 +83,31 @@ def _coerce_state(value: Optional[StateLike]) -> Optional[NavigationState]:
         return value
     try:
         return NavigationState.from_dict(value)
-    except Exception:
+    except (AttributeError, KeyError, TypeError, ValueError, IndexError):
         return None
 
 
 @component
 def NavigationContainer(
-    *children: Node,
-    linking: Optional[LinkingConfig] = None,
+    navigator: "Navigator",
+    *,
+    link_prefixes: Sequence[str] = (),
     initial_state: Optional[StateLike] = None,
     on_state_change: Optional[Callable[[NavigationState], None]] = None,
     on_ready: Optional[Callable[[], None]] = None,
     ref: Optional[NavigationRef] = None,
-    theme: Optional[NavigationTheme] = None,
 ) -> Element:
-    """Root of a navigator tree.
+    """Render ``navigator`` as the root of the app's navigation.
 
     Args:
-        *children: The root navigator (a ``Stack.Navigator``, ``Tab.Navigator``,
-            or ``Drawer.Navigator``) and anything rendered alongside it.
-        linking: Deep-link configuration. The URL the app was launched
-            with seeds the initial state; URLs that arrive later are
-            dispatched as ``navigate`` calls.
+        navigator: The root [`StackNavigator`][pythonnative.StackNavigator],
+            [`TabNavigator`][pythonnative.TabNavigator], or
+            [`DrawerNavigator`][pythonnative.DrawerNavigator].
+        link_prefixes: URL prefixes that open deep links (``"myapp://"``,
+            ``"https://example.com"``). Paths come from each screen's
+            ``path``. The URL the app was launched with seeds the
+            initial state; URLs that arrive later navigate. Empty
+            disables deep linking.
         initial_state: Explicit initial state for the root navigator
             (a ``NavigationState`` or its ``to_dict()`` form). Takes
             precedence over the launch URL. State restored by a native
@@ -112,44 +116,40 @@ def NavigationContainer(
         on_state_change: Called with the root navigator's state after
             every change. Persist ``state.to_dict()`` to restore later.
         on_ready: Called once the root navigator has mounted.
-        ref: A [`NavigationRef`][pythonnative.NavigationRef] from
-            [`create_navigation_ref`][pythonnative.create_navigation_ref];
-            bound to the root navigator while the container is mounted.
-        theme: The [`NavigationTheme`][pythonnative.NavigationTheme]
-            navigators draw with. ``None`` follows the color scheme
-            (light or dark preset).
+        ref: A [`NavigationRef`][pythonnative.NavigationRef]; bound to the
+            root navigator while the container is mounted.
 
     Example:
         ```python
-        Stack = pn.create_stack_navigator()
-        nav_ref = pn.create_navigation_ref()
+        Root = pn.StackNavigator(pn.Screen(HomeScreen, title="Home"), pn.Screen(ItemScreen, path="items/{id}"))
+        nav_ref = pn.NavigationRef()
+
 
         @pn.component
-        def App():
-            return pn.NavigationContainer(
-                Stack.Navigator(
-                    Stack.Screen("Home", HomeScreen),
-                    Stack.Screen("Detail", DetailScreen, options={"title": "Detail"}),
-                ),
-                linking=linking,
-                ref=nav_ref,
-                theme=pn.DARK_NAVIGATION_THEME,
-            )
+        def App() -> pn.Node:
+            return pn.NavigationContainer(Root, link_prefixes=["myapp://"], ref=nav_ref)
         ```
     """
     coerced = _coerce_state(initial_state)
+    links: Optional[LinkTable] = use_memo(
+        lambda: LinkTable(navigator, link_prefixes) if link_prefixes else None,
+        [navigator, tuple(link_prefixes)],
+    )
 
     def build() -> ContainerConfig:
         seed = coerced
-        if seed is None and linking is not None:
+        if seed is None and links is not None:
             from ..native_modules.linking import Linking
 
             url = Linking.get_initial_url()
             if url:
-                seed = linking.state_from_url(url)
+                seed = links.state_from_url(url)
         return ContainerConfig(seed, on_state_change, on_ready, ref)
 
-    config = use_memo(build, [])
+    config = use_memo(
+        build,
+        [],  # pn: ignore[PN103] built once; later renders update the config in place
+    )
     config.on_state_change = on_state_change
     config.on_ready = on_ready
     if config.ref is not ref:
@@ -163,7 +163,7 @@ def NavigationContainer(
     initial_url: Any = use_ref(None)
 
     def subscribe() -> Optional[Callable[[], None]]:
-        if linking is None:
+        if links is None:
             return None
         from ..native_modules.linking import Linking
 
@@ -174,12 +174,12 @@ def NavigationContainer(
             if url == initial_url.current:
                 initial_url.current = None
                 return
-            seed = linking.state_from_url(url)
+            seed = links.state_from_url(url)
             if seed is not None:
                 config.dispatch_seed(seed)
 
         return Linking.add_listener(on_url)
 
-    use_effect(subscribe, [linking])
+    use_effect(subscribe, [links])
 
-    return provide(ContainerContext, config, provide(NavigationThemeContext, theme, *children))
+    return provide(ContainerContext, config, navigator())

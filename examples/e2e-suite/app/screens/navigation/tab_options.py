@@ -1,25 +1,46 @@
 """Demo screen for ``tab_bar_style``, ``tab_bar_visible``, and ``freeze_on_blur``.
 
-A nested Tab navigator styles its bar with a
+A module-level tab navigator styles its bar with a
 [`TabBarStyle`][pythonnative.TabBarStyle], hides the bar while the
 ``Hidden`` tab is focused (``tab_bar_visible=False``), and freezes the
 ``TabA`` subtree while it is blurred (``freeze_on_blur=True``). To make
-freezing observable, every tab renders the demo's ``tick`` counter and
-reports the tick it last rendered with: while ``TabA`` is blurred and the
-tick advances, its reported tick stays behind; the plain ``TabB`` follows
-immediately; ``TabA`` catches up when it regains focus. The jump buttons
-live in the persistent demo body (see ``drawer_navigator.py``).
+freezing observable, every tab takes a typed ``tick`` param and reports
+the tick it last rendered with. "Advance tick" calls ``set_params(tick=...)``
+on every mounted tab: the plain ``TabB`` re-renders with the new params
+immediately, while the blurred ``TabA`` keeps its last render and catches
+up when it regains focus. The jump buttons live in the persistent demo
+body (see ``drawer_navigator.py``) and call ``jump_to`` on the focused
+tab's [`TabNavigation`][pythonnative.navigation.TabNavigation].
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict
+from typing import Callable, Dict, Optional
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
+from pythonnative.navigation import TabNavigation
 
-_Tab = pn.create_tab_navigator()
-_Bus: pn.Context[Dict[str, Any]] = pn.create_context({})
+
+class _Bus:
+    """One mutable object shared with the tabs for the demo's lifetime.
+
+    A fresh context value on every render would re-render every tab and
+    defeat the freeze, so the demo provides the same object throughout.
+
+    Attributes:
+        focused: The focused tab's handle, for the jump buttons.
+        tabs: Every mounted tab's handle by label, for ``set_params``.
+        report: Records the tick a tab last rendered with.
+    """
+
+    def __init__(self, report: Callable[[str, int], None]) -> None:
+        self.focused: Optional[TabNavigation] = None
+        self.tabs: Dict[str, pn.Navigation] = {}
+        self.report = report
+
+
+_BusContext: pn.Context[Optional[_Bus]] = pn.create_context(None)
 
 _TAB_BAR_STYLE: pn.TabBarStyle = {
     "background_color": "#0F172A",
@@ -30,91 +51,109 @@ _TAB_BAR_STYLE: pn.TabBarStyle = {
 }
 
 
-def _make_tab(label: str) -> Callable[[], pn.Element]:
+def _make_tab(label: str) -> pn.Component[[int]]:
+    """Build a tab screen that reports the ``tick`` param it last rendered with."""
+
     @pn.component
-    def TabScreen() -> pn.Element:
+    def TabScreen(tick: int = 0) -> pn.Node:
         nav = pn.use_navigation()
-        bus = pn.use_context(_Bus)
-        tick = bus["tick"]
+        bus = pn.use_context(_BusContext)
+
+        def register() -> Optional[Callable[[], None]]:
+            if bus is None:
+                return None
+            tabs = bus.tabs
+            tabs[label] = nav
+
+            def unregister() -> None:
+                tabs.pop(label, None)
+
+            return unregister
+
+        pn.use_effect(register, [bus, nav])
 
         def on_focus() -> None:
-            bus["ref"].current = nav
+            if bus is not None and isinstance(nav, TabNavigation):
+                bus.focused = nav
 
-        pn.use_focus_effect(on_focus, [])
+        pn.use_focus_effect(on_focus, [bus, nav])
 
-        def report():
-            bus["report"](label, tick)
-            return None
+        def report() -> None:
+            if bus is not None:
+                bus.report(label, tick)
 
-        pn.use_effect(report, [tick])
+        pn.use_effect(report, [bus, tick])
         return pn.Column(
             pn.Text(f"{label} body", style=pn.style(font_size=16, font_weight="700")),
             pn.Text(f"{label} rendered tick {tick}", style=pn.style(color="#475569")),
-            style=pn.style(padding=16, spacing=6),
+            style=pn.style(padding=16, gap=6),
         )
 
     return TabScreen
 
 
-_TabA = _make_tab("TabA")
-_TabB = _make_tab("TabB")
-_Hidden = _make_tab("Hidden")
+TabA = _make_tab("TabA")
+TabB = _make_tab("TabB")
+Hidden = _make_tab("Hidden")
+
+DemoTabs = pn.TabNavigator(
+    pn.Screen(TabA, name="TabA", title="TabA", freeze_on_blur=True),
+    pn.Screen(TabB, name="TabB", title="TabB", lazy=False),
+    pn.Screen(Hidden, name="Hidden", title="TabH", tab_bar_visible=False),
+    tab_bar_style=_TAB_BAR_STYLE,
+)
+"""A styled tab bar with a frozen tab and a tab that hides the bar."""
 
 
 @pn.component
-def TabOptionsDemo() -> pn.Element:
+def TabOptionsDemo() -> pn.Node:
     """Render a styled tab bar with a hidden-bar tab and a frozen tab."""
-    handle_ref = pn.use_ref(None)
     tick, set_tick = pn.use_state(0)
     seen, set_seen = pn.use_state({"TabA": -1, "TabB": -1, "Hidden": -1})
 
-    def report(label: str, rendered_tick: int) -> None:
-        set_seen(lambda current: {**current, label: rendered_tick})
+    def make_bus() -> _Bus:
+        def report(label: str, rendered_tick: int) -> None:
+            set_seen(lambda current: {**current, label: rendered_tick})
 
-    # One stable dict for the whole demo: a fresh context value on every
-    # render would force every consumer to re-render and defeat the freeze,
-    # so the tick is written into the same object instead.
-    bus = pn.use_memo(lambda: {"ref": handle_ref, "tick": tick, "report": report}, [])
-    bus["tick"] = tick
+        return _Bus(report)
 
-    def jump(name: str) -> Callable[[], None]:
+    bus = pn.use_memo(make_bus, [])
+
+    def jump(target: pn.Component[[int]]) -> Callable[[], None]:
         def _run() -> None:
-            handle = handle_ref.current
-            if handle is not None:
-                handle.jump_to(name)
+            if bus.focused is not None:
+                bus.focused.jump_to(target)
 
         return _run
 
-    return demo_screen(
+    def advance() -> None:
+        set_tick(tick + 1)
+        for handle in list(bus.tabs.values()):
+            handle.set_params(tick=tick + 1)
+
+    last: Dict[str, int] = seen
+    return DemoScreen(
         "Tab options",
         "tab_bar_style, tab_bar_visible=False, and freeze_on_blur on a nested tab navigator.",
-        section(
+        DemoSection(
             "Nested tabs",
-            result_text("Tick", tick),
-            result_text("TabA last tick", seen["TabA"]),
-            result_text("TabB last tick", seen["TabB"]),
+            ResultText("Tick", tick),
+            ResultText("TabA last tick", last["TabA"]),
+            ResultText("TabB last tick", last["TabB"]),
             pn.View(
-                _Bus.Provider(
-                    _Tab.Navigator(
-                        _Tab.Screen("TabA", _TabA, title="TabA", freeze_on_blur=True),
-                        _Tab.Screen("TabB", _TabB, title="TabB", lazy=False),
-                        _Tab.Screen("Hidden", _Hidden, title="TabH", tab_bar_visible=False),
-                        tab_bar_style=_TAB_BAR_STYLE,
-                    ),
-                    value=bus,
-                ),
+                _BusContext.Provider(DemoTabs(), value=bus),
                 style=pn.style(height=260, border_radius=8, background_color="#F8FAFC", overflow="hidden"),
             ),
             # Two rows: three buttons in one row overflow the card on a
             # 390 pt phone and Maestro can't tap a clipped button.
-            buttons_row(
-                pn.Button("Jump to TabA", on_press=jump("TabA")),
-                pn.Button("Jump to TabB", on_press=jump("TabB")),
+            ButtonsRow(
+                pn.Button("Jump to TabA", on_press=jump(TabA)),
+                pn.Button("Jump to TabB", on_press=jump(TabB)),
             ),
-            buttons_row(
-                pn.Button("Jump to Hidden", on_press=jump("Hidden")),
-                pn.Button("Advance tick", on_press=lambda: set_tick(tick + 1)),
+            ButtonsRow(
+                pn.Button("Jump to Hidden", on_press=jump(Hidden)),
+                pn.Button("Advance tick", on_press=advance),
             ),
-            hint("A blurred TabA keeps its last tick until it is focused again; TabB follows every tick."),
+            Hint("A blurred TabA keeps its last tick until it is focused again; TabB follows every tick."),
         ),
     )

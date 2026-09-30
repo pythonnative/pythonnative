@@ -329,7 +329,7 @@ def test_no_unkeyed_warning_for_positional_children_or_keyed_lists(dev_mode: Any
 
 
 def test_warns_on_nested_unkeyed_list_among_children(dev_mode: Any) -> None:
-    result = render(Column([Text("a"), Text("b")]))  # type: ignore[arg-type]
+    result = render(Column([Text("a"), Text("b")]))
     assert "Column" in _warning_containing("without keys")
     result.unmount()
 
@@ -419,17 +419,18 @@ def test_dev_warnings_are_silent_in_production() -> None:
 # ======================================================================
 
 
-def test_component_keyed_attaches_key_and_keeps_signature() -> None:
+def test_with_key_attaches_key_and_keeps_signature() -> None:
     @component
     def Row(label: str, bold: bool = False) -> Element:
         return Text(label)
 
-    el = Row.keyed(7)("a", bold=True)
-    assert el.type is Row
+    with pytest.raises(TypeError, match=r"Row\(\.\.\.\)\.with_key"):
+        Row("plain", key="k")  # type: ignore[call-arg]
+    assert Row("x").key is None
+    el = Row("a", bold=True).with_key(7)
     assert el.key == "7"
     assert el.props == {"label": "a", "bold": True}
-    assert Row.keyed(None)("x").key is None
-    assert Row("plain", key="k").key == "k", "key= is still accepted at runtime"
+    assert el.type is Row
 
 
 def test_use_reducer_and_deps_accept_tuples() -> None:

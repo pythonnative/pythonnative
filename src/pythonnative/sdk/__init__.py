@@ -98,7 +98,6 @@ from ._components import (
     list_components,
     unregister_component,
 )
-from .codegen import generate
 from .schema import ComponentSchema, ModuleSchema, NativeField, register_schema
 
 __all__ = [
@@ -108,7 +107,6 @@ __all__ = [
     "ModuleSchema",
     "NativeField",
     "register_schema",
-    "generate",
     # Core types
     "Element",
     # Style types

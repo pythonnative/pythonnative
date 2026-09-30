@@ -41,6 +41,17 @@ PYTHON_ONLY_STYLE_KEYS = frozenset({"inset", "inset_horizontal", "inset_vertical
 PYTHON_ONLY_PROPS = frozenset({"style", "ref", "key", "content_container_style"})
 
 
+def _unpacked_fields(annotation: Any) -> list[Any]:
+    """Expand ``**props: Unpack[SomeTypedDict]`` into optional dataclass fields."""
+    if typing.get_origin(annotation) is not typing.Unpack:
+        return []
+    (typed_dict,) = typing.get_args(annotation)
+    return [
+        (name, field_type, dataclasses.field(default=None))
+        for name, field_type in typing.get_type_hints(typed_dict).items()
+    ]
+
+
 def install(factories: dict[str, Any]) -> None:
     """Compile ordinary Python annotations into the shared native contract."""
     style_fields = {
@@ -57,7 +68,10 @@ def install(factories: dict[str, Any]) -> None:
         hints = typing.get_type_hints(factory)
         fields: list[Any] = []
         for key, parameter in signature.parameters.items():
-            if key in PYTHON_ONLY_PROPS or parameter.kind in {parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD}:
+            if parameter.kind is parameter.VAR_KEYWORD:
+                fields.extend(_unpacked_fields(hints.get(key)))
+                continue
+            if key in PYTHON_ONLY_PROPS or parameter.kind is parameter.VAR_POSITIONAL:
                 continue
             annotation = hints.get(key, Any)
             default = parameter.default

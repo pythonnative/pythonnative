@@ -12,19 +12,19 @@ manifest; the glyph shapes themselves aren't inspected.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 from pythonnative.assets import font_faces
 
 
 @pn.component
-def CustomFontDemo() -> pn.Element:
+def CustomFontDemo() -> pn.Node:
     """Render text in a bundled font and list the registered faces."""
     faces = font_faces()
     families = sorted({face.family for face in faces})
-    return demo_screen(
+    return DemoScreen(
         "Custom font",
         "Fonts under app/assets/ are available to font_family by their family name.",
-        section(
+        DemoSection(
             "Pacifico",
             pn.Text(
                 "Hello from a bundled font",
@@ -36,12 +36,12 @@ def CustomFontDemo() -> pn.Element:
                 pn.Text(" inside one Text."),
                 style=pn.style(font_size=16),
             ),
-            hint("The same family name works on iOS, Android, and in the browser preview."),
+            Hint("The same family name works on iOS, Android, and in the browser preview."),
         ),
-        section(
+        DemoSection(
             "Registered faces",
-            result_text("Bundled families", ", ".join(families) or "none"),
-            result_text("Face count", len(faces)),
-            result_text("Pacifico weight", next((face.weight for face in faces if face.family == "Pacifico"), "n/a")),
+            ResultText("Bundled families", ", ".join(families) or "none"),
+            ResultText("Face count", len(faces)),
+            ResultText("Pacifico weight", next((face.weight for face in faces if face.family == "Pacifico"), "n/a")),
         ),
     )

@@ -48,6 +48,7 @@ from . import artifacts, deps, runtime_assets
 from . import ios as ios_config
 from . import plugins as native_plugins
 from .android import AndroidLayout
+from .bundle import copy_library
 from .config import AppConfig
 from .ios import IOSLayout
 
@@ -402,7 +403,7 @@ class Builder:
                 android=layout,
             )
 
-        ios_layout = ios_config.configure(project_dir, self.config, log=self.log)
+        ios_layout = ios_config.configure(project_dir, self.config, release=release, log=self.log)
         native_plugins.stage_ios_plugins(project_dir, plugins, log=self.log)
         self._stage_ios_python(project_dir, release=release, sdks=ios_sdks)
         self._stage_contracts(
@@ -513,12 +514,7 @@ class Builder:
             # bridge into PythonNativeKit is ctypes), so it is copied
             # verbatim into every slice.
             if self.dev_lib_root.is_dir():
-                shutil.copytree(
-                    self.dev_lib_root,
-                    packages_dir / "pythonnative",
-                    dirs_exist_ok=True,
-                    ignore=android_config.LIB_IGNORE,
-                )
+                copy_library(self.dev_lib_root, packages_dir / "pythonnative", release=release)
 
             if self.config.requirements:
                 self.log(f"Resolving {len(self.config.requirements)} requirement(s) for {target.label}...")

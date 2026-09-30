@@ -1,20 +1,23 @@
 """Verify ordinary asyncio networking and cancellation inside embedded Python."""
 
+from __future__ import annotations
+
 import asyncio
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, ResultText
 
 
 @pn.component
-def StandardAsyncioDemo():
+def StandardAsyncioDemo() -> pn.Node:
+    """Run socket, TaskGroup, timeout, and cancellation checks on the app's event loop."""
     status, set_status = pn.use_state("idle")
 
-    async def verify():
+    async def verify() -> None:
         set_status("running")
         finished = asyncio.Event()
 
-        async def echo(reader, writer):
+        async def echo(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
             try:
                 writer.write(await reader.readexactly(4))
                 await writer.drain()
@@ -53,8 +56,8 @@ def StandardAsyncioDemo():
         assert task.cancelled()
         set_status("passed")
 
-    return demo_screen(
+    return DemoScreen(
         "Standard asyncio",
         "Sockets, TaskGroup, timeouts, and cancellation in embedded Python.",
-        section("Runtime", result_text("Runtime", status), pn.Button("Run runtime checks", on_press=verify)),
+        DemoSection("Runtime", ResultText("Runtime", status), pn.Button("Run runtime checks", on_press=verify)),
     )

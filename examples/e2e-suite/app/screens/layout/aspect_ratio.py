@@ -8,16 +8,16 @@ widescreen should be wider than tall.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint
 
 
 @pn.component
-def AspectRatioDemo() -> pn.Element:
+def AspectRatioDemo() -> pn.Node:
     """Render a 1:1 square and a 16:9 widescreen box."""
-    return demo_screen(
+    return DemoScreen(
         "Aspect ratio",
         "Width is fixed; height derives from aspect_ratio.",
-        section(
+        DemoSection(
             "1:1 + 16:9",
             pn.Row(
                 pn.View(
@@ -38,8 +38,8 @@ def AspectRatioDemo() -> pn.Element:
                         padding=8,
                     ),
                 ),
-                style=pn.style(spacing=8),
+                style=pn.style(gap=8),
             ),
-            hint("Both labels must be visible; layout passes without crashing."),
+            Hint("Both labels must be visible; layout passes without crashing."),
         ),
     )

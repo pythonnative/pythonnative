@@ -80,14 +80,20 @@ def test_parse_devicectl_devices() -> None:
     assert offline.state == "offline"
 
 
+def _found(devices: list[Device], query: str) -> Device:
+    device = find_device(devices, query)
+    assert device is not None, query
+    return device
+
+
 def test_find_device_by_identifier_name_and_substring() -> None:
     devices = parse_simctl_devices(_SIMCTL_PAYLOAD) + parse_devicectl_devices(_DEVICECTL_PAYLOAD)
-    assert find_device(devices, "BBBB-2222").name == "iPhone 15 Pro"
-    assert find_device(devices, "owen's iphone").identifier == "EEEE-5555"
-    assert find_device(devices, "ipad").identifier == "FFFF-6666"
+    assert _found(devices, "BBBB-2222").name == "iPhone 15 Pro"
+    assert _found(devices, "owen's iphone").identifier == "EEEE-5555"
+    assert _found(devices, "ipad").identifier == "FFFF-6666"
     assert find_device(devices, "nope") is None
     # Exact-name matches prefer ready devices; "iPhone 15" is booted.
-    assert find_device(devices, "iPhone 15").state == "booted"
+    assert _found(devices, "iPhone 15").state == "booted"
 
 
 def test_find_device_prefers_ready() -> None:
@@ -95,4 +101,4 @@ def test_find_device_prefers_ready() -> None:
         Device(platform="android", kind="device", identifier="one", name="Pixel", state="offline"),
         Device(platform="android", kind="device", identifier="two", name="Pixel", state="connected"),
     ]
-    assert find_device(devices, "Pixel").identifier == "two"
+    assert _found(devices, "Pixel").identifier == "two"

@@ -10,7 +10,7 @@ error, that the surrounding labels render, and that the load lifecycle
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 # A 1x1 transparent PNG. Bundling an inline data URI means the demo
 # works even when the CI runner has no internet access.
@@ -20,7 +20,7 @@ TRANSPARENT_PNG = (
 
 
 @pn.component
-def ImageDemo() -> pn.Element:
+def ImageDemo() -> pn.Node:
     """Render a tiny inline data-URI image with stable labels around it."""
     load_started, set_load_started = pn.use_state(False)
     load_ended, set_load_ended = pn.use_state(False)
@@ -29,10 +29,10 @@ def ImageDemo() -> pn.Element:
     def on_load(event: pn.ImageLoadEvent) -> None:
         set_loaded_size(f"{int(event.width)}x{int(event.height)}")
 
-    return demo_screen(
+    return DemoScreen(
         "Image",
         "Three sized image instances render side-by-side.",
-        section(
+        DemoSection(
             "Inline data-URI image",
             pn.Image(
                 source=TRANSPARENT_PNG,
@@ -43,12 +43,12 @@ def ImageDemo() -> pn.Element:
                 on_load_end=lambda: set_load_ended(True),
                 style=pn.style(width=64, height=64, background_color="#FECACA"),
             ),
-            result_text("Load started", "yes" if load_started else "no"),
-            result_text("Load ended", "yes" if load_ended else "no"),
-            result_text("Loaded size", loaded_size),
-            hint("If the image fails to load, the colored background remains."),
+            ResultText("Load started", "yes" if load_started else "no"),
+            ResultText("Load ended", "yes" if load_ended else "no"),
+            ResultText("Loaded size", loaded_size),
+            Hint("If the image fails to load, the colored background remains."),
         ),
-        section(
+        DemoSection(
             "Three tiles",
             pn.Row(
                 pn.Image(
@@ -64,7 +64,7 @@ def ImageDemo() -> pn.Element:
                     source=TRANSPARENT_PNG,
                     style=pn.style(width=40, height=40, background_color="#93C5FD"),
                 ),
-                style=pn.style(spacing=8),
+                style=pn.style(gap=8),
             ),
             pn.Text("Tiles rendered: 3"),
         ),

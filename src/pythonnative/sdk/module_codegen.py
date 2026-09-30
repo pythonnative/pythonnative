@@ -46,6 +46,15 @@ def generate_modules(types: NativeTypes) -> dict[str, str]:
                 params_kotlin.append(f"`{key}`: {kt}")
                 arguments.append(key)
             asynchronous = contract["async"]
+            call = (
+                f'{"await " if asynchronous else ""}native_module("{name}").'
+                f'{"call_async" if asynchronous else "call"}("{method}"'
+                + "".join(f", {key}={key}" for key in arguments)
+                + ")"
+            )
+            # The registry returns ``Any``; bind it to the declared type so the
+            # facade type-checks under ``warn_return_any`` (mypy --strict).
+            body = [f"        {call}"] if void else [f"        result: {result_py} = {call}", "        return result"]
             python.extend(
                 [
                     "    @staticmethod",
@@ -54,10 +63,7 @@ def generate_modules(types: NativeTypes) -> dict[str, str]:
                     + ", ".join(params_py)
                     + f") -> {result_py}:",
                     f'        """Invoke the checked {name}.{method} native method."""',
-                    f'        return {"await " if asynchronous else ""}native_module("{name}").'
-                    f'{"call_async" if asynchronous else "call"}("{method}"'
-                    + "".join(f", {key}={key}" for key in arguments)
-                    + ")",
+                    *body,
                     "",
                 ]
             )

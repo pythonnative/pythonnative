@@ -18,16 +18,20 @@ Key building blocks:
   [`use_effect`][pythonnative.use_effect],
   [`use_reducer`][pythonnative.use_reducer], etc.) manage state, side
   effects, and context inside `@component` functions.
-- **Navigation** is built from
-  [`NavigationContainer`][pythonnative.NavigationContainer] plus one of
-  the [`create_stack_navigator`][pythonnative.create_stack_navigator],
-  [`create_tab_navigator`][pythonnative.create_tab_navigator], or
-  [`create_drawer_navigator`][pythonnative.create_drawer_navigator]
-  factories.
-- **Styling** uses a single ``style`` dict per element (or a list of
-  dicts), composable via [`StyleSheet`][pythonnative.StyleSheet].
-  PythonNative ships a fully-typed [`Style`][pythonnative.style.Style]
-  TypedDict so editors and ``mypy`` validate every key as you type.
+- **Navigation**: screens are components whose parameters are their
+  route params, listed in module-level
+  [`StackNavigator`][pythonnative.StackNavigator],
+  [`TabNavigator`][pythonnative.TabNavigator], or
+  [`DrawerNavigator`][pythonnative.DrawerNavigator] values and rendered
+  by [`NavigationContainer`][pythonnative.NavigationContainer].
+  ``nav.push(ItemScreen(id=42))`` is checked by the type checker.
+- **Styling** uses a ``style`` dict per element (or a list of dicts),
+  typed by the [`Style`][pythonnative.style.Style] ``TypedDict``.
+  [`StyleSheet`][pythonnative.StyleSheet] namespaces group named
+  styles, and one [`Theme`][pythonnative.Theme] styles the app and
+  its navigators.
+- **State** lives in hooks for a component and in a typed
+  [`Store`][pythonnative.Store] for the app.
 - **Animations** use the ``Animated`` namespace. Serialized graphs
   connect values, arithmetic, interpolation, and style bindings.
   Native timing, spring, decay, scroll, and gesture drivers update
@@ -52,12 +56,12 @@ Example:
     import pythonnative as pn
 
     @pn.component
-    def App():
+    def App() -> pn.Node:
         count, set_count = pn.use_state(0)
         return pn.Column(
             pn.Text(f"Count: {count}", style=pn.style(font_size=24)),
             pn.Button("+", on_press=lambda: set_count(count + 1)),
-            style=pn.style(spacing=12),
+            style=pn.style(gap=12),
         )
     ```
 """
@@ -117,8 +121,9 @@ from .components import (
     WebNavigationEvent,
     WebView,
 )
+from .components.props import AccessibilityProps, ViewProps
 from .diagnostics import HookOrderError
-from .element import Element
+from .element import Element, Node
 from .gestures import GestureSpec, SwipeDirection
 from .handles import ScrollOffset, ScrollViewHandle, TextInputHandle, ViewHandle, WebViewHandle
 from .hooks import (
@@ -190,28 +195,24 @@ from .native_modules import (
     use_screen_reader_enabled,
 )
 from .navigation import (
-    DARK_NAVIGATION_THEME,
-    DEFAULT_NAVIGATION_THEME,
-    LinkingConfig,
+    DrawerNavigator,
+    Group,
     Navigation,
-    NavigationColors,
     NavigationContainer,
     NavigationRef,
     NavigationState,
-    NavigationTheme,
+    Navigator,
     Route,
-    ScreenGroup,
+    Screen,
     ScreenOptions,
+    StackNavigator,
     TabBarStyle,
-    create_drawer_navigator,
-    create_navigation_ref,
-    create_stack_navigator,
-    create_tab_navigator,
+    TabNavigator,
     use_focus_effect,
     use_is_focused,
     use_navigation,
-    use_navigation_theme,
     use_route,
+    use_screen_options,
 )
 from .net import HTTPError, Response, fetch
 from .platform import Platform, get_platform
@@ -220,9 +221,9 @@ from .runtime import run_async, run_blocking
 from .scheduler import batch_updates
 from .sdk import Props, define_component, element_factory
 from .storage import AsyncStorage, use_persisted_state
+from .store import Store, use_store
 from .style import (
-    DEFAULT_DARK_THEME,
-    DEFAULT_LIGHT_THEME,
+    ABSOLUTE_FILL,
     AccessibilityAction,
     AccessibilityState,
     AccessibilityValue,
@@ -254,15 +255,23 @@ from .style import (
     TextAlign,
     TextDecoration,
     TextTransform,
-    Theme,
-    ThemeContext,
     TransformSpec,
-    default_theme,
     resolve_style,
     style,
-    use_theme,
 )
 from .suspense import Resource, lazy, start_resource
+from .theme import (
+    DARK_THEME,
+    LIGHT_THEME,
+    Colors,
+    Radii,
+    Spacing,
+    Theme,
+    ThemeProvider,
+    Typography,
+    use_styles,
+    use_theme,
+)
 
 __all__ = [
     "UNSET",
@@ -314,6 +323,9 @@ __all__ = [
     "TouchableOpacity",
     "View",
     "WebView",
+    # Shared props
+    "AccessibilityProps",
+    "ViewProps",
     # Typed events
     "ContentSizeEvent",
     "KeyPressEvent",
@@ -334,6 +346,7 @@ __all__ = [
     # Core
     "Component",
     "Element",
+    "Node",
     "component",
     "create_screen",
     "memo",
@@ -373,28 +386,24 @@ __all__ = [
     "lazy",
     "start_resource",
     # Navigation
-    "DARK_NAVIGATION_THEME",
-    "DEFAULT_NAVIGATION_THEME",
-    "LinkingConfig",
+    "DrawerNavigator",
+    "Group",
     "Navigation",
-    "NavigationColors",
     "NavigationContainer",
     "NavigationRef",
     "NavigationState",
-    "NavigationTheme",
+    "Navigator",
     "Route",
-    "ScreenGroup",
+    "Screen",
     "ScreenOptions",
+    "StackNavigator",
     "TabBarStyle",
-    "create_navigation_ref",
-    "use_navigation_theme",
-    "create_drawer_navigator",
-    "create_stack_navigator",
-    "create_tab_navigator",
+    "TabNavigator",
     "use_focus_effect",
     "use_is_focused",
     "use_navigation",
     "use_route",
+    "use_screen_options",
     # Styling - typed primitives
     "AccessibilityAction",
     "AccessibilityState",
@@ -405,8 +414,6 @@ __all__ = [
     "AutoCapitalize",
     "BorderStyle",
     "Color",
-    "DEFAULT_DARK_THEME",
-    "DEFAULT_LIGHT_THEME",
     "Dimension",
     "Display",
     "DynamicColor",
@@ -430,9 +437,16 @@ __all__ = [
     "TextDecoration",
     "TextTransform",
     "Theme",
-    "ThemeContext",
+    "ThemeProvider",
+    "Colors",
+    "Typography",
+    "Spacing",
+    "Radii",
+    "LIGHT_THEME",
+    "DARK_THEME",
+    "ABSOLUTE_FILL",
+    "use_styles",
     "TransformSpec",
-    "default_theme",
     "resolve_style",
     "style",
     "use_theme",
@@ -487,6 +501,9 @@ __all__ = [
     "Vibration",
     "use_app_state",
     "use_net_info",
+    # Stores
+    "Store",
+    "use_store",
     # Networking + persistence
     "AsyncStorage",
     "fetch",

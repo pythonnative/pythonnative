@@ -10,11 +10,11 @@ as a [`ScrollOffset`][pythonnative.ScrollOffset].
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def ScrollViewHandleDemo() -> pn.Element:
+def ScrollViewHandleDemo() -> pn.Node:
     """Drive a ScrollView through the handle published on its ref."""
     scroll_ref = pn.use_ref(None)
     last_call, set_last_call = pn.use_state("none")
@@ -46,25 +46,25 @@ def ScrollViewHandleDemo() -> pn.Element:
         set_offset("top" if current.y < 1 else "scrolled")
         set_last_call("get_scroll_offset")
 
-    return demo_screen(
+    return DemoScreen(
         "ScrollViewHandle",
         "Scroll a ScrollView imperatively through ref.current.",
-        section(
+        DemoSection(
             "Handle",
-            result_text("Handle attached", "yes" if scroll_ref.current is not None else "no"),
-            result_text("Last call", last_call),
-            result_text("Offset", offset),
-            buttons_row(
+            ResultText("Handle attached", "yes" if scroll_ref.current is not None else "no"),
+            ResultText("Last call", last_call),
+            ResultText("Offset", offset),
+            ButtonsRow(
                 pn.Button("Handle scroll to end", on_press=scroll_to_end),
                 pn.Button("Handle scroll to top", on_press=scroll_to_top),
             ),
-            buttons_row(
-                pn.Button("Read offset", on_press=lambda: pn.run_async(read_offset())),
+            ButtonsRow(
+                pn.Button("Read offset", on_press=read_offset),
                 pn.Button("Flash indicators", on_press=flash),
             ),
-            hint("The buttons live outside the box and act through the handle."),
+            Hint("The buttons live outside the box and act through the handle."),
         ),
-        section(
+        DemoSection(
             "Content",
             pn.ScrollView(
                 pn.Column(
@@ -75,7 +75,7 @@ def ScrollViewHandleDemo() -> pn.Element:
                         )
                         for i in range(1, 41)
                     ],
-                    style=pn.style(spacing=4),
+                    style=pn.style(gap=4),
                 ),
                 ref=scroll_ref,
                 # Three rows tall: the flow only needs the first row to

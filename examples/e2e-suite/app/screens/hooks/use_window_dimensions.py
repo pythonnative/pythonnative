@@ -8,20 +8,20 @@ asserts the line is present and contains the expected ``×`` glyph.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UseWindowDimensionsDemo() -> pn.Element:
+def UseWindowDimensionsDemo() -> pn.Node:
     """Render the current window dimensions in a stable, single line."""
     dims = pn.use_window_dimensions()
 
-    return demo_screen(
+    return DemoScreen(
         "use_window_dimensions",
         "Current window size, returned reactively by the hook.",
-        section(
+        DemoSection(
             "Dimensions",
-            result_text("Window", f"{int(dims.width)} × {int(dims.height)}"),
-            hint("Maestro asserts the 'Window:' line is visible (size varies)."),
+            ResultText("Window", f"{int(dims.width)} × {int(dims.height)}"),
+            Hint("Maestro asserts the 'Window:' line is visible (size varies)."),
         ),
     )

@@ -30,6 +30,7 @@ def test_lock_merges_targets_and_requires_every_selected_hash(tmp_path: Path) ->
         lockfile.requirements(app, targets)
     lockfile.write(app, [deps.Resolution(target=targets[1], packages=[package("b" * 64)])])
     pinned = lockfile.requirements(app, targets)
+    assert pinned is not None
     assert "example==1.2" in pinned
     assert "--hash=sha256:" + "a" * 64 in pinned
     assert "--hash=sha256:" + "b" * 64 in pinned

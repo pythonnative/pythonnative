@@ -33,7 +33,7 @@ import pythonnative as pn
 
 
 @pn.component
-def Toolbar():
+def Toolbar() -> pn.Node:
     async def export():
         report = await build_report()
         await save_to_disk(report)
@@ -50,7 +50,7 @@ render **suspends** and the nearest
 
 ```python
 @pn.component
-async def Profile(user_id: str):
+async def Profile(user_id: str) -> pn.Node:
     user = await api.fetch_user(user_id)
     return pn.Column(
         pn.Text(user["name"]),
@@ -59,7 +59,7 @@ async def Profile(user_id: str):
 
 
 @pn.component
-def ProfileScreen():
+def ProfileScreen() -> pn.Node:
     return pn.Suspense(
         Profile(user_id="42"),
         fallback=pn.ActivityIndicator(),
@@ -100,7 +100,7 @@ change:
 
 ```python
 @pn.component
-def UserCard(user_id: str):
+def UserCard(user_id: str) -> pn.Node:
     resource = pn.use_resource(lambda: api.get_user(user_id), [user_id])
     user = resource.read()  # suspends while pending
     return pn.Text(user["name"])
@@ -133,7 +133,7 @@ Chart = pn.lazy(lambda: __import__("app.chart", fromlist=["Chart"]).Chart)
 
 
 @pn.component
-def Dashboard():
+def Dashboard() -> pn.Node:
     return pn.Suspense(
         Chart(points=[1, 2, 3]),
         fallback=pn.ActivityIndicator(),
@@ -153,7 +153,7 @@ the commit, and the task is **cancelled automatically** whenever
 
 ```python
 @pn.component
-def WelcomeBanner():
+def WelcomeBanner() -> pn.Node:
     visible, set_visible = pn.use_state(True)
 
     async def auto_dismiss():
@@ -188,7 +188,7 @@ meantime render first:
 
 ```python
 @pn.component
-def Search():
+def Search() -> pn.Node:
     query, set_query = pn.use_state("")
     submitted, set_submitted = pn.use_state("")
     is_pending, start_transition = pn.use_transition()
@@ -223,7 +223,7 @@ re-renders when its result changes. The return value is a frozen
 
 ```python
 @pn.component
-def UserCard(user_id: int):
+def UserCard(user_id: int) -> pn.Node:
     q = pn.use_query(lambda: api.get_user(user_id), [user_id])
 
     if q.loading and q.data is None:
@@ -259,14 +259,14 @@ mutator:
 
 ```python
 @pn.component
-def NewPostForm():
+def NewPostForm() -> pn.Node:
     title, set_title = pn.use_state("")
     state, save = pn.use_mutation(api.create_post)
 
     async def submit():
         await save(title)              # await the result
         set_title("")
-        await pn.Alert.show("Posted!")
+        pn.Alert.show("Posted!")
 
     return pn.Column(
         pn.TextInput(value=title, on_change=set_title),
@@ -329,7 +329,7 @@ loads the previous value on mount and writes every update back to
 
 ```python
 @pn.component
-def ThemeToggle():
+def ThemeToggle() -> pn.Node:
     theme, set_theme = pn.use_persisted_state("settings.theme", "light")
     return pn.Button(
         f"Theme: {theme}",
@@ -396,16 +396,16 @@ import pythonnative as pn
 
 
 @pn.component
-async def PostList(user_id: int, version: int):
+async def PostList(user_id: int, version: int) -> pn.Node:
     posts = await pn.use_resource(lambda: api.list_posts(user_id), [user_id, version])
     return pn.FlatList(
-        posts,
+        data=posts,
         render_item=lambda p, _: pn.Text(p["body"]),
     )
 
 
 @pn.component
-def PostsScreen(user_id: int):
+def PostsScreen(user_id: int) -> pn.Node:
     draft, set_draft = pn.use_persisted_state(f"draft.{user_id}", "")
     state, create = pn.use_mutation(api.create_post)
     version, set_version = pn.use_state(0)
@@ -433,7 +433,7 @@ def PostsScreen(user_id: int):
             PostList(user_id=user_id, version=version),
             fallback=pn.ActivityIndicator(),
         ),
-        style={"opacity": opacity, "padding": 16, "spacing": 8},
+        style={"opacity": opacity, "padding": 16, "gap": 8},
     )
 ```
 

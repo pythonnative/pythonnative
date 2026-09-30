@@ -9,16 +9,16 @@ expected order.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint
 
 
 @pn.component
-def FlexLayoutDemo() -> pn.Element:
+def FlexLayoutDemo() -> pn.Node:
     """Render three flex children in a row, with the middle one stretching."""
-    return demo_screen(
+    return DemoScreen(
         "Flex layout",
         "Three siblings: fixed, flex:1, fixed.",
-        section(
+        DemoSection(
             "Row with flex",
             pn.Row(
                 pn.View(
@@ -33,8 +33,8 @@ def FlexLayoutDemo() -> pn.Element:
                     pn.Text("flex-fixed-right", style=pn.style(color="#FFFFFF")),
                     style=pn.style(width=80, background_color="#0EA5E9", padding=8),
                 ),
-                style=pn.style(spacing=4, height=64),
+                style=pn.style(gap=4, height=64),
             ),
-            hint("Maestro asserts the three labels are visible together."),
+            Hint("Maestro asserts the three labels are visible together."),
         ),
     )

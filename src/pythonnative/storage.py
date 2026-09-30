@@ -35,7 +35,10 @@ Example:
 from __future__ import annotations
 
 import json
-from typing import Any, Callable, List, Optional, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Tuple, TypeVar, Union
+
+if TYPE_CHECKING:
+    from .hooks import StateSetter
 
 from .native_modules.registry import NativeModule, native_module
 
@@ -113,22 +116,20 @@ class AsyncStorage:
         await AsyncStorage.set(key, json.dumps(value, default=str))
 
 
-def use_persisted_state(
-    key: str,
-    initial: T,
-) -> Tuple[T, Callable[[Any], None]]:
-    """Persisted [`use_state`][pythonnative.hooks.use_state] variant.
+def use_persisted_state(key: str, initial: T) -> Tuple[T, "StateSetter[T]"]:
+    """Persisted [`use_state`][pythonnative.use_state] variant.
 
     Backed by [`AsyncStorage`][pythonnative.storage.AsyncStorage]:
     behaves like ``use_state`` but loads the prior value (if any) on
-    mount and persists every subsequent update. Until the load
-    completes the value is ``initial``, the same fallback React
-    Native users get with ``AsyncStorage.getItem``.
+    mount and persists every later committed change. Until the load
+    completes the value is ``initial``, the same fallback React Native
+    users get with ``AsyncStorage.getItem``.
 
-    The setter accepts either a value or a ``current -> new``
-    callable, matching
-    [`use_state`][pythonnative.use_state]. Writes are
-    fire-and-forget; failures are silently absorbed (storage is
+    Writes happen in an effect after a change commits, never inside a
+    state updater, so transitions that replay updaters don't write
+    twice. A value set before the first load finishes wins: the stored
+    value is discarded and the new one is persisted. Values must be
+    JSON-serializable; write failures are absorbed (storage is
     best-effort by design).
 
     Args:
@@ -137,7 +138,7 @@ def use_persisted_state(
         initial: Value used before the first load completes.
 
     Returns:
-        ``(value, setter)``, same shape as
+        ``(value, setter)``, the same shape as
         [`use_state`][pythonnative.use_state].
 
     Example:
@@ -146,7 +147,7 @@ def use_persisted_state(
 
 
         @pn.component
-        def ThemeToggle():
+        def ThemeToggle() -> pn.Node:
             theme, set_theme = pn.use_persisted_state("settings.theme", "light")
             return pn.Button(
                 f"Theme: {theme}",
@@ -154,31 +155,53 @@ def use_persisted_state(
             )
         ```
     """
+    from .equality import equal
     from .hooks import use_callback, use_effect, use_ref, use_state
-    from .runtime import run_async
 
     state, set_state = use_state(initial)
     loaded = use_ref(False)
+    touched = use_ref(False)
+    persisted: Any = use_ref(_UNWRITTEN)
+    latest: Any = use_ref(state)
+    latest.current = state
 
     async def _load() -> None:
+        loaded.current = False
         stored = await AsyncStorage.get_json(key)
-        if stored is not None:
-            set_state(stored)
         loaded.current = True
+        if touched.current:
+            # A value set while loading wins over the stored one.
+            await _persist_value(key, latest.current, persisted)
+            return
+        if stored is not None:
+            persisted.current = stored
+            set_state(stored)
 
     use_effect(_load, [key])
 
-    def setter(value_or_updater: Any) -> None:
-        def _reducer(current: Any) -> Any:
-            new_value = value_or_updater(current) if callable(value_or_updater) else value_or_updater
-            if loaded.current is True:
-                run_async(AsyncStorage.set_json(key, new_value))
-            return new_value
+    async def _persist() -> None:
+        if loaded.current and touched.current and not equal(persisted.current, state):
+            await _persist_value(key, state, persisted)
 
-        set_state(_reducer)
+    use_effect(_persist, [key, state])
 
-    stable_setter = use_callback(setter, [key])
-    return state, stable_setter
+    def setter(update: Union[T, Callable[[T], T]]) -> None:
+        touched.current = True
+        set_state(update)
+
+    return state, use_callback(setter, [key])
+
+
+_UNWRITTEN = object()
+
+
+async def _persist_value(key: str, value: Any, persisted: Any) -> None:
+    """Write ``value`` under ``key`` and remember it as the last persisted value."""
+    persisted.current = value
+    try:
+        await AsyncStorage.set_json(key, value)
+    except Exception:
+        pass
 
 
 __all__ = ["AsyncStorage", "use_persisted_state"]

@@ -122,8 +122,10 @@ name) and at call time (`KeyError` for an unknown name). Browse the set at
 names:
 
 ```python
-Tab.Screen("Home", HomeScreen, tab_bar_icon="house")
-Tab.Screen("Profile", ProfileScreen, tab_bar_icon=pn.asset("images/avatar-tab.png"))
+Tabs = pn.TabNavigator(
+    pn.Screen(HomeScreen, tab_bar_icon="house"),
+    pn.Screen(ProfileScreen, tab_bar_icon=pn.asset("images/avatar-tab.png")),
+)
 ```
 
 An asset used as a tab icon is drawn as a template image and tinted with

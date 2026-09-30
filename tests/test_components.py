@@ -143,20 +143,20 @@ def test_button_disabled() -> None:
 
 
 def test_column_with_children() -> None:
-    el = Column(Text("a"), Text("b"), style={"spacing": 10, "padding": 16, "align_items": "stretch"})
+    el = Column(Text("a"), Text("b"), style={"gap": 10, "padding": 16, "align_items": "stretch"})
     assert el.type == "Column"
     assert len(el.children) == 2
-    assert el.props["spacing"] == 10
+    assert el.props["gap"] == 10
     assert el.props["padding"] == 16
     assert el.props["align_items"] == "stretch"
     assert el.props["flex_direction"] == "column"
 
 
 def test_row_with_children() -> None:
-    el = Row(Text("x"), Text("y"), style={"spacing": 5})
+    el = Row(Text("x"), Text("y"), style={"gap": 5})
     assert el.type == "Row"
     assert len(el.children) == 2
-    assert el.props["spacing"] == 5
+    assert el.props["gap"] == 5
     assert el.props["flex_direction"] == "row"
 
 

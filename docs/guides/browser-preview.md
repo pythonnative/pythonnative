@@ -26,7 +26,9 @@ pn preview
 ```
 
 This starts the [dev server](dev-workflow.md), opens
-`http://localhost:8765/` in your default browser, mounts your `App` in
+`http://localhost:8765/?token=...` in your default browser (the page
+trades your [dev token](dev-workflow.md#the-dev-token) for a cookie and
+drops it from the address bar), mounts your `App` in
 a phone frame, and watches `app/` for changes. Edit any component and
 save: the page updates in place while preserving component state
 (counters, text input, scroll position, the navigation stack).
@@ -110,9 +112,9 @@ and intrinsic sizes match what you see.
 
 ### Navigation
 
-Root navigators (`create_stack_navigator`, tabs, drawer) drive a real
-stack of screens in the page, the same way they drive
-`UINavigationController` / AndroidX Navigation on device. Each pushed
+Root navigators (`StackNavigator`, `TabNavigator`, and
+`DrawerNavigator`) drive a real stack of screens in the page, the same
+way they drive `UINavigationController` and fragments on device. Each pushed
 screen remains a logical child of the application's shared tree;
 `navigate(...)` selects or adds a route, `go_back()` pops, and covered
 screens keep their state.
@@ -173,7 +175,7 @@ and logic rather than pixel-perfect platform chrome.
 
 Faithful:
 
-- Flex layout, sizing, padding, spacing, absolute positioning, and
+- Flex layout, sizing, padding, gap, absolute positioning, and
   safe areas for the chosen device frame.
 - Component lifecycle, hooks, effects, context, error boundaries,
   Suspense.
@@ -218,11 +220,14 @@ When the chrome matters, verify on device with `pn run`.
 
 ## Sharing the preview
 
-The server binds to all interfaces by default, so someone on the same
-network can open `http://<your-ip>:8765/` and see the app. One page
-drives the app at a time: the newest tab to connect takes over, and the
-previous one shows a notice until you reload it. Use
-`--host 127.0.0.1` to keep the preview local.
+The server binds to all interfaces by default so your own phones can
+reach it, but it only answers clients that present your
+[dev token](dev-workflow.md#the-dev-token). The LAN URLs `pn start`
+prints carry the token, and anyone who has one can read your app's
+source for as long as the token stays the same, so open them only on
+your own devices. One page drives the app at a time: the newest tab to
+connect takes over, and the previous one shows a notice until you reload
+it. Use `--host 127.0.0.1` to keep the preview local.
 
 ## Next steps
 

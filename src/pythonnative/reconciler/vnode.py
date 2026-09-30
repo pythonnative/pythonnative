@@ -131,7 +131,7 @@ def _check_unkeyed(siblings: List[Element], owner: str) -> None:
         return
     diagnostics.warn_once(
         f"{owner or 'A component'} rendered a list of {len(siblings)} sibling elements without keys. "
-        "Give each element in a dynamic list a stable key (Row.keyed(item.id)(item), or key=...) so "
+        "Give each element in a dynamic list a stable key (Row(item).with_key(item.id), or key= on built-ins) so "
         "inserts and reorders keep the right state and native views.",
         key=f"unkeyed:{owner}",
     )
@@ -182,6 +182,7 @@ class VNode:
         "suspense_hidden",
         "suspense_hydration",
         "suspense_waits",
+        "context_consumers",
     )
 
     def __setattr__(self, name: str, value: Any) -> None:
@@ -233,6 +234,9 @@ class VNode:
         self.suspense_hidden: Optional[List[VNode]] = None
         self.suspense_hydration: Optional[Dict[Tuple[int, Any], List[HookState]]] = None
         self.suspense_waits: Optional[Set[int]] = None
+        # For provider nodes: components that read this provider's
+        # context, registered by ``use_context``.
+        self.context_consumers: Any = None
 
     # ------------------------------------------------------------------
     # Classification helpers

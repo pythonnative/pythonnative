@@ -161,9 +161,7 @@ def generate(destination: str | Path) -> list[Path]:
         kt_events.append("    }")
         python.extend(
             [
-                f"def {name}(*children: Element, "
-                + ", ".join(parameters + ["key: str | None = None"])
-                + ") -> Element:",
+                f"def {name}(*children: Node, " + ", ".join(parameters + ["key: str | None = None"]) + ") -> Element:",
                 f'    """Create a validated {name} native element."""',
                 "    props = {" + ", ".join(values) + "}",
                 "    props = {name: value for name, value in props.items() if value is not UNSET}",
@@ -215,7 +213,7 @@ def generate(destination: str | Path) -> list[Path]:
         "NativeValues.kt": (templates / "values.kt").read_text() + "\n" + "\n".join(types.kotlin),
         "components.py": "\n".join(
             headers
-            + ["from pythonnative.element import Element", "from pythonnative.sdk.schema import COMPONENTS", ""]
+            + ["from pythonnative.element import Element, Node", "from pythonnative.sdk.schema import COMPONENTS", ""]
             + python
         ),
         "README.md": "\n".join(docs),

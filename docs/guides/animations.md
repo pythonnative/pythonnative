@@ -64,7 +64,7 @@ import pythonnative as pn
 
 
 @pn.component
-def FadeInBox():
+def FadeInBox() -> pn.Node:
     opacity = pn.use_animated_value(0.0)
 
     async def _fade_in():
@@ -100,7 +100,7 @@ def _press():
 
 ```python
 @pn.component
-def Bouncy():
+def Bouncy() -> pn.Node:
     scale = pn.use_animated_value(1.0)
 
     def _press():

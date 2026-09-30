@@ -2,30 +2,31 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Literal, Mapping, Optional, Sequence, TypedDict, Union, Unpack
+import inspect
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Mapping, Optional, Sequence, TypedDict, Union, Unpack
 
 from ..assets import Asset
+from ..component import Component
 from ..element import Element
 from ..icons import IconName
+
+if TYPE_CHECKING:
+    from .navigators import Navigator
 
 __all__ = [
     "PYTHON_ONLY_OPTIONS",
     "Animation",
-    "HeaderSlot",
-    "OptionsLike",
+    "Group",
     "Presentation",
-    "ScreenDef",
-    "ScreenGroup",
+    "Screen",
+    "ScreenLike",
     "ScreenOptions",
+    "ScreenTarget",
     "TabBarStyle",
-    "Unpack",
+    "find_screen",
     "flatten_screens",
-    "resolve_options",
     "validate_screen_options",
 ]
-
-HeaderSlot = Union[Element, Callable[[], Optional[Element]], None]
-"""An element (or zero-arg factory) rendered into a header slot."""
 
 Presentation = Literal["card", "modal", "full_screen_modal", "form_sheet", "transparent_modal"]
 """How a stack screen is presented (see ``ScreenOptions.presentation``)."""
@@ -35,23 +36,20 @@ Animation = Literal["default", "none", "fade", "slide_from_right", "slide_from_b
 
 
 class ScreenOptions(TypedDict, total=False):
-    """Per-screen options accepted by ``Screen(...)``, ``Group(...)``, ``Navigator(...)``, and ``set_options(...)``.
+    """Per-screen options accepted by ``Screen(...)``, ``Group(...)``, ``screen_options=``, and ``set_options(...)``.
 
     All keys are optional. Navigators ignore keys they don't use; the
     native host applies the header keys it can (see the platform notes
     on each key). Options layer in this order, later entries winning:
-    ``Navigator(screen_options=...)``, ``Group(screen_options=...)``,
-    the ``Screen`` itself, then ``nav.set_options(...)`` at runtime.
-
-    The native ``Screen`` element also carries ``guarded``, an internal
-    wire prop that isn't a user option: the stack navigator sets it
-    while the route has a ``before_remove`` listener so iOS refuses the
-    pop or dismiss synchronously and lets Python decide.
+    the navigator's ``screen_options``, each enclosing ``Group``, the
+    ``Screen`` itself, then options set at runtime with
+    [`use_screen_options`][pythonnative.use_screen_options] or
+    ``nav.set_options(...)``.
 
     Attributes:
         title: Screen title. Stack navigators show it in the native
             navigation bar; tab and drawer navigators use it as the item
-            label.
+            label. Defaults to the route name.
         header_shown: Whether the navigation bar is visible for this
             screen (default ``True``).
         header_large_title: Use a large title that collapses on scroll.
@@ -62,18 +60,18 @@ class ScreenOptions(TypedDict, total=False):
             Android shows a bare back arrow and ignores this key.
         header_back_visible: Whether the back button is shown
             (default ``True``).
-        header_left: Element (or factory) rendered at the leading edge
-            of the navigation bar.
-        header_right: Element (or factory) rendered at the trailing edge
-            of the navigation bar.
+        header_left: Element rendered at the leading edge of the
+            navigation bar.
+        header_right: Element rendered at the trailing edge of the
+            navigation bar.
         header_tint_color: Color of the bar's buttons and back chevron.
-            Defaults to the navigation theme's ``primary`` color.
+            Defaults to the theme's ``colors.primary``.
         header_style: Style dict for the bar itself; ``background_color``
             is honored on every platform that draws a bar and defaults
-            to the theme's ``card`` color.
+            to the theme's ``colors.surface``.
         header_title_style: Style dict for the title label
             (``color``, ``font_size``, ``bold``). ``color`` defaults to
-            the theme's ``text`` color.
+            the theme's ``colors.text``.
         presentation: ``"card"`` (default) pushes onto the stack. The
             modal styles present the screen over the stack: on iOS
             ``"modal"`` is a page sheet, ``"full_screen_modal"`` covers
@@ -90,8 +88,8 @@ class ScreenOptions(TypedDict, total=False):
             ``"default"``, ``"none"``, ``"fade"``, ``"slide_from_right"``,
             or ``"slide_from_bottom"``. Honored on iOS and Android.
         tab_bar_icon: Icon for the tab item: a bundled icon name from
-            ``pythonnative.icons`` (``"house"``,
-            ``"settings"``) drawn as a vector on every platform, or a
+            ``pythonnative.icons`` (``"house"``, ``"settings"``) drawn as
+            a vector on every platform, or a
             [`pn.asset`][pythonnative.asset] pointing at a PNG that's
             drawn as a template image.
         tab_bar_badge: Badge text or count shown on the tab item.
@@ -109,10 +107,11 @@ class ScreenOptions(TypedDict, total=False):
             screen when it loses focus instead of keeping it alive
             hidden (default ``False``).
         freeze_on_blur: Tab and drawer navigators only: while the
-            screen is unfocused, reuse its last rendered element instead
-            of re-rendering it when the navigator re-renders (default
-            ``False``). The screen's own state updates still apply; it
-            renders fresh again when it regains focus.
+            screen is unfocused, hold back new params (from
+            ``set_params`` or a ``jump_to`` element) until it's focused
+            again (default ``False``). Navigators already skip unfocused
+            screens whose params didn't change, and the screen's own
+            state updates still apply.
     """
 
     title: str
@@ -120,8 +119,8 @@ class ScreenOptions(TypedDict, total=False):
     header_large_title: bool
     header_back_title: str
     header_back_visible: bool
-    header_left: HeaderSlot
-    header_right: HeaderSlot
+    header_left: Optional[Element]
+    header_right: Optional[Element]
     header_tint_color: str
     header_style: Dict[str, Any]
     header_title_style: Dict[str, Any]
@@ -142,11 +141,11 @@ PYTHON_ONLY_OPTIONS = frozenset({"header_left", "header_right", "tab_bar_icon", 
 
 
 class TabBarStyle(TypedDict, total=False):
-    """Appearance of a tab navigator's bar, passed as ``Tab.Navigator(tab_bar_style=...)``.
+    """Appearance of a tab navigator's bar, passed as ``TabNavigator(..., tab_bar_style=...)``.
 
-    Every key is optional; unset keys fall back to the navigation
-    theme (``active_tint_color`` to ``primary``, ``background_color``
-    to ``card``) or to the platform default.
+    Every key is optional; unset keys fall back to the theme
+    (``active_tint_color`` to ``colors.primary``, ``background_color``
+    to ``colors.surface``) or to the platform default.
 
     Attributes:
         background_color: Bar background.
@@ -165,135 +164,224 @@ class TabBarStyle(TypedDict, total=False):
     show_labels: bool
 
 
-OptionsLike = Union[ScreenOptions, Mapping[str, Any], Callable[[Any], Optional[Mapping[str, Any]]], None]
-"""Static options, a ``(route) -> options`` callable, or ``None``."""
-
-_ENUM_OPTIONS: Dict[str, frozenset] = {
+_ENUM_OPTIONS: Dict[str, frozenset[str]] = {
     "presentation": frozenset(("card", "modal", "full_screen_modal", "form_sheet", "transparent_modal")),
     "animation": frozenset(("default", "none", "fade", "slide_from_right", "slide_from_bottom")),
 }
 
+_KNOWN_OPTIONS = frozenset(ScreenOptions.__annotations__)
+
 
 def validate_screen_options(options: Mapping[str, Any]) -> None:
-    """Reject unknown ``presentation`` and ``animation`` values.
+    """Reject unknown option keys and ``presentation`` / ``animation`` values outside their ``Literal``.
 
     Raises:
+        TypeError: If ``options`` names a key that isn't a ``ScreenOptions`` field.
         ValueError: If an enumerated option holds a value outside its ``Literal``.
     """
+    unknown = sorted(set(options) - _KNOWN_OPTIONS)
+    if unknown:
+        raise TypeError(f"Unknown screen option(s) {unknown}; see pn.ScreenOptions for the supported keys")
     for key, allowed in _ENUM_OPTIONS.items():
         value = options.get(key)
         if value is not None and value not in allowed:
             raise ValueError(f"ScreenOptions.{key} must be one of {sorted(allowed)}, got {value!r}")
 
 
-def resolve_options(options: OptionsLike, route: Any) -> Dict[str, Any]:
-    """Evaluate ``options`` for ``route``: call a callable, copy a mapping, or return ``{}`` for ``None``."""
-    if options is None:
-        return {}
-    resolved = dict(options(route) or {}) if callable(options) else dict(options)
-    validate_screen_options(resolved)
-    return resolved
+ScreenComponent = Union[Component[...], "Navigator"]
+"""What a screen renders: a ``@component`` whose parameters are the route params, or a nested navigator."""
 
 
-class ScreenDef:
-    """Configuration for one screen inside a navigator.
+def _required_params(component: Any) -> list[str]:
+    """Names of ``component``'s parameters that have no default (navigators have none)."""
+    if not isinstance(component, Component):
+        return []
+    return [
+        name
+        for name, parameter in inspect.signature(component.fn).parameters.items()
+        if parameter.default is inspect.Parameter.empty
+        and parameter.kind not in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD)
+    ]
 
-    Created by ``Navigator.Screen(name, component, **options)``.
 
-    Attributes:
-        name: Route name used by ``nav.navigate(name)``.
-        component: The ``@component`` rendered when this screen is
-            active. Receives no props; read params with
-            [`use_route`][pythonnative.use_route].
-        options: Static [`ScreenOptions`][pythonnative.ScreenOptions]
-            for the screen. May be a callable ``(route) -> options`` to
-            derive options from the route's params.
-        initial_params: Params merged under any params supplied by
-            ``navigate`` when this screen is first shown.
+class Screen:
+    """One screen in a navigator: the component it renders, its route name, deep-link path, and options.
+
+    A screen's component receives its route params as ordinary
+    arguments, so the component's signature *is* the screen's params
+    type:
+
+    ```python
+    @pn.component
+    def ItemScreen(id: int, tab: str = "details") -> pn.Node: ...
+
+    Root = pn.StackNavigator(pn.Screen(ItemScreen, title="Item", path="items/{id}"))
+    nav.push(ItemScreen(id=42))
+    ```
+
+    A bare component or navigator listed in a navigator is shorthand
+    for ``Screen(component)``.
+
+    Args:
+        component: The ``@component`` to render, or a nested
+            [`Navigator`][pythonnative.navigation.Navigator].
+        name: Route name, used in serialized state and diagnostics.
+            Defaults to the component's name or the navigator's
+            ``name``.
+        path: Deep-link path relative to the enclosing navigator's
+            path, with Python format placeholders for params
+            (``"items/{id}"``). Params are converted with the
+            component's annotations. Nested navigators use ``path`` as
+            a prefix for their screens.
+        **options: Static [`ScreenOptions`][pythonnative.ScreenOptions].
+
+    Raises:
+        TypeError: If ``component`` isn't a component or navigator, or
+            an option key is unknown.
+        ValueError: If no route name can be derived.
     """
 
-    __slots__ = ("name", "component", "options", "initial_params")
+    __slots__ = ("component", "name", "path", "options")
 
     def __init__(
         self,
-        name: str,
-        component: Callable[[], Any],
+        component: ScreenComponent,
         *,
-        options: OptionsLike = None,
-        initial_params: Optional[Mapping[str, Any]] = None,
-        **option_kwargs: Unpack[ScreenOptions],
+        name: Optional[str] = None,
+        path: Optional[str] = None,
+        **options: Unpack[ScreenOptions],
     ) -> None:
-        if not name or not isinstance(name, str):
-            raise TypeError("Screen name must be a non-empty string")
-        if not callable(component):
-            raise TypeError(f"Screen {name!r}: component must be a @component, got {component!r}")
-        self.name = name
-        self.component = component
-        if callable(options):
-            if option_kwargs:
-                raise TypeError("Pass either a callable `options` or keyword options, not both")
-            self.options: Union[ScreenOptions, Callable[[Any], ScreenOptions]] = options  # type: ignore[assignment]
-        else:
-            merged: Dict[str, Any] = dict(options or {})
-            merged.update(option_kwargs)
-            validate_screen_options(merged)
-            self.options = merged  # type: ignore[assignment]
-        self.initial_params: Dict[str, Any] = dict(initial_params or {})
+        from .navigators import Navigator
 
-    def resolve_options(self, route: Any) -> Dict[str, Any]:
-        """Return the static options, evaluating a callable ``options`` for ``route``."""
-        return resolve_options(self.options, route)
+        if not isinstance(component, (Component, Navigator)):
+            raise TypeError(f"Screen expects a @component or a navigator, got {component!r}")
+        resolved = name or (component.name if isinstance(component, Navigator) else component.display_name)
+        if not resolved:
+            raise ValueError(f"{component!r} needs a route name: pass Screen(..., name=...) or name the navigator")
+        validate_screen_options(options)
+        self.component = component
+        self.name: str = resolved
+        self.path = path.strip("/") if path is not None else None
+        self.options: Dict[str, Any] = dict(options)
+
+    @property
+    def navigator(self) -> Optional["Navigator"]:
+        """The nested navigator this screen renders, or ``None`` for a component screen."""
+        from .navigators import Navigator
+
+        return self.component if isinstance(self.component, Navigator) else None
+
+    def required_params(self) -> list[str]:
+        """Parameters the screen's component needs a value for."""
+        return _required_params(self.component)
+
+    def render(self, params: Mapping[str, Any]) -> Element:
+        """Build the screen's element for a route carrying ``params``."""
+        if isinstance(self.component, Component):
+            return self.component(**params)
+        return self.component()
+
+    def matches(self, target: Any, *, exact: bool = False) -> bool:
+        """Whether ``target`` (a component or navigator) is what this screen renders.
+
+        Identity decides; unless ``exact``, a component replaced by Fast
+        Refresh also matches its predecessor by module, qualified name,
+        and display name. Components made by one factory share a qualified name, so
+        callers try an identity match across every screen first (see
+        ``find_screen``).
+        """
+        if target is self.component:
+            return True
+        if exact:
+            return False
+        if isinstance(target, Component) and isinstance(self.component, Component):
+            return (target.__module__, getattr(target, "__qualname__", None), target.display_name) == (
+                self.component.__module__,
+                getattr(self.component, "__qualname__", None),
+                self.component.display_name,
+            )
+        return False
 
     def __repr__(self) -> str:
         return f"Screen({self.name!r})"
 
 
-class ScreenGroup:
-    """Screens that share a layer of options, created by ``Navigator.Group(*screens, screen_options=...)``.
+class Group:
+    """Screens that share a layer of options.
 
-    A group has no state of its own: the navigator flattens its screens
-    into the route list and layers ``screen_options`` between the
-    navigator's options and each screen's own.
+    ```python
+    pn.StackNavigator(
+        Home,
+        pn.Group(pn.Screen(Compose), pn.Screen(Filters), presentation="modal"),
+    )
+    ```
 
-    Attributes:
-        screens: The grouped [`ScreenDef`][pythonnative.navigation.ScreenDef]s, in order.
-        screen_options: Options applied to every screen in the group
-            (a mapping or ``(route) -> options``).
+    Args:
+        *screens: The grouped screens (``Screen`` objects, bare
+            components or navigators, or nested groups).
+        **options: [`ScreenOptions`][pythonnative.ScreenOptions] layered
+            between the navigator's ``screen_options`` and each
+            screen's own options.
     """
 
-    __slots__ = ("screens", "screen_options")
+    __slots__ = ("screens", "options")
 
-    def __init__(self, screens: Sequence[ScreenDef], screen_options: OptionsLike = None) -> None:
-        for screen in screens:
-            if not isinstance(screen, ScreenDef):
-                raise TypeError(f"Group accepts Screen(...) definitions, got {screen!r}")
-        self.screens: tuple[ScreenDef, ...] = tuple(screens)
-        if screen_options is not None and not callable(screen_options):
-            validate_screen_options(screen_options)
-        self.screen_options = screen_options
+    def __init__(self, *screens: "ScreenLike", **options: Unpack[ScreenOptions]) -> None:
+        validate_screen_options(options)
+        self.screens: tuple[ScreenLike, ...] = screens
+        self.options: Dict[str, Any] = dict(options)
 
     def __repr__(self) -> str:
-        return f"Group({[s.name for s in self.screens]!r})"
+        return f"Group({list(self.screens)!r})"
 
 
-def flatten_screens(
-    items: Sequence[Union[ScreenDef, ScreenGroup]],
-) -> tuple[tuple[ScreenDef, ...], Dict[str, OptionsLike]]:
-    """Expand groups into ``(screens, group_options_by_name)``; duplicate names raise ``ValueError``."""
-    screens: list[ScreenDef] = []
-    group_options: Dict[str, OptionsLike] = {}
+def find_screen(screens: Iterable[Screen], target: Any) -> Optional[Screen]:
+    """The screen rendering ``target``: an identity match wins over a Fast Refresh name match."""
+    candidates = tuple(screens)
+    for exact in (True, False):
+        found = next((screen for screen in candidates if screen.matches(target, exact=exact)), None)
+        if found is not None:
+            return found
+    return None
+
+
+ScreenLike = Union[Screen, Group, Component[...], "Navigator"]
+"""An entry in a navigator's screen list."""
+
+ScreenTarget = Union[Element, Component[...], "Navigator"]
+"""A navigation destination: an element carrying params, or a component or navigator with none."""
+
+
+def flatten_screens(items: Sequence[ScreenLike]) -> tuple[tuple[Screen, ...], Dict[str, Dict[str, Any]]]:
+    """Expand groups into ``(screens, group_options_by_name)``.
+
+    Raises:
+        TypeError: For an entry that isn't a screen, group, component, or navigator.
+        ValueError: For duplicate route names.
+    """
+    from .navigators import Navigator
+
+    screens: list[Screen] = []
+    group_options: Dict[str, Dict[str, Any]] = {}
+
+    def visit(entry: Any, inherited: Dict[str, Any]) -> None:
+        if isinstance(entry, Group):
+            merged = {**inherited, **entry.options}
+            for child in entry.screens:
+                visit(child, merged)
+            return
+        if isinstance(entry, (Component, Navigator)):
+            entry = Screen(entry)
+        if not isinstance(entry, Screen):
+            raise TypeError(f"Navigators accept Screen(...), Group(...), components, and navigators, got {entry!r}")
+        screens.append(entry)
+        if inherited:
+            group_options[entry.name] = inherited
+
     for item in items:
-        if isinstance(item, ScreenGroup):
-            for screen in item.screens:
-                screens.append(screen)
-                if item.screen_options is not None:
-                    group_options[screen.name] = item.screen_options
-        elif isinstance(item, ScreenDef):
-            screens.append(item)
-        else:
-            raise TypeError(f"Navigator accepts Screen(...) and Group(...) definitions, got {item!r}")
+        visit(item, {})
     names = [screen.name for screen in screens]
     duplicates = sorted({name for name in names if names.count(name) > 1})
     if duplicates:
-        raise ValueError(f"Duplicate screen names in navigator: {duplicates}")
+        raise ValueError(f"Duplicate screen names in navigator: {duplicates}; give one of them Screen(..., name=...)")
     return tuple(screens), group_options

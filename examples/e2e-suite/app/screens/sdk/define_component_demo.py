@@ -13,9 +13,10 @@ demo unmounts so the SDK demo's registry count stays stable.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 _NAME = "E2EBadge"
 
@@ -28,7 +29,7 @@ class _BadgeProps(pn.Props):
     count: int = 0
 
 
-def _rejects_unknown_prop(factory) -> bool:
+def _rejects_unknown_prop(factory: Callable[..., pn.Element]) -> bool:
     try:
         factory(label="x", bogus=1)
     except TypeError:
@@ -37,26 +38,26 @@ def _rejects_unknown_prop(factory) -> bool:
 
 
 @pn.component
-def DefineComponentDemo() -> pn.Element:
+def DefineComponentDemo() -> pn.Node:
     """Inspect the element factory returned by define_component."""
     factory = pn.use_memo(lambda: pn.define_component(_NAME, _BadgeProps), [])
     pn.use_effect(lambda: lambda: pn.sdk.unregister_component(_NAME), [])
     element = factory(label="hello", count=3, style=pn.style(padding=4))
 
-    return demo_screen(
+    return DemoScreen(
         "define_component",
         "Declare a custom native component and inspect its typed factory.",
-        section(
+        DemoSection(
             "Factory",
-            result_text("Factory type", element.type),
-            result_text("Label prop", element.props.get("label")),
-            result_text("Count prop", element.props.get("count")),
+            ResultText("Factory type", element.type),
+            ResultText("Label prop", element.props.get("label")),
+            ResultText("Count prop", element.props.get("count")),
             # The factory resolves ``style`` at the boundary and merges its
             # keys into the wire props, so the padding lands on the element.
-            result_text("Style accepted", "yes" if element.props.get("padding") == 4 else "no"),
-            result_text("Rejects unknown prop", "yes" if _rejects_unknown_prop(factory) else "no"),
-            result_text("Registered", "yes" if _NAME in pn.sdk.list_components() else "no"),
-            result_text("Props type", pn.sdk.get_props_type(_NAME).__name__),
-            hint("The element is inspected, not mounted: this app ships no native renderer for it."),
+            ResultText("Style accepted", "yes" if element.props.get("padding") == 4 else "no"),
+            ResultText("Rejects unknown prop", "yes" if _rejects_unknown_prop(factory) else "no"),
+            ResultText("Registered", "yes" if _NAME in pn.sdk.list_components() else "no"),
+            ResultText("Props type", getattr(pn.sdk.get_props_type(_NAME), "__name__", "(none)")),
+            Hint("The element is inspected, not mounted: this app ships no native renderer for it."),
         ),
     )

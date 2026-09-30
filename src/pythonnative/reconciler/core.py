@@ -38,6 +38,7 @@ this module holds the render/diff/commit pipeline,
 from __future__ import annotations
 
 import asyncio
+import weakref
 from contextlib import contextmanager
 from functools import partial
 from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Set, Tuple
@@ -204,9 +205,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         if self.root is None:
             return self.mount(element)
         with self._pass():
-            # A full pass covers every dirty component; reactive context
-            # may re-add entries during it, which the drain picks up.
-            self._dirty_nodes.clear()
+            # Dirty components stay queued: the pass may skip an unchanged
+            # subtree, and the drain skips any component the pass rendered.
             self._destroyed_tags.clear()
             try:
                 self.root = self._reconcile_node(self.root, element)
@@ -772,7 +772,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
 
     def _create_provider(self, element: Element) -> VNode:
         context: Context = element.type
-        context._push(element.props.get("value"))
+        consumers: "weakref.WeakSet[HookState]" = weakref.WeakSet()
+        context._push(element.props.get("value"), consumers)
         try:
             children = self._create_child_list(
                 normalize_children(element.children, owner=self._provider_label(context))
@@ -780,6 +781,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         finally:
             context._pop()
         node = VNode(element, children)
+        node.context_consumers = consumers
         for child in children:
             child.parent = node
         self._refresh_identity(node)
@@ -834,7 +836,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         count("components.rendered")
         journal = _journal.current()
         if journal is not None:
-            for name in HookState.__slots__:
+            for name in HookState.__slots__[:-1]:  # every slot but __weakref__
                 journal.attribute(hook_state, name)
         self._effect_states[id(hook_state)] = hook_state
         component: Component = element.type
@@ -967,7 +969,9 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         """
         before_roots = [root.tag for root in self._native_roots(node)]
         container = self._nearest_native_ancestor(node)
-        before = self._native_children.get(container.tag, []) if container is not None else []
+        before = (
+            self._native_children.get(container.tag, []) if container is not None and container.tag is not None else []
+        )
         work()
         current = node.parent
         while current is not None and current is not container:
@@ -1026,19 +1030,19 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     @contextmanager
     def _providers_above(self, vnode: VNode) -> Iterator[None]:
         """Push the provided values of every provider above ``vnode``, outermost first."""
-        chain: List[Tuple[Context, Any]] = []
+        chain: List[Tuple[Context, Any, Any]] = []
         node = vnode.parent
         while node is not None:
             if node.is_provider:
-                chain.append((node.element.type, node.element.props.get("value")))
+                chain.append((node.element.type, node.element.props.get("value"), node.context_consumers))
             node = node.parent
         chain.reverse()
-        for context, value in chain:
-            context._push(value)
+        for context, value, consumers in chain:
+            context._push(value, consumers)
         try:
             yield
         finally:
-            for context, _value in reversed(chain):
+            for context, _value, _consumers in reversed(chain):
                 context._pop()
 
     # ------------------------------------------------------------------
@@ -1046,6 +1050,11 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     # ------------------------------------------------------------------
 
     def _reconcile_node(self, old: VNode, new_el: Element) -> VNode:
+        if new_el is old.element and self._reusable(old):
+            # The parent rendered the identical element: nothing in this
+            # subtree changed through props. Components with their own
+            # pending state are still in the dirty queue and render there.
+            return old
         if not self._same_type(old.element, new_el):
             new_node = self._create_tree(new_el)
             self._destroy_tree(old)
@@ -1061,6 +1070,14 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         if old.is_suspense:
             return self._reconcile_suspense(old, new_el)
         return self._reconcile_wrapper(old, new_el, "Fragment")
+
+    @staticmethod
+    def _reusable(node: VNode) -> bool:
+        """Whether ``node`` can be kept as is when its parent renders the identical element."""
+        if node.is_component:
+            hs = node.hook_state
+            return hs is not None and node.rendered is not None and not hs._dirty
+        return node.tag is not None or not node.is_native
 
     def _reconcile_native(self, old: VNode, new_el: Element) -> VNode:
         new_clean, events = self._split_props(new_el.props)
@@ -1118,7 +1135,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         new_value = new_el.props.get("value")
         if "value" not in old.element.props or not equal(old.element.props["value"], new_value):
             self._mark_context_consumers(old, context)
-        context._push(new_value)
+        context._push(new_value, old.context_consumers)
         try:
             children = self._reconcile_child_list(
                 old.children, normalize_children(new_el.children, owner=self._provider_label(context))
@@ -1142,24 +1159,20 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         return old
 
     def _mark_context_consumers(self, provider: VNode, context: Context) -> None:
-        """Mark every descendant that read ``context`` for re-render.
+        """Mark every component that read ``context`` from ``provider`` for re-render.
 
-        Descent is pruned at nested providers of the same context, since
-        their subtrees read the inner (unchanged) value.
+        ``use_context`` registers each reader with the innermost
+        provider, so this touches exactly the consumers instead of
+        walking the provider's subtree. Readers that stopped reading the
+        context or unmounted are skipped.
         """
         target = id(context)
-
-        def walk(node: VNode) -> None:
-            for child in node.children:
-                if child.is_provider and child.element.type is context:
-                    continue
-                hs = child.hook_state
-                if hs is not None and target in hs.context_deps:
-                    hs._dirty = True
-                    self._dirty_nodes[id(child)] = child
-                walk(child)
-
-        walk(provider)
+        for hs in list(provider.context_consumers or ()):
+            node = hs.vnode
+            if node is None or not node.mounted or target not in hs.context_deps:
+                continue
+            hs._dirty = True
+            self._dirty_nodes[id(node)] = node
 
     @staticmethod
     def _can_skip_memoized(old: VNode, new_el: Element) -> bool:
@@ -1177,7 +1190,14 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         compare = component.props_equal or equal_props
         try:
             return bool(compare(old.element.props, new_el.props)) and old.element.children == new_el.children
-        except Exception:
+        except Exception as exc:
+            # A failing comparator means "changed": render rather than risk a stale subtree.
+            if diagnostics.is_dev():
+                diagnostics.warn_once(
+                    f"The memo comparator of {component.display_name} raised {type(exc).__name__}: {exc}. "
+                    "The component re-renders instead of skipping.",
+                    key=f"memo-comparator:{component.display_name}",
+                )
             return False
 
     def _reconcile_child_list(self, old_children: List[VNode], new_children: List[Element]) -> List[VNode]:
@@ -1426,7 +1446,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         if hasattr(ref, "current"):
             from ..handles import make_handle
 
-            handle = make_handle(element.type, tag, self.backend)
+            handle = make_handle(element.type, tag, self.backend)  # type: ignore[arg-type]
             node = self._tag_nodes.get(tag) if tag is not None else None
             if node is not None and node.last_frame is not None:
                 self._publish_frame_to_handle(handle, node.last_frame)

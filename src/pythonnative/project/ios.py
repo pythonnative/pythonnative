@@ -87,12 +87,17 @@ class IOSLayout:
     bundle_id: str
 
 
-def configure(project_dir: Path, config: AppConfig, *, log: Optional[Logger] = None) -> IOSLayout:
+def configure(
+    project_dir: Path, config: AppConfig, *, release: bool = False, log: Optional[Logger] = None
+) -> IOSLayout:
     """Configure a staged iOS template for ``config``.
 
     Args:
         project_dir: The staged ``ios_template`` directory.
         config: The validated app configuration.
+        release: Configure a release build, which doesn't talk to the
+            dev server (see
+            [`configure_info_plist`][pythonnative.project.ios.configure_info_plist]).
         log: Optional progress logger.
 
     Returns:
@@ -110,7 +115,7 @@ def configure(project_dir: Path, config: AppConfig, *, log: Optional[Logger] = N
         privacy_manifest(source)
         shutil.copy2(source, manifest_path)
     privacy_manifest(manifest_path)
-    configure_info_plist(info_plist, config)
+    configure_info_plist(info_plist, config, release=release)
     write_entitlements(project_dir, config)
     _apply_branding(project_dir, config, emit)
 
@@ -123,12 +128,16 @@ def configure(project_dir: Path, config: AppConfig, *, log: Optional[Logger] = N
 # ======================================================================
 
 
-def configure_info_plist(info_plist: Path, config: AppConfig) -> None:
+def configure_info_plist(info_plist: Path, config: AppConfig, *, release: bool = False) -> None:
     """Write display name, orientation, permissions, and extras to the plist.
 
     Args:
         info_plist: Path to the app ``Info.plist``.
         config: The validated app configuration.
+        release: Leave out the development-only keys. Debug builds add
+            an ``NSLocalNetworkUsageDescription`` so they can reach
+            ``pn start`` over the LAN; release builds carry one only when
+            ``[ios].extra_info_plist`` sets it.
     """
     with open(info_plist, "rb") as handle:
         plist = plistlib.load(handle)
@@ -144,12 +153,13 @@ def configure_info_plist(info_plist: Path, config: AppConfig) -> None:
     resolved = config.resolved_permissions()
     for key, reason in resolved.ios_usage_descriptions.items():
         plist[key] = reason
-    # Debug builds connect to `pn start` over the LAN, which iOS gates
-    # behind the local-network prompt; the prompt needs this string.
-    plist.setdefault(
-        "NSLocalNetworkUsageDescription",
-        "Development builds connect to the PythonNative dev server on your computer.",
-    )
+    if not release:
+        # Debug builds connect to `pn start` over the LAN, which iOS gates
+        # behind the local-network prompt; the prompt needs this string.
+        plist.setdefault(
+            "NSLocalNetworkUsageDescription",
+            "Development builds connect to the PythonNative dev server on your computer.",
+        )
     if resolved.ios_background_modes:
         plist["UIBackgroundModes"] = list(resolved.ios_background_modes)
 

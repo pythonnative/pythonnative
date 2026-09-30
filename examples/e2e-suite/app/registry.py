@@ -15,16 +15,18 @@ Adding a new demo is a three-step process:
 2. Append a ``DemoEntry`` to :data:`DEMOS` below.
 3. Author a Maestro flow at ``tests/e2e/flows/<category>/<id>.yaml``.
 
-``app/main.py`` consumes this list to wire every screen into the root
-[`Stack.Navigator`][pythonnative.create_stack_navigator]. The
-home screen ([`app.screens.home.HomeScreen`][]) also consumes it to
-render a categorized list of buttons.
+``app/main.py`` consumes this list to build the root
+[`StackNavigator`][pythonnative.StackNavigator]: every demo becomes a
+[`Screen`][pythonnative.Screen] whose route name is the demo ``id``. The
+category screen ([`app.screens.category.CategoryListScreen`][]) also
+consumes it to render a list of buttons that push each demo's
+component.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, List
+from typing import Dict, List
 
 import pythonnative as pn
 from app.screens.alerts.confirm_alert import ConfirmAlertDemo
@@ -113,6 +115,7 @@ from app.screens.hooks.use_ref import UseRefDemo
 from app.screens.hooks.use_resource import UseResourceDemo
 from app.screens.hooks.use_screen_reader_enabled import UseScreenReaderEnabledDemo
 from app.screens.hooks.use_state import UseStateDemo
+from app.screens.hooks.use_store import UseStoreDemo
 from app.screens.hooks.use_theme import UseThemeDemo
 from app.screens.hooks.use_transition import UseTransitionDemo
 from app.screens.hooks.use_window_dimensions import UseWindowDimensionsDemo
@@ -150,9 +153,8 @@ class DemoEntry:
     """One demo screen in the registry.
 
     Attributes:
-        id: Unique, URL-safe identifier used as the Stack route name,
-            as the home-screen button label suffix, and as the Maestro
-            flow file name. ``snake_case``.
+        id: Unique, URL-safe identifier used as the root stack's route
+            name and as the Maestro flow file name. ``snake_case``.
         category: Bucket used to group demos on the home screen.
             Mirrors the directory under ``app/screens/`` and
             ``tests/e2e/flows/``.
@@ -163,14 +165,15 @@ class DemoEntry:
             ``"category::feature"`` form for sub-features that aren't
             themselves listed in ``__all__`` (e.g.
             ``"styling::transform"``).
-        component: The ``@pn.component`` function rendering the demo.
+        component: The ``@pn.component`` rendering the demo. Every
+            parameter has a default, so ``component()`` opens the demo.
     """
 
     id: str
     category: str
     title: str
     feature: str
-    component: Callable[[], pn.Element]
+    component: pn.Component[...]
 
 
 DEMOS: List[DemoEntry] = [
@@ -327,6 +330,7 @@ DEMOS: List[DemoEntry] = [
         UseColorSchemeDemo,
     ),
     DemoEntry("use_theme", "Hooks", "use_theme", "use_theme", UseThemeDemo),
+    DemoEntry("use_store", "Hooks", "use_store", "use_store", UseStoreDemo),
     DemoEntry("use_locales", "Hooks", "use_locales", "use_locales", UseLocalesDemo),
     DemoEntry("use_reduce_motion", "Hooks", "use_reduce_motion", "use_reduce_motion", UseReduceMotionDemo),
     DemoEntry(
@@ -343,14 +347,14 @@ DEMOS: List[DemoEntry] = [
         "tab_navigator",
         "Navigation",
         "Tab Navigator",
-        "create_tab_navigator",
+        "TabNavigator",
         TabNavigatorDemo,
     ),
     DemoEntry(
         "drawer_navigator",
         "Navigation",
         "Drawer Navigator",
-        "create_drawer_navigator",
+        "DrawerNavigator",
         DrawerNavigatorDemo,
     ),
     DemoEntry(
@@ -367,9 +371,9 @@ DEMOS: List[DemoEntry] = [
         "use_focus_effect",
         FocusEffectDemo,
     ),
-    DemoEntry("navigation_theme", "Navigation", "Navigation theme", "use_navigation_theme", NavigationThemeDemo),
-    DemoEntry("navigation_ref", "Navigation", "Navigation ref", "create_navigation_ref", NavigationRefDemo),
-    DemoEntry("stack_options", "Navigation", "Stack options", "navigation::stack_options", StackOptionsDemo),
+    DemoEntry("navigation_theme", "Navigation", "Navigation theme", "ThemeProvider", NavigationThemeDemo),
+    DemoEntry("navigation_ref", "Navigation", "Navigation ref", "NavigationRef", NavigationRefDemo),
+    DemoEntry("stack_options", "Navigation", "Stack options", "use_screen_options", StackOptionsDemo),
     DemoEntry("tab_options", "Navigation", "Tab options", "navigation::tab_options", TabOptionsDemo),
     DemoEntry("presentation", "Navigation", "Presentation", "navigation::presentation", PresentationDemo),
     # ------------------------------------------------------------------
@@ -537,7 +541,7 @@ def demos_for_category(category: str) -> List[DemoEntry]:
     return [d for d in DEMOS if d.category == category]
 
 
-def feature_to_demo_id() -> dict:
+def feature_to_demo_id() -> Dict[str, str]:
     """Map every covered feature string to its demo ``id``.
 
     Used by ``scripts/check-e2e-coverage.py`` to confirm that every

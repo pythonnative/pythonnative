@@ -12,12 +12,12 @@ descriptor: the gesture keeps its slot but stops delivering events.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 from pythonnative.gestures import GestureEvent, Pan
 
 
 @pn.component
-def PanGestureDemo() -> pn.Element:
+def PanGestureDemo() -> pn.Node:
     """Render a pan target with offsets, absolute coordinates, and an enabled toggle."""
     enabled, set_enabled = pn.use_state(True)
     begins, set_begins = pn.use_state(0)
@@ -37,18 +37,18 @@ def PanGestureDemo() -> pn.Element:
         del event
         set_ends(lambda n: n + 1)
 
-    return demo_screen(
+    return DemoScreen(
         "Pan gesture",
         "Pan with activation offsets, absolute coordinates, and enabled=False.",
-        section(
+        DemoSection(
             # Differs from the box's "Pan target" label: Maestro swipes from
             # the first element matching the text and must find only the box.
             "Pan area",
-            result_text("Pan enabled", "yes" if enabled else "no"),
-            result_text("Pan begins", begins),
-            result_text("Pan ends", ends),
-            result_text("Moved left", "yes" if translation < 0 else "no"),
-            result_text("Absolute point", absolute),
+            ResultText("Pan enabled", "yes" if enabled else "no"),
+            ResultText("Pan begins", begins),
+            ResultText("Pan ends", ends),
+            ResultText("Moved left", "yes" if translation < 0 else "no"),
+            ResultText("Absolute point", absolute),
             pn.View(
                 pn.Text("Pan target", style=pn.style(color="#FFFFFF", font_weight="700")),
                 gestures=[
@@ -70,10 +70,10 @@ def PanGestureDemo() -> pn.Element:
                     justify_content="center",
                 ),
             ),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Disable pan", on_press=lambda: set_enabled(False)),
                 pn.Button("Enable pan", on_press=lambda: set_enabled(True)),
             ),
-            hint("Swipe left across the target; a disabled pan leaves the counters alone."),
+            Hint("Swipe left across the target; a disabled pan leaves the counters alone."),
         ),
     )

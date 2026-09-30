@@ -9,11 +9,11 @@ from __future__ import annotations
 import asyncio
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def RunAsyncDemo() -> pn.Element:
+def RunAsyncDemo() -> pn.Node:
     """Render a button that schedules an async coroutine via run_async."""
     last, set_last = pn.use_state("idle")
 
@@ -22,13 +22,13 @@ def RunAsyncDemo() -> pn.Element:
         await asyncio.sleep(0.2)
         set_last("done")
 
-    return demo_screen(
+    return DemoScreen(
         "run_async",
         "Fire-and-forget a coroutine on the framework asyncio loop.",
-        section(
+        DemoSection(
             "Async job",
-            result_text("Status", last),
+            ResultText("Status", last),
             pn.Button("Run async job", on_press=lambda: pn.run_async(_job())),
-            hint("Maestro taps the button and waits for 'Status: done'."),
+            Hint("Maestro taps the button and waits for 'Status: done'."),
         ),
     )

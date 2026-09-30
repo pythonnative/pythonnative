@@ -10,11 +10,11 @@ callable, ``delay_long_press``, ``android_ripple``, and ``disabled``.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def PressableDemo() -> pn.Element:
+def PressableDemo() -> pn.Node:
     """Render a Pressable that toggles its background and tracks tap count."""
     count, set_count = pn.use_state(0)
     long_presses, set_long_presses = pn.use_state(0)
@@ -42,14 +42,14 @@ def PressableDemo() -> pn.Element:
             opacity=0.6 if state.pressed else (0.4 if disabled else 1.0),
         )
 
-    return demo_screen(
+    return DemoScreen(
         "Pressable",
         "Tap the colored area; the press counter and background flip.",
-        section(
+        DemoSection(
             "Tap target",
-            result_text("Presses", count),
-            result_text("Long presses", long_presses),
-            result_text("Disabled", "yes" if disabled else "no"),
+            ResultText("Presses", count),
+            ResultText("Long presses", long_presses),
+            ResultText("Disabled", "yes" if disabled else "no"),
             pn.Pressable(
                 render_label,
                 on_press=on_press,
@@ -60,10 +60,10 @@ def PressableDemo() -> pn.Element:
                 style=target_style,
                 accessibility_label="pressable-target",
             ),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Disable pressable", on_press=lambda: set_disabled(True)),
                 pn.Button("Enable pressable", on_press=lambda: set_disabled(False)),
             ),
-            hint("Maestro taps and long-presses the area, then checks a disabled press is ignored."),
+            Hint("Maestro taps and long-presses the area, then checks a disabled press is ignored."),
         ),
     )

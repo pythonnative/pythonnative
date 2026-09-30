@@ -7,25 +7,25 @@ Most basic hook demo: increment, decrement, reset. Maestro taps
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UseStateDemo() -> pn.Element:
+def UseStateDemo() -> pn.Node:
     """Render an int counter driven by use_state."""
     count, set_count = pn.use_state(0)
 
-    return demo_screen(
+    return DemoScreen(
         "use_state",
         "Counter driven by a single use_state hook.",
-        section(
+        DemoSection(
             "Counter",
-            result_text("Counter", count),
-            buttons_row(
+            ResultText("Counter", count),
+            ButtonsRow(
                 pn.Button("Increment", on_press=lambda: set_count(count + 1)),
                 pn.Button("Decrement", on_press=lambda: set_count(count - 1)),
                 pn.Button("Reset", on_press=lambda: set_count(0)),
             ),
-            hint("Maestro taps Increment twice, asserts 'Counter: 2'."),
+            Hint("Maestro taps Increment twice, asserts 'Counter: 2'."),
         ),
     )

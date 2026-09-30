@@ -2,13 +2,13 @@
 
 from typing import Any, Callable, Literal, Optional
 
-from ..element import Element
+from ..element import Element, Node
 from ..style import StyleProp
 from ._base import _make_element
 
 
 def Modal(
-    *children: Element,
+    *children: Node,
     visible: bool = False,
     on_dismiss: Optional[Callable[[], Any]] = None,
     on_show: Optional[Callable[[], Any]] = None,
@@ -85,7 +85,7 @@ def Modal(
     )
 
 
-def Portal(*children: Element, key: Optional[str] = None) -> Element:
+def Portal(*children: Node, key: Optional[str] = None) -> Element:
     """Render ``children`` into a full-screen overlay above everything else.
 
     Like React DOM's ``createPortal``: the children stay part of this

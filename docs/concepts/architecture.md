@@ -15,6 +15,26 @@ flowchart LR
     D --- G[Native animation graph]
 ```
 
+## The authoring model
+
+Application code is ordinary, typed Python. Components are functions
+whose signatures are their prop lists, and they return a
+[`pn.Node`][pythonnative.element.Node], so a strict type checker
+verifies element trees, props, and conditional children. Screens are
+components whose parameters are their route params, and navigators are
+module-level values (see [Navigation](../guides/navigation.md)). One
+[`Theme`][pythonnative.Theme] styles both the app and its navigators,
+[`StyleSheet`][pythonnative.StyleSheet] namespaces give styles typed
+names, and a [`Store`][pythonnative.Store] holds app state outside the
+tree. `pn lint` checks the rules of hooks statically.
+
+Run-time validation is a development aid. Built-in prop and style
+validation, and checks of user component props against their
+annotations, run only in development builds and under the pytest
+plugin. Release builds skip them and omit development-only modules
+(the CLI, dev server, Fast Refresh, browser preview, SDK code
+generators, and testing library) from the bundle.
+
 ## Execution and ownership
 
 `runtime.py` owns a standard asyncio application loop on a dedicated thread.
@@ -25,7 +45,10 @@ ordinary asyncio APIs and explicitly move blocking I/O off the application loop.
 
 The reconciler maintains stable keyed instances, parent relationships, native
 tag indexes, dirty component work, and pending effects. Updating a child preserves
-its ancestors and siblings unless their own inputs or context change. Native
+its ancestors and siblings unless their own inputs or context change. A child
+element that's the identical object from the previous render is skipped with
+its subtree, and a changed context value marks only the consumers recorded in
+its provider's registry (see [Reconciliation](reconciliation.md#skipping-unchanged-subtrees)). Native
 child relationships are rebuilt when a component's native roots change.
 Effects run after committed views exist, with child effects preceding parents.
 Renders are batched automatically: setter calls made in one callback, effect,
@@ -35,9 +58,12 @@ component that re-dirties itself for more than fifty passes raises
 `RuntimeError("Too many re-renders")` through the same path.
 
 Equality accepts identity and scalar Boolean comparisons. Array-like comparisons
-that produce another array aren't coerced to a Boolean. Mutable objects must be
-replaced to signal a state or dependency change. Frozen dataclasses are a good
-choice for shared snapshots.
+that produce another array aren't coerced to a Boolean. Bound methods compare
+equal when they wrap the same function on the same object, so passing
+`service.subscribe` as a dependency or prop doesn't count as a change. Mutable
+objects must be replaced to signal a state or dependency change. Frozen
+dataclasses are a good choice for shared snapshots and
+[`Store`][pythonnative.Store] values.
 
 ## Native presentation
 
@@ -83,8 +109,9 @@ SDK compatibility remain separate checks; a lock doesn't prove an extension can
 run on a device. Test every supported deployment target.
 
 Fast Refresh preserves compatible component state. Changes to hook order or
-custom-hook signatures remount affected instances. Changes to helper classes or
-services remount the application to avoid retaining instances of old definitions.
+custom-hook signatures remount affected instances. Removing a class or changing
+its definition remounts the application to avoid retaining instances of the old
+definition; functions, `TypedDict`s, `Protocol`s, and unchanged classes don't.
 Native contract changes require rebuilding the dev client. Development errors
 use a host-owned overlay with a traceback and reload/dismiss controls. It can
 report a poisoned renderer and reload a fresh surface without rendering an
@@ -113,7 +140,10 @@ validate device signing, store submission, or performance on physical devices.
 
 | Area | Location under `src/pythonnative` |
 | --- | --- |
-| Components and lifetimes | `component.py`, `hooks.py`, `runtime.py` |
+| Components and lifetimes | `component.py`, `element.py`, `hooks.py`, `runtime.py` |
+| Styles, themes, and stores | `style.py`, `theme.py`, `store.py` |
+| Props and dev-mode checks | `components/props.py`, `prop_checks.py`, `diagnostics.py` |
+| Rules-of-hooks linter | `lint.py` |
 | Reconciliation | `reconciler/`, `mutations.py`, `events.py` |
 | Bridge protocol | `bridge/`, `native_views/bridge_backend.py` |
 | Imperative handles and undo journal | `handles.py`, `journal.py` |

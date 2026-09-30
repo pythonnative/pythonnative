@@ -3,7 +3,7 @@
 from dataclasses import dataclass, replace
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, ResultText
 
 
 @dataclass(frozen=True)
@@ -13,7 +13,7 @@ class Item:
 
 
 @pn.component
-def CounterRow(item: Item) -> pn.Element:
+def CounterRow(item: Item) -> pn.Node:
     taps, set_taps = pn.use_state(0)
     return pn.Button(f"{item.title}: {taps}", on_press=lambda: set_taps(taps + 1))
 
@@ -23,7 +23,7 @@ def render_row(item: Item, index: int) -> pn.Element:
 
 
 @pn.component
-def ListDataDemo() -> pn.Element:
+def ListDataDemo() -> pn.Node:
     data = pn.use_memo(
         lambda: pn.ListData((Item(str(i), f"Live row {i}") for i in range(10_000)), key=lambda item: item.key), []
     )
@@ -41,12 +41,12 @@ def ListDataDemo() -> pn.Element:
                 data.insert(0, Item("new", "Inserted row"))
             data.move("0", 1)
 
-    return demo_screen(
+    return DemoScreen(
         "ListData",
         "Incremental edits preserve visible keyed row state.",
-        section(
+        DemoSection(
             "Live data",
-            result_text("First visible key", viewed),
+            ResultText("First visible key", viewed),
             pn.FlatList(
                 data=data,
                 render_item=render_row,
@@ -55,7 +55,7 @@ def ListDataDemo() -> pn.Element:
                 on_viewable_items_changed=viewable,
                 style=pn.style(height=280),
             ),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Apply live edits", on_press=edit),
                 pn.Button(
                     "Jump near end", on_press=lambda: controller.current.scroll_to_index(len(data) - 8, animated=False)

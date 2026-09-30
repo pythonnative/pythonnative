@@ -839,27 +839,6 @@ public enum PNViewPointerEvents: String, Codable {
     case `box_only` = "box_only"
 }
 
-public enum PNViewHitSlop: Codable {
-    case option0(Double)
-    case option1([String: Double])
-    case option2(PNJSONValue)
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let value = try? container.decode(Double.self) { self = .option0(value); return }
-        if let value = try? container.decode([String: Double].self) { self = .option1(value); return }
-        if let value = try? container.decode(PNJSONValue.self) { self = .option2(value); return }
-        throw NativeDecodeError.invalid("PNViewHitSlop")
-    }
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .option0(let value): try container.encode(value)
-        case .option1(let value): try container.encode(value)
-        case .option2(let value): try container.encode(value)
-        }
-    }
-}
-
 public enum PNPNPNAccessibilityStateChecked1: String, Codable {
     case `mixed` = "mixed"
 }
@@ -994,6 +973,27 @@ public enum PNViewImportantForAccessibility: String, Codable {
     case `yes` = "yes"
     case `no` = "no"
     case `no_hide_descendants` = "no_hide_descendants"
+}
+
+public enum PNViewHitSlop: Codable {
+    case option0(Double)
+    case option1([String: Double])
+    case option2(PNJSONValue)
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let value = try? container.decode(Double.self) { self = .option0(value); return }
+        if let value = try? container.decode([String: Double].self) { self = .option1(value); return }
+        if let value = try? container.decode(PNJSONValue.self) { self = .option2(value); return }
+        throw NativeDecodeError.invalid("PNViewHitSlop")
+    }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .option0(let value): try container.encode(value)
+        case .option1(let value): try container.encode(value)
+        case .option2(let value): try container.encode(value)
+        }
+    }
 }
 
 public enum PNViewPnHeaderSlot: String, Codable {
@@ -1233,7 +1233,6 @@ public struct PNScrollViewRefreshControl: Codable {
     public let `margin_end`: PNViewMarginTop?
     public let `margin_horizontal`: PNViewMarginTop?
     public let `margin_vertical`: PNViewMarginTop?
-    public let `spacing`: Double?
     public let `gap`: Double?
     public let `row_gap`: Double?
     public let `column_gap`: Double?
@@ -1286,7 +1285,7 @@ public struct PNScrollViewRefreshControl: Codable {
     public let `accessibility_role`: String?
     public let `ref`: PNJSONValue?
     public let `on_layout`: Bool?
-    public init(`width`: PNViewWidth?, `height`: PNViewWidth?, `min_width`: PNViewWidth?, `max_width`: PNViewWidth?, `min_height`: PNViewWidth?, `max_height`: PNViewWidth?, `aspect_ratio`: Double?, `flex`: Double?, `flex_grow`: Double?, `flex_shrink`: Double?, `flex_basis`: PNViewWidth?, `flex_direction`: PNViewFlexDirection?, `flex_wrap`: PNViewFlexWrap?, `justify_content`: PNViewJustifyContent?, `align_items`: PNViewAlignItems?, `align_self`: PNViewAlignItems?, `align_content`: PNViewAlignContent?, `direction`: PNViewDirection?, `display`: PNViewDisplay?, `position`: PNViewPosition?, `top`: PNViewWidth?, `right`: PNViewWidth?, `bottom`: PNViewWidth?, `left`: PNViewWidth?, `start`: PNViewWidth?, `end`: PNViewWidth?, `padding`: PNViewPadding?, `padding_top`: PNViewWidth?, `padding_bottom`: PNViewWidth?, `padding_left`: PNViewWidth?, `padding_right`: PNViewWidth?, `padding_start`: PNViewWidth?, `padding_end`: PNViewWidth?, `padding_horizontal`: PNViewWidth?, `padding_vertical`: PNViewWidth?, `margin`: PNViewMargin?, `margin_top`: PNViewMarginTop?, `margin_bottom`: PNViewMarginTop?, `margin_left`: PNViewMarginTop?, `margin_right`: PNViewMarginTop?, `margin_start`: PNViewMarginTop?, `margin_end`: PNViewMarginTop?, `margin_horizontal`: PNViewMarginTop?, `margin_vertical`: PNViewMarginTop?, `spacing`: Double?, `gap`: Double?, `row_gap`: Double?, `column_gap`: Double?, `overflow`: PNViewOverflow?, `background_color`: PNViewBorderColor?, `color`: PNViewBorderColor?, `border_color`: PNViewBorderColor?, `placeholder_color`: PNViewBorderColor?, `tint_color`: PNActivityIndicatorColor?, `border_width`: Double?, `border_style`: PNViewBorderStyle?, `border_radius`: Double?, `border_top_left_radius`: Double?, `border_top_right_radius`: Double?, `border_bottom_left_radius`: Double?, `border_bottom_right_radius`: Double?, `border_top_width`: Double?, `border_right_width`: Double?, `border_bottom_width`: Double?, `border_left_width`: Double?, `border_top_color`: PNViewBorderColor?, `border_right_color`: PNViewBorderColor?, `border_bottom_color`: PNViewBorderColor?, `border_left_color`: PNViewBorderColor?, `font_size`: Double?, `font_family`: String?, `font_weight`: PNViewFontWeight?, `bold`: Bool?, `italic`: Bool?, `text_align`: PNViewTextAlign?, `text_decoration`: PNViewTextDecoration?, `text_transform`: PNViewTextTransform?, `line_height`: Double?, `letter_spacing`: Double?, `max_lines`: Int64?, `text_shadow_color`: PNViewBorderColor?, `text_shadow_offset`: PNViewTextShadowOffset?, `text_shadow_radius`: Double?, `shadow_color`: PNViewBorderColor?, `shadow_offset`: PNViewTextShadowOffset?, `shadow_opacity`: Double?, `shadow_radius`: Double?, `elevation`: Double?, `opacity`: Double?, `transform`: PNViewTransform?, `z_index`: Int64?, `pointer_events`: PNViewPointerEvents?, `refreshing`: Bool?, `on_refresh`: PNPresence<Bool?>, `accessibility_role`: String?, `ref`: PNJSONValue?, `on_layout`: Bool?) {
+    public init(`width`: PNViewWidth?, `height`: PNViewWidth?, `min_width`: PNViewWidth?, `max_width`: PNViewWidth?, `min_height`: PNViewWidth?, `max_height`: PNViewWidth?, `aspect_ratio`: Double?, `flex`: Double?, `flex_grow`: Double?, `flex_shrink`: Double?, `flex_basis`: PNViewWidth?, `flex_direction`: PNViewFlexDirection?, `flex_wrap`: PNViewFlexWrap?, `justify_content`: PNViewJustifyContent?, `align_items`: PNViewAlignItems?, `align_self`: PNViewAlignItems?, `align_content`: PNViewAlignContent?, `direction`: PNViewDirection?, `display`: PNViewDisplay?, `position`: PNViewPosition?, `top`: PNViewWidth?, `right`: PNViewWidth?, `bottom`: PNViewWidth?, `left`: PNViewWidth?, `start`: PNViewWidth?, `end`: PNViewWidth?, `padding`: PNViewPadding?, `padding_top`: PNViewWidth?, `padding_bottom`: PNViewWidth?, `padding_left`: PNViewWidth?, `padding_right`: PNViewWidth?, `padding_start`: PNViewWidth?, `padding_end`: PNViewWidth?, `padding_horizontal`: PNViewWidth?, `padding_vertical`: PNViewWidth?, `margin`: PNViewMargin?, `margin_top`: PNViewMarginTop?, `margin_bottom`: PNViewMarginTop?, `margin_left`: PNViewMarginTop?, `margin_right`: PNViewMarginTop?, `margin_start`: PNViewMarginTop?, `margin_end`: PNViewMarginTop?, `margin_horizontal`: PNViewMarginTop?, `margin_vertical`: PNViewMarginTop?, `gap`: Double?, `row_gap`: Double?, `column_gap`: Double?, `overflow`: PNViewOverflow?, `background_color`: PNViewBorderColor?, `color`: PNViewBorderColor?, `border_color`: PNViewBorderColor?, `placeholder_color`: PNViewBorderColor?, `tint_color`: PNActivityIndicatorColor?, `border_width`: Double?, `border_style`: PNViewBorderStyle?, `border_radius`: Double?, `border_top_left_radius`: Double?, `border_top_right_radius`: Double?, `border_bottom_left_radius`: Double?, `border_bottom_right_radius`: Double?, `border_top_width`: Double?, `border_right_width`: Double?, `border_bottom_width`: Double?, `border_left_width`: Double?, `border_top_color`: PNViewBorderColor?, `border_right_color`: PNViewBorderColor?, `border_bottom_color`: PNViewBorderColor?, `border_left_color`: PNViewBorderColor?, `font_size`: Double?, `font_family`: String?, `font_weight`: PNViewFontWeight?, `bold`: Bool?, `italic`: Bool?, `text_align`: PNViewTextAlign?, `text_decoration`: PNViewTextDecoration?, `text_transform`: PNViewTextTransform?, `line_height`: Double?, `letter_spacing`: Double?, `max_lines`: Int64?, `text_shadow_color`: PNViewBorderColor?, `text_shadow_offset`: PNViewTextShadowOffset?, `text_shadow_radius`: Double?, `shadow_color`: PNViewBorderColor?, `shadow_offset`: PNViewTextShadowOffset?, `shadow_opacity`: Double?, `shadow_radius`: Double?, `elevation`: Double?, `opacity`: Double?, `transform`: PNViewTransform?, `z_index`: Int64?, `pointer_events`: PNViewPointerEvents?, `refreshing`: Bool?, `on_refresh`: PNPresence<Bool?>, `accessibility_role`: String?, `ref`: PNJSONValue?, `on_layout`: Bool?) {
         self.`width` = `width`
         self.`height` = `height`
         self.`min_width` = `min_width`
@@ -1331,7 +1330,6 @@ public struct PNScrollViewRefreshControl: Codable {
         self.`margin_end` = `margin_end`
         self.`margin_horizontal` = `margin_horizontal`
         self.`margin_vertical` = `margin_vertical`
-        self.`spacing` = `spacing`
         self.`gap` = `gap`
         self.`row_gap` = `row_gap`
         self.`column_gap` = `column_gap`
@@ -1385,7 +1383,7 @@ public struct PNScrollViewRefreshControl: Codable {
         self.`ref` = `ref`
         self.`on_layout` = `on_layout`
     }
-    private enum CodingKeys: String, CodingKey { case `width`; case `height`; case `min_width`; case `max_width`; case `min_height`; case `max_height`; case `aspect_ratio`; case `flex`; case `flex_grow`; case `flex_shrink`; case `flex_basis`; case `flex_direction`; case `flex_wrap`; case `justify_content`; case `align_items`; case `align_self`; case `align_content`; case `direction`; case `display`; case `position`; case `top`; case `right`; case `bottom`; case `left`; case `start`; case `end`; case `padding`; case `padding_top`; case `padding_bottom`; case `padding_left`; case `padding_right`; case `padding_start`; case `padding_end`; case `padding_horizontal`; case `padding_vertical`; case `margin`; case `margin_top`; case `margin_bottom`; case `margin_left`; case `margin_right`; case `margin_start`; case `margin_end`; case `margin_horizontal`; case `margin_vertical`; case `spacing`; case `gap`; case `row_gap`; case `column_gap`; case `overflow`; case `background_color`; case `color`; case `border_color`; case `placeholder_color`; case `tint_color`; case `border_width`; case `border_style`; case `border_radius`; case `border_top_left_radius`; case `border_top_right_radius`; case `border_bottom_left_radius`; case `border_bottom_right_radius`; case `border_top_width`; case `border_right_width`; case `border_bottom_width`; case `border_left_width`; case `border_top_color`; case `border_right_color`; case `border_bottom_color`; case `border_left_color`; case `font_size`; case `font_family`; case `font_weight`; case `bold`; case `italic`; case `text_align`; case `text_decoration`; case `text_transform`; case `line_height`; case `letter_spacing`; case `max_lines`; case `text_shadow_color`; case `text_shadow_offset`; case `text_shadow_radius`; case `shadow_color`; case `shadow_offset`; case `shadow_opacity`; case `shadow_radius`; case `elevation`; case `opacity`; case `transform`; case `z_index`; case `pointer_events`; case `refreshing`; case `on_refresh`; case `accessibility_role`; case `ref`; case `on_layout` }
+    private enum CodingKeys: String, CodingKey { case `width`; case `height`; case `min_width`; case `max_width`; case `min_height`; case `max_height`; case `aspect_ratio`; case `flex`; case `flex_grow`; case `flex_shrink`; case `flex_basis`; case `flex_direction`; case `flex_wrap`; case `justify_content`; case `align_items`; case `align_self`; case `align_content`; case `direction`; case `display`; case `position`; case `top`; case `right`; case `bottom`; case `left`; case `start`; case `end`; case `padding`; case `padding_top`; case `padding_bottom`; case `padding_left`; case `padding_right`; case `padding_start`; case `padding_end`; case `padding_horizontal`; case `padding_vertical`; case `margin`; case `margin_top`; case `margin_bottom`; case `margin_left`; case `margin_right`; case `margin_start`; case `margin_end`; case `margin_horizontal`; case `margin_vertical`; case `gap`; case `row_gap`; case `column_gap`; case `overflow`; case `background_color`; case `color`; case `border_color`; case `placeholder_color`; case `tint_color`; case `border_width`; case `border_style`; case `border_radius`; case `border_top_left_radius`; case `border_top_right_radius`; case `border_bottom_left_radius`; case `border_bottom_right_radius`; case `border_top_width`; case `border_right_width`; case `border_bottom_width`; case `border_left_width`; case `border_top_color`; case `border_right_color`; case `border_bottom_color`; case `border_left_color`; case `font_size`; case `font_family`; case `font_weight`; case `bold`; case `italic`; case `text_align`; case `text_decoration`; case `text_transform`; case `line_height`; case `letter_spacing`; case `max_lines`; case `text_shadow_color`; case `text_shadow_offset`; case `text_shadow_radius`; case `shadow_color`; case `shadow_offset`; case `shadow_opacity`; case `shadow_radius`; case `elevation`; case `opacity`; case `transform`; case `z_index`; case `pointer_events`; case `refreshing`; case `on_refresh`; case `accessibility_role`; case `ref`; case `on_layout` }
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.`width` = try container.decodeIfPresent(PNViewWidth.self, forKey: .`width`)
@@ -1432,7 +1430,6 @@ public struct PNScrollViewRefreshControl: Codable {
         self.`margin_end` = try container.decodeIfPresent(PNViewMarginTop.self, forKey: .`margin_end`)
         self.`margin_horizontal` = try container.decodeIfPresent(PNViewMarginTop.self, forKey: .`margin_horizontal`)
         self.`margin_vertical` = try container.decodeIfPresent(PNViewMarginTop.self, forKey: .`margin_vertical`)
-        self.`spacing` = try container.decodeIfPresent(Double.self, forKey: .`spacing`)
         self.`gap` = try container.decodeIfPresent(Double.self, forKey: .`gap`)
         self.`row_gap` = try container.decodeIfPresent(Double.self, forKey: .`row_gap`)
         self.`column_gap` = try container.decodeIfPresent(Double.self, forKey: .`column_gap`)
@@ -1532,7 +1529,6 @@ public struct PNScrollViewRefreshControl: Codable {
         try container.encodeIfPresent(`margin_end`, forKey: .`margin_end`)
         try container.encodeIfPresent(`margin_horizontal`, forKey: .`margin_horizontal`)
         try container.encodeIfPresent(`margin_vertical`, forKey: .`margin_vertical`)
-        try container.encodeIfPresent(`spacing`, forKey: .`spacing`)
         try container.encodeIfPresent(`gap`, forKey: .`gap`)
         try container.encodeIfPresent(`row_gap`, forKey: .`row_gap`)
         try container.encodeIfPresent(`column_gap`, forKey: .`column_gap`)

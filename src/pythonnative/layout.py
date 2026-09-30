@@ -59,7 +59,6 @@ LAYOUT_STYLE_KEYS = frozenset(
         "flex_direction",
         "justify_content",
         "align_items",
-        "spacing",
         "gap",
         "row_gap",
         "column_gap",
@@ -82,6 +81,7 @@ _Measure = C.CFUNCTYPE(
 def _measure(ptr: int, width: float, wm: int, height: float, hm: int, outw: Any, outh: Any) -> None:
     node = _nodes.get(ptr)
     try:
+        assert node is not None and node.measure is not None
         w, h = node.measure(width if wm else math.inf, height if hm else math.inf)
         outw[0], outh[0] = max(0, w), max(0, h)
     except BaseException as exc:
@@ -94,7 +94,7 @@ def _api() -> Any:
     global _lib
     if _lib is not None:
         return _lib
-    from . import _yoga
+    from . import _yoga  # type: ignore[attr-defined]
 
     lib = C.CDLL(_yoga.__file__)
     signatures: dict[str, Any] = {
@@ -235,7 +235,7 @@ def apply_style(ptr: int, style: dict[str, Any]) -> None:
             "aspect_ratio",
         }:
             _set(ptr, "".join(part.title() for part in key.split("_")), value)
-        elif key in {"spacing", "gap", "row_gap", "column_gap"}:
+        elif key in {"gap", "row_gap", "column_gap"}:
             _set(ptr, "Gap", value, {"column_gap": 0, "row_gap": 1}.get(key, 2))
         elif key in EDGES and key not in {"all", "horizontal", "vertical"}:
             _set(ptr, "Position", value, EDGES[key])

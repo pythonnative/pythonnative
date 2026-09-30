@@ -35,6 +35,21 @@ jobs:
       - name: Type check (MyPy)
         run: uv run mypy
 
+      # The Inbox and e2e apps each own a top-level ``app`` package, so
+      # they're checked from their own directories rather than whole-tree.
+      - name: Type check the Inbox example (strict)
+        working-directory: examples/inbox
+        env:
+          MYPYPATH: ../inbox-extension/src
+        run: uv run --project ../.. mypy --strict app
+
+      - name: Type check the e2e suite (strict)
+        working-directory: examples/e2e-suite
+        run: uv run --project ../.. mypy --strict app
+
+      - name: Rules of hooks (pn lint)
+        run: uv run pn lint src/pythonnative examples
+
       # Produces the sdist and wheel through the setuptools backend. Note
       # this builds but does not install them, so the previous non-editable
       # install smoke test is not replaced.
