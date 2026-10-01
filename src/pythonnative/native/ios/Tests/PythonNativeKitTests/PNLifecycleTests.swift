@@ -15,7 +15,9 @@ final class PNLifecycleTests: XCTestCase {
     private func settle() {
         let ready = expectation(description: "native transition completes")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { ready.fulfill() }
-        wait(for: [ready], timeout: 3)
+        // The wait measures when the main thread is free again after a UIKit
+        // transition; a loaded CI simulator can stall it for several seconds.
+        wait(for: [ready], timeout: 15)
         window.layoutIfNeeded()
     }
     override func tearDown() {

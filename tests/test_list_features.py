@@ -234,3 +234,32 @@ def test_inverted_section_list_mirrors_rows() -> None:
     assert view.props["transform"] == [{"scale_y": -1}]
     assert all(row.props["transform"] == [{"scale_y": -1}] for row in _row_wrappers(view))
     result.unmount()
+
+
+def test_list_data_is_owned_by_the_first_thread_that_uses_it() -> None:
+    import threading
+
+    # Built at import time on one thread (a module-level repository), then
+    # subscribed to and edited on the application thread.
+    built: list[pn.ListData[str]] = []
+    creator = threading.Thread(target=lambda: built.append(pn.ListData(["a", "b"], key=lambda item: item)))
+    creator.start()
+    creator.join()
+    data = built[0]
+    unsubscribe = data.subscribe(lambda: None)
+    data.append("c")
+    assert list(data) == ["a", "b", "c"]
+
+    errors: list[BaseException] = []
+
+    def mutate_elsewhere() -> None:
+        try:
+            data.append("d")
+        except RuntimeError as exc:
+            errors.append(exc)
+
+    other = threading.Thread(target=mutate_elsewhere)
+    other.start()
+    other.join()
+    assert len(errors) == 1 and "owning application thread" in str(errors[0])
+    unsubscribe()

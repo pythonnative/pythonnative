@@ -40,9 +40,12 @@ class _Entry(Generic[T]):
 class ListData(Sequence[T]):
     """A keyed collection that publishes explicit edits to virtualized lists.
 
-    Call mutations on the thread that created the collection, normally the
-    application thread. Items are application values: replace an item with
-    ``update`` after editing it instead of mutating it silently. Keys must be
+    The first thread that subscribes to or mutates the collection owns it,
+    normally the application thread; later subscriptions and mutations must
+    happen there. Creating one at module import time (a module-level
+    repository, say) is fine even when the import runs on another thread.
+    Items are application values: replace an item with ``update`` after
+    editing it instead of mutating it silently. Keys must be
     unique, nonempty strings and can't change in an update.
 
     ``update`` and key lookup take constant time. Insertion, removal, and moves
@@ -56,7 +59,8 @@ class ListData(Sequence[T]):
     def __init__(self, items: Iterable[T] = (), *, key: Callable[[T], str], history_limit: int = 1024) -> None:
         if history_limit < 1:
             raise ValueError("history_limit must be positive")
-        self._owner = threading.get_ident()
+        # Claimed by the first subscription or mutation, not by construction.
+        self._owner: int | None = None
         self._key = key
         self._keys: list[str] = []
         self._entries: dict[str, _Entry[T]] = {}
@@ -79,7 +83,10 @@ class ListData(Sequence[T]):
         return name
 
     def _check_thread(self) -> None:
-        if threading.get_ident() != self._owner:
+        current = threading.get_ident()
+        if self._owner is None:
+            self._owner = current
+        elif current != self._owner:
             raise RuntimeError("Mutate ListData on its owning application thread")
 
     def __len__(self) -> int:
