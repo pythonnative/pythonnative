@@ -894,6 +894,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1096,6 +1100,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1460,6 +1492,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -1916,6 +1976,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2836,6 +2902,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../navigation/" class="md-nav__link">
         
   
@@ -2872,6 +2994,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -4158,7 +4308,7 @@ process or an older version of the app.</p>
 <a href="#pythonnative.storage.use_persisted_state" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">use_persisted_state</span><span class="p">(</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">key</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n">initial</span><span class="p">:</span> <span class="n"><span title="pythonnative.storage.T">T</span></span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Tuple&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Tuple">Tuple</a></span><span class="p">[</span><span class="n"><span title="pythonnative.storage.T">T</span></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Callable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Callable">Callable</a></span><span class="p">[[</span><span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Tuple&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Tuple">Tuple</a></span><span class="p">[</span><span class="n"><span title="pythonnative.storage.T">T</span></span><span class="p">,</span> <span class="s2">"StateSetter[T]"</span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -4166,13 +4316,14 @@ process or an older version of the app.</p>
         <p>Persisted <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_state&lt;/span&gt;" href="../hooks/#pythonnative.hooks.use_state"><code>use_state</code></a> variant.</p>
 <p>Backed by <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AsyncStorage&lt;/span&gt;" href="#pythonnative.storage.AsyncStorage"><code>AsyncStorage</code></a>:
 behaves like <code>use_state</code> but loads the prior value (if any) on
-mount and persists every subsequent update. Until the load
-completes the value is <code>initial</code>, the same fallback React
-Native users get with <code>AsyncStorage.getItem</code>.</p>
-<p>The setter accepts either a value or a <code>current -&gt; new</code>
-callable, matching
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_state&lt;/span&gt;" href="../hooks/#pythonnative.hooks.use_state"><code>use_state</code></a>. Writes are
-fire-and-forget; failures are silently absorbed (storage is
+mount and persists every later committed change. Until the load
+completes the value is <code>initial</code>, the same fallback React Native
+users get with <code>AsyncStorage.getItem</code>.</p>
+<p>Writes happen in an effect after a change commits, never inside a
+state updater, so transitions that replay updaters don't write
+twice. A value set before the first load finishes wins: the stored
+value is discarded and the new one is persisted. Values must be
+JSON-serializable; write failures are absorbed (storage is
 best-effort by design).</p>
 
 
@@ -4239,13 +4390,13 @@ best-effort by design).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(value, setter)</code>, same shape as</p>
+                <p><code>(value, setter)</code>, the same shape as</p>
               </div>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Callable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Callable">Callable</a>[[<a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a>], None]</code>
+                  <code>&#39;StateSetter[T]&#39;</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4263,7 +4414,7 @@ best-effort by design).</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">ThemeToggle</span><span class="p">():</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">ThemeToggle</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">theme</span><span class="p">,</span> <span class="n">set_theme</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_persisted_state</span><span class="p">(</span><span class="s2">"settings.theme"</span><span class="p">,</span> <span class="s2">"light"</span><span class="p">)</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="sa">f</span><span class="s2">"Theme: </span><span class="si">{</span><span class="n">theme</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>

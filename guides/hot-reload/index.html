@@ -896,6 +896,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1099,6 +1103,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1470,6 +1502,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#when-state-survives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When state survives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-gets-reloaded" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1587,6 +1630,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -2041,6 +2112,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2786,6 +2863,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/navigation/" class="md-nav__link">
         
   
@@ -2822,6 +2955,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3457,6 +3618,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#when-state-survives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When state survives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-gets-reloaded" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3587,8 +3759,9 @@ any debug build launched with <code>pn run</code> while it's running is a client
    rewrites the <code>Element.type</code> references in place. The next
    reconcile sees the new function with the same <code>HookState</code>, so state
    survives when the captured hook signature is compatible. Hook-order or
-   custom-hook changes remount the affected component. Helper-class and service
-   changes trigger an application remount.</li>
+   custom-hook changes remount the affected component, and a changed class
+   definition remounts the application (see
+   <a href="#when-state-survives">When state survives</a>).</li>
 <li>The host re-renders. Layout and native views update incrementally
    through the normal reconciler path.</li>
 <li>The client reports back (<code>fast_refresh: app.screens.home 42ms</code>),
@@ -3598,13 +3771,61 @@ any debug build launched with <code>pn run</code> while it's running is a client
 changed, a render raised with the new function, or the swap itself
 failed), the host falls back to a <strong>full remount</strong> of its root, so you
 never get stuck with a stale tree. Hook state is reset in that case
-and the report says <code>remount</code>.</p>
+and the report says <code>remount</code>. When no screen is mounted yet, nothing is
+refreshed and nothing is reported; the first render reads the new files.</p>
 <p>If the saved file fails to import (a syntax error mid-edit), the
 previous module stays in <code>sys.modules</code>, the traceback shows in the
 RedBox and the terminal, and the app keeps running. Fix the file and
 save again.</p>
 <p>Refresh walks the application's shared logical tree, including covered screens
 and mounted list rows. Native containers don't create separate Python hosts.</p>
+<h2 id="when-state-survives">When state survives<a class="headerlink" href="#when-state-survives" title="Permanent link">&para;</a></h2>
+<p>A save keeps component state unless one of the following is true:</p>
+<ul>
+<li><strong>A component's hooks changed.</strong> Fast Refresh records each component's
+  hook calls (their order, kind, and binding names, following custom
+  hooks defined in your app). If the new function's signature differs,
+  only the instances of that component remount; the rest of the tree
+  keeps its state.</li>
+<li><strong>A class definition changed.</strong> Before reloading, <code>apply_reload</code>
+  fingerprints every class defined in each module it's about to
+  re-execute. The fingerprint covers the class's name, metaclass, and
+  bases; its annotated field names; its dataclass fields and their
+  defaults; its immutable class attributes (numbers, strings, tuples, and
+  <code>Enum</code> member values); and the bytecode, constants, names, and defaults
+  of every method, property, <code>staticmethod</code>, and <code>classmethod</code>. If a class
+  that existed before is removed, renamed, or has a different fingerprint
+  after the reload, the whole application remounts, because an instance
+  of the old class could still sit in <code>use_state</code>, <code>use_memo</code>, or
+  <code>use_ref</code>.</li>
+</ul>
+<p>Everything else preserves state. In particular, these never force a
+remount:</p>
+<ul>
+<li>Editing a component's body, text, styles, or props (as long as its hooks
+  stay the same).</li>
+<li>Adding, editing, or removing plain functions, lambdas, and constants.
+  They're rebound when the module re-executes, and components pick them
+  up on their next render.</li>
+<li>Defining or editing a <code>TypedDict</code> or <code>Protocol</code>. They describe shapes;
+  nothing holds an instance of the class itself.</li>
+<li>Re-executing a module whose classes didn't change. A dataclass, <code>Enum</code>,
+  <code>NamedTuple</code>, or exception class that's identical to its previous
+  definition keeps its fingerprint.</li>
+<li>Moving a class, adding blank lines or comments around it, or editing
+  the text of its docstring or its methods' docstrings. Line numbers,
+  file names, and docstring text aren't part of the fingerprint.</li>
+<li>Adding a new class. No live instance can refer to it yet.</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Unchanged classes are still new objects</p>
+<p>Re-executing a module creates new class objects even when their
+fingerprints match. An instance created before the save keeps its old
+class, so <code>isinstance</code> checks against the new class, or identity
+comparisons between an old <code>Enum</code> member held in state and a new one,
+return <code>False</code>. Compare <code>Enum</code> members by <code>.name</code> or <code>.value</code> if that
+matters during development, or reload the app.</p>
+</div>
 <h2 id="what-gets-reloaded">What gets reloaded<a class="headerlink" href="#what-gets-reloaded" title="Permanent link">&para;</a></h2>
 <p>Any <code>.py</code> file under <code>app/</code>. Assets under <code>app/</code> (images, JSON, fonts)
 are synced too, so an <code>Image</code> that points at a bundle-relative file
@@ -3645,7 +3866,8 @@ preview or relaunch the device build.</p>
 <p>Adding or removing a hook in a component changes the slot layout.
 Fast Refresh compares captured hook signatures before preserving
 state. Hook-order and custom-hook changes remount affected component
-instances. Changes to helper classes or services remount the application.</p>
+instances. Changed class definitions remount the application; see
+<a href="#when-state-survives">When state survives</a>.</p>
 </div>
 <div class="admonition info">
 <p class="admonition-title">Renaming a component</p>
@@ -3659,6 +3881,13 @@ navigation or state change, or reload the app.</p>
 CLI says so and builds an app that runs its bundled sources; start the
 server and relaunch to connect it. For rebuild-on-every-change (more
 predictable, much slower), pass <code>--rebuild</code>.</p>
+<p>The app also needs your dev token, which <code>pn run</code> passes along with the
+server's URL; see <a href="../dev-workflow/#the-dev-token">The dev token</a>. If
+you delete the token file, relaunch installed debug builds with <code>pn run</code>
+so they pick up the new one.</p>
+<p>Release builds have no Fast Refresh at all: they leave out
+<code>pythonnative.hot_reload</code>, <code>pythonnative.refresh</code>, and the dev client.
+See <a href="../building-for-release/#what-a-release-bundle-leaves-out">Building for release</a>.</p>
 <h2 id="reading-logs">Reading logs<a class="headerlink" href="#reading-logs" title="Permanent link">&para;</a></h2>
 <p>Every dev client mirrors its <code>print</code> output, warnings, and tracebacks
 to the <code>pn start</code> terminal, so you rarely need a device log viewer. For

@@ -894,6 +894,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1096,6 +1100,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1460,6 +1492,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -2019,6 +2079,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2764,6 +2830,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/navigation/" class="md-nav__link">
         
   
@@ -2800,6 +2922,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3522,7 +3672,7 @@ then run <code>pn preview app.main.Counter</code>.</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">Counter</span><span class="p">(</span><span class="n">initial</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">Counter</span><span class="p">(</span><span class="n">initial</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">count</span><span class="p">,</span> <span class="n">set_count</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="n">initial</span><span class="p">)</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">inc</span> <span class="o">=</span> <span class="k">lambda</span><span class="p">:</span> <span class="n">set_count</span><span class="p">(</span><span class="n">count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
@@ -3539,11 +3689,11 @@ then run <code>pn preview app.main.Counter</code>.</p>
 </span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
 </span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"-"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">dec</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span>
 </span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"+"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">inc</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"gap"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
 </span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>        <span class="p">),</span>
 </span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Reset"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">reset</span><span class="p">),</span>
 </span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>            <span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>            <span class="s2">"gap"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span>
 </span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>            <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span>
 </span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>            <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"stretch"</span><span class="p">,</span>
 </span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>        <span class="p">},</span>
@@ -3555,7 +3705,7 @@ then run <code>pn preview app.main.Counter</code>.</p>
   <code>initial</code>. They are recreated on every render but the reconciler
   doesn't care; only behavior, not identity, matters here.</li>
 <li><code>style</code> arguments are plain dicts. Layout properties (<code>flex</code>,
-  <code>spacing</code>, <code>padding</code>, <code>align_items</code>) sit beside visual properties
+  <code>gap</code>, <code>padding</code>, <code>align_items</code>) sit beside visual properties
   (<code>color</code>, <code>font_size</code>, <code>bold</code>).</li>
 <li>The <code>Row</code> uses <code>flex: 1</code> on its children to split space evenly. The
   same <code>flex</code> knob works inside <code>Column</code>s for vertical layouts.</li>
@@ -3572,31 +3722,36 @@ top-level component like this one, the closure version is fine.</p>
 <h2 id="reducer-flavor">Reducer flavor<a class="headerlink" href="#reducer-flavor" title="Permanent link">&para;</a></h2>
 <p>For more complex counters (with bounds, multipliers, history), reach
 for <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_reducer&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_reducer"><code>use_reducer</code></a>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">reducer</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">action</span><span class="p">):</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="k">if</span> <span class="n">action</span> <span class="o">==</span> <span class="s2">"inc"</span><span class="p">:</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>        <span class="k">return</span> <span class="n">state</span> <span class="o">+</span> <span class="mi">1</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="k">if</span> <span class="n">action</span> <span class="o">==</span> <span class="s2">"dec"</span><span class="p">:</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="k">return</span> <span class="n">state</span> <span class="o">-</span> <span class="mi">1</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">if</span> <span class="n">action</span> <span class="o">==</span> <span class="s2">"reset"</span><span class="p">:</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="k">return</span> <span class="mi">0</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown action: </span><span class="si">{</span><span class="n">action</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">reducer</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">action</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"inc"</span><span class="p">,</span> <span class="s2">"dec"</span><span class="p">,</span> <span class="s2">"reset"</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">if</span> <span class="n">action</span> <span class="o">==</span> <span class="s2">"inc"</span><span class="p">:</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="k">return</span> <span class="n">state</span> <span class="o">+</span> <span class="mi">1</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="k">if</span> <span class="n">action</span> <span class="o">==</span> <span class="s2">"dec"</span><span class="p">:</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="k">return</span> <span class="n">state</span> <span class="o">-</span> <span class="mi">1</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="k">return</span> <span class="mi">0</span>
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="k">def</span><span class="w"> </span><span class="nf">Counter</span><span class="p">():</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="n">state</span><span class="p">,</span> <span class="n">dispatch</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_reducer</span><span class="p">(</span><span class="n">reducer</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">state</span><span class="p">),</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">28</span><span class="p">}),</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"-"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">dispatch</span><span class="p">(</span><span class="s2">"dec"</span><span class="p">)),</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"+"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">dispatch</span><span class="p">(</span><span class="s2">"inc"</span><span class="p">)),</span>
-</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
-</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>        <span class="p">),</span>
-</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Reset"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">dispatch</span><span class="p">(</span><span class="s2">"reset"</span><span class="p">)),</span>
-</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"stretch"</span><span class="p">},</span>
-</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>    <span class="p">)</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="k">def</span><span class="w"> </span><span class="nf">Counter</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">state</span><span class="p">,</span> <span class="n">dispatch</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_reducer</span><span class="p">(</span><span class="n">reducer</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">state</span><span class="p">),</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">28</span><span class="p">}),</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"-"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">dispatch</span><span class="p">(</span><span class="s2">"dec"</span><span class="p">)),</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"+"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">dispatch</span><span class="p">(</span><span class="s2">"inc"</span><span class="p">)),</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"gap"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>        <span class="p">),</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Reset"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">dispatch</span><span class="p">(</span><span class="s2">"reset"</span><span class="p">)),</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"gap"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"stretch"</span><span class="p">},</span>
+</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>    <span class="p">)</span>
 </span></code></pre></div>
-<p>The reducer is a plain function: easy to test, easy to read.</p>
+<p>The reducer is a plain function: easy to test, easy to read, and
+typed, so <code>dispatch("increment")</code> is a static error. When several
+screens need the same counter, move it into a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Store&lt;/span&gt;" href="../../api/store/#pythonnative.store.Store"><code>Store</code></a>; see
+<a href="../../guides/state/">Managing state</a>.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Capture and submit user input: <a href="../forms/">Forms</a>.</li>

@@ -894,6 +894,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1096,6 +1100,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1460,6 +1492,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -1916,6 +1976,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2618,7 +2684,7 @@
   <a href="#pythonnative.element.Node" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;Node
+        <code class="doc-symbol doc-symbol-toc doc-symbol-type_alias"></code>&nbsp;Node
       
     </span>
   </a>
@@ -2814,6 +2880,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../navigation/" class="md-nav__link">
         
   
@@ -2850,6 +2972,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3510,7 +3660,7 @@
   <a href="#pythonnative.element.Node" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;Node
+        <code class="doc-symbol doc-symbol-toc doc-symbol-type_alias"></code>&nbsp;Node
       
     </span>
   </a>
@@ -3618,6 +3768,12 @@ tree. <code>Element</code> instances are produced by the
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a>.</p>
 <p>You almost never construct an <code>Element</code> by hand; the factory functions
 exist precisely so app code stays in plain Python.</p>
+<p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-type_alias&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-type_alias-name&quot;&gt;Node&lt;/span&gt;" href="#pythonnative.element.Node"><code>Node</code></a> is the type of anything that can
+appear in a tree: an element, <code>None</code> or a <code>bool</code> for "nothing", or a
+(possibly nested) iterable of nodes. Built-in containers take
+<code>*children: pn.Node</code>, and components return <code>pn.Node</code>.
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;with_key&lt;/span&gt;" href="#pythonnative.element.Element.with_key"><code>Element.with_key</code></a> returns a keyed
+copy, the typed way to key a user component.</p>
 
 
 <div class="doc doc-object doc-module">
@@ -3684,6 +3840,27 @@ element can collide with them.</p>
 
 
 
+
+
+<p><span class="doc-section-title">Type Aliases:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-type_alias&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-type_alias-name&quot;&gt;Node&lt;/span&gt; (&lt;code&gt;pythonnative.element.Node&lt;/code&gt;)" href="#pythonnative.element.Node">Node</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>Anything that can appear in an element tree.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 
@@ -3802,21 +3979,6 @@ element can collide with them.</p>
               </div>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;Node&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt; (&lt;code&gt;pythonnative.element.Node&lt;/code&gt;)" href="#pythonnative.element.Node">Node</a></code></td>
-            <td>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Anything a component may render: an element, <code>None</code> / <code>False</code></p>
-              </div>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -3902,36 +4064,35 @@ element can collide with them.</p>
 
 </div>
 
-<div class="doc doc-object doc-attribute">
+
+<div class="doc doc-object doc-type_alias">
 
 
 
 <h2 id="pythonnative.element.Node" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">Node</span>
+<code class="doc-symbol doc-symbol-heading doc-symbol-type_alias"></code>            <span class="doc doc-object-name doc-type_alias-name">Node</span>
 
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
-  </span>
 
 <a href="#pythonnative.element.Node" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">Node</span> <span class="o">=</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Union&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Union">Union</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nc">Node</span> <span class="o">=</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
 
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt; (&lt;code&gt;pythonnative.element.Element&lt;/code&gt;)" href="#pythonnative.element.Element">Element</a></span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#bool">bool</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Iterable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Iterable">Iterable</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">]]</span>
+  &lt;/span&gt; (&lt;code&gt;pythonnative.element.Element&lt;/code&gt;)" href="#pythonnative.element.Element">Element</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">|</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#bool">bool</a></span> <span class="o">|</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Iterable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Iterable">Iterable</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-type_alias&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-type_alias-name&quot;&gt;Node&lt;/span&gt; (&lt;code&gt;pythonnative.element.Node&lt;/code&gt;)" href="#pythonnative.element.Node">Node</a></span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Anything a component may render: an element, <code>None</code> / <code>False</code>
-for "nothing", or a (possibly nested) iterable of nodes.</p>
-
+        <p>Anything that can appear in an element tree.</p>
+<p>An element, <code>None</code> or a <code>bool</code> for "nothing" (so <code>cond and
+pn.Text(...)</code> and <code>pn.Text(...) if cond else None</code> both work), or a
+possibly nested iterable of nodes. Every built-in container declares
+<code>*children: Node</code> and component bodies return a <code>Node</code>. Strings
+aren't nodes: wrap text in <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Text&lt;/span&gt;" href="../components/#pythonnative.components.Text"><code>Text</code></a>.</p>
     </div>
 
 </div>
-
 
 
 <div class="doc doc-object doc-class">
@@ -4140,15 +4301,19 @@ diffing keyed lists. Two elements with the same <code>type</code> and
 
 
 <a href="#pythonnative.element.Element.with_key" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">with_key</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s1">'Element'</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">with_key</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#object">object</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s1">'Element'</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
         <p>Return a copy of this element carrying <code>key</code>.</p>
-<p>Handy when a factory result needs a key after the fact, for
-example while building a list comprehension over elements
-produced by a helper that doesn't take <code>key</code>.</p>
+<p>This is the typed way to key a user component, whose call
+signature can't include <code>key=</code> (PEP 612 forbids keyword
+parameters next to a <code>ParamSpec</code>):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">Row</span><span class="p">(</span><span class="n">item</span><span class="p">)</span><span class="o">.</span><span class="n">with_key</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">))</span>
+</span></code></pre></div>
+<p>Built-in factories also accept <code>key=</code> directly. Non-string
+keys are converted with <code>str</code>; <code>None</code> clears the key.</p>
 
 
     </div>

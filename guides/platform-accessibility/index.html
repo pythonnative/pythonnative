@@ -896,6 +896,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1099,6 +1103,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1650,6 +1682,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2091,6 +2151,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2836,6 +2902,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/navigation/" class="md-nav__link">
         
   
@@ -2872,6 +2994,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3678,7 +3828,7 @@ which is useful for skipping native-only code paths in tests.</p>
 <p>PythonNative ships reactive hooks that subscribe to the
 platform-published metrics in <code>pythonnative.platform_metrics</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Responsive</span><span class="p">():</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Responsive</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">dims</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_window_dimensions</span><span class="p">()</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">insets</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_safe_area_insets</span><span class="p">()</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">keyboard</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_keyboard_height</span><span class="p">()</span>
@@ -3687,7 +3837,7 @@ platform-published metrics in <code>pythonnative.platform_metrics</code>:</p>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">dims</span><span class="o">.</span><span class="n">width</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2"> × </span><span class="si">{</span><span class="n">dims</span><span class="o">.</span><span class="n">height</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span>
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Bottom inset: </span><span class="si">{</span><span class="n">insets</span><span class="o">.</span><span class="n">bottom</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span>
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Keyboard: </span><span class="si">{</span><span class="n">keyboard</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"gap"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p>The component re-renders whenever the underlying value actually
@@ -3862,7 +4012,7 @@ hooks <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symb
 and <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_reduce_motion&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.accessibility_info.use_reduce_motion"><code>use_reduce_motion</code></a>, which
 re-render when the setting changes:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Toast</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Toast</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">reduce_motion</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_reduce_motion</span><span class="p">()</span>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">use_effect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">AccessibilityInfo</span><span class="o">.</span><span class="n">announce</span><span class="p">(</span><span class="n">message</span><span class="p">),</span> <span class="p">[</span><span class="n">message</span><span class="p">])</span>
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span>
@@ -3873,7 +4023,7 @@ re-render when the setting changes:</p>
 </span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>
 </span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>
 </span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="k">def</span><span class="w"> </span><span class="nf">Chart</span><span class="p">(</span><span class="n">points</span><span class="p">):</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="k">def</span><span class="w"> </span><span class="nf">Chart</span><span class="p">(</span><span class="n">points</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>    <span class="k">if</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_screen_reader_enabled</span><span class="p">():</span>
 </span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>        <span class="k">return</span> <span class="n">DataTable</span><span class="p">(</span><span class="n">points</span><span class="o">=</span><span class="n">points</span><span class="p">)</span>   <span class="c1"># a readable alternative to the drawing</span>
 </span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Svg</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
@@ -3898,7 +4048,7 @@ hook re-renders when they change. Each <a class="autorefs autorefs-internal" tit
   &lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.localization.Locale"><code>Locale</code></a>
 carries <code>language_tag</code>, <code>language_code</code>, <code>region_code</code>, and <code>is_rtl</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Greeting</span><span class="p">():</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Greeting</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">locale</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_locales</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">text</span> <span class="o">=</span> <span class="s2">"Hola"</span> <span class="k">if</span> <span class="n">locale</span><span class="o">.</span><span class="n">language_code</span> <span class="o">==</span> <span class="s2">"es"</span> <span class="k">else</span> <span class="s2">"Hello"</span>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">style</span><span class="p">(</span><span class="n">text_align</span><span class="o">=</span><span class="s2">"right"</span> <span class="k">if</span> <span class="n">locale</span><span class="o">.</span><span class="n">is_rtl</span> <span class="k">else</span> <span class="s2">"left"</span><span class="p">))</span>

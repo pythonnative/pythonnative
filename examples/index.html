@@ -894,6 +894,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1096,6 +1100,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1460,6 +1492,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -2069,6 +2129,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2814,6 +2880,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../api/navigation/" class="md-nav__link">
         
   
@@ -2850,6 +2972,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3642,7 +3792,7 @@ project scaffolded with <code>pn init</code>.</p>
 </tr>
 <tr>
 <td><a href="navigation/">Navigation</a></td>
-<td>Stack, tab, and drawer navigators side-by-side.</td>
+<td>Typed screens, stack, tab, and drawer navigators, and nesting.</td>
 </tr>
 <tr>
 <td><a href="collapsing-header/">Collapsing header &amp; bottom sheet</a></td>
@@ -3668,9 +3818,9 @@ project scaffolded with <code>pn init</code>.</p>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>pn<span class="w"> </span>preview<span class="w">       </span><span class="c1"># dev server + browser preview with Fast Refresh</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w">   </span><span class="c1"># or: pn run ios</span>
 </span></code></pre></div>
-<p>The <code>app/main.py</code> that <code>pn init</code> writes already returns a small
-counter; replace it with one of the snippets to try a different
-example. The quickest way to iterate is
+<p>The <code>app/main.py</code> that <code>pn init</code> writes already renders a small
+counter with a detail screen; replace it with one of the snippets to
+try a different example. The quickest way to iterate is
 <a href="../guides/browser-preview/"><code>pn preview</code></a>, which renders the app in a
 browser tab and Fast Refreshes on every save; <code>pn run</code> puts it on a
 device or simulator connected to the same dev server.</p>
@@ -3681,54 +3831,61 @@ device or simulator connected to the same dev server.</p>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">LabeledInput</span><span class="p">(</span><span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span> <span class="n">placeholder</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">):</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">LabeledInput</span><span class="p">(</span><span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span> <span class="n">placeholder</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">14</span><span class="p">,</span> <span class="s2">"bold"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}),</span>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">TextInput</span><span class="p">(</span><span class="n">placeholder</span><span class="o">=</span><span class="n">placeholder</span><span class="p">),</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">4</span><span class="p">},</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"gap"</span><span class="p">:</span> <span class="mi">4</span><span class="p">},</span>
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="p">)</span>
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">SignUp</span><span class="p">():</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">SignUp</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">ScrollView</span><span class="p">(</span>
 </span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
 </span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Sign up"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">24</span><span class="p">,</span> <span class="s2">"bold"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}),</span>
 </span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>            <span class="n">LabeledInput</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="s2">"Name"</span><span class="p">,</span> <span class="n">placeholder</span><span class="o">=</span><span class="s2">"Enter your name"</span><span class="p">),</span>
 </span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>            <span class="n">LabeledInput</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="s2">"Email"</span><span class="p">,</span> <span class="n">placeholder</span><span class="o">=</span><span class="s2">"you@example.com"</span><span class="p">),</span>
 </span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Submit"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="s2">"submitted"</span><span class="p">)),</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"gap"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
 </span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>        <span class="p">)</span>
 </span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <h3 id="theming">Theming<a class="headerlink" href="#theming" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">BRAND</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">DEFAULT_LIGHT_THEME</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">primary_color</span><span class="o">=</span><span class="s2">"#0a84ff"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">replace</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">Header</span><span class="p">():</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">theme</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_theme</span><span class="p">()</span>  <span class="c1"># follows light/dark mode unless a provider pins one</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="s2">"Hello"</span><span class="p">,</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">theme</span><span class="o">.</span><span class="n">primary_color</span><span class="p">,</span> <span class="s2">"font_size"</span><span class="p">:</span> <span class="n">theme</span><span class="o">.</span><span class="n">font_size_title</span><span class="p">,</span> <span class="s2">"bold"</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="p">)</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">ThemeContext</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span><span class="n">Header</span><span class="p">(),</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">}),</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        <span class="n">value</span><span class="o">=</span><span class="n">BRAND</span><span class="p">,</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="p">)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">LIGHT</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">LIGHT_THEME</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="n">replace</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">LIGHT_THEME</span><span class="o">.</span><span class="n">colors</span><span class="p">,</span> <span class="n">primary</span><span class="o">=</span><span class="s2">"#0A84FF"</span><span class="p">))</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">DARK</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">DARK_THEME</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="n">replace</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">DARK_THEME</span><span class="o">.</span><span class="n">colors</span><span class="p">,</span> <span class="n">primary</span><span class="o">=</span><span class="s2">"#64D2FF"</span><span class="p">))</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">HeaderStyles</span><span class="p">:</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theme</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Theme</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">title</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Style</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">theme</span><span class="o">.</span><span class="n">typography</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="n">theme</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">primary</span><span class="p">}</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">container</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">style</span><span class="p">(</span><span class="n">padding</span><span class="o">=</span><span class="n">theme</span><span class="o">.</span><span class="n">spacing</span><span class="o">.</span><span class="n">md</span><span class="p">,</span> <span class="n">background_color</span><span class="o">=</span><span class="n">theme</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">background</span><span class="p">)</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="k">def</span><span class="w"> </span><span class="nf">Header</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    <span class="n">styles</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_styles</span><span class="p">(</span><span class="n">HeaderStyles</span><span class="p">)</span>  <span class="c1"># rebuilt only when the theme changes</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Hello"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="n">styles</span><span class="o">.</span><span class="n">title</span><span class="p">),</span> <span class="n">style</span><span class="o">=</span><span class="n">styles</span><span class="o">.</span><span class="n">container</span><span class="p">)</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">ThemeProvider</span><span class="p">(</span><span class="n">Header</span><span class="p">(),</span> <span class="n">light</span><span class="o">=</span><span class="n">LIGHT</span><span class="p">,</span> <span class="n">dark</span><span class="o">=</span><span class="n">DARK</span><span class="p">)</span>
 </span></code></pre></div>
+<p><code>ThemeProvider</code> picks <code>LIGHT</code> or <code>DARK</code> from the color scheme, and the
+navigators use the same theme. See <a href="../guides/styling/#themes">Styling</a>.</p>
 <h3 id="wrapping-with-an-error-boundary">Wrapping with an error boundary<a class="headerlink" href="#wrapping-with-an-error-boundary" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Risky</span><span class="p">():</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Risky</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"oops"</span><span class="p">)</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">Safe</span><span class="p">():</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">Safe</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">ErrorBoundary</span><span class="p">(</span>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="n">Risky</span><span class="p">(),</span>
 </span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="n">fallback</span><span class="o">=</span><span class="k">lambda</span> <span class="n">exc</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span>
@@ -3736,13 +3893,13 @@ device or simulator connected to the same dev server.</p>
 </span></code></pre></div>
 <h3 id="flex-distribution-and-absolute-positioning">Flex distribution and absolute positioning<a class="headerlink" href="#flex-distribution-and-absolute-positioning" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">LayoutShowcase</span><span class="p">():</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">LayoutShowcase</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
 </span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">60</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FAD"</span><span class="p">}),</span>
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">60</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#ADF"</span><span class="p">}),</span>
 </span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">60</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#DFA"</span><span class="p">}),</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"stretch"</span><span class="p">},</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"gap"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"stretch"</span><span class="p">},</span>
 </span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>        <span class="p">),</span>
 </span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
 </span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"position"</span><span class="p">:</span> <span class="s2">"absolute"</span><span class="p">,</span> <span class="s2">"top"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"left"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
@@ -3753,7 +3910,7 @@ device or simulator connected to the same dev server.</p>
 </span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>                           <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#0A0"</span><span class="p">}),</span>
 </span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">120</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#EEE"</span><span class="p">},</span>
 </span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>        <span class="p">),</span>
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"gap"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
 </span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p>See <a href="../concepts/layout/">Layout engine</a> for the full set of supported

@@ -894,6 +894,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1096,6 +1100,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1460,6 +1492,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -1914,6 +1974,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2659,6 +2725,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/navigation/" class="md-nav__link">
         
   
@@ -2695,6 +2817,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3532,6 +3682,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-release-build-fails-with-modulenotfounderror-no-module-named-pythonnativedevclient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A release build fails with ModuleNotFoundError: No module named 'pythonnative.devclient'
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#blank-screen-on-simulator-no-logs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3636,6 +3797,17 @@
     <span class="md-ellipsis">
       
         pn run rebuilt the whole native project after a Python edit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-browser-preview-keeps-saying-its-waiting-for-pn-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The browser preview keeps saying it's waiting for pn start
       
     </span>
   </a>
@@ -4034,6 +4206,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-release-build-fails-with-modulenotfounderror-no-module-named-pythonnativedevclient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A release build fails with ModuleNotFoundError: No module named 'pythonnative.devclient'
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#blank-screen-on-simulator-no-logs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4138,6 +4321,17 @@
     <span class="md-ellipsis">
       
         pn run rebuilt the whole native project after a Python edit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-browser-preview-keeps-saying-its-waiting-for-pn-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The browser preview keeps saying it's waiting for pn start
       
     </span>
   </a>
@@ -4370,6 +4564,13 @@ and try again:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pn<span class="w"> </span>clean
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>pn<span class="w"> </span>run<span class="w"> </span>ios
 </span></code></pre></div>
+<h3 id="a-release-build-fails-with-modulenotfounderror-no-module-named-pythonnativedevclient">A release build fails with <code>ModuleNotFoundError: No module named 'pythonnative.devclient'</code><a class="headerlink" href="#a-release-build-fails-with-modulenotfounderror-no-module-named-pythonnativedevclient" title="Permanent link">&para;</a></h3>
+<p>Release bundles leave out the development modules (the dev client, Fast
+Refresh, the dev server, the CLI, the test helpers, and the SDK code
+generators), so application code that imports one of them works in
+debug builds only. Move the import into a code path that runs only in
+development. See
+<a href="../../guides/building-for-release/#what-a-release-bundle-leaves-out">What a release bundle leaves out</a>.</p>
 <h3 id="blank-screen-on-simulator-no-logs">Blank screen on Simulator, no logs<a class="headerlink" href="#blank-screen-on-simulator-no-logs" title="Permanent link">&para;</a></h3>
 <p><code>pn run ios</code> rewires <code>sys.stdout</code> to file descriptor 2 so <code>print()</code>
 output reaches the launching terminal alongside <code>NSLog</code>. If you don't
@@ -4413,8 +4614,14 @@ see the failure and keep the rest of the page alive. See
 <li>Is the device on the same network? Simulators and emulators reach
   the server through <code>localhost</code> (Android via <code>adb reverse</code>), but a
   physical iPhone needs your Mac's LAN address and an open port. Pass
-  <code>--dev-server ws://&lt;ip&gt;:8765/ws?role=client</code> to <code>pn run</code> if the
-  auto-detected address is wrong.</li>
+  the device URL <code>pn start</code> printed (<code>--dev-server
+  "http://&lt;ip&gt;:8765/?token=..."</code>) to <code>pn run</code> if the auto-detected
+  address is wrong.</li>
+<li>Did the server refuse the app's token? The app logs "refused the
+  connection" when its URL has no dev token or an old one (after the
+  token file was deleted, say). Relaunch with <code>pn run</code>, or enter the
+  URL <code>pn start</code> prints on the dev-client connect screen. See
+  <a href="../../guides/dev-workflow/#the-dev-token">The dev token</a>.</li>
 <li>The watcher only sees files under <code>app/</code>. Code outside <code>app/</code> needs
   a rebuild.</li>
 <li>Top-level side effects re-run on each reload; if your module
@@ -4427,6 +4634,16 @@ rebuild means a native input changed (<code>pythonnative.toml</code>, the
 <code>pythonnative</code> package version, native plugins) or no dev server was
 running when <code>pn run</code> started. See
 <a href="../../guides/dev-workflow/#when-native-rebuilds-happen">When native rebuilds happen</a>.</p>
+<h3 id="the-browser-preview-keeps-saying-its-waiting-for-pn-start">The browser preview keeps saying it's waiting for <code>pn start</code><a class="headerlink" href="#the-browser-preview-keeps-saying-its-waiting-for-pn-start" title="Permanent link">&para;</a></h3>
+<p>The page itself is public, but its connection needs your dev token.
+If you opened <code>http://localhost:8765/</code> directly (a bookmark, or a
+browser that cleared its cookies), the page says it doesn't have the
+token. Open the preview URL that <code>pn start</code> printed, which ends in
+<code>?token=...</code>, once; the page stores the token as a cookie and removes it
+from the address bar. <code>curl</code> and other scripts get <code>401 Unauthorized</code>
+for the same reason; send the token in an <code>X-PN-Token</code> header.</p>
+<p>To start over with a new token, stop <code>pn start</code>, delete
+<code>~/.pythonnative/dev-token</code>, and start it again.</p>
 <h3 id="the-browser-preview-shows-a-blank-frame">The browser preview shows a blank frame<a class="headerlink" href="#the-browser-preview-shows-a-blank-frame" title="Permanent link">&para;</a></h3>
 <p>Open its console (<code>`</code>) and check the <code>pn start</code> terminal. The usual
 cause is an import error in the entry module, often a package from

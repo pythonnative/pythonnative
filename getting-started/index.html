@@ -1029,6 +1029,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1231,6 +1235,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1595,6 +1627,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -2049,6 +2109,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2794,6 +2860,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../api/navigation/" class="md-nav__link">
         
   
@@ -2830,6 +2952,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3597,67 +3747,91 @@ resolve identically on both.</p>
 a letter, so the directory name and the <code>name</code> field in the generated
 config stay identical. Run <code>pn init</code> without a name to scaffold into the
 current directory instead, named after it; that name is used as-is.</p>
-<p>A minimal <code>app/main.py</code> looks like:</p>
+<p>The generated <code>app/main.py</code> is a small, typed app with two screens:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">Stack</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">create_stack_navigator</span><span class="p">()</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">HomeScreen</span><span class="p">():</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">nav</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_navigation</span><span class="p">()</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">count</span><span class="p">,</span> <span class="n">set_count</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Count: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"font_size"</span><span class="p">:</span> <span class="mi">24</span><span class="p">}),</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Tap me"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_count</span><span class="p">(</span><span class="n">count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)),</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Open details"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">nav</span><span class="o">.</span><span class="n">navigate</span><span class="p">(</span><span class="s2">"Detail"</span><span class="p">,</span> <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">)),</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">},</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="p">)</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="k">def</span><span class="w"> </span><span class="nf">DetailScreen</span><span class="p">():</span>
-</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>    <span class="n">route</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_route</span><span class="p">()</span>
-</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Count was </span><span class="si">{</span><span class="n">route</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'count'</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span>
-</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>
-</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>
-</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
-</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">NavigationContainer</span><span class="p">(</span>
-</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>        <span class="n">Stack</span><span class="o">.</span><span class="n">Navigator</span><span class="p">(</span>
-</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>            <span class="n">Stack</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="s2">"Home"</span><span class="p">,</span> <span class="n">HomeScreen</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"Home"</span><span class="p">),</span>
-</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>            <span class="n">Stack</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="s2">"Detail"</span><span class="p">,</span> <span class="n">DetailScreen</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"Detail"</span><span class="p">),</span>
-</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>        <span class="p">)</span>
-</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>    <span class="p">)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">Styles</span><span class="p">:</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theme</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Theme</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">screen</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">style</span><span class="p">(</span><span class="n">padding</span><span class="o">=</span><span class="n">theme</span><span class="o">.</span><span class="n">spacing</span><span class="o">.</span><span class="n">md</span><span class="p">,</span> <span class="n">gap</span><span class="o">=</span><span class="n">theme</span><span class="o">.</span><span class="n">spacing</span><span class="o">.</span><span class="n">md</span><span class="p">,</span> <span class="n">align_items</span><span class="o">=</span><span class="s2">"stretch"</span><span class="p">)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">title</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Style</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">theme</span><span class="o">.</span><span class="n">typography</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="n">theme</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">text</span><span class="p">}</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Style</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">theme</span><span class="o">.</span><span class="n">typography</span><span class="o">.</span><span class="n">body</span><span class="p">,</span> <span class="s2">"color"</span><span class="p">:</span> <span class="n">theme</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">text</span><span class="p">}</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="k">def</span><span class="w"> </span><span class="nf">HomeScreen</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="n">count</span><span class="p">,</span> <span class="n">set_count</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">nav</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_navigation</span><span class="p">()</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="n">styles</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_styles</span><span class="p">(</span><span class="n">Styles</span><span class="p">)</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">ScrollView</span><span class="p">(</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Hello from PythonNative!"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="n">styles</span><span class="o">.</span><span class="n">title</span><span class="p">),</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Tapped </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2"> times"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="n">styles</span><span class="o">.</span><span class="n">body</span><span class="p">),</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Tap me"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_count</span><span class="p">(</span><span class="n">count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)),</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Open detail"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">nav</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">DetailScreen</span><span class="p">(</span><span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">))),</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>            <span class="n">style</span><span class="o">=</span><span class="n">styles</span><span class="o">.</span><span class="n">screen</span><span class="p">,</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>        <span class="p">)</span>
+</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>    <span class="p">)</span>
+</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>
+</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>
+</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="k">def</span><span class="w"> </span><span class="nf">DetailScreen</span><span class="p">(</span><span class="n">count</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>    <span class="n">nav</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_navigation</span><span class="p">()</span>
+</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>    <span class="n">styles</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_styles</span><span class="p">(</span><span class="n">Styles</span><span class="p">)</span>
+</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"The count was </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="n">styles</span><span class="o">.</span><span class="n">body</span><span class="p">),</span>
+</span><span id="__span-2-33"><a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Back"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="n">nav</span><span class="o">.</span><span class="n">go_back</span><span class="p">),</span>
+</span><span id="__span-2-34"><a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>        <span class="n">style</span><span class="o">=</span><span class="n">styles</span><span class="o">.</span><span class="n">screen</span><span class="p">,</span>
+</span><span id="__span-2-35"><a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>    <span class="p">)</span>
+</span><span id="__span-2-36"><a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>
+</span><span id="__span-2-37"><a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>
+</span><span id="__span-2-38"><a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a><span class="n">Root</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">StackNavigator</span><span class="p">(</span>
+</span><span id="__span-2-39"><a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">HomeScreen</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"Home"</span><span class="p">),</span>
+</span><span id="__span-2-40"><a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">DetailScreen</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"Detail"</span><span class="p">),</span>
+</span><span id="__span-2-41"><a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a><span class="p">)</span>
+</span><span id="__span-2-42"><a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a>
+</span><span id="__span-2-43"><a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a>
+</span><span id="__span-2-44"><a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-2-45"><a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-2-46"><a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">NavigationContainer</span><span class="p">(</span><span class="n">Root</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Key ideas:</p>
 <ul>
-<li><strong><code>@pn.component</code></strong> marks a function as a PythonNative component. The function returns an element tree describing the UI. PythonNative creates and updates native views automatically.</li>
+<li><strong><code>@pn.component</code></strong> marks a function as a PythonNative component. The function returns an element tree (a <code>pn.Node</code>) describing the UI, and PythonNative creates and updates native views to match. Its parameters are its props, so your type checker verifies every call.</li>
 <li><strong><code>pn.use_state(initial)</code></strong> creates local component state. Call the setter to update it and the UI re-renders automatically.</li>
-<li><strong><code>pn.create_stack_navigator()</code></strong> returns a <code>Stack</code> with <code>.Navigator</code> and <code>.Screen</code> factories. Wrap them in <code>pn.NavigationContainer</code> to enable <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../api/navigation/#pythonnative.navigation.hooks.use_navigation"><code>pn.use_navigation()</code></a> and <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_route&lt;/span&gt;" href="../api/navigation/#pythonnative.navigation.hooks.use_route"><code>pn.use_route()</code></a> anywhere below.</li>
+<li><strong>Screens are components.</strong> <code>DetailScreen(count: int)</code> declares its route params as ordinary parameters, and <code>nav.push(DetailScreen(count=count))</code> navigates to it with a checked call. See <a href="../guides/navigation/">Navigation</a>.</li>
+<li><strong><code>pn.StackNavigator(...)</code></strong> is a module-level value listing the screens. <code>pn.NavigationContainer(Root)</code> renders it and makes <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../api/navigation/#pythonnative.navigation.hooks.use_navigation"><code>pn.use_navigation()</code></a> available in every screen.</li>
+<li><strong>The <code>Styles</code> class</strong> derives styles from the active <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Theme&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../api/theme/#pythonnative.theme.Theme"><code>Theme</code></a>'s tokens. <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_styles&lt;/span&gt;" href="../api/theme/#pythonnative.theme.use_styles"><code>pn.use_styles(Styles)</code></a> builds it once per theme, so the app follows the system's light and dark appearance. See <a href="../guides/styling/">Styling</a>.</li>
 <li><strong>The <code>App</code> function</strong> is the entry point. The Android and iOS templates import <code>app.main</code>, look up its top-level <code>App</code> attribute, and start rendering. If you'd rather expose a differently-named component, configure your templates to load an explicit dotted path like <code>"app.main.RootScreen"</code>.</li>
-<li><strong><code>style={...}</code></strong> passes visual and layout properties as a dict (or list of dicts) to any component.</li>
-<li>Element functions like <code>pn.Text(...)</code>, <code>pn.Button(...)</code>, <code>pn.Column(...)</code> create lightweight descriptions, not native objects.</li>
+<li>Element functions like <code>pn.Text(...)</code>, <code>pn.Button(...)</code>, and <code>pn.Column(...)</code> create lightweight descriptions, not native objects.</li>
 </ul>
-<p>When the root <code>Stack.Navigator</code> is rendered inside the host's first screen, <code>navigate(...)</code> and <code>go_back()</code> drive the <strong>native</strong> navigation controller (UINavigationController on iOS, AndroidX Navigation Component on Android). Each pushed screen runs in its own reconciler host, so state on the previous screen is preserved by the platform stack.</p>
+<p>On a device, the root stack drives the <strong>native</strong> navigation controller (<code>UINavigationController</code> on iOS, fragments on Android). Every screen stays part of one Python component tree, so providers and state above the navigator are shared, and the previous screen keeps its state while another is pushed on top.</p>
+<p>The scaffold passes strict type checking and <code>pn lint</code>, which checks the <a href="../concepts/hooks/#rules-of-hooks">rules of hooks</a>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pn<span class="w"> </span>lint
+</span></code></pre></div>
 <h2 id="configure-your-app">Configure your app<a class="headerlink" href="#configure-your-app" title="Permanent link">&para;</a></h2>
 <p>Everything about your app's <em>identity</em> (its bundle/application id,
 display name, version, the device permissions it requests, its icon and
 splash, third-party packages, and signing) lives in a single
 <code>pythonnative.toml</code> at the project root:</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[app]</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"com.example.my_app"</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_app"</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"My App"</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.0.0"</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">build</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="k">[permissions]</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="n">camera</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Scan receipts with your camera."</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="n">notifications</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="k">[assets]</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="n">icon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"assets/icon.png"</span>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">[app]</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"com.example.my_app"</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_app"</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"My App"</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.0.0"</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">build</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="k">[permissions]</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="n">camera</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Scan receipts with your camera."</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="n">notifications</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="k">[assets]</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="n">icon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"assets/icon.png"</span>
 </span></code></pre></div>
 <p>The build system reads this file for every command, so <code>pn run</code>,
 <code>pn build</code>, <code>pn doctor</code>, and <code>pn app-id</code> all stay in sync. See the full
@@ -3666,19 +3840,20 @@ splash, third-party packages, and signing) lives in a single
 <h2 id="start-the-dev-server">Start the dev server<a class="headerlink" href="#start-the-dev-server" title="Permanent link">&para;</a></h2>
 <p>Everything during development goes through one long-running process,
 the dev server. Start it in a terminal and leave it running:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pn<span class="w"> </span>preview
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pn<span class="w"> </span>preview
 </span></code></pre></div>
 <p><code>pn preview</code> starts the server, opens <code>http://localhost:8765/</code> in your
-browser, and mounts your project's <code>App</code> in a phone frame. It <strong>Fast
+browser (the URL carries your per-user
+<a href="../guides/dev-workflow/#the-dev-token">dev token</a> once), and mounts your project's <code>App</code> in a phone frame. It <strong>Fast
 Refreshes on every save</strong>: edit a component, save, and the page updates
 in place while keeping component state (counters, form input, scroll
 position, the navigation stack). Your components, hooks, async work, and
 logical navigation use the shared Python runtime. The page speaks the
 same bridge protocol as the mobile renderers, implements widgets with DOM
 elements, and computes layout with Yoga WebAssembly.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pn<span class="w"> </span>preview<span class="w">                    </span><span class="c1"># server + browser tab for app/main.py -&gt; App</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>pn<span class="w"> </span>preview<span class="w"> </span>app.screens.home<span class="w">   </span><span class="c1"># mount a different module's App</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>pn<span class="w"> </span>start<span class="w">                      </span><span class="c1"># the server without opening a browser</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pn<span class="w"> </span>preview<span class="w">                    </span><span class="c1"># server + browser tab for app/main.py -&gt; App</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>pn<span class="w"> </span>preview<span class="w"> </span>app.screens.home<span class="w">   </span><span class="c1"># mount a different module's App</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>pn<span class="w"> </span>start<span class="w">                      </span><span class="c1"># the server without opening a browser</span>
 </span></code></pre></div>
 <p>Use the toolbar to switch device frames, rotate, toggle dark mode, or
 send a back press. The preview is a <strong>development</strong> surface for layout
@@ -3687,14 +3862,14 @@ simulated. Ship to devices with <code>pn run</code>. See the
 <a href="../guides/browser-preview/">Browser preview guide</a>.</p>
 <h2 id="run-on-a-device-or-simulator">Run on a device or simulator<a class="headerlink" href="#run-on-a-device-or-simulator" title="Permanent link">&para;</a></h2>
 <p>With the dev server still running, in a second terminal:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1"># or</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>pn<span class="w"> </span>run<span class="w"> </span>ios
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1"># or</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>pn<span class="w"> </span>run<span class="w"> </span>ios
 </span></code></pre></div>
 <p><code>pn run</code> stages the bundled native template, copies your <code>app/</code> in,
 builds a debug app, installs it, and launches it. The CLI finds the
-dev server on <code>localhost:8765</code>, bakes its URL into the build, and the
-app connects on startup. From then on it's a <strong>dev client</strong>: every save
+dev server on <code>localhost:8765</code>, passes its URL and your dev token to
+the app, and the app connects on startup. From then on it's a <strong>dev client</strong>: every save
 under <code>app/</code> syncs to the device and Fast Refreshes the running screens,
 and the app's <code>print</code> output and tracebacks stream back into the
 <code>pn start</code> terminal.</p>
@@ -3703,12 +3878,12 @@ native input changed (<code>pythonnative.toml</code>, the template, the
 <code>pythonnative</code> package, native plugins); otherwise the previous build
 is reinstalled in seconds. Force a rebuild with <code>--rebuild</code>.</p>
 <p>If you just want to scaffold the platform project without building, use:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--prepare-only
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--prepare-only
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--prepare-only
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--prepare-only
 </span></code></pre></div>
 <p>This stages files under <code>build/</code> so you can open them in Android Studio or Xcode.</p>
 <p>Physical iPhones on the same Wi-Fi work the same way (<code>pn run ios
---device "My iPhone"</code>); the CLI bakes in your Mac's LAN address instead
+--device "My iPhone"</code>); the CLI passes your Mac's LAN address instead
 of <code>localhost</code>. See the <a href="../guides/dev-workflow/">Development workflow</a>
 for the details, including the reusable <code>--dev-client</code> shell app.</p>
 <p>Native template changes (Kotlin, Swift, manifests) and edits to
@@ -3720,17 +3895,17 @@ and tracebacks to the <code>pn start</code> terminal, so that one window shows
 every client. <code>pn run</code> also attaches to the app's native log stream
 after launch until you press Ctrl+C, which is where lower-level output
 (and anything printed before the client connects) shows up:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">():</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">count</span><span class="p">,</span> <span class="n">set_count</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"[App] render count=</span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Count: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span>
-</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Tap me"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_count</span><span class="p">(</span><span class="n">count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)),</span>
-</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    <span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">count</span><span class="p">,</span> <span class="n">set_count</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"[App] render count=</span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Count: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Tap me"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_count</span><span class="p">(</span><span class="n">count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)),</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <ul>
 <li>On Android, logs are streamed via <code>adb logcat</code> filtered to the
@@ -3740,24 +3915,24 @@ after launch until you press Ctrl+C, which is where lower-level output
   which forwards the Python process's standard streams to your terminal.</li>
 </ul>
 <p>Pass <code>--no-logs</code> if you'd rather run fire-and-forget:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--no-logs
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--no-logs
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--no-logs
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--no-logs
 </span></code></pre></div>
 <h2 id="check-your-toolchain">Check your toolchain<a class="headerlink" href="#check-your-toolchain" title="Permanent link">&para;</a></h2>
 <p>Before your first build, run <code>pn doctor</code> to verify the local toolchain
 (Java/Android SDK for Android; Xcode/Simulator and a signing team for
 iOS) and validate your <code>pythonnative.toml</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>pn<span class="w"> </span>doctor<span class="w">            </span><span class="c1"># check everything</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>pn<span class="w"> </span>doctor<span class="w"> </span>android<span class="w">    </span><span class="c1"># only Android-relevant checks</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>pn<span class="w"> </span>doctor<span class="w"> </span>ios<span class="w">        </span><span class="c1"># only iOS-relevant checks</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>pn<span class="w"> </span>doctor<span class="w">            </span><span class="c1"># check everything</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>pn<span class="w"> </span>doctor<span class="w"> </span>android<span class="w">    </span><span class="c1"># only Android-relevant checks</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>pn<span class="w"> </span>doctor<span class="w"> </span>ios<span class="w">        </span><span class="c1"># only iOS-relevant checks</span>
 </span></code></pre></div>
 <p>It prints <code>[ok]</code> / <code>[!]</code> / <code>[x]</code> for each check and exits non-zero when
 something will block a build, so it's safe to run in CI.</p>
 <h2 id="build-for-release">Build for release<a class="headerlink" href="#build-for-release" title="Permanent link">&para;</a></h2>
 <p>When you're ready to ship, <code>pn build</code> produces signed, distributable
 artifacts:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>pn<span class="w"> </span>build<span class="w"> </span>android<span class="w">     </span><span class="c1"># release APK + AAB</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>pn<span class="w"> </span>build<span class="w"> </span>ios<span class="w">         </span><span class="c1"># signed .ipa via xcodebuild archive/export</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>pn<span class="w"> </span>build<span class="w"> </span>android<span class="w">     </span><span class="c1"># release APK + AAB</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>pn<span class="w"> </span>build<span class="w"> </span>ios<span class="w">         </span><span class="c1"># signed .ipa via xcodebuild archive/export</span>
 </span></code></pre></div>
 <p>Release builds need signing configured in <code>pythonnative.toml</code> (a
 keystore for Android, a development team for iOS). See
@@ -3765,7 +3940,7 @@ keystore for Android, a development team for iOS). See
 walkthrough.</p>
 <h2 id="clean">Clean<a class="headerlink" href="#clean" title="Permanent link">&para;</a></h2>
 <p>Remove the build artifacts safely:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>pn<span class="w"> </span>clean
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>pn<span class="w"> </span>clean
 </span></code></pre></div>
 
 

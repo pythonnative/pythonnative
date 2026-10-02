@@ -1010,6 +1010,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1212,6 +1216,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1576,6 +1608,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -2030,6 +2090,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2775,6 +2841,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/navigation/" class="md-nav__link">
         
   
@@ -2811,6 +2933,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3546,15 +3696,23 @@ runtime, however, is meaningfully different.</p>
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> descriptors. Nothing is mounted
-  until the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> commits
-  the tree.</li>
+  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> descriptors, typed as
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-type_alias&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-type_alias-name&quot;&gt;Node&lt;/span&gt;" href="../../api/element/#pythonnative.element.Node"><code>pn.Node</code></a>. Nothing is mounted until the
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> commits the tree.</li>
+<li>A component's signature is its prop list, so your type checker
+  verifies every call, including navigation: a screen's parameters are
+  its route params, and <code>nav.push(ItemScreen(id=42))</code> is an ordinary
+  call.</li>
 <li>Hooks (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_state&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_state"><code>use_state</code></a>,
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a>, etc.) drive re-renders.
   State updates are batched automatically: every setter call in one
   callback, effect, or task step produces one render pass.</li>
 <li>Re-rendering produces a new tree; the reconciler diffs it against
-  the previous one and applies the smallest set of native mutations.</li>
+  the previous one, skips subtrees whose elements didn't change, and
+  applies the smallest set of native mutations.</li>
+<li>State lives in hooks for one component, in context for a subtree,
+  and in a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Store&lt;/span&gt;" href="../../api/store/#pythonnative.store.Store"><code>Store</code></a> for the app. See
+  <a href="../../guides/state/">Managing state</a>.</li>
 <li>Native widgets are created and updated by Swift and Kotlin
   component managers that receive one serialized transaction per
   commit over the <a href="../bridge/">native bridge</a>. Mobile applications embed
@@ -3617,7 +3775,27 @@ keeps dirtying itself for more than fifty passes raises
 <tr>
 <td>Dev loop</td>
 <td>Metro dev server; Expo Go / dev client on device; Fast Refresh</td>
-<td><code>pn start</code> dev server; debug builds and the <code>--dev-client</code> shell connect over WebSocket; Fast Refresh reloads <code>.py</code> modules in place</td>
+<td><code>pn start</code> dev server; debug builds and the <code>--dev-client</code> shell connect over an authenticated WebSocket; Fast Refresh reloads <code>.py</code> modules in place</td>
+</tr>
+<tr>
+<td>Navigation</td>
+<td><code>navigation.navigate("Detail", {id})</code> with a typed <code>ParamList</code></td>
+<td><code>nav.push(DetailScreen(id=42))</code>; navigators are module-level values</td>
+</tr>
+<tr>
+<td>Styles and themes</td>
+<td><code>StyleSheet.create({...})</code>; separate app and navigation themes</td>
+<td><code>class Styles(pn.StyleSheet)</code> namespaces; one <code>Theme</code> dataclass for the app and its navigators</td>
+</tr>
+<tr>
+<td>Global state</td>
+<td>Zustand, Redux, or Jotai</td>
+<td><code>pn.Store</code> with <code>pn.use_store(store, selector)</code></td>
+</tr>
+<tr>
+<td>Rules of hooks</td>
+<td><code>eslint-plugin-react-hooks</code></td>
+<td><code>pn lint</code></td>
 </tr>
 <tr>
 <td>Preview without a device</td>

@@ -894,6 +894,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1096,6 +1100,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1460,6 +1492,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -1914,6 +1974,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2659,6 +2725,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/navigation/" class="md-nav__link">
         
   
@@ -2695,6 +2817,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3869,26 +4019,37 @@ WebAssembly, while headless tests use the Python host binding in
 and controls can have different intrinsic sizes. See
 <a href="../../concepts/layout/">Layout engine</a>.</p>
 <h2 id="how-is-state-shared-across-screens">How is state shared across screens?<a class="headerlink" href="#how-is-state-shared-across-screens" title="Permanent link">&para;</a></h2>
-<p>Two main options:</p>
+<p>Every screen is part of one component tree, so the usual tools work
+across screens:</p>
 <ul>
+<li>A <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Store&lt;/span&gt;" href="../../api/store/#pythonnative.store.Store"><code>pn.Store</code></a> for app-wide, long-lived state.
+  Define it at module level, change it with plain functions that call
+  <code>store.update(...)</code>, and read it with
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_store&lt;/span&gt;" href="../../api/store/#pythonnative.store.use_store"><code>use_store</code></a>. A selector
+  (<code>pn.use_store(store, lambda s: s.unread)</code>) re-renders a component
+  only when the value it reads changes. It fills the role of Zustand
+  or Redux in a React Native app.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_context&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_context"><code>use_context</code></a> /
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Provider&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.Context.Provider"><code>Context.Provider</code></a> for tree-scoped values
-  (themes, current user). The provider sits at the top of the
-  navigator and descendants subscribe.</li>
-<li>A plain Python module-level object (a "store") for app-wide,
-  long-lived state. Subscribe to changes via your own event bus and
-  call <code>set_state</code> on a hook to trigger re-renders.</li>
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Provider&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.Context.Provider"><code>Context.Provider</code></a> for
+  tree-scoped values (the current user, a repository object). Place
+  the provider above the <code>NavigationContainer</code> so every screen can
+  read it.</li>
+<li>Screen params for the data a screen needs to show: pass an id as a
+  parameter (<code>nav.push(ItemScreen(id=42))</code>) and look the record up in
+  the screen.</li>
 </ul>
-<p>PythonNative doesn't ship a Redux-style store; the
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_reducer&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_reducer"><code>use_reducer</code></a> hook covers most cases
-without one.</p>
+<p>See <a href="../../guides/state/">Managing state</a> for when to use each, and for
+persisting state across launches.</p>
 <h2 id="how-do-i-navigate-between-screens">How do I navigate between screens?<a class="headerlink" href="#how-do-i-navigate-between-screens" title="Permanent link">&para;</a></h2>
-<p>Use <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;NavigationContainer&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.container.NavigationContainer"><code>NavigationContainer</code></a> plus one
-of <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_stack_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.navigators.create_stack_navigator"><code>create_stack_navigator</code></a>,
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_tab_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.navigators.create_tab_navigator"><code>create_tab_navigator</code></a>, or
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;create_drawer_navigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.navigators.create_drawer_navigator"><code>create_drawer_navigator</code></a>.
-From a screen, call <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.hooks.use_navigation"><code>use_navigation</code></a>
-to get an imperative handle (<code>navigate</code>, <code>go_back</code>, etc.). See the
+<p>Define your screens as components, list them in a module-level
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;StackNavigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.navigators.StackNavigator"><code>StackNavigator</code></a>,
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;TabNavigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.navigators.TabNavigator"><code>TabNavigator</code></a>, or
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;DrawerNavigator&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.navigators.DrawerNavigator"><code>DrawerNavigator</code></a>, and render it with
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;NavigationContainer&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.container.NavigationContainer"><code>NavigationContainer</code></a>. From a
+screen, call <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_navigation&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.hooks.use_navigation"><code>use_navigation</code></a> and pass
+the destination as a call to its component:
+<code>nav.push(ItemScreen(id=42))</code>. The screen's parameters are its route
+params, so the type checker verifies them. See the
 <a href="../../guides/navigation/">Navigation guide</a>.</p>
 <h2 id="why-hooks-instead-of-class-components">Why hooks instead of class components?<a class="headerlink" href="#why-hooks-instead-of-class-components" title="Permanent link">&para;</a></h2>
 <p>Hooks are smaller (no inheritance), composable (a custom hook is just

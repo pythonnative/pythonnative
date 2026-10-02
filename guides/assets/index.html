@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://pythonnative.com/guides/assets/">
       
       
-        <link rel="prev" href="../styling/">
+        <link rel="prev" href="../state/">
       
       
         <link rel="next" href="../animations/">
@@ -896,6 +896,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1099,6 +1103,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1617,6 +1649,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2058,6 +2118,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2803,6 +2869,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/navigation/" class="md-nav__link">
         
   
@@ -2839,6 +2961,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3676,8 +3826,10 @@ as a vector, so it looks the same on every platform:</p>
 name) and at call time (<code>KeyError</code> for an unknown name). Browse the set at
 <a href="https://lucide.dev/icons">lucide.dev/icons</a>. Tab bars take the same
 names:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">Tab</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="s2">"Home"</span><span class="p">,</span> <span class="n">HomeScreen</span><span class="p">,</span> <span class="n">tab_bar_icon</span><span class="o">=</span><span class="s2">"house"</span><span class="p">)</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">Tab</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="s2">"Profile"</span><span class="p">,</span> <span class="n">ProfileScreen</span><span class="p">,</span> <span class="n">tab_bar_icon</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">asset</span><span class="p">(</span><span class="s2">"images/avatar-tab.png"</span><span class="p">))</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">Tabs</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">TabNavigator</span><span class="p">(</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">HomeScreen</span><span class="p">,</span> <span class="n">tab_bar_icon</span><span class="o">=</span><span class="s2">"house"</span><span class="p">),</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">ProfileScreen</span><span class="p">,</span> <span class="n">tab_bar_icon</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">asset</span><span class="p">(</span><span class="s2">"images/avatar-tab.png"</span><span class="p">)),</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>An asset used as a tab icon is drawn as a template image and tinted with
 the tab bar's colors.</p>

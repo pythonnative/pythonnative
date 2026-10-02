@@ -894,6 +894,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1096,6 +1100,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1473,6 +1505,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1683,6 +1743,17 @@
     <span class="md-ellipsis">
       
         Frozen dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-release-bundle-leaves-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a release bundle leaves out
       
     </span>
   </a>
@@ -2130,6 +2201,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2875,6 +2952,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/navigation/" class="md-nav__link">
         
   
@@ -2911,6 +3044,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3557,6 +3718,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-a-release-bundle-leaves-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a release bundle leaves out
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#android" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3770,6 +3942,29 @@ all build targets. Resolve and review the lock before building:</p>
 local wheel requires refreshing it. Releases reject missing or stale locks;
 development builds can still resolve unlocked requirements. Native extension
 manifests pin SwiftPM and Maven dependencies to exact versions.</p>
+<h2 id="what-a-release-bundle-leaves-out">What a release bundle leaves out<a class="headerlink" href="#what-a-release-bundle-leaves-out" title="Permanent link">&para;</a></h2>
+<p>Every build bundles a copy of the <code>pythonnative</code> package. Debug builds
+are dev clients, so their copy is complete. Release builds leave out the
+modules that exist only for development:</p>
+<ul>
+<li>the <code>pn</code> CLI and build tooling (<code>pythonnative/cli</code>, <code>pythonnative/project</code>);</li>
+<li>the dev server and browser preview (<code>pythonnative/devserver</code>,
+  <code>pythonnative/preview.py</code>, <code>pythonnative/bridge/web.py</code>);</li>
+<li>the dev client and Fast Refresh (<code>pythonnative/devclient.py</code>,
+  <code>pythonnative/hot_reload.py</code>, <code>pythonnative/refresh.py</code>);</li>
+<li>the test helpers (<code>pythonnative/testing</code>);</li>
+<li>the SDK code generators (<code>pythonnative/sdk/codegen.py</code>,
+  <code>contract_codegen.py</code>, <code>module_codegen.py</code>, and their templates).</li>
+</ul>
+<p>The runtime never imports them, and the test suite checks that it stays
+that way, so a release app behaves exactly like a debug build that isn't
+connected to <code>pn start</code>. If your own code imports one of these modules,
+it works in debug builds but fails with <code>ModuleNotFoundError</code> in a
+release build; keep such imports in development-only code paths.</p>
+<p>iOS release builds also omit the <code>NSLocalNetworkUsageDescription</code> that
+debug builds add so they can reach <code>pn start</code> over Wi-Fi. If your app
+uses the local network itself, declare the key with your own wording in
+<code>[ios].extra_info_plist</code>.</p>
 <h2 id="android">Android<a class="headerlink" href="#android" title="Permanent link">&para;</a></h2>
 <p><code>pn build android</code> runs <code>assembleRelease</code> and <code>bundleRelease</code>, producing
 both an APK and a Play-ready AAB. Artifacts are reported at the end of

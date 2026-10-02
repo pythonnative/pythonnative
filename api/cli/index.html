@@ -894,6 +894,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1096,6 +1100,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1460,6 +1492,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -1916,6 +1976,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2662,6 +2728,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../navigation/" class="md-nav__link">
         
   
@@ -2698,6 +2820,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3229,6 +3379,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.cli.pn.lint_command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;lint_command
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.cli.pn.codegen_command" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3688,6 +3849,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.cli.pn.lint_command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;lint_command
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.cli.pn.codegen_command" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3780,10 +3952,11 @@ the documented behavior never drifts from the code.</p>
   satisfied. See <a href="../../guides/pypi-packages/">PyPI packages</a>.</li>
 <li><code>pn start [entry]</code>: run the dev server. It watches <code>app/</code>, syncs
   every save to each connected debug build with Fast Refresh, relays
-  their logs, and serves the browser preview page. Flags: <code>--port</code>
-  (default 8765), <code>--host</code> (default <code>0.0.0.0</code>), <code>--open</code> to also open
-  the browser preview. See the
-  <a href="../../guides/dev-workflow/">Development workflow</a>.</li>
+  their logs, and serves the browser preview page. Every client needs
+  your dev token from <code>~/.pythonnative/dev-token</code>, which the printed URLs
+  carry. Flags: <code>--port</code> (default 8765), <code>--host</code> (default <code>0.0.0.0</code>),
+  <code>--open</code> to also open the browser preview. See the
+  <a href="../../guides/dev-workflow/#the-dev-token">Development workflow</a>.</li>
 <li><code>pn preview [entry]</code>: <code>pn start</code> plus opening the browser preview in
   your default browser. Flags: <code>--port</code>, <code>--host</code>, <code>--no-open</code>. See the
   <a href="../../guides/browser-preview/">Browser preview guide</a>.</li>
@@ -3798,7 +3971,7 @@ the documented behavior never drifts from the code.</p>
   reinstalled. Flags: <code>--device</code> (target a specific device by
   identifier or name), <code>--prepare-only</code>, <code>--no-logs</code>, <code>--rebuild</code>
   (force the toolchain), <code>--dev-server URL</code> (override the server URL
-  baked into the app), <code>--port</code> (where <code>pn start</code> listens),
+  passed to the app; include the <code>?token=</code> from <code>pn start</code>), <code>--port</code> (where <code>pn start</code> listens),
   <code>--dev-client</code> (build a shell app with a connect screen that loads
   any project from a dev server).</li>
 <li><code>pn logs android|ios</code>: stream logs from the running app without
@@ -3815,6 +3988,13 @@ the documented behavior never drifts from the code.</p>
   scripting; the config
   error goes to stderr instead, and a missing config still exits 1.</li>
 <li><code>pn clean</code>: remove the local <code>build/</code> directory.</li>
+<li><code>pn lint [paths...]</code>: check the rules of hooks without running the
+  code. With no paths it lints <code>app/</code>, or the current directory if
+  there's no <code>app/</code>. Each finding prints as <code>path:line:col: CODE
+  message</code>. Flag: <code>--json</code> to print a JSON array of findings to stdout
+  for scripting; the summary line goes to stderr instead. Exits 1 when
+  there are findings and 2 when a path doesn't exist. See the
+  <a href="../../guides/linting/">Linting guide</a>.</li>
 <li><code>pn --version</code> (<code>-V</code>): print the installed PythonNative version.</li>
 </ul>
 
@@ -3854,6 +4034,9 @@ the documented behavior never drifts from the code.</p>
 <li><code>pn app-id android|ios</code>: print the resolved application/bundle id
   (handy for scripts and CI), as plain text or as JSON with <code>--json</code>.</li>
 <li><code>pn clean</code>: remove the local <code>build/</code> directory.</li>
+<li><code>pn lint [paths...]</code>: check the rules of hooks without running the
+  code, as <code>path:line:col: CODE message</code> lines or as JSON with
+  <code>--json</code>.</li>
 </ul>
 <p>The heavy lifting lives in the <code>pythonnative.project</code> and
 <code>pythonnative.devserver</code> packages; this module is a thin,
@@ -3966,6 +4149,14 @@ be unit tested.</p>
               <td>
                 <div class="doc-md-description">
                   <p>Remove the local <code>build/</code> directory.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;lint_command&lt;/span&gt; (&lt;code&gt;pythonnative.cli.pn.lint_command&lt;/code&gt;)" href="#pythonnative.cli.pn.lint_command">lint_command</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Check the rules of hooks and exit 1 when anything is found.</p>
                 </div>
               </td>
             </tr>
@@ -4647,6 +4838,67 @@ seconds.</p>
             <td>
               <div class="doc-md-description">
                 <p>Parsed namespace (unused).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.cli.pn.lint_command" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">lint_command</span>
+
+
+<a href="#pythonnative.cli.pn.lint_command" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">lint_command</span><span class="p">(</span><span class="n">args</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;argparse.Namespace&lt;/code&gt;" href="https://docs.python.org/3/library/argparse.html#argparse.Namespace">Namespace</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Check the rules of hooks and exit 1 when anything is found.</p>
+<p>Lints each path in <code>args.paths</code> (files, or directories searched
+recursively for <code>*.py</code>). With no paths it lints <code>app/</code> when that
+directory exists and the current directory otherwise. The checks
+themselves live in <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;lint_paths&lt;/span&gt;" href="../lint/#pythonnative.lint.lint_paths"><code>lint_paths</code></a>.</p>
+<p>Without <code>--json</code>, each finding prints as <code>path:line:col: CODE
+message</code> followed by a summary line. With <code>--json</code>, stdout
+carries a JSON array and nothing else, one object per finding with
+<code>path</code>, <code>line</code>, <code>col</code>, <code>code</code>, and <code>message</code> keys, and the
+summary goes to stderr. Either way the exit status is 1 when there
+are findings, 0 when there aren't, and 2 when a path doesn't exist.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>args</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;argparse.Namespace&lt;/code&gt;" href="https://docs.python.org/3/library/argparse.html#argparse.Namespace">Namespace</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Parsed namespace with <code>paths</code> and optional <code>json</code>.</p>
               </div>
             </td>
             <td>

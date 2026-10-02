@@ -896,6 +896,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1282,6 +1286,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../assets/" class="md-nav__link">
         
   
@@ -1626,6 +1658,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -2080,6 +2140,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2825,6 +2891,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/navigation/" class="md-nav__link">
         
   
@@ -2861,6 +2983,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3652,7 +3802,9 @@ from those in a mobile app.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pn<span class="w"> </span>preview
 </span></code></pre></div>
 <p>This starts the <a href="../dev-workflow/">dev server</a>, opens
-<code>http://localhost:8765/</code> in your default browser, mounts your <code>App</code> in
+<code>http://localhost:8765/?token=...</code> in your default browser (the page
+trades your <a href="../dev-workflow/#the-dev-token">dev token</a> for a cookie and
+drops it from the address bar), mounts your <code>App</code> in
 a phone frame, and watches <code>app/</code> for changes. Edit any component and
 save: the page updates in place while preserving component state
 (counters, text input, scroll position, the navigation stack).</p>
@@ -3726,9 +3878,9 @@ for every element, and the page positions each element with that frame.
 Text is measured by the page with the same font it renders, so wrapping
 and intrinsic sizes match what you see.</p>
 <h3 id="navigation">Navigation<a class="headerlink" href="#navigation" title="Permanent link">&para;</a></h3>
-<p>Root navigators (<code>create_stack_navigator</code>, tabs, drawer) drive a real
-stack of screens in the page, the same way they drive
-<code>UINavigationController</code> / AndroidX Navigation on device. Each pushed
+<p>Root navigators (<code>StackNavigator</code>, <code>TabNavigator</code>, and
+<code>DrawerNavigator</code>) drive a real stack of screens in the page, the same
+way they drive <code>UINavigationController</code> and fragments on device. Each pushed
 screen remains a logical child of the application's shared tree;
 <code>navigate(...)</code> selects or adds a route, <code>go_back()</code> pops, and covered
 screens keep their state.
@@ -3776,7 +3928,7 @@ browser is a development surface, so use an explicit <code>"web"</code> key (or
 and logic rather than pixel-perfect platform chrome.</p>
 <p>Faithful:</p>
 <ul>
-<li>Flex layout, sizing, padding, spacing, absolute positioning, and
+<li>Flex layout, sizing, padding, gap, absolute positioning, and
   safe areas for the chosen device frame.</li>
 <li>Component lifecycle, hooks, effects, context, error boundaries,
   Suspense.</li>
@@ -3819,11 +3971,14 @@ and logic rather than pixel-perfect platform chrome.</p>
 </ul>
 <p>When the chrome matters, verify on device with <code>pn run</code>.</p>
 <h2 id="sharing-the-preview">Sharing the preview<a class="headerlink" href="#sharing-the-preview" title="Permanent link">&para;</a></h2>
-<p>The server binds to all interfaces by default, so someone on the same
-network can open <code>http://&lt;your-ip&gt;:8765/</code> and see the app. One page
-drives the app at a time: the newest tab to connect takes over, and the
-previous one shows a notice until you reload it. Use
-<code>--host 127.0.0.1</code> to keep the preview local.</p>
+<p>The server binds to all interfaces by default so your own phones can
+reach it, but it only answers clients that present your
+<a href="../dev-workflow/#the-dev-token">dev token</a>. The LAN URLs <code>pn start</code>
+prints carry the token, and anyone who has one can read your app's
+source for as long as the token stays the same, so open them only on
+your own devices. One page drives the app at a time: the newest tab to
+connect takes over, and the previous one shows a notice until you reload
+it. Use <code>--host 127.0.0.1</code> to keep the preview local.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li>The whole loop, including simulators and devices:

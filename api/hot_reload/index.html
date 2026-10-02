@@ -894,6 +894,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1096,6 +1100,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1460,6 +1492,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -1916,6 +1976,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2662,6 +2728,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../navigation/" class="md-nav__link">
         
   
@@ -2698,6 +2820,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3155,17 +3305,6 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;configure_dev_environment
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pythonnative.hot_reload.overlay_root" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;overlay_root
       
     </span>
   </a>
@@ -3722,17 +3861,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pythonnative.hot_reload.overlay_root" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;overlay_root
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#pythonnative.hot_reload.apply_reload" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3816,9 +3944,12 @@ changed modules with <code>importlib</code> and refreshes the logical applicatio
   preserve state; hook-order or custom-hook changes remount the affected
   component instances. Covered screens and mounted rows participate in the
   same refresh.</li>
-<li><strong>Full remount</strong>: changes to helper classes or services, or an unsuccessful
-  component swap, rebuild the application tree. State is reset. A module
-  import failure is reported while its previous definition remains available.</li>
+<li><strong>Full remount</strong>: a reloaded module that removes a class or changes a
+  class's definition (its fields, bases, or method bodies), or an
+  unsuccessful component swap, rebuilds the application tree. State is
+  reset. Functions, <code>TypedDict</code> and <code>Protocol</code> classes, and classes whose
+  definition didn't change never force a remount. A module import failure
+  is reported while its previous definition remains available.</li>
 </ul>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply_reload&lt;/span&gt;" href="#pythonnative.hot_reload.apply_reload"><code>apply_reload</code></a> is the single
 entry point: it reloads once per process and then refreshes each live
@@ -3888,14 +4019,6 @@ and there is no overlay.</p>
               <td>
                 <div class="doc-md-description">
                   <p>Create and prioritize the writable source overlay.</p>
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;overlay_root&lt;/span&gt; (&lt;code&gt;pythonnative.hot_reload.overlay_root&lt;/code&gt;)" href="#pythonnative.hot_reload.overlay_root">overlay_root</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  <p>The overlay directory configured for this process, if any.</p>
                 </div>
               </td>
             </tr>
@@ -5038,7 +5161,8 @@ across renders.</p>
                 <p><code>"fast_refresh"</code> when every host refreshed in place,
 <code>"remount"</code> when at least one fell back to a full remount,
 <code>"error"</code> when a host hit an exception (shown in its
-RedBox), or <code>"none"</code> when nothing could be reloaded.</p>
+RedBox), or <code>"none"</code> when nothing could be reloaded or no
+host had a mounted tree to refresh.</p>
               </div>
             </td>
           </tr>
@@ -5197,26 +5321,6 @@ client picks it up; a remembered server is used otherwise.</p>
           </tr>
       </tbody>
     </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="pythonnative.hot_reload.overlay_root" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">overlay_root</span>
-
-
-<a href="#pythonnative.hot_reload.overlay_root" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">overlay_root</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">]</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>The overlay directory configured for this process, if any.</p>
 
 
     </div>

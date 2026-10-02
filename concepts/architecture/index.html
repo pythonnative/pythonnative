@@ -686,6 +686,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#the-authoring-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The authoring model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#execution-and-ownership" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -999,6 +1010,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1201,6 +1216,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1565,6 +1608,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -2019,6 +2090,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2764,6 +2841,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/navigation/" class="md-nav__link">
         
   
@@ -2800,6 +2933,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3424,6 +3585,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#the-authoring-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The authoring model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#execution-and-ownership" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3523,6 +3695,28 @@ screens, overlays, and visible list rows.</p>
     E --&gt; A
     D --- F[Yoga layout and native measurement]
     D --- G[Native animation graph]</code></pre>
+<h2 id="the-authoring-model">The authoring model<a class="headerlink" href="#the-authoring-model" title="Permanent link">&para;</a></h2>
+<p>Application code is ordinary, typed Python. Components are functions
+whose signatures are their prop lists, and they return a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-type_alias&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-type_alias-name&quot;&gt;Node&lt;/span&gt;" href="../../api/element/#pythonnative.element.Node"><code>pn.Node</code></a>, so a strict type checker
+verifies element trees, props, and conditional children. Screens are
+components whose parameters are their route params, and navigators are
+module-level values (see <a href="../../guides/navigation/">Navigation</a>). One
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Theme&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/theme/#pythonnative.theme.Theme"><code>Theme</code></a> styles both the app and its navigators,
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;StyleSheet&lt;/span&gt;" href="../../api/style/#pythonnative.style.StyleSheet"><code>StyleSheet</code></a> namespaces give styles typed
+names, and a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Store&lt;/span&gt;" href="../../api/store/#pythonnative.store.Store"><code>Store</code></a> holds app state outside the
+tree. <code>pn lint</code> checks the rules of hooks statically.</p>
+<p>Run-time validation is a development aid. Built-in prop and style
+validation, and checks of user component props against their
+annotations, run only in development builds and under the pytest
+plugin. Release builds skip them and omit development-only modules
+(the CLI, dev server, Fast Refresh, browser preview, SDK code
+generators, and testing library) from the bundle.</p>
 <h2 id="execution-and-ownership">Execution and ownership<a class="headerlink" href="#execution-and-ownership" title="Permanent link">&para;</a></h2>
 <p><code>runtime.py</code> owns a standard asyncio application loop on a dedicated thread.
 Components, effects, and callbacks execute there. Component task scopes cancel
@@ -3531,7 +3725,10 @@ Blocking Python work delays application callbacks, so applications should use
 ordinary asyncio APIs and explicitly move blocking I/O off the application loop.</p>
 <p>The reconciler maintains stable keyed instances, parent relationships, native
 tag indexes, dirty component work, and pending effects. Updating a child preserves
-its ancestors and siblings unless their own inputs or context change. Native
+its ancestors and siblings unless their own inputs or context change. A child
+element that's the identical object from the previous render is skipped with
+its subtree, and a changed context value marks only the consumers recorded in
+its provider's registry (see <a href="../reconciliation/#skipping-unchanged-subtrees">Reconciliation</a>). Native
 child relationships are rebuilt when a component's native roots change.
 Effects run after committed views exist, with child effects preceding parents.
 Renders are batched automatically: setter calls made in one callback, effect,
@@ -3540,9 +3737,12 @@ raises is routed to the nearest error boundary like a render error, and a
 component that re-dirties itself for more than fifty passes raises
 <code>RuntimeError("Too many re-renders")</code> through the same path.</p>
 <p>Equality accepts identity and scalar Boolean comparisons. Array-like comparisons
-that produce another array aren't coerced to a Boolean. Mutable objects must be
-replaced to signal a state or dependency change. Frozen dataclasses are a good
-choice for shared snapshots.</p>
+that produce another array aren't coerced to a Boolean. Bound methods compare
+equal when they wrap the same function on the same object, so passing
+<code>service.subscribe</code> as a dependency or prop doesn't count as a change. Mutable
+objects must be replaced to signal a state or dependency change. Frozen
+dataclasses are a good choice for shared snapshots and
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Store&lt;/span&gt;" href="../../api/store/#pythonnative.store.Store"><code>Store</code></a> values.</p>
 <h2 id="native-presentation">Native presentation<a class="headerlink" href="#native-presentation" title="Permanent link">&para;</a></h2>
 <p>Swift and Kotlin component managers create widgets, apply props, measure native
 content, handle commands, and release resources. Yoga owns geometry. The platform
@@ -3579,8 +3779,9 @@ Builds reject stale locks and missing targets. Wheel tag compatibility and nativ
 SDK compatibility remain separate checks; a lock doesn't prove an extension can
 run on a device. Test every supported deployment target.</p>
 <p>Fast Refresh preserves compatible component state. Changes to hook order or
-custom-hook signatures remount affected instances. Changes to helper classes or
-services remount the application to avoid retaining instances of old definitions.
+custom-hook signatures remount affected instances. Removing a class or changing
+its definition remounts the application to avoid retaining instances of the old
+definition; functions, <code>TypedDict</code>s, <code>Protocol</code>s, and unchanged classes don't.
 Native contract changes require rebuilding the dev client. Development errors
 use a host-owned overlay with a traceback and reload/dismiss controls. It can
 report a poisoned renderer and reload a fresh surface without rendering an
@@ -3611,7 +3812,19 @@ validate device signing, store submission, or performance on physical devices.</
 <tbody>
 <tr>
 <td>Components and lifetimes</td>
-<td><code>component.py</code>, <code>hooks.py</code>, <code>runtime.py</code></td>
+<td><code>component.py</code>, <code>element.py</code>, <code>hooks.py</code>, <code>runtime.py</code></td>
+</tr>
+<tr>
+<td>Styles, themes, and stores</td>
+<td><code>style.py</code>, <code>theme.py</code>, <code>store.py</code></td>
+</tr>
+<tr>
+<td>Props and dev-mode checks</td>
+<td><code>components/props.py</code>, <code>prop_checks.py</code>, <code>diagnostics.py</code></td>
+</tr>
+<tr>
+<td>Rules-of-hooks linter</td>
+<td><code>lint.py</code></td>
 </tr>
 <tr>
 <td>Reconciliation</td>

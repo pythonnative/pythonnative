@@ -853,6 +853,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#skipping-unchanged-subtrees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skipping unchanged subtrees
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#fragments-and-multi-child-rendering" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1037,6 +1048,10 @@
   
     
     
+      
+        
+      
+        
       
         
       
@@ -1278,6 +1293,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1642,6 +1685,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -2096,6 +2167,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2841,6 +2918,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/navigation/" class="md-nav__link">
         
   
@@ -2877,6 +3010,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3556,6 +3717,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#skipping-unchanged-subtrees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skipping unchanged subtrees
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#fragments-and-multi-child-rendering" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3751,7 +3923,7 @@ emits <strong>zero</strong> ops.</p>
 <p>Without keys, children are matched by <strong>index</strong>. That's fine for static
 lists but breaks down when items are inserted or reordered:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Inbox</span><span class="p">():</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Inbox</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">msgs</span><span class="p">,</span> <span class="n">set_msgs</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">([(</span><span class="s2">"a"</span><span class="p">,</span> <span class="s2">"Hi"</span><span class="p">),</span> <span class="p">(</span><span class="s2">"b"</span><span class="p">,</span> <span class="s2">"Hello"</span><span class="p">)])</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        <span class="o">*</span><span class="p">[</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">mid</span><span class="p">)</span> <span class="k">for</span> <span class="n">mid</span><span class="p">,</span> <span class="n">text</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">],</span>
@@ -3767,6 +3939,11 @@ the others without re-rendering them.</p>
 <p><code>key=i</code> for <code>i in range(len(items))</code> is no better than no key at
 all. Use a stable identifier (database id, file path, etc.).</p>
 </div>
+<p>Built-in factories take <code>key=</code> directly. To key one of your own
+components, call <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;with_key&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element.with_key"><code>.with_key()</code></a>
+on its element: <code>MessageRow(message).with_key(message.id)</code>. A user
+component doesn't accept <code>key=</code>, because a key identifies the element
+rather than being a prop.</p>
 <h2 id="function-components">Function components<a class="headerlink" href="#function-components" title="Permanent link">&para;</a></h2>
 <p>A <code>@pn.component</code> function is treated as an element type just like
 <code>"Text"</code> or <code>"Button"</code>. When the reconciler encounters one:</p>
@@ -3774,21 +3951,55 @@ all. Use a stable identifier (database id, file path, etc.).</p>
 <li>It looks up the function's hook state (or creates a fresh slot).</li>
 <li>It calls the function with the current props inside an active hook
    context.</li>
-<li>It recursively reconciles whatever the function returned: a single
+<li>It recursively reconciles whatever the function returned, a
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-type_alias&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-type_alias-name&quot;&gt;Node&lt;/span&gt;" href="../../api/element/#pythonnative.element.Node"><code>Node</code></a>: a single
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
 
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a>, a <code>list</code> of elements (which
-   mount as siblings at the component's position), or <code>None</code> (which
-   mounts nothing).</li>
+  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a>, a <code>list</code> or other iterable of
+   nodes (which mount as siblings at the component's position), or
+   <code>None</code> (which mounts nothing).</li>
 </ol>
 <p>Hook slots are matched by their position in the function body, which is
 why hooks must be called at the top level (not inside <code>if</code>/<code>for</code>). In
 dev mode the reconciler verifies the hook call sequence on every
 render and raises
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;HookOrderError&lt;/span&gt;" href="../../api/diagnostics/#pythonnative.diagnostics.HookOrderError"><code>HookOrderError</code></a> on a mismatch.</p>
+<h2 id="skipping-unchanged-subtrees">Skipping unchanged subtrees<a class="headerlink" href="#skipping-unchanged-subtrees" title="Permanent link">&para;</a></h2>
+<p>A component re-renders when its own state changes, when its parent
+re-renders it with new props, or when a context it reads changes. Two
+checks let the reconciler skip work when a parent re-renders:</p>
+<ul>
+<li><strong>Identity bailout.</strong> When a child element is the <em>identical</em> object
+  the node rendered last time, and the node has no pending work of its
+  own, the reconciler reuses the node and its whole subtree without
+  calling any component functions. Element objects are immutable, so
+  identity proves nothing changed. Descendants that do have pending
+  state updates are already in the dirty queue and render in their own
+  pass, and context consumers are marked through the provider's
+  registry (below), so skipping a subtree never hides an update.</li>
+<li><strong>Memo.</strong> A <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;memo&lt;/span&gt;" href="../../api/component/#pythonnative.component.memo"><code>@pn.memo</code></a> component whose new props
+  equal its previous props (shallowly, by default) is skipped even when
+  the parent built a new element for it.</li>
+</ul>
+<p>The identity bailout needs no API. It applies whenever a component
+passes through elements it didn't build, which is the common case for
+containers:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Card</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">expanded</span><span class="p">,</span> <span class="n">set_expanded</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_expanded</span><span class="p">(</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="ow">not</span> <span class="n">e</span><span class="p">)),</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"display"</span><span class="p">:</span> <span class="s2">"flex"</span> <span class="k">if</span> <span class="n">expanded</span> <span class="k">else</span> <span class="s2">"none"</span><span class="p">}),</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="p">)</span>
+</span></code></pre></div>
+<p>Toggling <code>expanded</code> re-renders <code>Card</code>, but <code>children</code> are the same
+element objects its parent passed in, so the reconciler doesn't
+re-render them. Navigators rely on the same rule: each route's screen
+element is cached, so a navigator re-render (a title change, a focus
+change) doesn't re-render the screens.</p>
 <h2 id="fragments-and-multi-child-rendering">Fragments and multi-child rendering<a class="headerlink" href="#fragments-and-multi-child-rendering" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Fragment&lt;/span&gt;" href="../../api/components/#pythonnative.components.Fragment"><code>Fragment</code></a> groups siblings without a wrapping
 native view: its children splice directly into the parent's native
@@ -3808,20 +4019,27 @@ the native views live elsewhere.</p>
 whose type is the context itself. When the reconciler mounts one, it
 pushes a value onto a per-context stack;
 descendants reading via <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_context&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_context"><code>use_context</code></a>
-observe the topmost value. Context is reactive: when a re-render
-changes a Provider's value, the reconciler marks every recorded
-consumer of that context dirty, so consumers re-render even when a
-memoized ancestor in between skips its subtree.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">ThemeContext</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">create_context</span><span class="p">({</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#000"</span><span class="p">})</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">Screen</span><span class="p">():</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">return</span> <span class="n">ThemeContext</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span><span class="n">Header</span><span class="p">(),</span> <span class="n">value</span><span class="o">=</span><span class="p">{</span><span class="s2">"primary"</span><span class="p">:</span> <span class="s2">"#222"</span><span class="p">})</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">Header</span><span class="p">():</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">theme</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_context</span><span class="p">(</span><span class="n">ThemeContext</span><span class="p">)</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Hi"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">theme</span><span class="p">[</span><span class="s2">"primary"</span><span class="p">]})</span>
+observe the topmost value.</p>
+<p>Context is reactive, and propagation is targeted. <code>use_context</code> records
+which provider node supplied the value, and each provider keeps a
+registry of its consumer nodes, updated as consumers render and
+unmount. When a re-render changes a provider's value, the reconciler
+marks exactly the registered consumers dirty. It doesn't walk the
+provider's subtree looking for them, so the cost is proportional to the
+number of consumers. Consumers re-render even when a memoized ancestor
+or an identity bailout skips the subtree between them and the provider.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">Accent</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">create_context</span><span class="p">(</span><span class="s2">"#000000"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"Accent"</span><span class="p">)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">Page</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">return</span> <span class="n">Accent</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span><span class="n">Header</span><span class="p">(),</span> <span class="n">value</span><span class="o">=</span><span class="s2">"#222222"</span><span class="p">)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="k">def</span><span class="w"> </span><span class="nf">Header</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">accent</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_context</span><span class="p">(</span><span class="n">Accent</span><span class="p">)</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Hi"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">accent</span><span class="p">})</span>
 </span></code></pre></div>
 <h2 id="error-boundaries">Error boundaries<a class="headerlink" href="#error-boundaries" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;ErrorBoundary&lt;/span&gt;" href="../../api/components/#pythonnative.components.ErrorBoundary"><code>ErrorBoundary</code></a> is a special-cased

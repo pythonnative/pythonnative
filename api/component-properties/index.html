@@ -894,6 +894,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1096,6 +1100,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1460,6 +1492,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -1916,6 +1976,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2662,6 +2728,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../navigation/" class="md-nav__link">
         
   
@@ -2698,6 +2820,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -4197,9 +4347,8 @@ differences.</p>
 <li><code>margin</code>: outer spacing. Accepts a number (all sides), or a dict with any
   of <code>horizontal</code>, <code>vertical</code>, <code>left</code>, <code>top</code>, <code>right</code>, <code>bottom</code>.</li>
 <li><code>padding</code>: inner spacing on container elements. Same shape as <code>margin</code>.</li>
-<li><code>spacing</code>: gap between children of a flex container (applied along the
-  main axis).</li>
-<li><code>gap</code>: alias for <code>spacing</code>.</li>
+<li><code>gap</code>: space between children of a flex container. <code>row_gap</code> and
+  <code>column_gap</code> set one axis.</li>
 </ul>
 <h3 id="position">Position<a class="headerlink" href="#position" title="Permanent link">&para;</a></h3>
 <ul>
@@ -4252,7 +4401,7 @@ differences.</p>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="s2">"justify_content"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">"overflow"</span><span class="p">:</span> <span class="s2">"hidden"</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="s2">"gap"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#F5F5F5"</span><span class="p">,</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">})</span>
@@ -4264,7 +4413,7 @@ differences.</p>
 <li><code>justify_content</code>: <code>"flex_start"</code>, <code>"center"</code>, <code>"flex_end"</code>, <code>"space_between"</code>, <code>"space_around"</code>, <code>"space_evenly"</code></li>
 <li><code>align_items</code>: <code>"stretch"</code>, <code>"flex_start"</code>, <code>"center"</code>, <code>"flex_end"</code></li>
 <li><code>overflow</code>: <code>"visible"</code> (default), <code>"hidden"</code></li>
-<li><code>spacing</code>, <code>padding</code>, <code>background_color</code></li>
+<li><code>gap</code>, <code>padding</code>, <code>background_color</code></li>
 </ul>
 <p>Containers also fully support absolute positioning for their children:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
@@ -4310,8 +4459,8 @@ whole-label event.</p>
 <li>Style properties: <code>color</code>, <code>background_color</code>, <code>font_size</code></li>
 </ul>
 <h2 id="column-row">Column / Row<a class="headerlink" href="#column-row" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">})</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"spacing"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"justify_content"</span><span class="p">:</span> <span class="s2">"space_between"</span><span class="p">})</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"gap"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"align_items"</span><span class="p">:</span> <span class="s2">"center"</span><span class="p">})</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"gap"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s2">"justify_content"</span><span class="p">:</span> <span class="s2">"space_between"</span><span class="p">})</span>
 </span></code></pre></div>
 <p>Convenience wrappers for <code>View</code> with fixed <code>flex_direction</code>:</p>
 <ul>
@@ -4323,7 +4472,7 @@ whole-label event.</p>
 <p><code>*children</code>: child elements (positional)</p>
 </li>
 <li>Style properties:</li>
-<li><code>spacing</code>: gap between children (dp / pt)</li>
+<li><code>gap</code>: space between children (dp / pt)</li>
 <li><code>padding</code>: inner padding (int for all sides, or dict with <code>horizontal</code>, <code>vertical</code>, <code>left</code>, <code>top</code>, <code>right</code>, <code>bottom</code>)</li>
 <li><code>align_items</code>: cross-axis alignment: <code>"stretch"</code>, <code>"flex_start"</code>, <code>"center"</code>, <code>"flex_end"</code>, <code>"leading"</code>, <code>"trailing"</code></li>
 <li><code>justify_content</code>: main-axis distribution: <code>"flex_start"</code>, <code>"center"</code>, <code>"flex_end"</code>, <code>"space_between"</code>, <code>"space_around"</code>, <code>"space_evenly"</code></li>
@@ -4465,7 +4614,7 @@ whole-label event.</p>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>         <span class="n">on_load_start</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span> <span class="n">on_load</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span> <span class="n">on_load_end</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>         <span class="n">on_error</span><span class="o">=</span><span class="k">lambda</span> <span class="n">message</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>         <span class="n">fade_duration</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">},</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>         <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">150</span><span class="p">,</span> <span class="s2">"scale_type"</span><span class="p">:</span> <span class="s2">"cover"</span><span class="p">})</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>         <span class="n">scale_type</span><span class="o">=</span><span class="s2">"cover"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">150</span><span class="p">})</span>
 </span></code></pre></div>
 <ul>
 <li><code>source</code>: a bundled <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Asset&lt;/span&gt;
@@ -4758,7 +4907,8 @@ absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
 </span><span id="__span-27-7"><a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a>    <span class="s2">"on_tab_select"</span><span class="p">:</span> <span class="n">handler</span><span class="p">,</span>
 </span><span id="__span-27-8"><a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a><span class="p">})</span>
 </span></code></pre></div>
-<p>Native tab bar, typically created automatically by <code>Tab.Navigator</code>.</p>
+<p>Native tab bar, typically created automatically by a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;TabNavigator&lt;/span&gt;" href="../navigation/#pythonnative.navigation.navigators.TabNavigator"><code>TabNavigator</code></a>.</p>
 <table>
 <thead>
 <tr>
@@ -4828,7 +4978,7 @@ absolutely-filled <code>Image</code> plus a content <code>View</code>.</p>
 <h2 id="sectionlist">SectionList<a class="headerlink" href="#sectionlist" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">SectionList</span><span class="p">(</span><span class="n">sections</span><span class="o">=</span><span class="p">[</span><span class="n">pn</span><span class="o">.</span><span class="n">Section</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="s2">"a"</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"A"</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">[</span><span class="s2">"Apple"</span><span class="p">])],</span>
 </span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>               <span class="n">render_item</span><span class="o">=</span><span class="k">lambda</span> <span class="n">item</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">item</span><span class="p">),</span>
-</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>               <span class="n">render_section_header</span><span class="o">=</span><span class="k">lambda</span> <span class="n">section</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">section</span><span class="p">[</span><span class="s2">"title"</span><span class="p">]),</span>
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>               <span class="n">render_section_header</span><span class="o">=</span><span class="k">lambda</span> <span class="n">section</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">section</span><span class="o">.</span><span class="n">title</span><span class="p">),</span>
 </span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>               <span class="n">sticky_section_headers</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">inverted</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 </span><span id="__span-29-5"><a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>               <span class="n">item_separator</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"height"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#EEE"</span><span class="p">}),</span>
 </span><span id="__span-29-6"><a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a>               <span class="n">on_viewable_items_changed</span><span class="o">=</span><span class="n">handler</span><span class="p">)</span>

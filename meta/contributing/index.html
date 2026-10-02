@@ -894,6 +894,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1096,6 +1100,34 @@
     
   
     Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing State
   
 
     
@@ -1460,6 +1492,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/linting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linting
   
 
     
@@ -1914,6 +1974,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -2659,6 +2725,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/theme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/navigation/" class="md-nav__link">
         
   
@@ -2695,6 +2817,34 @@
     
   
     Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lint
   
 
     
@@ -3880,7 +4030,9 @@ way:</p>
 <li><code>journal.py</code>: the undo journal a failed render pass rolls back through</li>
 <li><code>native_views/</code>: the thin backend accessor (<code>get_backend</code> / <code>set_backend</code>) and the bridge backend that serializes commits</li>
 <li><code>native_modules/</code>: device module facades and their Python fallbacks</li>
-<li><code>navigation/</code>: navigators, container, hooks, linking, theme, and the navigation ref</li>
+<li><code>navigation/</code>: navigator values, screens, container, hooks, deep-link table, and the navigation ref</li>
+<li><code>theme.py</code>, <code>style.py</code>, <code>store.py</code>: the app <code>Theme</code>, <code>StyleSheet</code> namespaces and style resolution, and <code>Store</code></li>
+<li><code>lint.py</code>: the <code>pn lint</code> rules-of-hooks checker</li>
 <li><code>testing/</code>: the headless testing library and the shipped pytest plugin (<code>testing/pytest_plugin.py</code>)</li>
 <li><code>bridge/</code>: JSON codec and per-platform transports into the native rendering core</li>
 <li><code>cli/</code>: <code>pn</code> command</li>
@@ -4002,7 +4154,7 @@ aren't.</p>
 <li><code>bridge</code>: wire codec, transports, handshake, and native-to-Python callback (<code>bridge/</code>)</li>
 <li><code>cli</code>: CLI tool and <code>pn</code> command (<code>src/pythonnative/cli/</code>)</li>
 <li><code>component</code>: the <code>@component</code> decorator, <code>Component</code>, and <code>memo</code> (<code>component.py</code>)</li>
-<li><code>components</code>: declarative element-creating functions (<code>components/</code>)</li>
+<li><code>components</code>: declarative element-creating functions and their shared props (<code>components/</code>)</li>
 <li><code>element</code>: Element descriptor class (<code>element.py</code>)</li>
 <li><code>events</code>: tag-based event routing between native views and Python callbacks (<code>events.py</code>)</li>
 <li><code>gestures</code>: gesture descriptors and the pure-Python recognition arbiter (<code>gestures.py</code>)</li>
@@ -4014,10 +4166,11 @@ aren't.</p>
 <li><code>hot_reload</code>: module reloader and Fast Refresh (<code>hot_reload.py</code>)</li>
 <li><code>journal</code>: render undo journal (<code>journal.py</code>)</li>
 <li><code>layout</code>: Yoga layout integration and the host binding (<code>layout.py</code>, <code>native/yoga/</code>)</li>
+<li><code>lint</code>: the <code>pn lint</code> rules-of-hooks checker (<code>lint.py</code>)</li>
 <li><code>mutations</code>: batched mutation ops between reconciler and native backends (<code>mutations.py</code>)</li>
 <li><code>native_modules</code>: native module registry, Python facades, and Python fallbacks (<code>native_modules/</code>)</li>
 <li><code>native_views</code>: view backend accessor and bridge backend (<code>native_views/</code>)</li>
-<li><code>navigation</code>: navigation state, container, navigators, hooks, linking, theme, and ref (<code>navigation/</code>)</li>
+<li><code>navigation</code>: navigation state, container, navigators, screens, hooks, linking, and ref (<code>navigation/</code>)</li>
 <li><code>net</code>: awaitable HTTP client (<code>net.py</code>)</li>
 <li><code>package</code>: <code>src/pythonnative/__init__.py</code> exports and package boundary</li>
 <li><code>platform</code>: <code>Platform.OS</code>/<code>Platform.select</code> and version detection (<code>platform.py</code>)</li>
@@ -4028,9 +4181,11 @@ aren't.</p>
 <li><code>runtime</code>: framework-wide asyncio loop and thread-safe future helpers (<code>runtime.py</code>)</li>
 <li><code>sdk</code>: public extension SDK for custom native components (<code>sdk/</code>)</li>
 <li><code>storage</code>: AsyncStorage key/value persistence and <code>use_persisted_state</code> (<code>storage.py</code>)</li>
+<li><code>store</code>: the <code>Store</code> app-state container and <code>use_store</code> (<code>store.py</code>)</li>
 <li><code>scheduler</code>: render batching and transition queues (<code>scheduler.py</code>)</li>
-<li><code>style</code>: StyleSheet and theming (<code>style.py</code>)</li>
+<li><code>style</code>: the <code>Style</code> type, style resolution, and <code>StyleSheet</code> (<code>style.py</code>)</li>
 <li><code>testing</code>: public test utilities and the pytest plugin (<code>testing/</code>)</li>
+<li><code>theme</code>: <code>Theme</code>, <code>ThemeProvider</code>, <code>use_theme</code>, and <code>use_styles</code> (<code>theme.py</code>)</li>
 <li>
 <p><code>utils</code>: shared utilities (<code>utils.py</code>)</p>
 </li>
