@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v0.48.0 (2026-10-02)
+
+### Features
+
+- Add typed navigation, themes, stores, and hook linting
+  ([#109](https://github.com/pythonnative/pythonnative/pull/109),
+  [`109008e`](https://github.com/pythonnative/pythonnative/commit/109008ef6ff479d61894e4c69dd4f6ed7cca3478))
+
+### Testing
+
+- **project**: Cover deterministic native fingerprint hashing
+  ([#98](https://github.com/pythonnative/pythonnative/pull/98),
+  [`9f4e907`](https://github.com/pythonnative/pythonnative/commit/9f4e907875f44ae786d381e609b920fab3461ca7))
+
+Refs: #91
+
+Co-authored-by: Owen Carey <37121709+owenthcarey@users.noreply.github.com>
+
+
 ## v0.47.0 (2026-09-29)
 
 ### Features
