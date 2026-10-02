@@ -48,6 +48,9 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # Type-only re-exports: statically checkable, no UI surface.
     # --------------------------------------------------------------
     "Element",
+    "Node",  # recursive alias for element trees; every demo component returns one
+    "AccessibilityProps",  # TypedDict of shared accessibility keys; the accessibility_props demo passes them
+    "ViewProps",  # TypedDict of shared view keys; every demo container passes some of them
     "Section",  # typed section record exercised by the SectionList flow
     "ViewableItem",  # typed callback record exercised by the ListData flow
     "UnsetType",  # sentinel type; UNSET is exercised by the custom_component flow
@@ -89,7 +92,6 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "TextAlign",
     "TextDecoration",
     "TextTransform",
-    "ThemeContext",
     "TransformSpec",
     "AnimatedValue",  # observed via use_animated_value usage in animations
     "QueryResult",  # observed via use_query demo
@@ -107,16 +109,16 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "Column",  # used everywhere; co-tested with View in ViewColumnRowDemo
     "Row",  # used everywhere; co-tested with View in ViewColumnRowDemo
     "NavigationContainer",  # wraps the root navigator; used by main.py
-    "create_stack_navigator",  # used by main.py; every flow pushes screens
+    "StackNavigator",  # main.py's root navigator; every flow pushes screens on it
+    "Screen",  # main.py wraps every demo in one; the navigation demos set per-screen options
+    "Navigator",  # base type of the three navigator values; every navigation demo builds one
+    "Group",  # layers options over screens; the stack_options demo groups two screens
     "create_screen",  # platform bridge invoked by the native templates
     "use_navigation",  # used by every screen for go_back
     "use_is_focused",  # underlies use_focus_effect; covered by the focus_effect demo
     "use_subscription",  # underlies use_color_scheme / use_window_dimensions demos
     "use_animated_value",  # used in every animation demo
     "create_context",  # covered by use_context demo (Context.Provider)
-    # Deep linking needs the OS to deliver a URL to the app; the URL <->
-    # state mapping is unit-tested in tests/test_navigation.py.
-    "LinkingConfig",
     "style",  # the style helper itself is exercised by every styled demo
     "resolve_style",  # internal helper exposed for SDK authors
     # --------------------------------------------------------------
@@ -153,13 +155,21 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "Share",
     "Vibration",
     # --------------------------------------------------------------
-    # Theming data: observed through the use_theme demo, which flips
-    # the scheme and asserts the built-in light/dark values render.
+    # Theming data: app/app_theme.py derives the suite's themes from
+    # the presets, main.py provides them, and the use_theme and
+    # navigation_theme demos flip the scheme and assert the values.
     # --------------------------------------------------------------
-    "Theme",  # frozen dataclass returned by use_theme; fields asserted in use_theme demo
-    "DEFAULT_LIGHT_THEME",  # constant Theme; values asserted in use_theme demo
-    "DEFAULT_DARK_THEME",  # constant Theme; values asserted in use_theme demo
-    "default_theme",  # pure lookup over the two constants; use_theme demo
+    "Theme",  # frozen dataclass returned by use_theme; fields asserted in the use_theme demo
+    "Colors",  # palette record on Theme.colors; the use_theme demo asserts background and primary
+    "Typography",  # text-style record on Theme; part of every theme the suite provides
+    "Spacing",  # spacing scale on Theme; the use_theme demo prints spacing.md
+    "Radii",  # corner radii on Theme; the shared card and use_theme swatches use radii
+    "LIGHT_THEME",  # preset the suite's light theme derives from; use_theme asserts its primary
+    "DARK_THEME",  # preset the suite's dark theme derives from; use_theme asserts its primary
+    "use_styles",  # builds the shared styles in app/theme.py for every demo; the use_theme demo
+    "ABSOLUTE_FILL",  # style constant; the stylesheet demo composes it in a style list
+    "Store",  # value class read by use_store; driven by the use_store demo
+    "TabBarStyle",  # TypedDict passed as TabNavigator(tab_bar_style=); the tab_options demo
     # --------------------------------------------------------------
     # SDK re-exports: module-level names mirroring submodule content.
     # --------------------------------------------------------------
@@ -213,13 +223,6 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "WindowDimensions",  # NamedTuple from Dimensions.get / use_window_dimensions; both demos print it
     "DeviceInfo",  # frozen record from Device.info; every field printed by the device_info demo
     "Locale",  # frozen record from Localization.get_locales / use_locales; both demos print its fields
-    "NavigationColors",  # frozen record on NavigationTheme.colors; the navigation_theme demo prints it
-    "NavigationTheme",  # frozen record read by use_navigation_theme; the navigation_theme demo
-    "DEFAULT_NAVIGATION_THEME",  # preset constant; navigation_theme demo asserts "Matches preset: yes"
-    "DARK_NAVIGATION_THEME",  # preset constant; navigation_theme demo switches the root to it
-    "NavigationRef",  # handle class from create_navigation_ref; driven by the navigation_ref demo
-    "TabBarStyle",  # TypedDict passed as Tab.Navigator(tab_bar_style=); the tab_options demo
-    "ScreenGroup",  # value returned by Navigator.Group(...); the stack_options demo nests one
     "ANIMATABLE_PROPS",  # frozenset constant; its size is printed by the easing demo
     "AnimationResult",  # frozen record returned by awaited animations; easing and decay demos read .finished
     "ViewHandle",  # base handle on ref.current for plain views; the on_layout demo reads .frame

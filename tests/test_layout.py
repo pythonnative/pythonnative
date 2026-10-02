@@ -392,7 +392,7 @@ def test_justify_space_evenly() -> None:
 
 
 # ======================================================================
-# Padding & spacing
+# Padding & gap
 # ======================================================================
 
 
@@ -426,9 +426,9 @@ def test_padding_per_edge_keys_override_omnibus() -> None:
     assert root.children[0].y == 5
 
 
-def test_spacing_between_children_in_column() -> None:
+def test_gap_between_children_in_column() -> None:
     root = LayoutNode(
-        style={"width": 100, "height": 200, "spacing": 8},
+        style={"width": 100, "height": 200, "gap": 8},
         children=[
             LayoutNode(style={"height": 30}),
             LayoutNode(style={"height": 30}),
@@ -441,7 +441,19 @@ def test_spacing_between_children_in_column() -> None:
     assert root.children[2].y == 76
 
 
-def test_gap_alias_for_spacing() -> None:
+def test_spacing_is_not_a_layout_key() -> None:
+    root = LayoutNode(
+        style={"width": 100, "height": 200, "spacing": 8},
+        children=[
+            LayoutNode(style={"height": 30}),
+            LayoutNode(style={"height": 30}),
+        ],
+    )
+    calculate_layout(root, 320, 480)
+    assert root.children[1].y == 30
+
+
+def test_gap_between_two_children() -> None:
     root = LayoutNode(
         style={"width": 100, "height": 200, "gap": 4},
         children=[
@@ -845,7 +857,7 @@ def test_scroll_axis_x_clamps_container_width_to_parent_avail() -> None:
 
 def test_display_none_child_is_skipped_in_row() -> None:
     root = LayoutNode(
-        style={"flex_direction": "row", "width": 300, "height": 50, "spacing": 10},
+        style={"flex_direction": "row", "width": 300, "height": 50, "gap": 10},
         children=[
             LayoutNode(style={"width": 80, "height": 40}),
             LayoutNode(style={"width": 100, "height": 40, "margin": 20, "display": "none"}),

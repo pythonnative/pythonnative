@@ -83,7 +83,7 @@ def type_schema(annotation: Any, *, _parents: tuple[type, ...] = ()) -> dict[str
     if inspect.isclass(annotation) and callable(getattr(annotation, "__native_schema__", None)):
         # A Python value type whose wire form is simpler than its fields
         # (``Asset`` travels as its ``asset://`` URI string).
-        return dict(annotation.__native_schema__())
+        return dict(getattr(annotation, "__native_schema__")())
     if origin is typing.Literal:
         values = [encode_value(arg) for arg in args]
         if not all(value is None or type(value) in (str, int, bool, float) for value in values):
@@ -95,7 +95,7 @@ def type_schema(annotation: Any, *, _parents: tuple[type, ...] = ()) -> dict[str
         return {"type": {str: "string", bool: "boolean", int: "integer", float: "number"}[annotation]}
     if origin in (list, tuple, set, frozenset, collections.abc.Sequence) or annotation in (list, tuple, set, frozenset):
         container = origin or annotation
-        result: dict[str, Any] = {"type": "array"}
+        result = {"type": "array"}
         if container is tuple and args and args[-1] is not Ellipsis:
             result["prefixItems"] = [type_schema(arg, _parents=_parents) for arg in args]
         else:
@@ -229,7 +229,9 @@ def decode_value(value: Any, schema: Mapping[str, Any], path: str = "value") -> 
             decode_value(item, prefix[index] if prefix is not None else schema.get("items", {}), f"{path}[{index}]")
             for index, item in enumerate(value)
         ]
-        constructor = {"tuple": tuple, "set": set, "frozenset": frozenset}.get(schema.get("python_container"), list)
+        constructor = {"tuple": tuple, "set": set, "frozenset": frozenset}.get(
+            str(schema.get("python_container")), list
+        )
         return constructor(items)
     if schema.get("type") == "integer":
         return int(value)

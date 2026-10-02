@@ -1,54 +1,58 @@
-"""Settings tab: Platform info, native alerts, and a push to the showcase.
+"""Settings tab: a persisted appearance setting, platform info, native alerts, and a push.
 
-Demonstrates the imperative ``pn.Alert`` API, runtime queries via
-``pn.Platform`` and ``pn.use_window_dimensions``, and how to drive
-the root stack from inside a tab via ``pn.use_navigation``.
+Demonstrates reading app-wide state from context, the imperative
+``pn.Alert`` API (including an ``async`` handler that awaits a
+confirmation), runtime queries via ``pn.Platform`` and
+``pn.use_window_dimensions``, and pushing a root-stack screen from
+inside a tab.
 """
 
 import pythonnative as pn
-from app.theme import styles
+from app.preferences import APPEARANCES, AppearanceContext
+from app.screens.showcase import ShowcaseScreen
+from app.theme import AppStyles
 
 
 @pn.component
-def SettingsScreen() -> pn.Element:
+def SettingsScreen() -> pn.Node:
     nav = pn.use_navigation()
     dims = pn.use_window_dimensions()
+    styles = pn.use_styles(AppStyles)
+    theme = pn.use_theme()
+    appearance = pn.use_context(AppearanceContext)
 
-    def _show_alert() -> None:
+    def show_alert() -> None:
         # Fire-and-forget; no await needed for a simple notice.
         pn.Alert.show("Hello!", "This is a native alert dialog.")
 
-    def _confirm_destructive() -> None:
-        async def _run() -> None:
-            ok = await pn.Alert.confirm(
-                "Delete item?",
-                message="This action cannot be undone.",
-                confirm_label="Delete",
-                cancel_label="Keep",
-            )
-            print(f"[SettingsScreen] {'confirmed' if ok else 'cancelled'}")
-
-        pn.run_async(_run())
-
-    def _view_showcase() -> None:
-        nav.navigate("Showcase", message="Visual showcase")
+    async def confirm_destructive() -> None:
+        confirmed = await pn.Alert.confirm(
+            "Delete item?",
+            message="This action cannot be undone.",
+            confirm_label="Delete",
+            cancel_label="Keep",
+        )
+        print(f"[SettingsScreen] {'confirmed' if confirmed else 'cancelled'}")
 
     return pn.ScrollView(
         pn.Column(
-            pn.StatusBar(bar_style="dark"),
-            pn.Text("Settings", style=styles["title"]),
-            pn.Text(f"PythonNative v{pn.__version__}", style=styles["subtitle"]),
-            pn.Text(
-                f"Running on {pn.Platform.OS} {pn.Platform.Version}",
-                style=styles["subtitle"],
+            pn.StatusBar(bar_style="light" if theme.dark else "dark"),
+            pn.Text("Settings", style=styles.title),
+            pn.Text("Appearance", style=styles.section_title),
+            pn.SegmentedControl(
+                segments=[choice.capitalize() for choice in APPEARANCES],
+                selected_index=APPEARANCES.index(appearance.value),
+                on_change=lambda index: appearance.set(APPEARANCES[index]),
+                accessibility_label="Appearance",
             ),
-            pn.Text(
-                f"Window: {dims.width:.0f} × {dims.height:.0f}",
-                style=styles["subtitle"],
-            ),
-            pn.Button("Show alert", on_press=_show_alert),
-            pn.Button("Confirm destructive", on_press=_confirm_destructive),
-            pn.Button("Visual showcase", on_press=_view_showcase),
-            style=styles["section"],
+            pn.Text("Saved on this device and applied at launch.", style=styles.hint),
+            pn.Text("About", style=styles.section_title),
+            pn.Text(f"PythonNative v{pn.__version__}", style=styles.subtitle),
+            pn.Text(f"Running on {pn.Platform.OS} {pn.Platform.Version}", style=styles.subtitle),
+            pn.Text(f"Window: {dims.width:.0f} × {dims.height:.0f}", style=styles.subtitle),
+            pn.Button("Show alert", on_press=show_alert),
+            pn.Button("Confirm destructive", on_press=confirm_destructive),
+            pn.Button("Visual showcase", on_press=lambda: nav.push(ShowcaseScreen())),
+            style=styles.section,
         )
     )

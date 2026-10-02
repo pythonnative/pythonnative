@@ -10,17 +10,17 @@ mount path matches the production usage.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint
 
 
 @pn.component
-def KeyboardAvoidingViewDemo() -> pn.Element:
+def KeyboardAvoidingViewDemo() -> pn.Node:
     """Render KeyboardAvoidingView with a TextInput inside it."""
     value, set_value = pn.use_state("")
-    return demo_screen(
+    return DemoScreen(
         "KeyboardAvoidingView",
         "TextInput inside a KeyboardAvoidingView; mainly a smoke test.",
-        section(
+        DemoSection(
             "Body",
             pn.KeyboardAvoidingView(
                 pn.Column(
@@ -37,9 +37,9 @@ def KeyboardAvoidingViewDemo() -> pn.Element:
                             background_color="#FFFFFF",
                         ),
                     ),
-                    style=pn.style(spacing=8),
+                    style=pn.style(gap=8),
                 )
             ),
-            hint("Maestro asserts 'KAV body label' is visible after mount."),
+            Hint("Maestro asserts 'KAV body label' is visible after mount."),
         ),
     )

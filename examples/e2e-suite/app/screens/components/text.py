@@ -10,7 +10,7 @@ that several text labels render together and taps the pressable ones.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 _LONG_LINE = (
     "This deliberately long single line keeps going and going so the "
@@ -19,31 +19,31 @@ _LONG_LINE = (
 
 
 @pn.component
-def TextDemo() -> pn.Element:
+def TextDemo() -> pn.Node:
     """Render a handful of [`Text`][pythonnative.Text] variants."""
     label_presses, set_label_presses = pn.use_state(0)
     span_presses, set_span_presses = pn.use_state(0)
 
-    return demo_screen(
+    return DemoScreen(
         "Text",
         "Plain text, bold text, sized text, and colored text in one place.",
-        section(
+        DemoSection(
             "Plain text",
             pn.Text("Plain text line"),
-            hint("Renders with default body style."),
+            Hint("Renders with default body style."),
         ),
-        section(
+        DemoSection(
             "Bold text",
             pn.Text("Bold text line", style=pn.style(bold=True, font_size=18)),
         ),
-        section(
+        DemoSection(
             "Sized + colored text",
             pn.Text(
                 "Sized and colored line",
                 style=pn.style(font_size=20, color="#DC2626", font_weight="600"),
             ),
         ),
-        section(
+        DemoSection(
             "Multi-line text",
             pn.Text(
                 "First paragraph that should wrap if it is long enough to "
@@ -51,7 +51,7 @@ def TextDemo() -> pn.Element:
                 style=pn.style(font_size=14, color="#1F2937", line_height=20),
             ),
         ),
-        section(
+        DemoSection(
             "Truncation + selection",
             pn.Text(
                 _LONG_LINE,
@@ -65,12 +65,12 @@ def TextDemo() -> pn.Element:
                 allow_font_scaling=False,
                 style=pn.style(font_size=14, color="#1F2937"),
             ),
-            hint("The long line truncates with an ellipsis in the middle."),
+            Hint("The long line truncates with an ellipsis in the middle."),
         ),
-        section(
+        DemoSection(
             "Pressable text",
-            result_text("Label presses", label_presses),
-            result_text("Span presses", span_presses),
+            ResultText("Label presses", label_presses),
+            ResultText("Span presses", span_presses),
             pn.Text(
                 "Tap this whole label",
                 on_press=lambda: set_label_presses(label_presses + 1),
@@ -87,9 +87,9 @@ def TextDemo() -> pn.Element:
                 # element's center.
                 style=pn.style(font_size=16, align_self="flex_start"),
             ),
-            hint("Maestro taps the label and the span and asserts both counters."),
+            Hint("Maestro taps the label and the span and asserts both counters."),
         ),
-        section(
+        DemoSection(
             "Rich text (nested spans)",
             pn.Text(
                 "Rich start ",
@@ -97,6 +97,6 @@ def TextDemo() -> pn.Element:
                 pn.Text(" red end", style=pn.style(color="#DC2626")),
                 style=pn.style(font_size=15),
             ),
-            hint("One native label built from three styled spans."),
+            Hint("One native label built from three styled spans."),
         ),
     )

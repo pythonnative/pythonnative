@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+import base64
+import http.client
 import json
 import os
+import socket
+import stat
 import threading
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, Iterator, List
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import pytest
 
-from pythonnative.devserver import DevServer, ws
+from pythonnative.devserver import DevServer, auth, ws
 from pythonnative.devserver.watcher import modules_for_paths, snapshot_sources
 
 
@@ -45,11 +49,49 @@ def server(tmp_path: Path) -> Iterator[DevServer]:
         srv.stop()
 
 
-def _get(server: DevServer, path: str) -> Any:
-    with urllib.request.urlopen(server.info.url("127.0.0.1") + path, timeout=5) as response:
+def _get(server: DevServer, path: str, *, headers: Optional[Dict[str, str]] = None, auth: bool = True) -> Any:
+    """GET ``path``; ``auth`` sends the dev token in the ``X-PN-Token`` header."""
+    request = urllib.request.Request(server.info.url("127.0.0.1") + path, headers=dict(headers or {}))
+    if auth:
+        request.add_header("X-PN-Token", server.token)
+    with urllib.request.urlopen(request, timeout=5) as response:
         body = response.read()
         ctype = response.headers.get("Content-Type", "")
         return (response.status, ctype, body)
+
+
+def _raw(server: DevServer, path: str, headers: Dict[str, str]) -> Tuple[int, Dict[str, str], bytes]:
+    """One request without following redirects: ``(status, lower-cased headers, body)``."""
+    connection = http.client.HTTPConnection("127.0.0.1", server.info.port, timeout=5)
+    try:
+        connection.request("GET", path, headers=headers)
+        response = connection.getresponse()
+        return response.status, {k.lower(): v for k, v in response.getheaders()}, response.read()
+    finally:
+        connection.close()
+
+
+def _upgrade(server: DevServer, path: str, headers: Dict[str, str]) -> str:
+    """Send a WebSocket upgrade with ``headers`` and return the response status line."""
+    key = base64.b64encode(os.urandom(16)).decode("ascii")
+    lines = [
+        f"GET {path} HTTP/1.1",
+        f"Host: 127.0.0.1:{server.info.port}",
+        "Upgrade: websocket",
+        "Connection: Upgrade",
+        f"Sec-WebSocket-Key: {key}",
+        "Sec-WebSocket-Version: 13",
+        *(f"{name}: {value}" for name, value in headers.items()),
+    ]
+    with socket.create_connection(("127.0.0.1", server.info.port), timeout=5) as sock:
+        sock.sendall(("\r\n".join(lines) + "\r\n\r\n").encode("ascii"))
+        head = b""
+        while b"\r\n" not in head:
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            head += chunk
+    return head.split(b"\r\n", 1)[0].decode("ascii")
 
 
 def _wait(predicate: Any, timeout: float = 5.0) -> None:
@@ -151,12 +193,154 @@ def test_http_404_for_unknown_routes(server: DevServer) -> None:
 
 
 # ----------------------------------------------------------------------
+# Dev token
+# ----------------------------------------------------------------------
+
+_PROTECTED = ["/manifest", "/status", "/file/app/main.py", "/assets/logo.txt", "/assets/pn_assets.json"]
+
+
+def test_unknown_routes_need_the_token_before_revealing_anything(server: DevServer) -> None:
+    with pytest.raises(urllib.error.HTTPError) as excinfo:
+        _get(server, "/nope", auth=False)
+    assert excinfo.value.code == 401
+
+
+@pytest.mark.parametrize("path", _PROTECTED)
+def test_protected_routes_need_the_token(server: DevServer, path: str) -> None:
+    with pytest.raises(urllib.error.HTTPError) as missing:
+        _get(server, path, auth=False)
+    assert missing.value.code == 401
+    with pytest.raises(urllib.error.HTTPError) as wrong:
+        _get(server, path, auth=False, headers={"X-PN-Token": "not-the-token"})
+    assert wrong.value.code == 403
+    with pytest.raises(urllib.error.HTTPError) as wrong_query:
+        _get(server, path + "?token=not-the-token", auth=False)
+    assert wrong_query.value.code == 403
+    with pytest.raises(urllib.error.HTTPError) as wrong_cookie:
+        _get(server, path, auth=False, headers={"Cookie": "pn_token=not-the-token"})
+    assert wrong_cookie.value.code == 403
+
+
+@pytest.mark.parametrize("path", _PROTECTED)
+def test_protected_routes_accept_query_header_or_cookie(server: DevServer, path: str) -> None:
+    assert _get(server, path)[0] == 200
+    assert _get(server, f"{path}?token={server.token}", auth=False)[0] == 200
+    cookie = f"theme=dark; {auth.COOKIE_NAME}={server.token}; other=1"
+    assert _get(server, path, auth=False, headers={"Cookie": cookie})[0] == 200
+
+
+@pytest.mark.parametrize("path", ["/", "/index.html", "/static/shell.js", "/static/bridge.js", "/static/schema.js"])
+def test_page_and_renderer_files_stay_public(server: DevServer, path: str) -> None:
+    status, headers, _ = _raw(server, path, {})
+    assert status == 200
+    assert "set-cookie" not in headers
+    assert "access-control-allow-origin" not in headers
+
+
+def test_page_trades_the_query_token_for_a_cookie_and_redirects(server: DevServer) -> None:
+    status, headers, _ = _raw(server, f"/?token={server.token}", {})
+    assert status == 302
+    assert headers["location"] == "/"
+    cookie = headers["set-cookie"]
+    assert cookie.startswith(f"{auth.COOKIE_NAME}={server.token};")
+    for attribute in ("HttpOnly", "SameSite=Strict", "Path=/"):
+        assert attribute in cookie
+    # The cookie then authorizes the page's own requests.
+    assert _get(server, "/manifest", auth=False, headers={"Cookie": cookie.split(";", 1)[0]})[0] == 200
+
+
+def test_page_refuses_a_wrong_query_token(server: DevServer) -> None:
+    status, headers, _ = _raw(server, "/?token=wrong", {})
+    assert status == 403
+    assert "set-cookie" not in headers
+
+
+def test_server_urls_carry_the_token(server: DevServer) -> None:
+    assert server.info.preview_url("10.0.0.2") == f"http://10.0.0.2:{server.info.port}/?token={server.token}"
+    assert server.info.ws_url("10.0.0.2") == f"ws://10.0.0.2:{server.info.port}/ws?role=client&token={server.token}"
+    assert server.token not in repr(server.info)
+
+
+def test_websocket_upgrade_needs_the_token(server: DevServer) -> None:
+    assert " 401 " in _upgrade(server, "/ws?role=client", {})
+    assert " 403 " in _upgrade(server, "/ws?role=client&token=wrong", {})
+    assert " 101 " in _upgrade(server, f"/ws?role=client&token={server.token}", {})
+    assert " 101 " in _upgrade(server, "/ws?role=client", {"X-PN-Token": server.token})
+    assert " 404 " in _upgrade(server, f"/elsewhere?token={server.token}", {})
+    with pytest.raises(ws.HandshakeError, match="401"):
+        _client(server, token=None)
+
+
+def test_websocket_origin_must_match_the_host(server: DevServer) -> None:
+    path = f"/ws?role=client&token={server.token}"
+    port = server.info.port
+    # Native dev clients send no Origin at all.
+    assert " 101 " in _upgrade(server, path, {})
+    # The preview page's own origin.
+    assert " 101 " in _upgrade(server, path, {"Origin": f"http://127.0.0.1:{port}"})
+    # Any other page, even one holding the cookie, is refused before the upgrade.
+    cookie = f"{auth.COOKIE_NAME}={server.token}"
+    for origin in ("http://evil.example", f"http://evil.example:{port}", "http://127.0.0.1:1", "null", ""):
+        assert " 403 " in _upgrade(server, path, {"Origin": origin, "Cookie": cookie}), origin
+
+
+def test_token_file_is_created_private_and_reused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    token_file = tmp_path / "home" / ".pythonnative" / "dev-token"
+    monkeypatch.setenv(auth.TOKEN_FILE_ENV, str(token_file))
+    first = auth.load_token()
+    assert len(first) >= 32
+    assert token_file.read_text(encoding="utf-8").strip() == first
+    if os.name == "posix":
+        assert stat.S_IMODE(token_file.stat().st_mode) == 0o600
+        assert stat.S_IMODE(token_file.parent.stat().st_mode) == 0o700
+        # A file someone loosened is tightened and keeps its token.
+        token_file.chmod(0o644)
+        assert auth.load_token() == first
+        assert stat.S_IMODE(token_file.stat().st_mode) == 0o600
+    assert auth.load_token() == first
+    # Deleting the file issues a new token.
+    token_file.unlink()
+    assert auth.load_token() != first
+
+
+def test_token_env_overrides_the_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    token_file = tmp_path / "dev-token"
+    monkeypatch.setenv(auth.TOKEN_FILE_ENV, str(token_file))
+    monkeypatch.setenv(auth.TOKEN_ENV, "from-the-environment")
+    assert auth.load_token() == "from-the-environment"
+    assert not token_file.exists()
+    assert auth.token_source() == "$PN_DEV_TOKEN"
+
+
+def test_preview_urls_carry_the_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import pythonnative.devserver as devserver
+    from pythonnative.preview import PreviewSession
+
+    monkeypatch.setattr(devserver, "lan_addresses", lambda: ["192.168.1.5"])
+    session = PreviewSession(str(_project(tmp_path)), "app.main", host="127.0.0.1", port=9999, log=lambda _: None)
+    token = auth.load_token()
+    assert session.urls() == [f"http://localhost:9999/?token={token}", f"http://192.168.1.5:9999/?token={token}"]
+
+
+def test_server_defaults_to_the_user_token(tmp_path: Path) -> None:
+    srv = DevServer(str(_project(tmp_path)), watch=False, log=lambda _: None)
+    assert srv.token == auth.load_token()
+    assert srv.info.token == srv.token
+
+
+# ----------------------------------------------------------------------
 # Dev-client protocol
 # ----------------------------------------------------------------------
 
 
-def _client(server: DevServer, role: str = "client") -> ws.WebSocketClient:
-    client = ws.WebSocketClient(server.info.url("127.0.0.1").replace("http", "ws") + f"/ws?role={role}", timeout=5.0)
+_SERVER_TOKEN = object()
+
+
+def _client(server: DevServer, role: str = "client", token: Any = _SERVER_TOKEN) -> ws.WebSocketClient:
+    url = server.info.url("127.0.0.1").replace("http", "ws") + f"/ws?role={role}"
+    if token is not None:
+        url = auth.with_token(url, server.token if token is _SERVER_TOKEN else token)
+    client = ws.WebSocketClient(url, timeout=5.0)
     client.connect()
     return client
 

@@ -1,59 +1,57 @@
-"""Navigation: stack, tab, and drawer navigators with a React Navigation-style API.
+"""Navigation: typed stack, tab, and drawer navigators.
+
+Screens are ordinary components whose parameters are their route
+params; navigators are module-level values listing them:
 
 ```python
 import pythonnative as pn
 
-Stack = pn.create_stack_navigator()
-nav_ref = pn.create_navigation_ref()
 
 @pn.component
-def HomeScreen():
+def HomeScreen() -> pn.Node:
     nav = pn.use_navigation()
-    return pn.Button("Open 42", on_press=lambda: nav.navigate("Detail", id=42))
+    return pn.Button("Open 42", on_press=lambda: nav.push(ItemScreen(id=42)))
+
 
 @pn.component
-def DetailScreen():
-    route = pn.use_route()
-    return pn.Text(f"Item {route.params['id']}")
+def ItemScreen(id: int) -> pn.Node:
+    pn.use_screen_options(title=f"Item {id}")
+    return pn.Text(f"Item {id}")
+
+
+Root = pn.StackNavigator(
+    pn.Screen(HomeScreen, title="Home"),
+    pn.Screen(ItemScreen, path="items/{id}"),
+    screen_options=pn.ScreenOptions(header_large_title=True),
+)
+nav_ref = pn.NavigationRef()
+
 
 @pn.component
-def App():
-    return pn.NavigationContainer(
-        Stack.Navigator(
-            Stack.Screen("Home", HomeScreen, title="Home"),
-            Stack.Group(
-                Stack.Screen("Detail", DetailScreen, options=lambda route: {"title": f"Item {route.params['id']}"}),
-                screen_options={"presentation": "modal"},
-            ),
-            screen_options={"header_large_title": True},
-        ),
-        ref=nav_ref,
-    )
+def App() -> pn.Node:
+    return pn.NavigationContainer(Root, link_prefixes=["myapp://"], ref=nav_ref)
 ```
 
-Public surface (all re-exported from ``pythonnative``):
+``nav.push(ItemScreen(id=42))`` builds the destination with the screen
+component's own signature, so a missing or mistyped param is a type
+error. Public surface (all re-exported from ``pythonnative``):
 
-- Factories: [`create_stack_navigator`][pythonnative.create_stack_navigator],
-  [`create_tab_navigator`][pythonnative.create_tab_navigator],
-  [`create_drawer_navigator`][pythonnative.create_drawer_navigator],
-  [`create_navigation_ref`][pythonnative.create_navigation_ref],
+- Navigators: [`StackNavigator`][pythonnative.StackNavigator],
+  [`TabNavigator`][pythonnative.TabNavigator],
+  [`DrawerNavigator`][pythonnative.DrawerNavigator],
+  [`Screen`][pythonnative.Screen], [`Group`][pythonnative.Group], and
   [`NavigationContainer`][pythonnative.NavigationContainer].
 - Hooks: [`use_navigation`][pythonnative.use_navigation],
   [`use_route`][pythonnative.use_route],
-  [`use_is_focused`][pythonnative.use_is_focused],
-  [`use_focus_effect`][pythonnative.use_focus_effect],
-  [`use_navigation_theme`][pythonnative.use_navigation_theme].
+  [`use_screen_options`][pythonnative.use_screen_options],
+  [`use_is_focused`][pythonnative.use_is_focused], and
+  [`use_focus_effect`][pythonnative.use_focus_effect].
 - Types: [`Navigation`][pythonnative.Navigation],
   [`NavigationRef`][pythonnative.NavigationRef],
   [`Route`][pythonnative.navigation.Route],
   [`NavigationState`][pythonnative.navigation.NavigationState],
-  [`ScreenOptions`][pythonnative.ScreenOptions],
-  [`TabBarStyle`][pythonnative.TabBarStyle],
-  [`NavigationTheme`][pythonnative.NavigationTheme],
-  [`NavigationColors`][pythonnative.NavigationColors],
-  [`LinkingConfig`][pythonnative.LinkingConfig].
-- Themes: [`DEFAULT_NAVIGATION_THEME`][pythonnative.DEFAULT_NAVIGATION_THEME],
-  [`DARK_NAVIGATION_THEME`][pythonnative.DARK_NAVIGATION_THEME].
+  [`ScreenOptions`][pythonnative.ScreenOptions], and
+  [`TabBarStyle`][pythonnative.TabBarStyle].
 """
 
 from .container import ContainerContext, NavigationContainer
@@ -70,67 +68,43 @@ from .handle import (
 )
 from .hooks import use_focus_effect, use_is_focused, use_navigation, use_route
 from .host import NAV_STATE_ARG, HostContext, HostRoot
-from .linking import LinkingConfig
-from .navigators import (
-    DrawerNavigator,
-    StackNavigator,
-    TabNavigator,
-    create_drawer_navigator,
-    create_stack_navigator,
-    create_tab_navigator,
-)
-from .ref import NavigationRef, create_navigation_ref
-from .screen import HeaderSlot, ScreenDef, ScreenGroup, ScreenOptions, TabBarStyle
-from .state import NavigationState, Route, RouteParams
-from .theme import (
-    DARK_NAVIGATION_THEME,
-    DEFAULT_NAVIGATION_THEME,
-    NavigationColors,
-    NavigationTheme,
-    NavigationThemeContext,
-    use_navigation_theme,
-)
+from .linking import LinkTable
+from .navigators import DrawerNavigator, Navigator, StackNavigator, TabNavigator, use_screen_options
+from .ref import NavigationRef
+from .screen import Group, Screen, ScreenOptions, ScreenTarget, TabBarStyle
+from .state import NavigationState, Route
 
 __all__ = [
-    "DARK_NAVIGATION_THEME",
-    "DEFAULT_NAVIGATION_THEME",
     "NAV_STATE_ARG",
     "ContainerContext",
     "DrawerNavigation",
     "DrawerNavigator",
     "EventName",
     "FocusContext",
-    "HeaderSlot",
+    "Group",
     "HostContext",
     "HostNavigator",
     "HostRoot",
-    "LinkingConfig",
+    "LinkTable",
     "Navigation",
-    "NavigationColors",
     "NavigationContainer",
     "NavigationContext",
     "NavigationEvent",
     "NavigationRef",
     "NavigationState",
-    "NavigationTheme",
-    "NavigationThemeContext",
+    "Navigator",
     "NavigatorCore",
     "Route",
-    "RouteParams",
-    "ScreenDef",
-    "ScreenGroup",
+    "Screen",
     "ScreenOptions",
+    "ScreenTarget",
     "StackNavigator",
     "TabBarStyle",
     "TabNavigation",
     "TabNavigator",
-    "create_drawer_navigator",
-    "create_navigation_ref",
-    "create_stack_navigator",
-    "create_tab_navigator",
     "use_focus_effect",
     "use_is_focused",
     "use_navigation",
-    "use_navigation_theme",
     "use_route",
+    "use_screen_options",
 ]

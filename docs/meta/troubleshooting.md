@@ -160,6 +160,15 @@ pn clean
 pn run ios
 ```
 
+### A release build fails with `ModuleNotFoundError: No module named 'pythonnative.devclient'`
+
+Release bundles leave out the development modules (the dev client, Fast
+Refresh, the dev server, the CLI, the test helpers, and the SDK code
+generators), so application code that imports one of them works in
+debug builds only. Move the import into a code path that runs only in
+development. See
+[What a release bundle leaves out](../guides/building-for-release.md#what-a-release-bundle-leaves-out).
+
 ### Blank screen on Simulator, no logs
 
 `pn run ios` rewires `sys.stdout` to file descriptor 2 so `print()`
@@ -219,8 +228,14 @@ You're either missing keys or using positional keys. See
 - Is the device on the same network? Simulators and emulators reach
   the server through `localhost` (Android via `adb reverse`), but a
   physical iPhone needs your Mac's LAN address and an open port. Pass
-  `--dev-server ws://<ip>:8765/ws?role=client` to `pn run` if the
-  auto-detected address is wrong.
+  the device URL `pn start` printed (`--dev-server
+  "http://<ip>:8765/?token=..."`) to `pn run` if the auto-detected
+  address is wrong.
+- Did the server refuse the app's token? The app logs "refused the
+  connection" when its URL has no dev token or an old one (after the
+  token file was deleted, say). Relaunch with `pn run`, or enter the
+  URL `pn start` prints on the dev-client connect screen. See
+  [The dev token](../guides/dev-workflow.md#the-dev-token).
 - The watcher only sees files under `app/`. Code outside `app/` needs
   a rebuild.
 - Top-level side effects re-run on each reload; if your module
@@ -234,6 +249,19 @@ rebuild means a native input changed (`pythonnative.toml`, the
 `pythonnative` package version, native plugins) or no dev server was
 running when `pn run` started. See
 [When native rebuilds happen](../guides/dev-workflow.md#when-native-rebuilds-happen).
+
+### The browser preview keeps saying it's waiting for `pn start`
+
+The page itself is public, but its connection needs your dev token.
+If you opened `http://localhost:8765/` directly (a bookmark, or a
+browser that cleared its cookies), the page says it doesn't have the
+token. Open the preview URL that `pn start` printed, which ends in
+`?token=...`, once; the page stores the token as a cookie and removes it
+from the address bar. `curl` and other scripts get `401 Unauthorized`
+for the same reason; send the token in an `X-PN-Token` header.
+
+To start over with a new token, stop `pn start`, delete
+`~/.pythonnative/dev-token`, and start it again.
 
 ### The browser preview shows a blank frame
 

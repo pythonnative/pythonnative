@@ -35,8 +35,9 @@ pn run ios          # terminal 2 (or android, or open the browser preview)
    rewrites the `Element.type` references in place. The next
    reconcile sees the new function with the same `HookState`, so state
    survives when the captured hook signature is compatible. Hook-order or
-   custom-hook changes remount the affected component. Helper-class and service
-   changes trigger an application remount.
+   custom-hook changes remount the affected component, and a changed class
+   definition remounts the application (see
+   [When state survives](#when-state-survives)).
 6. The host re-renders. Layout and native views update incrementally
    through the normal reconciler path.
 7. The client reports back (`fast_refresh: app.screens.home 42ms`),
@@ -46,7 +47,8 @@ If Fast Refresh can't find a clean swap (a component's `__qualname__`
 changed, a render raised with the new function, or the swap itself
 failed), the host falls back to a **full remount** of its root, so you
 never get stuck with a stale tree. Hook state is reset in that case
-and the report says `remount`.
+and the report says `remount`. When no screen is mounted yet, nothing is
+refreshed and nothing is reported; the first render reads the new files.
 
 If the saved file fails to import (a syntax error mid-edit), the
 previous module stays in `sys.modules`, the traceback shows in the
@@ -55,6 +57,53 @@ save again.
 
 Refresh walks the application's shared logical tree, including covered screens
 and mounted list rows. Native containers don't create separate Python hosts.
+
+## When state survives
+
+A save keeps component state unless one of the following is true:
+
+- **A component's hooks changed.** Fast Refresh records each component's
+  hook calls (their order, kind, and binding names, following custom
+  hooks defined in your app). If the new function's signature differs,
+  only the instances of that component remount; the rest of the tree
+  keeps its state.
+- **A class definition changed.** Before reloading, `apply_reload`
+  fingerprints every class defined in each module it's about to
+  re-execute. The fingerprint covers the class's name, metaclass, and
+  bases; its annotated field names; its dataclass fields and their
+  defaults; its immutable class attributes (numbers, strings, tuples, and
+  `Enum` member values); and the bytecode, constants, names, and defaults
+  of every method, property, `staticmethod`, and `classmethod`. If a class
+  that existed before is removed, renamed, or has a different fingerprint
+  after the reload, the whole application remounts, because an instance
+  of the old class could still sit in `use_state`, `use_memo`, or
+  `use_ref`.
+
+Everything else preserves state. In particular, these never force a
+remount:
+
+- Editing a component's body, text, styles, or props (as long as its hooks
+  stay the same).
+- Adding, editing, or removing plain functions, lambdas, and constants.
+  They're rebound when the module re-executes, and components pick them
+  up on their next render.
+- Defining or editing a `TypedDict` or `Protocol`. They describe shapes;
+  nothing holds an instance of the class itself.
+- Re-executing a module whose classes didn't change. A dataclass, `Enum`,
+  `NamedTuple`, or exception class that's identical to its previous
+  definition keeps its fingerprint.
+- Moving a class, adding blank lines or comments around it, or editing
+  the text of its docstring or its methods' docstrings. Line numbers,
+  file names, and docstring text aren't part of the fingerprint.
+- Adding a new class. No live instance can refer to it yet.
+
+!!! note "Unchanged classes are still new objects"
+    Re-executing a module creates new class objects even when their
+    fingerprints match. An instance created before the save keeps its old
+    class, so `isinstance` checks against the new class, or identity
+    comparisons between an old `Enum` member held in state and a new one,
+    return `False`. Compare `Enum` members by `.name` or `.value` if that
+    matters during development, or reload the app.
 
 ## What gets reloaded
 
@@ -96,7 +145,8 @@ picks up the new bytes the next time it renders.
     Adding or removing a hook in a component changes the slot layout.
     Fast Refresh compares captured hook signatures before preserving
     state. Hook-order and custom-hook changes remount affected component
-    instances. Changes to helper classes or services remount the application.
+    instances. Changed class definitions remount the application; see
+    [When state survives](#when-state-survives).
 
 !!! info "Renaming a component"
     Fast Refresh keys on each function's `__qualname__`. Renaming a
@@ -110,6 +160,15 @@ Fast Refresh needs `pn start` running. If you `pn run` without one, the
 CLI says so and builds an app that runs its bundled sources; start the
 server and relaunch to connect it. For rebuild-on-every-change (more
 predictable, much slower), pass `--rebuild`.
+
+The app also needs your dev token, which `pn run` passes along with the
+server's URL; see [The dev token](dev-workflow.md#the-dev-token). If
+you delete the token file, relaunch installed debug builds with `pn run`
+so they pick up the new one.
+
+Release builds have no Fast Refresh at all: they leave out
+`pythonnative.hot_reload`, `pythonnative.refresh`, and the dev client.
+See [Building for release](building-for-release.md#what-a-release-bundle-leaves-out).
 
 ## Reading logs
 

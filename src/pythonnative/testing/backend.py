@@ -309,9 +309,9 @@ class FakeBackend:
             return ("insert_child", parent.id, child.id, index)
 
         if isinstance(op, DestroyOp):
-            view = self.views.pop(op.tag, None)
-            if view is None:
+            if op.tag not in self.views:
                 raise AssertionError(f"destroy: unknown tag {op.tag}")
+            view = self.views.pop(op.tag)
             if view.parent is not None:
                 view.parent.children.remove(view)
                 view.parent = None

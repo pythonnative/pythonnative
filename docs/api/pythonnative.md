@@ -12,9 +12,18 @@ Your app module defines a top-level component named `App`:
 ```python
 import pythonnative as pn
 
+
 @pn.component
-def App():
-    return pn.NavigationContainer(...)
+def HomeScreen() -> pn.Node:
+    return pn.Text("Hello from PythonNative")
+
+
+Root = pn.StackNavigator(HomeScreen)
+
+
+@pn.component
+def App() -> pn.Node:
+    return pn.NavigationContainer(Root)
 ```
 
 The bundled Android `ScreenFragment` and iOS `ViewController` load
@@ -36,8 +45,9 @@ The reference is split per module so each page stays scannable:
 
 | Area | Page | Key symbols |
 |---|---|---|
-| Component model | [Component](component.md) | [`component`][pythonnative.component.component], [`Component`][pythonnative.Component], [`memo`][pythonnative.memo] |
+| Component model | [Component](component.md) | [`component`][pythonnative.component.component], [`Component`][pythonnative.Component], [`memo`][pythonnative.memo], [`Node`][pythonnative.element.Node], [`Element.with_key`][pythonnative.element.Element.with_key] |
 | Element factories | [Components](components.md) | [`Text`][pythonnative.Text], [`Button`][pythonnative.Button], [`Column`][pythonnative.Column], [`Row`][pythonnative.Row], [`ScrollView`][pythonnative.ScrollView], [`FlatList`][pythonnative.FlatList], [`SectionList`][pythonnative.SectionList], [`Modal`][pythonnative.Modal], [`Pressable`][pythonnative.Pressable], [`PressState`][pythonnative.PressState], [`Ripple`][pythonnative.Ripple], [`StatusBar`][pythonnative.StatusBar], [`KeyboardAvoidingView`][pythonnative.KeyboardAvoidingView], [`RefreshControl`][pythonnative.RefreshControl], [`Picker`][pythonnative.Picker], [`Fragment`][pythonnative.Fragment], [`Portal`][pythonnative.Portal], [`ErrorBoundary`][pythonnative.ErrorBoundary] |
+| Shared props | [Components](components.md#shared-props) | [`AccessibilityProps`][pythonnative.AccessibilityProps], [`ViewProps`][pythonnative.ViewProps] |
 | Typed event payloads | [Components](components.md#typed-event-payloads) | [`LayoutEvent`][pythonnative.LayoutEvent], [`ScrollEvent`][pythonnative.ScrollEvent], [`SelectionEvent`][pythonnative.SelectionEvent], [`KeyPressEvent`][pythonnative.KeyPressEvent], [`ContentSizeEvent`][pythonnative.ContentSizeEvent], [`ImageLoadEvent`][pythonnative.ImageLoadEvent], [`WebNavigationEvent`][pythonnative.WebNavigationEvent] |
 | Imperative handles | [Handles](handles.md) | [`ViewHandle`][pythonnative.ViewHandle], [`TextInputHandle`][pythonnative.TextInputHandle], [`ScrollViewHandle`][pythonnative.ScrollViewHandle], [`WebViewHandle`][pythonnative.WebViewHandle], [`ScrollOffset`][pythonnative.ScrollOffset], [`ListController`][pythonnative.ListController] |
 | Hooks | [Hooks](hooks.md) | [`use_state`][pythonnative.use_state], [`use_reducer`][pythonnative.use_reducer], [`use_effect`][pythonnative.use_effect] (with [`Deps`][pythonnative.Deps]), [`use_layout_effect`][pythonnative.use_layout_effect], [`use_memo`][pythonnative.use_memo], [`use_ref`][pythonnative.use_ref], [`use_imperative_handle`][pythonnative.use_imperative_handle], [`use_context`][pythonnative.use_context], [`use_back_handler`][pythonnative.use_back_handler], [`use_window_dimensions`][pythonnative.use_window_dimensions], [`use_safe_area_insets`][pythonnative.use_safe_area_insets], [`use_keyboard_height`][pythonnative.use_keyboard_height], [`use_color_scheme`][pythonnative.use_color_scheme] (a [`ColorScheme`][pythonnative.hooks.ColorScheme]), [`use_resource`][pythonnative.use_resource], [`use_transition`][pythonnative.use_transition], [`use_deferred_value`][pythonnative.use_deferred_value], [`create_context`][pythonnative.create_context] |
@@ -46,9 +56,11 @@ The reference is split per module so each page stays scannable:
 | Gestures | [Gestures](gestures.md) | [`Tap`][pythonnative.gestures.Tap], [`LongPress`][pythonnative.gestures.LongPress], [`Pan`][pythonnative.gestures.Pan], [`Swipe`][pythonnative.gestures.Swipe], [`Fling`][pythonnative.gestures.Fling], [`Pinch`][pythonnative.gestures.Pinch], [`Rotation`][pythonnative.gestures.Rotation], [`GestureEvent`][pythonnative.gestures.GestureEvent], [`SwipeDirection`][pythonnative.SwipeDirection] |
 | System dialogs | [Alerts](alerts.md) | [`Alert`][pythonnative.Alert] |
 | Platform | [Platform](platform.md) | [`Platform`][pythonnative.Platform] |
-| Navigation | [Navigation](navigation.md) | [`NavigationContainer`][pythonnative.NavigationContainer], [`create_stack_navigator`][pythonnative.create_stack_navigator], [`create_tab_navigator`][pythonnative.create_tab_navigator], [`create_drawer_navigator`][pythonnative.create_drawer_navigator], [`Navigation`][pythonnative.Navigation], [`use_navigation`][pythonnative.use_navigation], [`use_route`][pythonnative.use_route], [`use_is_focused`][pythonnative.use_is_focused], [`LinkingConfig`][pythonnative.LinkingConfig], [`ScreenOptions`][pythonnative.ScreenOptions], [`TabBarStyle`][pythonnative.TabBarStyle], [`create_navigation_ref`][pythonnative.create_navigation_ref], [`NavigationRef`][pythonnative.NavigationRef], [`NavigationTheme`][pythonnative.NavigationTheme], [`DEFAULT_NAVIGATION_THEME`][pythonnative.DEFAULT_NAVIGATION_THEME], [`DARK_NAVIGATION_THEME`][pythonnative.DARK_NAVIGATION_THEME], [`use_navigation_theme`][pythonnative.use_navigation_theme] |
+| Navigation | [Navigation](navigation.md) | [`NavigationContainer`][pythonnative.NavigationContainer], [`StackNavigator`][pythonnative.StackNavigator], [`TabNavigator`][pythonnative.TabNavigator], [`DrawerNavigator`][pythonnative.DrawerNavigator], [`Screen`][pythonnative.Screen], [`Group`][pythonnative.Group], [`ScreenOptions`][pythonnative.ScreenOptions], [`TabBarStyle`][pythonnative.TabBarStyle], [`Navigation`][pythonnative.Navigation], [`NavigationRef`][pythonnative.NavigationRef], [`use_navigation`][pythonnative.use_navigation], [`use_screen_options`][pythonnative.use_screen_options], [`use_route`][pythonnative.use_route], [`use_is_focused`][pythonnative.use_is_focused], [`use_focus_effect`][pythonnative.use_focus_effect], [`LinkTable`][pythonnative.navigation.LinkTable] |
 | Testing | [Testing](testing.md) | [`render`][pythonnative.testing.render], [`render_hook`][pythonnative.testing.render_hook], [`within`][pythonnative.testing.within], [`wait_for`][pythonnative.testing.wait_for], [`fake_clock`][pythonnative.testing.fake_clock], [`FakeBackend`][pythonnative.testing.FakeBackend], [`FakeHost`][pythonnative.testing.FakeHost] |
-| Styling | [Style](style.md) | [`StyleSheet`][pythonnative.StyleSheet], [`Style`][pythonnative.style.Style], [`StyleProp`][pythonnative.style.StyleProp], [`style`][pythonnative.style.style], [`Color`][pythonnative.Color], [`DynamicColor`][pythonnative.DynamicColor], [`TransformSpec`][pythonnative.TransformSpec], [`Theme`][pythonnative.Theme], [`ThemeContext`][pythonnative.style.ThemeContext], [`use_theme`][pythonnative.use_theme] |
+| Styling | [Style](style.md) | [`Style`][pythonnative.style.Style], [`style`][pythonnative.style.style], [`StyleProp`][pythonnative.style.StyleProp], [`StyleSheet`][pythonnative.StyleSheet], [`ABSOLUTE_FILL`][pythonnative.style.ABSOLUTE_FILL], [`resolve_style`][pythonnative.style.resolve_style], [`Color`][pythonnative.Color], [`DynamicColor`][pythonnative.DynamicColor], [`TransformSpec`][pythonnative.TransformSpec] |
+| Theming | [Theme](theme.md) | [`Theme`][pythonnative.Theme], [`Colors`][pythonnative.Colors], [`Typography`][pythonnative.Typography], [`Spacing`][pythonnative.Spacing], [`Radii`][pythonnative.Radii], [`LIGHT_THEME`][pythonnative.LIGHT_THEME], [`DARK_THEME`][pythonnative.DARK_THEME], [`ThemeProvider`][pythonnative.ThemeProvider], [`use_theme`][pythonnative.use_theme], [`use_styles`][pythonnative.use_styles] |
+| App state | [Store](store.md) | [`Store`][pythonnative.Store], [`use_store`][pythonnative.use_store] |
 | Appearance | [Appearance](appearance.md) | [`use_color_scheme`][pythonnative.use_color_scheme], `appearance.set_color_scheme`, `appearance.get_color_scheme` |
 | Images | [Images](images.md) | `Image`, `ImageBackground` |
 | Element descriptor | [Element](element.md) | [`Element`][pythonnative.Element] |

@@ -10,20 +10,24 @@ prop, and a second toggle flips the ``translucent`` (Android) and
 
 from __future__ import annotations
 
+from typing import Literal
+
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
+
+_INITIAL_STYLE: Literal["light", "dark"] = "dark"
 
 
 @pn.component
-def StatusBarDemo() -> pn.Element:
+def StatusBarDemo() -> pn.Node:
     """Render a StatusBar plus toggles for ``bar_style``, ``translucent``, and ``animated``."""
-    style, set_style = pn.use_state("dark")
+    style, set_style = pn.use_state(_INITIAL_STYLE)
     translucent, set_translucent = pn.use_state(False)
 
-    return demo_screen(
+    return DemoScreen(
         "StatusBar",
         "Toggle the status bar style between dark and light.",
-        section(
+        DemoSection(
             "Status bar style",
             pn.StatusBar(
                 bar_style=style,
@@ -31,15 +35,15 @@ def StatusBarDemo() -> pn.Element:
                 animated=True,
                 background_color="#00000000" if translucent else None,
             ),
-            result_text("Bar style", style),
-            result_text("Translucent", "ON" if translucent else "OFF"),
-            buttons_row(
+            ResultText("Bar style", style),
+            ResultText("Translucent", "ON" if translucent else "OFF"),
+            ButtonsRow(
                 pn.Button(
                     "Toggle",
                     on_press=lambda: set_style("light" if style == "dark" else "dark"),
                 ),
                 pn.Button("Toggle translucent", on_press=lambda: set_translucent(not translucent)),
             ),
-            hint("Tapping the button flips Bar style between 'dark' and 'light'."),
+            Hint("Tapping the button flips Bar style between 'dark' and 'light'."),
         ),
     )

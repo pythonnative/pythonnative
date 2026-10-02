@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 async def _submit(payload: str) -> str:
@@ -18,7 +18,7 @@ async def _submit(payload: str) -> str:
 
 
 @pn.component
-def UseMutationDemo() -> pn.Element:
+def UseMutationDemo() -> pn.Node:
     """Render a submit button that fires a use_mutation call."""
     state, run = pn.use_mutation(_submit)
 
@@ -29,14 +29,14 @@ def UseMutationDemo() -> pn.Element:
     else:
         status = "idle"
 
-    return demo_screen(
+    return DemoScreen(
         "use_mutation",
         "use_mutation tracks loading, error, and last data fields.",
-        section(
+        DemoSection(
             "Mutation",
-            result_text("Status", status),
-            result_text("Last data", state.data or "(none)"),
+            ResultText("Status", status),
+            ResultText("Last data", state.data or "(none)"),
             pn.Button("Submit hello", on_press=lambda: run("hello")),
-            hint("Tap submit; Maestro asserts 'Last data: echo:hello'."),
+            Hint("Tap submit; Maestro asserts 'Last data: echo:hello'."),
         ),
     )

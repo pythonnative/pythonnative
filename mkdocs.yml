@@ -82,6 +82,7 @@ nav:
     - Browser Preview: guides/browser-preview.md
     - Navigation: guides/navigation.md
     - Styling: guides/styling.md
+    - Managing State: guides/state.md
     - Assets, Fonts, Icons & SVG: guides/assets.md
     - Animations: guides/animations.md
     - Gestures: guides/gestures.md
@@ -95,6 +96,7 @@ nav:
     - Fast Refresh: guides/hot-reload.md
     - Error Boundaries: guides/error-boundaries.md
     - Testing: guides/testing.md
+    - Linting: guides/linting.md
   - Building:
     - Configuration: guides/configuration.md
     - Permissions: guides/permissions.md
@@ -130,8 +132,11 @@ nav:
     - Reconciler: api/reconciler.md
     - Layout: api/layout.md
     - Style: api/style.md
+    - Theme: api/theme.md
+    - Store: api/store.md
     - Navigation: api/navigation.md
     - Testing: api/testing.md
+    - Lint: api/lint.md
     - Native modules: api/native_modules.md
     - Native views: api/native_views.md
     - Bridge: api/bridge.md

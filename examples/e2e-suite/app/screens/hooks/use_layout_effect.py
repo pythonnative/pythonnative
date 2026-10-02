@@ -10,41 +10,38 @@ against a plain ``use_effect``.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UseLayoutEffectDemo() -> pn.Element:
+def UseLayoutEffectDemo() -> pn.Node:
     """Measure a box during commit and show effect-phase ordering."""
     box_ref = pn.use_ref(None)
     wide, set_wide = pn.use_state(False)
     measured, set_measured = pn.use_state("pending")
     order, set_order = pn.use_state("pending")
 
-    phases = pn.use_ref([])
+    phases: pn.Ref[list[str]] = pn.use_ref([])
 
     def on_layout() -> None:
         phases.current.append("layout")
         handle = box_ref.current
         frame = handle.frame if handle is not None else None
         if frame is not None:
-            label = f"{frame.width:.0f}x{frame.height:.0f}"
-            if measured != label:
-                set_measured(label)
+            # Setting an equal value is a no-op, so this doesn't loop.
+            set_measured(f"{frame.width:.0f}x{frame.height:.0f}")
 
     def on_passive() -> None:
         phases.current.append("passive")
-        joined = " then ".join(phases.current[-2:])
-        if order != joined:
-            set_order(joined)
+        set_order(" then ".join(phases.current[-2:]))
 
     pn.use_layout_effect(on_layout, [wide])
     pn.use_effect(on_passive, [wide])
 
-    return demo_screen(
+    return DemoScreen(
         "use_layout_effect",
         "Run an effect inside the commit, before passive effects.",
-        section(
+        DemoSection(
             "Measured frame",
             pn.View(
                 ref=box_ref,
@@ -55,13 +52,13 @@ def UseLayoutEffectDemo() -> pn.Element:
                     border_radius=8,
                 ),
             ),
-            result_text("Box size", measured),
-            result_text("Phase order", order),
-            buttons_row(
+            ResultText("Box size", measured),
+            ResultText("Phase order", order),
+            ButtonsRow(
                 pn.Button("Narrow box", on_press=lambda: set_wide(False)),
                 pn.Button("Wide box", on_press=lambda: set_wide(True)),
             ),
-            hint(
+            Hint(
                 "The layout effect reads the committed frame from the ref; "
                 "the passive effect always observes 'layout then passive'."
             ),

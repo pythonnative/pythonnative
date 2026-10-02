@@ -1,38 +1,48 @@
-"""Demo screen for [`pn.use_theme`][pythonnative.use_theme].
+"""Demo screen for [`pn.use_theme`][pythonnative.use_theme] and [`pn.use_styles`][pythonnative.use_styles].
 
-Without a ``ThemeContext`` provider, ``use_theme`` resolves the
-built-in light or dark theme from the effective color scheme. Maestro
-forces dark via the appearance override and asserts the theme's
-background color flipped, which also observes ``default_theme`` and
-the ``DEFAULT_LIGHT_THEME`` / ``DEFAULT_DARK_THEME`` constants.
+``main.py`` provides the suite's light and dark themes (see
+:mod:`app.app_theme`) through a [`ThemeProvider`][pythonnative.ThemeProvider],
+which follows the effective color scheme. ``use_theme(SuiteTheme)``
+returns the active preset typed as the suite's subclass, so its extra
+``hint`` token type-checks. Maestro forces dark via the appearance
+override and asserts the theme's background and primary colors flipped;
+the swatches are styled by ``use_styles``, which rebuilds them once per
+theme.
 """
 
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.app_theme import SuiteTheme
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
+
+
+class _SwatchStyles:
+    """Swatches painted from theme tokens."""
+
+    def __init__(self, theme: SuiteTheme) -> None:
+        self.primary = pn.style(
+            width=64, height=24, background_color=theme.colors.primary, border_radius=theme.radii.sm
+        )
+        self.hint = pn.style(width=64, height=24, background_color=theme.hint, border_radius=theme.radii.sm)
 
 
 @pn.component
-def UseThemeDemo() -> pn.Element:
+def UseThemeDemo() -> pn.Node:
     """Render theme-derived values that flip with the color scheme."""
-    theme = pn.use_theme()
-    return demo_screen(
+    theme = pn.use_theme(SuiteTheme)
+    styles = pn.use_styles(_SwatchStyles)
+    return DemoScreen(
         "use_theme",
-        "The built-in theme follows the color scheme unless a provider pins one.",
-        section(
+        "The provided theme follows the color scheme unless the app pins one.",
+        DemoSection(
             "Theme values",
-            result_text("Theme background", theme.background_color),
-            result_text("Theme primary", theme.primary_color),
-            pn.View(
-                style=pn.style(
-                    width=64,
-                    height=24,
-                    background_color=theme.primary_color,
-                    border_radius=6,
-                ),
-            ),
-            buttons_row(
+            ResultText("Theme background", theme.colors.background),
+            ResultText("Theme primary", theme.colors.primary),
+            ResultText("Theme hint", theme.hint),
+            ResultText("Theme spacing md", theme.spacing.md),
+            pn.Row(pn.View(style=styles.primary), pn.View(style=styles.hint), style=pn.style(gap=theme.spacing.sm)),
+            ButtonsRow(
                 pn.Button(
                     "Force dark",
                     on_press=lambda: pn.appearance.set_color_scheme("dark"),
@@ -46,6 +56,6 @@ def UseThemeDemo() -> pn.Element:
                 "Follow system",
                 on_press=lambda: pn.appearance.set_color_scheme(None),
             ),
-            hint("Maestro flips the scheme and asserts the theme colors follow."),
+            Hint("Maestro flips the scheme and asserts the theme colors follow."),
         ),
     )

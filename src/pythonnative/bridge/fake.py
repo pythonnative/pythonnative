@@ -125,9 +125,9 @@ class FakeTransport:
             child.parent = parent
         elif code == "d":
             _, tag = op
-            view = self.views.pop(tag, None)
-            if view is None:
+            if tag not in self.views:
                 raise AssertionError(f"destroy: unknown tag {tag}")
+            view = self.views.pop(tag)
             if view.parent is not None:
                 view.parent.children.remove(view)
                 view.parent = None

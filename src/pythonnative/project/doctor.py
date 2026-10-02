@@ -189,7 +189,11 @@ def check_android(config: Optional[AppConfig]) -> List[CheckResult]:
         CheckResult(
             "Java (JDK 17-23)",
             OK if major is not None and 17 <= major <= 23 else ERROR,
-            java if major is not None and 17 <= major <= 23 else "Install JDK 17 or 21 and select it with JAVA_HOME.",
+            (
+                (java or "")
+                if major is not None and 17 <= major <= 23
+                else "Install JDK 17 or 21 and select it with JAVA_HOME."
+            ),
         )
     )
     sdk = Path(
@@ -259,7 +263,7 @@ def check_ios(config: Optional[AppConfig]) -> List[CheckResult]:
         CheckResult(
             "Xcode 26 or later",
             OK if modern else ERROR,
-            xcodebuild if modern else "Install Xcode 26 or later and select it with xcode-select.",
+            (xcodebuild or "") if modern else "Install Xcode 26 or later and select it with xcode-select.",
         )
     )
     simctl = shutil.which("xcrun")

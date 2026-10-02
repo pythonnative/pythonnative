@@ -1,24 +1,21 @@
 """Media factories: ``Image``, ``ImageBackground``, and ``WebView``."""
 
-from typing import Any, Callable, Literal, Mapping, Optional, Sequence, Union
+from typing import Any, Callable, Mapping, Optional, Union, Unpack, cast
 
 from ..assets import Asset
-from ..element import Element
+from ..element import Element, Node
 from ..hooks import Ref
 from ..style import (
-    AccessibilityAction,
-    AccessibilityState,
-    AccessibilityValue,
     Color,
-    ImportantForAccessibility,
     ScaleType,
     Style,
     StyleProp,
-    StyleSheet,
+    resolve_style,
 )
-from ._base import _accessibility_actions, _accessibility_value, _make_element
+from ._base import _make_element
 from .events import ImageLoadEvent, WebNavigationEvent
 from .layout import View
+from .props import AccessibilityProps
 
 ImageSource = Union[str, Asset]
 """What ``Image.source`` accepts: a URL, ``data:`` URI, file path, or bundled [`Asset`][pythonnative.Asset]."""
@@ -47,18 +44,9 @@ def Image(
     fade_duration: Optional[float] = None,
     headers: Optional[Mapping[str, str]] = None,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_role: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
-    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
-    on_accessibility_action: Optional[Callable[[str], Any]] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    important_for_accessibility: Optional[ImportantForAccessibility] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """Display a bundled, local, or remote image.
 
@@ -103,28 +91,10 @@ def Image(
         headers: Extra HTTP headers sent with a network ``source``
             (authorization, cache control).
         style: Style dict (or list of dicts).
-        accessibility_label: Spoken description for screen readers.
-        accessibility_role: Override the default ``"image"`` role.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_value: The widget's current value for assistive
-            tech (a string or an
-            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
-        accessibility_actions: Custom screen-reader actions, each an
-            [`AccessibilityAction`][pythonnative.AccessibilityAction].
-        on_accessibility_action: Callback invoked with the action name.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
-        important_for_accessibility: Whether AT sees this view and its
-            subtree.
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Image"``.
@@ -149,35 +119,18 @@ def Image(
         on_error=on_error,
         fade_duration=fade_duration,
         headers=dict(headers) if headers else None,
-        accessibility_label=accessibility_label,
-        accessibility_role=accessibility_role,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_value=_accessibility_value(accessibility_value),
-        accessibility_actions=_accessibility_actions(accessibility_actions),
-        on_accessibility_action=on_accessibility_action,
-        accessibility_live_region=accessibility_live_region,
-        important_for_accessibility=important_for_accessibility,
-        test_id=test_id,
         _defaults={"accessibility_role": "image"},
+        **props,
     )
 
 
 def ImageBackground(
-    *children: Element,
+    *children: Node,
     source: ImageSource = "",
     scale_type: Optional[ScaleType] = None,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
-    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
-    on_accessibility_action: Optional[Callable[[str], Any]] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    important_for_accessibility: Optional[ImportantForAccessibility] = None,
-    test_id: Optional[str] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """Render ``children`` layered on top of a background image.
 
@@ -194,26 +147,9 @@ def ImageBackground(
         scale_type: Background fit mode (``"cover"`` is the most common
             for backgrounds).
         style: Style dict for the container (size, padding, alignment).
-        accessibility_label: Spoken description of the background image.
-        accessible: Override whether the image is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_value: The widget's current value for assistive
-            tech (a string or an
-            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
-        accessibility_actions: Custom screen-reader actions, each an
-            [`AccessibilityAction`][pythonnative.AccessibilityAction].
-        on_accessibility_action: Callback invoked with the action name.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
-        important_for_accessibility: Whether AT sees this view and its
-            subtree.
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"View"`` wrapping
@@ -224,22 +160,14 @@ def ImageBackground(
         source,
         scale_type=scale_type or "cover",
         style=fill,
-        accessibility_label=accessibility_label,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_value=accessibility_value,
-        accessibility_actions=accessibility_actions,
-        on_accessibility_action=on_accessibility_action,
-        accessibility_live_region=accessibility_live_region,
-        important_for_accessibility=important_for_accessibility,
-        test_id=test_id,
     )
     content = View(*children, style={"flex": 1})
     return View(
         background,
         content,
-        style=[{"overflow": "hidden"}, StyleSheet.flatten(style)],
+        style=[{"overflow": "hidden"}, cast(Style, resolve_style(style))],
         key=key,
+        **props,
     )
 
 

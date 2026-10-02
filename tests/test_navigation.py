@@ -1,79 +1,157 @@
-"""Tests for the navigation package: state, core, navigators, hooks, linking."""
+"""Tests for the navigation package: state, screens, navigator values, the core, rendering, hooks, and deep links."""
 
-from typing import Any, Dict, List, NotRequired, TypedDict
+import enum
+from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, Tuple
 
 import pytest
 
 import pythonnative as pn
-from pythonnative.component import component
+from pythonnative.component import Component, component
 from pythonnative.components import Button, Column, Text
+from pythonnative.element import Element
 from pythonnative.hooks import use_effect, use_state
 from pythonnative.native_modules import linking as linking_module
 from pythonnative.navigation import (
     DrawerNavigation,
-    LinkingConfig,
+    DrawerNavigator,
+    Group,
+    LinkTable,
     Navigation,
     NavigationContainer,
     NavigationContext,
     NavigationEvent,
+    NavigationRef,
     NavigationState,
+    Navigator,
     NavigatorCore,
     Route,
-    ScreenDef,
+    Screen,
+    ScreenOptions,
+    StackNavigator,
     TabNavigation,
-    create_drawer_navigator,
-    create_stack_navigator,
-    create_tab_navigator,
+    TabNavigator,
     use_focus_effect,
     use_is_focused,
     use_navigation,
     use_route,
+    use_screen_options,
 )
-from pythonnative.testing import FakeHost, render, render_hook
+from pythonnative.navigation.screen import flatten_screens
+from pythonnative.testing import FakeHost, RenderResult, render, render_hook
+from pythonnative.theme import LIGHT_THEME
 
 # ======================================================================
-# Helpers
+# Screens
 # ======================================================================
 
+BOX: Dict[str, Navigation] = {}
+"""The ``Navigation`` handle each rendered screen captured, keyed by its label."""
 
-def _screen(label: str) -> Any:
-    """A screen component that shows ``label`` and its route params."""
-
-    @component
-    def Screen() -> Any:
-        route = use_route()
-        params = ",".join(f"{k}={v}" for k, v in sorted(route.params.items()))
-        return Column(Text(label), Text(f"params:{params}"))
-
-    return Screen
+RENDERS: Dict[str, int] = {}
+"""Render counts, keyed by screen label."""
 
 
-def _capturing_screen(label: str, box: Dict[str, Any]) -> Any:
-    """A screen that stores its ``Navigation`` handle in ``box`` for the test to drive."""
-
-    @component
-    def Screen() -> Any:
-        box[label] = use_navigation()
-        route = use_route()
-        params = ",".join(f"{k}={v}" for k, v in sorted(route.params.items()))
-        return Column(Text(label), Text(f"params:{params}"))
-
-    return Screen
+@pytest.fixture(autouse=True)
+def _reset_screens() -> Iterator[None]:
+    BOX.clear()
+    RENDERS.clear()
+    yield
+    BOX.clear()
+    RENDERS.clear()
 
 
-def _stateful_screen(label: str, box: Dict[str, Any]) -> Any:
-    """A screen with a counter so tests can check whether state survived."""
+def use_screen_body(label: str, **params: Any) -> Element:
+    """Capture the screen's handle, count renders, and show ``label``, a counter, and the params."""
+    BOX[label] = use_navigation()
+    RENDERS[label] = RENDERS.get(label, 0) + 1
+    count, set_count = use_state(0)
+    shown = ",".join(f"{key}={value}" for key, value in sorted(params.items()))
+    return Column(
+        Text(label),
+        Text(f"{label} count={count}"),
+        Button(f"{label} inc", on_press=lambda: set_count(count + 1)),
+        Text(f"{label} params:{shown}"),
+    )
 
-    @component
-    def Screen() -> Any:
-        box[label] = use_navigation()
-        count, set_count = use_state(0)
-        return Column(
-            Text(f"{label} count={count}"),
-            Button(f"{label} inc", on_press=lambda: set_count(count + 1)),
-        )
 
-    return Screen
+def _labelled(name: str) -> Component[[]]:
+    """A parameterless screen named ``name`` that renders ``name.lower()``.
+
+    Every screen this returns shares one ``__qualname__``, so the
+    navigators must tell them apart by identity.
+    """
+
+    def body() -> pn.Node:
+        return use_screen_body(name.lower())
+
+    return Component(body, display_name=name)
+
+
+Home = _labelled("Home")
+Login = _labelled("Login")
+Settings = _labelled("Settings")
+Other = _labelled("Other")
+Form = _labelled("Form")
+Feed = _labelled("Feed")
+Compose = _labelled("Compose")
+Preview = _labelled("Preview")
+Plain = _labelled("Plain")
+Unlisted = _labelled("Unlisted")
+
+
+@component
+def Detail(id: int, tab: str = "info") -> pn.Node:
+    return use_screen_body("detail", id=id, tab=tab)
+
+
+@component
+def Post(id: int) -> pn.Node:
+    return use_screen_body("post", id=id)
+
+
+@component
+def Profile(user: str = "me") -> pn.Node:
+    return use_screen_body("profile", user=user)
+
+
+@component
+def A(flag: bool = False) -> pn.Node:
+    return use_screen_body("a", flag=flag)
+
+
+@component
+def B(id: int = 0, more: bool = False) -> pn.Node:
+    return use_screen_body("b", id=id, more=more)
+
+
+@component
+def C(id: int = 0) -> pn.Node:
+    return use_screen_body("c", id=id)
+
+
+@component
+def D(id: int = 0) -> pn.Node:
+    return use_screen_body("d", id=id)
+
+
+def _names(state: NavigationState) -> List[str]:
+    return [route.name for route in state.routes]
+
+
+def _tabs(label: str) -> TabNavigation:
+    handle = BOX[label]
+    assert isinstance(handle, TabNavigation)
+    return handle
+
+
+def _drawer(label: str) -> DrawerNavigation:
+    handle = BOX[label]
+    assert isinstance(handle, DrawerNavigation)
+    return handle
+
+
+def _select_tab(result: RenderResult, name: str) -> None:
+    result.fire(result.get_by_type("TabBar"), "on_tab_select", name)
 
 
 # ======================================================================
@@ -119,7 +197,7 @@ def test_navigation_state_requires_a_route_and_valid_index() -> None:
 def test_navigation_state_push_pop_and_pop_to_top() -> None:
     s = NavigationState([Route("A")])
     s2 = s.push("B", {"id": 1}).push("C")
-    assert [r.name for r in s2.routes] == ["A", "B", "C"]
+    assert _names(s2) == ["A", "B", "C"]
     assert s2.current.name == "C"
     assert s2.can_go_back
     assert s2.pop().current.name == "B"
@@ -129,24 +207,22 @@ def test_navigation_state_push_pop_and_pop_to_top() -> None:
 
 def test_navigation_state_push_drops_forward_entries() -> None:
     s = NavigationState([Route("A"), Route("B"), Route("C")], index=0)
-    s2 = s.push("D")
-    assert [r.name for r in s2.routes] == ["A", "D"]
+    assert _names(s.push("D")) == ["A", "D"]
 
 
 def test_navigation_state_navigate_pops_to_existing_or_pushes() -> None:
     s = NavigationState([Route("A"), Route("B", {"id": 1}), Route("C")])
     back = s.navigate("B", {"extra": True})
-    assert [r.name for r in back.routes] == ["A", "B"]
+    assert _names(back) == ["A", "B"]
     assert back.current.params == {"id": 1, "extra": True}
     assert back.current.key == s.routes[1].key
-    pushed = s.navigate("D")
-    assert [r.name for r in pushed.routes] == ["A", "B", "C", "D"]
+    assert _names(s.navigate("D")) == ["A", "B", "C", "D"]
 
 
 def test_navigation_state_replace_uses_fresh_key() -> None:
     s = NavigationState([Route("A"), Route("B")])
     s2 = s.replace("C", {"x": 1})
-    assert [r.name for r in s2.routes] == ["A", "C"]
+    assert _names(s2) == ["A", "C"]
     assert s2.current.key != s.current.key
 
 
@@ -158,8 +234,7 @@ def test_navigation_state_jump_to_and_set_params() -> None:
     assert s2.routes[1].key == s.routes[1].key  # same visit
     with pytest.raises(KeyError):
         s.jump_to("Missing")
-    s3 = s.set_params({"q": 1})
-    assert s3.current.params == {"q": 1}
+    assert s.set_params({"q": 1}).current.params == {"q": 1}
 
 
 def test_navigation_state_serialization_round_trip() -> None:
@@ -171,23 +246,154 @@ def test_navigation_state_serialization_round_trip() -> None:
 
 
 # ======================================================================
-# ScreenDef
+# Screen, Group, and navigator values
 # ======================================================================
 
 
-def test_screen_def_static_and_callable_options() -> None:
-    static = ScreenDef("Home", lambda: None, options={"title": "Home"}, header_shown=False)
-    assert static.resolve_options(Route("Home")) == {"title": "Home", "header_shown": False}
+def test_screen_names_default_to_the_component_and_navigator_names() -> None:
+    assert Screen(Detail).name == "Detail"
+    assert Screen(Detail, name="Item").name == "Item"
+    assert Screen(Home).name == "Home"
+    nested = StackNavigator(Home, name="Nested")
+    assert Screen(nested).name == "Nested"
+    assert Screen(nested).navigator is nested
+    assert Screen(Home).navigator is None
+    assert Screen(Detail, path="/items/{id}/").path == "items/{id}"
+    assert repr(Screen(Detail)) == "Screen('Detail')"
 
-    dynamic = ScreenDef("Detail", lambda: None, options=lambda route: {"title": f"Item {route.params['id']}"})
-    assert dynamic.resolve_options(Route("Detail", {"id": 7}))["title"] == "Item 7"
-    assert "Detail" in repr(dynamic)
+
+def test_screen_rejects_bad_components_names_and_options() -> None:
+    with pytest.raises(TypeError, match="@component or a navigator"):
+        Screen("Home")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="needs a route name"):
+        Screen(StackNavigator(Home))
+    with pytest.raises(TypeError, match="Unknown screen option"):
+        Screen(Home, titel="Home")  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="presentation"):
+        Screen(Home, presentation="sheet")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="presentation"):
+        Group(Screen(Home), presentation="popover")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="animation"):
+        StackNavigator(Home, screen_options=ScreenOptions(animation="zoom"))  # type: ignore[typeddict-item]
+    for value in ("card", "modal", "full_screen_modal", "form_sheet", "transparent_modal"):
+        assert Screen(Home, presentation=value).options["presentation"] == value
 
 
-def test_screen_def_initial_params() -> None:
-    s = ScreenDef("Detail", lambda: None, initial_params={"id": 0})
-    assert s.initial_params == {"id": 0}
-    assert ScreenDef("Home", lambda: None).initial_params == {}
+def test_screen_required_params_come_from_the_signature() -> None:
+    assert Screen(Detail).required_params() == ["id"]
+    assert Screen(Profile).required_params() == []
+    assert Screen(StackNavigator(Home, name="N")).required_params() == []
+
+
+def test_flatten_screens_expands_groups_and_rejects_duplicates() -> None:
+    group = Group(Screen(Detail), Compose, presentation="modal")
+    screens, group_options = flatten_screens([Home, group])
+    assert [s.name for s in screens] == ["Home", "Detail", "Compose"]
+    assert group_options == {"Detail": {"presentation": "modal"}, "Compose": {"presentation": "modal"}}
+    assert "Detail" in repr(group)
+
+    nested, options = flatten_screens([Group(Group(Home, title="inner"), header_shown=False)])
+    assert options == {"Home": {"header_shown": False, "title": "inner"}}
+    assert [s.name for s in nested] == ["Home"]
+
+    with pytest.raises(ValueError, match=r"Duplicate screen names.*name="):
+        flatten_screens([Home, Group(Home)])
+    with pytest.raises(TypeError):
+        flatten_screens(["Home"])  # type: ignore[list-item]
+    # ``name=`` resolves the clash.
+    assert [s.name for s in flatten_screens([Home, Screen(Home, name="Home2")])[0]] == ["Home", "Home2"]
+
+
+def test_navigators_need_a_screen() -> None:
+    with pytest.raises(ValueError, match="at least one screen"):
+        StackNavigator()
+    with pytest.raises(ValueError, match="at least one screen"):
+        TabNavigator()
+    with pytest.raises(ValueError, match="at least one screen"):
+        DrawerNavigator()
+
+
+def test_navigator_initial_accepts_components_and_elements_with_params() -> None:
+    stack = StackNavigator(Home, Detail)
+    assert (stack.initial_name, stack.initial_params) == ("Home", {})
+    with_params = StackNavigator(Home, Detail, initial=Detail(id=7))
+    assert with_params.initial_name == "Detail"
+    assert with_params.initial_params == {"id": 7}
+    assert StackNavigator(Home, Settings, initial=Settings).initial_name == "Settings"
+
+    with pytest.raises(ValueError, match="isn't one of this navigator's screens"):
+        StackNavigator(Home, initial=Unlisted())
+    with pytest.raises(TypeError, match=r"requires \['id'\]"):
+        StackNavigator(Detail)
+    with pytest.raises(TypeError, match=r"requires \['id'\]"):
+        StackNavigator(Home, Detail, initial=Detail)
+
+
+def test_keep_alive_navigators_reject_screens_with_required_params() -> None:
+    with pytest.raises(TypeError, match=r"TabNavigator screen 'Detail' requires \['id'\]"):
+        TabNavigator(Home, Detail)
+    with pytest.raises(TypeError, match=r"DrawerNavigator screen 'Post' requires \['id'\]"):
+        DrawerNavigator(Home, Post)
+    # The initial screen's params come from ``initial``.
+    tabs = TabNavigator(Home, Detail, initial=Detail(id=1))
+    assert tabs.initial_name == "Detail"
+    # Stacks only need the initial screen to be parameterless.
+    assert StackNavigator(Home, Detail, Post).initial_name == "Home"
+
+
+def test_navigator_path_to_searches_direct_then_nested_screens() -> None:
+    inner = StackNavigator(Feed, Post, name="FeedTab")
+    tabs = TabNavigator(inner, Profile, name="Tabs")
+    root = StackNavigator(Screen(tabs), Login)
+    chain = root.path_to(Post)
+    assert chain is not None
+    assert [s.name for s in chain] == ["Tabs", "FeedTab", "Post"]
+    direct = root.path_to(Login)
+    assert direct is not None and [s.name for s in direct] == ["Login"]
+    nav_chain = root.path_to(inner)
+    assert nav_chain is not None and [s.name for s in nav_chain] == ["Tabs", "FeedTab"]
+    assert root.path_to(Unlisted) is None
+    assert "Tabs" in repr(root) and "'Tabs'" in repr(tabs)
+
+
+def test_screens_with_the_same_qualified_name_resolve_by_identity() -> None:
+    # Every ``_labelled`` screen shares one ``__qualname__`` (the Fast Refresh
+    # fallback key); the identical component must still win, even when it
+    # sits in a nested navigator and a direct screen matches by name.
+    stack = StackNavigator(Home, Login, Settings, initial=Settings)
+    assert stack.initial_name == "Settings"
+    chain = stack.path_to(Login)
+    assert chain is not None and chain[0].name == "Login"
+
+    nested = StackNavigator(Screen(TabNavigator(Feed, Other, name="Tabs")), Login)
+    chain = nested.path_to(Other)
+    assert chain is not None and [s.name for s in chain] == ["Tabs", "Other"]
+
+
+def test_screen_matches_a_fast_refresh_replacement_by_module_and_name() -> None:
+    @component
+    def Replaced() -> pn.Node:
+        return None
+
+    first = Replaced
+
+    @component  # type: ignore[no-redef]
+    def Replaced() -> pn.Node:
+        return None
+
+    assert first is not Replaced
+    assert Screen(first).matches(Replaced)
+    assert not Screen(first).matches(Detail)
+    stack = StackNavigator(Home, first)
+    chain = stack.path_to(Replaced)
+    assert chain is not None and chain[0].component is first
+
+
+def test_calling_a_navigator_returns_its_element() -> None:
+    stack = StackNavigator(Home)
+    element = stack()
+    assert isinstance(element, Element)
+    assert element.props["navigator"] is stack
 
 
 # ======================================================================
@@ -196,140 +402,157 @@ def test_screen_def_initial_params() -> None:
 
 
 class _Recorder:
-    """Stands in for the ``use_state`` setter: records committed states."""
+    """Stands in for the ``use_state`` setter: records committed states and render requests."""
 
     def __init__(self, state: NavigationState) -> None:
         self.state = state
         self.commits: List[NavigationState] = []
+        self.renders = 0
 
     def __call__(self, new_state: Any) -> None:
         self.state = new_state(self.state) if callable(new_state) else new_state
         self.commits.append(self.state)
 
+    def request_render(self) -> None:
+        self.renders += 1
 
-def _make_core(kind: str, *names: str, parent: Any = None, host: Any = None) -> "tuple[NavigatorCore, _Recorder]":
-    screens = {n: ScreenDef(n, lambda: None) for n in names}
-    if kind == "stack":
-        state = NavigationState([Route(names[0])])
-    else:
-        state = NavigationState([Route(n) for n in names], 0)
+
+def _initial_state(navigator: Navigator) -> NavigationState:
+    if navigator.kind == "stack":
+        return NavigationState([Route(navigator.initial_name, navigator.initial_params)])
+    names = [screen.name for screen in navigator.screens]
+    return NavigationState([Route(name) for name in names], names.index(navigator.initial_name))
+
+
+def _make_core(
+    navigator: Navigator, parent: Optional[Navigation] = None, host: Optional[FakeHost] = None
+) -> Tuple[NavigatorCore, _Recorder]:
+    state = _initial_state(navigator)
     rec = _Recorder(state)
-    core = NavigatorCore(kind, screens, state, rec, parent, host)  # type: ignore[arg-type]
+    core = NavigatorCore(navigator, state, rec, parent, host, request_render=rec.request_render)
     return core, rec
 
 
-def _sync(core: NavigatorCore, rec: _Recorder) -> None:
-    """Mimic the owning component re-rendering with the committed state."""
-    core.update(core.screens, rec.state, rec, core.parent, core.host)
+def _top(core: NavigatorCore) -> Navigation:
+    return core.handle_for(core.state.current)
 
 
 def test_core_stack_push_navigate_pop() -> None:
-    core, rec = _make_core("stack", "Home", "Detail")
-    home = core.handle_for(core.state.current)
-    home.navigate("Detail", id=3)
-    _sync(core, rec)
-    assert [r.name for r in core.state.routes] == ["Home", "Detail"]
+    core, _ = _make_core(StackNavigator(Home, Detail))
+    home = _top(core)
+    home.navigate(Detail(id=3))
+    assert _names(core.state) == ["Home", "Detail"]
     assert core.state.current.params == {"id": 3}
 
-    detail = core.handle_for(core.state.current)
+    detail = _top(core)
     assert detail.can_go_back()
     assert detail.pop() is True
-    _sync(core, rec)
     assert core.state.current.name == "Home"
     assert home.pop() is False  # nothing to pop, no parent
 
 
+def test_core_params_are_the_explicit_element_props() -> None:
+    core, _ = _make_core(StackNavigator(A, B))
+    _top(core).push(B())
+    assert core.state.current.params == {}
+    _top(core).push(B(id=5, more=True))
+    assert core.state.current.params == {"id": 5, "more": True}
+
+
+def test_navigating_back_merges_only_the_params_passed() -> None:
+    core, _ = _make_core(StackNavigator(A, B, C))
+    h = _top(core)
+    h.push(B(id=5, more=True))
+    h.push(C())
+    # ``B(id=6)`` binds ``more=False`` from the signature, but only ``id``
+    # was passed, so the existing route keeps ``more=True``.
+    h.navigate(B(id=6))
+    assert _names(core.state) == ["A", "B"]
+    assert core.state.current.params == {"id": 6, "more": True}
+
+
 def test_core_stack_navigate_to_existing_pops_back() -> None:
-    core, rec = _make_core("stack", "A", "B", "C")
-    h = core.handle_for(core.state.current)
-    h.push("B")
-    _sync(core, rec)
-    h.push("C")
-    _sync(core, rec)
-    h.navigate("A", flag=True)
-    _sync(core, rec)
-    assert [r.name for r in core.state.routes] == ["A"]
+    core, _ = _make_core(StackNavigator(A, B, C))
+    h = _top(core)
+    h.push(B())
+    h.push(C())
+    h.navigate(A(flag=True))
+    assert _names(core.state) == ["A"]
     assert core.state.current.params == {"flag": True}
 
 
 def test_core_navigate_same_route_only_updates_params() -> None:
-    core, rec = _make_core("stack", "A", "B")
-    h = core.handle_for(core.state.current)
+    core, rec = _make_core(StackNavigator(Home, A))
+    h = _top(core)
     key = core.state.current.key
-    h.navigate("A")
-    assert rec.commits == []  # no-op
-    h.navigate("A", x=1)
-    _sync(core, rec)
-    assert core.state.current.key == key
-    assert core.state.current.params == {"x": 1}
+    h.navigate(Home())
+    assert rec.commits == []  # no params, same route: no-op
+    h.push(A())
+    h.navigate(A(flag=True))
+    assert _names(core.state) == ["Home", "A"]
+    assert core.state.current.params == {"flag": True}
+    assert core.state.routes[0].key == key
 
 
-def test_core_unknown_route_raises_without_parent() -> None:
-    core, _ = _make_core("stack", "A")
-    with pytest.raises(ValueError, match="Unknown route"):
-        core.handle_for(core.state.current).navigate("Nope")
+def test_core_unknown_target_raises_without_parent() -> None:
+    core, _ = _make_core(StackNavigator(A))
+    with pytest.raises(ValueError, match=r"Unlisted isn't a screen of this navigator tree"):
+        _top(core).navigate(Unlisted())
+    with pytest.raises(TypeError, match="Navigation targets are screen elements"):
+        _top(core).navigate("A")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="can't carry children"):
+        _top(core).navigate(Element(A, {}, [Text("child")]))
 
 
 def test_core_replace_reset_set_params_pop_to_top() -> None:
-    core, rec = _make_core("stack", "A", "B", "C")
-    h = core.handle_for(core.state.current)
-    h.push("B")
-    _sync(core, rec)
-    h.replace("C", id=9)
-    _sync(core, rec)
-    assert [r.name for r in core.state.routes] == ["A", "C"]
+    core, _ = _make_core(StackNavigator(A, B, C))
+    h = _top(core)
+    h.push(B())
+    h.replace(C(id=9))
+    assert _names(core.state) == ["A", "C"]
     assert core.state.current.params == {"id": 9}
 
-    top = core.handle_for(core.state.current)
-    top.set_params(more=True)
-    _sync(core, rec)
-    assert core.state.current.params == {"id": 9, "more": True}
+    top = _top(core)
+    top.set_params(id=10)
+    assert core.state.current.params == {"id": 10}
 
-    top.push("B")
-    _sync(core, rec)
-    core.handle_for(core.state.current).pop_to_top()
-    _sync(core, rec)
-    assert [r.name for r in core.state.routes] == ["A"]
+    top.push(B())
+    _top(core).pop_to_top()
+    assert _names(core.state) == ["A"]
 
-    core.handle_for(core.state.current).reset(Route("B"), Route("C", {"z": 1}), index=0)
-    _sync(core, rec)
-    assert [r.name for r in core.state.routes] == ["B", "C"]
+    _top(core).reset(B(), C(id=1), index=0)
+    assert _names(core.state) == ["B", "C"]
     assert core.state.index == 0
+    assert core.state.routes[1].params == {"id": 1}
 
-    core.handle_for(core.state.current).reset("A", q=2)
-    _sync(core, rec)
-    assert core.state.current.name == "A"
-    assert core.state.current.params == {"q": 2}
+    _top(core).reset(A(flag=True))
+    assert _names(core.state) == ["A"]
+    assert core.state.current.params == {"flag": True}
 
 
-def test_core_reset_validates_routes_and_arguments() -> None:
-    core, _ = _make_core("stack", "A")
-    h = core.handle_for(core.state.current)
-    with pytest.raises(ValueError, match="Unknown route"):
-        h.reset("Nope")
-    with pytest.raises(TypeError):
+def test_core_reset_validates_targets_and_arguments() -> None:
+    core, _ = _make_core(StackNavigator(A))
+    h = _top(core)
+    with pytest.raises(ValueError, match="isn't a screen of this navigator"):
+        h.reset(Unlisted())
+    with pytest.raises(TypeError, match="at least one screen"):
         h.reset()
+
+
+def test_core_set_params_validates_against_the_signature() -> None:
+    core, rec = _make_core(StackNavigator(A, C))
+    _top(core).push(C(id=1))
+    before = len(rec.commits)
     with pytest.raises(TypeError):
-        h.reset(Route("A"), Route("A"), q=1)
-
-
-def test_core_push_merges_initial_params() -> None:
-    screens = {
-        "A": ScreenDef("A", lambda: None),
-        "B": ScreenDef("B", lambda: None, initial_params={"id": 0, "tab": "x"}),
-    }
-    rec = _Recorder(NavigationState([Route("A")]))
-    core = NavigatorCore("stack", screens, rec.state, rec)
-    core.handle_for(core.state.current).push("B", id=5)
-    _sync(core, rec)
-    assert core.state.current.params == {"id": 5, "tab": "x"}
+        _top(core).set_params(nope=1)
+    assert len(rec.commits) == before
+    assert core.state.current.params == {"id": 1}
 
 
 def test_core_before_remove_can_prevent_pop() -> None:
-    core, rec = _make_core("stack", "A", "B")
-    core.handle_for(core.state.current).push("B")
-    _sync(core, rec)
-    b = core.handle_for(core.state.current)
+    core, _ = _make_core(StackNavigator(A, B))
+    _top(core).push(B())
+    b = _top(core)
     seen: List[str] = []
 
     def guard(evt: NavigationEvent) -> None:
@@ -343,37 +566,39 @@ def test_core_before_remove_can_prevent_pop() -> None:
 
     unsub()
     assert b.pop() is True
-    _sync(core, rec)
     assert core.state.current.name == "A"
 
 
 def test_core_set_options_merges_and_requests_render() -> None:
-    renders: List[int] = []
-    screens = {"A": ScreenDef("A", lambda: None, title="Static")}
-    rec = _Recorder(NavigationState([Route("A")]))
-    core = NavigatorCore("stack", screens, rec.state, rec, request_render=lambda: renders.append(1))
-    h = core.handle_for(core.state.current)
+    core, rec = _make_core(StackNavigator(Screen(A, title="Static")))
+    h = _top(core)
     assert h.get_options()["title"] == "Static"
     h.set_options(title="Dynamic", header_shown=False)
     assert h.get_options() == {"title": "Dynamic", "header_shown": False}
-    assert renders == [1]
+    assert rec.renders == 1
     h.set_options(title="Dynamic")  # unchanged: no re-render
-    assert renders == [1]
+    assert rec.renders == 1
+    with pytest.raises(TypeError, match="Unknown screen option"):
+        h.set_options(titel="x")  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="animation"):
+        h.set_options(animation="zoom")  # type: ignore[arg-type]
 
 
 def test_core_tab_and_drawer_handles() -> None:
-    core, rec = _make_core("tab", "Home", "Profile")
-    h = core.handle_for(core.state.current)
+    core, _ = _make_core(TabNavigator(Home, Profile))
+    h = _top(core)
     assert isinstance(h, TabNavigation)
-    h.jump_to("Profile", user="ada")
-    _sync(core, rec)
+    assert h.kind == "tab"
+    h.jump_to(Profile(user="ada"))
     assert core.state.index == 1
     assert core.state.current.params == {"user": "ada"}
+    h.jump_to(Home)
+    assert core.state.current.name == "Home"
     assert h.pop() is False
     assert not h.can_go_back()
 
-    dcore, _ = _make_core("drawer", "Feed", "Settings")
-    dh = dcore.handle_for(dcore.state.current)
+    dcore, _ = _make_core(DrawerNavigator(Feed, Settings))
+    dh = _top(dcore)
     assert isinstance(dh, DrawerNavigation)
     opened: List[bool] = []
     dcore._set_drawer_open = opened.append
@@ -382,902 +607,53 @@ def test_core_tab_and_drawer_handles() -> None:
     dcore.drawer_open = False
     dh.toggle_drawer()
     assert opened == [True, False, True]
+    dh.jump_to(Settings)
+    assert dcore.state.current.name == "Settings"
+    assert opened[-1] is False  # jump_to closes the drawer
 
 
-def test_core_forwards_unknown_routes_and_pops_to_parent() -> None:
-    parent_core, parent_rec = _make_core("stack", "Root", "Other")
-    parent_handle = parent_core.handle_for(parent_core.state.current)
-    parent_core.handle_for(parent_core.state.current).push("Other")
-    _sync(parent_core, parent_rec)
-    parent_handle = parent_core.handle_for(parent_core.state.current)
+def test_core_forwards_unknown_targets_and_pops_to_parent() -> None:
+    parent_core, _ = _make_core(StackNavigator(Home, Other))
+    _top(parent_core).push(Other())
+    parent_handle = _top(parent_core)
 
-    child_core, child_rec = _make_core("tab", "Feed", "Search", parent=parent_handle)
-    child = child_core.handle_for(child_core.state.current)
+    child_core, _ = _make_core(TabNavigator(Feed, Settings), parent=parent_handle)
+    child = _top(child_core)
     assert child.get_parent() is parent_handle
     assert child.can_go_back()  # parent stack can pop
 
-    child.navigate("Root")
-    _sync(parent_core, parent_rec)
-    assert parent_core.state.current.name == "Root"
+    child.navigate(Home())
+    assert parent_core.state.current.name == "Home"
+    assert _names(parent_core.state) == ["Home"]
 
-    with pytest.raises(ValueError):
-        child.navigate("Nowhere")
+    with pytest.raises(ValueError, match="isn't a screen of this navigator tree"):
+        child.navigate(Unlisted())
 
 
 def test_core_native_root_commits_one_logical_navigation_state() -> None:
-    host = FakeHost()
-    screens = {"A": ScreenDef("A", lambda: None), "B": ScreenDef("B", lambda: None, title="Bee")}
-    rec = _Recorder(NavigationState([Route("A")]))
-    core = NavigatorCore("stack", screens, rec.state, rec, host=host)
-    handle = core.handle_for(core.state.current)
-    handle.push("B", id=1)
-    core.state = rec.state
-    assert [route.name for route in core.state.routes] == ["A", "B"]
+    core, rec = _make_core(StackNavigator(A, Screen(B, title="Bee")), host=FakeHost())
+    assert core.is_native_root
+    handle = _top(core)
+    handle.push(B(id=1))
+    assert _names(core.state) == ["A", "B"]
     assert core.state.current.params == {"id": 1}
     assert rec.commits
-    handle.replace("B", id=2)
-    core.state = rec.state
+    handle.replace(B(id=2))
     assert core.state.current.params == {"id": 2}
-    handle.reset(Route("A"))
-    core.state = rec.state
-    assert [route.name for route in core.state.routes] == ["A"]
-
-
-# ======================================================================
-# Stack navigator (rendered)
-# ======================================================================
-
-
-def test_stack_renders_initial_screen_with_header() -> None:
-    Stack = create_stack_navigator()
-    result = render(
-        NavigationContainer(
-            Stack.Navigator(
-                Stack.Screen("Home", _screen("HOME"), title="Welcome"),
-                Stack.Screen("Detail", _screen("DETAIL")),
-            )
-        )
-    )
-    assert result.get_by_text("HOME")
-    assert result.get_by_text("Welcome")  # header title
-    assert result.query_by_text("DETAIL") is None
-    assert result.query_by_label("Back") is None
-
-
-def test_stack_respects_initial_route_and_initial_params() -> None:
-    Stack = create_stack_navigator()
-    result = render(
-        Stack.Navigator(
-            Stack.Screen("Home", _screen("HOME")),
-            Stack.Screen("Detail", _screen("DETAIL"), initial_params={"id": 7}),
-            initial_route="Detail",
-        )
-    )
-    assert result.get_by_text("DETAIL")
-    assert result.get_by_text("params:id=7")
-    assert result.get_by_text("Detail")  # falls back to route name for the title
-
-
-def test_stack_navigate_back_and_state_preservation() -> None:
-    Stack = create_stack_navigator()
-    box: Dict[str, Any] = {}
-    result = render(
-        Stack.Navigator(
-            Stack.Screen("Home", _stateful_screen("home", box)),
-            Stack.Screen("Detail", _capturing_screen("detail", box), title="Detail"),
-        )
-    )
-    result.press(result.get_by_text("home inc"))
-    assert result.get_by_text("home count=1")
-
-    box["home"].navigate("Detail", id=42)
-    result.settle()
-    assert result.get_by_text("detail")
-    assert result.get_by_text("params:id=42")
-    assert result.query_by_text("home count=1") is None  # hidden below
-    assert result.get_by_text("home count=1", hidden=True)
-
-    result.press(result.get_by_label("Back"))
-    assert result.get_by_text("home count=1")  # state survived the round trip
-    assert result.query_by_text("detail") is None
-    assert result.query_by_text("detail", hidden=True) is None  # unmounted
-
-
-def test_stack_replace_resets_screen_state_and_pop_to_top() -> None:
-    Stack = create_stack_navigator()
-    box: Dict[str, Any] = {}
-    result = render(
-        Stack.Navigator(
-            Stack.Screen("A", _stateful_screen("a", box)),
-            Stack.Screen("B", _stateful_screen("b", box)),
-            Stack.Screen("C", _stateful_screen("c", box)),
-        )
-    )
-    box["a"].push("B")
-    result.settle()
-    result.press(result.get_by_text("b inc"))
-    assert result.get_by_text("b count=1")
-
-    box["b"].replace("B")
-    result.settle()
-    assert result.get_by_text("b count=0")  # fresh key, fresh state
-    assert box["b"].get_state().routes[0].name == "A"
-
-    box["b"].push("C")
-    result.settle()
-    assert result.get_by_text("c count=0")
-    box["c"].pop_to_top()
-    result.settle()
-    assert result.get_by_text("a count=0")
-    assert len(box["a"].get_state()) == 1
-
-
-def test_stack_system_back_pops_and_reports_consumption() -> None:
-    Stack = create_stack_navigator()
-    box: Dict[str, Any] = {}
-    result = render(
-        Stack.Navigator(
-            Stack.Screen("A", _capturing_screen("a", box)),
-            Stack.Screen("B", _capturing_screen("b", box)),
-        )
-    )
-    assert result.back() is False  # at root, nothing to pop
-    box["a"].push("B")
-    result.settle()
-    assert result.get_by_text("b")
-    assert result.back() is True
-    assert result.get_by_text("a")
-
-
-def test_stack_header_options_callable_set_options_and_hidden_header() -> None:
-    Stack = create_stack_navigator()
-    box: Dict[str, Any] = {}
-    result = render(
-        Stack.Navigator(
-            Stack.Screen("Home", _capturing_screen("home", box), header_shown=False),
-            Stack.Screen(
-                "Detail",
-                _capturing_screen("detail", box),
-                options=lambda route: {"title": f"Item {route.params['id']}", "header_back_title": "Home"},
-            ),
-        )
-    )
-    assert result.query_by_text("Home") is None  # header hidden
-    box["home"].navigate("Detail", id=5)
-    result.settle()
-    assert result.get_by_text("Item 5")
-    assert result.get_by_text("\u2039 Home")
-
-    box["detail"].set_options(title="Edited")
-    result.settle()
-    assert result.get_by_text("Edited")
-    assert result.query_by_text("Item 5") is None
-
-
-def test_stack_header_slots_and_custom_left() -> None:
-    Stack = create_stack_navigator()
-    right = Text("RIGHT")
-    result = render(
-        Stack.Navigator(
-            Stack.Screen(
-                "Home",
-                _screen("HOME"),
-                header_right=lambda: right,
-                header_left=Text("LEFT"),
-            ),
-        )
-    )
-    assert result.get_by_text("RIGHT")
-    assert result.get_by_text("LEFT")
-
-
-def test_stack_empty_navigator_renders_placeholder() -> None:
-    Stack = create_stack_navigator()
-    result = render(Stack.Navigator())
-    assert result.root is not None
-    assert result.text() == []
-
-
-def test_stack_unknown_navigate_raises_from_handler() -> None:
-    Stack = create_stack_navigator()
-    box: Dict[str, Any] = {}
-    render(Stack.Navigator(Stack.Screen("Home", _capturing_screen("home", box))))
-    with pytest.raises(ValueError, match="Unknown route"):
-        box["home"].navigate("Nope")
-
-
-# ======================================================================
-# Stack navigator as native root (FakeHost)
-# ======================================================================
-
-
-def test_native_root_stack_pushes_to_host_and_syncs_options() -> None:
-    Stack = create_stack_navigator()
-    host = FakeHost()
-    box: Dict[str, Any] = {}
-    result = render(
-        NavigationContainer(
-            Stack.Navigator(
-                Stack.Screen("Home", _capturing_screen("home", box), title="Home!"),
-                Stack.Screen("Detail", _capturing_screen("detail", box), title="Detail!"),
-            )
-        ),
-        host=host,
-    )
-    assert next(view for view in result.views() if view.type_name == "Screen").props["title"] == "Home!"
-    assert result.query_by_label("Back") is None  # host draws the nav bar
-
-    box["home"].navigate("Detail", id=1)
-    result.settle()
-    assert result.get_by_text("home", hidden=True)  # Logical state stays mounted.
-    assert result.get_by_text("detail")
-    assert [route.name for route in box["detail"].get_state().routes] == ["Home", "Detail"]
-
-
-def test_native_root_stack_boots_from_host_state_and_pops_via_host() -> None:
-    Stack = create_stack_navigator()
-    pushed_state = NavigationState([Route("Home"), Route("Detail", {"id": 9})]).to_dict()
-    host = FakeHost(initial_state=pushed_state)
-    box: Dict[str, Any] = {}
-    result = render(
-        Stack.Navigator(
-            Stack.Screen("Home", _capturing_screen("home", box)),
-            Stack.Screen("Detail", _capturing_screen("detail", box)),
-        ),
-        host=host,
-    )
-    assert result.get_by_text("detail")
-    assert result.get_by_text("params:id=9")
-    assert box["detail"].can_go_back()
-    assert box["detail"].get_state().routes[0].name == "Home"
-
-    box["detail"].go_back()
-    result.settle()
-    assert result.get_by_text("home")
-    assert result.query_by_text("detail", hidden=True) is None
-
-
-def test_native_root_stack_ignores_host_state_with_unknown_routes() -> None:
-    Stack = create_stack_navigator()
-    host = FakeHost(initial_state=NavigationState([Route("Ghost")]).to_dict())
-    result = render(Stack.Navigator(Stack.Screen("Home", _screen("HOME"))), host=host)
-    assert result.get_by_text("HOME")
-
-
-def test_native_root_stack_before_remove_blocks_system_back() -> None:
-    Stack = create_stack_navigator()
-    host = FakeHost(initial_state=NavigationState([Route("Home"), Route("Form")]).to_dict())
-    box: Dict[str, Any] = {}
-    result = render(
-        Stack.Navigator(
-            Stack.Screen("Home", _capturing_screen("home", box)),
-            Stack.Screen("Form", _capturing_screen("form", box)),
-        ),
-        host=host,
-    )
-    box["form"].add_listener("before_remove", lambda e: e.prevent_default())
-    assert result.back() is True  # consumed: host must not pop
-
-
-def test_native_host_focus_drives_use_is_focused() -> None:
-    Stack = create_stack_navigator()
-    host = FakeHost()
-    focus_log: List[bool] = []
-
-    @component
-    def Home() -> Any:
-        focused = use_is_focused()
-        focus_log.append(focused)
-        return Text("focused" if focused else "blurred")
-
-    result = render(Stack.Navigator(Stack.Screen("Home", Home)), host=host)
-    assert result.get_by_text("focused")
-    host.set_focused(False)
-    result.settle()
-    assert result.get_by_text("blurred")
-    host.set_focused(True)
-    result.settle()
-    assert result.get_by_text("focused")
-
-
-# ======================================================================
-# Tab navigator
-# ======================================================================
-
-
-def test_tab_renders_tab_bar_items_with_icons_and_badges() -> None:
-    Tab = create_tab_navigator()
-    result = render(
-        Tab.Navigator(
-            Tab.Screen("Home", _screen("HOME"), title="Home", tab_bar_icon="house"),
-            Tab.Screen("Alerts", _screen("ALERTS"), tab_bar_label="Inbox", tab_bar_badge=3),
-            Tab.Screen("Me", _screen("ME"), tab_bar_icon=pn.asset("icons/me.png")),
-        )
-    )
-    bar = result.get_by_type("TabBar")
-    assert bar.props["active_tab"] == "Home"
-    items = bar.props["items"]
-    assert items[0]["name"] == "Home" and items[0]["title"] == "Home"
-    assert items[0]["icon"]["view_box"] == "0 0 24 24"
-    assert items[0]["icon"]["shapes"] and all(shape["kind"] == "path" for shape in items[0]["icon"]["shapes"])
-    assert items[1] == {"name": "Alerts", "title": "Inbox", "badge": "3"}
-    assert items[2]["icon"] == {"uri": "asset://icons/me.png"}
-    assert result.get_by_text("HOME")
-    assert result.query_by_text("ALERTS", hidden=True) is None  # lazy: not mounted yet
-
-
-def test_tab_select_switches_and_keeps_visited_tabs_alive() -> None:
-    Tab = create_tab_navigator()
-    box: Dict[str, Any] = {}
-    result = render(
-        Tab.Navigator(
-            Tab.Screen("Home", _stateful_screen("home", box)),
-            Tab.Screen("Profile", _stateful_screen("profile", box)),
-        )
-    )
-    result.press(result.get_by_text("home inc"))
-    result.fire(result.get_by_type("TabBar"), "on_tab_select", "Profile")
-    assert result.get_by_text("profile count=0")
-    assert result.query_by_text("home count=1") is None
-    assert result.get_by_text("home count=1", hidden=True)  # kept alive
-    assert result.get_by_type("TabBar").props["active_tab"] == "Profile"
-
-    box["profile"].jump_to("Home")
-    result.settle()
-    assert result.get_by_text("home count=1")
-    assert result.get_by_text("profile count=0", hidden=True)
-
-
-def test_tab_lazy_false_mounts_eagerly_and_unmount_on_blur_tears_down() -> None:
-    Tab = create_tab_navigator()
-    box: Dict[str, Any] = {}
-    result = render(
-        Tab.Navigator(
-            Tab.Screen("A", _stateful_screen("a", box)),
-            Tab.Screen("B", _stateful_screen("b", box), lazy=False),
-            Tab.Screen("C", _stateful_screen("c", box), unmount_on_blur=True),
-        )
-    )
-    assert result.get_by_text("b count=0", hidden=True)  # eager
-    result.fire(result.get_by_type("TabBar"), "on_tab_select", "C")
-    result.press(result.get_by_text("c inc"))
-    assert result.get_by_text("c count=1")
-    result.fire(result.get_by_type("TabBar"), "on_tab_select", "A")
-    assert result.query_by_text("c count=1", hidden=True) is None
-    result.fire(result.get_by_type("TabBar"), "on_tab_select", "C")
-    assert result.get_by_text("c count=0")  # remounted fresh
-
-
-def test_tab_initial_route_and_empty() -> None:
-    Tab = create_tab_navigator()
-    result = render(Tab.Navigator(Tab.Screen("A", _screen("A!")), Tab.Screen("B", _screen("B!")), initial_route="B"))
-    assert result.get_by_text("B!")
-    assert result.get_by_type("TabBar").props["active_tab"] == "B"
-    assert render(Tab.Navigator()).text() == []
-
-
-# ======================================================================
-# Drawer navigator
-# ======================================================================
-
-
-def test_drawer_open_select_close_and_back() -> None:
-    Drawer = create_drawer_navigator()
-    box: Dict[str, Any] = {}
-    result = render(
-        Drawer.Navigator(
-            Drawer.Screen("Feed", _stateful_screen("feed", box), title="My Feed"),
-            Drawer.Screen("Settings", _stateful_screen("settings", box)),
-        )
-    )
-    nav = box["feed"]
-    assert isinstance(nav, DrawerNavigation)
-    assert not nav.is_drawer_open()
-    assert result.query_by_text("My Feed") is None
-
-    nav.open_drawer()
-    result.settle()
-    assert nav.is_drawer_open()
-    assert result.get_by_text("My Feed")
-    assert result.get_by_text("Settings")
-
-    result.press(result.get_by_text("Settings").parent)
-    assert result.get_by_text("settings count=0")
-    assert not nav.is_drawer_open()
-    assert result.query_by_text("My Feed") is None  # closed on select
-    assert result.get_by_text("feed count=0", hidden=True)  # kept alive
-
-    box["settings"].toggle_drawer()
-    result.settle()
-    assert result.get_by_text("My Feed")
-    assert result.back() is True  # back closes the drawer first
-    assert result.query_by_text("My Feed") is None
-    assert result.back() is False
-
-    box["settings"].jump_to("Feed")
-    result.settle()
-    assert result.get_by_text("feed count=0")
-
-
-def test_drawer_empty_renders_placeholder() -> None:
-    Drawer = create_drawer_navigator()
-    assert render(Drawer.Navigator()).text() == []
-
-
-# ======================================================================
-# Hooks
-# ======================================================================
-
-
-def test_use_navigation_outside_navigator_raises() -> None:
-    @component
-    def Lonely() -> Any:
-        use_navigation()
-        return Text("x")
-
-    with pytest.raises(RuntimeError, match="outside a navigator"):
-        render(Lonely())
-
-
-def test_use_route_outside_navigator_returns_placeholder() -> None:
-    hook = render_hook(use_route)
-    assert hook.current.name == "__root__"
-    assert hook.current.params == {}
-
-
-class _DetailParams(TypedDict):
-    id: int
-    title: NotRequired[str]
-
-
-def test_use_route_with_params_type_returns_typed_route() -> None:
-    Stack = create_stack_navigator()
-    seen: List[Route[_DetailParams]] = []
-
-    @component
-    def Detail() -> Any:
-        route = use_route(_DetailParams)
-        seen.append(route)
-        return Text(f"id={route.params['id']}")
-
-    result = render(
-        Stack.Navigator(
-            Stack.Screen("Detail", Detail, initial_params={"id": 7}),
-        )
-    )
-    assert result.get_by_text("id=7")
-    assert seen[-1].params == {"id": 7}
-
-
-def test_use_route_with_params_type_reports_missing_required_keys() -> None:
-    Stack = create_stack_navigator()
-
-    @component
-    def Detail() -> Any:
-        route = use_route(_DetailParams)
-        return Text(str(route.params))
-
-    with pytest.raises(TypeError, match=r"missing required params \['id'\] declared by _DetailParams"):
-        render(Stack.Navigator(Stack.Screen("Detail", Detail, initial_params={"title": "x"})))
-
-
-def test_use_route_with_params_type_skips_validation_outside_navigator() -> None:
-    hook = render_hook(lambda: use_route(_DetailParams))
-    assert hook.current.name == "__root__"
-
-
-def test_use_is_focused_defaults_true_outside_navigator() -> None:
-    assert render_hook(use_is_focused).current is True
-
-
-def test_use_focus_effect_runs_on_focus_and_cleans_up_on_blur() -> None:
-    Tab = create_tab_navigator()
-    log: List[str] = []
-
-    @component
-    def Home() -> Any:
-        def effect() -> Any:
-            log.append("focus")
-            return lambda: log.append("blur")
-
-        use_focus_effect(effect, [])
-        return Text("home")
-
-    result = render(Tab.Navigator(Tab.Screen("Home", Home), Tab.Screen("Other", _screen("OTHER"))))
-    assert log == ["focus"]
-    result.fire(result.get_by_type("TabBar"), "on_tab_select", "Other")
-    assert log == ["focus", "blur"]
-    result.fire(result.get_by_type("TabBar"), "on_tab_select", "Home")
-    assert log == ["focus", "blur", "focus"]
-
-
-def test_use_focus_effect_without_deps_reruns_each_focused_render() -> None:
-    runs: List[int] = []
-
-    @component
-    def Comp() -> Any:
-        count, set_count = use_state(0)
-        use_focus_effect(lambda: runs.append(count))
-        return Button("go", on_press=lambda: set_count(count + 1))
-
-    result = render(Comp())
-    result.press(result.get_by_text("go"))
-    assert runs == [0, 1]
-
-
-def test_navigation_listeners_focus_blur_state_and_unsubscribe() -> None:
-    Tab = create_tab_navigator()
-    box: Dict[str, Any] = {}
-    events: List[str] = []
-
-    @component
-    def Home() -> Any:
-        nav = use_navigation()
-        box["home"] = nav
-
-        def subscribe() -> Any:
-            unsub_focus = nav.add_listener("focus", lambda e: events.append(f"focus:{e.route.name}"))
-            unsub_blur = nav.add_listener("blur", lambda e: events.append(f"blur:{e.route.name}"))
-
-            def both() -> None:
-                unsub_focus()
-                unsub_blur()
-
-            return both
-
-        use_effect(subscribe, [])
-        return Text("home")
-
-    result = render(Tab.Navigator(Tab.Screen("Home", Home), Tab.Screen("Other", _screen("OTHER"))))
-    assert events == ["focus:Home"]
-    result.fire(result.get_by_type("TabBar"), "on_tab_select", "Other")
-    assert events == ["focus:Home", "blur:Home"]
-
-    states: List[NavigationState] = []
-    unsub = box["home"].add_listener("state", lambda e: states.append(e.data["state"]))
-    box["home"].jump_to("Home")
-    result.settle()
-    assert events[-1] == "focus:Home"
-    assert states and states[-1].current.name == "Home"
-    unsub()
-    result.fire(result.get_by_type("TabBar"), "on_tab_select", "Other")
-    assert len(states) == 1
-
-
-def test_navigation_handle_introspection() -> None:
-    Stack = create_stack_navigator()
-    box: Dict[str, Any] = {}
-    result = render(
-        Stack.Navigator(
-            Stack.Screen("Home", _capturing_screen("home", box), title="H"),
-            Stack.Screen("Detail", _capturing_screen("detail", box)),
-        )
-    )
-    home: Navigation = box["home"]
-    assert home.kind == "stack"
-    assert home.route.name == "Home"
-    assert home.get_params() == {}
-    assert home.get_options()["title"] == "H"
-    assert home.get_parent() is None
-    assert home.is_focused()
-    assert "stack" in repr(home) and "Home" in repr(home)
-
-    home.push("Detail", id=1)
-    result.settle()
-    assert not home.is_focused()
-    assert box["detail"].is_focused()
-    assert box["detail"].get_params() == {"id": 1}
-    assert use_route  # imported symbol is the public hook
-    assert box["detail"].route.params == {"id": 1}
-
-
-# ======================================================================
-# Nesting
-# ======================================================================
-
-
-def _nested_app(box: Dict[str, Any], **container_kwargs: Any) -> Any:
-    Root = create_stack_navigator()
-    Tabs = create_tab_navigator()
-    Feed = create_stack_navigator()
-
-    @component
-    def FeedStack() -> Any:
-        return Feed.Navigator(
-            Feed.Screen("List", _stateful_screen("list", box)),
-            Feed.Screen("Post", _capturing_screen("post", box)),
-        )
-
-    @component
-    def TabsScreen() -> Any:
-        return Tabs.Navigator(
-            Tabs.Screen("FeedTab", FeedStack),
-            Tabs.Screen("Profile", _capturing_screen("profile", box)),
-        )
-
-    return NavigationContainer(
-        Root.Navigator(
-            Root.Screen("Tabs", TabsScreen, header_shown=False),
-            Root.Screen("Login", _capturing_screen("login", box)),
-        ),
-        **container_kwargs,
-    )
-
-
-def test_nested_navigate_bubbles_to_ancestor_and_pop_falls_through() -> None:
-    box: Dict[str, Any] = {}
-    result = render(_nested_app(box))
-    assert result.get_by_text("list count=0")
-
-    # Unknown in Feed stack and Tabs: bubbles to the root stack.
-    box["list"].navigate("Login")
-    result.settle()
-    assert result.get_by_text("login")
-    assert box["list"].get_parent() is not None
-    assert box["login"].get_state().routes[0].name == "Tabs"
-
-    assert result.back() is True
-    assert result.get_by_text("list count=0")
-
-    # Inner stack pop at its root falls through to the outer stack (nothing above: False).
-    assert box["list"].pop() is False
-    box["list"].push("Post", id=3)
-    result.settle()
-    assert result.get_by_text("params:id=3")
-    assert box["post"].can_go_back()
-    box["post"].pop()
-    result.settle()
-    assert result.get_by_text("list count=0")
-
-
-def test_nested_navigate_with_screen_seeds_child_navigators() -> None:
-    box: Dict[str, Any] = {}
-    result = render(_nested_app(box))
-    box["list"].navigate("Login")
-    result.settle()
-    box["login"].navigate("Tabs", screen="Profile", user="ada")
-    result.settle()
-    assert result.get_by_text("profile")
-    assert result.get_by_text("params:user=ada")
-    assert result.get_by_type("TabBar").props["active_tab"] == "Profile"
-
-
-def test_deep_link_into_nested_stack_keeps_initial_route_beneath() -> None:
-    box: Dict[str, Any] = {}
-    initial = NavigationState(
-        [Route("Tabs", state=NavigationState([Route("FeedTab", state=NavigationState([Route("Post", {"id": 8})]))]))]
-    )
-    result = render(_nested_app(box, initial_state=initial))
-    assert result.get_by_text("params:id=8")
-    assert box["post"].can_go_back()
-    box["post"].go_back()
-    result.settle()
-    assert result.get_by_text("list count=0")
-
-
-# ======================================================================
-# NavigationContainer
-# ======================================================================
-
-
-def test_container_reports_state_changes_and_ready() -> None:
-    Stack = create_stack_navigator()
-    box: Dict[str, Any] = {}
-    states: List[NavigationState] = []
-    ready: List[bool] = []
-    result = render(
-        NavigationContainer(
-            Stack.Navigator(
-                Stack.Screen("A", _capturing_screen("a", box)),
-                Stack.Screen("B", _capturing_screen("b", box)),
-            ),
-            on_state_change=states.append,
-            on_ready=lambda: ready.append(True),
-        )
-    )
-    assert ready == [True]
-    assert states and states[-1].current.name == "A"
-    box["a"].push("B")
-    result.settle()
-    assert states[-1].current.name == "B"
-    assert NavigationState.from_dict(states[-1].to_dict()) == states[-1]
-
-
-def test_container_initial_state_accepts_dict() -> None:
-    Stack = create_stack_navigator()
-    saved = NavigationState([Route("A"), Route("B", {"id": 2})]).to_dict()
-    result = render(
-        NavigationContainer(
-            Stack.Navigator(Stack.Screen("A", _screen("A!")), Stack.Screen("B", _screen("B!"))),
-            initial_state=saved,
-        )
-    )
-    assert result.get_by_text("B!")
-    assert result.get_by_text("params:id=2")
-    assert result.get_by_label("Back")
-
-
-def test_container_wraps_arbitrary_children() -> None:
-    result = render(NavigationContainer(Text("alone")))
-    assert result.get_by_text("alone")
-
-
-# ======================================================================
-# Linking
-# ======================================================================
-
-
-def _linking() -> LinkingConfig:
-    return LinkingConfig(
-        prefixes=["myapp://", "https://example.com"],
-        screens={
-            "Home": "",
-            "Detail": {"path": "item/:id", "parse": {"id": int}},
-            "Tabs": {
-                "path": "tabs",
-                "screens": {"Feed": "feed", "Profile": {"path": "u/:user"}},
-            },
-        },
-    )
-
-
-def test_linking_strip_prefix_variants() -> None:
-    cfg = _linking()
-    assert cfg.strip_prefix("myapp://item/1") == "item/1"
-    assert cfg.strip_prefix("MYAPP://item/1") == "item/1"
-    assert cfg.strip_prefix("https://example.com/item/1") == "/item/1"
-    assert cfg.strip_prefix("https://example.com") == ""
-    assert cfg.strip_prefix("https://example.com?x=1") == "?x=1"
-    assert cfg.strip_prefix("https://other.com/item/1") is None
-    assert cfg.strip_prefix("/item/1") == "/item/1"  # bare paths pass through
-
-
-def test_linking_state_from_url_flat_nested_and_query() -> None:
-    cfg = _linking()
-    home = cfg.state_from_url("myapp://")
-    assert home is not None and home.current.name == "Home"
-
-    detail = cfg.state_from_url("https://example.com/item/42?ref=mail")
-    assert detail is not None
-    assert detail.current.name == "Detail"
-    assert detail.current.params == {"id": 42, "ref": "mail"}  # parsed + query
-
-    nested = cfg.state_from_url("myapp://tabs/u/ada")
-    assert nested is not None
-    assert nested.current.name == "Tabs"
-    assert nested.current.state is not None
-    assert nested.current.state.current.name == "Profile"
-    assert nested.current.state.current.params == {"user": "ada"}
-
-    assert cfg.state_from_url("myapp://nothing/here") is None
-    assert cfg.state_from_url("otherapp://item/1") is None
-
-
-def test_linking_url_from_state() -> None:
-    cfg = _linking()
-    assert cfg.url_from_state(NavigationState([Route("Home")])) == "myapp://"
-    assert cfg.url_from_state(NavigationState([Route("Detail", {"id": 3, "ref": "x"})])) == "myapp://item/3?ref=x"
-    nested = NavigationState([Route("Tabs", state=NavigationState([Route("Profile", {"user": "a b"})]))])
-    assert cfg.url_from_state(nested) == "myapp://tabs/u/a%20b"
-    unknown = NavigationState([Route("Tabs", state=NavigationState([Route("Ghost")]))])
-    assert cfg.url_from_state(unknown) == "myapp://tabs"  # deepest ancestor with a path
-    assert cfg.url_from_state(NavigationState([Route("Nowhere")])) is None
-
-
-def test_container_seeds_from_launch_url_and_follows_later_links(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(linking_module, "_initial_url", "myapp://item/5")
-    monkeypatch.setattr(linking_module, "_url_listeners", [])
-    Stack = create_stack_navigator()
-    result = render(
-        NavigationContainer(
-            Stack.Navigator(
-                Stack.Screen("Home", _screen("HOME")),
-                Stack.Screen("Detail", _screen("DETAIL")),
-            ),
-            linking=_linking(),
-        )
-    )
-    assert result.get_by_text("DETAIL")
-    assert result.get_by_text("params:id=5")
-    assert result.get_by_label("Back")  # Home sits beneath the deep-linked screen
-
-    linking_module.dispatch_url("myapp://")
-    result.settle()
-    assert result.get_by_text("HOME")
-    assert result.query_by_text("DETAIL", hidden=True) is None
-
-
-# ======================================================================
-# Public API
-# ======================================================================
-
-
-def test_navigation_exports_from_package() -> None:
-    for name in (
-        "NavigationContainer",
-        "Navigation",
-        "NavigationState",
-        "Route",
-        "ScreenOptions",
-        "LinkingConfig",
-        "create_stack_navigator",
-        "create_tab_navigator",
-        "create_drawer_navigator",
-        "use_navigation",
-        "use_route",
-        "use_is_focused",
-        "use_focus_effect",
-    ):
-        assert hasattr(pn, name), name
-        assert name in pn.__all__, name
-    assert pn.use_navigation is use_navigation
-    assert pn.NavigationContext is NavigationContext if hasattr(pn, "NavigationContext") else True
-
-
-def test_native_header_slots_keep_route_context_and_update_without_serializing_elements() -> None:
-    stack = create_stack_navigator()
-    handles: dict[str, Any] = {}
-
-    @component
-    def Header() -> pn.Element:
-        navigation = pn.use_navigation()
-        return pn.Button("Open detail", on_press=lambda: navigation.navigate("Detail"))
-
-    result = render(
-        stack.Navigator(
-            stack.Screen("Home", _capturing_screen("home", handles), header_right=Header),
-            stack.Screen("Detail", _capturing_screen("detail", handles)),
-        ),
-        host=FakeHost(),
-    )
-    screens = [view for view in result.views() if view.type_name == "Screen"]
-    assert "header_right" not in screens[0].props
-    slots = [view for view in result.views() if view.props.get("_pn_header_slot") == "right"]
-    assert len(slots) == 1
-    result.press(result.get_by_text("Open detail"))
-    assert result.get_by_text("detail")
-    result.unmount()
-
-
-# ======================================================================
-# Navigator screen_options, groups, and option layering
-# ======================================================================
-
-
-def test_flatten_screens_expands_groups_and_rejects_duplicates() -> None:
-    from pythonnative.navigation.screen import ScreenGroup, flatten_screens
-
-    a = ScreenDef("A", lambda: None)
-    b = ScreenDef("B", lambda: None)
-    group = ScreenGroup([b], {"presentation": "modal"})
-    screens, group_options = flatten_screens([a, group])
-    assert [s.name for s in screens] == ["A", "B"]
-    assert group_options == {"B": {"presentation": "modal"}}
-    assert "B" in repr(group)
-    with pytest.raises(ValueError, match="Duplicate"):
-        flatten_screens([a, ScreenGroup([a])])
-    with pytest.raises(TypeError):
-        flatten_screens(["A"])  # type: ignore[list-item]
-    with pytest.raises(TypeError):
-        ScreenGroup(["A"])  # type: ignore[list-item]
+    handle.reset(A())
+    assert _names(core.state) == ["A"]
 
 
 def test_core_options_layer_navigator_group_screen_then_runtime() -> None:
-    screens = {
-        "A": ScreenDef("A", lambda: None),
-        "B": ScreenDef("B", lambda: None, title="Screen B"),
-    }
-    rec = _Recorder(NavigationState([Route("A"), Route("B")]))
-    core = NavigatorCore(
-        "stack",
-        screens,
-        rec.state,
-        rec,
-        screen_options=lambda route: {"title": f"Nav {route.name}", "header_shown": False, "animation": "fade"},
-        group_options={"B": {"title": "Group B", "presentation": "modal"}},
+    navigator = StackNavigator(
+        A,
+        Group(Screen(B, title="Screen B"), title="Group B", presentation="modal"),
+        screen_options=ScreenOptions(title="Nav", header_shown=False, animation="fade"),
     )
+    core, _ = _make_core(navigator)
+    _top(core).push(B())
     a, b = core.state.routes
-    assert core.options_for(a) == {"title": "Nav A", "header_shown": False, "animation": "fade"}
+    assert core.options_for(a) == {"title": "Nav", "header_shown": False, "animation": "fade"}
     assert core.options_for(b) == {
         "title": "Screen B",
         "header_shown": False,
@@ -1290,132 +666,57 @@ def test_core_options_layer_navigator_group_screen_then_runtime() -> None:
     assert core.options_for(b)["presentation"] == "modal"
 
 
-def test_screen_options_reject_unknown_enum_values() -> None:
-    with pytest.raises(ValueError, match="presentation"):
-        ScreenDef("A", lambda: None, presentation="sheet")  # type: ignore[arg-type]
-    with pytest.raises(ValueError, match="animation"):
-        ScreenDef("A", lambda: None, options={"animation": "zoom"})
-    core, _ = _make_core("stack", "A")
-    with pytest.raises(ValueError, match="animation"):
-        core.handle_for(core.state.current).set_options(animation="zoom")
-    from pythonnative.navigation.screen import ScreenGroup
-
-    with pytest.raises(ValueError, match="presentation"):
-        ScreenGroup([ScreenDef("A", lambda: None)], {"presentation": "popover"})
-    for value in ("card", "modal", "full_screen_modal", "form_sheet", "transparent_modal"):
-        assert ScreenDef("A", lambda: None, presentation=value).resolve_options(Route("A"))["presentation"] == value
-
-
-def test_stack_navigator_screen_options_and_groups_render_layered_titles() -> None:
-    Stack = create_stack_navigator()
-    box: Dict[str, Any] = {}
-    result = render(
-        Stack.Navigator(
-            Stack.Screen("Home", _capturing_screen("home", box), title="Home!"),
-            Stack.Group(
-                Stack.Screen("Compose", _capturing_screen("compose", box)),
-                Stack.Screen("Preview", _capturing_screen("preview", box), title="Preview!"),
-                screen_options={"title": "Grouped"},
-            ),
-            Stack.Screen("Plain", _capturing_screen("plain", box)),
-            screen_options=lambda route: {"title": f"Nav {route.name}"},
-        )
-    )
-    assert result.get_by_text("Home!")  # screen beats navigator
-    box["home"].push("Compose")
-    result.settle()
-    assert result.get_by_text("Grouped")  # group beats navigator
-    box["compose"].push("Preview")
-    result.settle()
-    assert result.get_by_text("Preview!")  # screen beats group
-    box["preview"].push("Plain")
-    result.settle()
-    assert result.get_by_text("Nav Plain")  # navigator callable applies to ungrouped screens
-    box["plain"].set_options(title="Runtime")
-    result.settle()
-    assert result.get_by_text("Runtime")
-    assert box["plain"].get_options()["title"] == "Runtime"
-
-
-def test_tab_and_drawer_navigators_accept_groups_and_screen_options() -> None:
-    Tab = create_tab_navigator()
-    result = render(
-        Tab.Navigator(
-            Tab.Screen("Home", _screen("HOME")),
-            Tab.Group(Tab.Screen("Feed", _screen("FEED")), screen_options={"tab_bar_label": "Grouped"}),
-            screen_options={"tab_bar_badge": 1},
-        )
-    )
-    items = result.get_by_type("TabBar").props["items"]
-    assert items == [
-        {"name": "Home", "title": "Home", "badge": "1"},
-        {"name": "Feed", "title": "Grouped", "badge": "1"},
-    ]
-
-    Drawer = create_drawer_navigator()
-    box: Dict[str, Any] = {}
-    result = render(
-        Drawer.Navigator(
-            Drawer.Group(Drawer.Screen("Feed", _capturing_screen("feed", box)), screen_options={"title": "Menu Feed"}),
-            screen_options={"title": "Nav"},
-        )
-    )
-    box["feed"].open_drawer()
-    result.settle()
-    assert result.get_by_text("Menu Feed")
-
-
-# ======================================================================
-# pop_to and the before_remove matrix
-# ======================================================================
-
-
 def test_core_pop_to_pops_replaces_or_updates_params() -> None:
-    core, rec = _make_core("stack", "A", "B", "C", "D")
-    h = core.handle_for(core.state.current)
-    h.push("B")
-    h.push("C")
-    assert [r.name for r in core.state.routes] == ["A", "B", "C"]  # eager state
+    core, _ = _make_core(StackNavigator(A, B, C, D))
+    h = _top(core)
+    h.push(B())
+    h.push(C())
+    assert _names(core.state) == ["A", "B", "C"]  # eager state
     b_key = core.state.routes[1].key
 
-    core.handle_for(core.state.current).pop_to("B", flag=True)
-    assert [r.name for r in core.state.routes] == ["A", "B"]
+    _top(core).pop_to(B)  # a component: no params
+    assert _names(core.state) == ["A", "B"]
     assert core.state.current.key == b_key
-    assert core.state.current.params == {"flag": True}
+    assert core.state.current.params == {}
 
-    core.handle_for(core.state.current).pop_to("B", more=1)  # already active: params only
+    _top(core).pop_to(B(id=4, more=True))  # already active: params only
     assert core.state.current.key == b_key
-    assert core.state.current.params == {"flag": True, "more": 1}
+    assert core.state.current.params == {"id": 4, "more": True}
 
-    core.handle_for(core.state.current).pop_to("D", id=4)  # not in history: replace
-    assert [r.name for r in core.state.routes] == ["A", "D"]
+    _top(core).push(C())
+    _top(core).pop_to(B(id=5))  # an element: its passed params merge into the existing route
+    assert _names(core.state) == ["A", "B"]
+    assert core.state.current.key == b_key
+    assert core.state.current.params == {"id": 5, "more": True}
+
+    _top(core).pop_to(D(id=4))  # not in history: replace
+    assert _names(core.state) == ["A", "D"]
     assert core.state.current.params == {"id": 4}
 
-    with pytest.raises(ValueError, match="Unknown route"):
-        core.handle_for(core.state.current).pop_to("Nope")
+    with pytest.raises(ValueError, match="isn't a screen"):
+        _top(core).pop_to(Unlisted)
 
-    tabs, _ = _make_core("tab", "X", "Y")
-    tabs.handle_for(tabs.state.current).pop_to("Y")  # non-stack: jump
-    assert tabs.state.current.name == "Y"
+    tabs, _ = _make_core(TabNavigator(Home, Settings))
+    _top(tabs).pop_to(Settings)  # non-stack: jump
+    assert tabs.state.current.name == "Settings"
 
 
 def test_core_pop_to_bubbles_to_parent() -> None:
-    parent_core, _ = _make_core("stack", "Root", "Other")
-    parent_core.handle_for(parent_core.state.current).push("Other")
-    parent_handle = parent_core.handle_for(parent_core.state.current)
-    child_core, _ = _make_core("tab", "Feed", parent=parent_handle)
-    child_core.handle_for(child_core.state.current).pop_to("Root")
-    assert [r.name for r in parent_core.state.routes] == ["Root"]
+    parent_core, _ = _make_core(StackNavigator(Home, Other))
+    _top(parent_core).push(Other())
+    child_core, _ = _make_core(TabNavigator(Feed), parent=_top(parent_core))
+    _top(child_core).pop_to(Home)
+    assert _names(parent_core.state) == ["Home"]
 
 
-_REMOVALS: Dict[str, Any] = {
+_REMOVALS: Dict[str, Callable[[Navigation], Any]] = {
     "pop": lambda h: h.pop(),
     "go_back": lambda h: h.go_back(),
     "pop_to_top": lambda h: h.pop_to_top(),
-    "pop_to": lambda h: h.pop_to("A"),
-    "navigate": lambda h: h.navigate("A"),
-    "replace": lambda h: h.replace("B"),
-    "reset": lambda h: h.reset("A"),
+    "pop_to": lambda h: h.pop_to(A),
+    "navigate": lambda h: h.navigate(A()),
+    "replace": lambda h: h.replace(B()),
+    "reset": lambda h: h.reset(A()),
 }
 _EXPECTED_AFTER: Dict[str, List[str]] = {
     "pop": ["A", "B"],
@@ -1431,11 +732,11 @@ _EXPECTED_AFTER: Dict[str, List[str]] = {
 @pytest.mark.parametrize("action", sorted(_REMOVALS))
 @pytest.mark.parametrize("veto", [False, True])
 def test_core_before_remove_fires_for_every_removal_and_veto_cancels(action: str, veto: bool) -> None:
-    core, rec = _make_core("stack", "A", "B", "C")
-    root = core.handle_for(core.state.current)
-    root.push("B")
-    root.push("C")
-    top = core.handle_for(core.state.current)
+    core, rec = _make_core(StackNavigator(A, B, C))
+    root = _top(core)
+    root.push(B())
+    root.push(C())
+    top = _top(core)
     seen: List[str] = []
 
     def guard(evt: NavigationEvent) -> None:
@@ -1445,22 +746,23 @@ def test_core_before_remove_fires_for_every_removal_and_veto_cancels(action: str
 
     top.add_listener("before_remove", guard)
     before = core.state
+    commits = len(rec.commits)
     _REMOVALS[action](top)
     assert seen == [action]
     if veto:
         assert core.state is before
-        assert rec.commits == [] or rec.commits[-1] == before
+        assert len(rec.commits) == commits
     else:
-        assert [r.name for r in core.state.routes] == _EXPECTED_AFTER[action]
+        assert _names(core.state) == _EXPECTED_AFTER[action]
 
 
 def test_core_veto_on_a_lower_route_cancels_the_whole_pop_to_and_orders_events_topmost_first() -> None:
-    core, _ = _make_core("stack", "A", "B", "C")
-    root = core.handle_for(core.state.current)
-    root.push("B")
-    b = core.handle_for(core.state.current)
-    root.push("C")
-    c = core.handle_for(core.state.current)
+    core, _ = _make_core(StackNavigator(A, B, C))
+    root = _top(core)
+    root.push(B())
+    b = _top(core)
+    root.push(C())
+    c = _top(core)
     order: List[str] = []
     c.add_listener("before_remove", lambda e: order.append("C"))
 
@@ -1469,31 +771,38 @@ def test_core_veto_on_a_lower_route_cancels_the_whole_pop_to_and_orders_events_t
         evt.prevent_default()
 
     b.add_listener("before_remove", veto_b)
-    c.pop_to("A")
+    c.pop_to(A)
     assert order == ["C", "B"]
-    assert [r.name for r in core.state.routes] == ["A", "B", "C"]
-    c.navigate("A")
-    assert [r.name for r in core.state.routes] == ["A", "B", "C"]
+    assert _names(core.state) == ["A", "B", "C"]
+    c.navigate(A())
+    assert _names(core.state) == ["A", "B", "C"]
 
 
 def test_core_reset_fires_before_remove_only_for_routes_that_leave() -> None:
-    core, _ = _make_core("stack", "A", "B")
-    root = core.handle_for(core.state.current)
-    root.push("B")
+    core, _ = _make_core(StackNavigator(A, B))
+    _top(core).push(B())
     a_route, b_route = core.state.routes
     seen: List[str] = []
     core.handle_for(a_route).add_listener("before_remove", lambda e: seen.append("A"))
     core.handle_for(b_route).add_listener("before_remove", lambda e: seen.append("B"))
-    core.handle_for(b_route).reset(a_route, Route("B"))  # A stays (same key), old B leaves
+    core.reset([a_route, Route("B")])  # A stays (same key), old B leaves
     assert seen == ["B"]
     assert core.state.routes[0].key == a_route.key
     assert core.state.routes[1].key != b_route.key
 
+    # ``Navigation.reset`` builds fresh routes, so every current route leaves.
+    seen.clear()
+    top = _top(core)
+    core.handle_for(core.state.routes[0]).add_listener("before_remove", lambda e: seen.append("A2"))
+    top.add_listener("before_remove", lambda e: seen.append("B2"))
+    top.reset(A(), B())
+    assert seen == ["B2", "A", "A2"]  # topmost first; the kept A route still has its first listener
+
 
 def test_core_commit_updates_state_eagerly_and_handles_follow() -> None:
-    core, rec = _make_core("stack", "A", "B")
-    h = core.handle_for(core.state.current)
-    h.push("B")
+    core, rec = _make_core(StackNavigator(A, B))
+    h = _top(core)
+    h.push(B())
     assert core.state.current.name == "B"
     assert h.get_state() is core.state
     assert rec.commits[-1] is core.state
@@ -1501,98 +810,321 @@ def test_core_commit_updates_state_eagerly_and_handles_follow() -> None:
 
 
 # ======================================================================
-# Native back veto: restore_stack
+# Stack navigator (rendered)
 # ======================================================================
 
 
-def _native_stack(host: FakeHost, box: Dict[str, Any]) -> Any:
-    Stack = create_stack_navigator()
-    return render(
-        Stack.Navigator(
-            Stack.Screen("Home", _capturing_screen("home", box)),
-            Stack.Screen("Form", _capturing_screen("form", box)),
-        ),
-        host=host,
+def test_stack_renders_initial_screen_with_header() -> None:
+    Root = StackNavigator(Screen(Home, title="Welcome"), Detail)
+    result = render(NavigationContainer(Root))
+    assert result.get_by_text("home")
+    assert result.get_by_text("Welcome")  # header title
+    assert result.query_by_text("detail") is None
+    assert result.query_by_label("Back") is None
+
+
+def test_stack_renders_without_a_container() -> None:
+    result = render(StackNavigator(Home)())
+    assert result.get_by_text("home")
+    assert result.get_by_text("Home")  # the title falls back to the route name
+
+
+def test_stack_initial_screen_with_params() -> None:
+    result = render(StackNavigator(Home, Detail, initial=Detail(id=7))())
+    assert result.get_by_text("detail")
+    assert result.get_by_text("detail params:id=7,tab=info")
+    assert result.get_by_text("Detail")  # falls back to the route name for the title
+
+
+def test_stack_navigate_back_and_state_preservation() -> None:
+    result = render(StackNavigator(Home, Screen(Detail, title="Detail"))())
+    result.press(result.get_by_text("home inc"))
+    assert result.get_by_text("home count=1")
+
+    BOX["home"].navigate(Detail(id=42))
+    result.settle()
+    assert result.get_by_text("detail")
+    assert result.get_by_text("detail params:id=42,tab=info")
+    assert result.query_by_text("home count=1") is None  # hidden below
+    assert result.get_by_text("home count=1", hidden=True)
+
+    result.press(result.get_by_label("Back"))
+    assert result.get_by_text("home count=1")  # state survived the round trip
+    assert result.query_by_text("detail") is None
+    assert result.query_by_text("detail", hidden=True) is None  # unmounted
+
+
+def test_stack_replace_resets_screen_state_and_pop_to_top() -> None:
+    result = render(StackNavigator(A, B, C)())
+    BOX["a"].push(B())
+    result.settle()
+    result.press(result.get_by_text("b inc"))
+    assert result.get_by_text("b count=1")
+
+    BOX["b"].replace(B())
+    result.settle()
+    assert result.get_by_text("b count=0")  # fresh key, fresh state
+    assert BOX["b"].get_state().routes[0].name == "A"
+
+    BOX["b"].push(C())
+    result.settle()
+    assert result.get_by_text("c count=0")
+    BOX["c"].pop_to_top()
+    result.settle()
+    assert result.get_by_text("a count=0")
+    assert len(BOX["a"].get_state()) == 1
+
+
+def test_stack_system_back_pops_and_reports_consumption() -> None:
+    result = render(StackNavigator(A, B)())
+    assert result.back() is False  # at root, nothing to pop
+    BOX["a"].push(B())
+    result.settle()
+    assert result.get_by_text("b")
+    assert result.back() is True
+    assert result.get_by_text("a")
+
+
+def test_stack_header_options_set_options_and_hidden_header() -> None:
+    result = render(
+        StackNavigator(
+            Screen(Home, header_shown=False),
+            Screen(Detail, title="Detail", header_back_title="Home"),
+        )()
     )
+    assert result.query_by_text("Home") is None  # header hidden
+    BOX["home"].navigate(Detail(id=5))
+    result.settle()
+    assert result.get_by_text("Detail")
+    assert result.get_by_text("‹ Home")
+
+    BOX["detail"].set_options(title="Edited")
+    result.settle()
+    assert result.get_by_text("Edited")
+    assert result.query_by_text("Detail") is None
 
 
-def _restore_commands(result: Any) -> List[Any]:
-    return [command for command in result.backend.commands if command[1] == "restore_stack"]
+def test_stack_header_slots_take_elements() -> None:
+    result = render(StackNavigator(Screen(Home, header_right=Text("RIGHT"), header_left=Text("LEFT")))())
+    assert result.get_by_text("RIGHT")
+    assert result.get_by_text("LEFT")
 
 
-@pytest.fixture
-def _fake_view_commands(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Let ``ref.current.command(...)`` reach the fake backend until the typed ``ViewHandle`` lands."""
-    from pythonnative.testing import FakeView
-
-    if hasattr(FakeView, "command"):
-        return
-
-    def command(self: Any, name: str, **args: Any) -> Any:
-        backend = getattr(self, "_pn_backend", None)
-        if backend is None:
-            raise AttributeError("FakeView has no backend")
-        return backend.command(self.tag, name, args)
-
-    monkeypatch.setattr(FakeView, "command", command, raising=False)
+def test_stack_unknown_navigate_raises_from_handler() -> None:
+    render(StackNavigator(Home)())
+    with pytest.raises(ValueError, match="isn't a screen of this navigator tree"):
+        BOX["home"].navigate(Unlisted())
 
 
-def _bind_backend(result: Any) -> None:
-    for view in result.backend.views.values():
-        if view.type_name == "ScreenStack":
-            view._pn_backend = result.backend
+def test_stack_header_uses_theme_colors() -> None:
+    result = render(StackNavigator(Screen(Home, title="Themed"))())
+    title = result.get_by_text("Themed")
+    assert title.props["color"] == LIGHT_THEME.colors.text
+    header = title.parent
+    assert header is not None
+    assert header.props["background_color"] == LIGHT_THEME.colors.surface
 
 
-def test_native_back_veto_issues_restore_stack(_fake_view_commands: None) -> None:
+# ======================================================================
+# use_screen_options, set_params, and cached screen bodies
+# ======================================================================
+
+
+@component
+def Titled(id: int = 1) -> pn.Node:
+    RENDERS["titled"] = RENDERS.get("titled", 0) + 1
+    use_screen_options(title=f"Item {id}")
+    BOX["titled"] = use_navigation()
+    return Text(f"titled {id}")
+
+
+def test_use_screen_options_sets_the_title_without_looping() -> None:
+    result = render(StackNavigator(Titled)())
+    assert result.get_by_text("Item 1")
+    assert RENDERS["titled"] == 1  # the navigator re-render doesn't re-render the screen
+    assert BOX["titled"].get_options()["title"] == "Item 1"
+
+    BOX["titled"].set_params(id=2)
+    result.settle()
+    assert result.get_by_text("titled 2")
+    assert result.get_by_text("Item 2")
+    assert result.query_by_text("Item 1") is None
+    assert RENDERS["titled"] == 2
+
+
+def test_use_screen_options_with_a_fresh_header_element_each_render_settles() -> None:
+    pressed: List[int] = []
+
+    @component
+    def Sharing() -> pn.Node:
+        RENDERS["sharing"] = RENDERS.get("sharing", 0) + 1
+        count, set_count = use_state(0)
+        use_screen_options(
+            title=f"Shared {count}", header_right=Button("Share", on_press=lambda: pressed.append(count))
+        )
+        return Button("bump", on_press=lambda: set_count(count + 1))
+
+    result = render(StackNavigator(Sharing)())
+    assert RENDERS["sharing"] == 1
+    result.press(result.get_by_text("Share"))
+    assert pressed == [0]
+    result.press(result.get_by_text("bump"))
+    assert result.get_by_text("Shared 1")
+    assert RENDERS["sharing"] == 2
+    result.press(result.get_by_text("Share"))
+    assert pressed == [0, 1]  # the header slot follows the latest render
+
+
+def test_use_screen_options_rejects_unknown_keys() -> None:
+    @component
+    def Bad() -> pn.Node:
+        use_screen_options(titel="x")  # type: ignore[call-arg]
+        return None
+
+    with pytest.raises(TypeError, match="Unknown screen option"):
+        render(StackNavigator(Bad)())
+
+
+def test_use_screen_options_outside_a_navigator_raises() -> None:
+    @component
+    def Lonely() -> pn.Node:
+        use_screen_options(title="x")
+        return None
+
+    with pytest.raises(RuntimeError, match="outside a navigator"):
+        render(Lonely())
+
+
+def test_set_params_re_renders_the_screen_with_new_props_and_validates() -> None:
+    result = render(StackNavigator(Home, Detail)())
+    BOX["home"].push(Detail(id=1))
+    result.settle()
+    result.press(result.get_by_text("detail inc"))
+    BOX["detail"].set_params(tab="reviews")
+    result.settle()
+    assert result.get_by_text("detail params:id=1,tab=reviews")
+    assert result.get_by_text("detail count=1")  # same route, same state
+    assert BOX["detail"].route.params == {"id": 1, "tab": "reviews"}
+    with pytest.raises(TypeError):
+        BOX["detail"].set_params(nope=True)
+    assert BOX["detail"].route.params == {"id": 1, "tab": "reviews"}
+
+
+def test_navigator_re_renders_reuse_cached_screen_bodies() -> None:
+    result = render(StackNavigator(Home, Screen(Other, title="Other"))())
+    BOX["home"].push(Other())
+    result.settle()
+    home, other = RENDERS["home"], RENDERS["other"]
+
+    # An option change re-renders the navigator (the header shows it), not the screens.
+    BOX["other"].set_options(title="Renamed")
+    result.settle()
+    assert result.get_by_text("Renamed")
+    assert (RENDERS["home"], RENDERS["other"]) == (home, other)
+
+    # The screen's own state still renders it.
+    result.press(result.get_by_text("other inc"))
+    assert RENDERS["other"] == other + 1
+    assert RENDERS["home"] == home
+
+
+# ======================================================================
+# Stack navigator as native root (FakeHost)
+# ======================================================================
+
+
+def _native_screens(result: RenderResult) -> List[Any]:
+    return [view for view in result.views(hidden=True) if view.type_name == "Screen"]
+
+
+def test_native_root_stack_renders_screens_and_syncs_options() -> None:
+    Root = StackNavigator(Screen(Home, title="Home!"), Screen(Detail, title="Detail!"))
+    result = render(NavigationContainer(Root), host=FakeHost())
+    assert _native_screens(result)[0].props["title"] == "Home!"
+    assert result.query_by_label("Back") is None  # the host draws the nav bar
+
+    BOX["home"].navigate(Detail(id=1))
+    result.settle()
+    assert result.get_by_text("home", hidden=True)  # the logical state stays mounted
+    assert result.get_by_text("detail")
+    assert _names(BOX["detail"].get_state()) == ["Home", "Detail"]
+    assert [screen.props["title"] for screen in _native_screens(result)] == ["Home!", "Detail!"]
+
+
+def test_native_root_stack_boots_from_host_state_and_pops_via_host() -> None:
+    pushed_state = NavigationState([Route("Home"), Route("Detail", {"id": 9})]).to_dict()
+    result = render(StackNavigator(Home, Detail)(), host=FakeHost(initial_state=pushed_state))
+    assert result.get_by_text("detail")
+    assert result.get_by_text("detail params:id=9,tab=info")
+    assert BOX["detail"].can_go_back()
+    assert BOX["detail"].get_state().routes[0].name == "Home"
+
+    BOX["detail"].go_back()
+    result.settle()
+    assert result.get_by_text("home")
+    assert result.query_by_text("detail", hidden=True) is None
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        pytest.param(NavigationState([Route("Ghost")]), id="unknown-route"),
+        pytest.param(NavigationState([Route("Home"), Route("Detail")]), id="missing-required-param"),
+    ],
+)
+def test_native_root_stack_ignores_unrestorable_host_state(state: NavigationState) -> None:
+    result = render(StackNavigator(Home, Detail)(), host=FakeHost(initial_state=state.to_dict()))
+    assert result.get_by_text("home")
+    assert result.query_by_text("detail", hidden=True) is None
+
+
+def test_native_root_stack_before_remove_blocks_system_back() -> None:
     host = FakeHost(initial_state=NavigationState([Route("Home"), Route("Form")]).to_dict())
-    box: Dict[str, Any] = {}
-    result = _native_stack(host, box)
-    _bind_backend(result)
-    actions: List[str] = []
-
-    def guard(evt: NavigationEvent) -> None:
-        actions.append(evt.data["action"])
-        evt.prevent_default()
-
-    box["form"].add_listener("before_remove", guard)
-    stack = result.get_by_type("ScreenStack")
-    result.fire(stack, "on_native_back", 1)
-    assert actions == ["back"]
+    result = render(StackNavigator(Home, Form)(), host=host)
+    BOX["form"].add_listener("before_remove", lambda e: e.prevent_default())
+    assert result.back() is True  # consumed: the host must not pop
     assert result.get_by_text("form")
-    assert [route.name for route in box["form"].get_state().routes] == ["Home", "Form"]
-    restores = _restore_commands(result)
-    assert len(restores) == 1
-    assert restores[0][0] == stack.tag
 
 
-def test_native_back_without_veto_pops_and_does_not_restore(_fake_view_commands: None) -> None:
-    host = FakeHost(initial_state=NavigationState([Route("Home"), Route("Form")]).to_dict())
-    box: Dict[str, Any] = {}
-    result = _native_stack(host, box)
-    _bind_backend(result)
-    result.fire(result.get_by_type("ScreenStack"), "on_native_back", 1)
-    assert result.get_by_text("home")
-    assert result.query_by_text("form", hidden=True) is None
-    assert _restore_commands(result) == []
-
-
-def test_native_back_at_root_restores_stack(_fake_view_commands: None) -> None:
+def test_native_host_focus_drives_use_is_focused() -> None:
     host = FakeHost()
-    box: Dict[str, Any] = {}
-    result = _native_stack(host, box)
-    _bind_backend(result)
-    result.fire(result.get_by_type("ScreenStack"), "on_native_back", 1)
-    assert result.get_by_text("home")
-    assert len(_restore_commands(result)) == 1
+
+    @component
+    def Focus() -> pn.Node:
+        return Text("focused" if use_is_focused() else "blurred")
+
+    result = render(StackNavigator(Focus)(), host=host)
+    assert result.get_by_text("focused")
+    host.set_focused(False)
+    result.settle()
+    assert result.get_by_text("blurred")
+    host.set_focused(True)
+    result.settle()
+    assert result.get_by_text("focused")
+
+
+@component
+def OpenDetail() -> pn.Node:
+    navigation = use_navigation()
+    return Button("Open detail", on_press=lambda: navigation.navigate(Detail(id=1)))
+
+
+def test_native_header_slots_keep_route_context_and_update_without_serializing_elements() -> None:
+    result = render(StackNavigator(Screen(Home, header_right=OpenDetail()), Detail)(), host=FakeHost())
+    screens = _native_screens(result)
+    assert "header_right" not in screens[0].props
+    slots = [view for view in result.views() if view.props.get("_pn_header_slot") == "right"]
+    assert len(slots) == 1
+    result.press(result.get_by_text("Open detail"))
+    assert result.get_by_text("detail")
+    result.unmount()
 
 
 def test_native_screen_props_omit_python_only_options() -> None:
-    Stack = create_stack_navigator()
     result = render(
-        Stack.Navigator(
-            Stack.Screen(
-                "Home",
-                _screen("HOME"),
+        StackNavigator(
+            Screen(
+                Home,
                 header_left=Text("L"),
                 tab_bar_icon="house",
                 tab_bar_visible=False,
@@ -1600,7 +1132,7 @@ def test_native_screen_props_omit_python_only_options() -> None:
                 presentation="form_sheet",
                 animation="slide_from_bottom",
             )
-        ),
+        )(),
         host=FakeHost(),
     )
     screen = result.get_by_type("Screen")
@@ -1608,70 +1140,760 @@ def test_native_screen_props_omit_python_only_options() -> None:
         assert key not in screen.props
     assert screen.props["presentation"] == "form_sheet"
     assert screen.props["animation"] == "slide_from_bottom"
+    # Theme colors fill in the chrome defaults.
+    assert screen.props["header_tint_color"] == LIGHT_THEME.colors.primary
+    assert screen.props["header_style"]["background_color"] == LIGHT_THEME.colors.surface
+    assert screen.props["header_title_style"]["color"] == LIGHT_THEME.colors.text
 
 
 # ======================================================================
-# Tab bar visibility and freeze_on_blur
+# Native back veto: restore_stack
 # ======================================================================
+
+
+def _native_stack(host: FakeHost) -> RenderResult:
+    return render(StackNavigator(Home, Form)(), host=host)
+
+
+def _restore_commands(result: RenderResult) -> List[Any]:
+    return [command for command in result.backend.commands if command[1] == "restore_stack"]
+
+
+def test_native_back_veto_issues_restore_stack() -> None:
+    host = FakeHost(initial_state=NavigationState([Route("Home"), Route("Form")]).to_dict())
+    result = _native_stack(host)
+    actions: List[str] = []
+
+    def guard(evt: NavigationEvent) -> None:
+        actions.append(evt.data["action"])
+        evt.prevent_default()
+
+    BOX["form"].add_listener("before_remove", guard)
+    stack = result.get_by_type("ScreenStack")
+    result.fire(stack, "on_native_back", 1)
+    assert actions == ["back"]
+    assert result.get_by_text("form")
+    assert _names(BOX["form"].get_state()) == ["Home", "Form"]
+    restores = _restore_commands(result)
+    assert len(restores) == 1
+    assert restores[0][0] == stack.tag
+
+
+def test_native_back_without_veto_pops_and_does_not_restore() -> None:
+    host = FakeHost(initial_state=NavigationState([Route("Home"), Route("Form")]).to_dict())
+    result = _native_stack(host)
+    result.fire(result.get_by_type("ScreenStack"), "on_native_back", 1)
+    assert result.get_by_text("home")
+    assert result.query_by_text("form", hidden=True) is None
+    assert _restore_commands(result) == []
+
+
+def test_native_back_at_root_restores_stack() -> None:
+    result = _native_stack(FakeHost())
+    result.fire(result.get_by_type("ScreenStack"), "on_native_back", 1)
+    assert result.get_by_text("home")
+    assert len(_restore_commands(result)) == 1
+
+
+def test_native_screen_guarded_prop_follows_before_remove_listeners() -> None:
+    host = FakeHost(initial_state=NavigationState([Route("Home"), Route("Form")]).to_dict())
+    result = _native_stack(host)
+
+    def screen(name: str) -> Any:
+        return next(view for view in _native_screens(result) if view.props.get("route_key", "").startswith(name))
+
+    assert screen("Home").props["guarded"] is False
+    assert screen("Form").props["guarded"] is False
+
+    unsubscribe = BOX["form"].add_listener("before_remove", lambda e: e.prevent_default())
+    result.settle()  # adding the first listener re-renders on its own
+    assert screen("Form").props["guarded"] is True
+    assert screen("Home").props["guarded"] is False
+
+    second = BOX["form"].add_listener("before_remove", lambda e: None)
+    unsubscribe()
+    result.settle()
+    assert screen("Form").props["guarded"] is True  # one listener left
+    second()
+    result.settle()
+    assert screen("Form").props["guarded"] is False
+
+    BOX["home"].add_listener("focus", lambda e: None)  # other events don't guard
+    result.settle()
+    assert screen("Home").props["guarded"] is False
+
+
+# ======================================================================
+# Tab navigator
+# ======================================================================
+
+
+def test_tab_renders_tab_bar_items_with_icons_and_badges() -> None:
+    result = render(
+        TabNavigator(
+            Screen(Home, title="Home", tab_bar_icon="house"),
+            Screen(Other, tab_bar_label="Inbox", tab_bar_badge=3),
+            Screen(Profile, tab_bar_icon=pn.asset("icons/me.png")),
+        )()
+    )
+    bar = result.get_by_type("TabBar")
+    assert bar.props["active_tab"] == "Home"
+    items = bar.props["items"]
+    assert items[0]["name"] == "Home" and items[0]["title"] == "Home"
+    assert items[0]["icon"]["view_box"] == "0 0 24 24"
+    assert items[0]["icon"]["shapes"] and all(shape["kind"] == "path" for shape in items[0]["icon"]["shapes"])
+    assert items[1] == {"name": "Other", "title": "Inbox", "badge": "3"}
+    assert items[2]["icon"] == {"uri": "asset://icons/me.png"}
+    assert result.get_by_text("home")
+    assert result.query_by_text("other", hidden=True) is None  # lazy: not mounted yet
+
+
+def test_tab_bar_style_and_theme_defaults() -> None:
+    result = render(TabNavigator(Home, Other, tab_bar_style={"active_tint_color": "#FF0000", "show_labels": False})())
+    props = result.get_by_type("TabBar").props
+    assert props["tint_color"] == "#FF0000"
+    assert props["shows_labels"] is False
+    assert props["background_color"] == LIGHT_THEME.colors.surface
+
+    themed = render(TabNavigator(Home)()).get_by_type("TabBar").props
+    assert themed["tint_color"] == LIGHT_THEME.colors.primary
+
+
+def test_tab_select_switches_and_keeps_visited_tabs_alive() -> None:
+    result = render(TabNavigator(Home, Profile)())
+    result.press(result.get_by_text("home inc"))
+    _select_tab(result, "Profile")
+    assert result.get_by_text("profile count=0")
+    assert result.query_by_text("home count=1") is None
+    assert result.get_by_text("home count=1", hidden=True)  # kept alive
+    assert result.get_by_type("TabBar").props["active_tab"] == "Profile"
+
+    _tabs("profile").jump_to(Home)
+    result.settle()
+    assert result.get_by_text("home count=1")
+    assert result.get_by_text("profile count=0", hidden=True)
+
+
+def test_tab_jump_to_an_element_merges_params() -> None:
+    result = render(TabNavigator(Home, Profile)())
+    _tabs("home").jump_to(Profile(user="ada"))
+    result.settle()
+    assert result.get_by_text("profile params:user=ada")
+
+
+def test_tab_lazy_false_mounts_eagerly_and_unmount_on_blur_tears_down() -> None:
+    result = render(TabNavigator(A, Screen(B, lazy=False), Screen(C, unmount_on_blur=True))())
+    assert result.get_by_text("b count=0", hidden=True)  # eager
+    _select_tab(result, "C")
+    result.press(result.get_by_text("c inc"))
+    assert result.get_by_text("c count=1")
+    _select_tab(result, "A")
+    assert result.query_by_text("c count=1", hidden=True) is None
+    _select_tab(result, "C")
+    assert result.get_by_text("c count=0")  # remounted fresh
+
+
+def test_tab_initial_screen() -> None:
+    result = render(TabNavigator(A, B, initial=B)())
+    assert result.get_by_text("b")
+    assert result.get_by_type("TabBar").props["active_tab"] == "B"
+
+    with_params = render(TabNavigator(A, Detail, initial=Detail(id=4))())
+    assert with_params.get_by_text("detail params:id=4,tab=info")
 
 
 def test_tab_bar_visible_false_hides_the_tab_bar_while_that_tab_is_focused() -> None:
-    Tab = create_tab_navigator()
-    box: Dict[str, Any] = {}
-    result = render(
-        Tab.Navigator(
-            Tab.Screen("Home", _capturing_screen("home", box), tab_bar_visible=False),
-            Tab.Screen("Other", _capturing_screen("other", box)),
-        )
-    )
+    result = render(TabNavigator(Screen(Home, tab_bar_visible=False), Other)())
     assert result.query_by_type("TabBar") is None
-    box["home"].jump_to("Other")
+    _tabs("home").jump_to(Other)
     result.settle()
     assert result.get_by_type("TabBar").props["active_tab"] == "Other"
-    box["other"].set_options(tab_bar_visible=False)
+    BOX["other"].set_options(tab_bar_visible=False)
     result.settle()
     assert result.query_by_type("TabBar") is None
-    box["other"].set_options(tab_bar_visible=True)
+    BOX["other"].set_options(tab_bar_visible=True)
     result.settle()
     assert result.get_by_type("TabBar")
 
 
-def test_freeze_on_blur_skips_rerenders_while_blurred_and_resumes_on_focus() -> None:
-    Tab = create_tab_navigator()
-    renders: Dict[str, int] = {"frozen": 0, "plain": 0}
-    box: Dict[str, Any] = {}
+@component
+def FrozenTab(n: int = 0) -> pn.Node:
+    RENDERS["frozen"] = RENDERS.get("frozen", 0) + 1
+    BOX["frozen"] = use_navigation()
+    return Text(f"frozen {n}")
 
-    @component
-    def Frozen() -> Any:
-        renders["frozen"] += 1
-        return Text("frozen tab")
 
-    @component
-    def Plain() -> Any:
-        renders["plain"] += 1
-        return Text("plain tab")
+@component
+def PlainTab(n: int = 0) -> pn.Node:
+    RENDERS["plain"] = RENDERS.get("plain", 0) + 1
+    BOX["plain"] = use_navigation()
+    return Text(f"plain {n}")
 
-    result = render(
-        Tab.Navigator(
-            Tab.Screen("Frozen", Frozen, freeze_on_blur=True),
-            Tab.Screen("Plain", Plain, lazy=False),
-            Tab.Screen("Other", _capturing_screen("other", box)),
-        )
-    )
-    assert renders == {"frozen": 1, "plain": 1}
-    result.fire(result.get_by_type("TabBar"), "on_tab_select", "Other")
-    frozen_after_blur, plain_after_blur = renders["frozen"], renders["plain"]
 
-    # A navigator re-render while both tabs are hidden: only the plain tab renders again.
-    box["other"].set_options(title="Changed")
+def test_blurred_tabs_skip_navigator_re_renders() -> None:
+    result = render(TabNavigator(Screen(FrozenTab, freeze_on_blur=True), Screen(PlainTab, lazy=False), Other)())
+    assert (RENDERS["frozen"], RENDERS["plain"]) == (1, 1)
+    _select_tab(result, "Other")
+    frozen, plain = RENDERS["frozen"], RENDERS["plain"]
+
+    # A navigator re-render reuses every cached screen body.
+    BOX["other"].set_options(title="Changed")
     result.settle()
-    assert renders["frozen"] == frozen_after_blur
-    assert renders["plain"] > plain_after_blur
-    assert result.get_by_text("frozen tab", hidden=True)  # still mounted
+    assert (RENDERS["frozen"], RENDERS["plain"]) == (frozen, plain)
+    assert result.get_by_text("frozen 0", hidden=True)  # still mounted
 
-    result.fire(result.get_by_type("TabBar"), "on_tab_select", "Frozen")
-    assert renders["frozen"] == frozen_after_blur + 1
-    assert result.get_by_text("frozen tab")
+
+def test_freeze_on_blur_holds_new_params_until_focus() -> None:
+    result = render(TabNavigator(Screen(FrozenTab, freeze_on_blur=True), Screen(PlainTab, lazy=False), Other)())
+    _select_tab(result, "Other")
+    frozen = RENDERS["frozen"]
+
+    BOX["frozen"].set_params(n=1)
+    BOX["plain"].set_params(n=1)
+    result.settle()
+    assert result.get_by_text("plain 1", hidden=True)  # unfrozen: renders while hidden
+    assert result.get_by_text("frozen 0", hidden=True)  # frozen: keeps its last body
+    assert RENDERS["frozen"] == frozen
+
+    _select_tab(result, "FrozenTab")
+    assert result.get_by_text("frozen 1")
+    assert RENDERS["frozen"] == frozen + 1
+
+
+# ======================================================================
+# Drawer navigator
+# ======================================================================
+
+
+def test_drawer_open_select_close_and_back() -> None:
+    result = render(DrawerNavigator(Screen(Feed, title="My Feed"), Settings, drawer_width=200)())
+    nav = _drawer("feed")
+    assert not nav.is_drawer_open()
+    assert result.query_by_text("My Feed") is None
+
+    nav.open_drawer()
+    result.settle()
+    assert nav.is_drawer_open()
+    assert result.get_by_text("My Feed")
+    assert result.get_by_text("Settings")
+    panel = result.get_by_text("My Feed").parent
+    assert panel is not None and panel.parent is not None
+    assert panel.parent.props["width"] == 200
+
+    row = result.get_by_text("Settings").parent
+    assert row is not None
+    result.press(row)
+    assert result.get_by_text("settings count=0")
+    assert not nav.is_drawer_open()
+    assert result.query_by_text("My Feed") is None  # closed on select
+    assert result.get_by_text("feed count=0", hidden=True)  # kept alive
+
+    _drawer("settings").toggle_drawer()
+    result.settle()
+    assert result.get_by_text("My Feed")
+    assert result.back() is True  # back closes the drawer first
+    assert result.query_by_text("My Feed") is None
+    assert result.back() is False
+
+    _drawer("settings").jump_to(Feed)
+    result.settle()
+    assert result.get_by_text("feed count=0")
+
+
+def test_tab_and_drawer_navigators_accept_groups_and_screen_options() -> None:
+    result = render(
+        TabNavigator(
+            Home,
+            Group(Feed, tab_bar_label="Grouped"),
+            screen_options=ScreenOptions(tab_bar_badge=1),
+        )()
+    )
+    items = result.get_by_type("TabBar").props["items"]
+    assert items == [
+        {"name": "Home", "title": "Home", "badge": "1"},
+        {"name": "Feed", "title": "Grouped", "badge": "1"},
+    ]
+
+    result = render(DrawerNavigator(Group(Feed, title="Menu Feed"), screen_options=ScreenOptions(title="Nav"))())
+    _drawer("feed").open_drawer()
+    result.settle()
+    assert result.get_by_text("Menu Feed")
+
+
+def test_stack_navigator_screen_options_and_groups_render_layered_titles() -> None:
+    result = render(
+        StackNavigator(
+            Screen(Home, title="Home!"),
+            Group(Compose, Screen(Preview, title="Preview!"), title="Grouped"),
+            Plain,
+            screen_options=ScreenOptions(title="Nav"),
+        )()
+    )
+    assert result.get_by_text("Home!")  # screen beats navigator
+    BOX["home"].push(Compose())
+    result.settle()
+    assert result.get_by_text("Grouped")  # group beats navigator
+    BOX["compose"].push(Preview())
+    result.settle()
+    assert result.get_by_text("Preview!")  # screen beats group
+    BOX["preview"].push(Plain())
+    result.settle()
+    assert result.get_by_text("Nav")  # navigator options apply to ungrouped screens
+    BOX["plain"].set_options(title="Runtime")
+    result.settle()
+    assert result.get_by_text("Runtime")
+    assert BOX["plain"].get_options()["title"] == "Runtime"
+
+
+# ======================================================================
+# Hooks
+# ======================================================================
+
+
+def test_use_navigation_outside_navigator_raises() -> None:
+    @component
+    def Lonely() -> pn.Node:
+        use_navigation()
+        return Text("x")
+
+    with pytest.raises(RuntimeError, match="outside a navigator"):
+        render(Lonely())
+
+
+def test_use_route_outside_navigator_returns_placeholder() -> None:
+    hook = render_hook(use_route)
+    assert hook.current.name == "__root__"
+    assert hook.current.params == {}
+
+
+def test_use_route_returns_the_screen_route() -> None:
+    seen: List[Route] = []
+
+    @component
+    def Routed(id: int = 0) -> pn.Node:
+        seen.append(use_route())
+        return Text(f"routed {id}")
+
+    render(StackNavigator(Routed, initial=Routed(id=7))())
+    assert seen[-1].name == "Routed"
+    assert seen[-1].params == {"id": 7}
+    assert seen[-1].key.startswith("Routed-")
+
+
+def test_use_is_focused_defaults_true_outside_navigator() -> None:
+    assert render_hook(use_is_focused).current is True
+
+
+def test_use_focus_effect_runs_on_focus_and_cleans_up_on_blur() -> None:
+    log: List[str] = []
+
+    @component
+    def Focused() -> pn.Node:
+        def effect() -> Any:
+            log.append("focus")
+            return lambda: log.append("blur")
+
+        use_focus_effect(effect, [])
+        return Text("focused screen")
+
+    result = render(TabNavigator(Focused, Other)())
+    assert log == ["focus"]
+    _select_tab(result, "Other")
+    assert log == ["focus", "blur"]
+    _select_tab(result, "Focused")
+    assert log == ["focus", "blur", "focus"]
+
+
+def test_use_focus_effect_without_deps_reruns_each_focused_render() -> None:
+    runs: List[int] = []
+
+    @component
+    def Comp() -> pn.Node:
+        count, set_count = use_state(0)
+        use_focus_effect(lambda: runs.append(count))
+        return Button("go", on_press=lambda: set_count(count + 1))
+
+    result = render(Comp())
+    result.press(result.get_by_text("go"))
+    assert runs == [0, 1]
+
+
+def test_navigation_listeners_focus_blur_state_and_unsubscribe() -> None:
+    events: List[str] = []
+
+    @component
+    def Listening() -> pn.Node:
+        nav = use_navigation()
+        BOX["listening"] = nav
+
+        def subscribe() -> Any:
+            unsub_focus = nav.add_listener("focus", lambda e: events.append(f"focus:{e.route.name}"))
+            unsub_blur = nav.add_listener("blur", lambda e: events.append(f"blur:{e.route.name}"))
+
+            def both() -> None:
+                unsub_focus()
+                unsub_blur()
+
+            return both
+
+        use_effect(subscribe, [])
+        return Text("listening")
+
+    result = render(TabNavigator(Listening, Other)())
+    assert events == ["focus:Listening"]
+    _select_tab(result, "Other")
+    assert events == ["focus:Listening", "blur:Listening"]
+
+    states: List[NavigationState] = []
+    handle = _tabs("listening")
+    unsub = handle.add_listener("state", lambda e: states.append(e.data["state"]))
+    handle.jump_to(Listening)
+    result.settle()
+    assert events[-1] == "focus:Listening"
+    assert states and states[-1].current.name == "Listening"
+    unsub()
+    _select_tab(result, "Other")
+    assert len(states) == 1
+
+
+def test_navigation_handle_introspection() -> None:
+    result = render(StackNavigator(Screen(Home, title="H"), Detail)())
+    home = BOX["home"]
+    assert home.kind == "stack"
+    assert home.route.name == "Home"
+    assert home.route.params == {}
+    assert home.get_options()["title"] == "H"
+    assert home.get_parent() is None
+    assert home.is_focused()
+    assert "stack" in repr(home) and "Home" in repr(home)
+
+    home.push(Detail(id=1))
+    result.settle()
+    assert not home.is_focused()
+    assert BOX["detail"].is_focused()
+    assert BOX["detail"].route.params == {"id": 1}
+
+
+# ======================================================================
+# Static nesting
+# ======================================================================
+
+FeedStack = StackNavigator(Feed, Post, name="FeedTab")
+Tabs = TabNavigator(FeedStack, Profile, name="Tabs")
+NestedRoot = StackNavigator(Screen(Tabs, header_shown=False), Login)
+
+
+def test_nested_navigate_bubbles_to_ancestor_and_pop_falls_through() -> None:
+    result = render(NavigationContainer(NestedRoot))
+    assert result.get_by_text("feed count=0")
+
+    # Unknown in the feed stack and the tabs: bubbles to the root stack.
+    BOX["feed"].navigate(Login())
+    result.settle()
+    assert result.get_by_text("login")
+    assert BOX["feed"].get_parent() is not None
+    assert BOX["login"].get_state().routes[0].name == "Tabs"
+
+    assert result.back() is True
+    assert result.get_by_text("feed count=0")
+
+    # An inner stack's pop at its root falls through to the outer stack (nothing above: False).
+    assert BOX["feed"].pop() is False
+    BOX["feed"].push(Post(id=3))
+    result.settle()
+    assert result.get_by_text("post params:id=3")
+    assert BOX["post"].can_go_back()
+    BOX["post"].pop()
+    result.settle()
+    assert result.get_by_text("feed count=0")
+
+
+def test_navigate_from_a_stack_screen_to_a_screen_inside_a_nested_tab_navigator() -> None:
+    result = render(NavigationContainer(NestedRoot))
+    BOX["feed"].navigate(Login())
+    result.settle()
+    BOX["login"].navigate(Profile(user="ada"))
+    result.settle()
+    assert result.get_by_text("profile")
+    assert result.get_by_text("profile params:user=ada")
+    assert result.get_by_type("TabBar").props["active_tab"] == "Profile"
+    assert _names(BOX["profile"].get_parent().get_state()) == ["Tabs"]  # type: ignore[union-attr]
+
+
+def test_navigate_reaches_a_screen_two_navigators_down() -> None:
+    result = render(NavigationContainer(NestedRoot))
+    BOX["feed"].navigate(Login())
+    result.settle()
+    BOX["login"].navigate(Post(id=8))
+    result.settle()
+    assert result.get_by_text("post params:id=8")
+    assert result.get_by_type("TabBar").props["active_tab"] == "FeedTab"
+    assert _names(BOX["post"].get_state()) == ["Feed", "Post"]  # the stack's initial screen stays beneath
+    BOX["post"].go_back()
+    result.settle()
+    assert result.get_by_text("feed count=0")
+
+
+def test_navigate_to_a_nested_navigator_switches_to_it() -> None:
+    result = render(NavigationContainer(NestedRoot))
+    BOX["feed"].navigate(Login())
+    result.settle()
+    BOX["login"].navigate(Tabs())
+    result.settle()
+    assert result.get_by_text("feed")
+    assert _names(BOX["feed"].get_parent().get_parent().get_state()) == ["Tabs"]  # type: ignore[union-attr]
+
+
+def test_initial_state_into_a_nested_stack_keeps_the_initial_route_beneath() -> None:
+    initial = NavigationState(
+        [Route("Tabs", state=NavigationState([Route("FeedTab", state=NavigationState([Route("Post", {"id": 8})]))]))]
+    )
+    result = render(NavigationContainer(NestedRoot, initial_state=initial))
+    assert result.get_by_text("post params:id=8")
+    assert BOX["post"].can_go_back()
+    BOX["post"].go_back()
+    result.settle()
+    assert result.get_by_text("feed count=0")
+
+
+# ======================================================================
+# NavigationContainer
+# ======================================================================
+
+
+def test_container_reports_state_changes_and_ready() -> None:
+    states: List[NavigationState] = []
+    ready: List[bool] = []
+    result = render(
+        NavigationContainer(StackNavigator(A, B), on_state_change=states.append, on_ready=lambda: ready.append(True))
+    )
+    assert ready == [True]
+    assert states and states[-1].current.name == "A"
+    BOX["a"].push(B())
+    result.settle()
+    assert states[-1].current.name == "B"
+    assert NavigationState.from_dict(states[-1].to_dict()) == states[-1]
+
+
+def test_container_initial_state_accepts_dict_and_ignores_garbage() -> None:
+    saved = NavigationState([Route("A"), Route("Detail", {"id": 2})]).to_dict()
+    result = render(NavigationContainer(StackNavigator(A, Detail), initial_state=saved))
+    assert result.get_by_text("detail params:id=2,tab=info")  # a missing default comes from the signature
+    assert result.get_by_label("Back")
+
+    for garbage in ({"routes": "nope"}, {"routes": [{"name": "Ghost"}]}, {"routes": [{"name": "Detail"}]}):
+        fallback = render(NavigationContainer(StackNavigator(A, Detail), initial_state=garbage))
+        assert fallback.get_by_text("a"), garbage
+        fallback.unmount()
+
+
+# ======================================================================
+# Deep links
+# ======================================================================
+
+
+class Color(enum.Enum):
+    RED = "red"
+    BLUE = "blue"
+
+
+@component
+def Typed(
+    id: int,
+    ratio: float = 1.0,
+    flag: bool = False,
+    color: Color = Color.RED,
+    note: Optional[str] = None,
+    count: Optional[int] = None,
+    mode: Literal["list", "grid"] = "list",
+) -> pn.Node:
+    return Text(f"typed {id}")
+
+
+@component
+def Search(**filters: str) -> pn.Node:
+    return Text(f"search {sorted(filters.items())}")
+
+
+LinkTabs = TabNavigator(Screen(Feed, path="feed"), Screen(Profile, path="u/{user}"), name="Tabs")
+LinkRoot = StackNavigator(
+    Screen(Home, path=""),
+    Screen(Detail, path="items/{id}"),
+    Screen(Typed, path="typed/{id}"),
+    Screen(Search, path="search"),
+    Screen(LinkTabs, path="tabs"),
+    Login,  # no path: not linkable
+)
+
+
+def _links() -> LinkTable:
+    return LinkTable(LinkRoot, ["myapp://", "https://example.com/"])
+
+
+def _leaf(state: Optional[NavigationState]) -> Route:
+    assert state is not None
+    route = state.current
+    while route.state is not None:
+        route = route.state.current
+    return route
+
+
+def test_link_table_strip_prefix_variants() -> None:
+    links = _links()
+    assert links.strip_prefix("myapp://items/1") == "items/1"
+    assert links.strip_prefix("MYAPP://items/1") == "items/1"
+    assert links.strip_prefix("https://example.com/items/1") == "/items/1"
+    assert links.strip_prefix("https://example.com") == ""
+    assert links.strip_prefix("https://example.com?x=1") == "?x=1"
+    assert links.strip_prefix("https://other.com/items/1") is None
+    assert links.strip_prefix("/items/1") == "/items/1"  # bare paths pass through
+
+
+def test_link_table_state_from_url_flat_nested_and_query() -> None:
+    links = _links()
+    home = links.state_from_url("myapp://")
+    assert home is not None and home.current.name == "Home"
+
+    detail = links.state_from_url("https://example.com/items/42?tab=reviews&ref=mail")
+    assert detail is not None
+    assert detail.current.name == "Detail"
+    assert detail.current.params == {"id": 42, "tab": "reviews"}  # converted; unknown query ignored
+
+    nested = links.state_from_url("myapp://tabs/u/ada")
+    assert nested is not None
+    assert nested.current.name == "Tabs"
+    assert nested.current.state is not None
+    assert nested.current.state.current.name == "Profile"
+    assert nested.current.state.current.params == {"user": "ada"}
+
+    assert links.state_from_url("myapp://tabs/feed") is not None
+    assert links.state_from_url("myapp://nothing/here") is None
+    assert links.state_from_url("otherapp://items/1") is None
+    assert links.state_from_url("myapp://Login") is None
+
+
+def test_link_table_converts_params_with_annotations() -> None:
+    links = _links()
+    route = _leaf(links.state_from_url("myapp://typed/7?ratio=2.5&flag=yes&color=blue&note=hi&count=3&mode=grid"))
+    assert route.name == "Typed"
+    assert route.params == {
+        "id": 7,
+        "ratio": 2.5,
+        "flag": True,
+        "color": Color.BLUE,
+        "note": "hi",
+        "count": 3,
+        "mode": "grid",
+    }
+    # Enum members also match by name; bool accepts 0/1/false/true.
+    route = _leaf(links.state_from_url("myapp://typed/1?color=RED&flag=0"))
+    assert route.params == {"id": 1, "color": Color.RED, "flag": False}
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "myapp://typed/seven",
+        "myapp://typed/1?ratio=fast",
+        "myapp://typed/1?flag=maybe",
+        "myapp://typed/1?color=green",
+        "myapp://typed/1?count=many",
+        "myapp://typed/1?mode=table",
+    ],
+)
+def test_link_table_rejects_urls_whose_values_do_not_convert(url: str) -> None:
+    assert _links().state_from_url(url) is None
+
+
+def test_link_table_open_keyword_components_accept_any_query() -> None:
+    route = _leaf(_links().state_from_url("myapp://search?q=pie&sort=new"))
+    assert route.name == "Search"
+    assert route.params == {"q": "pie", "sort": "new"}
+
+
+def test_link_table_rejects_bad_paths() -> None:
+    with pytest.raises(ValueError, match="isn't a parameter of its component"):
+        LinkTable(StackNavigator(Screen(Home, path="h/{nope}")), ["myapp://"])
+    with pytest.raises(ValueError, match="whole"):
+        LinkTable(StackNavigator(Home, Screen(Detail, path="items-{id}")), ["myapp://"])
+
+
+def test_link_table_url_from_state() -> None:
+    links = _links()
+    assert links.url_from_state(NavigationState([Route("Home")])) == "myapp://"
+    assert links.url_from_state(NavigationState([Route("Detail", {"id": 3, "tab": "x"})])) == "myapp://items/3?tab=x"
+    nested = NavigationState([Route("Tabs", state=NavigationState([Route("Profile", {"user": "a b"})]))])
+    assert links.url_from_state(nested) == "myapp://tabs/u/a%20b"
+    typed = NavigationState([Route("Typed", {"id": 1, "color": Color.BLUE, "flag": True})])
+    assert links.url_from_state(typed) == "myapp://typed/1?color=blue&flag=true"
+    assert links.url_from_state(NavigationState([Route("Login")])) is None
+    unknown = NavigationState([Route("Tabs", state=NavigationState([Route("Ghost")]))])
+    assert links.url_from_state(unknown) is None
+
+    web = LinkTable(LinkRoot, ["https://example.com/"])
+    assert web.url_from_state(NavigationState([Route("Detail", {"id": 3})])) == "https://example.com/items/3"
+
+
+def test_link_table_round_trips_urls() -> None:
+    links = _links()
+    for url in ("myapp://items/3?tab=x", "myapp://tabs/u/ada", "myapp://typed/2?flag=true"):
+        state = links.state_from_url(url)
+        assert state is not None
+        assert links.url_from_state(state) == url
+
+
+@pytest.fixture
+def launch_url(monkeypatch: pytest.MonkeyPatch) -> Callable[[Optional[str]], None]:
+    monkeypatch.setattr(linking_module, "_url_listeners", [])
+
+    def set_url(url: Optional[str]) -> None:
+        monkeypatch.setattr(linking_module, "_initial_url", url)
+
+    set_url(None)
+    return set_url
+
+
+def test_container_seeds_from_the_launch_url_and_follows_later_links(
+    launch_url: Callable[[Optional[str]], None],
+) -> None:
+    launch_url("myapp://items/5")
+    result = render(NavigationContainer(LinkRoot, link_prefixes=["myapp://"]))
+    assert result.get_by_text("detail params:id=5,tab=info")
+    assert result.get_by_label("Back")  # Home sits beneath the deep-linked screen
+
+    linking_module.dispatch_url("myapp://")
+    result.settle()
+    assert result.get_by_text("home")
+    assert result.query_by_text("detail", hidden=True) is None
+
+    linking_module.dispatch_url("myapp://tabs/u/ada")
+    result.settle()
+    assert result.get_by_text("profile params:user=ada")
+
+    linking_module.dispatch_url("myapp://nowhere")  # no match: ignored
+    result.settle()
+    assert result.get_by_text("profile params:user=ada")
+
+
+def test_container_ignores_the_launch_url_without_link_prefixes(launch_url: Callable[[Optional[str]], None]) -> None:
+    launch_url("myapp://items/5")
+    result = render(NavigationContainer(LinkRoot))
+    assert result.get_by_text("home")
+
+
+def test_container_initial_state_wins_over_the_launch_url(launch_url: Callable[[Optional[str]], None]) -> None:
+    launch_url("myapp://items/5")
+    initial = NavigationState([Route("Login")])
+    result = render(NavigationContainer(LinkRoot, link_prefixes=["myapp://"], initial_state=initial))
+    assert result.get_by_text("login")
+
+
+def test_container_launch_url_with_a_bad_value_falls_back_to_the_initial_screen(
+    launch_url: Callable[[Optional[str]], None],
+) -> None:
+    launch_url("myapp://items/not-a-number")
+    result = render(NavigationContainer(LinkRoot, link_prefixes=["myapp://"]))
+    assert result.get_by_text("home")
 
 
 # ======================================================================
@@ -1680,63 +1902,57 @@ def test_freeze_on_blur_skips_rerenders_while_blurred_and_resumes_on_focus() -> 
 
 
 def test_navigation_ref_raises_until_a_container_binds_it() -> None:
-    from pythonnative.navigation import NavigationRef, create_navigation_ref
-
-    ref = create_navigation_ref()
-    assert isinstance(ref, NavigationRef)
+    ref = NavigationRef()
     assert not ref.is_ready()
     assert ref.current is None
     assert "unbound" in repr(ref)
-    for call in (
-        lambda: ref.navigate("Home"),
-        lambda: ref.push("Home"),
-        lambda: ref.replace("Home"),
+    calls: List[Callable[[], Any]] = [
+        lambda: ref.navigate(Home()),
+        lambda: ref.push(Home()),
+        lambda: ref.replace(Home()),
         lambda: ref.pop(),
         lambda: ref.go_back(),
-        lambda: ref.pop_to("Home"),
+        lambda: ref.pop_to(Home),
         lambda: ref.pop_to_top(),
-        lambda: ref.reset("Home"),
+        lambda: ref.reset(Home()),
         lambda: ref.get_state(),
-    ):
+    ]
+    for call in calls:
         with pytest.raises(RuntimeError, match="Navigation container is not mounted"):
             call()
 
 
 def test_navigation_ref_binds_to_root_navigator_and_unbinds_on_unmount() -> None:
-    from pythonnative.navigation import create_navigation_ref
-
-    Stack = create_stack_navigator()
-    ref = create_navigation_ref()
-    box: Dict[str, Any] = {}
-    result = render(
-        NavigationContainer(
-            Stack.Navigator(
-                Stack.Screen("Home", _capturing_screen("home", box)),
-                Stack.Screen("Detail", _capturing_screen("detail", box)),
-                Stack.Screen("Login", _capturing_screen("login", box)),
-            ),
-            ref=ref,
-        )
-    )
+    ref = NavigationRef()
+    result = render(NavigationContainer(StackNavigator(Home, Detail, Login), ref=ref))
     assert ref.is_ready()
+    assert "ready" in repr(ref)
     assert ref.current is not None
     assert ref.current.route.name == "Home"
 
-    ref.navigate("Detail", id=1)
+    ref.navigate(Detail(id=1))
     result.settle()
-    assert result.get_by_text("params:id=1")
+    assert result.get_by_text("detail params:id=1,tab=info")
     assert ref.get_state().current.name == "Detail"
     assert ref.current.route.name == "Detail"  # the ref's handle follows the active route
 
-    ref.push("Login")
+    ref.push(Login())
     result.settle()
-    ref.pop_to("Detail")
+    ref.pop_to(Detail)
     result.settle()
-    assert [route.name for route in ref.get_state().routes] == ["Home", "Detail"]
+    assert _names(ref.get_state()) == ["Home", "Detail"]
+    ref.replace(Detail(id=2))
+    result.settle()
+    assert result.get_by_text("detail params:id=2,tab=info")
     assert ref.go_back() is True
     result.settle()
     assert result.get_by_text("home")
-    ref.reset("Login")
+    ref.push(Login())
+    result.settle()
+    ref.pop_to_top()
+    result.settle()
+    assert _names(ref.get_state()) == ["Home"]
+    ref.reset(Login())
     result.settle()
     assert result.get_by_text("login")
     assert ref.pop() is False
@@ -1746,60 +1962,91 @@ def test_navigation_ref_binds_to_root_navigator_and_unbinds_on_unmount() -> None
     assert ref.current is None
 
 
-def test_navigation_ref_reaches_nested_navigators() -> None:
-    from pythonnative.navigation import create_navigation_ref
+def test_navigation_ref_moves_when_the_container_gets_a_new_ref() -> None:
+    first, second = NavigationRef(), NavigationRef()
+    Root = StackNavigator(Home)
+    result = render(NavigationContainer(Root, ref=first))
+    assert first.is_ready()
+    result.rerender(NavigationContainer(Root, ref=second))
+    assert second.is_ready()
+    assert not first.is_ready()
 
-    ref = create_navigation_ref()
-    box: Dict[str, Any] = {}
-    result = render(_nested_app(box, ref=ref))
-    ref.navigate("Tabs", screen="Profile", user="ada")
+
+def test_navigation_ref_reaches_nested_navigators() -> None:
+    ref = NavigationRef()
+    result = render(NavigationContainer(NestedRoot, ref=ref))
+    ref.navigate(Profile(user="ada"))
     result.settle()
-    assert result.get_by_text("params:user=ada")
+    assert result.get_by_text("profile params:user=ada")
     assert result.get_by_type("TabBar").props["active_tab"] == "Profile"
 
 
-def test_navigation_package_exports_new_symbols() -> None:
+# ======================================================================
+# Public API
+# ======================================================================
+
+
+def test_navigation_exports_from_package() -> None:
+    for name in (
+        "DrawerNavigator",
+        "Group",
+        "Navigation",
+        "NavigationContainer",
+        "NavigationRef",
+        "NavigationState",
+        "Navigator",
+        "Route",
+        "Screen",
+        "ScreenOptions",
+        "StackNavigator",
+        "TabBarStyle",
+        "TabNavigator",
+        "use_focus_effect",
+        "use_is_focused",
+        "use_navigation",
+        "use_route",
+        "use_screen_options",
+    ):
+        assert hasattr(pn, name), name
+        assert name in pn.__all__, name
+    assert pn.use_navigation is use_navigation
+    assert pn.StackNavigator is StackNavigator
+    assert not hasattr(pn, "NavigationContext")
+    assert NavigationContext is not None
+
+
+def test_removed_navigation_api_is_gone() -> None:
     from pythonnative import navigation
 
     for name in (
-        "DARK_NAVIGATION_THEME",
-        "DEFAULT_NAVIGATION_THEME",
-        "NavigationColors",
-        "NavigationRef",
-        "NavigationTheme",
-        "ScreenGroup",
-        "TabBarStyle",
+        "create_stack_navigator",
+        "create_tab_navigator",
+        "create_drawer_navigator",
         "create_navigation_ref",
+        "LinkingConfig",
+        "ScreenDef",
+        "ScreenGroup",
+        "RouteParams",
+        "NavigationTheme",
+        "NavigationColors",
+        "DEFAULT_NAVIGATION_THEME",
+        "DARK_NAVIGATION_THEME",
         "use_navigation_theme",
     ):
-        assert hasattr(navigation, name), name
-        assert name in navigation.__all__, name
+        assert not hasattr(pn, name), name
+        assert not hasattr(navigation, name), name
+        assert name not in pn.__all__, name
 
 
-def test_native_screen_guarded_prop_follows_before_remove_listeners() -> None:
-    host = FakeHost(initial_state=NavigationState([Route("Home"), Route("Form")]).to_dict())
-    box: Dict[str, Any] = {}
-    result = _native_stack(host, box)
+def test_native_screens_paint_the_theme_background_except_transparent_modals() -> None:
+    from pythonnative.navigation.navigators import _native_screen
 
-    def screen(name: str) -> Any:
-        return next(view for view in result.views(hidden=True) if view.props.get("route_key", "").startswith(name))
-
-    assert screen("Home").props["guarded"] is False
-    assert screen("Form").props["guarded"] is False
-
-    unsubscribe = box["form"].add_listener("before_remove", lambda e: e.prevent_default())
-    result.settle()  # adding the first listener re-renders on its own
-    assert screen("Form").props["guarded"] is True
-    assert screen("Home").props["guarded"] is False
-
-    second = box["form"].add_listener("before_remove", lambda e: None)
-    unsubscribe()
-    result.settle()
-    assert screen("Form").props["guarded"] is True  # one listener left
-    second()
-    result.settle()
-    assert screen("Form").props["guarded"] is False
-
-    box["home"].add_listener("focus", lambda e: None)  # other events don't guard
-    result.settle()
-    assert screen("Home").props["guarded"] is False
+    navigator = StackNavigator(A, pn.Screen(B, presentation="transparent_modal"))
+    core, _ = _make_core(navigator)
+    _top(core).push(B())
+    theme = pn.LIGHT_THEME
+    first, second = (
+        _native_screen(core, route, route is core.state.current, True, theme) for route in core.state.routes
+    )
+    assert first.props["background_color"] == theme.colors.background
+    assert second.props["background_color"] == "#00000000"

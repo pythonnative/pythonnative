@@ -1,41 +1,35 @@
-"""StyleSheet, typed `Style`, style resolution, and theming.
+"""The typed [`Style`][pythonnative.Style], style resolution, and style sheets.
 
-PythonNative ships a single, fully-typed [`Style`][pythonnative.Style]
-TypedDict that enumerates every supported style property and constrains
-enum-shaped values via [`typing.Literal`][typing.Literal]. The TypedDict
-gives editors and type-checkers (mypy, pyright) full autocomplete and
-validation: a typo such as ``flex_direction="collumn"`` is now a static
-error, not a silent runtime no-op.
+PythonNative ships a single, fully typed [`Style`][pythonnative.Style]
+``TypedDict`` that enumerates every supported style property and
+constrains enum-shaped values with [`typing.Literal`][typing.Literal].
+Editors and type checkers (mypy, pyright) autocomplete and validate
+every key: ``flex_direction="collumn"`` is a static error, not a silent
+runtime no-op.
 
-Style values remain plain dicts at runtime so they are trivial to
-compose, diff, and store. Properties unrecognized by a platform handler
-are still ignored, so third-party handlers may extend the palette
-without modifying core types.
+Style values are plain dicts at runtime, so they're trivial to compose,
+diff, and store. Pass one dict or a list of them (later entries win,
+``None`` entries are skipped); [`resolve_style`][pythonnative.style.resolve_style]
+flattens the list and resolves the ``inset*`` shorthands.
 
-The runtime helpers ([`resolve_style`][pythonnative.style.resolve_style],
-[`StyleSheet`][pythonnative.StyleSheet]) accept a ``Style`` TypedDict or
-a sequence of them (``None`` entries are skipped) and always return a
-fresh, flat dict with the ``inset*`` shorthands resolved to edges.
+Group related styles in a [`StyleSheet`][pythonnative.StyleSheet]
+namespace, and derive theme-dependent styles with
+[`use_styles`][pythonnative.use_styles]:
 
-Example:
-    ```python
-    import pythonnative as pn
+```python
+import pythonnative as pn
 
-    styles = pn.StyleSheet.create(
-        title=pn.style(font_size=24, bold=True, color="#333"),
-        container=pn.style(padding=16, spacing=12),
-    )
 
-    pn.Column(
-        pn.Text("Hello", style=styles["title"]),
-        style=styles["container"],
-    )
-    ```
+class Styles(pn.StyleSheet):
+    container = pn.style(padding=16, gap=12)
+    title = pn.style(font_size=24, font_weight="700")
+
+
+pn.Column(pn.Text("Hello", style=Styles.title), style=Styles.container)
+```
 """
 
-import dataclasses
 import difflib
-from dataclasses import dataclass
 from typing import (
     Any,
     Dict,
@@ -52,7 +46,6 @@ from typing import (
 )
 
 from . import diagnostics
-from .hooks import Context, create_context, use_color_scheme, use_context
 
 # ======================================================================
 # Atomic value types
@@ -471,7 +464,6 @@ class Style(TypedDict, total=False):
     margin_end: MarginValue
     margin_horizontal: MarginValue
     margin_vertical: MarginValue
-    spacing: float
     gap: float
     row_gap: float
     column_gap: float
@@ -732,238 +724,45 @@ def validate_style_keys(style_dict: Dict[str, Any], owner: str = "") -> None:
 
 
 class StyleSheet:
-    """Utility for creating, composing, and flattening style dictionaries.
+    """Base class for a namespace of named styles.
 
-    All methods are stateless and return fresh dicts, so the values can
-    be reused safely across components.
-    """
-
-    @staticmethod
-    def create(**named_styles: Style) -> Dict[str, Style]:
-        """Create a set of named styles from keyword arguments.
-
-        Args:
-            **named_styles: Each keyword argument is a style name
-                mapping to a [`Style`][pythonnative.Style] dict.
-
-        Returns:
-            A dict mapping each name to a copy of the supplied style,
-            so the caller can mutate the result without affecting the
-            originals.
-
-        Example:
-            ```python
-            from pythonnative import StyleSheet, style
-
-            styles = StyleSheet.create(
-                heading=style(font_size=28, bold=True),
-                body=style(font_size=16),
-            )
-            ```
-        """
-        return {name: dict(props) for name, props in named_styles.items()}  # type: ignore[misc]
-
-    @staticmethod
-    def compose(*styles: StyleProp) -> Style:
-        """Merge multiple style dicts.
-
-        Args:
-            *styles: Style dicts to merge. Later dicts override keys
-                from earlier ones. Falsy entries (``None``) are skipped.
-                List entries are flattened in turn.
-
-        Returns:
-            A new ``Style`` dict containing the merged result.
-        """
-        merged: Dict[str, Any] = {}
-        for entry in styles:
-            if entry is None:
-                continue
-            if isinstance(entry, dict):
-                merged.update(entry)
-                continue
-            for nested in entry:
-                if nested:
-                    merged.update(nested)
-        return merged  # type: ignore[return-value]
-
-    @staticmethod
-    def flatten(styles: StyleProp) -> Style:
-        """Flatten a style value or list of styles into a single dict.
-
-        Equivalent to
-        [`resolve_style`][pythonnative.style.resolve_style] but exposed
-        on `StyleSheet` for parity with React Native's API and typed
-        as returning a ``Style``.
-
-        Args:
-            styles: A single dict, a list of dicts, or `None`.
-
-        Returns:
-            A flat ``Style`` dict combining the inputs.
-        """
-        return resolve_style(styles)  # type: ignore[return-value]
-
-    @staticmethod
-    def absolute_fill() -> Style:
-        """Return a style that absolutely fills the parent.
-
-        Convenience preset matching React Native's
-        ``StyleSheet.absoluteFill``: ``position: "absolute"`` with
-        every inset pinned to ``0``.
-        """
-        return {"position": "absolute", "top": 0, "right": 0, "bottom": 0, "left": 0}
-
-
-# ======================================================================
-# Theming
-# ======================================================================
-
-
-@dataclass(frozen=True)
-class Theme:
-    """Design tokens read through [`use_theme`][pythonnative.use_theme].
-
-    A ``Theme`` is an immutable, fully typed record, so
-    ``theme.text_color`` autocompletes and a typo is a static error
-    rather than a runtime ``KeyError``. Derive a custom theme from a
-    built-in one with [`replace`][pythonnative.style.Theme.replace]:
+    Subclass it and assign [`Style`][pythonnative.Style] dicts as class
+    attributes. Attribute access is typed, so a misspelled style name is
+    a static error, and every style is checked for unknown keys once in
+    dev mode:
 
     ```python
-    brand = pn.DEFAULT_LIGHT_THEME.replace(primary_color="#FF2D55")
+    class Styles(pn.StyleSheet):
+        card = pn.style(padding=16, border_radius=12)
+        title = pn.style(font_size=17, font_weight="600")
+
+
+    pn.View(pn.Text("Hello", style=Styles.title), style=Styles.card)
     ```
 
-    Attributes:
-        primary_color: Main accent color.
-        secondary_color: Secondary accent color.
-        background_color: Screen background.
-        surface_color: Raised surfaces such as cards and sheets.
-        text_color: Primary text.
-        text_secondary_color: De-emphasized text.
-        error_color: Destructive and error states.
-        success_color: Success states.
-        warning_color: Warning states.
-        font_size: Body text size, in points.
-        font_size_small: Caption size, in points.
-        font_size_large: Subtitle size, in points.
-        font_size_title: Title size, in points.
-        spacing: Base spacing unit, in points.
-        spacing_large: Large spacing unit, in points.
-        border_radius: Default corner radius, in points.
+    Compose styles with a list (``style=[Styles.card, {"opacity": 0.5}]``).
+    For styles derived from the theme, see
+    [`use_styles`][pythonnative.use_styles]. A style sheet is a
+    namespace, not an object: instantiating one raises ``TypeError``.
     """
 
-    primary_color: Color
-    secondary_color: Color
-    background_color: Color
-    surface_color: Color
-    text_color: Color
-    text_secondary_color: Color
-    error_color: Color
-    success_color: Color
-    warning_color: Color
-    font_size: float = 16
-    font_size_small: float = 13
-    font_size_large: float = 20
-    font_size_title: float = 28
-    spacing: float = 8
-    spacing_large: float = 16
-    border_radius: float = 8
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        for name, value in vars(cls).items():
+            if not name.startswith("_") and isinstance(value, dict):
+                validate_style_keys(value, owner=f"{cls.__name__}.{name}")
 
-    def replace(self, **changes: Any) -> "Theme":
-        """Return a copy of this theme with the given fields replaced.
-
-        Raises:
-            TypeError: If ``changes`` names a field that doesn't exist.
-        """
-        return dataclasses.replace(self, **changes)
+    def __new__(cls, *args: Any, **kwargs: Any) -> "StyleSheet":
+        """Refuse instantiation: a style sheet is a namespace, not an object."""
+        raise TypeError(f"{cls.__name__} is a namespace of styles; use {cls.__name__}.<name> instead of calling it")
 
 
-DEFAULT_LIGHT_THEME = Theme(
-    primary_color="#007AFF",
-    secondary_color="#5856D6",
-    background_color="#FFFFFF",
-    surface_color="#F2F2F7",
-    text_color="#000000",
-    text_secondary_color="#8E8E93",
-    error_color="#FF3B30",
-    success_color="#34C759",
-    warning_color="#FF9500",
-)
-"""Built-in light theme selected by [`use_theme`][pythonnative.use_theme]."""
-
-DEFAULT_DARK_THEME = Theme(
-    primary_color="#0A84FF",
-    secondary_color="#5E5CE6",
-    background_color="#000000",
-    surface_color="#1C1C1E",
-    text_color="#FFFFFF",
-    text_secondary_color="#8E8E93",
-    error_color="#FF453A",
-    success_color="#30D158",
-    warning_color="#FF9F0A",
-)
-"""Built-in dark theme selected by [`use_theme`][pythonnative.use_theme]."""
-
-_FOLLOW_SYSTEM_THEME = object()
-"""Sentinel default for `ThemeContext`: resolve from the color scheme."""
-
-ThemeContext: Context = create_context(_FOLLOW_SYSTEM_THEME)
-"""Theme context that follows the system color scheme by default.
-
-Without a provider, [`use_theme`][pythonnative.use_theme] resolves to
-[`DEFAULT_LIGHT_THEME`][pythonnative.style.DEFAULT_LIGHT_THEME] or
-[`DEFAULT_DARK_THEME`][pythonnative.style.DEFAULT_DARK_THEME] based on
-the current appearance. Wrap a subtree in
-[`ThemeContext.Provider(..., value=my_theme)`][pythonnative.hooks.Context.Provider] to
-pin an explicit theme for that subtree, then read it inside
-descendants via [`use_theme`][pythonnative.use_theme] (or
-[`use_context(ThemeContext)`][pythonnative.use_context]).
-"""
-
-
-def default_theme(scheme: str) -> Theme:
-    """Return the built-in [`Theme`][pythonnative.Theme] for ``scheme`` (``"light"`` / ``"dark"``)."""
-    return DEFAULT_DARK_THEME if scheme == "dark" else DEFAULT_LIGHT_THEME
-
-
-def use_theme() -> Theme:
-    """Return the active [`Theme`][pythonnative.Theme], following the system appearance by default.
-
-    If an ancestor mounted a ``ThemeContext.Provider(..., value=theme)``, that
-    theme is returned as-is. Otherwise the built-in light or dark
-    theme is selected from the effective color scheme (via
-    [`use_color_scheme`][pythonnative.use_color_scheme], so the
-    component re-renders when the system appearance flips).
-
-    Returns:
-        The active theme.
-
-    Raises:
-        RuntimeError: If called outside a `@component` function.
-
-    Example:
-        ```python
-        import pythonnative as pn
-
-        @pn.component
-        def Card():
-            theme = pn.use_theme()
-            return pn.View(
-                pn.Text("Hello", style=pn.style(color=theme.text_color)),
-                style=pn.style(background_color=theme.surface_color),
-            )
-        ```
-    """
-    scheme = use_color_scheme()
-    theme = use_context(ThemeContext)
-    if theme is _FOLLOW_SYSTEM_THEME:
-        return default_theme(scheme)
-    if not isinstance(theme, Theme):
-        raise TypeError(f"ThemeContext.Provider expects a pn.Theme, got {type(theme).__name__}: {theme!r}")
-    return theme
+ABSOLUTE_FILL: Style = {"position": "absolute", "top": 0, "right": 0, "bottom": 0, "left": 0}
+"""A style that absolutely fills the parent, like React Native's ``StyleSheet.absoluteFill``."""
 
 
 __all__ = [
+    "ABSOLUTE_FILL",
     "AccessibilityAction",
     "AccessibilityState",
     "AccessibilityValue",
@@ -972,8 +771,6 @@ __all__ = [
     "AutoCapitalize",
     "BorderStyle",
     "Color",
-    "DEFAULT_DARK_THEME",
-    "DEFAULT_LIGHT_THEME",
     "Dimension",
     "Display",
     "DynamicColor",
@@ -998,8 +795,6 @@ __all__ = [
     "TextAlign",
     "TextDecoration",
     "TextTransform",
-    "Theme",
-    "ThemeContext",
     "TransformEntry",
     "TransformPerspective",
     "TransformRotate",
@@ -1013,9 +808,7 @@ __all__ = [
     "TransformSkewY",
     "TransformSpec",
     "TransformTranslate",
-    "default_theme",
     "resolve_style",
     "style",
-    "use_theme",
     "validate_style_keys",
 ]

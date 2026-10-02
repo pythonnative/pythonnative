@@ -9,11 +9,11 @@ later loop turn.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UseTransitionDemo() -> pn.Element:
+def UseTransitionDemo() -> pn.Node:
     """Split one tap into an urgent update and a deferred transition."""
     taps, set_taps = pn.use_state(0)
     adopted, set_adopted = pn.use_state(0)
@@ -24,15 +24,15 @@ def UseTransitionDemo() -> pn.Element:
         set_taps(next_value)  # urgent: renders synchronously
         start_transition(lambda: set_adopted(next_value))  # deferred
 
-    return demo_screen(
+    return DemoScreen(
         "use_transition",
         "start_transition defers a low-priority update so urgent updates render first.",
-        section(
+        DemoSection(
             "Transition",
-            result_text("Taps", taps),
-            result_text("Adopted", adopted),
-            result_text("Pending", "yes" if is_pending else "no"),
+            ResultText("Taps", taps),
+            ResultText("Adopted", adopted),
+            ResultText("Pending", "yes" if is_pending else "no"),
             pn.Button("Tap", on_press=on_press),
-            hint("Maestro taps, then waits for 'Adopted: 1' (the deferred render catching up)."),
+            Hint("Maestro taps, then waits for 'Adopted: 1' (the deferred render catching up)."),
         ),
     )

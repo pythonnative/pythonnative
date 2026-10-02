@@ -211,13 +211,13 @@ class PreviewSession:
     # -- info ----------------------------------------------------------------
 
     def urls(self) -> List[str]:
-        """Every URL the server can be reached at (local first)."""
+        """Every URL the server can be reached at (local first), each carrying the dev token."""
         from .devserver import lan_addresses
 
         info = self.server.info
-        urls = [info.url("localhost")]
+        urls = [info.preview_url("localhost")]
         for address in lan_addresses():
-            url = info.url(address)
+            url = info.preview_url(address)
             if url not in urls:
                 urls.append(url)
         return urls
@@ -273,6 +273,8 @@ def serve(
     session.start()
     urls = session.urls()
     if banner:
+        from .devserver.auth import token_source
+
         emit = session.log
         emit("")
         emit(f"  PythonNative dev server for {project_name or entry_module}")
@@ -282,6 +284,7 @@ def serve(
             emit(f"  Devices (LAN):    {url}")
         emit("")
         emit("  Debug builds made with `pn run` connect here automatically.")
+        emit(f"  The URLs carry your dev token ({token_source()}); keep them to your own devices.")
         emit("  Press Ctrl+C to stop.")
         emit("")
     if open_browser:

@@ -58,7 +58,6 @@ static bool resetField(YGNodeRef node, const std::string& key) {
     if (key == "start") { YGNodeStyleSetPosition(node, static_cast<YGEdge>(4), YGUndefined); return true; }
     if (key == "end") { YGNodeStyleSetPosition(node, static_cast<YGEdge>(5), YGUndefined); return true; }
     if (key == "gap") { YGNodeStyleSetGap(node, static_cast<YGGutter>(2), YGUndefined); return true; }
-    if (key == "spacing") { YGNodeStyleSetGap(node, static_cast<YGGutter>(2), YGUndefined); return true; }
     if (key == "row_gap") { YGNodeStyleSetGap(node, static_cast<YGGutter>(1), YGUndefined); return true; }
     if (key == "column_gap") { YGNodeStyleSetGap(node, static_cast<YGGutter>(0), YGUndefined); return true; }
     return false;
@@ -327,7 +326,6 @@ extern "C" bool PNYogaSetStyle(YGNodeRef node, const char* rawKey, const char* r
         YGNodeStyleSetBorder(node, static_cast<YGEdge>(8), number); return end != rawValue;
     }
     if (key == "gap") { if (percent) YGNodeStyleSetGapPercent(node, static_cast<YGGutter>(2), number); else YGNodeStyleSetGap(node, static_cast<YGGutter>(2), number); return true; }
-    if (key == "spacing") { if (percent) YGNodeStyleSetGapPercent(node, static_cast<YGGutter>(2), number); else YGNodeStyleSetGap(node, static_cast<YGGutter>(2), number); return true; }
     if (key == "row_gap") { if (percent) YGNodeStyleSetGapPercent(node, static_cast<YGGutter>(1), number); else YGNodeStyleSetGap(node, static_cast<YGGutter>(1), number); return true; }
     if (key == "column_gap") { if (percent) YGNodeStyleSetGapPercent(node, static_cast<YGGutter>(0), number); else YGNodeStyleSetGap(node, static_cast<YGGutter>(0), number); return true; }
     return false;

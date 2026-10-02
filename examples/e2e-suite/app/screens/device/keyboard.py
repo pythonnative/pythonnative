@@ -10,12 +10,14 @@ readout flips back to "no".
 
 from __future__ import annotations
 
+from typing import Callable
+
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def KeyboardDemo() -> pn.Element:
+def KeyboardDemo() -> pn.Node:
     """Render a text field plus Keyboard module readouts and a dismiss button."""
     text, set_text = pn.use_state("")
     focused, set_focused = pn.use_state(False)
@@ -24,7 +26,7 @@ def KeyboardDemo() -> pn.Element:
     last_height, set_last_height = pn.use_state(0)
     dismiss_calls, set_dismiss_calls = pn.use_state(0)
 
-    def subscribe():
+    def subscribe() -> Callable[[], None]:
         def on_event(event: pn.KeyboardEvent) -> None:
             set_events(lambda n: n + 1)
             set_visible(event.visible)
@@ -39,19 +41,19 @@ def KeyboardDemo() -> pn.Element:
         set_dismiss_calls(dismiss_calls + 1)
         set_visible(pn.Keyboard.is_visible())
 
-    return demo_screen(
+    return DemoScreen(
         "Keyboard",
         "Keyboard.is_visible, add_listener, and dismiss.",
-        section(
+        DemoSection(
             "Keyboard module",
             # The button sits above the field: the software keyboard covers
             # the lower half of a short screen while the field is focused.
             pn.Button("Dismiss keyboard", on_press=dismiss),
-            result_text("Focused", "ON" if focused else "OFF"),
-            result_text("Keyboard visible", "yes" if visible else "no"),
-            result_text("Keyboard events", events),
-            result_text("Last height positive", "yes" if last_height > 0 else "no"),
-            result_text("Dismiss calls", dismiss_calls),
+            ResultText("Focused", "ON" if focused else "OFF"),
+            ResultText("Keyboard visible", "yes" if visible else "no"),
+            ResultText("Keyboard events", events),
+            ResultText("Last height positive", "yes" if last_height > 0 else "no"),
+            ResultText("Dismiss calls", dismiss_calls),
             pn.TextInput(
                 value=text,
                 on_change=set_text,
@@ -67,6 +69,6 @@ def KeyboardDemo() -> pn.Element:
                     font_size=16,
                 ),
             ),
-            hint("Maestro focuses the field, then dismisses the keyboard from Python."),
+            Hint("Maestro focuses the field, then dismisses the keyboard from Python."),
         ),
     )

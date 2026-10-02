@@ -233,6 +233,7 @@ class G(_Paint):
     """
 
     __slots__ = ("children",)
+    children: Tuple["Shape", ...]
 
     def __init__(self, *children: "Shape", **paint: Any) -> None:
         unknown = set(paint) - set(_PAINT_KEYS)

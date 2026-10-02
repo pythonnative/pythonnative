@@ -9,7 +9,7 @@ element renders with its label.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint
 
 
 def _styled_box(label: str, border_style: pn.BorderStyle) -> pn.Element:
@@ -27,12 +27,12 @@ def _styled_box(label: str, border_style: pn.BorderStyle) -> pn.Element:
 
 
 @pn.component
-def BordersShadowsDemo() -> pn.Element:
+def BordersShadowsDemo() -> pn.Node:
     """Render a card with borders, radius, and shadow styling."""
-    return demo_screen(
+    return DemoScreen(
         "Borders & shadows",
         "Card with border, radius, and shadow / elevation.",
-        section(
+        DemoSection(
             "Card",
             pn.View(
                 pn.Text("border-shadow-card", style=pn.style(font_weight="600", font_size=16)),
@@ -51,19 +51,19 @@ def BordersShadowsDemo() -> pn.Element:
                     shadow_opacity=0.08,
                     shadow_radius=10,
                     elevation=4,
-                    spacing=6,
+                    gap=6,
                 ),
             ),
-            hint("Maestro asserts the 'border-shadow-card' label."),
+            Hint("Maestro asserts the 'border-shadow-card' label."),
         ),
-        section(
+        DemoSection(
             "border_style",
             pn.Row(
                 _styled_box("solid-border", "solid"),
                 _styled_box("dashed-border", "dashed"),
                 _styled_box("dotted-border", "dotted"),
-                style=pn.style(spacing=8, flex_wrap="wrap"),
+                style=pn.style(gap=8, flex_wrap="wrap"),
             ),
-            hint("Solid, dashed, and dotted borders drawn by every renderer."),
+            Hint("Solid, dashed, and dotted borders drawn by every renderer."),
         ),
     )

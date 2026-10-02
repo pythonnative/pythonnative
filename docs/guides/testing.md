@@ -24,9 +24,34 @@ covered by their XCTest and JUnit suites and by the Maestro E2E suite
 (`tests/e2e/`).
 
 Installing `pythonnative` also installs a pytest plugin (registered
-under the `pytest11` entry point) that resets the framework runtime
-between tests and provides the `pn_clock` fixture, so no `conftest.py`
-is needed. Disable it with `-p no:pythonnative`.
+under the `pytest11` entry point), so no `conftest.py` is needed. It
+runs every test in development mode, resets the framework runtime
+between tests, and provides the `pn_clock` fixture. Disable it with
+`-p no:pythonnative`.
+
+Development mode turns on the checks a debug build runs and a release
+build skips: built-in prop and style validation, hook-order checks,
+and checks of your components' props against their annotations. A
+mismatch is a [`diagnostics`][pythonnative.diagnostics] warning, not an
+exception, so assert on it when a test cares:
+
+```python
+import pythonnative as pn
+from pythonnative import diagnostics
+from pythonnative.testing import render
+
+
+@pn.component
+def Greeting(name: str) -> pn.Node:
+    return pn.Text(f"Hello, {name}")
+
+
+def test_untyped_caller_is_reported() -> None:
+    render(Greeting(name=42))  # type: ignore[arg-type]
+    assert any("Greeting() received name=42" in w for w in diagnostics.get_warnings())
+```
+
+The plugin clears recorded warnings between tests.
 
 ## Rendering a component
 
@@ -39,7 +64,7 @@ from pythonnative.testing import render
 
 
 @pn.component
-def Counter():
+def Counter() -> pn.Node:
     count, set_count = pn.use_state(0)
     return pn.Column(
         pn.Text(f"Count: {count}"),
@@ -47,7 +72,7 @@ def Counter():
     )
 
 
-def test_counter_increments():
+def test_counter_increments() -> None:
     result = render(Counter())
     result.press(result.get_by_role("button", name="+"))
     assert result.get_by_text("Count: 1")
@@ -193,37 +218,60 @@ is how you test hooks that react to prop changes.
 ## Testing navigation
 
 Navigators draw their own header when no native host is present, so a
-whole flow fits in one test:
+whole flow fits in one test. With the `App` from the
+[Navigation guide](navigation.md#a-complete-example):
 
 ```python
-def test_home_to_detail_and_back():
+def test_home_to_item_and_back() -> None:
     result = render(App())
     result.press(result.get_by_text("Open item 42"))
-    assert result.get_by_text("Detail #42")
+    assert result.get_by_text("Item 42 (details)")
     assert result.back() is True
-    assert result.get_by_text("Home")
+    assert result.get_by_text("Open item 42")
 ```
 
-To test what a root stack asks the *platform* to do, render under a
-[`FakeHost`][pythonnative.testing.FakeHost]. It records `pushed`,
-`popped`, `replaced`, `resets`, and `options`, exposes the latest
-`title`, and lets you simulate focus changes with `set_focused`:
+To assert on navigation state, pass `on_state_change` to the container
+and record what it reports. Route names default to the screen
+components' names:
+
+```python
+def test_push_records_params() -> None:
+    states: list[pn.NavigationState] = []
+
+    @pn.component
+    def Harness() -> pn.Node:
+        return pn.NavigationContainer(Root, on_state_change=states.append)
+
+    result = render(Harness())
+    result.press(result.get_by_text("Open item 42"))
+    route = states[-1].current
+    assert (route.name, route.params) == ("ItemScreen", {"id": 42, "tab": "details"})
+```
+
+To test how the root navigator behaves under a native host, render
+under a [`FakeHost`][pythonnative.testing.FakeHost]. Its `initial_state`
+boots the navigator "mid-stack" from a saved state, the way a pushed
+native screen re-entering Python does, and `set_focused` simulates the
+platform covering or revealing the screen:
 
 ```python
 from pythonnative.testing import FakeHost
 
 
-def test_detail_pushes_native_screen():
-    host = FakeHost()
-    result = render(App(), host=host)
-    result.press(result.get_by_text("Open item 42"))
-    state, options = host.pushed[0]
-    assert [r["name"] for r in state["routes"]] == ["Home", "Detail"]
-    assert options["title"] == "Item 42"
+def test_restores_saved_stack() -> None:
+    saved = {
+        "routes": [
+            {"name": "HomeScreen", "params": {}, "key": "home"},
+            {"name": "ItemScreen", "params": {"id": 7}, "key": "item"},
+        ],
+        "index": 1,
+    }
+    result = render(App(), host=FakeHost(initial_state=saved))
+    assert result.get_by_text("Item 7 (details)")
 ```
 
-Booting a screen "mid-stack" the way a pushed native screen does is
-`FakeHost(initial_state=state.to_dict())`.
+The host also records the screen options it receives in `options`, with
+the latest title in `title`.
 
 ## Testing layouts
 
@@ -240,7 +288,7 @@ def test_row_distributes_flex_children():
         pn.Row(
             pn.View(test_id="a", style={"flex": 1, "height": 50}),
             pn.View(test_id="b", style={"flex": 2, "height": 50}),
-            style={"width": 310, "spacing": 10},
+            style={"width": 310, "gap": 10},
         )
     )
     a, b = result.get_by_test_id("a"), result.get_by_test_id("b")

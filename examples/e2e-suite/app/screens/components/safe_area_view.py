@@ -9,16 +9,16 @@ without error and renders its children.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint
 
 
 @pn.component
-def SafeAreaViewDemo() -> pn.Element:
+def SafeAreaViewDemo() -> pn.Node:
     """Render a SafeAreaView holding a stable text line."""
-    return demo_screen(
+    return DemoScreen(
         "SafeAreaView",
         "Children inside SafeAreaView should render without overlapping insets.",
-        section(
+        DemoSection(
             "SafeAreaView body",
             pn.SafeAreaView(
                 pn.Text(
@@ -27,6 +27,6 @@ def SafeAreaViewDemo() -> pn.Element:
                 ),
                 style=pn.style(background_color="#EEF2FF", padding=8),
             ),
-            hint("Maestro asserts 'Inside SafeAreaView' is visible."),
+            Hint("Maestro asserts 'Inside SafeAreaView' is visible."),
         ),
     )

@@ -1,28 +1,23 @@
 """Text-centric leaf factories: ``Text``, ``Button``, and ``TextInput``."""
 
-from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, TypedDict, Union
+from typing import Any, Callable, Dict, Literal, Optional, Tuple, TypedDict, Unpack
 
 from ..element import Element
 from ..hooks import Ref
 from ..style import (
-    AccessibilityAction,
-    AccessibilityState,
-    AccessibilityValue,
     AutoCapitalize,
     Color,
-    ImportantForAccessibility,
     KeyboardType,
     ReturnKeyType,
     StyleProp,
 )
 from ._base import (
-    _accessibility_actions,
-    _accessibility_value,
     _flatten_text_spans,
     _make_element,
     _SpanPressDispatcher,
 )
 from .events import ContentSizeEvent, KeyPressEvent, SelectionEvent
+from .props import AccessibilityProps
 
 EllipsizeMode = Literal["head", "middle", "tail", "clip"]
 """Where ``Text`` truncates when it exceeds ``max_lines``."""
@@ -45,19 +40,9 @@ def Text(
     selectable: bool = False,
     allow_font_scaling: bool = True,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_hint: Optional[str] = None,
-    accessibility_role: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
-    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
-    on_accessibility_action: Optional[Callable[[str], Any]] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    important_for_accessibility: Optional[ImportantForAccessibility] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """Display a string of text, optionally with styled nested spans.
 
@@ -108,30 +93,10 @@ def Text(
             text size (iOS Dynamic Type, Android ``sp``). Set ``False``
             for text that must keep its exact size.
         style: Style dict (or list of dicts).
-        accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail. iOS reads it after the
-            label; Android appends it to the content description.
-        accessibility_role: Semantic role for assistive tech.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_value: The widget's current value for assistive
-            tech (a string or an
-            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
-        accessibility_actions: Custom screen-reader actions, each an
-            [`AccessibilityAction`][pythonnative.AccessibilityAction].
-        on_accessibility_action: Callback invoked with the action name.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
-        important_for_accessibility: Whether AT sees this view and its
-            subtree.
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Text"``.
@@ -160,17 +125,7 @@ def Text(
         ellipsize_mode=ellipsize_mode if ellipsize_mode != "tail" else None,
         selectable=selectable or None,
         allow_font_scaling=False if allow_font_scaling is False else None,
-        accessibility_label=accessibility_label,
-        accessibility_hint=accessibility_hint,
-        accessibility_role=accessibility_role,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_value=_accessibility_value(accessibility_value),
-        accessibility_actions=_accessibility_actions(accessibility_actions),
-        on_accessibility_action=on_accessibility_action,
-        accessibility_live_region=accessibility_live_region,
-        important_for_accessibility=important_for_accessibility,
-        test_id=test_id,
+        **props,
     )
 
 
@@ -180,19 +135,9 @@ def Button(
     on_press: Optional[Callable[[], Any]] = None,
     disabled: bool = False,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_hint: Optional[str] = None,
-    accessibility_role: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
-    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
-    on_accessibility_action: Optional[Callable[[str], Any]] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    important_for_accessibility: Optional[ImportantForAccessibility] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """Display a tappable button.
 
@@ -208,30 +153,10 @@ def Button(
         disabled: When ``True``, the button is disabled and cannot be
             tapped.
         style: Style dict (or list of dicts).
-        accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail. iOS reads it after the
-            label; Android appends it to the content description.
-        accessibility_role: Override the default ``"button"`` role.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_value: The widget's current value for assistive
-            tech (a string or an
-            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
-        accessibility_actions: Custom screen-reader actions, each an
-            [`AccessibilityAction`][pythonnative.AccessibilityAction].
-        on_accessibility_action: Callback invoked with the action name.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
-        important_for_accessibility: Whether AT sees this view and its
-            subtree.
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Button"``.
@@ -244,18 +169,8 @@ def Button(
         title=title,
         on_press=on_press,
         disabled=disabled,
-        accessibility_label=accessibility_label,
-        accessibility_hint=accessibility_hint,
-        accessibility_role=accessibility_role,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_value=_accessibility_value(accessibility_value),
-        accessibility_actions=_accessibility_actions(accessibility_actions),
-        on_accessibility_action=on_accessibility_action,
-        accessibility_live_region=accessibility_live_region,
-        important_for_accessibility=important_for_accessibility,
-        test_id=test_id,
         _defaults={"accessibility_role": "button"},
+        **props,
     )
 
 
@@ -297,18 +212,9 @@ def TextInput(
     selection_color: Optional[Color] = None,
     text_content_type: Optional[str] = None,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_hint: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
-    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
-    on_accessibility_action: Optional[Callable[[str], Any]] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    important_for_accessibility: Optional[ImportantForAccessibility] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """Display a text-entry field (single-line by default, or ``multiline``).
 
@@ -378,31 +284,12 @@ def TextInput(
         text_content_type: Semantic content hint for autofill (e.g.
             ``"username"``, ``"password"``, ``"one_time_code"``).
         style: Style dict (or list of dicts).
-        accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail. iOS reads it after the
-            label; Android appends it to the content description.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_value: The widget's current value for assistive
-            tech (a string or an
-            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
-        accessibility_actions: Custom screen-reader actions, each an
-            [`AccessibilityAction`][pythonnative.AccessibilityAction].
-        on_accessibility_action: Callback invoked with the action name.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
-        important_for_accessibility: Whether AT sees this view and its
-            subtree.
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``;
             receives a [`TextInputHandle`][pythonnative.TextInputHandle]
             with ``focus()``, ``blur()``, ``clear()``, and friends.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"TextInput"``.
@@ -438,14 +325,5 @@ def TextInput(
         on_blur=on_blur,
         selection_color=selection_color,
         text_content_type=text_content_type,
-        accessibility_label=accessibility_label,
-        accessibility_hint=accessibility_hint,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_value=_accessibility_value(accessibility_value),
-        accessibility_actions=_accessibility_actions(accessibility_actions),
-        on_accessibility_action=on_accessibility_action,
-        accessibility_live_region=accessibility_live_region,
-        important_for_accessibility=important_for_accessibility,
-        test_id=test_id,
+        **props,
     )

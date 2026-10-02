@@ -7,7 +7,7 @@ over the background image; no interaction is required.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint
 
 # A 1x1 transparent PNG as an inline data URI, so the demo renders
 # without network access on CI runners.
@@ -17,12 +17,12 @@ TRANSPARENT_PNG = (
 
 
 @pn.component
-def ImageBackgroundDemo() -> pn.Element:
+def ImageBackgroundDemo() -> pn.Node:
     """Render foreground text layered over a fixed-size background image."""
-    return demo_screen(
+    return DemoScreen(
         "ImageBackground",
         "Foreground text renders on top of a background image.",
-        section(
+        DemoSection(
             "Background image",
             pn.ImageBackground(
                 pn.Text(
@@ -39,6 +39,6 @@ def ImageBackgroundDemo() -> pn.Element:
                     border_radius=8,
                 ),
             ),
-            hint("Maestro asserts the 'On top' label is visible over the image."),
+            Hint("Maestro asserts the 'On top' label is visible over the image."),
         ),
     )

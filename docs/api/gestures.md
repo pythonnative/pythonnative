@@ -14,6 +14,8 @@ in both the view's (`x`, `y`) and the window's (`absolute_x`,
 as [`SwipeDirection`][pythonnative.SwipeDirection]. See the
 [Gestures guide](../guides/gestures.md) for usage patterns.
 
+[](){ #pythonnative.gestures }
+
 ::: pythonnative.gestures
     options:
       show_root_heading: false

@@ -1,19 +1,16 @@
 """Graphics factories: ``Svg``, ``LinearGradient``, and ``BlurView``."""
 
-from typing import Any, Callable, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, Literal, Optional, Sequence, Tuple, Unpack
 
-from ..element import Element
+from ..element import Element, Node
 from ..hooks import Ref
 from ..style import (
-    AccessibilityAction,
-    AccessibilityState,
-    AccessibilityValue,
     Color,
-    ImportantForAccessibility,
     StyleProp,
 )
 from ..svg import FillRule, LineCap, LineJoin, SvgShape, flatten
-from ._base import _accessibility_actions, _accessibility_value, _make_element
+from ._base import _make_element
+from .props import AccessibilityProps
 
 PreserveAspectRatio = Literal["meet", "slice", "none"]
 """How an ``Svg`` view box scales into a frame of a different aspect ratio."""
@@ -44,17 +41,9 @@ def Svg(
     stroke_linejoin: Optional[LineJoin] = None,
     fill_rule: Optional[FillRule] = None,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_role: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
-    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
-    on_accessibility_action: Optional[Callable[[str], Any]] = None,
-    important_for_accessibility: Optional[ImportantForAccessibility] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """Draw vector shapes in a single native view.
 
@@ -85,21 +74,10 @@ def Svg(
         fill_rule: Default fill rule.
         style: Style dict (or list of dicts). ``width`` and ``height`` set
             the drawn size; ``opacity`` and transforms apply as usual.
-        accessibility_label: Spoken description for screen readers.
-        accessibility_role: Override the default ``"image"`` role.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech.
-        accessibility_value: The widget's current value for assistive
-            tech (a string or an
-            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
-        accessibility_actions: Custom screen-reader actions, each an
-            [`AccessibilityAction`][pythonnative.AccessibilityAction].
-        on_accessibility_action: Callback invoked with the action name.
-        important_for_accessibility: Whether AT sees this view and its
-            subtree.
-        test_id: Stable identifier for UI tests.
         ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Svg"``.
@@ -131,31 +109,21 @@ def Svg(
         stroke_linecap=stroke_linecap,
         stroke_linejoin=stroke_linejoin,
         fill_rule=fill_rule,
-        accessibility_label=accessibility_label,
-        accessibility_role=accessibility_role,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_value=_accessibility_value(accessibility_value),
-        accessibility_actions=_accessibility_actions(accessibility_actions),
-        on_accessibility_action=on_accessibility_action,
-        important_for_accessibility=important_for_accessibility,
-        test_id=test_id,
         _defaults={"accessibility_role": "image"},
+        **props,
     )
 
 
 def LinearGradient(
-    *children: Element,
+    *children: Node,
     colors: Sequence[Color],
     locations: Optional[Sequence[float]] = None,
     start_point: Tuple[float, float] = (0.0, 0.0),
     end_point: Tuple[float, float] = (0.0, 1.0),
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """A container filled with a linear color gradient.
 
@@ -174,11 +142,10 @@ def LinearGradient(
         end_point: Unit point where the last color sits.
         style: Style dict (or list of dicts); ``border_radius`` clips the
             gradient.
-        accessibility_label: Spoken description for screen readers.
-        accessible: Override whether the element is exposed to AT.
-        test_id: Stable identifier for UI tests.
         ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"LinearGradient"``.
@@ -215,23 +182,19 @@ def LinearGradient(
         locations=locations,
         start_point=(float(start_point[0]), float(start_point[1])),
         end_point=(float(end_point[0]), float(end_point[1])),
-        accessibility_label=accessibility_label,
-        accessible=accessible,
-        test_id=test_id,
         _defaults={"flex_direction": "column"},
+        **props,
     )
 
 
 def BlurView(
-    *children: Element,
+    *children: Node,
     blur_type: BlurType = "regular",
     intensity: float = 100.0,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """A container that blurs whatever is drawn behind it.
 
@@ -249,11 +212,10 @@ def BlurView(
             iOS 13 materials and fall back to the closest tint elsewhere.
         intensity: Blur strength from ``0`` (transparent) to ``100``.
         style: Style dict (or list of dicts).
-        accessibility_label: Spoken description for screen readers.
-        accessible: Override whether the element is exposed to AT.
-        test_id: Stable identifier for UI tests.
         ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"BlurView"``.
@@ -275,8 +237,6 @@ def BlurView(
         key=key,
         blur_type=blur_type if blur_type != "regular" else None,
         intensity=float(intensity) if intensity != 100 else None,
-        accessibility_label=accessibility_label,
-        accessible=accessible,
-        test_id=test_id,
         _defaults={"flex_direction": "column"},
+        **props,
     )

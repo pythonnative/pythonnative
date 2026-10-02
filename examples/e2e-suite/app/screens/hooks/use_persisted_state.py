@@ -10,24 +10,24 @@ update the visible value and a "Clear" button must reset it to 0.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UsePersistedStateDemo() -> pn.Element:
+def UsePersistedStateDemo() -> pn.Node:
     """Render a counter persisted under ``e2e.persisted_demo``."""
     value, set_value = pn.use_persisted_state("e2e.persisted_demo", 0)
 
-    return demo_screen(
+    return DemoScreen(
         "use_persisted_state",
         "Counter persisted to AsyncStorage; restored on relaunch.",
-        section(
+        DemoSection(
             "Counter",
-            result_text("Persisted value", value),
-            buttons_row(
-                pn.Button("Bump", on_press=lambda: set_value(value + 1)),
+            ResultText("Persisted value", value),
+            ButtonsRow(
+                pn.Button("Bump", on_press=lambda: set_value(lambda current: current + 1)),
                 pn.Button("Clear", on_press=lambda: set_value(0)),
             ),
-            hint("Tap 'Bump' twice; Maestro asserts 'Persisted value: 2'."),
+            Hint("Tap 'Bump' twice; Maestro asserts 'Persisted value: 2'."),
         ),
     )

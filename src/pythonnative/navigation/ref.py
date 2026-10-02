@@ -1,15 +1,17 @@
 """``NavigationRef``: navigate from outside the component tree.
 
 ```python
-nav_ref = pn.create_navigation_ref()
+nav_ref = pn.NavigationRef()
+
 
 @pn.component
-def App():
-    return pn.NavigationContainer(Stack.Navigator(...), ref=nav_ref)
+def App() -> pn.Node:
+    return pn.NavigationContainer(Root, ref=nav_ref)
 
-def on_push_notification(payload):
+
+def on_push_notification(payload: dict[str, str]) -> None:
     if nav_ref.is_ready():
-        nav_ref.navigate("Thread", id=payload["thread"])
+        nav_ref.navigate(ThreadScreen(id=payload["thread"]))
 ```
 
 The container binds the root navigator's handle to ``ref.current``
@@ -20,12 +22,14 @@ when it mounts and clears it on unmount. Every proxied method raises
 
 from __future__ import annotations
 
-from typing import Any, Optional, Union
+from typing import Optional
 
+from ..element import Element
 from .handle import Navigation
-from .state import NavigationState, Route
+from .screen import ScreenTarget
+from .state import NavigationState
 
-__all__ = ["NavigationRef", "create_navigation_ref"]
+__all__ = ["NavigationRef"]
 
 _NOT_MOUNTED = "Navigation container is not mounted"
 
@@ -33,11 +37,12 @@ _NOT_MOUNTED = "Navigation container is not mounted"
 class NavigationRef:
     """Handle to the root navigator, usable outside components.
 
-    Created by [`create_navigation_ref`][pythonnative.create_navigation_ref]
-    and bound with ``NavigationContainer(ref=...)``. The proxied methods
-    mirror [`Navigation`][pythonnative.Navigation] and act on the root
-    navigator; reach a nested navigator's screen with
-    ``ref.navigate("Tabs", screen="Profile", user="ada")``.
+    Create one at module level and bind it with
+    ``NavigationContainer(ref=...)``, so push-notification handlers,
+    deep-link code, and services can navigate without a component in
+    scope. The proxied methods mirror [`Navigation`][pythonnative.Navigation]
+    and act from the root navigator, which reaches every statically
+    nested screen.
 
     Attributes:
         current: The root navigator's
@@ -59,37 +64,37 @@ class NavigationRef:
             raise RuntimeError(_NOT_MOUNTED)
         return self.current
 
-    def navigate(self, route: str, /, *, screen: Optional[str] = None, **params: Any) -> None:
-        """Go to ``route`` on the root navigator (see ``Navigation.navigate``)."""
-        self._require().navigate(route, screen=screen, **params)
+    def navigate(self, target: Element, /) -> None:
+        """Go to ``target`` (see ``Navigation.navigate``)."""
+        self._require().navigate(target)
 
-    def push(self, route: str, /, *, screen: Optional[str] = None, **params: Any) -> None:
-        """Push ``route`` onto the root stack (see ``Navigation.push``)."""
-        self._require().push(route, screen=screen, **params)
+    def push(self, target: Element, /) -> None:
+        """Push ``target`` (see ``Navigation.push``)."""
+        self._require().push(target)
 
-    def replace(self, route: str, /, *, screen: Optional[str] = None, **params: Any) -> None:
-        """Replace the active screen with ``route`` (see ``Navigation.replace``)."""
-        self._require().replace(route, screen=screen, **params)
+    def replace(self, target: Element, /) -> None:
+        """Replace the active screen with ``target`` (see ``Navigation.replace``)."""
+        self._require().replace(target)
 
     def pop(self, count: int = 1) -> bool:
         """Pop ``count`` screens; returns whether anything happened."""
         return self._require().pop(count)
 
     def go_back(self) -> bool:
-        """Alias for ``pop()``."""
+        """Pop one screen; returns whether anything happened."""
         return self._require().go_back()
 
-    def pop_to(self, route: str, /, *, screen: Optional[str] = None, **params: Any) -> None:
-        """Pop back to ``route`` (see ``Navigation.pop_to``)."""
-        self._require().pop_to(route, screen=screen, **params)
+    def pop_to(self, target: ScreenTarget, /) -> None:
+        """Pop back to ``target`` (see ``Navigation.pop_to``)."""
+        self._require().pop_to(target)
 
     def pop_to_top(self) -> None:
         """Pop every screen above the first one."""
         self._require().pop_to_top()
 
-    def reset(self, *routes: Union[str, Route], index: Optional[int] = None, **params: Any) -> None:
-        """Replace the whole history (see ``Navigation.reset``)."""
-        self._require().reset(*routes, index=index, **params)
+    def reset(self, *targets: Element, index: Optional[int] = None) -> None:
+        """Replace the root navigator's history (see ``Navigation.reset``)."""
+        self._require().reset(*targets, index=index)
 
     def get_state(self) -> NavigationState:
         """The root navigator's current state."""
@@ -97,25 +102,3 @@ class NavigationRef:
 
     def __repr__(self) -> str:
         return f"<NavigationRef {'ready' if self.is_ready() else 'unbound'}>"
-
-
-def create_navigation_ref() -> NavigationRef:
-    """Create a [`NavigationRef`][pythonnative.NavigationRef] to bind with ``NavigationContainer(ref=...)``.
-
-    Create it at module level so push-notification handlers, deep-link
-    code, and services can navigate without a component in scope.
-
-    Example:
-        ```python
-        nav_ref = pn.create_navigation_ref()
-
-        @pn.component
-        def App():
-            return pn.NavigationContainer(Stack.Navigator(...), ref=nav_ref)
-
-        def open_thread(thread_id: int) -> None:
-            if nav_ref.is_ready():
-                nav_ref.navigate("Thread", id=thread_id)
-        ```
-    """
-    return NavigationRef()

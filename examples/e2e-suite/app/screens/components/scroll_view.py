@@ -11,13 +11,13 @@ callbacks, and the typed [`ScrollEvent`][pythonnative.ScrollEvent].
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 _TILE_WIDTH = 140
 
 
 @pn.component
-def ScrollViewDemo() -> pn.Element:
+def ScrollViewDemo() -> pn.Node:
     """Render a fixed-height ScrollView with 60 numbered rows.
 
     60 rows (not 30) so the last row's *unclipped* accessibility frame
@@ -43,12 +43,12 @@ def ScrollViewDemo() -> pn.Element:
             set_scrolled(True)
         set_offset_y(int(event.y))
 
-    return demo_screen(
+    return DemoScreen(
         "ScrollView",
         "Scroll vertically to reveal rows beyond the visible area.",
-        section(
+        DemoSection(
             "Tall content",
-            result_text("Scrolled", "ON" if scrolled else "OFF"),
+            ResultText("Scrolled", "ON" if scrolled else "OFF"),
             # The ScrollView is intentionally large enough to overlap
             # the screen's vertical center on both the iOS and Android
             # CI emulators. Maestro's ``scrollUntilVisible`` always
@@ -67,20 +67,20 @@ def ScrollViewDemo() -> pn.Element:
                         )
                         for i in rows
                     ],
-                    style=pn.style(spacing=4),
+                    style=pn.style(gap=4),
                 ),
                 on_scroll=on_scroll,
                 scroll_event_throttle=32,
                 style=pn.style(height=400, border_width=1, border_color="#CBD5E1"),
             ),
-            result_text("Offset y positive", "yes" if offset_y > 0 else "no"),
-            hint("Maestro scrolls to reveal a row from later in the list."),
+            ResultText("Offset y positive", "yes" if offset_y > 0 else "no"),
+            Hint("Maestro scrolls to reveal a row from later in the list."),
         ),
-        section(
+        DemoSection(
             "Horizontal + snapping",
-            result_text("Drag", "ON" if drag_events > 0 else "OFF"),
-            result_text("Momentum ends", momentum_events),
-            result_text("Snapped x", horizontal_x),
+            ResultText("Drag", "ON" if drag_events > 0 else "OFF"),
+            ResultText("Momentum ends", momentum_events),
+            ResultText("Snapped x", horizontal_x),
             pn.ScrollView(
                 *[
                     pn.View(
@@ -109,6 +109,6 @@ def ScrollViewDemo() -> pn.Element:
                 on_momentum_scroll_end=lambda e: set_momentum_events(lambda n: n + 1),
                 style=pn.style(height=96, border_width=1, border_color="#CBD5E1"),
             ),
-            hint("Swipe the tiles left; the drag callback flips 'Drag' to ON."),
+            Hint("Swipe the tiles left; the drag callback flips 'Drag' to ON."),
         ),
     )

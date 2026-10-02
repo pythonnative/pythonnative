@@ -9,21 +9,21 @@ itself isn't inspected.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 from pythonnative import svg
 
 LOGO = pn.asset("vectors/logo.svg")
 
 
 @pn.component
-def SvgDemo() -> pn.Element:
+def SvgDemo() -> pn.Node:
     """Draw shapes declared in Python next to a logo loaded from an asset file."""
     logo = svg.load(LOGO, style=pn.style(width=96, height=96), accessibility_label="svg-logo")
     shape_count = len(logo.props.get("shapes") or ())
-    return demo_screen(
+    return DemoScreen(
         "Svg",
         "Vector shapes drawn in one native view, from Python or from an .svg file.",
-        section(
+        DemoSection(
             "Shapes from Python",
             pn.Row(
                 pn.Svg(
@@ -41,13 +41,13 @@ def SvgDemo() -> pn.Element:
                     view_box="0 0 64 64",
                     style=pn.style(width=96, height=96),
                 ),
-                style=pn.style(spacing=16),
+                style=pn.style(gap=16),
             ),
-            hint("Coordinates are in view_box units and scale to the style size."),
+            Hint("Coordinates are in view_box units and scale to the style size."),
         ),
-        section(
+        DemoSection(
             "Loaded from app/assets/vectors/logo.svg",
             logo,
-            result_text("Parsed shapes", shape_count),
+            ResultText("Parsed shapes", shape_count),
         ),
     )

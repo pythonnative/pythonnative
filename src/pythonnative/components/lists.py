@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, TypeVar, Union, cast, overload
 
 from ..bridge.list_store import ListRow
-from ..component import component, memo
+from ..component import builtin_component, component, memo
 from ..element import Element
 from ..hooks import (
     Ref,
@@ -278,7 +278,7 @@ def _prepare_incremental(
     heights = _Indexed(total, lambda i: source.extent or estimated if offset <= i < offset + size else estimated)
     source_revision = data.revision
     reusable = before is not None and before.source is data and equal(before.render_inputs, render_inputs)
-    edits = data._changes_since(before.source_revision) if reusable else None
+    edits = data._changes_since(before.source_revision) if reusable and before is not None else None
     # Decoration changes or an empty/nonempty transition need a fresh snapshot.
     if before is not None and (
         before.inputs != {"decorations": (header, footer, empty)} or bool(before.public_indices) != bool(size)
@@ -566,7 +566,7 @@ def _NativeList(
         if initial_index is not None and dataset.public_indices.get(initial_index) is not None:
             scroll_to_index(initial_index, False)
 
-    use_effect(scroll_to_initial, [])
+    use_effect(scroll_to_initial, [])  # pn: ignore[PN103] scrolls to the initial index once, on mount
     props = {
         "flex_grow": 1,
         **(list_style or {}),
@@ -604,7 +604,7 @@ def _NativeList(
     return Element("VirtualList", props, children)
 
 
-@component
+@builtin_component
 def FlatList(
     *,
     data: Optional[Sequence[T]] = None,
@@ -813,7 +813,7 @@ def FlatList(
 
     rows = use_memo(
         prepare_rows,
-        [
+        [  # pn: ignore[PN103] derived from item_separator, which is listed
             _Identity(data),
             data_revision,
             source_version,
@@ -859,7 +859,7 @@ def _default_section_header(section: Section[Any], _index: int) -> Element:
     return Text(section.title, style={"bold": True, "padding": 8})
 
 
-@component
+@builtin_component
 def SectionList(
     *,
     sections: Optional[Sequence[Section[T]]] = None,
@@ -1009,7 +1009,7 @@ def SectionList(
 
     rows = use_memo(
         prepare_rows,
-        [
+        [  # pn: ignore[PN103] derived from dependencies that are listed
             _Identity(sections),
             data_revision,
             render_item,

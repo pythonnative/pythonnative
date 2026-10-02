@@ -206,6 +206,8 @@ class Shell {
         this.host.clear();
         this.renderer.reset();
         this.logLine("info", "disconnected from pn start; retrying...");
+      } else {
+        this.explainRefusal();
       }
     };
     b.onDev = (payload) => this.onDevMessage(payload);
@@ -215,6 +217,21 @@ class Shell {
     window.addEventListener("unhandledrejection", (event) => {
       this.logLine("error", `unhandled rejection: ${event.reason}`);
     });
+  }
+
+  // The page is public, but the socket needs the dev token, which the page
+  // holds as a cookie once it has been opened through the URL `pn start`
+  // printed. Browsers hide why a WebSocket upgrade failed, so ask `/status`.
+  async explainRefusal() {
+    try {
+      const response = await fetch("/status", { cache: "no-store" });
+      if (response.status === 401 || response.status === 403) {
+        $("pn-connect-detail").textContent =
+          "This page doesn't have the dev token. Open the preview URL that `pn start` printed (it ends in ?token=...).";
+      }
+    } catch (err) {
+      /* the server is down; the default message applies */
+    }
   }
 
   setConnected(connected) {

@@ -123,7 +123,7 @@ and remount. See [Commits](bridge.md#commits) for the failure contract.
 ## Layout and styling
 
 Layout-related style keys are interpreted by the renderer's Yoga engine. The full
-list (sizing, flex, position, margin, padding, spacing, ...) is
+list (sizing, flex, position, margin, padding, gap, ...) is
 documented in [Component properties](../api/component-properties.md).
 The set of keys the layout engine consumes is exposed as
 `pythonnative.layout.LAYOUT_STYLE_KEYS`.

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import inbox_extension  # noqa: F401
 
-from pythonnative.sdk import generate
+from pythonnative.sdk.codegen import generate
 from pythonnative.sdk.schema import COMPONENTS, MODULES, manifest
 
 spec = manifest()

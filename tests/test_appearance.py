@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Generator, List
 
 import pytest
@@ -11,15 +12,8 @@ from pythonnative.component import component
 from pythonnative.element import Element
 from pythonnative.hooks import use_color_scheme
 from pythonnative.reconciler import Reconciler
-from pythonnative.style import (
-    DEFAULT_DARK_THEME,
-    DEFAULT_LIGHT_THEME,
-    Theme,
-    ThemeContext,
-    default_theme,
-    use_theme,
-)
 from pythonnative.testing import FakeBackend
+from pythonnative.theme import DARK_THEME, LIGHT_THEME, Theme, ThemeProvider, use_theme
 
 
 @pytest.fixture(autouse=True)
@@ -131,14 +125,8 @@ def test_use_color_scheme_outside_component_raises() -> None:
 
 
 # ======================================================================
-# use_theme / default_theme
+# use_theme follows the color scheme
 # ======================================================================
-
-
-def test_default_theme_selects_by_scheme() -> None:
-    assert default_theme("light") is DEFAULT_LIGHT_THEME
-    assert default_theme("dark") is DEFAULT_DARK_THEME
-    assert default_theme("unknown") is DEFAULT_LIGHT_THEME
 
 
 def test_use_theme_follows_system_scheme() -> None:
@@ -152,15 +140,15 @@ def test_use_theme_follows_system_scheme() -> None:
     rec = Reconciler(FakeBackend())
     rec.on_render_requested = lambda: None
     rec.mount(comp())
-    assert seen[-1] is DEFAULT_LIGHT_THEME
+    assert seen[-1] is LIGHT_THEME
 
     appearance.set_system_color_scheme("dark")
     rec.flush_dirty()
-    assert seen[-1] is DEFAULT_DARK_THEME
+    assert seen[-1] is DARK_THEME
 
 
-def test_use_theme_provider_pins_explicit_theme() -> None:
-    custom = DEFAULT_LIGHT_THEME.replace(text_color="#ABCDEF")
+def test_theme_provider_with_one_theme_pins_it_across_scheme_flips() -> None:
+    custom = dataclasses.replace(LIGHT_THEME, colors=dataclasses.replace(LIGHT_THEME.colors, text="#ABCDEF"))
     seen: List[Theme] = []
 
     @component
@@ -170,30 +158,14 @@ def test_use_theme_provider_pins_explicit_theme() -> None:
 
     @component
     def app() -> Element:
-        return ThemeContext.Provider(consumer(), value=custom)
+        return ThemeProvider(consumer(), light=custom, dark=custom)
 
     rec = Reconciler(FakeBackend())
     rec.on_render_requested = lambda: None
     rec.mount(app())
     assert seen[-1] is custom
 
-    # A scheme flip must not displace an explicitly provided theme.
+    # A scheme flip must not displace a pinned theme.
     appearance.set_system_color_scheme("dark")
     rec.flush_dirty()
     assert seen[-1] is custom
-
-
-def test_use_theme_rejects_untyped_provider_values() -> None:
-    @component
-    def consumer() -> Element:
-        use_theme()
-        return Element("Text", {"text": "ok"}, [])
-
-    @component
-    def app() -> Element:
-        return ThemeContext.Provider(consumer(), value={"text_color": "#ABCDEF"})
-
-    rec = Reconciler(FakeBackend())
-    rec.on_render_requested = lambda: None
-    with pytest.raises(TypeError, match="expects a pn.Theme"):
-        rec.mount(app())

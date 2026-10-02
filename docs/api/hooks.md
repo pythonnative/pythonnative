@@ -3,7 +3,8 @@
 Hook primitives for `@component` functions: state, effects, memoization,
 context, and refs. Hooks must be called at the top level of a component
 (not inside conditionals or loops) so they can be matched to the same
-slot across renders.
+slot across renders. [`pn lint`](../guides/linting.md) checks these
+rules, and missing effect dependencies, before you run the app.
 
 The hooks are typed for editors: dependency lists are any
 [`Deps`][pythonnative.Deps] sequence (a list or a tuple),
@@ -116,6 +117,8 @@ defers renders started inside
   [`use_focus_effect`][pythonnative.use_focus_effect] (after focus).
 - Share state across the tree with
   [`create_context`][pythonnative.create_context] and
-  [`Context.Provider`][pythonnative.hooks.Context.Provider].
+  [`Context.Provider`][pythonnative.hooks.Context.Provider], or across
+  the app with a [`Store`][pythonnative.Store]; see
+  [Managing state](../guides/state.md).
 - Animate without re-rendering using [`use_ref`][pythonnative.use_ref]
   + `Animated`; see the [Animations guide](../guides/animations.md).

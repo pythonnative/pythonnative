@@ -46,7 +46,7 @@ style keys, listed as `pythonnative.layout.LAYOUT_STYLE_KEYS`:
 |---|---|
 | Sizing | `width`, `height`, `min_width`, `max_width`, `min_height`, `max_height`, `aspect_ratio` |
 | Flex | `flex`, `flex_grow`, `flex_shrink`, `flex_basis`, `align_self` |
-| Container | `flex_direction`, `justify_content`, `align_items`, `spacing`, `gap` |
+| Container | `flex_direction`, `justify_content`, `align_items`, `gap`, `row_gap`, `column_gap` |
 | Spacing | `margin`, `padding` |
 | Position | `position`, `top`, `right`, `bottom`, `left` |
 
@@ -121,7 +121,7 @@ Use the host Yoga binding to test layout without a simulator or emulator:
 from pythonnative.layout import LayoutNode, calculate_layout
 
 root = LayoutNode(
-    style={"flex_direction": "row", "padding": 10, "spacing": 5,
+    style={"flex_direction": "row", "padding": 10, "gap": 5,
            "width": 200, "height": 100},
     children=[
         LayoutNode(style={"width": 50, "height": 20}),

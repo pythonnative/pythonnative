@@ -37,7 +37,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Iterable, Mapping, Optional, Union
+from typing import Any, Iterable, Iterator, Mapping, Optional
 
 __all__ = [
     "ERROR_BOUNDARY",
@@ -114,7 +114,7 @@ class Element:
     ) -> None:
         object.__setattr__(self, "type", type_)
         object.__setattr__(self, "props", MappingProxyType(dict(props or {})))
-        object.__setattr__(self, "children", tuple(children) if children is not None else ())
+        object.__setattr__(self, "children", tuple(map(_materialize, children)) if children is not None else ())
         object.__setattr__(self, "key", key)
 
     def __repr__(self) -> str:
@@ -138,19 +138,46 @@ class Element:
 
     __hash__ = None  # type: ignore[assignment,unused-ignore]
 
-    def with_key(self, key: Optional[str]) -> "Element":
+    def with_key(self, key: object) -> "Element":
         """Return a copy of this element carrying ``key``.
 
-        Handy when a factory result needs a key after the fact, for
-        example while building a list comprehension over elements
-        produced by a helper that doesn't take ``key``.
+        This is the typed way to key a user component, whose call
+        signature can't include ``key=`` (PEP 612 forbids keyword
+        parameters next to a ``ParamSpec``):
+
+        ```python
+        pn.Column(*(Row(item).with_key(item.id) for item in items))
+        ```
+
+        Built-in factories also accept ``key=`` directly. Non-string
+        keys are converted with ``str``; ``None`` clears the key.
         """
-        return Element(self.type, self.props, self.children, key=key)
+        text = None if key is None else (key if isinstance(key, str) else str(key))
+        return Element(self.type, self.props, self.children, key=text)
 
 
-Node = Union[Element, None, bool, Iterable[Any]]
-"""Anything a component may render: an element, ``None`` / ``False``
-for "nothing", or a (possibly nested) iterable of nodes."""
+def _materialize(child: Any) -> Any:
+    """Freeze a one-shot iterator child (a generator expression) into a tuple.
+
+    Children are read on every render of the element (a component passes
+    its ``*children`` through again when its own state changes), so an
+    iterator would be empty the second time.
+    """
+    if child is None or isinstance(child, (Element, bool, list, tuple)):
+        return child
+    if isinstance(child, Iterator):
+        return tuple(map(_materialize, child))
+    return child
+
+
+type Node = Element | None | bool | Iterable[Node]
+"""Anything that can appear in an element tree.
+
+An element, ``None`` or a ``bool`` for "nothing" (so ``cond and
+pn.Text(...)`` and ``pn.Text(...) if cond else None`` both work), or a
+possibly nested iterable of nodes. Every built-in container declares
+``*children: Node`` and component bodies return a ``Node``. Strings
+aren't nodes: wrap text in [`Text`][pythonnative.Text]."""
 
 
 def type_label(type_obj: Any) -> str:

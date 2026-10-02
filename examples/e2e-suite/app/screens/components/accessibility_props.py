@@ -13,7 +13,7 @@ props themselves are validated by mounting on every renderer.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 _ACTIONS: list[pn.AccessibilityAction] = [
     {"name": "increment", "label": "Increase the value"},
@@ -23,7 +23,7 @@ _ACTIONS: list[pn.AccessibilityAction] = [
 
 
 @pn.component
-def AccessibilityPropsDemo() -> pn.Element:
+def AccessibilityPropsDemo() -> pn.Node:
     """Render a target with value, actions, importance, and a live region."""
     value, set_value = pn.use_state(5)
     last_action, set_last_action = pn.use_state("none")
@@ -37,13 +37,13 @@ def AccessibilityPropsDemo() -> pn.Element:
 
     accessibility_value: pn.AccessibilityValue = {"min": 0, "max": 10, "now": value, "text": f"{value} of 10"}
 
-    return demo_screen(
+    return DemoScreen(
         "Accessibility props",
         "accessibility_value, accessibility_actions, and important_for_accessibility.",
-        section(
+        DemoSection(
             "Adjustable target",
-            result_text("Value", value),
-            result_text("Last action", last_action),
+            ResultText("Value", value),
+            ResultText("Last action", last_action),
             pn.View(
                 pn.Text(f"a11y-target {value}", style=pn.style(color="#FFFFFF", font_weight="700")),
                 accessibility_label="a11y-target",
@@ -59,13 +59,13 @@ def AccessibilityPropsDemo() -> pn.Element:
                     align_items="center",
                 ),
             ),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Increment", on_press=lambda: on_action("increment")),
                 pn.Button("Decrement", on_press=lambda: on_action("decrement")),
             ),
-            hint("A screen reader's increment/decrement actions route to the same handler."),
+            Hint("A screen reader's increment/decrement actions route to the same handler."),
         ),
-        section(
+        DemoSection(
             "important_for_accessibility",
             pn.View(
                 pn.Text("decorative-only", style=pn.style(color="#94A3B8")),
@@ -73,6 +73,6 @@ def AccessibilityPropsDemo() -> pn.Element:
                 style=pn.style(padding=8),
             ),
             pn.Text("a11y-visible-marker", style=pn.style(font_weight="600")),
-            hint("The grey decorative text is hidden from assistive technology."),
+            Hint("The grey decorative text is hidden from assistive technology."),
         ),
     )

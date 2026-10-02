@@ -15,7 +15,7 @@ import pythonnative as pn
 
 
 @pn.component
-def Search():
+def Search() -> pn.Node:
     field = pn.use_ref()
 
     def focus_field():

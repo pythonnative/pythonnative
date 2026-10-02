@@ -10,7 +10,7 @@ instead of silently falling back, which the demo also checks.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 _CURVES: list[tuple[str, pn.EasingSpec]] = [
     ("linear", pn.Easing.linear),
@@ -34,7 +34,7 @@ def _rejects_unknown_easing() -> bool:
 
 
 @pn.component
-def EasingDemo() -> pn.Element:
+def EasingDemo() -> pn.Node:
     """Slide a box with every Easing curve in turn."""
     tx = pn.use_animated_value(0.0)
     status, set_status = pn.use_state("idle")
@@ -53,27 +53,27 @@ def EasingDemo() -> pn.Element:
         set_curves_run(len(_CURVES))
         set_status("done" if finished == 2 * len(_CURVES) else "interrupted")
 
-    return demo_screen(
+    return DemoScreen(
         "Easing",
         "Animated.timing with every Easing curve, including a bezier.",
-        section(
+        DemoSection(
             "Easing curves",
-            result_text("Status", status),
-            result_text("Curves run", curves_run),
-            result_text("Last curve", last_curve),
-            result_text("Rejects unknown easing", "yes" if _rejects_unknown_easing() else "no"),
-            result_text("Animatable props", len(pn.ANIMATABLE_PROPS)),
+            ResultText("Status", status),
+            ResultText("Curves run", curves_run),
+            ResultText("Last curve", last_curve),
+            ResultText("Rejects unknown easing", "yes" if _rejects_unknown_easing() else "no"),
+            ResultText("Animatable props", len(pn.ANIMATABLE_PROPS)),
             pn.Animated.View(
                 pn.Text("easing-box", style=pn.style(color="#FFFFFF", font_weight="700")),
-                style=pn.style(
-                    translate_x=tx,
-                    padding=16,
-                    background_color="#8B5CF6",
-                    border_radius=10,
-                    align_self="flex_start",
-                ),
+                style={
+                    "translate_x": tx,
+                    "padding": 16,
+                    "background_color": "#8B5CF6",
+                    "border_radius": 10,
+                    "align_self": "flex_start",
+                },
             ),
-            buttons_row(pn.Button("Run all curves", on_press=lambda: pn.run_async(run_all()))),
-            hint("Maestro taps 'Run all curves' and waits for 'Curves run: 9'."),
+            ButtonsRow(pn.Button("Run all curves", on_press=run_all)),
+            Hint("Maestro taps 'Run all curves' and waits for 'Curves run: 9'."),
         ),
     )

@@ -2,22 +2,19 @@
 
 import dataclasses
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Union, Unpack, cast
 
 from ..component import component
-from ..element import Element
+from ..element import Element, Node
 from ..hooks import Ref, use_state
 from ..style import (
-    AccessibilityAction,
-    AccessibilityState,
-    AccessibilityValue,
     Color,
-    ImportantForAccessibility,
+    Style,
     StyleProp,
-    StyleSheet,
+    resolve_style,
 )
-from ._base import _accessibility_actions, _accessibility_value, _make_element
-from .events import LayoutEvent
+from ._base import _make_element
+from .props import AccessibilityProps, ViewProps
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,9 +61,9 @@ def _ripple_props(ripple: Optional[Ripple]) -> Optional[Dict[str, Any]]:
 
 @component
 def _StatefulPressable(
-    *children: Element,
+    *children: Node,
     style_fn: Optional[Callable[[PressState], StyleProp]] = None,
-    child_fn: Optional[Callable[[PressState], Element]] = None,
+    child_fn: Optional[Callable[[PressState], Node]] = None,
     on_press_in: Optional[Callable[[], Any]] = None,
     on_press_out: Optional[Callable[[], Any]] = None,
     **props: Any,
@@ -109,7 +106,7 @@ def _StatefulPressable(
 
 
 def Pressable(
-    *children: Union[Element, Callable[[PressState], Element]],
+    *children: Union[Node, Callable[[PressState], Node]],
     on_press: Optional[Callable[[], Any]] = None,
     on_long_press: Optional[Callable[[], Any]] = None,
     on_press_in: Optional[Callable[[], Any]] = None,
@@ -118,23 +115,10 @@ def Pressable(
     delay_long_press: float = 500,
     pressed_opacity: float = 0.6,
     android_ripple: Optional[Ripple] = None,
-    gestures: Optional[List[Any]] = None,
-    hit_slop: Optional[Union[float, Dict[str, float]]] = None,
-    on_layout: Optional[Callable[[LayoutEvent], Any]] = None,
     style: Union[StyleProp, Callable[[PressState], StyleProp]] = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_hint: Optional[str] = None,
-    accessibility_role: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
-    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
-    on_accessibility_action: Optional[Callable[[str], Any]] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    important_for_accessibility: Optional[ImportantForAccessibility] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[ViewProps],
 ) -> Element:
     """Wrap children with tap / long-press / gesture handlers.
 
@@ -156,7 +140,7 @@ def Pressable(
     ```
 
     Args:
-        *children: Elements to make pressable, or a single callable
+        *children: Nodes to make pressable, or a single callable
             receiving the [`PressState`][pythonnative.PressState] and
             returning the child to render.
         on_press: Callback invoked on a normal tap.
@@ -172,17 +156,6 @@ def Pressable(
             finger is down. Set to ``1.0`` for no visual feedback.
         android_ripple: A [`Ripple`][pythonnative.Ripple] drawn on
             Android while pressed; ignored on iOS and in the browser.
-        gestures: Optional list of gesture descriptors from
-            `pythonnative.gestures` recognized natively on this view
-            (pan / swipe / pinch / rotation / multi-tap).
-        hit_slop: Extend the touch target beyond the view's bounds
-            without changing layout: a uniform number of points, or a
-            dict with any of ``top`` / ``left`` / ``bottom`` /
-            ``right``. Essential for small touch targets (icons,
-            chips) that should honor the 44-point guideline.
-        on_layout: Callback invoked with a
-            [`LayoutEvent`][pythonnative.LayoutEvent] after layout and
-            on frame changes.
         style: Style dict applied to the wrapper, or a callable
             receiving the [`PressState`][pythonnative.PressState] and
             returning a style, re-evaluated on every press transition:
@@ -195,45 +168,20 @@ def Pressable(
                 ),
             )
             ```
-        accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail. iOS reads it after the
-            label; Android appends it to the content description.
-        accessibility_role: Override the default ``"button"`` role.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_value: The widget's current value for assistive
-            tech: a string, or an
-            [`AccessibilityValue`][pythonnative.AccessibilityValue]
-            with ``min`` / ``max`` / ``now`` / ``text``.
-        accessibility_actions: Custom actions a screen reader may
-            invoke, each an
-            [`AccessibilityAction`][pythonnative.AccessibilityAction].
-        on_accessibility_action: Callback invoked with the action name
-            when a screen reader triggers one of
-            ``accessibility_actions``.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
-        important_for_accessibility: Whether AT sees this view and its
-            subtree: ``"auto"``, ``"yes"``, ``"no"``, or
-            ``"no_hide_descendants"``.
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`ViewProps`][pythonnative.ViewProps] (layout, gestures, and accessibility).
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Pressable"``
         (wrapped in a stateful composite when ``style`` or the child
         is callable).
     """
-    if disabled and accessibility_state is None:
-        accessibility_state = {"disabled": True}
-    child_fn: Optional[Callable[[PressState], Element]] = None
-    elements: List[Element] = []
+    if disabled and props.get("accessibility_state") is None:
+        props["accessibility_state"] = {"disabled": True}
+    child_fn: Optional[Callable[[PressState], Node]] = None
+    elements: List[Node] = []
     for child in children:
         if child is not None and not isinstance(child, Element) and callable(child):
             if child_fn is not None or len(children) != 1:
@@ -248,20 +196,7 @@ def Pressable(
         delay_long_press=delay_long_press if delay_long_press != 500 else None,
         pressed_opacity=pressed_opacity,
         android_ripple=_ripple_props(android_ripple),
-        gestures=gestures,
-        hit_slop=hit_slop,
-        on_layout=on_layout,
-        accessibility_label=accessibility_label,
-        accessibility_hint=accessibility_hint,
-        accessibility_role=accessibility_role,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_value=_accessibility_value(accessibility_value),
-        accessibility_actions=_accessibility_actions(accessibility_actions),
-        on_accessibility_action=on_accessibility_action,
-        accessibility_live_region=accessibility_live_region,
-        important_for_accessibility=important_for_accessibility,
-        test_id=test_id,
+        **props,
     )
     if callable(style) or child_fn is not None:
         return _StatefulPressable(
@@ -269,11 +204,10 @@ def Pressable(
             style_fn=style if callable(style) else (lambda _state: style),
             child_fn=child_fn,
             ref=ref,
-            key=key,
             on_press_in=on_press_in,
             on_press_out=on_press_out,
             **common,
-        )
+        ).with_key(key)
     return _make_element(
         "Pressable",
         *elements,
@@ -288,24 +222,14 @@ def Pressable(
 
 
 def TouchableOpacity(
-    *children: Element,
+    *children: Node,
     on_press: Optional[Callable[[], Any]] = None,
     on_long_press: Optional[Callable[[], Any]] = None,
     active_opacity: float = 0.2,
     disabled: bool = False,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_hint: Optional[str] = None,
-    accessibility_role: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_value: Optional[Union[str, AccessibilityValue]] = None,
-    accessibility_actions: Optional[Sequence[AccessibilityAction]] = None,
-    on_accessibility_action: Optional[Callable[[str], Any]] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    important_for_accessibility: Optional[ImportantForAccessibility] = None,
-    test_id: Optional[str] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """Wrap children so they fade to ``active_opacity`` while pressed.
 
@@ -315,44 +239,25 @@ def TouchableOpacity(
     the wrapper is inert and renders at reduced opacity.
 
     Args:
-        *children: Elements to make tappable.
+        *children: Nodes to make tappable.
         on_press: Callback invoked on a normal tap.
         on_long_press: Callback invoked on a sustained press.
         active_opacity: Opacity (0 to 1) applied while the finger is down.
         disabled: When ``True``, ignores presses and renders at reduced
             opacity.
         style: Style dict applied to the wrapper.
-        accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail (iOS reads it after the
-            label; Android appends it to the content description).
-        accessibility_role: Override the default ``"button"`` role.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_value: The widget's current value for assistive
-            tech (a string or an
-            [`AccessibilityValue`][pythonnative.AccessibilityValue]).
-        accessibility_actions: Custom screen-reader actions.
-        on_accessibility_action: Callback invoked with the action name.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``.
-        important_for_accessibility: Whether AT sees this view and its
-            subtree.
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Pressable"``.
     """
     merged_style: StyleProp
     if disabled:
-        base = StyleSheet.flatten(style)
+        base = resolve_style(style)
         base.setdefault("opacity", 0.4)
-        merged_style = base
+        merged_style = cast(Style, base)
     else:
         merged_style = style
     return Pressable(
@@ -362,16 +267,6 @@ def TouchableOpacity(
         disabled=disabled,
         pressed_opacity=active_opacity,
         style=merged_style,
-        accessibility_label=accessibility_label,
-        accessibility_hint=accessibility_hint,
-        accessibility_role=accessibility_role,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_value=accessibility_value,
-        accessibility_actions=accessibility_actions,
-        on_accessibility_action=on_accessibility_action,
-        accessibility_live_region=accessibility_live_region,
-        important_for_accessibility=important_for_accessibility,
-        test_id=test_id,
         key=key,
+        **props,
     )

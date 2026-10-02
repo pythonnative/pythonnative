@@ -12,13 +12,13 @@ assert the header flipped from "expanded" to "collapsed".
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 HEADER_HEIGHT = 56.0
 
 
 @pn.component
-def CollapsingHeaderDemo() -> pn.Element:
+def CollapsingHeaderDemo() -> pn.Node:
     """Render a collapsing header driven by the scroll offset."""
     scroll_y = pn.use_animated_value(0.0)
     header_state, set_header_state = pn.use_state("expanded")
@@ -42,19 +42,19 @@ def CollapsingHeaderDemo() -> pn.Element:
         for i in range(1, 61)
     ]
 
-    return demo_screen(
+    return DemoScreen(
         "Collapsing header",
         "Scroll down to slide the header away via Animated.event.",
-        section(
+        DemoSection(
             "Collapsing header demo",
-            result_text("Header state", header_state),
+            ResultText("Header state", header_state),
             pn.View(
                 pn.ScrollView(
                     pn.Column(
                         # Spacer so the first rows start below the header.
                         pn.View(style=pn.style(height=HEADER_HEIGHT)),
                         *rows,
-                        style=pn.style(spacing=4),
+                        style=pn.style(gap=4),
                     ),
                     on_scroll=pn.Animated.event(on_scroll, y=scroll_y),
                     style=pn.style(height=400),
@@ -79,6 +79,6 @@ def CollapsingHeaderDemo() -> pn.Element:
                 ),
                 style=pn.style(height=400, border_width=1, border_color="#CBD5E1"),
             ),
-            hint("Maestro scrolls the list and asserts 'Header state: collapsed'."),
+            Hint("Maestro scrolls the list and asserts 'Header state: collapsed'."),
         ),
     )

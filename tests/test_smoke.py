@@ -35,6 +35,7 @@ def test_public_api_names() -> None:
         "View",
         "WebView",
         # Core
+        "Node",
         "create_screen",
         # Hooks
         "batch_updates",
@@ -49,14 +50,38 @@ def test_public_api_names() -> None:
         "use_reducer",
         "use_ref",
         "use_route",
+        "use_screen_options",
         "use_state",
         # Navigation
+        "DrawerNavigator",
+        "Group",
         "NavigationContainer",
-        "create_drawer_navigator",
-        "create_stack_navigator",
-        "create_tab_navigator",
-        # Styling
+        "NavigationRef",
+        "Screen",
+        "ScreenOptions",
+        "StackNavigator",
+        "TabNavigator",
+        # Styling and theming
         "StyleSheet",
-        "ThemeContext",
+        "Theme",
+        "ThemeProvider",
+        "use_styles",
+        "use_theme",
+        # Stores
+        "Store",
+        "use_store",
     }
     assert expected.issubset(set(pn.__all__))
+
+
+def test_removed_names_stay_removed() -> None:
+    removed = {
+        "create_drawer_navigator",
+        "create_navigation_ref",
+        "create_stack_navigator",
+        "create_tab_navigator",
+        "LinkingConfig",
+        "ThemeContext",
+    }
+    assert removed.isdisjoint(pn.__all__)
+    assert not any(hasattr(pn, name) for name in removed)

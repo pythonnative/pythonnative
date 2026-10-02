@@ -23,6 +23,15 @@ guide for how they fit together; this page documents the modules.
       members_order: source
       filters: ["!^_"]
 
+### Authentication
+
+::: pythonnative.devserver.auth
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
+
 ### File watcher and source snapshots
 
 ::: pythonnative.devserver.watcher

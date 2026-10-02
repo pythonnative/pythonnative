@@ -3,6 +3,8 @@
 from contextlib import contextmanager
 from typing import Any, Iterator
 
+import pytest
+
 from pythonnative import runtime
 from pythonnative.component import Component, component, memo
 from pythonnative.element import Element
@@ -554,9 +556,13 @@ def test_component_key_extraction() -> None:
     def widget(text: str = "") -> Element:
         return Element("Text", {"text": text}, [])
 
-    el = widget(text="hi", key="k1")  # type: ignore[call-arg]
+    el = widget(text="hi").with_key("k1")
     assert el.key == "k1"
     assert "key" not in el.props
+    assert el.props == {"text": "hi"}
+
+    with pytest.raises(TypeError, match=r"with_key"):
+        widget(text="hi", key="k1")  # type: ignore[call-arg]
 
 
 # ======================================================================

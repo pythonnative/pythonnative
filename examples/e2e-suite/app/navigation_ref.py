@@ -9,5 +9,5 @@ from __future__ import annotations
 
 import pythonnative as pn
 
-nav_ref: pn.NavigationRef = pn.create_navigation_ref()
+nav_ref = pn.NavigationRef()
 """Bound to the root container while the app is mounted."""

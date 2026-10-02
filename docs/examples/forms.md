@@ -11,6 +11,8 @@ then run `pn preview app.main.SignUp`.
 ## The code
 
 ```python
+from collections.abc import Callable
+
 import pythonnative as pn
 
 
@@ -19,25 +21,32 @@ def is_valid_email(s: str) -> bool:
 
 
 @pn.component
-def LabeledInput(label, value, on_change, placeholder="", error=None, secure=False):
+def LabeledInput(
+    label: str,
+    value: str,
+    on_change: Callable[[str], None],
+    placeholder: str = "",
+    error: str | None = None,
+    secure: bool = False,
+) -> pn.Node:
     return pn.Column(
         pn.Text(label, style={"font_size": 14, "bold": True}),
         pn.TextInput(
             value=value,
             on_change=on_change,
             placeholder=placeholder,
-            secure_text_entry=secure,
+            secure=secure,
         ),
         pn.Text(
             error or "",
             style={"font_size": 12, "color": "#ff3b30"},
         ),
-        style={"spacing": 4},
+        style={"gap": 4},
     )
 
 
 @pn.component
-def SignUp():
+def SignUp() -> pn.Node:
     name, set_name = pn.use_state("")
     email, set_email = pn.use_state("")
     password, set_password = pn.use_state("")
@@ -49,9 +58,9 @@ def SignUp():
     password_error = "At least 8 characters" if password and len(password) < 8 else None
 
     has_errors = bool(name_error or email_error or password_error)
-    can_submit = name and email and password and not has_errors and not submitting
+    can_submit = bool(name and email and password) and not has_errors and not submitting
 
-    def submit():
+    def submit() -> None:
         if not can_submit:
             return
         set_submitting(True)
@@ -63,7 +72,7 @@ def SignUp():
         return pn.Column(
             pn.Text("Welcome!", style={"font_size": 28, "bold": True}),
             pn.Text(f"Account created for {name}.", style={"font_size": 16}),
-            style={"spacing": 8, "padding": 16},
+            style={"gap": 8, "padding": 16},
         )
 
     return pn.ScrollView(
@@ -96,7 +105,7 @@ def SignUp():
                 on_press=submit,
                 disabled=not can_submit,
             ),
-            style={"spacing": 12, "padding": 16, "align_items": "stretch"},
+            style={"gap": 12, "padding": 16, "align_items": "stretch"},
         )
     )
 ```
@@ -123,12 +132,12 @@ For a real submission flow, hand the work to `asyncio`:
 import asyncio
 
 
-def submit():
+def submit() -> None:
     if not can_submit:
         return
     set_submitting(True)
 
-    async def go():
+    async def go() -> None:
         try:
             await api.create_account(name=name, email=email, password=password)
             set_submitted(True)
@@ -137,8 +146,12 @@ def submit():
         finally:
             set_submitting(False)
 
-    asyncio.create_task(go())
+    pn.run_async(go())
 ```
+
+`pn.run_async` runs the coroutine on the application loop in the
+component's task scope, so it's cancelled if the form unmounts first.
+You can also pass an `async def` handler straight to `on_press`.
 
 Wrap state updates that touch the same screen in a single setter when
 possible (e.g., a single `dispatch` from a reducer) so the page only

@@ -30,7 +30,8 @@ class InboxTools:
     @staticmethod
     async def prepare(*, records: list[PNInboxRecord], limit: int = decode_value(10, {'type': 'integer'}), delay_ms: int = decode_value(50, {'type': 'integer'})) -> PNInboxBatch:
         """Invoke the checked InboxTools.prepare native method."""
-        return await native_module("InboxTools").call_async("prepare", records=records, limit=limit, delay_ms=delay_ms)
+        result: PNInboxBatch = await native_module("InboxTools").call_async("prepare", records=records, limit=limit, delay_ms=delay_ms)
+        return result
 
     @staticmethod
     def on_prepared(callback: Callable[[PNInboxBatch], Any]) -> Callable[[], None]:

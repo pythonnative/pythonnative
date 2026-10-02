@@ -9,7 +9,7 @@ buttons for the programmatic path.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 _OPTIONS = [
     {"value": "apple", "label": "Apple"},
@@ -19,16 +19,16 @@ _OPTIONS = [
 
 
 @pn.component
-def PickerDemo() -> pn.Element:
+def PickerDemo() -> pn.Node:
     """Render a Picker plus selector buttons so flows can drive it deterministically."""
     fruit, set_fruit = pn.use_state("apple")
 
-    return demo_screen(
+    return DemoScreen(
         "Picker",
         "Pick a fruit via the wheel or the buttons.",
-        section(
+        DemoSection(
             "Picker",
-            result_text("Picked", fruit),
+            ResultText("Picked", fruit),
             pn.Picker(
                 value=fruit,
                 items=_OPTIONS,
@@ -41,11 +41,11 @@ def PickerDemo() -> pn.Element:
                     background_color="#FFFFFF",
                 ),
             ),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Pick apple", on_press=lambda: set_fruit("apple")),
                 pn.Button("Pick banana", on_press=lambda: set_fruit("banana")),
                 pn.Button("Pick cherry", on_press=lambda: set_fruit("cherry")),
             ),
-            hint("Maestro opens the picker and selects, then taps the buttons."),
+            Hint("Maestro opens the picker and selects, then taps the buttons."),
         ),
     )

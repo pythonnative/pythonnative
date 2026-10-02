@@ -1,8 +1,8 @@
-# Tests use_navigation_theme mirrors the root NavigationContainer theme and
-# that switching to DARK_NAVIGATION_THEME repaints the themed chrome.
+# Tests the root ThemeProvider: the app theme follows the color scheme, and
+# switching to the dark preset repaints the themed navigator chrome.
 #
 # Demo screen: examples/e2e-suite/app/screens/navigation/navigation_theme.py
-# Source under test: src/pythonnative/navigation/theme.py :: use_navigation_theme
+# Source under test: src/pythonnative/theme.py :: ThemeProvider, use_theme
 appId: ${APP_ID}
 ---
 - runFlow:

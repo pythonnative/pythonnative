@@ -10,18 +10,20 @@ that the readings are positive.
 
 from __future__ import annotations
 
+from typing import Callable
+
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def DimensionsDemo() -> pn.Element:
+def DimensionsDemo() -> pn.Node:
     """Render window and screen dimensions plus a change counter."""
     changes, set_changes = pn.use_state(0)
     window = pn.Dimensions.get("window")
     screen = pn.Dimensions.get("screen")
 
-    def subscribe():
+    def subscribe() -> Callable[[], None]:
         def on_change(event: pn.DimensionsEvent) -> None:
             del event
             set_changes(lambda n: n + 1)
@@ -30,18 +32,18 @@ def DimensionsDemo() -> pn.Element:
 
     pn.use_effect(subscribe, [])
 
-    return demo_screen(
+    return DemoScreen(
         "Dimensions",
         "Dimensions.get for the window and screen, plus change events.",
-        section(
+        DemoSection(
             "Dimensions module",
-            result_text("Window", f"{int(window.width)} x {int(window.height)}"),
-            result_text("Screen", f"{int(screen.width)} x {int(screen.height)}"),
-            result_text("Window positive", "yes" if window.width > 0 and window.height > 0 else "no"),
-            result_text("Screen covers window", "yes" if screen.height >= window.height else "no"),
-            result_text("Scale", window.scale),
-            result_text("Font scale", window.font_scale),
-            result_text("Dimension changes", changes),
-            hint("Values vary per device; Maestro asserts the positive flags."),
+            ResultText("Window", f"{int(window.width)} x {int(window.height)}"),
+            ResultText("Screen", f"{int(screen.width)} x {int(screen.height)}"),
+            ResultText("Window positive", "yes" if window.width > 0 and window.height > 0 else "no"),
+            ResultText("Screen covers window", "yes" if screen.height >= window.height else "no"),
+            ResultText("Scale", window.scale),
+            ResultText("Font scale", window.font_scale),
+            ResultText("Dimension changes", changes),
+            Hint("Values vary per device; Maestro asserts the positive flags."),
         ),
     )

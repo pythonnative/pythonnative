@@ -7,11 +7,11 @@ Runs a fade + scale in parallel and asserts the status flips to
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def ParallelAnimationDemo() -> pn.Element:
+def ParallelAnimationDemo() -> pn.Node:
     """Render a box with parallel fade + scale animations."""
     opacity = pn.use_animated_value(0.0)
     scale = pn.use_animated_value(0.5)
@@ -27,23 +27,23 @@ def ParallelAnimationDemo() -> pn.Element:
         )
         set_status("done")
 
-    return demo_screen(
+    return DemoScreen(
         "Animated.parallel",
         "Fade + spring concurrently; status flips when both complete.",
-        section(
+        DemoSection(
             "Parallel demo",
-            result_text("Status", status),
+            ResultText("Status", status),
             pn.Animated.View(
                 pn.Text("parallel-box label", style=pn.style(color="#FFFFFF", font_weight="700")),
-                style=pn.style(
-                    opacity=opacity,
-                    scale=scale,
-                    padding=20,
-                    background_color="#F97316",
-                    border_radius=12,
-                ),
+                style={
+                    "opacity": opacity,
+                    "scale": scale,
+                    "padding": 20,
+                    "background_color": "#F97316",
+                    "border_radius": 12,
+                },
             ),
-            buttons_row(pn.Button("Run parallel", on_press=lambda: pn.run_async(run()))),
-            hint("Maestro taps 'Run parallel' and asserts 'Status: done'."),
+            ButtonsRow(pn.Button("Run parallel", on_press=run)),
+            Hint("Maestro taps 'Run parallel' and asserts 'Status: done'."),
         ),
     )

@@ -23,6 +23,8 @@ Most apps never call this module directly; it exists so framework
 code (and custom component libraries) can report problems in a way
 that reaches the developer instead of disappearing into a log.
 
+[](){ #pythonnative.diagnostics }
+
 ::: pythonnative.diagnostics
     options:
       show_root_heading: false

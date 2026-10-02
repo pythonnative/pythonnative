@@ -269,6 +269,7 @@ def test_refresh_in_place_swaps_components_and_preserves_state(
     # Bump the counter so the hook state is non-default.
     module.set_counter._set_count(5)
     rec.reconcile(module.Counter())
+    assert rec.root is not None
     assert get_text(rec.root.native_view) == "A:5"
 
     # Edit the module (change the prefix from "A:" to "B:").
@@ -301,6 +302,7 @@ def test_refresh_in_place_swaps_components_and_preserves_state(
     # called against the same VNode (and HookState), so state survives.
     new_module = sys.modules["rstate_pkg.comp"]
     rec.reconcile(new_module.Counter())
+    assert rec.root is not None
     assert get_text(rec.root.native_view) == "B:5"
 
 
@@ -508,3 +510,280 @@ def test_changed_hook_bindings_remount_instead_of_reusing_slots(
     finally:
         result.unmount()
         sys.modules.pop(module_name, None)
+
+
+# ======================================================================
+# apply_reload: when a reload preserves state and when it remounts
+# ======================================================================
+
+_COUNTER = (
+    "\n\n@pn.component\n"
+    "def App():\n"
+    "    count, set_count = pn.use_state(0)\n"
+    "    return pn.Button(f'{LABEL} {count}', on_press=lambda: set_count(count + 1))\n"
+)
+
+
+def _counter_source(preamble: str, label: str) -> str:
+    return f"import pythonnative as pn\n\nLABEL = {label!r}\n{preamble}{_COUNTER}"
+
+
+def _mount_counter(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pkg: str, source: str) -> Any:
+    """Mount ``source`` as ``{pkg}.main`` and press its first counter button once."""
+    from pythonnative.events import dispatch_event
+    from pythonnative.hosts import create_screen
+    from pythonnative.testing import settle
+
+    package_dir = tmp_path / pkg
+    package_dir.mkdir()
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (package_dir / "main.py").write_text(source, encoding="utf-8")
+    monkeypatch.syspath_prepend(os.fspath(tmp_path))
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    for name in (f"{pkg}.main", pkg):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    host = create_screen(f"{pkg}.main")
+    host.on_create()
+    button = next(v for v in host.root_native_view.walk() if v.type_name == "Button")
+    assert dispatch_event(button.tag, "on_press")
+    settle(host.reconciler)
+    return host
+
+
+def _reload_counter(tmp_path: Path, pkg: str, host: Any, source: str) -> Any:
+    from pythonnative.testing import settle
+
+    path = tmp_path / pkg / "main.py"
+    path.write_text(source, encoding="utf-8")
+    os.utime(path)
+    result = apply_reload([f"{pkg}.main"], [host])
+    settle(host.reconciler)
+    return result
+
+
+def _button_text(host: Any) -> str:
+    return next(v.text for v in host.root_native_view.walk() if v.type_name == "Button")
+
+
+_HELPERS = (
+    "\nfrom typing import TypedDict, Protocol\n\n\n"
+    "class Params(TypedDict):\n"
+    "    count: int\n\n\n"
+    "class Greeter(Protocol):\n"
+    "    def greet(self) -> str: ...\n\n\n"
+    "def shout(text):\n"
+    "    return text.upper()\n\n\n"
+    "helper = lambda: None\n"
+)
+
+_POINT = (
+    "\nimport dataclasses\n\n\n"
+    "@dataclasses.dataclass\n"
+    "class Point:\n"
+    "    x: int = 0\n\n"
+    "    def norm(self):\n"
+    "        return abs(self.x)\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "preserved"),
+    [
+        pytest.param(_HELPERS, _HELPERS, True, id="typeddict-protocol-and-helpers"),
+        pytest.param(
+            _HELPERS,
+            _HELPERS.replace("text.upper()", "text.lower()").replace("count: int", "count: int\n    extra: str"),
+            True,
+            id="edited-helpers-and-typeddict",
+        ),
+        pytest.param(_POINT, _POINT, True, id="unchanged-dataclass"),
+        pytest.param(_POINT, "\n\n# A comment.\n\n" + _POINT, True, id="blank-lines-above-class"),
+        pytest.param(
+            _POINT.replace("def norm(self):\n", 'def norm(self):\n        """Old."""\n'),
+            _POINT.replace("def norm(self):\n", 'def norm(self):\n        """New, longer."""\n'),
+            True,
+            id="edited-docstring",
+        ),
+        pytest.param(_POINT, _POINT.replace("x: int = 0", "x: int = 0\n    y: int = 0"), False, id="added-field"),
+        pytest.param(_POINT, _POINT.replace("abs(self.x)", "self.x * 2"), False, id="changed-method-body"),
+        pytest.param(_POINT, _POINT.replace("x: int = 0", "x: int = 1"), False, id="changed-default"),
+        pytest.param(_POINT, "\nimport dataclasses\n", False, id="removed-class"),
+        pytest.param("", _POINT, True, id="added-class"),
+    ],
+)
+def test_apply_reload_remounts_only_when_a_class_definition_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    _screen_backend: Any,
+    before: str,
+    after: str,
+    preserved: bool,
+) -> None:
+    host = _mount_counter(tmp_path, monkeypatch, "ar_cls", _counter_source(before, "before"))
+    assert _button_text(host) == "before 1"
+
+    result = _reload_counter(tmp_path, "ar_cls", host, _counter_source(after, "after"))
+
+    assert result.error is None
+    if preserved:
+        assert result.mode == "fast_refresh"
+        assert _button_text(host) == "after 1"
+    else:
+        assert result.mode == "remount"
+        assert _button_text(host) == "after 0"
+    host.on_destroy()
+
+
+def _scaffold_source(greeting: str) -> str:
+    """An equivalent of the `pn init` `main.py`: a theme-derived styles class, typed screens, and a navigator."""
+    return (
+        "import pythonnative as pn\n\n\n"
+        "class Styles:\n"
+        "    def __init__(self, theme: pn.Theme) -> None:\n"
+        "        self.title: pn.Style = {**theme.typography.title, 'color': theme.colors.text}\n\n\n"
+        "@pn.component\n"
+        "def HomeScreen() -> pn.Node:\n"
+        "    count, set_count = pn.use_state(0)\n"
+        "    nav = pn.use_navigation()\n"
+        "    styles = pn.use_styles(Styles)\n"
+        "    return pn.Column(\n"
+        "        pn.Button(f'Tapped {count} times', on_press=lambda: set_count(count + 1)),\n"
+        f"        pn.Text({greeting!r}, style=styles.title),\n"
+        "        pn.Button('Open detail', on_press=lambda: nav.push(DetailScreen(count=count))),\n"
+        "    )\n\n\n"
+        "@pn.component\n"
+        "def DetailScreen(count: int) -> pn.Node:\n"
+        "    return pn.Text(f'Detail: count was {count}')\n\n\n"
+        "Root = pn.StackNavigator(\n"
+        "    pn.Screen(HomeScreen, title='Home'),\n"
+        "    pn.Screen(DetailScreen, title='Detail'),\n"
+        ")\n\n\n"
+        "@pn.component\n"
+        "def App() -> pn.Node:\n"
+        "    return pn.NavigationContainer(Root)\n"
+    )
+
+
+def test_apply_reload_preserves_state_in_a_scaffold_style_module(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _screen_backend: Any
+) -> None:
+    host = _mount_counter(tmp_path, monkeypatch, "ar_scaffold", _scaffold_source("Hello from PythonNative!"))
+    assert "Tapped 1 times" in _texts(host.root_native_view)
+
+    result = _reload_counter(tmp_path, "ar_scaffold", host, _scaffold_source("Hello, edited!"))
+
+    assert result.mode == "fast_refresh"
+    texts = _texts(host.root_native_view)
+    assert "Hello, edited!" in texts
+    assert "Tapped 1 times" in texts
+
+    # The reloaded navigator resolves the reloaded screen component.
+    from pythonnative.events import dispatch_event
+    from pythonnative.testing import settle
+
+    button = next(v for v in host.root_native_view.walk() if v.type_name == "Button" and v.text == "Open detail")
+    assert dispatch_event(button.tag, "on_press")
+    settle(host.reconciler)
+    assert "Detail: count was 1" in _texts(host.root_native_view)
+    host.on_destroy()
+
+
+def test_apply_reload_reports_none_when_no_host_has_a_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _screen_backend: Any
+) -> None:
+    host = _mount_screen(tmp_path, monkeypatch, "ar_idle", "idle")
+    host.on_destroy()
+    host.reconciler = None
+    _rewrite(tmp_path / "ar_idle" / "main.py", "edited")
+
+    result = apply_reload(["ar_idle.main"], [host])
+
+    assert result.reloaded[-1] == "ar_idle.main"
+    assert result.mode == "none"
+
+
+def _fingerprints_of(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, source: str) -> Any:
+    from pythonnative.hot_reload import _class_fingerprints
+
+    monkeypatch.syspath_prepend(os.fspath(tmp_path))
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    (tmp_path / f"{name}.py").write_text(source, encoding="utf-8")
+    monkeypatch.delitem(sys.modules, name, raising=False)
+    importlib.invalidate_caches()
+    importlib.import_module(name)
+    try:
+        return _class_fingerprints([name])[name]
+    finally:
+        sys.modules.pop(name, None)
+
+
+_ENUM = "import enum\n\n\nclass Color(enum.Enum):\n    RED = 1\n    BLUE = 2\n\n    class Nested:\n        pass\n"
+
+
+@pytest.mark.parametrize(
+    ("after", "same"),
+    [
+        pytest.param(_ENUM, True, id="unchanged"),
+        pytest.param("# Moved down.\n\n\n" + _ENUM + "\n# Trailing comment.\n", True, id="moved"),
+        pytest.param(_ENUM.replace("BLUE = 2", "BLUE = 3"), False, id="changed-value"),
+        pytest.param(_ENUM.replace("    BLUE = 2\n", ""), False, id="removed-member"),
+    ],
+)
+def test_class_fingerprints_track_enum_definitions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, after: str, same: bool
+) -> None:
+    before = _fingerprints_of(tmp_path, monkeypatch, "pn_fp_enum", _ENUM)
+    assert set(before) == {"Color", "Color.Nested"}
+    assert (_fingerprints_of(tmp_path, monkeypatch, "pn_fp_enum", after) == before) is same
+
+
+def test_class_fingerprints_skip_typeddicts_protocols_and_foreign_classes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = (
+        "from collections import OrderedDict\n"
+        "from typing import NamedTuple, Protocol, TypedDict\n\n\n"
+        "class Params(TypedDict):\n    count: int\n\n\n"
+        "class Speaker(Protocol):\n    def speak(self) -> str: ...\n\n\n"
+        "class Pair(NamedTuple):\n    a: int\n    b: int\n\n\n"
+        "class Failure(Exception):\n    pass\n"
+    )
+    assert set(_fingerprints_of(tmp_path, monkeypatch, "pn_fp_skip", source)) == {"Pair", "Failure"}
+
+
+def test_class_fingerprints_track_dataclass_default_factories(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = (
+        "import dataclasses\n\n\n"
+        "@dataclasses.dataclass\n"
+        "class Bag:\n"
+        "    items: list = dataclasses.field(default_factory=list)\n"
+    )
+    before = _fingerprints_of(tmp_path, monkeypatch, "pn_fp_factory", source)
+    assert _fingerprints_of(tmp_path, monkeypatch, "pn_fp_factory", source) == before
+    edited = source.replace(
+        "items: list = dataclasses.field(default_factory=list)",
+        "items: list = dataclasses.field(default_factory=lambda: [1])",
+    )
+    assert _fingerprints_of(tmp_path, monkeypatch, "pn_fp_factory", edited) != before
+
+
+def test_class_fingerprints_see_through_decorated_methods(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = (
+        "import functools\n\n\n"
+        "def logged(fn):\n"
+        "    @functools.wraps(fn)\n"
+        "    def wrapper(*args, **kwargs):\n"
+        "        return fn(*args, **kwargs)\n"
+        "    return wrapper\n\n\n"
+        "class Service:\n"
+        "    @logged\n"
+        "    def fetch(self):\n"
+        "        return 1\n\n"
+        "    @property\n"
+        "    def ready(self):\n"
+        "        return True\n"
+    )
+    before = _fingerprints_of(tmp_path, monkeypatch, "pn_fp_wrapped", source)
+    assert _fingerprints_of(tmp_path, monkeypatch, "pn_fp_wrapped", source) == before
+    for edit in (("return 1", "return 2"), ("return True", "return False")):
+        assert _fingerprints_of(tmp_path, monkeypatch, "pn_fp_wrapped", source.replace(*edit)) != before

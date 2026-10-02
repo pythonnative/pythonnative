@@ -38,16 +38,19 @@ import sys
 import threading
 import time
 import traceback
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .assets import configure_native, manifest_for_sync
 from .devserver import ws
 from .devserver.watcher import is_synced_file, modules_for_paths
+from .utils import overlay_root
 
 __all__ = [
     "ConnectScreen",
     "DevClient",
     "current",
+    "display_server_url",
     "normalize_server_url",
     "saved_server_url",
     "start",
@@ -79,27 +82,44 @@ def normalize_server_url(text: str) -> str:
     """Turn whatever the developer typed into a dev-client WebSocket URL.
 
     Accepts ``192.168.1.20``, ``192.168.1.20:8765``, ``http://host:port``,
-    ``ws://host:port``, and full URLs with a path; the result always
-    ends in ``/ws?role=client``.
+    ``ws://host:port``, and full URLs with a path, such as the device URL
+    ``pn start`` prints (``http://192.168.1.20:8765/?token=...``). The
+    result always has the path ``/ws`` and the query
+    ``role=client&token=...``; the dev token is kept when the input
+    carries one.
     """
+    from .devserver.auth import QUERY_PARAM
+
     value = (text or "").strip()
     if not value:
         raise ValueError("empty server address")
     if "://" not in value:
         value = "ws://" + value
-    value = value.replace("http://", "ws://", 1).replace("https://", "wss://", 1)
-    scheme, _, rest = value.partition("://")
-    hostport, _, path = rest.partition("/")
+    parts = urlsplit(value)
+    scheme = {"http": "ws", "ws": "ws", "https": "wss", "wss": "wss"}.get(parts.scheme.lower())
+    if scheme is None:
+        raise ValueError(f"unsupported dev server scheme in {text!r}")
+    hostport = parts.netloc
+    if not hostport:
+        raise ValueError(f"missing host in {text!r}")
     if ":" not in hostport:
         from .devserver.server import DEFAULT_PORT
 
         hostport = f"{hostport}:{DEFAULT_PORT}"
-    if not path or path.startswith("?"):
-        path = "ws?role=client"
-    elif "role=" not in path:
-        path = path.rstrip("/")
-        path = (path + ("&" if "?" in path else "?") + "role=client") if path.startswith("ws") else "ws?role=client"
-    return f"{scheme}://{hostport}/{path}"
+    query: List[Tuple[str, str]] = [("role", "client")]
+    token = dict(parse_qsl(parts.query)).get(QUERY_PARAM)
+    if token:
+        query.append((QUERY_PARAM, token))
+    return urlunsplit((scheme, hostport, "/ws", urlencode(query), ""))
+
+
+def display_server_url(url: str) -> str:
+    """The short form of a dev-client URL for the connect screen (``host:port/?token=...``)."""
+    from .devserver.auth import QUERY_PARAM
+
+    parts = urlsplit(url)
+    token = dict(parse_qsl(parts.query)).get(QUERY_PARAM)
+    return parts.netloc + (f"/?{urlencode({QUERY_PARAM: token})}" if token else "")
 
 
 def _saved_url_path(overlay: str) -> str:
@@ -108,8 +128,6 @@ def _saved_url_path(overlay: str) -> str:
 
 def saved_server_url(overlay: Optional[str] = None) -> Optional[str]:
     """The URL remembered by a previous connection (``--dev-client`` builds)."""
-    from .hot_reload import overlay_root
-
     root = overlay or overlay_root()
     if not root:
         return None
@@ -226,6 +244,11 @@ class DevClient:
     # -- state -----------------------------------------------------------
 
     @property
+    def server_label(self) -> str:
+        """``host:port`` of the server, for logs (the full URL carries the dev token)."""
+        return urlsplit(self.url).netloc
+
+    @property
     def state(self) -> str:
         """``"idle"``, ``"connecting"``, ``"connected"``, ``"syncing"``, or ``"disconnected"``."""
         with self._state_lock:
@@ -283,15 +306,24 @@ class DevClient:
     def _run(self) -> None:
         attempt = 0
         while not self._stop.is_set():
-            self._set_state("connecting", self.url)
+            self._set_state("connecting", self.server_label)
             try:
                 self._session()
                 attempt = 0
             except (OSError, ws.WebSocketError) as exc:
                 detail = f"{type(exc).__name__}: {exc}"
+                refused = isinstance(exc, ws.HandshakeError) and any(f" {code} " in f"{exc} " for code in (401, 403))
+                if refused:
+                    detail = "the dev server refused this client's token"
                 self._set_state("disconnected", detail)
-                if attempt == 0:
-                    self._log(f"[pn dev] cannot reach {self.url} ({detail}); retrying")
+                if attempt == 0 and refused:
+                    self._log(
+                        f"[pn dev] {self.server_label} refused the connection: the URL is missing the dev "
+                        "token or carries an old one. Relaunch with `pn run`, or enter the device URL that "
+                        "`pn start` prints."
+                    )
+                elif attempt == 0:
+                    self._log(f"[pn dev] cannot reach {self.server_label} ({detail}); retrying")
             except Exception as exc:
                 self._set_state("disconnected", repr(exc))
                 self._log(f"[pn dev] client error: {exc!r}")
@@ -308,7 +340,7 @@ class DevClient:
         self._socket = client
         try:
             client.send_text(json.dumps(self._hello()))
-            self._set_state("connected", self.url)
+            self._set_state("connected", self.server_label)
             self._flush_outbox()
             while not self._stop.is_set():
                 try:
@@ -469,7 +501,7 @@ class DevClient:
             # The app already runs these exact sources (a fresh build, or an
             # overlay from the last session): nothing to reload.
             return
-        self._log(f"[pn dev] synced {len(written)} file(s) from {self.url}")
+        self._log(f"[pn dev] synced {len(written)} file(s) from {self.server_label}")
         modules = modules_for_paths(written)
         assets_changed = bool(manifest_for_sync(written))
         if modules or assets_changed:
@@ -648,7 +680,7 @@ def current() -> Optional[DevClient]:
 def start(url: str, overlay: Optional[str] = None, **kwargs: Any) -> DevClient:
     """Start (or replace) the process-wide dev client for ``url``."""
     global _current
-    from .hot_reload import configure_dev_environment, overlay_root
+    from .hot_reload import configure_dev_environment
 
     root = overlay or overlay_root()
     if root is None:
@@ -680,8 +712,6 @@ def start_if_configured(entry_module: Optional[str] = None) -> Optional[DevClien
     builds, from the URL saved by a previous connection. Returns the
     client, or ``None`` when nothing is configured.
     """
-    from .hot_reload import overlay_root
-
     root = overlay_root()
     if root is None:
         return None
@@ -710,7 +740,7 @@ def _connect_screen() -> Any:
     def ConnectScreen() -> Any:
         client = current()
         initial = client.url if client is not None else (saved_server_url() or "")
-        url, set_url = use_state(initial.replace("/ws?role=client", "") if initial else "")
+        url, set_url = use_state(display_server_url(initial) if initial else "")
         status, set_status = use_state(client.state if client is not None else "idle")
         detail, set_detail = use_state("")
 
@@ -741,10 +771,13 @@ def _connect_screen() -> Any:
                 return
             start(normalized)
             set_status("connecting")
-            set_detail(normalized)
+            set_detail(urlsplit(normalized).netloc)
 
-        lan_hint = "Run `pn start` on your computer and enter its address (for example 192.168.1.20:8765)."
-        colors = {
+        lan_hint = (
+            "Run `pn start` on your computer and enter the device URL it prints "
+            "(for example 192.168.1.20:8765/?token=...)."
+        )
+        colors: Dict[str, str] = {
             "idle": "#8E8E93",
             "connecting": "#FF9F0A",
             "connected": "#30D158",
@@ -756,14 +789,14 @@ def _connect_screen() -> Any:
             c.Column(
                 c.Text("PythonNative", style={"font_size": 30, "bold": True, "color": "#FFFFFF"}),
                 c.Text("Dev client", style={"font_size": 17, "color": "#8E8E93"}),
-                style={"spacing": 4, "padding_top": 72},
+                style={"gap": 4, "padding_top": 72},
             ),
             c.Column(
                 c.Text("Dev server address", style={"font_size": 13, "color": "#8E8E93"}),
                 c.TextInput(
                     value=url,
                     on_change=set_url,
-                    placeholder="192.168.1.20:8765",
+                    placeholder="192.168.1.20:8765/?token=...",
                     auto_correct=False,
                     auto_capitalize="none",
                     keyboard_type="url",
@@ -780,21 +813,26 @@ def _connect_screen() -> Any:
                     on_press=_connect,
                     style={"background_color": "#0A84FF", "color": "#FFFFFF", "padding": 12, "border_radius": 10},
                 ),
-                style={"spacing": 8, "align_items": "stretch"},
+                style={"gap": 8, "align_items": "stretch"},
             ),
             c.Column(
                 c.Row(
                     c.View(
-                        style={"width": 10, "height": 10, "border_radius": 5, "background_color": colors.get(status)}
+                        style={
+                            "width": 10,
+                            "height": 10,
+                            "border_radius": 5,
+                            "background_color": colors.get(status, "#8E8E93"),
+                        }
                     ),
                     c.Text(status, style={"color": "#FFFFFF", "font_size": 15}),
-                    style={"spacing": 8, "align_items": "center"},
+                    style={"gap": 8, "align_items": "center"},
                 ),
                 c.Text(detail, style={"color": "#8E8E93", "font_size": 12}),
-                style={"spacing": 4},
+                style={"gap": 4},
             ),
             c.Text(lan_hint, style={"color": "#636366", "font_size": 12}),
-            style={"flex": 1, "padding": 24, "spacing": 28, "background_color": "#000000"},
+            style={"flex": 1, "padding": 24, "gap": 28, "background_color": "#000000"},
         )
 
     return ConnectScreen

@@ -12,25 +12,25 @@ velocity) so the flow is robust across emulator speeds.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 from pythonnative import gestures
 
 
 @pn.component
-def GesturesDemo() -> pn.Element:
+def GesturesDemo() -> pn.Node:
     """Render a gesture area tracking taps, long presses, and swipes."""
     taps, set_taps = pn.use_state(0)
     presses, set_presses = pn.use_state(0)
     swipe, set_swipe = pn.use_state("none")
 
-    return demo_screen(
+    return DemoScreen(
         "gestures",
         "Tap, long-press, or swipe the area below.",
-        section(
+        DemoSection(
             "Gesture area",
-            result_text("Taps", taps),
-            result_text("Long presses", presses),
-            result_text("Swipe", swipe),
+            ResultText("Taps", taps),
+            ResultText("Long presses", presses),
+            ResultText("Swipe", swipe),
             pn.View(
                 # Label deliberately differs from the "Gesture area" section
                 # title; Maestro taps by text and must match only the box.
@@ -57,6 +57,6 @@ def GesturesDemo() -> pn.Element:
                     ),
                 ],
             ),
-            hint("Maestro taps, long-presses, then swipes left."),
+            Hint("Maestro taps, long-presses, then swipes left."),
         ),
     )

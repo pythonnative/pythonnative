@@ -27,6 +27,9 @@ The console script `pn` (declared in `pyproject.toml`) dispatches to:
 - `pn app-id android|ios`: print the resolved application/bundle id
   (handy for scripts and CI), as plain text or as JSON with `--json`.
 - `pn clean`: remove the local `build/` directory.
+- `pn lint [paths...]`: check the rules of hooks without running the
+  code, as ``path:line:col: CODE message`` lines or as JSON with
+  `--json`.
 
 The heavy lifting lives in the ``pythonnative.project`` and
 ``pythonnative.devserver`` packages; this module is a thin,
@@ -42,13 +45,16 @@ import dataclasses
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, TextIO
-from urllib.request import urlopen
+from urllib.error import HTTPError
+from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 
 from ..project import builder as builder_mod
 from ..project import deps as deps_mod
@@ -66,52 +72,52 @@ DEFAULT_DEV_PORT = 8765
 # init
 # ======================================================================
 
-_MAIN_TEMPLATE = """from typing import TypedDict
-
-import pythonnative as pn
-
-Stack = pn.create_stack_navigator()
+_MAIN_TEMPLATE = """import pythonnative as pn
 
 
-class DetailParams(TypedDict):
-    count: int
+class Styles:
+    def __init__(self, theme: pn.Theme) -> None:
+        self.screen = pn.style(padding=theme.spacing.md, gap=theme.spacing.md, align_items="stretch")
+        self.title: pn.Style = {**theme.typography.title, "color": theme.colors.text}
+        self.body: pn.Style = {**theme.typography.body, "color": theme.colors.text}
 
 
 @pn.component
-def HomeScreen():
+def HomeScreen() -> pn.Node:
     count, set_count = pn.use_state(0)
     nav = pn.use_navigation()
-    theme = pn.use_theme()
+    styles = pn.use_styles(Styles)
     return pn.ScrollView(
         pn.Column(
-            pn.Text("Hello from PythonNative!", style={"font_size": theme.font_size_title, "bold": True}),
-            pn.Text(f"Tapped {count} times"),
+            pn.Text("Hello from PythonNative!", style=styles.title),
+            pn.Text(f"Tapped {count} times", style=styles.body),
             pn.Button("Tap me", on_press=lambda: set_count(count + 1)),
-            pn.Button("Open detail", on_press=lambda: nav.navigate("Detail", count=count)),
-            style={"spacing": theme.spacing_large, "padding": 16, "align_items": "stretch"},
+            pn.Button("Open detail", on_press=lambda: nav.push(DetailScreen(count=count))),
+            style=styles.screen,
         )
     )
 
 
 @pn.component
-def DetailScreen():
+def DetailScreen(count: int) -> pn.Node:
     nav = pn.use_navigation()
-    route = pn.use_route(DetailParams)
+    styles = pn.use_styles(Styles)
     return pn.Column(
-        pn.Text(f"Detail: count was {route.params['count']}", style={"font_size": 20}),
+        pn.Text(f"The count was {count}", style=styles.body),
         pn.Button("Back", on_press=nav.go_back),
-        style={"spacing": 12, "padding": 16},
+        style=styles.screen,
     )
+
+
+Root = pn.StackNavigator(
+    pn.Screen(HomeScreen, title="Home"),
+    pn.Screen(DetailScreen, title="Detail"),
+)
 
 
 @pn.component
-def App():
-    return pn.NavigationContainer(
-        Stack.Navigator(
-            Stack.Screen("Home", HomeScreen, title="Home"),
-            Stack.Screen("Detail", DetailScreen, title="Detail"),
-        )
-    )
+def App() -> pn.Node:
+    return pn.NavigationContainer(Root)
 """
 
 _GITIGNORE = "# PythonNative\n__pycache__/\n*.pyc\n.venv/\nbuild/\n.DS_Store\n"
@@ -526,8 +532,6 @@ def _missing_requirements(requirements: Sequence[str]) -> List[str]:
 
 def _missing_requirements_message(missing: Sequence[str]) -> str:
     """The warning ``pn start`` prints, ending in a command that installs ``missing`` here."""
-    import shlex
-
     command = " ".join([shlex.quote(sys.executable), "-m", "pip", "install", *(shlex.quote(m) for m in missing)])
     names = ", ".join(_requirement_distribution(m) for m in missing)
     return (
@@ -542,11 +546,26 @@ def preview_command(args: argparse.Namespace) -> None:
     start_command(args, open_browser=True)
 
 
-def _running_dev_server(port: int) -> Optional[Dict[str, Any]]:
-    """Return ``/status`` of a dev server on ``localhost:port``, or ``None``."""
+def _running_dev_server(port: int, token: str) -> Optional[Dict[str, Any]]:
+    """Return ``/status`` of a dev server on ``localhost:port``, or ``None``.
+
+    The request carries this user's dev ``token``. A server that refuses
+    it (another user's, or one started with a different ``PN_DEV_TOKEN``)
+    counts as absent, with a note saying why.
+    """
+    from ..devserver.auth import HEADER_NAME
+
+    request = Request(f"http://127.0.0.1:{port}/status", headers={HEADER_NAME: token})
     try:
-        with urlopen(f"http://127.0.0.1:{port}/status", timeout=0.5) as response:
+        with urlopen(request, timeout=0.5) as response:
             data = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        if exc.code in (401, 403):
+            print(
+                f"Note: the dev server on port {port} refused this user's dev token. Start 'pn start' "
+                "as the same user (with the same PN_DEV_TOKEN, if you set one) and relaunch."
+            )
+        return None
     except Exception:
         return None
     return data if isinstance(data, dict) else None
@@ -620,20 +639,23 @@ def _resolve_device(platform: str, query: Optional[str]) -> Optional[devices_mod
 # ======================================================================
 
 
-def _dev_server_url_for(platform: str, device: Optional[devices_mod.Device], port: int) -> str:
+def _dev_server_url_for(platform: str, device: Optional[devices_mod.Device], port: int, token: str) -> str:
     """The WebSocket URL a launched app should use to reach ``pn start``.
 
     Simulators share the host's loopback. Android emulators and USB
     devices reach it through ``adb reverse`` (set up by the caller), so
     ``localhost`` works for every Android target. A physical iOS device
-    is on the LAN, so it gets the first LAN address.
+    is on the LAN, so it gets the first LAN address. The URL carries the
+    dev ``token`` the server requires.
     """
+    from ..devserver.auth import with_token
+
+    host = "localhost"
     if platform == "ios" and device is not None and device.kind == "device":
         from ..devserver import lan_addresses
 
-        for address in lan_addresses():
-            return f"ws://{address}:{port}/ws?role=client"
-    return f"ws://localhost:{port}/ws?role=client"
+        host = next(iter(lan_addresses()), host)
+    return with_token(f"ws://{host}:{port}/ws?role=client", token)
 
 
 def run_project(args: argparse.Namespace) -> None:
@@ -675,12 +697,15 @@ def run_project(args: argparse.Namespace) -> None:
     else:
         ios_sdks = ("iphonesimulator",)
 
+    from ..devserver.auth import load_token
+
     explicit_server: Optional[str] = getattr(args, "dev_server", None)
-    status = _running_dev_server(port) if not explicit_server else None
+    token = load_token()
+    status = _running_dev_server(port, token) if not explicit_server else None
     if explicit_server:
         server_url: Optional[str] = explicit_server
     elif status is not None:
-        server_url = _dev_server_url_for(platform, device, int(status.get("port") or port))
+        server_url = _dev_server_url_for(platform, device, int(status.get("port") or port), token)
     else:
         server_url = None
         if not prepare_only:
@@ -718,7 +743,7 @@ def run_project(args: argparse.Namespace) -> None:
 
     app_id = config.application_id if platform == "android" else config.bundle_id
     if server_url:
-        print(f"Dev server: {server_url} (saves in app/ apply with Fast Refresh).")
+        print(f"Dev server: {urlsplit(server_url).netloc} (saves in app/ apply with Fast Refresh).")
     try:
         if platform == "android":
             artifact = _run_android(
@@ -792,7 +817,9 @@ def _run_android(
         subprocess.run(["adb", "reverse", f"tcp:{port}", f"tcp:{port}"], check=False, capture_output=True)
     command = ["adb", "shell", "am", "start", "-n", f"{app_id}/.MainActivity"]
     if server_url:
-        command += ["--es", "pn_dev_server", server_url]
+        # `adb shell` runs its arguments through the device's shell, where
+        # the `&` between query parameters would end the command.
+        command += ["--es", "pn_dev_server", shlex.quote(server_url)]
     subprocess.run(command, check=True)
     return artifact
 
@@ -1153,6 +1180,54 @@ def _terminate_subprocess(proc: Optional[subprocess.Popen]) -> None:
 
 
 # ======================================================================
+# lint
+# ======================================================================
+
+
+def lint_command(args: argparse.Namespace) -> None:
+    """Check the rules of hooks and exit 1 when anything is found.
+
+    Lints each path in ``args.paths`` (files, or directories searched
+    recursively for ``*.py``). With no paths it lints ``app/`` when that
+    directory exists and the current directory otherwise. The checks
+    themselves live in [`lint_paths`][pythonnative.lint.lint_paths].
+
+    Without ``--json``, each finding prints as ``path:line:col: CODE
+    message`` followed by a summary line. With ``--json``, stdout
+    carries a JSON array and nothing else, one object per finding with
+    ``path``, ``line``, ``col``, ``code``, and ``message`` keys, and the
+    summary goes to stderr. Either way the exit status is 1 when there
+    are findings, 0 when there aren't, and 2 when a path doesn't exist.
+
+    Args:
+        args: Parsed namespace with ``paths`` and optional ``json``.
+    """
+    from .. import lint as lint_mod
+
+    as_json: bool = getattr(args, "json", False)
+    paths: List[str] = list(getattr(args, "paths", None) or [])
+    if not paths:
+        paths = ["app" if Path("app").is_dir() else "."]
+    try:
+        findings = lint_mod.lint_paths(paths)
+    except FileNotFoundError as exc:
+        print(f"pn lint: {exc}", file=sys.stderr)
+        sys.exit(2)
+
+    summary_stream = sys.stderr if as_json else sys.stdout
+    if as_json:
+        print(json.dumps([finding.to_dict() for finding in findings], indent=2))
+    else:
+        for finding in findings:
+            print(finding.format())
+    if findings:
+        noun = "problem" if len(findings) == 1 else "problems"
+        print(f"Found {len(findings)} {noun}.", file=summary_stream)
+        sys.exit(1)
+    print("No problems found.", file=summary_stream)
+
+
+# ======================================================================
 # Argument parsing
 # ======================================================================
 
@@ -1263,7 +1338,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser_run.add_argument(
         "--dev-server",
-        help="Dev server WebSocket URL for the app (default: the 'pn start' found on --port, via localhost/LAN)",
+        help=(
+            "Dev server URL for the app, including its ?token= (default: the 'pn start' found on --port, "
+            "via localhost/LAN, with your dev token)"
+        ),
     )
     parser_run.add_argument(
         "--port", type=int, default=DEFAULT_DEV_PORT, help=f"Port 'pn start' listens on (default: {DEFAULT_DEV_PORT})"
@@ -1304,6 +1382,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser_clean = subparsers.add_parser("clean", help="Remove the local build/ directory")
     parser_clean.set_defaults(func=clean_project)
+
+    parser_lint = subparsers.add_parser("lint", help="Check the rules of hooks (exits 1 on findings)")
+    parser_lint.add_argument(
+        "paths", nargs="*", help="Files or directories to lint (default: app/ if it exists, else the current directory)"
+    )
+    parser_lint.add_argument(
+        "--json", action="store_true", help="Print a JSON array to stdout for scripting (the summary goes to stderr)"
+    )
+    parser_lint.set_defaults(func=lint_command)
 
     return parser
 

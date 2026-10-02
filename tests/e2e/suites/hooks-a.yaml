@@ -1,6 +1,6 @@
 # Hooks category suite, part 1 of two; see hooks.yaml.
 #
-# The hooks category (26 flows) takes a GitHub-hosted Android emulator
+# The hooks category (27 flows) takes a GitHub-hosted Android emulator
 # past its stable session length: the emulator drops offline after
 # roughly ten minutes of sustained Maestro driving. CI therefore runs the
 # category as two parts, each on a freshly booted emulator.

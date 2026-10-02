@@ -11,11 +11,11 @@ verifies that registration is inert.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UseBackHandlerDemo() -> pn.Element:
+def UseBackHandlerDemo() -> pn.Node:
     """Arm a back-press guard and count intercepted presses."""
     armed, set_armed = pn.use_state(False)
     intercepted, set_intercepted = pn.use_state(0)
@@ -28,18 +28,18 @@ def UseBackHandlerDemo() -> pn.Element:
 
     pn.use_back_handler(on_back)
 
-    return demo_screen(
+    return DemoScreen(
         "use_back_handler",
         "Intercept the system back action while a guard is armed.",
-        section(
+        DemoSection(
             "Back guard",
-            result_text("Guard armed", "yes" if armed else "no"),
-            result_text("Back presses intercepted", intercepted),
-            buttons_row(
+            ResultText("Guard armed", "yes" if armed else "no"),
+            ResultText("Back presses intercepted", intercepted),
+            ButtonsRow(
                 pn.Button("Arm guard", on_press=lambda: set_armed(True)),
                 pn.Button("Disarm guard", on_press=lambda: set_armed(False)),
             ),
-            hint(
+            Hint(
                 "Android: with the guard armed, the device back button "
                 "bumps the counter instead of leaving this screen. "
                 "Disarm to restore normal back behavior."

@@ -19,8 +19,10 @@ genuinely exercised, while keeping the scroll to a handful of swipes.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 _MODES = ("vertical", "horizontal", "inverted")
 
@@ -30,14 +32,14 @@ def _separator() -> pn.Element:
 
 
 @pn.component
-def FlatListDemo() -> pn.Element:
+def FlatListDemo() -> pn.Node:
     """Render a virtualized 40-row FlatList with stable row labels."""
     mode, set_mode = pn.use_state("vertical")
     items = [{"id": i, "label": f"FlatRow {i + 1}"} for i in range(40)]
     horizontal = mode == "horizontal"
     inverted = mode == "inverted"
 
-    def render_row(item: dict, _: int) -> pn.Element:
+    def render_row(item: dict[str, Any], _: int) -> pn.Element:
         return pn.View(
             pn.Text(item["label"], style=pn.style(font_size=15, font_weight="600")),
             style=pn.style(
@@ -47,12 +49,12 @@ def FlatListDemo() -> pn.Element:
             ),
         )
 
-    return demo_screen(
+    return DemoScreen(
         "FlatList",
         "Virtualized 40-row list; scroll vertically and horizontally.",
-        section(
+        DemoSection(
             "List body",
-            result_text("Mode", mode),
+            ResultText("Mode", mode),
             # See ``components/scroll_view.py`` for the rationale: this
             # is sized so Maestro's screen-center swipe lands inside
             # the FlatList on both the iOS and Android CI emulators.
@@ -70,10 +72,10 @@ def FlatListDemo() -> pn.Element:
                 key_extractor=lambda item, _: str(item["id"]),
                 style=pn.style(height=400, background_color="#F1F5F9"),
             ),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Show horizontal list", on_press=lambda: set_mode("horizontal")),
                 pn.Button("Show inverted list", on_press=lambda: set_mode("inverted")),
             ),
-            hint("Maestro asserts 'FlatRow 1' and (after scroll) 'FlatRow 40'."),
+            Hint("Maestro asserts 'FlatRow 1' and (after scroll) 'FlatRow 40'."),
         ),
     )

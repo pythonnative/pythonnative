@@ -68,7 +68,9 @@ Unsolicited pull requests for issues that are already assigned or already have a
   - `journal.py`: the undo journal a failed render pass rolls back through
   - `native_views/`: the thin backend accessor (`get_backend` / `set_backend`) and the bridge backend that serializes commits
   - `native_modules/`: device module facades and their Python fallbacks
-  - `navigation/`: navigators, container, hooks, linking, theme, and the navigation ref
+  - `navigation/`: navigator values, screens, container, hooks, deep-link table, and the navigation ref
+  - `theme.py`, `style.py`, `store.py`: the app `Theme`, `StyleSheet` namespaces and style resolution, and `Store`
+  - `lint.py`: the `pn lint` rules-of-hooks checker
   - `testing/`: the headless testing library and the shipped pytest plugin (`testing/pytest_plugin.py`)
   - `bridge/`: JSON codec and per-platform transports into the native rendering core
   - `cli/`: `pn` command
@@ -201,7 +203,7 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `bridge`: wire codec, transports, handshake, and native-to-Python callback (`bridge/`)
   - `cli`: CLI tool and `pn` command (`src/pythonnative/cli/`)
   - `component`: the `@component` decorator, `Component`, and `memo` (`component.py`)
-  - `components`: declarative element-creating functions (`components/`)
+  - `components`: declarative element-creating functions and their shared props (`components/`)
   - `element`: Element descriptor class (`element.py`)
   - `events`: tag-based event routing between native views and Python callbacks (`events.py`)
   - `gestures`: gesture descriptors and the pure-Python recognition arbiter (`gestures.py`)
@@ -213,10 +215,11 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `hot_reload`: module reloader and Fast Refresh (`hot_reload.py`)
   - `journal`: render undo journal (`journal.py`)
   - `layout`: Yoga layout integration and the host binding (`layout.py`, `native/yoga/`)
+  - `lint`: the `pn lint` rules-of-hooks checker (`lint.py`)
   - `mutations`: batched mutation ops between reconciler and native backends (`mutations.py`)
   - `native_modules`: native module registry, Python facades, and Python fallbacks (`native_modules/`)
   - `native_views`: view backend accessor and bridge backend (`native_views/`)
-  - `navigation`: navigation state, container, navigators, hooks, linking, theme, and ref (`navigation/`)
+  - `navigation`: navigation state, container, navigators, screens, hooks, linking, and ref (`navigation/`)
   - `net`: awaitable HTTP client (`net.py`)
   - `package`: `src/pythonnative/__init__.py` exports and package boundary
   - `platform`: `Platform.OS`/`Platform.select` and version detection (`platform.py`)
@@ -227,9 +230,11 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `runtime`: framework-wide asyncio loop and thread-safe future helpers (`runtime.py`)
   - `sdk`: public extension SDK for custom native components (`sdk/`)
   - `storage`: AsyncStorage key/value persistence and `use_persisted_state` (`storage.py`)
+  - `store`: the `Store` app-state container and `use_store` (`store.py`)
   - `scheduler`: render batching and transition queues (`scheduler.py`)
-  - `style`: StyleSheet and theming (`style.py`)
+  - `style`: the `Style` type, style resolution, and `StyleSheet` (`style.py`)
   - `testing`: public test utilities and the pytest plugin (`testing/`)
+  - `theme`: `Theme`, `ThemeProvider`, `use_theme`, and `use_styles` (`theme.py`)
   - `utils`: shared utilities (`utils.py`)
 
 - Other scopes:

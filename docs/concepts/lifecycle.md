@@ -135,7 +135,7 @@ import asyncio
 import pythonnative as pn
 
 @pn.component
-def LiveClock():
+def LiveClock() -> pn.Node:
     now, set_now = pn.use_state("--:--")
 
     async def tick():

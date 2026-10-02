@@ -16,12 +16,12 @@ import pythonnative as pn
 
 
 @pn.component
-def App():
+def App() -> pn.Node:
     count, set_count = pn.use_state(0)
     return pn.Column(
         pn.Text(f"Count: {count}", style={"font_size": 24, "bold": True}),
         pn.Button("Tap me", on_press=lambda: set_count(count + 1)),
-        style={"spacing": 12, "padding": 16, "align_items": "stretch"},
+        style={"gap": 12, "padding": 16, "align_items": "stretch"},
     )
 ```
 
@@ -40,7 +40,7 @@ def App():
   Swift and Kotlin component managers.
 - After every commit a [layout pass](../concepts/layout.md) computes
   frame for each widget using Yoga and the platform's intrinsic
-  measurements. `spacing`, `padding`, and `align_items` follow shared
+  measurements. `gap`, `padding`, and `align_items` follow shared
   layout rules; fonts and control sizes can differ by platform.
 
 ## Run it

@@ -5,7 +5,9 @@ own thread with a private ``asyncio`` loop, so it works both inside
 ``pn start`` and in tests independently of the Python application
 loop. It exposes:
 
-- ``GET /``: the browser preview page.
+- ``GET /``: the browser preview page. With a valid ``?token=``, the
+  response instead sets the ``pn_token`` cookie and redirects to ``/``,
+  so the token doesn't stay in the address bar.
 - ``GET /static/<name>``: preview assets (JS, CSS).
 - ``GET /manifest``: ``{"version", "entry", "files": {path: sha256}}``.
 - ``GET /file/<path>``: raw bytes of one synced source file.
@@ -18,6 +20,15 @@ loop. It exposes:
   server only relays text frames between the page and the
   [`PreviewChannel`][pythonnative.devserver.server.PreviewChannel]
   handler installed by the preview.
+
+Every route except the page and ``/static/`` requires the per-user dev
+token (see ``pythonnative.devserver.auth``) as a ``token`` query
+parameter, an ``X-PN-Token`` header, or the ``pn_token`` cookie.
+Requests without it get ``401``; requests with a wrong one get ``403``.
+A WebSocket upgrade that carries an ``Origin`` header (every browser
+sends one) must also come from the server's own origin: the ``Origin``
+host and port must equal the ``Host`` header. Native dev clients send no
+``Origin``.
 
 Dev-client protocol (JSON objects, one per text frame):
 
@@ -48,7 +59,7 @@ from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, Sequence
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from . import ws
+from . import auth, ws
 from .watcher import FileWatcher, SourceChange, SourceSnapshot, snapshot_sources
 
 __all__ = [
@@ -105,14 +116,19 @@ class ServerInfo:
     project_root: str
     entry_module: str
     project_name: str = ""
+    token: str = field(default="", repr=False)
 
     def url(self, host: Optional[str] = None) -> str:
         """The HTTP base URL, substituting ``host`` for the bind address."""
         return f"http://{host or self.display_host}:{self.port}"
 
+    def preview_url(self, host: Optional[str] = None) -> str:
+        """The browser preview URL, carrying the dev token once."""
+        return auth.with_token(self.url(host) + "/", self.token)
+
     def ws_url(self, host: Optional[str] = None) -> str:
-        """The dev-client WebSocket URL."""
-        return f"ws://{host or self.display_host}:{self.port}/ws?role=client"
+        """The dev-client WebSocket URL, including the dev token."""
+        return auth.with_token(f"ws://{host or self.display_host}:{self.port}/ws?role=client", self.token)
 
     @property
     def display_host(self) -> str:
@@ -219,6 +235,9 @@ class DevServer:
             it; pass ``127.0.0.1`` to stay local.
         port: TCP port; ``0`` picks a free one.
         project_name: Shown in the preview page and ``/status``.
+        token: The dev token clients must present; defaults to this
+            user's token from
+            [`load_token`][pythonnative.devserver.auth.load_token].
         static_dir: Where the preview page's assets live.
         log: Where to print client logs and connection events.
         watch: Whether to run the file watcher.
@@ -232,11 +251,13 @@ class DevServer:
         host: str = "0.0.0.0",
         port: int = DEFAULT_PORT,
         project_name: str = "",
+        token: Optional[str] = None,
         static_dir: Optional[str] = None,
         log: Optional[Logger] = None,
         watch: bool = True,
     ) -> None:
         self.project_root = os.path.abspath(project_root)
+        self.token = token or auth.load_token()
         self.entry_module = entry_module
         self.project_name = project_name
         self.static_dir = static_dir or _STATIC_DIR
@@ -263,6 +284,7 @@ class DevServer:
             project_root=self.project_root,
             entry_module=entry_module,
             project_name=project_name,
+            token=self.token,
         )
 
     # -- lifecycle -------------------------------------------------------
@@ -476,18 +498,35 @@ class DevServer:
             await self._serve_websocket(reader, writer, headers, path, query)
             return
         try:
-            await self._serve_http(writer, method, path, query)
+            await self._serve_http(writer, method, path, query, headers)
         finally:
             try:
                 writer.close()
             except Exception:
                 pass
 
-    async def _serve_http(self, writer: asyncio.StreamWriter, method: str, path: str, query: Dict[str, str]) -> None:
+    def _check_token(self, headers: Dict[str, str], query: Dict[str, str]) -> int:
+        """``200`` for a valid token, ``401`` when none was presented, ``403`` for a wrong one."""
+        presented = auth.request_token(headers, query)
+        if presented is None:
+            return 401
+        return 200 if auth.token_matches(presented, self.token) else 403
+
+    async def _serve_http(
+        self, writer: asyncio.StreamWriter, method: str, path: str, query: Dict[str, str], headers: Dict[str, str]
+    ) -> None:
         if method not in ("GET", "HEAD"):
             _respond(writer, 405, b"method not allowed", "text/plain")
             return
         if path in ("/", "/index.html"):
+            if auth.QUERY_PARAM in query:
+                # Trade the URL's token for a cookie, then drop it from the address bar.
+                if not auth.token_matches(query[auth.QUERY_PARAM], self.token):
+                    _respond_refusal(writer, 403)
+                    return
+                cookie = f"{auth.COOKIE_NAME}={self.token}; HttpOnly; SameSite=Strict; Path=/"
+                _respond(writer, 302, b"", "text/plain", headers={"Location": "/", "Set-Cookie": cookie})
+                return
             _respond_file(writer, os.path.join(self.static_dir, "index.html"))
             return
         if path == "/static/schema.js":
@@ -509,6 +548,12 @@ class DevServer:
                 _respond(writer, 404, b"not found", "text/plain")
                 return
             _respond_file(writer, candidate)
+            return
+        # Everything past the page and its static files needs the token,
+        # including routes that don't exist (so they reveal nothing).
+        status = self._check_token(headers, query)
+        if status != 200:
+            _respond_refusal(writer, status)
             return
         if path == "/manifest":
             _respond_json(writer, self.manifest())
@@ -582,6 +627,24 @@ class DevServer:
         path: str,
         query: Dict[str, str],
     ) -> None:
+        # Refuse with a plain HTTP response before upgrading, so a rejected
+        # peer never gets a socket.
+        refusal: Optional[int] = None
+        if path != "/ws":
+            refusal = 404
+        elif not _same_origin(headers):
+            refusal = 403
+        else:
+            status = self._check_token(headers, query)
+            refusal = None if status == 200 else status
+        if refusal is not None:
+            _respond_refusal(writer, refusal)
+            try:
+                await writer.drain()
+            except ConnectionError:
+                pass
+            writer.close()
+            return
         try:
             writer.write(ws.server_handshake(headers))
             await writer.drain()
@@ -589,10 +652,6 @@ class DevServer:
             writer.close()
             return
         role = query.get("role", "client")
-        if path != "/ws":
-            writer.write(ws.encode_close(1008, "unknown path"))
-            writer.close()
-            return
         if role == "preview":
             await self._preview_session(reader, writer, query)
         else:
@@ -734,16 +793,61 @@ def _encode_file(path: str, digest: str, data: bytes) -> Dict[str, Any]:
         return {"path": path, "sha256": digest, "content": base64.b64encode(data).decode("ascii"), "encoding": "base64"}
 
 
-_STATUS_TEXT = {200: "OK", 404: "Not Found", 405: "Method Not Allowed", 500: "Internal Server Error"}
+_STATUS_TEXT = {
+    200: "OK",
+    302: "Found",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not Found",
+    405: "Method Not Allowed",
+    500: "Internal Server Error",
+}
+
+_REFUSALS: Dict[int, bytes] = {
+    401: b"This dev server needs its token. Open the URL that `pn start` printed.\n",
+    403: b"Forbidden: wrong dev token or a cross-origin request. Open the URL that `pn start` printed.\n",
+    404: b"not found",
+}
 
 
-def _respond(writer: asyncio.StreamWriter, status: int, body: bytes, content_type: str) -> None:
+def _same_origin(headers: Dict[str, str]) -> bool:
+    """Whether a WebSocket upgrade may proceed given its ``Origin``.
+
+    Browsers always send ``Origin`` on a WebSocket upgrade, and any page
+    can open a socket to any host, so a browser peer must come from this
+    server's own origin: the ``Origin`` host and port must equal the
+    ``Host`` header. Native dev clients send no ``Origin`` and pass.
+    """
+    origin = headers.get("origin")
+    if origin is None:
+        return True
+    host = headers.get("host", "").strip().lower()
+    try:
+        netloc = urlsplit(origin.strip()).netloc.lower()
+    except ValueError:
+        return False
+    return bool(host) and netloc == host
+
+
+def _respond_refusal(writer: asyncio.StreamWriter, status: int) -> None:
+    _respond(writer, status, _REFUSALS.get(status, b""), "text/plain; charset=utf-8")
+
+
+def _respond(
+    writer: asyncio.StreamWriter,
+    status: int,
+    body: bytes,
+    content_type: str,
+    *,
+    headers: Optional[Dict[str, str]] = None,
+) -> None:
+    extra = "".join(f"{name}: {value}\r\n" for name, value in (headers or {}).items())
     head = (
         f"HTTP/1.1 {status} {_STATUS_TEXT.get(status, 'OK')}\r\n"
         f"Content-Type: {content_type}\r\n"
         f"Content-Length: {len(body)}\r\n"
         "Cache-Control: no-store\r\n"
-        "Access-Control-Allow-Origin: *\r\n"
+        f"{extra}"
         "Connection: close\r\n"
         "\r\n"
     ).encode("ascii")

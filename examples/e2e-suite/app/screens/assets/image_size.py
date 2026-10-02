@@ -10,13 +10,13 @@ logical size), which Maestro asserts.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 BADGE = pn.asset("images/badge.png")
 
 
 @pn.component
-def ImageSizeDemo() -> pn.Element:
+def ImageSizeDemo() -> pn.Node:
     """Measure and prefetch a bundled image through the Images module."""
     size, set_size = pn.use_state("measuring")
     prefetched, set_prefetched = pn.use_state("pending")
@@ -32,18 +32,18 @@ def ImageSizeDemo() -> pn.Element:
 
     pn.use_effect(_measure, [])
 
-    return demo_screen(
+    return DemoScreen(
         "Images module",
         "Images.get_size and Images.prefetch work on bundled assets and URLs.",
-        section(
+        DemoSection(
             "get_size",
-            result_text("Size", size),
-            hint("The badge is 48 x 48 logical points regardless of which density variant is bundled."),
+            ResultText("Size", size),
+            Hint("The badge is 48 x 48 logical points regardless of which density variant is bundled."),
         ),
-        section(
+        DemoSection(
             "prefetch",
-            result_text("Prefetched", prefetched),
+            ResultText("Prefetched", prefetched),
             pn.Button("Clear image cache", on_press=pn.Images.clear_cache),
         ),
-        *([result_text("Error", error)] if error else []),
+        *([ResultText("Error", error)] if error else []),
     )

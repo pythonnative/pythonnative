@@ -1,0 +1,33 @@
+# Tests use_store selectors re-render only for their slice, and Store.batch
+# coalesces writes into one notification.
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_store.py
+# Source under test: src/pythonnative/store.py :: Store, use_store
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_store
+- assertVisible: "Items: 0"
+- assertVisible: "Count renders: 1"
+- assertVisible: "Note: (empty)"
+- tapOn: "Add item"
+- assertVisible: "Items: 1"
+- assertVisible: "Count renders: 2"
+# The note changes but the count selector doesn't, so the count readout stays put.
+- tapOn: "Set note"
+- assertVisible: "Note: hello"
+- assertVisible: "Count renders: 2"
+# Two writes in one batch notify once.
+- tapOn: "Add two"
+- assertVisible: "Items: 3"
+- assertVisible: "Count renders: 3"
+- tapOn: "Reset store"
+- assertVisible: "Items: 0"
+- assertVisible: "Note: (empty)"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

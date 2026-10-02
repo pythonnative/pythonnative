@@ -69,8 +69,9 @@ def _nav_ref() -> pn.NavigationRef:
 
 def _open(result: RenderResult, demo_id: str) -> Any:
     demo = next(d for d in _registry().DEMOS if d.id == demo_id)
-    _nav_ref().navigate(demo.id)
+    _nav_ref().navigate(demo.component())
     result.settle()
+    assert _nav_ref().get_state().current.name == demo.id
     assert result.get_by_text(f"Demo: {demo.title}")
     return demo
 
@@ -184,15 +185,77 @@ def test_web_view_handle_demo(suite: RenderResult) -> None:
 
 
 def test_navigation_theme_demo_switches_root_theme(suite: RenderResult) -> None:
+    app_theme = importlib.import_module("app.app_theme")
     _open(suite, "navigation_theme")
     assert suite.get_by_text("Theme: light")
     assert suite.get_by_text("Matches preset: yes")
     suite.press(suite.get_by_text("Use dark theme"))
     assert suite.get_by_text("Theme: dark")
+    assert suite.get_by_text("Preset: dark")
     assert suite.get_by_text("Matches preset: yes")
-    assert suite.get_by_text(f"Card: {pn.DARK_NAVIGATION_THEME.colors.card}")
+    assert suite.get_by_text(f"Surface: {app_theme.SUITE_DARK.colors.surface}")
+    # The shared styles follow the provider too.
+    assert suite.get_by_text("Demo: Navigation theme").props["color"] == app_theme.SUITE_DARK.colors.text
     suite.press(suite.get_by_text("Use light theme"))
     assert suite.get_by_text("Theme: light")
+    assert suite.back()
+    suite.settle()
+    assert appearance.get_color_scheme() == appearance.get_system_color_scheme()
+
+
+def test_use_theme_demo_follows_the_scheme(suite: RenderResult) -> None:
+    _open(suite, "use_theme")
+    suite.press(suite.get_by_text("Force light"))
+    assert suite.get_by_text("Theme background: #FFFFFF")
+    assert suite.get_by_text("Theme primary: #007AFF")
+    suite.press(suite.get_by_text("Force dark"))
+    assert suite.get_by_text("Theme background: #000000")
+    assert suite.get_by_text("Theme primary: #0A84FF")
+    suite.press(suite.get_by_text("Follow system"))
+
+
+def test_use_store_demo_rerenders_only_the_selected_slice(suite: RenderResult) -> None:
+    _open(suite, "use_store")
+    assert suite.get_by_text("Items: 0")
+    assert suite.get_by_text("Count renders: 1")
+    assert suite.get_by_text("Note: (empty)")
+    suite.press(suite.get_by_text("Add item"))
+    assert suite.get_by_text("Items: 1")
+    assert suite.get_by_text("Count renders: 2")
+    suite.press(suite.get_by_text("Set note"))
+    assert suite.get_by_text("Note: hello")
+    assert suite.get_by_text("Count renders: 2")
+    suite.press(suite.get_by_text("Add two"))
+    assert suite.get_by_text("Items: 3")
+    assert suite.get_by_text("Count renders: 3")
+    suite.press(suite.get_by_text("Reset store"))
+    assert suite.get_by_text("Items: 0")
+    assert suite.back()
+    suite.settle()
+    assert importlib.import_module("app.screens.hooks.use_store").cart.get().items == ()
+
+
+def test_tab_navigator_demo_reaches_the_statically_nested_stack(suite: RenderResult) -> None:
+    _open(suite, "tab_navigator")
+    assert suite.get_by_text("Tab Alpha body")
+    suite.press(suite.get_by_text("Open Gamma detail"))
+    assert suite.get_by_text("Gamma detail: 7")
+    assert suite.get_by_type("TabBar").props["active_tab"] == "Gamma"
+    suite.press(suite.get_by_text("Back to Gamma"))
+    assert suite.get_by_text("Tab Gamma body")
+
+
+def test_params_passing_demo_pushes_typed_params(suite: RenderResult) -> None:
+    _open(suite, "params_passing")
+    assert suite.get_by_text("Param 'value': (none)")
+    suite.press(suite.get_by_text("Push value=alpha"))
+    assert suite.get_by_text("Param 'value': alpha")
+    assert _nav_ref().get_state().current.params == {"value": "alpha"}
+    suite.press(suite.get_by_text("Push value=beta"))
+    assert suite.get_by_text("Param 'value': beta")
+    assert suite.back()
+    suite.settle()
+    assert suite.get_by_text("Param 'value': alpha")
 
 
 def test_navigation_ref_demo_drives_root_stack(suite: RenderResult) -> None:

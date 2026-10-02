@@ -1,13 +1,15 @@
 """Demo screen for the ``presentation`` and ``animation`` screen options.
 
-The root Stack (see ``main.py``) registers one extra route per variant in
+The root stack (see ``main.py``) registers one extra screen per variant in
 :data:`PRESENTATION_VARIANTS`, each with a different ``presentation`` or
 ``animation`` option, so the *native* stack presents them: on iOS a page
 sheet, a full-screen cover, a form sheet, and an over-context transparent
 modal; Android presents every modal style as a full-screen screen with a
 slide-from-bottom transition, and both platforms honor the ``fade`` and
 ``slide_from_bottom`` animations. Each presented screen shows a stable
-marker and a "Dismiss presented" button that pops it.
+marker and a "Dismiss presented" button that pops it. Each variant has
+its own component, because a navigation target names a screen by its
+component: ``nav.push(variant.component())``.
 """
 
 from __future__ import annotations
@@ -16,22 +18,29 @@ from dataclasses import dataclass
 from typing import Callable, List
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @dataclass(frozen=True)
 class PresentationVariant:
-    """One extra root route presented from the demo."""
+    """One extra root screen presented from the demo.
+
+    Attributes:
+        route: The screen's route name on the root stack.
+        label: Shown on the open button and the presented screen.
+        options: The screen's static options.
+        component: The component the screen renders.
+    """
 
     route: str
     label: str
     options: pn.ScreenOptions
-    component: Callable[[], pn.Element]
+    component: pn.Component[[]]
 
 
-def _make_presented(label: str) -> Callable[[], pn.Element]:
+def _make_presented(label: str) -> pn.Component[[]]:
     @pn.component
-    def Presented() -> pn.Element:
+    def Presented() -> pn.Node:
         nav = pn.use_navigation()
         return pn.View(
             pn.Column(
@@ -41,7 +50,7 @@ def _make_presented(label: str) -> Callable[[], pn.Element]:
                     style=pn.style(color="#475569"),
                 ),
                 pn.Button("Dismiss presented", on_press=nav.go_back),
-                style=pn.style(padding=20, spacing=12, background_color="#FFFFFF", border_radius=12),
+                style=pn.style(padding=20, gap=12, background_color="#FFFFFF", border_radius=12),
             ),
             style=pn.style(flex=1, justify_content="center", padding=24),
         )
@@ -82,7 +91,7 @@ PRESENTATION_VARIANTS: List[PresentationVariant] = [
 
 
 @pn.component
-def PresentationDemo() -> pn.Element:
+def PresentationDemo() -> pn.Node:
     """Render one button per presentation / animation variant."""
     nav = pn.use_navigation()
     opened, set_opened = pn.use_state(0)
@@ -90,24 +99,24 @@ def PresentationDemo() -> pn.Element:
 
     def open_variant(variant: PresentationVariant) -> Callable[[], None]:
         def _open() -> None:
-            set_opened(opened + 1)
+            set_opened(lambda count: count + 1)
             set_last(variant.label)
-            nav.push(variant.route)
+            nav.push(variant.component())
 
         return _open
 
     buttons = [pn.Button(f"Open {variant.label}", on_press=open_variant(variant)) for variant in PRESENTATION_VARIANTS]
 
-    return demo_screen(
+    return DemoScreen(
         "Presentation",
         "Push root screens with every presentation and animation option.",
-        section(
+        DemoSection(
             "Variants",
-            result_text("Opened", opened),
-            result_text("Last variant", last),
+            ResultText("Opened", opened),
+            ResultText("Last variant", last),
             # One button per line: the long variant names overflow a shared row
             # on phone widths and Maestro can't tap a clipped button.
-            pn.Column(*buttons, style=pn.style(spacing=8, align_items="flex_start")),
-            hint("Each presented screen shows 'Presented: <variant>' and a dismiss button."),
+            pn.Column(*buttons, style=pn.style(gap=8, align_items="flex_start")),
+            Hint("Each presented screen shows 'Presented: <variant>' and a dismiss button."),
         ),
     )

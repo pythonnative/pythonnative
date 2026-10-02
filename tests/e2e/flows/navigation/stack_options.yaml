@@ -3,7 +3,7 @@
 # guard that vetoes pop_to while enabled.
 #
 # Demo screen: examples/e2e-suite/app/screens/navigation/stack_options.py
-# Source under test: src/pythonnative/navigation/navigators.py :: StackNavigator, ScreenGroup
+# Source under test: src/pythonnative/navigation/navigators.py :: StackNavigator, Group, use_screen_options
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -16,7 +16,7 @@ appId: ${APP_ID}
     timeout: 30000
 - assertVisible: "Focused route: Home"
 - assertVisible: "Depth: 1"
-# Group options beat the navigator callable.
+# Group options beat the navigator's screen_options.
 - tapOn: "Push Compose"
 - extendedWaitUntil:
     visible: "Grouped"
@@ -27,7 +27,7 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Preview!"
     timeout: 10000
-# An ungrouped screen gets the navigator callable's title.
+# An ungrouped screen sets its own title from its render with use_screen_options.
 - tapOn: "Push Plain"
 - extendedWaitUntil:
     visible: "Nav Plain"

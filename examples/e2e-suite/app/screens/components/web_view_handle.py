@@ -11,7 +11,7 @@ are visible to the page itself; the demo mirrors each call's result.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 _INLINE_HTML = (
     "<html><head><title>handle-page</title></head>"
@@ -22,7 +22,7 @@ _DATA_URL = "data:text/html,<html><head><title>second-page</title></head><body>S
 
 
 @pn.component
-def WebViewHandleDemo() -> pn.Element:
+def WebViewHandleDemo() -> pn.Node:
     """Drive a WebView through the handle published on its ref."""
     web_ref = pn.use_ref(None)
     last_call, set_last_call = pn.use_state("none")
@@ -58,27 +58,27 @@ def WebViewHandleDemo() -> pn.Element:
         set_can_go_back("yes" if await handle.can_go_back() else "no")
         set_last_call("eval_js")
 
-    return demo_screen(
+    return DemoScreen(
         "WebViewHandle",
         "reload, inject JS, evaluate JS, and load URLs through ref.current.",
-        section(
+        DemoSection(
             "Handle",
-            result_text("Handle attached", "yes" if web_ref.current is not None else "no"),
-            result_text("Last call", last_call),
-            result_text("Eval result", eval_result),
-            result_text("Can go back", can_go_back),
-            result_text("Reloads", reloads),
-            buttons_row(
-                pn.Button("Evaluate JS", on_press=lambda: pn.run_async(evaluate())),
+            ResultText("Handle attached", "yes" if web_ref.current is not None else "no"),
+            ResultText("Last call", last_call),
+            ResultText("Eval result", eval_result),
+            ResultText("Can go back", can_go_back),
+            ResultText("Reloads", reloads),
+            ButtonsRow(
+                pn.Button("Evaluate JS", on_press=evaluate),
                 pn.Button("Inject JS", on_press=inject),
             ),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Reload page", on_press=reload),
                 pn.Button("Load second page", on_press=load_second),
             ),
-            hint("eval_js('1 + 41') answers 42 on every platform."),
+            Hint("eval_js('1 + 41') answers 42 on every platform."),
         ),
-        section(
+        DemoSection(
             "WebView body",
             pn.WebView(
                 html=_INLINE_HTML,

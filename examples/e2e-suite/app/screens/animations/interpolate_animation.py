@@ -11,11 +11,11 @@ Maestro can assert the derived math.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def InterpolateAnimationDemo() -> pn.Element:
+def InterpolateAnimationDemo() -> pn.Node:
     """Render a box driven by interpolated and derived animated nodes."""
     driver = pn.use_animated_value(0.0)
     status, set_status = pn.use_state("idle")
@@ -34,28 +34,28 @@ def InterpolateAnimationDemo() -> pn.Element:
         await pn.Animated.timing(driver, to=0.0, duration=200)
         set_status("idle")
 
-    return demo_screen(
+    return DemoScreen(
         "Animated.interpolate",
         "Interpolate one driver into a shift, a color, and an opacity.",
-        section(
+        DemoSection(
             "Interpolate demo",
-            result_text("Status", status),
-            result_text("Shift", round(float(shift))),
+            ResultText("Status", status),
+            ResultText("Shift", round(float(shift))),
             pn.Animated.View(
                 pn.Text("interpolate-box", style=pn.style(color="#FFFFFF", font_weight="700")),
-                style=pn.style(
-                    opacity=opacity,
-                    background_color=tint,
-                    transform=[{"translate_x": shift}],
-                    padding=24,
-                    border_radius=12,
-                    align_self="flex_start",
-                ),
+                style={
+                    "opacity": opacity,
+                    "background_color": tint,
+                    "transform": [{"translate_x": shift}],
+                    "padding": 24,
+                    "border_radius": 12,
+                    "align_self": "flex_start",
+                },
             ),
-            buttons_row(
-                pn.Button("Run interpolate", on_press=lambda: pn.run_async(run())),
-                pn.Button("Reset", on_press=lambda: pn.run_async(reset())),
+            ButtonsRow(
+                pn.Button("Run interpolate", on_press=run),
+                pn.Button("Reset", on_press=reset),
             ),
-            hint("Maestro taps 'Run interpolate' and asserts 'Shift: 120'."),
+            Hint("Maestro taps 'Run interpolate' and asserts 'Shift: 120'."),
         ),
     )

@@ -10,12 +10,14 @@ counters (they are no-ops without a screen reader but must not raise).
 
 from __future__ import annotations
 
+from typing import Callable
+
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def AccessibilityInfoDemo() -> pn.Element:
+def AccessibilityInfoDemo() -> pn.Node:
     """Render accessibility settings plus announce / focus controls."""
     target_ref = pn.use_ref(None)
     announcements, set_announcements = pn.use_state(0)
@@ -24,7 +26,7 @@ def AccessibilityInfoDemo() -> pn.Element:
     screen_reader = pn.AccessibilityInfo.is_screen_reader_enabled()
     reduce_motion = pn.AccessibilityInfo.is_reduce_motion_enabled()
 
-    def subscribe():
+    def subscribe() -> Callable[[], None]:
         def on_change(event: pn.AccessibilityEvent) -> None:
             del event
             set_changes(lambda n: n + 1)
@@ -42,16 +44,16 @@ def AccessibilityInfoDemo() -> pn.Element:
             pn.AccessibilityInfo.set_accessibility_focus(target_ref)
             set_focus_calls(focus_calls + 1)
 
-    return demo_screen(
+    return DemoScreen(
         "AccessibilityInfo",
         "Screen reader / reduce motion readers, announce, and focus.",
-        section(
+        DemoSection(
             "AccessibilityInfo module",
-            result_text("Screen reader", "yes" if screen_reader else "no"),
-            result_text("Reduce motion", "yes" if reduce_motion else "no"),
-            result_text("Setting changes", changes),
-            result_text("Announcements", announcements),
-            result_text("Focus calls", focus_calls),
+            ResultText("Screen reader", "yes" if screen_reader else "no"),
+            ResultText("Reduce motion", "yes" if reduce_motion else "no"),
+            ResultText("Setting changes", changes),
+            ResultText("Announcements", announcements),
+            ResultText("Focus calls", focus_calls),
             pn.View(
                 pn.Text("a11y-focus-target", style=pn.style(color="#FFFFFF", font_weight="700")),
                 ref=target_ref,
@@ -59,10 +61,10 @@ def AccessibilityInfoDemo() -> pn.Element:
                 accessibility_label="a11y-focus-target",
                 style=pn.style(padding=14, background_color="#8B5CF6", border_radius=10, align_items="center"),
             ),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Announce", on_press=announce),
                 pn.Button("Focus target", on_press=focus_target),
             ),
-            hint("Both calls are safe no-ops when no screen reader is running."),
+            Hint("Both calls are safe no-ops when no screen reader is running."),
         ),
     )

@@ -12,7 +12,7 @@ the closed form so a driver that travels the wrong distance fails here.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 _VELOCITY = 1.5  # points per millisecond
 _DECELERATION = 0.99
@@ -20,7 +20,7 @@ _EXPECTED = _VELOCITY / (1 - _DECELERATION)  # 150 points
 
 
 @pn.component
-def DecayAnimationDemo() -> pn.Element:
+def DecayAnimationDemo() -> pn.Node:
     """Fling a box with Animated.decay and check where it settles."""
     tx = pn.use_animated_value(0.0)
     status, set_status = pn.use_state("idle")
@@ -43,29 +43,29 @@ def DecayAnimationDemo() -> pn.Element:
         set_finished("unknown")
         set_status("idle")
 
-    return demo_screen(
+    return DemoScreen(
         "Animated.decay",
         "Fling a box and settle at velocity / (1 - deceleration).",
-        section(
+        DemoSection(
             "Decay demo",
-            result_text("Status", status),
-            result_text("Finished", finished),
-            result_text("Settled x", settled),
-            result_text("Expected x", f"{_EXPECTED:.0f}"),
+            ResultText("Status", status),
+            ResultText("Finished", finished),
+            ResultText("Settled x", settled),
+            ResultText("Expected x", f"{_EXPECTED:.0f}"),
             pn.Animated.View(
                 pn.Text("decay-box", style=pn.style(color="#FFFFFF", font_weight="700")),
-                style=pn.style(
-                    translate_x=tx,
-                    padding=16,
-                    background_color="#F59E0B",
-                    border_radius=10,
-                    align_self="flex_start",
-                ),
+                style={
+                    "translate_x": tx,
+                    "padding": 16,
+                    "background_color": "#F59E0B",
+                    "border_radius": 10,
+                    "align_self": "flex_start",
+                },
             ),
-            buttons_row(
-                pn.Button("Fling", on_press=lambda: pn.run_async(fling())),
-                pn.Button("Reset decay", on_press=lambda: pn.run_async(reset())),
+            ButtonsRow(
+                pn.Button("Fling", on_press=fling),
+                pn.Button("Reset decay", on_press=reset),
             ),
-            hint("Maestro taps 'Fling' and asserts 'Status: done' and 'Finished: yes'."),
+            Hint("Maestro taps 'Fling' and asserts 'Status: done' and 'Finished: yes'."),
         ),
     )

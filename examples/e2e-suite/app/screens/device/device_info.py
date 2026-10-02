@@ -9,32 +9,32 @@ name and the fields the app configuration determines (``app_name``,
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def DeviceInfoDemo() -> pn.Element:
+def DeviceInfoDemo() -> pn.Node:
     """Render every DeviceInfo field."""
     info = pn.Device.info()
 
-    return demo_screen(
+    return DemoScreen(
         "Device info",
         "Device.info() fields for the running device.",
-        section(
+        DemoSection(
             "DeviceInfo",
-            result_text("Platform", info.platform),
-            result_text("OS version", info.os_version or "(unknown)"),
-            result_text("Model", info.model or "(unknown)"),
-            result_text("Manufacturer", info.manufacturer or "(unknown)"),
-            result_text("Simulator", "yes" if info.is_simulator else "no"),
-            result_text("Tablet", "yes" if info.is_tablet else "no"),
-            result_text("App name", info.app_name or "(unknown)"),
-            result_text("App version", info.app_version or "(unknown)"),
-            result_text("Build number", info.build_number or "(unknown)"),
-            result_text("Bundle id", info.bundle_id or "(unknown)"),
-            result_text("Scale positive", "yes" if info.scale > 0 else "no"),
-            result_text("Font scale positive", "yes" if info.font_scale > 0 else "no"),
-            result_text("Locale", info.locale or "(unknown)"),
-            hint("Maestro asserts the platform line and the bundle id from pythonnative.toml."),
+            ResultText("Platform", info.platform),
+            ResultText("OS version", info.os_version or "(unknown)"),
+            ResultText("Model", info.model or "(unknown)"),
+            ResultText("Manufacturer", info.manufacturer or "(unknown)"),
+            ResultText("Simulator", "yes" if info.is_simulator else "no"),
+            ResultText("Tablet", "yes" if info.is_tablet else "no"),
+            ResultText("App name", info.app_name or "(unknown)"),
+            ResultText("App version", info.app_version or "(unknown)"),
+            ResultText("Build number", info.build_number or "(unknown)"),
+            ResultText("Bundle id", info.bundle_id or "(unknown)"),
+            ResultText("Scale positive", "yes" if info.scale > 0 else "no"),
+            ResultText("Font scale positive", "yes" if info.font_scale > 0 else "no"),
+            ResultText("Locale", info.locale or "(unknown)"),
+            Hint("Maestro asserts the platform line and the bundle id from pythonnative.toml."),
         ),
     )

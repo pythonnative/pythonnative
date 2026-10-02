@@ -11,6 +11,8 @@ Paste it into `app/main.py` of a project scaffolded with `pn init`,
 then run `pn preview` (or `pn run ios` / `pn run android`).
 
 ```python
+from collections.abc import Callable
+
 import pythonnative as pn
 from pythonnative import gestures
 
@@ -19,7 +21,7 @@ SHEET_HEIGHT = 280.0
 
 
 @pn.component
-def CollapsingHeaderPage():
+def CollapsingHeaderPage() -> pn.Node:
     scroll_y = pn.use_animated_value(0.0)
 
     # The header hides after 64 points of downward travel and comes
@@ -46,7 +48,7 @@ def CollapsingHeaderPage():
             pn.Column(
                 pn.View(style={"height": HEADER_HEIGHT}),  # header spacer
                 *rows,
-                style={"spacing": 2},
+                style={"gap": 2},
             ),
             on_scroll=pn.Animated.event(y=scroll_y),
             style={"flex": 1},
@@ -77,27 +79,27 @@ def CollapsingHeaderPage():
 
 
 @pn.component
-def BottomSheet(*children, open: bool = False, on_close=None):
+def BottomSheet(*children: pn.Node, open: bool = False, on_close: Callable[[], None] | None = None) -> pn.Node:
     # 0.0 = fully open, SHEET_HEIGHT = fully hidden.
     slide = pn.use_animated_value(0.0 if open else SHEET_HEIGHT)
     drag_origin = pn.use_ref(0.0)
 
-    def _sync_open():
+    def _sync_open() -> None:
         target = 0.0 if open else SHEET_HEIGHT
         pn.Animated.spring(slide, to=target, stiffness=260, damping=24).start()
 
     pn.use_effect(_sync_open, [open])
 
-    def on_pan_begin(event):
+    def on_pan_begin(event: gestures.GestureEvent) -> None:
         drag_origin.current = float(slide)
 
-    def on_pan_change(event):
+    def on_pan_change(event: gestures.GestureEvent) -> None:
         # Follow the finger, but never above the open position.
         slide.set_value(
             max(0.0, min(SHEET_HEIGHT, drag_origin.current + event.translation_y))
         )
 
-    def on_pan_end(event):
+    def on_pan_end(event: gestures.GestureEvent) -> None:
         # Fast downward flick or past the midpoint: dismiss.
         dismiss = event.velocity_y > 800 or float(slide) > SHEET_HEIGHT / 2
         target = SHEET_HEIGHT if dismiss else 0.0
@@ -111,7 +113,7 @@ def BottomSheet(*children, open: bool = False, on_close=None):
 
     return pn.View(
         pn.Animated.View(
-            style=[pn.StyleSheet.absolute_fill(), {
+            style=[pn.ABSOLUTE_FILL, {
                 "background_color": "#0F172A",
                 "opacity": scrim_opacity * 0.4,
                 "pointer_events": "none",
@@ -145,12 +147,12 @@ def BottomSheet(*children, open: bool = False, on_close=None):
                 "padding": 16,
             },
         ),
-        style=[pn.StyleSheet.absolute_fill(), {"pointer_events": "box_none"}],
+        style=[pn.ABSOLUTE_FILL, {"pointer_events": "box_none"}],
     )
 
 
 @pn.component
-def App():
+def App() -> pn.Node:
     sheet_open, set_sheet_open = pn.use_state(False)
 
     return pn.View(

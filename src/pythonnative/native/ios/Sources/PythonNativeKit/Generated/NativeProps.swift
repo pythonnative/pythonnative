@@ -90,8 +90,6 @@ open class PNViewProps {
     public private(set) lazy var `margin_horizontal`: PNViewMarginTop? = { guard let value = values["margin_horizontal"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewMarginTop.self, value) }()
     public var has_margin_vertical: Bool { values["margin_vertical"] != nil }
     public private(set) lazy var `margin_vertical`: PNViewMarginTop? = { guard let value = values["margin_vertical"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewMarginTop.self, value) }()
-    public var has_spacing: Bool { values["spacing"] != nil }
-    public private(set) lazy var `spacing`: Double? = { guard let value = values["spacing"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }()
     public var has_gap: Bool { values["gap"] != nil }
     public private(set) lazy var `gap`: Double? = { guard let value = values["gap"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Double.self, value) }()
     public var has_row_gap: Bool { values["row_gap"] != nil }
@@ -178,12 +176,6 @@ open class PNViewProps {
     public private(set) lazy var `z_index`: Int64? = { guard let value = values["z_index"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Int64.self, value) }()
     public var has_pointer_events: Bool { values["pointer_events"] != nil }
     public private(set) lazy var `pointer_events`: PNViewPointerEvents? = { guard let value = values["pointer_events"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewPointerEvents.self, value) }()
-    public var has_gestures: Bool { values["gestures"] != nil }
-    public private(set) lazy var `gestures`: [PNJSONValue]? = { guard let value = values["gestures"], !(value is NSNull) else { return nil }; return try! PNValues.decode([PNJSONValue].self, value) }()
-    public var has_hit_slop: Bool { values["hit_slop"] != nil }
-    public private(set) lazy var `hit_slop`: PNViewHitSlop? = { guard let value = values["hit_slop"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewHitSlop.self, value) }()
-    public var has_on_layout: Bool { values["on_layout"] != nil }
-    public private(set) lazy var `on_layout`: Bool? = { guard let value = values["on_layout"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }()
     public var has_accessibility_label: Bool { values["accessibility_label"] != nil }
     public private(set) lazy var `accessibility_label`: String? = { guard let value = values["accessibility_label"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }()
     public var has_accessibility_hint: Bool { values["accessibility_hint"] != nil }
@@ -204,6 +196,12 @@ open class PNViewProps {
     public private(set) lazy var `important_for_accessibility`: PNViewImportantForAccessibility? = { guard let value = values["important_for_accessibility"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewImportantForAccessibility.self, value) }()
     public var has_test_id: Bool { values["test_id"] != nil }
     public private(set) lazy var `test_id`: String? = { guard let value = values["test_id"], !(value is NSNull) else { return nil }; return try! PNValues.decode(String.self, value) }()
+    public var has_gestures: Bool { values["gestures"] != nil }
+    public private(set) lazy var `gestures`: [PNJSONValue]? = { guard let value = values["gestures"], !(value is NSNull) else { return nil }; return try! PNValues.decode([PNJSONValue].self, value) }()
+    public var has_hit_slop: Bool { values["hit_slop"] != nil }
+    public private(set) lazy var `hit_slop`: PNViewHitSlop? = { guard let value = values["hit_slop"], !(value is NSNull) else { return nil }; return try! PNValues.decode(PNViewHitSlop.self, value) }()
+    public var has_on_layout: Bool { values["on_layout"] != nil }
+    public private(set) lazy var `on_layout`: Bool? = { guard let value = values["on_layout"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }()
     public var has__pn_layout: Bool { values["_pn_layout"] != nil }
     public private(set) lazy var `_pn_layout`: Bool? = { guard let value = values["_pn_layout"], !(value is NSNull) else { return nil }; return try! PNValues.decode(Bool.self, value) }()
     public var has__pn_events: Bool { values["_pn_events"] != nil }
@@ -1255,6 +1253,7 @@ public enum PNComponentEvents {
         @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum BlurView {
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Button {
@@ -1268,8 +1267,8 @@ public enum PNComponentEvents {
         @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Column {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum DatePicker {
         @discardableResult public static func `on_change`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_change", [PNValues.encode(argument0)]) }
@@ -1292,6 +1291,7 @@ public enum PNComponentEvents {
         @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum LinearGradient {
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Modal {
@@ -1313,8 +1313,8 @@ public enum PNComponentEvents {
         @discardableResult public static func `on_long_press`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_long_press", []) }
         @discardableResult public static func `on_press_in`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_press_in", []) }
         @discardableResult public static func `on_press_out`(_ view: UIView) -> String? { PNEvents.emitIfWired(view, "on_press_out", []) }
-        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum ProgressBar {
         @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
@@ -1324,19 +1324,19 @@ public enum PNComponentEvents {
         @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Row {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum SafeAreaView {
         @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Screen {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum ScreenStack {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_native_back`(_ view: UIView, _ argument0: Int64) -> String? { PNEvents.emitIfWired(view, "on_native_back", [PNValues.encode(argument0)]) }
     }
     public enum ScrollView {
@@ -1356,6 +1356,7 @@ public enum PNComponentEvents {
         @discardableResult public static func `on_change`(_ view: UIView, _ argument0: Double) -> String? { PNEvents.emitIfWired(view, "on_change", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_sliding_start`(_ view: UIView, _ argument0: Double) -> String? { PNEvents.emitIfWired(view, "on_sliding_start", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_sliding_complete`(_ view: UIView, _ argument0: Double) -> String? { PNEvents.emitIfWired(view, "on_sliding_complete", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum Spacer {
@@ -1370,11 +1371,12 @@ public enum PNComponentEvents {
     }
     public enum Switch {
         @discardableResult public static func `on_change`(_ view: UIView, _ argument0: Bool) -> String? { PNEvents.emitIfWired(view, "on_change", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum TabBar {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_tab_select`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_tab_select", [PNValues.encode(argument0)]) }
     }
     public enum Text {
@@ -1401,12 +1403,12 @@ public enum PNComponentEvents {
         @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum View {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }
     public enum VirtualList {
-        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) -> String? { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
+        @discardableResult public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) -> String? { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
         @discardableResult public static func `on_bind_row`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_bind_row", arguments) }
         @discardableResult public static func `on_window`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_window", arguments) }
         @discardableResult public static func `on_scroll`(_ view: UIView, _ arguments: [Any?] = []) -> String? { PNEvents.emitIfWired(view, "on_scroll", arguments) }

@@ -11,13 +11,16 @@ covers the RFC 0002 additions: the controlled ``selection`` tuple,
 
 from __future__ import annotations
 
+from typing import Optional, Tuple
+
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, label, result_text, section
-from app.theme import styles
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, Label, ResultText
+
+_NO_SELECTION: Optional[Tuple[int, int]] = None
 
 
 @pn.component
-def TextInputDemo() -> pn.Element:
+def TextInputDemo() -> pn.Node:
     """Render a single-line input, a multiline input, and live echoes."""
     name, set_name = pn.use_state("")
     notes, set_notes = pn.use_state("")
@@ -25,7 +28,7 @@ def TextInputDemo() -> pn.Element:
     multiline, set_multiline = pn.use_state(False)
     selection, set_selection = pn.use_state(pn.SelectionEvent(0, 0))
     # ``None`` leaves the caret alone; a tuple drives the native selection.
-    controlled_selection, set_controlled_selection = pn.use_state(None)
+    controlled_selection, set_controlled_selection = pn.use_state(_NO_SELECTION)
     last_key, set_last_key = pn.use_state("(none)")
     content_height, set_content_height = pn.use_state(0)
 
@@ -50,13 +53,13 @@ def TextInputDemo() -> pn.Element:
         set_controlled_selection((0, len(name)))
         set_selection(pn.SelectionEvent(0, len(name)))
 
-    return demo_screen(
+    return DemoScreen(
         "TextInput",
         "Single-line and multiline text entry with a live echo line.",
-        section(
+        DemoSection(
             "Single-line",
-            label("Name"),
-            result_text("Focused", "ON" if focused else "OFF"),
+            Label("Name"),
+            ResultText("Focused", "ON" if focused else "OFF"),
             pn.TextInput(
                 value=name,
                 placeholder="Type your name here",
@@ -75,21 +78,21 @@ def TextInputDemo() -> pn.Element:
                 auto_correct=False,
                 style=field_style,
             ),
-            result_text("Echo", name or "(empty)"),
-            result_text("Selection", f"{selection.start}:{selection.end}"),
-            result_text("Last key", last_key),
-            buttons_row(
+            ResultText("Echo", name or "(empty)"),
+            ResultText("Selection", f"{selection.start}:{selection.end}"),
+            ResultText("Last key", last_key),
+            ButtonsRow(
                 pn.Button(
                     "Use single line" if multiline else "Use multiline name",
                     on_press=lambda: set_multiline(not multiline),
                 ),
                 pn.Button("Select all", on_press=select_all),
             ),
-            hint("Switch the name field between modes while keeping its text."),
+            Hint("Switch the name field between modes while keeping its text."),
         ),
-        section(
+        DemoSection(
             "Multiline",
-            label("Notes"),
+            Label("Notes"),
             pn.TextInput(
                 value=notes,
                 placeholder="Type a note…",
@@ -100,11 +103,8 @@ def TextInputDemo() -> pn.Element:
                 on_content_size_change=lambda event: set_content_height(int(event.height)),
                 style={**field_style, "height": 100},
             ),
-            pn.Text(
-                f"Length: {len(notes)}",
-                style=styles["result"],
-            ),
-            result_text("Content measured", "yes" if content_height > 0 else "no"),
-            hint("Focusing the notes field selects its text; typing reports the content size."),
+            ResultText("Length", len(notes)),
+            ResultText("Content measured", "yes" if content_height > 0 else "no"),
+            Hint("Focusing the notes field selects its text; typing reports the content size."),
         ),
     )

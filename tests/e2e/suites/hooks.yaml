@@ -5,7 +5,7 @@
 #
 # The flow list lives in hooks-a.yaml and hooks-b.yaml; this file just
 # chains the parts. CI runs the parts as separate Android shards (a
-# GitHub-hosted emulator can't survive all 26 flows in one session),
+# GitHub-hosted emulator can't survive all 27 flows in one session),
 # while iOS simulators and local runs can use this aggregate directly.
 appId: ${APP_ID}
 ---

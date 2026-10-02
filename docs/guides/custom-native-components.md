@@ -321,12 +321,12 @@ from my_badge import Badge
 
 
 @pn.component
-def InboxRow():
+def InboxRow() -> pn.Node:
     count, _ = pn.use_state(3)
     return pn.Row(
         pn.Text("Inbox"),
         Badge(text=str(count), color="#0A84FF", on_press=lambda: print("badge")),
-        style={"spacing": 8, "align_items": "center"},
+        style={"gap": 8, "align_items": "center"},
     )
 ```
 
@@ -384,7 +384,7 @@ the reconciler publishes on a `ref` after commit:
 
 ```python
 @pn.component
-def PulsingBadge():
+def PulsingBadge() -> pn.Node:
     badge_ref = pn.use_ref()
 
     def pulse():

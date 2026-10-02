@@ -13,9 +13,12 @@ Two strategies share the surface:
   preserve state; hook-order or custom-hook changes remount the affected
   component instances. Covered screens and mounted rows participate in the
   same refresh.
-- **Full remount**: changes to helper classes or services, or an unsuccessful
-  component swap, rebuild the application tree. State is reset. A module
-  import failure is reported while its previous definition remains available.
+- **Full remount**: a reloaded module that removes a class or changes a
+  class's definition (its fields, bases, or method bodies), or an
+  unsuccessful component swap, rebuilds the application tree. State is
+  reset. Functions, `TypedDict` and `Protocol` classes, and classes whose
+  definition didn't change never force a remount. A module import failure
+  is reported while its previous definition remains available.
 
 [`apply_reload`][pythonnative.hot_reload.apply_reload] is the single
 entry point: it reloads once per process and then refreshes each live
@@ -30,13 +33,21 @@ and there is no overlay.
 
 from __future__ import annotations
 
+import enum
+import functools
+import hashlib
 import importlib
 import importlib.util
+import inspect
 import os
 import sys
 import threading
+import types
+import typing
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
+
+from .utils import OVERLAY_ENV, overlay_root
 
 __all__ = [
     "DEV_ROOT_DIR",
@@ -44,13 +55,10 @@ __all__ = [
     "ReloadResult",
     "apply_reload",
     "configure_dev_environment",
-    "overlay_root",
 ]
 
 DEV_ROOT_DIR = "pythonnative_dev"
 """Name of the writable on-device directory that shadows bundled app code."""
-
-_OVERLAY_ENV = "PYTHONNATIVE_HOT_RELOAD_ROOT"
 
 
 def configure_dev_environment(writable_root: str, server_url: Optional[str] = None) -> str:
@@ -77,15 +85,10 @@ def configure_dev_environment(writable_root: str, server_url: Optional[str] = No
     if dev_root in sys.path:
         sys.path.remove(dev_root)
     sys.path.insert(0, dev_root)
-    os.environ[_OVERLAY_ENV] = dev_root
+    os.environ[OVERLAY_ENV] = dev_root
     if server_url:
         os.environ["PN_DEV_SERVER"] = str(server_url)
     return dev_root
-
-
-def overlay_root() -> Optional[str]:
-    """The overlay directory configured for this process, if any."""
-    return os.environ.get(_OVERLAY_ENV) or None
 
 
 def _overlay_module_path(module_name: str) -> Optional[str]:
@@ -469,6 +472,251 @@ class ModuleReloader:
 
 
 # ======================================================================
+# Class fingerprints
+# ======================================================================
+
+# Class-dict entries that change without the class's shape changing: line
+# numbers, docstrings, caches, and bookkeeping that Python or `dataclasses`
+# derives from entries fingerprinted elsewhere.
+_CLASS_DICT_NOISE = frozenset(
+    {
+        "__module__",
+        "__qualname__",
+        "__doc__",
+        "__dict__",
+        "__weakref__",
+        "__firstlineno__",
+        "__static_attributes__",
+        "__annotations__",
+        "__annotate__",
+        "__annotate_func__",
+        "__annotations_cache__",
+        "__orig_bases__",
+        "__parameters__",
+        "__type_params__",
+        "__dataclass_params__",
+        "__dataclass_fields__",
+        "__abstractmethods__",
+        "_abc_impl",
+    }
+)
+
+_PRIMITIVES = (type(None), bool, int, float, complex, str, bytes, type(Ellipsis))
+
+_MAX_VALUE_DEPTH = 4
+
+
+def _qualified_name(obj: Any) -> str:
+    module = getattr(obj, "__module__", None) or ""
+    qualname = getattr(obj, "__qualname__", None) or getattr(obj, "__name__", None) or type(obj).__qualname__
+    return f"{module}.{qualname}"
+
+
+def _code_digest(code: types.CodeType, doc: Optional[str] = None) -> Any:
+    """A structural digest of ``code`` that ignores line numbers and file names.
+
+    ``doc`` is the owning function's docstring; its text is left out so
+    editing it keeps the digest.
+    """
+    consts = tuple(
+        ("doc",) if index == 0 and doc is not None and const == doc else _const_digest(const)
+        for index, const in enumerate(code.co_consts)
+    )
+    return (
+        "code",
+        code.co_qualname,
+        code.co_code,
+        consts,
+        code.co_names,
+        code.co_varnames,
+        code.co_freevars,
+        code.co_cellvars,
+        code.co_argcount,
+        code.co_posonlyargcount,
+        code.co_kwonlyargcount,
+        code.co_flags,
+    )
+
+
+def _const_digest(const: Any) -> Any:
+    if isinstance(const, types.CodeType):
+        return _code_digest(const)
+    if isinstance(const, tuple):
+        return ("tuple", tuple(_const_digest(item) for item in const))
+    if isinstance(const, frozenset):
+        return ("frozenset", tuple(sorted(repr(_const_digest(item)) for item in const)))
+    if isinstance(const, _PRIMITIVES):
+        return (type(const).__name__, repr(const))
+    return ("object", _qualified_name(type(const)))
+
+
+def _function_digest(function: types.FunctionType) -> Any:
+    layers = []
+    current: Any = function
+    seen: Set[int] = set()
+    # Decorators that use `functools.wraps` hide the body behind a wrapper whose
+    # code never changes, so the wrapped chain is digested too.
+    while isinstance(current, types.FunctionType) and id(current) not in seen:
+        seen.add(id(current))
+        layers.append(
+            (
+                _code_digest(current.__code__, current.__doc__),
+                _value_digest(current.__defaults__, 1),
+                _value_digest(current.__kwdefaults__, 1),
+            )
+        )
+        current = getattr(current, "__wrapped__", None)
+    return ("function", tuple(layers))
+
+
+def _value_digest(value: Any, depth: int = 0) -> Any:
+    """A stable digest of a class attribute, a default, or a nested container."""
+    if isinstance(value, types.FunctionType):
+        return _function_digest(value)
+    if isinstance(value, (staticmethod, classmethod)):
+        return (type(value).__name__, _value_digest(value.__func__, depth))
+    if isinstance(value, property):
+        return (
+            "property",
+            _value_digest(value.fget, depth),
+            _value_digest(value.fset, depth),
+            _value_digest(value.fdel, depth),
+        )
+    if isinstance(value, functools.cached_property):
+        return ("cached_property", _value_digest(value.func, depth))
+    if isinstance(value, _PRIMITIVES):
+        return (type(value).__name__, repr(value))
+    if isinstance(value, type):
+        return ("class", _qualified_name(value))
+    if isinstance(value, enum.Enum):
+        return ("member", _qualified_name(type(value)), value.name, _value_digest(value.value, depth + 1))
+    if depth < _MAX_VALUE_DEPTH:
+        if isinstance(value, tuple):
+            return ("tuple", tuple(_value_digest(item, depth + 1) for item in value))
+        if isinstance(value, frozenset):
+            return ("frozenset", tuple(sorted(repr(_value_digest(item, depth + 1)) for item in value)))
+    # Mutable containers (a class-level cache filled at run time would
+    # otherwise differ from its fresh copy) and arbitrary objects
+    # (descriptors, builtins, framework values, whose identity differs on
+    # every execution) contribute their type only.
+    return ("object", _qualified_name(type(value)))
+
+
+def _annotation_names(cls: type) -> List[str]:
+    try:
+        import annotationlib  # type: ignore[import-not-found, unused-ignore]
+
+        return sorted(annotationlib.get_annotations(cls, format=annotationlib.Format.FORWARDREF))
+    except ImportError:
+        pass
+    except Exception:
+        return []
+    try:
+        return sorted(inspect.get_annotations(cls))
+    except Exception:
+        return []
+
+
+def _class_fingerprint(cls: type) -> str:
+    """Hash the parts of ``cls`` that its instances depend on.
+
+    The fingerprint covers the qualified name, the metaclass and bases, the
+    annotated field names, and every class attribute: functions, methods, and
+    properties by their bytecode, constants, names, and defaults, and
+    immutable data by value. Line numbers, file names, and docstrings are
+    left out, so moving a class or adding a comment above it keeps its
+    fingerprint.
+    """
+    attributes = tuple(
+        (name, _value_digest(value)) for name, value in sorted(vars(cls).items()) if name not in _CLASS_DICT_NOISE
+    )
+    # Dataclass defaults and factories reach `__init__` through its globals
+    # rather than its code, so the fields are digested directly.
+    fields = tuple(
+        (
+            name,
+            _value_digest(getattr(spec, "default", None)),
+            _value_digest(getattr(spec, "default_factory", None)),
+            repr(getattr(spec, "_field_type", None)),
+            tuple(bool(getattr(spec, flag, False)) for flag in ("init", "repr", "compare", "kw_only")),
+        )
+        for name, spec in sorted((vars(cls).get("__dataclass_fields__") or {}).items())
+    )
+    parts = (
+        cls.__qualname__,
+        _qualified_name(type(cls)),
+        tuple(_qualified_name(base) for base in cls.__bases__),
+        tuple(_annotation_names(cls)),
+        attributes,
+        fields,
+    )
+    return hashlib.sha256(repr(parts).encode("utf-8")).hexdigest()
+
+
+def _is_exempt_class(cls: type) -> bool:
+    # TypedDicts and Protocols only describe shapes: nothing holds an instance
+    # of the class object itself, so redefining one never strands state.
+    return typing.is_typeddict(cls) or bool(getattr(cls, "_is_protocol", False))
+
+
+def _module_classes(module_name: str) -> Dict[str, type]:
+    """Classes defined by ``module_name`` (nested ones included), by qualname."""
+    module = sys.modules.get(module_name)
+    if module is None:
+        return {}
+    classes: Dict[str, type] = {}
+
+    def collect(candidates: Iterable[Any]) -> None:
+        for value in candidates:
+            if not isinstance(value, type) or value.__module__ != module_name:
+                continue
+            qualname = value.__qualname__
+            if "<locals>" in qualname or qualname in classes:
+                continue
+            classes[qualname] = value
+            collect(vars(value).values())
+
+    collect(list(vars(module).values()))
+    return classes
+
+
+def _class_fingerprints(module_names: Iterable[str]) -> Dict[str, Dict[str, str]]:
+    """Fingerprint every class the named modules define.
+
+    Args:
+        module_names: Dotted names of imported modules.
+
+    Returns:
+        ``{module_name: {qualname: fingerprint}}``. `TypedDict` and `Protocol`
+        classes are omitted because redefining them never strands state.
+    """
+    result: Dict[str, Dict[str, str]] = {}
+    for module_name in module_names:
+        result[module_name] = {
+            qualname: _class_fingerprint(cls)
+            for qualname, cls in _module_classes(module_name).items()
+            if not _is_exempt_class(cls)
+        }
+    return result
+
+
+def _classes_changed(before: Dict[str, Dict[str, str]], after: Dict[str, Dict[str, str]]) -> List[str]:
+    """Qualified names of classes that were removed or redefined differently.
+
+    New classes are not listed: no live instance can reference them yet.
+    """
+    changed: List[str] = []
+    for module_name, old_classes in before.items():
+        new_classes = after.get(module_name)
+        if new_classes is None:
+            continue
+        for qualname, fingerprint in old_classes.items():
+            if new_classes.get(qualname) != fingerprint:
+                changed.append(f"{module_name}.{qualname}")
+    return changed
+
+
+# ======================================================================
 # Process-wide reload
 # ======================================================================
 
@@ -483,7 +731,8 @@ class ReloadResult:
         mode: ``"fast_refresh"`` when every host refreshed in place,
             ``"remount"`` when at least one fell back to a full remount,
             ``"error"`` when a host hit an exception (shown in its
-            RedBox), or ``"none"`` when nothing could be reloaded.
+            RedBox), or ``"none"`` when nothing could be reloaded or no
+            host had a mounted tree to refresh.
         error: The import error text when a changed module failed to
             execute (the previous module stays in ``sys.modules``).
         hosts: Number of hosts refreshed.
@@ -524,19 +773,12 @@ def apply_reload(changed_modules: Sequence[str], hosts: Optional[Sequence[Any]] 
     # A changed module that was never imported needs no re-execution;
     # re-running the entry module (always last) imports it if it's used.
     imported = [m for m in result.requested if m in sys.modules]
-    # Instances of application classes can live in memo or ref slots. Replacing
-    # their defining module requires new instances, even if hooks didn't move.
-    from .component import Component
-
-    remount = any(
-        (isinstance(value, type) or callable(value))
-        and not isinstance(value, Component)
-        and getattr(value, "__module__", None) == name
-        and not key.startswith(("_", "use_"))
-        for name in imported
-        for key, value in vars(sys.modules[name]).items()
-    )
     targets = ModuleReloader.expand_reload_targets(imported, entry)
+    # Instances of application classes can live in state, memo, or ref slots.
+    # A class whose definition changed (or disappeared) would leave them
+    # stranded, so those reloads remount. Functions are rebound by the module
+    # re-execution and picked up on the next render.
+    fingerprints = _class_fingerprints(t for t in targets if t in sys.modules)
 
     # Changed modules are reloaded strictly so a syntax error is reported
     # with its traceback; the dependents (which didn't change) reload
@@ -560,6 +802,11 @@ def apply_reload(changed_modules: Sequence[str], hosts: Optional[Sequence[Any]] 
     result.reloaded = reloaded
     if not reloaded:
         return result
+    before = {name: fingerprints[name] for name in reloaded if name in fingerprints}
+    changed_classes = _classes_changed(before, _class_fingerprints(before))
+    remount = bool(changed_classes)
+    if remount:
+        diagnostics.log(f"reload: class definitions changed ({', '.join(changed_classes)}); remounting")
 
     modes: List[str] = []
     for host in hosts:
@@ -578,5 +825,6 @@ def apply_reload(changed_modules: Sequence[str], hosts: Optional[Sequence[Any]] 
     elif "fast_refresh" in modes:
         result.mode = "fast_refresh"
     else:
-        result.mode = "fast_refresh"
+        # No host had a mounted tree to refresh.
+        result.mode = "none"
     return result

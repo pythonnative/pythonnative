@@ -19,7 +19,7 @@ pn.Button("Tap me", on_press=lambda: print("tapped"))
 pn.Column(
     pn.Text("First"),
     pn.Text("Second"),
-    style={"spacing": 8, "padding": 16},
+    style={"gap": 8, "padding": 16},
 )
 ```
 
@@ -150,7 +150,7 @@ that fix the direction.
 - `align_items`: cross-axis alignment: `"stretch"`, `"flex_start"`,
   `"center"`, `"flex_end"`.
 - `overflow`: `"visible"` (default), `"hidden"`.
-- `spacing`: gap between children (dp / pt).
+- `gap`: space between children (dp / pt).
 - `padding`: inner spacing.
 
 #### Child layout properties
@@ -193,7 +193,7 @@ element tree:
 
 ```python
 @pn.component
-def App():
+def App() -> pn.Node:
     name, set_name = pn.use_state("World")
     return pn.Text(f"Hello, {name}!", style={"font_size": 24})
 ```
@@ -213,13 +213,13 @@ native views:
 
 ```python
 @pn.component
-def CounterPage():
+def CounterPage() -> pn.Node:
     count, set_count = pn.use_state(0)
 
     return pn.Column(
         pn.Text(f"Count: {count}", style={"font_size": 24}),
         pn.Button("Increment", on_press=lambda: set_count(count + 1)),
-        style={"spacing": 12},
+        style={"gap": 12},
     )
 ```
 
@@ -230,7 +230,7 @@ Each instance has **independent state**:
 
 ```python
 @pn.component
-def Counter(label: str = "Count", initial: int = 0):
+def Counter(label: str = "Count", initial: int = 0) -> pn.Node:
     count, set_count = pn.use_state(initial)
 
     return pn.Column(
@@ -238,33 +238,33 @@ def Counter(label: str = "Count", initial: int = 0):
         pn.Row(
             pn.Button("-", on_press=lambda: set_count(count - 1)),
             pn.Button("+", on_press=lambda: set_count(count + 1)),
-            style={"spacing": 8},
+            style={"gap": 8},
         ),
-        style={"spacing": 4},
+        style={"gap": 4},
     )
 
 
 @pn.component
-def App():
+def App() -> pn.Node:
     return pn.Column(
         Counter(label="Apples", initial=0),
         Counter(label="Oranges", initial=5),
-        style={"spacing": 16, "padding": 16},
+        style={"gap": 16, "padding": 16},
     )
 ```
 
 Changing one `Counter` doesn't affect the other; each has its own
 hook state.
 
-### Children and keys
+### Children
 
 Children are positional, for your components exactly as for the
 built-in containers. A component that accepts children declares
-`*children`:
+`*children: pn.Node`:
 
 ```python
 @pn.component
-def Card(*children: pn.Element, title: str):
+def Card(*children: pn.Node, title: str) -> pn.Node:
     return pn.Column(
         pn.Text(title, style={"bold": True}),
         *children,
@@ -275,17 +275,67 @@ def Card(*children: pn.Element, title: str):
 Card(pn.Text("Body"), pn.Button("OK"), title="Hello")
 ```
 
-`@pn.component` preserves the function's signature for type checkers,
-so `Card(titel="x")` is a static error and editors autocomplete props.
-Every component also accepts `key=` for keyed reconciliation. For a
-strictly typed call site, [`Component.keyed`][pythonnative.Component.keyed]
-returns the component's own signature with the key attached, so
-`[Row.keyed(item.id)(item) for item in items]` type-checks without
-declaring `key` in `Row`'s signature.
+[`pn.Node`][pythonnative.element.Node] is the type of anything that
+can appear in a tree: an element, `None` or a `bool` for "nothing", or
+a (possibly nested) iterable of nodes. That makes the usual
+conditional idioms type-check:
 
-Components that return a `list` of elements render them as siblings;
-`None` and `False` are dropped, so `cond and pn.Text("...")` is a
-fine way to render conditionally.
+```python
+pn.Column(
+    pn.Text(status) if status else None,
+    is_admin and AdminBanner(),
+    (Row(item=item).with_key(item.id) for item in items),
+)
+```
+
+`None` and `False` are dropped during reconciliation, and nested
+iterables are flattened. Strings aren't nodes: wrap text in
+[`pn.Text`][pythonnative.Text]. Annotate every component's return type
+as `pn.Node`, since a component may return an element, a list of
+siblings, or `None` to render nothing.
+
+### Typed props
+
+`@pn.component` preserves the function's signature for type checkers
+(it's a `ParamSpec`), so `Card(titel="x")` is a static error and editors
+autocomplete props from the function definition.
+
+In development builds (`pn start`, `pn run` without `--release`, and
+every test run under the pytest plugin), each call is also checked
+against the function's annotations at run time. A mismatch, such as
+`Card(title=3)` from untyped code, produces one
+[`diagnostics`][pythonnative.diagnostics] warning per component and
+parameter instead of an exception. The checker understands `str`,
+`int`, `float` (which accepts `int`), `bool`, `None`, `Optional`,
+unions, `Literal`, `Sequence`, `Mapping`, `Callable`, dataclasses, and
+plain classes, and skips annotations it can't evaluate. Release builds
+skip the check entirely, along with the built-in components' prop and
+style validation. Static checking remains the primary guard.
+
+### Keys
+
+A key identifies an element among its siblings so the reconciler can
+match it across renders when a list is reordered, inserted into, or
+filtered. Built-in factories take `key=` directly. User components
+don't: `key` isn't a prop, and PEP 612 doesn't allow a typed keyword
+next to a component's own signature. Key any element with
+[`.with_key()`][pythonnative.element.Element.with_key] instead:
+
+```python
+@pn.component
+def Row(item: Item) -> pn.Node:
+    return pn.Text(item.title)
+
+
+pn.Column(*(Row(item).with_key(item.id) for item in items))
+pn.Column(*(pn.Text(item.title, key=str(item.id)) for item in items))
+```
+
+`with_key` accepts any value and converts non-strings with `str`.
+Passing `key=` to a user component raises `TypeError` pointing to
+`.with_key()`, a component may not declare a parameter named `key`, and
+[`pn lint`](../guides/linting.md) reports `key=` on a component call
+(rule `PN104`) before you run the app.
 
 ### Available hooks
 
@@ -318,11 +368,21 @@ fine way to render conditionally.
   the canonical way to drive `Animated.View`.
 - [`use_context(context)`][pythonnative.use_context]: read from a
   context provider.
+- [`use_store(store, selector)`][pythonnative.use_store]: read an app
+  [`Store`][pythonnative.Store], re-rendering only when the selected
+  value changes.
+- [`use_theme()`][pythonnative.use_theme] and
+  [`use_styles(factory)`][pythonnative.use_styles]: read the active
+  [`Theme`][pythonnative.Theme] and derive styles from it once per
+  theme.
 - [`use_navigation()`][pythonnative.use_navigation]: the
   [`Navigation`][pythonnative.Navigation] handle for navigate, push,
   go_back, set_options, and listeners.
+- [`use_screen_options(**options)`][pythonnative.use_screen_options]:
+  set the current screen's title and header from its render.
 - [`use_route()`][pythonnative.use_route]: the current
-  [`Route`][pythonnative.navigation.Route] (name, params, key).
+  [`Route`][pythonnative.navigation.Route] (name, params, key). Screens
+  receive their params as arguments, so few need it.
 - [`use_focus_effect(effect, deps)`][pythonnative.use_focus_effect]:
   like `use_effect` but only runs when the screen is focused.
 - [`use_window_dimensions()`][pythonnative.use_window_dimensions]:
@@ -346,29 +406,46 @@ fine way to render conditionally.
 Extract reusable stateful logic into plain functions:
 
 ```python
-def use_toggle(initial: bool = False):
+from collections.abc import Callable
+
+
+def use_toggle(initial: bool = False) -> tuple[bool, Callable[[], None]]:
     value, set_value = pn.use_state(initial)
-    def toggle():
-        set_value(not value)
+
+    def toggle() -> None:
+        set_value(lambda current: not current)
+
     return value, toggle
 ```
+
+A custom hook is a function whose name starts with `use_`. It follows
+the same rules as the built-in hooks, which `pn lint` checks; see
+[Hooks](hooks.md#rules-of-hooks).
 
 ### Context and Provider
 
 Share values across the tree without prop drilling:
 
 ```python
-theme = pn.create_context({"primary": "#007AFF"})
+Accent = pn.create_context("#007AFF", name="Accent")
+
 
 @pn.component
-def App():
-    return theme.Provider(MyComponent(), value={"primary": "#FF0000"})
+def App() -> pn.Node:
+    return Accent.Provider(MyComponent(), value="#FF2D55")
+
 
 @pn.component
-def MyComponent():
-    t = pn.use_context(theme)
-    return pn.Button("Click", style={"color": t["primary"]})
+def MyComponent() -> pn.Node:
+    accent = pn.use_context(Accent)
+    return pn.Button("Click", style={"color": accent})
 ```
+
+For colors and other design tokens, use the built-in
+[`Theme`][pythonnative.Theme] and
+[`ThemeProvider`][pythonnative.ThemeProvider] rather than a context of
+your own; see [Styling](../guides/styling.md#themes). For app state
+that many components read, see [Managing state](../guides/state.md).
 
 ## Platform detection
 
@@ -401,6 +478,7 @@ pad = pn.Platform.select({"native": 16, "web": 12, "default": 8})
 ## Next steps
 
 - Learn the renderer underneath: [Architecture](architecture.md).
-- Manage state and side effects: [Hooks](hooks.md).
+- Manage state and side effects: [Hooks](hooks.md) and
+  [Managing state](../guides/state.md).
 - See worked examples: [Examples](../examples.md).
 - Browse the API: [Components](../api/components.md).

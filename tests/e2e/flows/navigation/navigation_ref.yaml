@@ -1,9 +1,9 @@
-# Tests create_navigation_ref: the ref bound to the root container is ready,
+# Tests NavigationRef: the ref bound to the root container is ready,
 # reports the current route, and navigates to another root screen with
 # params from plain module code.
 #
 # Demo screen: examples/e2e-suite/app/screens/navigation/navigation_ref.py
-# Source under test: src/pythonnative/navigation/ref.py :: create_navigation_ref
+# Source under test: src/pythonnative/navigation/ref.py :: NavigationRef
 appId: ${APP_ID}
 ---
 - runFlow:

@@ -12,11 +12,11 @@ from __future__ import annotations
 import asyncio
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def AsyncEffectDemo() -> pn.Element:
+def AsyncEffectDemo() -> pn.Node:
     """Run an async effect that flips a 'done' flag after a short delay."""
     done, set_done = pn.use_state(False)
 
@@ -26,12 +26,12 @@ def AsyncEffectDemo() -> pn.Element:
 
     pn.use_effect(_eventually_done, [])
 
-    return demo_screen(
+    return DemoScreen(
         "async use_effect",
         "An async def effect resolves after a short delay and flips the status line.",
-        section(
+        DemoSection(
             "Status",
-            result_text("Status", "done" if done else "loading"),
-            hint("Maestro waits for 'Status: done' (timeout 5s)."),
+            ResultText("Status", "done" if done else "loading"),
+            Hint("Maestro waits for 'Status: done' (timeout 5s)."),
         ),
     )

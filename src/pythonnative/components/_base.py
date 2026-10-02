@@ -9,7 +9,8 @@ prop normalizers shared by every view also live here.
 
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
-from ..element import Element
+from .. import diagnostics
+from ..element import Element, Node
 from ..hooks import Ref
 from ..style import AccessibilityAction, AccessibilityValue, StyleProp, resolve_style, validate_style_keys
 from .events import LayoutEvent
@@ -70,7 +71,7 @@ def _layout_callback(callback: Any) -> Any:
 
 def _make_element(
     name: str,
-    *children: Element,
+    *children: Node,
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
@@ -111,14 +112,19 @@ def _make_element(
     Returns:
         A fresh [`Element`][pythonnative.Element].
     """
-    from ..sdk.builtins import validate_props
-
     if props.get("on_layout") is not None:
         props["on_layout"] = _layout_callback(props["on_layout"])
-    validate_props(name, props)
+    if "accessibility_value" in props:
+        props["accessibility_value"] = _accessibility_value(props["accessibility_value"])
+    if "accessibility_actions" in props:
+        props["accessibility_actions"] = _accessibility_actions(props["accessibility_actions"])
     out: Dict[str, Any] = dict(resolve_style(style))
-    if out:
-        validate_style_keys(out, owner=name)
+    if diagnostics.is_dev():
+        from ..sdk.builtins import validate_props
+
+        validate_props(name, props)
+        if out:
+            validate_style_keys(out, owner=name)
     if _defaults:
         for k, v in _defaults.items():
             out.setdefault(k, v)

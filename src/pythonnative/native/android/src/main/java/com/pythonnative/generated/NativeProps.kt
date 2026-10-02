@@ -91,8 +91,6 @@ open class PNViewProps(val values: JSONObject) {
     val `margin_horizontal`: PNViewMarginTop? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("margin_horizontal"))) null else PNViewMarginTop.decode(values.get("margin_horizontal")) }
     val has_margin_vertical: Boolean get() = values.has("margin_vertical")
     val `margin_vertical`: PNViewMarginTop? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("margin_vertical"))) null else PNViewMarginTop.decode(values.get("margin_vertical")) }
-    val has_spacing: Boolean get() = values.has("spacing")
-    val `spacing`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("spacing"))) null else PNValues.number(values.get("spacing")) }
     val has_gap: Boolean get() = values.has("gap")
     val `gap`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("gap"))) null else PNValues.number(values.get("gap")) }
     val has_row_gap: Boolean get() = values.has("row_gap")
@@ -179,12 +177,6 @@ open class PNViewProps(val values: JSONObject) {
     val `z_index`: Long? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("z_index"))) null else PNValues.integer(values.get("z_index")) }
     val has_pointer_events: Boolean get() = values.has("pointer_events")
     val `pointer_events`: PNViewPointerEvents? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("pointer_events"))) null else PNViewPointerEvents.decode(values.get("pointer_events")) }
-    val has_gestures: Boolean get() = values.has("gestures")
-    val `gestures`: List<PNJSONValue>? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("gestures"))) null else PNValues.array(values.get("gestures")).map { item -> PNJSONValue(item ?: JSONObject.NULL) } }
-    val has_hit_slop: Boolean get() = values.has("hit_slop")
-    val `hit_slop`: PNViewHitSlop? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("hit_slop"))) null else PNViewHitSlop.decode(values.get("hit_slop")) }
-    val has_on_layout: Boolean get() = values.has("on_layout")
-    val `on_layout`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_layout"))) null else PNValues.boolean(values.get("on_layout")) }
     val has_accessibility_label: Boolean get() = values.has("accessibility_label")
     val `accessibility_label`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_label"))) null else if (PNValues.isNull(values.get("accessibility_label"))) null else PNValues.string(values.get("accessibility_label")) }
     val has_accessibility_hint: Boolean get() = values.has("accessibility_hint")
@@ -205,6 +197,12 @@ open class PNViewProps(val values: JSONObject) {
     val `important_for_accessibility`: PNViewImportantForAccessibility? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("important_for_accessibility"))) null else if (PNValues.isNull(values.get("important_for_accessibility"))) null else PNViewImportantForAccessibility.decode(values.get("important_for_accessibility")) }
     val has_test_id: Boolean get() = values.has("test_id")
     val `test_id`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("test_id"))) null else if (PNValues.isNull(values.get("test_id"))) null else PNValues.string(values.get("test_id")) }
+    val has_gestures: Boolean get() = values.has("gestures")
+    val `gestures`: List<PNJSONValue>? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("gestures"))) null else PNValues.array(values.get("gestures")).map { item -> PNJSONValue(item ?: JSONObject.NULL) } }
+    val has_hit_slop: Boolean get() = values.has("hit_slop")
+    val `hit_slop`: PNViewHitSlop? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("hit_slop"))) null else PNViewHitSlop.decode(values.get("hit_slop")) }
+    val has_on_layout: Boolean get() = values.has("on_layout")
+    val `on_layout`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_layout"))) null else PNValues.boolean(values.get("on_layout")) }
     val has__pn_layout: Boolean get() = values.has("_pn_layout")
     val `_pn_layout`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("_pn_layout"))) null else PNValues.boolean(values.get("_pn_layout")) }
     val has__pn_events: Boolean get() = values.has("_pn_events")
@@ -256,7 +254,7 @@ class BlurViewProps(values: JSONObject, partial: Boolean = true, validated: Bool
     val has_intensity: Boolean get() = values.has("intensity")
     val `intensity`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("intensity"))) null else PNValues.number(values.get("intensity")) }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
-    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
+    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
 }
 
 class ButtonProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
@@ -302,7 +300,7 @@ class CheckboxProps(values: JSONObject, partial: Boolean = true, validated: Bool
     val has_disabled: Boolean get() = values.has("disabled")
     val `disabled`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("disabled"))) null else PNValues.boolean(values.get("disabled")) }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
-    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
+    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
 }
 
 class ColumnProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
@@ -346,7 +344,7 @@ class DatePickerProps(values: JSONObject, partial: Boolean = true, validated: Bo
     val has_disabled: Boolean get() = values.has("disabled")
     val `disabled`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("disabled"))) null else PNValues.boolean(values.get("disabled")) }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
-    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
+    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
 }
 
 class ImageProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
@@ -402,7 +400,7 @@ class ImageBackgroundProps(values: JSONObject, partial: Boolean = true, validate
     val has_scale_type: Boolean get() = values.has("scale_type")
     val `scale_type`: PNImageScaleType? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("scale_type"))) null else if (PNValues.isNull(values.get("scale_type"))) null else PNImageScaleType.decode(values.get("scale_type")) }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
-    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
+    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
 }
 
 class KeyboardAvoidingViewProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
@@ -446,7 +444,7 @@ class LinearGradientProps(values: JSONObject, partial: Boolean = true, validated
     val has_end_point: Boolean get() = values.has("end_point")
     val `end_point`: PNPNViewTextShadowOffset1? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("end_point"))) null else PNPNViewTextShadowOffset1.decode(values.get("end_point")) }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
-    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
+    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
 }
 
 class ModalProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
@@ -508,7 +506,7 @@ class PickerProps(values: JSONObject, partial: Boolean = true, validated: Boolea
     val has_placeholder: Boolean get() = values.has("placeholder")
     val `placeholder`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("placeholder"))) null else PNValues.string(values.get("placeholder")) }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
-    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
+    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
 }
 
 class PortalProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
@@ -778,7 +776,7 @@ class SegmentedControlProps(values: JSONObject, partial: Boolean = true, validat
     val has_disabled: Boolean get() = values.has("disabled")
     val `disabled`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("disabled"))) null else PNValues.boolean(values.get("disabled")) }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
-    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
+    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
 }
 
 class SliderProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
@@ -816,7 +814,7 @@ class SliderProps(values: JSONObject, partial: Boolean = true, validated: Boolea
     val has_on_sliding_complete: Boolean get() = values.has("on_sliding_complete")
     val `on_sliding_complete`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_sliding_complete"))) null else if (PNValues.isNull(values.get("on_sliding_complete"))) null else PNValues.boolean(values.get("on_sliding_complete")) }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
-    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
+    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
 }
 
 class SpacerProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
@@ -918,7 +916,7 @@ class SwitchProps(values: JSONObject, partial: Boolean = true, validated: Boolea
     val has_thumb_color: Boolean get() = values.has("thumb_color")
     val `thumb_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("thumb_color"))) null else PNActivityIndicatorColor.decode(values.get("thumb_color")) }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
-    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
+    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
 }
 
 class TabBarProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
@@ -1042,7 +1040,7 @@ class TextInputProps(values: JSONObject, partial: Boolean = true, validated: Boo
     val has_text_content_type: Boolean get() = values.has("text_content_type")
     val `text_content_type`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("text_content_type"))) null else if (PNValues.isNull(values.get("text_content_type"))) null else PNValues.string(values.get("text_content_type")) }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
-    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
+    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) }
 }
 
 class TouchableOpacityProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
@@ -1154,6 +1152,7 @@ object PNComponentEvents {
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object BlurView {
+        fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object Button {
@@ -1167,8 +1166,8 @@ object PNComponentEvents {
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object Column {
-        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
         fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
+        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object DatePicker {
         fun `on_change`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_change", PNValues.encode(argument0))
@@ -1191,6 +1190,7 @@ object PNComponentEvents {
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object LinearGradient {
+        fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object Modal {
@@ -1212,8 +1212,8 @@ object PNComponentEvents {
         fun `on_long_press`(view: android.view.View): Boolean = PNEvents.fire(view, "on_long_press")
         fun `on_press_in`(view: android.view.View): Boolean = PNEvents.fire(view, "on_press_in")
         fun `on_press_out`(view: android.view.View): Boolean = PNEvents.fire(view, "on_press_out")
-        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
         fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
+        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object ProgressBar {
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
@@ -1223,19 +1223,19 @@ object PNComponentEvents {
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object Row {
-        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
         fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
+        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object SafeAreaView {
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object Screen {
-        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
         fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
+        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object ScreenStack {
-        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
         fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
+        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
         fun `on_native_back`(view: android.view.View, argument0: Long): Boolean = PNEvents.fire(view, "on_native_back", PNValues.encode(argument0))
     }
     object ScrollView {
@@ -1255,6 +1255,7 @@ object PNComponentEvents {
         fun `on_change`(view: android.view.View, argument0: Double): Boolean = PNEvents.fire(view, "on_change", PNValues.encode(argument0))
         fun `on_sliding_start`(view: android.view.View, argument0: Double): Boolean = PNEvents.fire(view, "on_sliding_start", PNValues.encode(argument0))
         fun `on_sliding_complete`(view: android.view.View, argument0: Double): Boolean = PNEvents.fire(view, "on_sliding_complete", PNValues.encode(argument0))
+        fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object Spacer {
@@ -1269,11 +1270,12 @@ object PNComponentEvents {
     }
     object Switch {
         fun `on_change`(view: android.view.View, argument0: Boolean): Boolean = PNEvents.fire(view, "on_change", PNValues.encode(argument0))
+        fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object TabBar {
-        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
         fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
+        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
         fun `on_tab_select`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_tab_select", PNValues.encode(argument0))
     }
     object Text {
@@ -1300,12 +1302,12 @@ object PNComponentEvents {
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object View {
-        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
         fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
+        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }
     object VirtualList {
-        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
         fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
+        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
         fun `on_bind_row`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "on_bind_row", *arguments)
         fun `on_window`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "on_window", *arguments)
         fun `on_scroll`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "on_scroll", *arguments)

@@ -11,24 +11,24 @@ an animation when the setting is on.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UseReduceMotionDemo() -> pn.Element:
+def UseReduceMotionDemo() -> pn.Node:
     """Render the Reduce Motion flag and the animation duration derived from it."""
     reduce_motion = pn.use_reduce_motion()
     duration = 0 if reduce_motion else 300
     agrees = reduce_motion == pn.AccessibilityInfo.is_reduce_motion_enabled()
 
-    return demo_screen(
+    return DemoScreen(
         "use_reduce_motion",
         "System Reduce Motion setting, returned reactively by the hook.",
-        section(
+        DemoSection(
             "Reduce motion",
-            result_text("Reduce motion", "yes" if reduce_motion else "no"),
-            result_text("Animation duration", duration),
-            result_text("Matches AccessibilityInfo", "yes" if agrees else "no"),
-            hint("Maestro checks the hook against AccessibilityInfo on any device."),
+            ResultText("Reduce motion", "yes" if reduce_motion else "no"),
+            ResultText("Animation duration", duration),
+            ResultText("Matches AccessibilityInfo", "yes" if agrees else "no"),
+            Hint("Maestro checks the hook against AccessibilityInfo on any device."),
         ),
     )

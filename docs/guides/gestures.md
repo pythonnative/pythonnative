@@ -19,7 +19,7 @@ from pythonnative import gestures
 
 
 @pn.component
-def TapCard():
+def TapCard() -> pn.Node:
     count, set_count = pn.use_state(0)
     return pn.View(
         pn.Text(f"Tapped {count} times"),
@@ -120,7 +120,7 @@ from pythonnative import gestures
 
 
 @pn.component
-def Draggable():
+def Draggable() -> pn.Node:
     tx = pn.use_animated_value(0.0)
     ty = pn.use_animated_value(0.0)
 

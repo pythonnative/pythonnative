@@ -13,11 +13,11 @@ from __future__ import annotations
 import threading
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def RefreshControlDemo() -> pn.Element:
+def RefreshControlDemo() -> pn.Node:
     """Render a page with a pull-to-refresh control plus a manual trigger button."""
     refreshing, set_refreshing = pn.use_state(False)
     count, set_count = pn.use_state(0)
@@ -31,15 +31,15 @@ def RefreshControlDemo() -> pn.Element:
 
         threading.Timer(0.6, _done).start()
 
-    return demo_screen(
+    return DemoScreen(
         "RefreshControl",
         "Pull the page down to refresh, or use the button for the same code path.",
-        section(
+        DemoSection(
             "Refresh state",
-            result_text("Refreshing", "yes" if refreshing else "no"),
-            result_text("Refresh runs", count),
+            ResultText("Refreshing", "yes" if refreshing else "no"),
+            ResultText("Refresh runs", count),
             pn.Button("Trigger refresh", on_press=start_refresh),
-            hint("Maestro pulls the page down, then taps 'Trigger refresh'."),
+            Hint("Maestro pulls the page down, then taps 'Trigger refresh'."),
         ),
         refresh_control=pn.RefreshControl(refreshing=refreshing, on_refresh=start_refresh),
     )
