@@ -209,8 +209,15 @@ def test_safe_extract_rechecks_paths_after_creating_links(tmp_path: Path) -> Non
         _add_link(tar, "alias", ".")
         _add_file(tar, "alias/../outside_target/payload.txt")
 
-    with pytest.raises(tarfile.OutsideDestinationError):
+    # CPython's data filter either refuses the member (3.14.7 and earlier)
+    # or resolves its path inside dest (3.14.8 and later). Both are safe;
+    # what matters is that nothing lands outside dest.
+    try:
         runtime_assets._safe_extract(tar_path, dest)
+    except tarfile.OutsideDestinationError:
+        pass
+    else:
+        assert (dest / "outside_target" / "payload.txt").is_file()
 
     assert (dest / "alias").is_symlink()
     assert list(outside.iterdir()) == []
