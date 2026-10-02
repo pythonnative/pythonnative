@@ -20,6 +20,14 @@ final class PNLifecycleTests: XCTestCase {
         wait(for: [ready], timeout: 15)
         window.layoutIfNeeded()
     }
+    /// Waits for a UIKit transition's end state rather than a fixed delay,
+    /// because presentation and dismissal take longer on a loaded simulator.
+    private func settle(until condition: @escaping () -> Bool, _ description: String) {
+        let done = expectation(for: NSPredicate { _, _ in condition() }, evaluatedWith: nil)
+        done.expectationDescription = description
+        wait(for: [done], timeout: 15)
+        window.layoutIfNeeded()
+    }
     override func tearDown() {
         window?.isHidden = true
         window?.rootViewController = nil
@@ -96,14 +104,14 @@ final class PNLifecycleTests: XCTestCase {
         XCTAssertTrue(navigation.topViewController?.navigationItem.rightBarButtonItem?.customView === PNViewRegistry.shared.view(for: 823))
         apply([["c", 825, "Screen", ["title": "Compose", "presentation": "modal", "gesture_enabled": false, "animation": "none", "flex": 1]],
                ["i", 821, 825, 1]])
-        settle()
+        settle(until: { navigation.presentedViewController != nil }, "modal is presented")
         let modal = try XCTUnwrap(navigation.presentedViewController as? UINavigationController)
         XCTAssertEqual(modal.topViewController?.title, "Compose")
         XCTAssertTrue(modal.isModalInPresentation)
         XCTAssertEqual(navigation.viewControllers.count, 1)
         XCTAssertTrue(PNViewRegistry.shared.view(for: 825)?.window === window)
         apply([["d", 825]])
-        settle()
+        settle(until: { navigation.presentedViewController == nil }, "modal is dismissed")
         XCTAssertNil(navigation.presentedViewController)
         XCTAssertTrue(PNViewRegistry.shared.view(for: 822)?.window === window)
         apply([["d", 824], ["d", 823]])
