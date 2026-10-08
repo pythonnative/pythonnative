@@ -327,6 +327,9 @@ def test_prepare_ios_release_omits_development_modules(tmp_path: Path, monkeypat
 
     _fake_ios_runtime(tmp_path, monkeypatch)
     cfg = AppConfig.load(_project(tmp_path, _TOML))
+    # Release builds compile bytecode, which needs an interpreter matching
+    # app.python_version; the one running the tests always qualifies.
+    cfg.python_version = f"{sys.version_info[0]}.{sys.version_info[1]}"
     builder = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None)
     debug = builder.prepare("ios", ios_sdks=("iphonesimulator",))
     lib = debug.project_dir / "app_packages.iphonesimulator" / "pythonnative"
