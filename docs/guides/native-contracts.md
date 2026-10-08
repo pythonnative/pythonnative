@@ -146,7 +146,7 @@ hasn't changed.
 
 ## Missing values, nulls, and resets
 
-Protocol 4 separates setting a value from removing a property:
+The protocol separates setting a value from removing a property:
 
 ```python
 import pythonnative as pn
@@ -183,12 +183,19 @@ a provider plugin if your application needs an Android image editor.
 `NativeModuleError("unsupported")` on Android, where remote push needs a
 provider extension.
 
-Only protocol 4 clients are supported. Rebuild the app after changing declarations,
+Only clients that speak the current protocol (5) are supported. Rebuild the app
+after changing declarations,
 native sources, or native dependencies. Startup checks the exact contract
 fingerprint and Yoga version before mounting. Fast Refresh handles Python
 application changes within that compiled interface.
 
 ## Verify contracts
+
+`scripts/generate-native-contracts.py` also writes the built-in contracts to
+`src/pythonnative/sdk/_builtin_contracts.json`, which `import pythonnative`
+loads instead of evaluating the factories' annotations. Regenerate after
+changing a built-in factory's signature; `tests/test_codegen.py` fails until
+you do.
 
 ```sh
 uv run python scripts/generate-native-contracts.py

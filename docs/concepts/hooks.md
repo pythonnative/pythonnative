@@ -148,11 +148,11 @@ once per site when a dependency list changes length between renders.
 
 ### use_layout_effect
 
-Like [`use_effect`][pythonnative.use_effect], but runs synchronously
-inside the commit, after native mutations and the layout pass and
+Like [`use_effect`][pythonnative.use_effect], but runs in the commit
+phase as soon as native has mounted the commit and applied its layout,
 before passive effects. Use it to read a committed frame from a ref or
-to issue an imperative command (like scrolling a list into position)
-before the user sees the new frame:
+to issue an imperative command (like scrolling a list into position) as
+early as possible:
 
 ```python
 @pn.component
@@ -167,8 +167,11 @@ def Chat(messages: list[str]) -> pn.Node:
     return pn.FlatList(data=messages, render_item=lambda text, index: pn.Text(text), ref=list_ref)
 ```
 
-Prefer `use_effect` for everything else; layout effects block the
-commit, so heavy work here delays the frame.
+Native renders on its own thread, so unlike React on the web the commit
+isn't held back from the screen: the user may see the committed frame
+before a layout effect runs, and state it sets commits in a following
+transaction, usually the next frame. Prefer `use_effect` for everything
+else; layout effects delay the commit's passive effects.
 
 ### use_navigation
 

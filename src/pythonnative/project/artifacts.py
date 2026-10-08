@@ -161,3 +161,47 @@ def ios_archive(path: Path) -> int:
         if not runtime_manifests:
             raise ArtifactError(f"{app.name}: PythonNativeKit privacy resource bundle is missing")
     return count
+
+
+# Where the Python half of an app lives inside each artifact type.
+_PYTHON_DIRS = ("python", "app_packages", "app")
+_ZIP_PYTHON_PREFIXES = ("assets/chaquopy/", "base/assets/chaquopy/")
+
+
+def _python_entry(name: str) -> bool:
+    if name.startswith(_ZIP_PYTHON_PREFIXES):
+        return True
+    parts = name.split("/")
+    # Payload/<App>.app/<dir>/... inside an .ipa.
+    return len(parts) > 3 and parts[0] == "Payload" and parts[1].endswith(".app") and parts[2] in _PYTHON_DIRS
+
+
+def size_report(path: Path) -> str | None:
+    """Describe an artifact's size and how much of it the Python runtime and app take.
+
+    Handles ``.app`` bundles, ``.xcarchive`` archives, and ``.ipa``,
+    ``.apk``, and ``.aab`` packages. Packaged sizes are compressed.
+
+    Returns:
+        A line such as ``"48.2 MB, 21.0 MB of it Python"``, or ``None`` for
+        anything else.
+    """
+    path = Path(path)
+    if path.suffix == ".xcarchive":
+        apps = sorted((path / "Products" / "Applications").glob("*.app"))
+        return size_report(apps[0]) if apps else None
+    if path.suffix == ".app" and path.is_dir():
+        total = python = 0
+        for item in path.rglob("*"):
+            if item.is_file() and not item.is_symlink():
+                size = item.stat().st_size
+                total += size
+                if item.relative_to(path).parts[0] in _PYTHON_DIRS:
+                    python += size
+    elif path.suffix in {".ipa", ".apk", ".aab"} and path.is_file():
+        with zipfile.ZipFile(path) as archive:
+            python = sum(info.compress_size for info in archive.infolist() if _python_entry(info.filename))
+        total = path.stat().st_size
+    else:
+        return None
+    return f"{total / 1e6:.1f} MB, {python / 1e6:.1f} MB of it Python"

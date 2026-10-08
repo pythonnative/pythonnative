@@ -36,7 +36,7 @@ def _pn_fresh_runtime() -> Iterator[None]:
 
     diagnostics.set_dev_mode(True)
     yield
-    diagnostics._dev_mode = None
+    diagnostics.reset_dev_mode()
 
     runtime._shutdown_for_tests()
     get_event_registry().reset()

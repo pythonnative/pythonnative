@@ -8,7 +8,9 @@ import UIKit
 /// - `["u", tag, {changed}, [removed]]` set values and explicitly remove properties
 /// - `["i", parent, child, index]` ensure `child` is at `index` under `parent`
 /// - `["d", tag]` destroy the view
-/// - `["f", tag, x, y, w, h]` set the frame in points
+///
+/// Geometry never travels as an operation: Yoga runs beside the widgets
+/// (`PNLayout`) and frames are applied after each commit.
 ///
 /// Only PNCommit may submit validated operation batches.
 public enum PNTransaction {
@@ -18,7 +20,6 @@ public enum PNTransaction {
         case update(tag: Int64, changed: [String: Any], removed: [String] = [])
         case insert(parent: Int64, child: Int64, index: Int)
         case destroy(tag: Int64)
-        case frame(tag: Int64, x: Double, y: Double, w: Double, h: Double)
 
         public static func == (lhs: Op, rhs: Op) -> Bool {
             switch (lhs, rhs) {
@@ -30,8 +31,6 @@ public enum PNTransaction {
                 return p1 == p2 && c1 == c2 && i1 == i2
             case let (.destroy(t1), .destroy(t2)):
                 return t1 == t2
-            case let (.frame(t1, x1, y1, w1, h1), .frame(t2, x2, y2, w2, h2)):
-                return t1 == t2 && x1 == x2 && y1 == y2 && w1 == w2 && h1 == h2
             default:
                 return false
             }
@@ -77,9 +76,6 @@ public enum PNTransaction {
             return .insert(parent: try tag(1), child: try tag(2), index: Int(try number(3)))
         case "d":
             return .destroy(tag: try tag(1))
-        case "f":
-            guard parts.count >= 6 else { throw DecodeError.malformedOp(index: index) }
-            return .frame(tag: try tag(1), x: try number(2), y: try number(3), w: try number(4), h: try number(5))
         default:
             throw DecodeError.unknownOpcode(code)
         }
@@ -137,10 +133,6 @@ public enum PNTransaction {
                 }
                 record.manager.destroy(view: record.view)
                 PNViewState.detach(record.view)
-
-            case let .frame(tag, x, y, w, h):
-                guard let record = registry.resolve(tag) else { throw MountError.missingTag(tag) }
-                record.manager.setFrame(view: record.view, x: x, y: y, w: w, h: h)
             }
             // Later operations in this batch need the current logical owners,
             // especially when replacing a container after moving its children.

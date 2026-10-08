@@ -108,7 +108,6 @@ enum PNLayout {
                     p.children.removeAll { $0 == tag }
                     YGNodeRemoveChild(p.node, entry.node)
                 }
-            case .frame: break
             }
         }
     }

@@ -128,8 +128,23 @@ __all__ = [
     "WebView",
 ]
 
-# Factories are the single source for Python signatures and native contracts.
-from ..sdk.builtins import install as _install_native_contracts
 
-_install_native_contracts(globals())
-del _install_native_contracts
+def _install_contracts() -> None:
+    """Register the built-in native contracts.
+
+    Factories are the single source for Python signatures and native
+    contracts. Code generation derives the contracts from them once
+    (``sdk.builtins``, which release bundles omit); importing reads the
+    generated document. A development checkout whose document predates a
+    protocol change derives them instead.
+    """
+    from ..sdk import schema
+
+    if not schema.load_builtin_contracts():
+        from ..sdk.builtins import install
+
+        install(globals())
+
+
+_install_contracts()
+del _install_contracts

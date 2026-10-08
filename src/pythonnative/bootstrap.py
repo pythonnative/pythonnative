@@ -1,16 +1,17 @@
 """Entry point the native app templates run right after Python starts.
 
-Both templates execute one line of Python once the interpreter is up:
+Both templates call [`start`][pythonnative.bootstrap.start] once the
+interpreter is up, on a background thread at launch:
 
 ```python
-import pythonnative.bootstrap; pythonnative.bootstrap.start()
+pythonnative.bootstrap.start(dev, True, "app.main")
 ```
 
-[`start`][pythonnative.bootstrap.start] connects the two halves of the
-bridge (installing the native -> Python callback on iOS), verifies the
-protocol version, routes ``print()`` to the console on iOS, warms the
-asyncio runtime, and, in debug builds, starts the dev client that syncs
-sources from ``pn start``. From then on the native runtime drives
+It connects the two halves of the bridge (installing the native -> Python
+callback on iOS), verifies the protocol version, routes ``print()`` to the
+console on iOS, warms the asyncio runtime, in debug builds starts the dev
+client that syncs sources from ``pn start``, and imports the entry module,
+so the first screen only has to render. From then on the native runtime drives
 everything through ``callback("host", ...)``; see ``docs/concepts/bridge.md``.
 """
 
@@ -19,14 +20,14 @@ from __future__ import annotations
 import os
 import sys
 import traceback
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 __all__ = ["start", "status"]
 
 _started: Dict[str, Any] = {}
 
 
-def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
+def start(dev: bool = False, strict: bool = False, entry: Optional[str] = None) -> Dict[str, Any]:
     """Connect the bridge and prepare the runtime.
 
     Args:
@@ -35,6 +36,9 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
         strict: Re-raise the failure after recording it. The templates
             pass ``True`` so a broken bridge surfaces as a bootstrap
             error screen with the full traceback.
+        entry: The app's entry module, imported last so a broken app
+            fails here with its traceback, and so the first screen
+            doesn't pay for the import.
 
     Returns:
         A status dict (``{"protocol": 2, "platform": "ios"}``) that the
@@ -89,6 +93,10 @@ def start(dev: bool = False, strict: bool = False) -> Dict[str, Any]:
             from .assets import configure_native
 
             configure_native()
+        if entry:
+            import importlib
+
+            importlib.import_module(entry)
     except Exception as exc:
         status_["error"] = f"{type(exc).__name__}: {exc}"
         print(f"[pn.bootstrap] start failed: {exc!r}", file=sys.stderr)

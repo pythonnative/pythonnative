@@ -48,7 +48,7 @@ export_method = "development"   # development | ad-hoc | app-store | enterprise
 [android]
 min_sdk = 24
 target_sdk = 36
-# abi_filters = ["arm64-v8a", "x86_64"]   # the default; add 32-bit ABIs if needed
+# abi_filters = ["arm64-v8a", "x86_64"]   # the default and the full set (64-bit only)
 
 [android.signing]
 # keystore = "release.keystore"
@@ -154,7 +154,7 @@ and why.
     Validation rejects it.
 
 C-extension packages need wheels built for the target architectures
-(`arm64-v8a`/`armeabi-v7a` on Android; `arm64`/`x86_64` for the iOS
+(`arm64-v8a`/`x86_64` on Android; `arm64`/`x86_64` for the iOS
 Simulator). Many popular extensions have no upstream mobile wheels yet.
 
 ---
@@ -215,8 +215,8 @@ provisioning_profile = "My App Distribution"
 | Key | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `min_sdk` | integer | `24` | Minimum API level. Must be at least 24 (Chaquopy 17 requirement). |
-| `target_sdk` | integer | `34` | Target API level. Must be ≥ `min_sdk`. |
-| `compile_sdk` | integer | `34` | SDK level the project compiles against. |
+| `target_sdk` | integer | `36` | Target API level. Must be ≥ `min_sdk`. |
+| `compile_sdk` | integer | `36` | SDK level the project compiles against. |
 | `application_id` | string | `app.id` | Override the Android application id (and package). |
 | `abi_filters` | list of strings | `["arm64-v8a", "x86_64"]` | Native ABIs to include: `arm64-v8a` (devices) and `x86_64` (emulators). CPython 3.13+ on Chaquopy and PEP 738 wheels are 64-bit only, so 32-bit ABIs are rejected. Drop `x86_64` for a smaller release APK. |
 | `permissions` | list of strings | `[]` | Extra **raw** Android permission strings appended to the ones derived from `[permissions]`. |

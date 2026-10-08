@@ -18,7 +18,7 @@ import pytest
 
 import pythonnative as pn
 from pythonnative import bridge
-from pythonnative.bridge import codec
+from pythonnative.bridge import PROTOCOL_VERSION, codec
 from pythonnative.bridge.web import BROWSER_MODULES, WebTransport
 from pythonnative.component import component
 from pythonnative.element import Element
@@ -33,7 +33,6 @@ class FakePage:
     def __init__(self, transport: WebTransport) -> None:
         self.transport = transport
         self.sent: List[List[Any]] = []
-        self.measure_size = (80.0, 20.0)
         self.viewport = {"width": 390.0, "height": 800.0, "insets": {"top": 0, "left": 0, "bottom": 34, "right": 0}}
         self.calls: List[Any] = []
         self.commands: List[Any] = []
@@ -47,7 +46,7 @@ class FakePage:
         message = json.loads(text)
         self.sent.append(message)
         kind = message[0]
-        if kind in ("apply", "measure", "command", "animate", "call"):
+        if kind in ("apply", "command", "animate", "call"):
             result = self._answer(message)
             reply = codec.dumps(["res", message[1], result])
             if self.answer_in_thread:
@@ -74,8 +73,6 @@ class FakePage:
                     "frames": [],
                 }
             return reply
-        if kind == "measure":
-            return list(self.measure_size)
         if kind == "command":
             _, _, tag, name, args = message
             self.commands.append((tag, name, json.loads(args) if args else None))
@@ -130,14 +127,6 @@ class FakePage:
         text = codec.dumps(["cb", kind, tag, name, payload if isinstance(payload, str) else codec.dumps(payload)])
         self.transport.on_preview_message(self, text)
 
-    def request(self, request_id: int, kind: str, tag: int, name: str, payload: Any) -> None:
-        if kind == "event":
-            payload = self._event(payload)
-        text = codec.dumps(
-            ["req", request_id, kind, tag, name, payload if isinstance(payload, str) else codec.dumps(payload)]
-        )
-        self.transport.on_preview_message(self, text)
-
 
 @pytest.fixture
 def web() -> Generator[Any, None, None]:
@@ -176,24 +165,21 @@ def _install_app(monkeypatch: pytest.MonkeyPatch, name: str, root: Any) -> str:
 
 
 def test_apply_waits_for_revision_acknowledgement(web: Any) -> None:
-    envelope = {"version": 4, "application": "test", "surface": 1, "revision": 1, "ops": [["c", 1, "View", {}]]}
+    envelope = {
+        "version": PROTOCOL_VERSION,
+        "application": "test",
+        "surface": 1,
+        "revision": 1,
+        "ops": [["c", 1, "View", {}]],
+    }
     result = json.loads(web.transport.apply(codec.dumps(envelope)))
     assert result == {"ok": True, "application": "test", "surface": 1, "revision": 1}
     assert web.page.sent[-1][0] == "apply"
     assert web.page.sent[-1][2] == envelope
 
 
-def test_measure_blocks_until_the_page_answers(web: Any) -> None:
-    web.page.measure_size = (123.5, 17.0)
-    assert web.transport.measure(7, 390.0, float("inf")) == (123.5, 17.0)
-    message = web.page.sent[-1]
-    # Infinity has no JSON spelling; the unconstrained axis travels as the 1e6 sentinel.
-    assert message[0] == "measure" and message[2:] == [7, 390.0, 1e6]
-
-
-def test_measure_returns_zero_when_no_page_is_attached() -> None:
+def test_requests_return_nothing_when_no_page_is_attached() -> None:
     transport = WebTransport(log=lambda line: None)
-    assert transport.measure(1, 10.0, 10.0) == (0.0, 0.0)
     assert transport.command(1, "focus", "{}") is None
 
 
@@ -210,22 +196,22 @@ def test_request_timeout_is_reported_not_raised(web: Any, monkeypatch: pytest.Mo
 
     monkeypatch.setattr(web_mod, "REQUEST_TIMEOUT_S", 0.05)
     web.page.send = lambda text: web.page.sent.append(json.loads(text))  # never answers
-    assert web.transport.measure(1, 1.0, 1.0) == (0.0, 0.0)
+    assert web.transport.command(1, "focus", "{}") is None
 
 
 def test_disconnect_fails_waiting_requests(web: Any) -> None:
     results: List[Any] = []
     web.page.send = lambda text: web.page.sent.append(json.loads(text))  # never answers
 
-    def _measure() -> None:
-        results.append(web.transport.measure(1, 1.0, 1.0))
+    def _command() -> None:
+        results.append(web.transport.command(1, "focus", "{}"))
 
-    thread = threading.Thread(target=_measure)
+    thread = threading.Thread(target=_command)
     thread.start()
     time.sleep(0.05)
     web.transport.on_preview_disconnected(web.page)
     thread.join(timeout=2.0)
-    assert results == [(0.0, 0.0)]
+    assert results == [None]
     assert not web.transport.connected
 
 
@@ -291,18 +277,25 @@ def test_events_from_the_page_reach_handlers_on_the_main_thread(web: Any) -> Non
     assert seen == [()]
 
 
-def test_requests_from_the_page_are_answered(web: Any) -> None:
+def test_page_callbacks_are_never_answered(web: Any) -> None:
     from pythonnative.events import get_event_registry
     from pythonnative.mutations import CreateOp
 
     web.backend.apply_mutations(
         [CreateOp(5, "VirtualList", {"dataset": {"base": 0, "revision": 1, "changes": [["reset", []]]}})]
     )
-    get_event_registry().set_events(5, {"on_bind_row": lambda payload: {"root": 77}})
-    web.page.request(3, "event", 5, "on_bind_row", [{"index": 0}])
+    seen: List[Any] = []
+
+    def bind_row(payload: Any) -> Dict[str, int]:
+        seen.append(payload)
+        return {"root": 77}
+
+    get_event_registry().set_events(5, {"on_bind_row": bind_row})
+    before = len(web.page.sent)
+    web.page.callback("event", 5, "on_bind_row", [{"index": 0}])
     web.transport.drain_main()
-    assert web.page.sent[-1][:2] == ["res", 3]
-    assert json.loads(web.page.sent[-1][2]) == {"root": 77}
+    assert seen == [{"index": 0}]
+    assert not any(message[0] == "res" for message in web.page.sent[before:])
 
 
 def test_dev_messages_and_peer_changes_run_hooks_on_the_main_thread(web: Any) -> None:
@@ -401,11 +394,12 @@ def test_screen_mounts_through_the_page(web: Any, monkeypatch: pytest.MonkeyPatc
 
     path = _install_app(monkeypatch, "web_preview_app", Root)
     payload = {"path": path, "args": None, **web.page.viewport, "color_scheme": "light"}
-    web.page.request(1, "host", 1, "create", payload)
+    web.page.callback("host", 1, "create", payload)
     web.transport.drain_main(timeout=1.0)
 
-    reply = next(m for m in web.page.sent if m[0] == "res" and m[1] == 1)
-    root_tag = json.loads(reply[2])["root"]
+    root_tag = next(
+        args["tag"] for module, method, args in web.page.calls if (module, method) == ("Host", "attach_root")
+    )
     created = {op[1]: op[2] for op in web.page.ops() if op[0] == "c"}
     assert created[root_tag] == "Column"
     assert "Text" in created.values() and "Button" in created.values()
@@ -415,7 +409,6 @@ def test_screen_mounts_through_the_page(web: Any, monkeypatch: pytest.MonkeyPatc
         message[0] == "apply" and message[2].get("layout", {}).get("roots") == [root_tag] for message in web.page.sent
     )
     assert not any(module == "Layout" for module, _, _ in web.page.calls)
-    assert not any(m[0] == "measure" for m in web.page.sent)
     window = platform_metrics.get_window_dimensions()
     assert (window.width, window.height) == (390.0, 800.0)
 
@@ -451,7 +444,7 @@ def test_backend_reset_forgets_every_view_when_the_page_goes_away(web: Any, monk
         return pn.Text("bye")
 
     path = _install_app(monkeypatch, "web_preview_reset_app", Root)
-    web.page.request(1, "host", 1, "create", {"path": path, **web.page.viewport})
+    web.page.callback("host", 1, "create", {"path": path, **web.page.viewport})
     web.transport.drain_main(timeout=1.0)
     assert web.backend.live_view_count() > 0
     from pythonnative.hosts.native import live_hosts

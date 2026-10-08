@@ -120,7 +120,7 @@ def _make_element(
         props["accessibility_actions"] = _accessibility_actions(props["accessibility_actions"])
     out: Dict[str, Any] = dict(resolve_style(style))
     if diagnostics.is_dev():
-        from ..sdk.builtins import validate_props
+        from ..sdk.schema import validate_props
 
         validate_props(name, props)
         if out:

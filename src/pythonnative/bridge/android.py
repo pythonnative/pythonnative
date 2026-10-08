@@ -10,7 +10,7 @@ through Chaquopy; this transport therefore has nothing to register.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional
 
 __all__ = ["AndroidTransport"]
 
@@ -44,18 +44,6 @@ class AndroidTransport:
         """Apply one serialized transaction (a JSON array of ops)."""
         return str(self._bridge.apply(transaction_json))
 
-    def measure(self, tag: int, max_width: float, max_height: float) -> Tuple[float, float]:
-        """Return the intrinsic ``(width, height)`` of the view ``tag`` under the constraints."""
-        packed = self._bridge.measure(int(tag), float(max_width), float(max_height))
-        if not packed:
-            return (0.0, 0.0)
-        text = str(packed)
-        w, _, h = text.partition(",")
-        try:
-            return (float(w), float(h))
-        except ValueError:
-            return (0.0, 0.0)
-
     def command(self, tag: int, name: str, args_json: str) -> Optional[str]:
         """Run an imperative command on one view; returns its JSON result or ``None``."""
         return _opt_str(self._bridge.command(int(tag), name, args_json))
@@ -68,7 +56,7 @@ class AndroidTransport:
         """Call a native module method with a ``{"call_id", "args"}`` envelope."""
         return _opt_str(self._bridge.call(module, method, args_json))
 
-    def set_callback(self, callback: Callable[[str, int, str, str], Optional[str]]) -> None:
+    def set_callback(self, callback: Callable[[str, int, str, str], None]) -> None:
         """No-op: the Android template installs the host through ``PNBridge.setHost``."""
         del callback
 

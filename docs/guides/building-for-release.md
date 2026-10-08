@@ -186,16 +186,26 @@ your application's data collection, tracking, or required-reason API usage.
 Declare those from your actual behavior using Apple's
 [privacy-manifest documentation](https://developer.apple.com/documentation/bundleresources/privacy-manifest-files).
 
-### Bytecode-only bundles
+### Bytecode everywhere
 
-Release builds byte-compile your `app/` sources and every bundled
-package to `.pyc` and drop the `.py` files, which shrinks the bundle
-and avoids shipping plain-text source. Because bytecode is
-version-specific, this requires the Python running `pn` to match
-`app.python_version`; otherwise `pn` prints a notice and ships `.py`
-sources instead. Debug builds (`pn run`, `pn build --debug`) keep the
-`.py` files on both platforms so tracebacks show source lines and the
-dev client can tell which sources the app already has.
+An app bundle is read-only, so the device can't cache what it compiles.
+`pn` therefore compiles ahead of time, in every build:
+
+- **Release builds** byte-compile your `app/` sources, every bundled
+  package, and the embedded standard library to sourceless `.pyc` files
+  and drop the `.py` files. That shrinks the bundle, speeds up launch,
+  and avoids shipping plain-text source.
+- **Debug builds** (`pn run`, `pn build --debug`) keep the `.py` files
+  beside `__pycache__` bytecode, so tracebacks show source lines and Fast
+  Refresh can read sources, while launch still skips compilation. Sources
+  the dev client syncs are cached on the device after their first import.
+
+Bytecode records bundle-relative file names (`app/main.py`), never paths
+on your build machine. Because bytecode is version-specific, compiling
+needs an interpreter matching `app.python_version`: the one running `pn`,
+or `python3.13` (for example) on your `PATH`. Release builds fail without
+one; debug builds warn and let the device compile at launch. Android uses
+Chaquopy's own compilation and has no such requirement.
 
 ### Signing
 
@@ -219,10 +229,14 @@ export fails, the error points you back at `[ios.signing]`.
 
 iOS has no system Python, so PythonNative embeds CPython from the
 [Python-Apple-support](https://github.com/beeware/Python-Apple-support)
-project. On the first iOS build, `pn` downloads the pinned, checksum-
-verified runtime for your `app.python_version` and caches it under
-`build/ios/ios_runtime/`. The Xcode build links `Python.xcframework`,
-installs the standard library, and bundles your `app/` sources, the
+project. The first iOS build on a machine downloads the pinned,
+checksum-verified runtime for your `app.python_version` into a cache
+every project shares (`~/Library/Caches/pythonnative/ios/`, or
+`$PN_CACHE_DIR/ios/`) and prepares it once: the standard library loses
+CPython's test suite, GUI toolkits, installers, and test-only extension
+modules, and the rest is compiled to bytecode. `pn clean` doesn't touch
+this cache. The Xcode build links `Python.xcframework`, installs the
+prepared standard library, and bundles your `app/` sources, the
 `pythonnative` package, and the `[requirements].packages` resolved for
 the SDK being built (device or Simulator), binary wheels included.
 

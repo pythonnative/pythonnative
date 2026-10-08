@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate checked-in built-in contracts and the bundled iOS test fixtures."""
+"""Regenerate checked-in built-in contracts (JSON, Swift, Kotlin) and native test fixtures."""
 
 import json
 import shutil
@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, NotRequired, TypedDict
 
-import pythonnative  # noqa: F401  # Install built-in schemas in a clean process.
+import pythonnative  # noqa: F401  # Import the factories in a clean process.
+from pythonnative.sdk.builtins import write_builtin_contracts
 from pythonnative.sdk.codegen import generate
 from pythonnative.sdk.contract_codegen import ContractCompiler
 from pythonnative.sdk.native_types import NativeTypes, quoted
@@ -108,6 +109,7 @@ def record_fixtures() -> dict[Path, str]:
 
 def main() -> None:
     """Generate both native libraries from the same Python definitions."""
+    write_builtin_contracts()
     with tempfile.TemporaryDirectory(prefix="pn-contracts-") as folder:
         generate(folder)
         for extension, destination in (

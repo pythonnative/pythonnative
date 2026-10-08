@@ -151,7 +151,6 @@ class Shell {
   rendererContext() {
     return {
       emit: (tag, name, args) => this.bridge.callback("event", tag, name, JSON.stringify(args ?? [])),
-      request: (tag, name, args) => this.bridge.request("event", tag, name, JSON.stringify(args ?? [])),
       gesture: (tag, phase, info) => this.bridge.send(["gesture", tag, phase, info]),
       animationFinished: (id, finished) => this.bridge.callback("animation", 0, "", JSON.stringify({ id, finished })),
       scheme: () => this.scheme,
@@ -182,7 +181,6 @@ class Shell {
   installBridgeHandlers() {
     const b = this.bridge;
     b.handlers.apply = (message) => this.renderer.apply(message[2]);
-    b.handlers.measure = (message) => this.renderer.measure(message[2], message[3], message[4]);
     b.handlers.command = (message) => this.renderer.command(message[2], message[3], message[4]);
     b.handlers.animate = (message) => this.renderer.animate(message[2], message[3]);
     b.handlers.call = (message) => message[2] === "Layout"

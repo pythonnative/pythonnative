@@ -58,8 +58,8 @@ view. The hooks mirror the op list:
 | `insertChild(parent, child, index)` | On `i`. Move-aware and clamped. |
 | `removeChild(parent, child)` | When a child is detached. |
 | `destroy(view)` | On `d`. Unwires gestures and animations, then removes the view. |
-| `setFrame(view, x, y, w, h)` | On `f`. Frames are points (iOS) or dp (Android). |
-| `measure(view, maxW, maxH)` | Synchronously, when the layout engine needs a content-derived size. |
+| `setFrame(view, x, y, w, h)` | After the native Yoga pass, with the computed frame. Frames are points (iOS) or dp (Android). |
+| `measure(view, maxW, maxH)` | On the UI thread, when Yoga needs a content-derived size. |
 | `command(view, name, args)` | For imperative actions (`focus`, `scroll_to_offset`, ...). |
 | `startAnimation` / `cancelAnimation` | For natively driven `Animated` values. |
 

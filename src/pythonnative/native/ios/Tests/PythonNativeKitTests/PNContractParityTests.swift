@@ -533,5 +533,4 @@ private let captureCallbackForContractTests: PNCallbackFn = { kind, tag, name, p
         kind.map { String(cString: $0) } ?? "", tag,
         name.map { String(cString: $0) } ?? "", payload.map { String(cString: $0) } ?? "{}"
     )
-    return nil
 }

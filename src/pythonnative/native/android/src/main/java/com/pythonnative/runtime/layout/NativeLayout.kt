@@ -91,7 +91,6 @@ object NativeLayout {
                 } }
                 child.yoga.close()
             }
-            is Op.Frame -> Unit
         }
     }
 

@@ -486,23 +486,57 @@ def test_vnode_writes_skip_the_journal_when_no_pass_is_recording(monkeypatch: py
     assert calls == []
 
 
-def test_journal_records_only_structural_fields_while_active(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: List[str] = []
-    monkeypatch.setattr(journal, "record_attribute", lambda obj, name: calls.append(name))
-    token = journal.install(journal.Journal())
+def test_journal_captures_each_existing_node_once_per_pass() -> None:
+    existing = VNode(Element("Text", {"text": "x"}, []))
+    layout_only = VNode(Element("Text", {"text": "x"}, []))
+    recording = journal.Journal()
+    token = journal.install(recording)
     try:
         assert journal.journal_active is True
-        node = VNode(Element("Text", {"text": "x"}, []))
-        calls.clear()
-        node.children = []
-        node.last_frame = (0.0, 0.0, 1.0, 1.0)
-        node.layout_dirty = True
-        node.measure_cache = None
-        node.element = Element("Text", {"text": "y"}, [])
+        fresh = VNode(Element("Text", {"text": "fresh"}, []))
+        for _ in range(100):
+            existing.children = []
+            existing.element = Element("Text", {"text": "y"}, [])
+            fresh.children = []
+            layout_only.last_frame = (0.0, 0.0, 1.0, 1.0)
+            layout_only.layout_dirty = True
+            layout_only.measure_cache = None
     finally:
         journal.uninstall(token)
-    assert calls == ["children", "element"]
+    assert len(recording.undo) == 1
     assert journal.journal_active is False
+
+
+def test_journal_rollback_restores_a_node_snapshot() -> None:
+    original = Element("Text", {"text": "x"}, [])
+    node = VNode(original)
+    child = VNode(Element("Text", {"text": "child"}, []))
+    node.children = [child]
+    recording = journal.Journal()
+    token = journal.install(recording)
+    try:
+        node.element = Element("Text", {"text": "y"}, [])
+        node.children.append(VNode(Element("Text", {"text": "new"}, [])))
+        node.children = []
+    finally:
+        journal.uninstall(token)
+    recording.rollback()
+    assert node.element is original
+    assert node.children == [child]
+
+
+def test_accepting_a_journal_makes_stamped_nodes_capturable_again() -> None:
+    node = VNode(Element("Text", {"text": "x"}, []))
+    recording = journal.Journal()
+    token = journal.install(recording)
+    try:
+        node.tag = 1
+        recording.accept()
+        node.tag = 2
+    finally:
+        journal.uninstall(token)
+    recording.rollback()
+    assert node.tag == 1
 
 
 def test_failed_render_rolls_back_in_place_updates_and_ref_writes() -> None:

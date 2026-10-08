@@ -834,10 +834,9 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         from ..profiling import count
 
         count("components.rendered")
-        journal = _journal.current()
-        if journal is not None:
-            for name in HookState.__slots__[:-1]:  # every slot but __weakref__
-                journal.attribute(hook_state, name)
+        journal = _journal.active
+        if journal is not None and hook_state._journal_stamp != journal.identity:
+            journal.snapshot(hook_state, HookState._JOURNALED)
         self._effect_states[id(hook_state)] = hook_state
         component: Component = element.type
         label = component.display_name
@@ -1217,11 +1216,18 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         """
         old_by_key: Dict[Any, VNode] = {}
         old_unkeyed: List[VNode] = []
+        # Duplicate keys are an application bug (dev mode warns), but they
+        # must never corrupt the tree: each old node matches at most once,
+        # and every old node that doesn't match is destroyed.
+        old_duplicates: List[VNode] = []
         for child in old_children:
-            if child.element.key is not None:
-                old_by_key[child.element.key] = child
-            else:
+            key = child.element.key
+            if key is None:
                 old_unkeyed.append(child)
+            elif key in old_by_key:
+                old_duplicates.append(child)
+            else:
+                old_by_key[key] = child
 
         result: List[VNode] = []
         fresh: List[VNode] = []
@@ -1231,9 +1237,10 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             for new_el in new_children:
                 matched: Optional[VNode] = None
                 if new_el.key is not None:
-                    matched = old_by_key.get(new_el.key)
-                    if matched is not None:
-                        used_keys.add(new_el.key)
+                    if new_el.key not in used_keys:
+                        matched = old_by_key.get(new_el.key)
+                        if matched is not None:
+                            used_keys.add(new_el.key)
                 else:
                     matched = next(unkeyed_iter, None)
 
@@ -1262,6 +1269,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         for key, node in old_by_key.items():
             if key not in used_keys:
                 self._destroy_tree(node)
+        for node in old_duplicates:
+            self._destroy_tree(node)
         for node in unkeyed_iter:
             self._destroy_tree(node)
         return result

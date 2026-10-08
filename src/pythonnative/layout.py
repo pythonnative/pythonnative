@@ -94,9 +94,11 @@ def _api() -> Any:
     global _lib
     if _lib is not None:
         return _lib
-    from . import _yoga  # type: ignore[attr-defined]
+    import importlib
 
-    lib = C.CDLL(_yoga.__file__)
+    # The host-only Yoga extension; device bundles don't ship it.
+    yoga = importlib.import_module("._yoga", __package__)
+    lib = C.CDLL(yoga.__file__)
     signatures: dict[str, Any] = {
         "YGNodeNew": (C.c_void_p, []),
         "YGNodeFree": (None, [C.c_void_p]),

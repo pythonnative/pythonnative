@@ -2,10 +2,9 @@
 //
 // Python (`pythonnative.bridge.web.WebTransport`) sends JSON arrays over
 // one WebSocket. Fire-and-forget messages carry no id; requests carry an
-// id in slot 1 and are answered with ["res", id, result]. The same shape
-// works in the other direction: the page raises `callback(kind, tag,
-// name, payload)` as ["cb", ...] (no reply) or ["req", id, ...] (Python
-// answers with ["res", id, text]).
+// id in slot 1 and are answered with ["res", id, result]. In the other
+// direction the page raises `callback(kind, tag, name, payload)` as
+// ["cb", ...]; as on device, Python never answers a callback.
 //
 // Payloads that the native protocol carries as JSON *text* stay text
 // here too (`args`, `request`, `payload`, `result`), so the page and
@@ -15,8 +14,6 @@ export class Bridge {
   constructor(url) {
     this.url = url;
     this.socket = null;
-    this.nextId = 1;
-    this.pending = new Map(); // id -> {resolve}
     this.handlers = {}; // kind -> async (message) => result
     this.onOpen = null;
     this.onClose = null;
@@ -46,8 +43,6 @@ export class Bridge {
       const wasConnected = this.connected;
       this.connected = false;
       this.socket = null;
-      for (const waiter of this.pending.values()) waiter.resolve(null);
-      this.pending.clear();
       if (this.onClose) this.onClose(wasConnected, event);
       if (!this._closedByUs) this._scheduleReconnect();
     });
@@ -80,18 +75,6 @@ export class Bridge {
     return this.send(["cb", kind, tag, name, payload == null ? "" : payload]);
   }
 
-  /** Callback that needs Python's answer (row binds, screen creation). */
-  request(kind, tag, name, payload) {
-    const id = this.nextId++;
-    return new Promise((resolve) => {
-      if (!this.send(["req", id, kind, tag, name, payload == null ? "" : payload])) {
-        resolve(null);
-        return;
-      }
-      this.pending.set(id, { resolve });
-    });
-  }
-
   /** Dev-channel message (logs, errors) shown in the `pn start` terminal. */
   dev(payload) {
     return this.send(["dev", payload]);
@@ -109,14 +92,6 @@ export class Bridge {
     }
     if (!Array.isArray(message) || message.length === 0) return;
     const kind = message[0];
-    if (kind === "res") {
-      const waiter = this.pending.get(message[1]);
-      if (waiter) {
-        this.pending.delete(message[1]);
-        waiter.resolve(message.length > 2 ? message[2] : null);
-      }
-      return;
-    }
     if (kind === "dev") {
       if (this.onDev) this.onDev(message[1] || {});
       return;

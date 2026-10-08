@@ -1,3 +1,4 @@
+import json
 import sys
 import zipfile
 from pathlib import Path
@@ -207,21 +208,42 @@ def test_prepare_ios_installs_requirements_per_slice(tmp_path: Path, monkeypatch
     assert any("iphonesimulator" in p for cmd in pip_cmds for p in cmd if p.startswith("ios_"))
 
 
-def test_prepare_ios_release_skips_bytecode_on_version_mismatch(
+def test_prepare_ios_release_requires_a_matching_interpreter(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _fake_ios_runtime(tmp_path, monkeypatch)
+    monkeypatch.setattr(builder_mod.bytecode, "compiler_for", lambda version: None)
+    cfg = AppConfig.load(_project(tmp_path, _TOML))
+    with pytest.raises(BuildError, match="No Python .* interpreter is installed to compile bytecode"):
+        Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", release=True)
+
+
+def test_prepare_ios_debug_compiles_beside_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _fake_ios_runtime(tmp_path, monkeypatch)
+    cfg = AppConfig.load(_project(tmp_path, _TOML))
+    cfg.python_version = f"{sys.version_info[0]}.{sys.version_info[1]}"
+    prepared = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios")
+
+    app_dir = prepared.project_dir / "app"
+    assert (app_dir / "main.py").is_file()
+    (compiled,) = (app_dir / "__pycache__").glob("main.*.pyc")
+    # Unchecked-hash bytecode: the interpreter trusts it without a timestamp check.
+    assert int.from_bytes(compiled.read_bytes()[4:8], "little") == 0b01
+    lib = prepared.project_dir / "app_packages.iphonesimulator" / "pythonnative"
+    assert (lib / "__init__.py").is_file()
+    assert (lib / "__pycache__").is_dir()
+
+
+def test_prepare_ios_debug_warns_without_a_matching_interpreter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _fake_ios_runtime(tmp_path, monkeypatch)
-    root = _project(tmp_path, _TOML)
-    cfg = AppConfig.load(root)
-    host = f"{sys.version_info[0]}.{sys.version_info[1]}"
-    if cfg.python_version == host:
-        cfg.python_version = "3.14" if host != "3.14" else "3.13"
+    monkeypatch.setattr(builder_mod.bytecode, "compiler_for", lambda version: None)
+    cfg = AppConfig.load(_project(tmp_path, _TOML))
     messages: List[str] = []
-    prepared = Builder(cfg, runner=RecordingRunner(), log=messages.append).prepare("ios", release=True)
+    prepared = Builder(cfg, runner=RecordingRunner(), log=messages.append).prepare("ios")
 
-    # Sources ship as .py when the host can't produce matching bytecode.
     assert (prepared.project_dir / "app" / "main.py").is_file()
-    assert any("Skipping bytecode compilation" in m for m in messages)
+    assert not (prepared.project_dir / "app" / "__pycache__").exists()
+    assert any("compile its modules at launch" in m for m in messages)
 
 
 def test_prepare_unknown_platform(tmp_path: Path) -> None:
@@ -332,6 +354,11 @@ def test_prepare_android_release_omits_development_modules(tmp_path: Path) -> No
     # A release build staged over a debug build doesn't inherit its dev modules.
     builder.prepare("android", release=True)
     assert (lib / "bootstrap.py").exists()
-    assert (lib / "_native_contracts.json").exists()
-    for name in (*_DEV_ONLY, "sdk/codegen.py"):
+    contracts = json.loads((lib / "_native_contracts.json").read_text(encoding="utf-8"))
+    # Built-in contracts load from the package; the app only bundles plugins'
+    # contracts and the fingerprint the native library was generated from.
+    assert "View" not in contracts["components"] and "Device" not in contracts["modules"]
+    assert len(contracts["fingerprint"]) == 64
+    assert (lib / "sdk" / "_builtin_contracts.json").is_file()
+    for name in (*_DEV_ONLY, "sdk/codegen.py", "sdk/builtins.py"):
         assert not (lib / name).exists(), name

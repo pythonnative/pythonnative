@@ -1,0 +1,166 @@
+{
+  "environment": {
+    "python": "3.13.15",
+    "system": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+    "machine": "x86_64",
+    "host": "Intel Mac (x86_64), Xcode 26.3, iPhone 17 Pro simulator (iOS 26.2), Android emulator API 31 (x86_64)",
+    "note": "The host ran unrelated builds throughout (load averages 6 to 64). Pairs were measured interleaved, before and after, under the same conditions."
+  },
+  "host_runtime": {
+    "command": "python scripts/benchmark-runtime.py (before: main at 444637a via PYTHONPATH)",
+    "sessions": [
+      {
+        "before": {
+          "import_ms": {
+            "median": 604.337,
+            "min": 589.22
+          },
+          "element_us": {
+            "median": 8.096,
+            "min": 7.723
+          },
+          "rerender_300_ms": {
+            "median": 95.793,
+            "min": 92.029
+          },
+          "commit_prepare_300_ms": {
+            "median": 5.376,
+            "min": 5.331
+          }
+        },
+        "after": {
+          "import_ms": {
+            "median": 326.183,
+            "min": 230.393
+          },
+          "element_us": {
+            "median": 5.805,
+            "min": 4.676
+          },
+          "rerender_300_ms": {
+            "median": 72.389,
+            "min": 67.702
+          },
+          "commit_prepare_300_ms": {
+            "median": 2.713,
+            "min": 2.668
+          }
+        }
+      },
+      {
+        "before": {
+          "import_ms": {
+            "median": 941.013,
+            "min": 732.964
+          },
+          "element_us": {
+            "median": 9.525,
+            "min": 9.283
+          },
+          "rerender_300_ms": {
+            "median": 121.243,
+            "min": 113.049
+          },
+          "commit_prepare_300_ms": {
+            "median": 6.622,
+            "min": 6.243
+          }
+        },
+        "after": {
+          "import_ms": {
+            "median": 294.232,
+            "min": 254.887
+          },
+          "element_us": {
+            "median": 4.082,
+            "min": 4.017
+          },
+          "rerender_300_ms": {
+            "median": 73.018,
+            "min": 70.377
+          },
+          "commit_prepare_300_ms": {
+            "median": 2.89,
+            "min": 2.858
+          }
+        }
+      }
+    ]
+  },
+  "ios_pn_init_template_debug": {
+    "app_size_mb": {
+      "before": 92,
+      "after": 62
+    },
+    "python_stdlib_mb": {
+      "before": 49,
+      "after": 22
+    },
+    "app_packages_mb": {
+      "before": 5.7,
+      "after": 8.4
+    },
+    "python_stdlib_bytecode_files": {
+      "before": 0,
+      "after": 526
+    },
+    "test_extension_frameworks": {
+      "before": 15,
+      "after": 0
+    },
+    "process_start_to_python_initialized_ms": {
+      "before": [
+        5062,
+        3644,
+        5673
+      ],
+      "after": [
+        1391,
+        922,
+        776
+      ]
+    },
+    "first_screen_attached_after_process_start_ms": {
+      "after": [
+        3419,
+        2415,
+        2322,
+        2045
+      ]
+    },
+    "screenshot_launch_to_first_content_s": {
+      "before": [
+        5.38,
+        5.61,
+        6.14,
+        5.26
+      ],
+      "after": [
+        3.36,
+        3.49,
+        3.59,
+        3.47
+      ],
+      "note": "simctl launch to first content, polled by screenshots (about 0.3 s granularity), load average 35 to 64"
+    },
+    "first_pn_run_ios_s": {
+      "before": 400.8,
+      "after": 116.1,
+      "note": "after: shared runtime cache already prepared; Xcode compiled from an empty build directory in both"
+    }
+  },
+  "android_pn_init_template_debug": {
+    "am_start_wait_ms": {
+      "before": [
+        50561,
+        17150
+      ],
+      "after": [
+        10605,
+        10955,
+        10994
+      ]
+    },
+    "note": "Software-emulated x86_64 emulator on a loaded Intel Mac; am start -W reported a timeout status in every run. Indicative only."
+  }
+}

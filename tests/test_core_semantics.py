@@ -751,6 +751,29 @@ def test_duplicate_sibling_keys_warn(dev_mode: Any) -> None:
     assert any("same" in w and "key" in w.lower() for w in warnings)
 
 
+@pytest.mark.parametrize("dev", [True, False])
+def test_duplicate_keys_never_share_or_leak_nodes(dev: bool) -> None:
+    diagnostics.set_dev_mode(dev)
+    rec, backend = _make_reconciler()
+
+    def tree(*texts: str) -> Element:
+        return Element("Column", {}, [Element("Text", {"text": text}, [], key="same") for text in texts])
+
+    rec.mount(tree("a", "b"))
+    assert rec.root is not None
+    first = list(rec.root.children)
+    assert len({id(node) for node in first}) == 2
+    rec.reconcile(tree("c", "d", "e"))
+    children = rec.root.children
+    assert len({id(node) for node in children}) == 3
+    assert children[0] is first[0]
+    assert all(not node.mounted for node in first[1:])
+    assert len(backend.views) == 4
+    rec.reconcile(tree("f"))
+    assert len(rec.root.children) == 1
+    assert len(backend.views) == 2
+
+
 # ======================================================================
 # Diagnostics primitives
 # ======================================================================

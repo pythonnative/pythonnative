@@ -45,7 +45,7 @@ BROWSER_MODULES = frozenset(
 REQUEST_TIMEOUT_S = 15.0
 """How long a synchronous request waits for the page before giving up."""
 
-Callback = Callable[[str, int, str, str], Optional[str]]
+Callback = Callable[[str, int, str, str], None]
 
 
 class _Waiter:
@@ -105,16 +105,6 @@ class WebTransport:
     def apply(self, transaction_json: str) -> str:
         """Wait for the page to acknowledge this exact commit revision."""
         return codec.dumps(self._request(["apply", None, codec.loads(transaction_json)]))
-
-    def measure(self, tag: int, max_width: float, max_height: float) -> Tuple[float, float]:
-        """Ask the page for the intrinsic size of ``tag``."""
-        result = self._request(["measure", None, int(tag), _finite(max_width), _finite(max_height)])
-        if isinstance(result, (list, tuple)) and len(result) >= 2:
-            try:
-                return (float(result[0]), float(result[1]))
-            except (TypeError, ValueError):
-                return (0.0, 0.0)
-        return (0.0, 0.0)
 
     def command(self, tag: int, name: str, args_json: str) -> Optional[str]:
         """Run an imperative command on one view; returns its JSON result or ``None``."""
@@ -232,9 +222,6 @@ class WebTransport:
         if kind == "cb":
             self.post_to_application(lambda: self._deliver_fire_and_forget(message))
             return
-        if kind == "req":
-            self.post_to_application(lambda: self._deliver_request(peer, message))
-            return
         if kind == "gesture":
             self.post_to_application(lambda: self._deliver_gesture(message))
             return
@@ -326,25 +313,12 @@ class WebTransport:
     # Inbound (application thread)
     # ------------------------------------------------------------------
 
-    def _deliver_callback(self, message: List[Any]) -> Optional[str]:
+    def _deliver_fire_and_forget(self, message: List[Any]) -> None:
         callback = self._callback
         if callback is None or len(message) < 5:
-            return None
-        _, kind, tag, name, payload = message[:5]
-        return callback(str(kind), int(tag or 0), str(name), _payload_text(payload))
-
-    def _deliver_fire_and_forget(self, message: List[Any]) -> None:
-        self._deliver_callback(message)
-
-    def _deliver_request(self, peer: Any, message: List[Any]) -> None:
-        if len(message) < 6:
             return
-        request_id = message[1]
-        result = self._deliver_callback(["cb", *message[2:6]])
-        try:
-            peer.send(codec.dumps(["res", request_id, result]))
-        except Exception as exc:
-            self._log(f"[pn preview] reply failed: {exc!r}")
+        _, kind, tag, name, payload = message[:5]
+        callback(str(kind), int(tag or 0), str(name), _payload_text(payload))
 
     def _deliver_dev(self, payload: Dict[str, Any]) -> None:
         hook = self.on_dev_message
@@ -477,27 +451,12 @@ class WebTransport:
             return codec.dumps({"ok": True, "value": None})
 
 
-_UNBOUNDED = 1e6
-"""Wire sentinel for an unconstrained measure axis (matches the native runtimes)."""
-
-
 def _optional_float(value: Any) -> Optional[float]:
     """A finite float from the wire, or ``None`` when the page didn't send one."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     f = float(value)
     return f if f == f and f not in (float("inf"), float("-inf")) else None
-
-
-def _finite(value: Any) -> float:
-    """JSON has no infinity: clamp unconstrained measure axes to the wire sentinel."""
-    try:
-        f = float(value)
-    except (TypeError, ValueError):
-        return _UNBOUNDED
-    if f != f or f > _UNBOUNDED or f == float("inf"):
-        return _UNBOUNDED
-    return max(0.0, f)
 
 
 def _as_json_text(result: Any) -> Optional[str]:

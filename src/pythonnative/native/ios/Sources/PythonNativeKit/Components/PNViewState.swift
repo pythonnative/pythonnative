@@ -76,18 +76,15 @@ public final class PNViewState {
 
 /// Event emission keyed by view.
 public enum PNEvents {
-    /// Emit `name` for `view` with positional `args`. Returns Python's
-    /// JSON reply for request-style events, else `nil`.
-    @discardableResult
-    public static func emit(_ view: UIView, _ name: String, _ args: [Any?] = []) -> String? {
-        guard let state = PNViewState.existing(for: view) else { return nil }
-        return PNBridge.shared.emitEvent(tag: state.tag, name: name, args: args)
+    /// Emit `name` for `view` with positional `args`.
+    public static func emit(_ view: UIView, _ name: String, _ args: [Any?] = []) {
+        guard let state = PNViewState.existing(for: view) else { return }
+        PNBridge.shared.emitEvent(tag: state.tag, name: name, args: args)
     }
 
     /// Emit only when the element wired a handler for `name`.
-    @discardableResult
-    public static func emitIfWired(_ view: UIView, _ name: String, _ args: [Any?] = []) -> String? {
-        guard let state = PNViewState.existing(for: view), state.hasEvent(name) else { return nil }
-        return PNBridge.shared.emitEvent(tag: state.tag, name: name, args: args)
+    public static func emitIfWired(_ view: UIView, _ name: String, _ args: [Any?] = []) {
+        guard let state = PNViewState.existing(for: view), state.hasEvent(name) else { return }
+        PNBridge.shared.emitEvent(tag: state.tag, name: name, args: args)
     }
 }

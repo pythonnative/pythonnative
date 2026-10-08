@@ -7,9 +7,8 @@ import {computeLayout, disposeLayout, stackHeaderHeight, updateLayout, insertLay
 //
 // This module plays the role PythonNativeKit (Swift) and the pythonnative
 // Gradle module (Kotlin) play on device: it applies transactions
-// (create/update/insert/destroy/frame ops), answers `measure`,
-// `command`, and `animate`, and raises `callback("event", ...)` for
-// user interaction. Yoga WebAssembly computes layout beside these views;
+// (create/update/insert/destroy ops), answers `command` and `animate`,
+// and raises `callback("event", ...)` for user interaction. Yoga WebAssembly computes layout beside these views;
 // frames use points, represented by CSS pixels inside the phone frame.
 //
 // Component managers mirror the Swift `PN*Manager` classes prop for
@@ -2676,7 +2675,7 @@ function installGestureSource(view) {
 export class Renderer {
   /**
    * @param ctx {{
-   *   emit(tag, name, args), request(tag, name, args), gesture(tag, phase, info),
+   *   emit(tag, name, args), gesture(tag, phase, info),
    *   animationFinished(id, finished), scheme(), overlays(), bottomInset(),
    *   frameWidth(), pointInFrame(event), statusBar(opts)
    * }}
@@ -2729,7 +2728,7 @@ export class Renderer {
   apply(envelope) {
     const {version, application, surface, revision, ops} = envelope || {};
     const fail = (error) => ({ok: false, application, surface, revision, error, failed: !!this.failed});
-    if (version !== 4 || typeof application !== "string" || !application || !Number.isSafeInteger(surface) || surface < 1 || !Array.isArray(ops)) return fail("invalid v4 commit");
+    if (version !== specification.protocol || typeof application !== "string" || !application || !Number.isSafeInteger(surface) || surface < 1 || !Array.isArray(ops)) return fail(`invalid v${specification.protocol} commit`);
     const replacing = this.application !== application;
     if (revision !== (replacing ? 1 : this.revision + 1)) return fail("stale revision");
     if (!replacing && surface !== this.surface) return fail("wrong surface");
@@ -2747,7 +2746,7 @@ export class Renderer {
     const parentOf = tag => edited.has(tag) ? edited.get(tag).parentTag : get(tag)?.parent?.tag;
     try {
       for (const op of ops) {
-        if (!Array.isArray(op) || op.length !== {c:4,u:4,i:4,d:2,f:6}[op[0]] || !Number.isSafeInteger(op[1]) || op[1] <= 0) return fail("invalid operation");
+        if (!Array.isArray(op) || op.length !== {c:4,u:4,i:4,d:2}[op[0]] || !Number.isSafeInteger(op[1]) || op[1] <= 0) return fail("invalid operation");
         const [code, tag] = op;
         if ((code === "c" ? op[2] : get(tag)?.type) === "VirtualList" && (code === "c" || code === "u") && Object.hasOwn(op[code === "c" ? 3 : 2], "dataset")) {
           if (listPatches.has(tag)) return fail("multiple list patches in one commit");
@@ -2779,7 +2778,7 @@ export class Renderer {
             const parent = parentOf(tag);
             if (parent) { const siblings = edit(parent).children; siblings.splice(siblings.indexOf(tag), 1); }
             edited.delete(tag); deleted.add(tag);
-          } else if (code === "f" && (op.slice(2).some(n => !Number.isFinite(n)) || op[4] < 0 || op[5] < 0)) return fail("invalid frame");
+          }
         }
       }
     } catch (error) { return fail(String(error)); }
@@ -2905,17 +2904,6 @@ export class Renderer {
         this.destroyView(view);
         return;
       }
-      case "f": {
-        const [, tag, x, y, w, h] = op;
-        const view = this.views.get(tag);
-        if (!view) return;
-        const finite = [x, y, w, h].every((v) => Number.isFinite(v));
-        if (!finite) return;
-        view.frame = { x, y, w, h };
-        view.manager.frame(view, x, y, w, h);
-        if (view.parent) this.dirtyContainers.add(view.parent);
-        return;
-      }
       default:
         console.warn("[pn] unknown op", op);
     }
@@ -2946,18 +2934,6 @@ export class Renderer {
   }
 
   // -- synchronous requests ---------------------------------------------
-
-  measure(tag, maxW, maxH) {
-    const view = this.views.get(tag);
-    if (!view) return [0, 0];
-    try {
-      const [w, h] = view.manager.measure(view, maxW, maxH);
-      return [Number.isFinite(w) ? w : 0, Number.isFinite(h) ? h : 0];
-    } catch (err) {
-      console.error("[pn] measure failed", tag, err);
-      return [0, 0];
-    }
-  }
 
   command(tag, name, argsJson) {
     const view = this.views.get(tag);

@@ -3,7 +3,9 @@ import CoreFoundation
 
 /// Executable generated contracts. No schema JSON is interpreted on the mount path.
 public enum PNContracts {
-    public static let fingerprint = "813e3e2f389698d21c1368f77b6f20696c83257e638746652878377c6f39f4ab"
+    public static let fingerprint = "a0f3693294a26f040d30268e868e30defcca0c0ad1980af3565d832ae91691bf"
+    public static let protocolVersion = 5
+    public static let yogaVersion = "3.2.1"
     private struct Field {
         let matches: (Any) -> Bool
         let allowed: Bool

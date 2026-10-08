@@ -14,7 +14,6 @@ class TransactionApplier(private val registry: ViewRegistry) {
             is Op.Update -> update(op)
             is Op.Insert -> insert(op)
             is Op.Destroy -> destroy(op)
-            is Op.Frame -> frame(op)
         }
     }
 
@@ -76,7 +75,10 @@ class TransactionApplier(private val registry: ViewRegistry) {
         replacement.parent = record.parent
         replacement.children.addAll(record.children)
         if (input != null) replacement.state["edit_revision"] = edited
-        record.frame?.let { frame(Op.Frame(record.tag, it[0], it[1], it[2], it[3])) }
+        record.frame?.let { frame ->
+            replacement.frame = frame
+            replacement.manager.setFrame(replacement.view, frame[0], frame[1], frame[2], frame[3])
+        }
         for ((position, child) in children.withIndex()) record.manager.insertChild(replacement.view, child.view, position)
         if (parent != null) parent.manager.insertChild(parent.view, replacement.view, index.coerceAtLeast(0))
         else physicalParent?.addView(replacement.view, physicalIndex, old.layoutParams)
@@ -115,12 +117,6 @@ class TransactionApplier(private val registry: ViewRegistry) {
         } finally {
             registry.unregister(record.tag)
         }
-    }
-
-    private fun frame(op: Op.Frame) {
-        val record = registry.get(op.tag) ?: throw IllegalStateException("frame: unknown tag ${op.tag}")
-        record.frame = doubleArrayOf(op.x, op.y, op.width, op.height)
-        record.manager.setFrame(record.view, op.x, op.y, op.width, op.height)
     }
 
     /** The props recorded for `tag`, mainly for diagnostics. */

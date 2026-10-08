@@ -41,16 +41,23 @@ from . import icons
 from .bundle import copy_library
 from .config import AppConfig
 
+
+def sdk_dir() -> Path:
+    """The Android SDK: ``ANDROID_HOME``, ``ANDROID_SDK_ROOT``, or the platform's default location."""
+    configured = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
+    if configured:
+        return Path(configured)
+    import sys
+
+    return Path.home() / ("Library/Android/sdk" if sys.platform == "darwin" else "Android/Sdk")
+
+
 TEMPLATE_PACKAGE = "com.pythonnative.android_template"
 """The fixed package the bundled Android template ships under."""
 
 TEXT_SUFFIXES = {".kt", ".java", ".gradle", ".xml", ".pro", ".properties", ".cfg"}
 
-_SOURCE_ROOTS = (
-    ("app", "src", "main", "java"),
-    ("app", "src", "test", "java"),
-    ("app", "src", "androidTest", "java"),
-)
+_SOURCE_ROOTS = (("app", "src", "main", "java"),)
 
 Logger = Callable[[str], None]
 

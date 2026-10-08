@@ -1,10 +1,20 @@
-"""Native contracts derived from the annotated built-in Python factories."""
+"""Derive the built-in native contracts from the annotated Python factories.
+
+The factories' signatures are the single source of truth for every
+built-in component's props. Evaluating their annotations takes far longer
+than an app can spend at startup, so code generation derives the contracts
+here once and writes them to ``pythonnative/sdk/_builtin_contracts.json``
+(see [`write_builtin_contracts`][pythonnative.sdk.builtins.write_builtin_contracts]),
+which [`load_builtin_contracts`][pythonnative.sdk.schema.load_builtin_contracts]
+reads at import. Release bundles omit this module.
+"""
 
 from __future__ import annotations
 
 import dataclasses
 import inspect
 import typing
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 from ..components.events import LayoutEvent
@@ -254,8 +264,25 @@ def install(factories: dict[str, Any]) -> None:
     install_services()
 
 
-def validate_props(name: str, props: dict[str, Any]) -> None:
-    """Validate resolved factory arguments, including reserved runtime fields."""
-    schema = COMPONENTS.get(name)
-    if schema is not None:
-        schema.validate({key: value for key, value in props.items() if value is not None})
+def derive() -> dict[str, Any]:
+    """Rebuild the built-in registry from the factories and return its manifest.
+
+    Contracts registered by extensions are discarded, so the result
+    depends only on PythonNative's own definitions.
+    """
+    from .. import components
+    from .schema import MODULES, manifest
+
+    COMPONENTS.clear()
+    MODULES.clear()
+    install(vars(components))
+    return manifest()
+
+
+def write_builtin_contracts(path: Any = None) -> Path:
+    """Derive the built-in contracts and write the generated JSON document."""
+    from .schema import BUILTIN_CONTRACTS, encode_builtin_contracts
+
+    destination = Path(path) if path is not None else Path(__file__).with_name(BUILTIN_CONTRACTS)
+    destination.write_text(encode_builtin_contracts(derive()), encoding="utf-8")
+    return destination
