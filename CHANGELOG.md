@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.49.0 (2026-10-08)
+
+### Performance Improvements
+
+- Make startup, bundles, and rendering fast and small
+  ([#111](https://github.com/pythonnative/pythonnative/pull/111),
+  [`8613d4b`](https://github.com/pythonnative/pythonnative/commit/8613d4bfdb622dc6f3fc796ebc2079b077135c7c))
+
+### Testing
+
+- Stabilize tar extraction and iOS lifecycle tests
+  ([#110](https://github.com/pythonnative/pythonnative/pull/110),
+  [`444637a`](https://github.com/pythonnative/pythonnative/commit/444637a2a13dcafac6fa44a449a3abaf44790732))
+
+
 ## v0.48.0 (2026-10-02)
 
 ### Features

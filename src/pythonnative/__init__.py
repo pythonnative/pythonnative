@@ -66,7 +66,7 @@ Example:
     ```
 """
 
-__version__ = "0.48.0"
+__version__ = "0.49.0"
 
 import importlib
 from typing import TYPE_CHECKING, Any
