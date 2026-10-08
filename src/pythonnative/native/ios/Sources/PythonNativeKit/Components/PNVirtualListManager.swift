@@ -11,10 +11,18 @@ private final class PNListCell: UICollectionViewCell {
 
 private final class PNStickyListLayout: UICollectionViewFlowLayout {
     weak var owner: PNCollectionList?
-    override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool { true }
+    /// Whether a header is pinned, which moves with every scroll offset.
+    private var pins: Bool {
+        guard let owner = owner else { return false }
+        return !owner.horizontal && !owner.store.stickyIndices.isEmpty
+    }
+    override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
+        // Without pinned headers, only a size change needs new attributes.
+        pins || super.shouldInvalidateLayout(forBoundsChange: newBounds)
+    }
     override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
-        guard let owner = owner, var attributes = super.layoutAttributesForElements(in: rect)?.map({ $0.copy() as! UICollectionViewLayoutAttributes }) else { return nil }
-        guard !owner.horizontal else { return attributes }
+        guard pins, let owner = owner else { return super.layoutAttributesForElements(in: rect) }
+        guard var attributes = super.layoutAttributesForElements(in: rect)?.map({ $0.copy() as! UICollectionViewLayoutAttributes }) else { return nil }
         let offset = owner.contentOffset.y + owner.adjustedContentInset.top
         let headers = owner.store.stickyIndices
         var low = 0, high = headers.count

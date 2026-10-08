@@ -4,7 +4,10 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
-/** One decoded mutation op. Geometry is in dp (points). */
+/**
+ * One decoded mutation op. Geometry never travels as an op: Yoga runs beside
+ * the widgets (`NativeLayout`), which applies frames after each commit.
+ */
 sealed class Op {
     /** `["c", tag, "Type", {props}]` */
     data class Create(val tag: Long, val typeName: String, val props: JSONObject) : Op()
@@ -17,9 +20,6 @@ sealed class Op {
 
     /** `["d", tag]` */
     data class Destroy(val tag: Long) : Op()
-
-    /** `["f", tag, x, y, w, h]` relative to the parent's content origin */
-    data class Frame(val tag: Long, val x: Double, val y: Double, val width: Double, val height: Double) : Op()
 }
 
 /** Decodes individual operations after CommitState validates the entire batch. */
@@ -38,13 +38,6 @@ object PNTransaction {
             })
             "i" -> Op.Insert(tag(raw, 1), tag(raw, 2), JsonUtil.toInt(raw.opt(3), 0))
             "d" -> Op.Destroy(tag(raw, 1))
-            "f" -> Op.Frame(
-                tag(raw, 1),
-                JsonUtil.toDouble(raw.opt(2)),
-                JsonUtil.toDouble(raw.opt(3)),
-                JsonUtil.toDouble(raw.opt(4)),
-                JsonUtil.toDouble(raw.opt(5)),
-            )
             else -> throw JSONException("unknown opcode '$code'")
         }
     }

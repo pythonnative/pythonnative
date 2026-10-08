@@ -33,6 +33,7 @@ from typing import Any, Callable, Deque, List, Optional, Set, Tuple
 
 __all__ = [
     "HookOrderError",
+    "reset_dev_mode",
     "set_dev_mode",
     "is_dev",
     "log",
@@ -61,8 +62,14 @@ class HookOrderError(RuntimeError):
 # Dev mode
 # ======================================================================
 
-# Tri-state: ``None`` means "not explicitly set, consult the environment".
-_dev_mode: Optional[bool] = None
+
+def _environment_dev_mode() -> bool:
+    return os.environ.get("PN_DEV", "").lower() in {"1", "true", "yes", "on"}
+
+
+# Read on every render path, so it's a plain module global: the ``PN_DEV``
+# environment variable seeds it at import and ``set_dev_mode`` overrides it.
+_dev_mode: bool = _environment_dev_mode()
 
 
 def set_dev_mode(enabled: bool) -> None:
@@ -80,16 +87,20 @@ def set_dev_mode(enabled: bool) -> None:
     _dev_mode = bool(enabled)
 
 
+def reset_dev_mode() -> None:
+    """Return to the mode the ``PN_DEV`` environment variable selects."""
+    global _dev_mode
+    _dev_mode = _environment_dev_mode()
+
+
 def is_dev() -> bool:
     """Return whether dev diagnostics are active.
 
-    Resolution order: an explicit
-    [`set_dev_mode`][pythonnative.diagnostics.set_dev_mode] call, then
-    the ``PN_DEV`` environment variable, then ``False``.
+    An explicit [`set_dev_mode`][pythonnative.diagnostics.set_dev_mode]
+    call wins; otherwise the ``PN_DEV`` environment variable, read when
+    this module is imported, decides (default ``False``).
     """
-    if _dev_mode is not None:
-        return _dev_mode
-    return os.environ.get("PN_DEV", "").lower() in {"1", "true", "yes", "on"}
+    return _dev_mode
 
 
 # ======================================================================

@@ -6,14 +6,14 @@ final class PNCommitTests: XCTestCase {
 
     private func commit(_ operations: [[Any]], revision: Int = 1) -> [String: Any] {
         PNJSON.decodeObject(PNCommit.apply(PNJSON.encode([
-            "version": 4, "application": app, "surface": 1,
+            "version": PNContracts.protocolVersion, "application": app, "surface": 1,
             "revision": revision, "ops": operations,
         ])))
     }
 
     override func tearDown() {
         _ = PNCommit.apply(PNJSON.encode([
-            "version": 4, "application": UUID().uuidString, "surface": 1,
+            "version": PNContracts.protocolVersion, "application": UUID().uuidString, "surface": 1,
             "revision": 1, "ops": [],
         ]))
         super.tearDown()
@@ -76,6 +76,23 @@ final class PNCommitTests: XCTestCase {
         XCTAssertTrue(PNLayout.compute(request).isEmpty)
     }
 
+    func testRejectedCommitRestoresParentsAndChildCounts() {
+        XCTAssertEqual(commit([["c", 9400, "View", [:]], ["c", 9401, "View", [:]], ["c", 9402, "Text", ["text": "child"]],
+                               ["i", 9400, 9402, 0]])["ok"] as? Bool, true)
+        // Moves the child and destroys its old parent, then fails validation.
+        XCTAssertEqual(commit([["i", 9401, 9402, 0], ["d", 9400], ["c", 9403, "NotAComponent", [:]]], revision: 2)["ok"] as? Bool, false)
+        XCTAssertNotNil(PNViewRegistry.shared.view(for: 9400))
+        // The child is still under 9400, so it can't be destroyed first.
+        XCTAssertEqual(commit([["d", 9400]], revision: 2)["ok"] as? Bool, false)
+        XCTAssertEqual(commit([["i", 9401, 9402, 0], ["d", 9400]], revision: 2)["ok"] as? Bool, true)
+        XCTAssertNil(PNViewRegistry.shared.view(for: 9400))
+    }
+
+    func testFrameOperationsAreNotPartOfTheProtocol() {
+        XCTAssertEqual(commit([["c", 9500, "View", [:]], ["f", 9500, 0, 0, 10, 10]])["ok"] as? Bool, false)
+        XCTAssertNil(PNViewRegistry.shared.view(for: 9500))
+    }
+
     func testReplayCannotDestroyAnAcceptedWidget() {
         XCTAssertEqual(commit([["c", 9301, "View", [:]]])["ok"] as? Bool, true)
         XCTAssertEqual(commit([["d", 9301]])["ok"] as? Bool, false)
@@ -88,7 +105,7 @@ final class PNCommitTests: XCTestCase {
                                   ["c", 9801, "Text", ["text": "Measured", "font_size": 20]], ["i", 9800, 9801, 0]]
         let request: [String: Any] = ["roots": [9800], "width": 320, "height": 640]
         let reply = PNJSON.decodeObject(PNCommit.apply(PNJSON.encode([
-            "version": 4, "application": app, "surface": 1, "revision": 1, "ops": operations, "layout": request,
+            "version": PNContracts.protocolVersion, "application": app, "surface": 1, "revision": 1, "ops": operations, "layout": request,
         ])))
         XCTAssertEqual(reply["ok"] as? Bool, true)
         let layout = reply["layout"] as? [String: Any]

@@ -969,9 +969,12 @@ def build_project(args: argparse.Namespace) -> None:
         if not upload:
             print("Build completed, but no artifacts were found. Check the build output above.")
         return
+    from ..project.artifacts import size_report
+
     print("\nBuilt artifacts:")
     for path in artifacts.paths:
-        print(f"  {path}")
+        report = size_report(path)
+        print(f"  {path}" + (f" ({report})" if report else ""))
 
 
 # ======================================================================

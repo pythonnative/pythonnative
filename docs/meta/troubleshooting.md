@@ -146,8 +146,8 @@ If the list is empty, install one via `Xcode -> Settings -> Platforms`.
 
 The pinned upstream archive was rotated. Update PythonNative (`pip
 install --upgrade pythonnative`); the new release will pin the new
-asset. As a stopgap, you can clear the cached archive at
-`build/ios/ios_runtime/` and re-run.
+asset. As a stopgap, you can clear the cached runtime under
+`~/Library/Caches/pythonnative/ios/` (or `$PN_CACHE_DIR/ios/`) and re-run.
 
 ### App crashes on launch with `dyld: Library not loaded`
 

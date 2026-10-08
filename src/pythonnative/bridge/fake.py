@@ -83,7 +83,7 @@ class FakeTransport:
         """Return the protocol version compiled into the native library."""
         return self._version
 
-    def set_callback(self, callback: Callable[[str, int, str, str], Optional[str]]) -> None:
+    def set_callback(self, callback: Callable[[str, int, str, str], None]) -> None:
         """Install ``callback`` as the native -> Python entry point."""
         self.callback = callback
 
@@ -184,13 +184,13 @@ class FakeTransport:
 
     # -- Playing the native side ------------------------------------------
 
-    def fire(self, tag: int, name: str, *args: Any) -> Any:
-        """Emit a view event as native would; returns the decoded handler result."""
+    def fire(self, tag: int, name: str, *args: Any) -> None:
+        """Emit a view event as native would."""
         self._event_sequence = getattr(self, "_event_sequence", 0) + 1
         envelope = self.commit_state.acknowledgement()
         envelope.pop("ok")
         envelope.update(sequence=self._event_sequence, args=[codec.to_jsonable(a) for a in args])
-        return self._callback("event", tag, name, codec.dumps(envelope))
+        self._callback("event", tag, name, codec.dumps(envelope))
 
     def emit_module_event(self, module: str, event: str, payload: Any = None) -> None:
         """Push an unsolicited module event (``AppState`` ``change``, ...) into Python."""
@@ -209,18 +209,18 @@ class FakeTransport:
             body["error"] = error
         self._callback("module", 0, module, codec.dumps(body))
 
-    def host_event(self, screen: int, event: str, payload: Any = None) -> Any:
-        """Deliver a screen lifecycle event as the native host would; returns the decoded result."""
-        return self._callback("host", screen, event, codec.dumps(codec.to_jsonable(payload)))
+    def host_event(self, screen: int, event: str, payload: Any = None) -> None:
+        """Deliver a screen lifecycle event as the native host would."""
+        self._callback("host", screen, event, codec.dumps(codec.to_jsonable(payload)))
 
     def complete_animation(self, anim_id: int, finished: bool = True) -> None:
         """Report a native animation as finished (or interrupted) to Python."""
         self._callback("animation", 0, "", codec.dumps({"id": anim_id, "finished": finished}))
 
-    def _callback(self, kind: str, tag: int, name: str, payload: str) -> Any:
+    def _callback(self, kind: str, tag: int, name: str, payload: str) -> None:
         if self.callback is None:
             raise AssertionError("FakeTransport has no callback; install it with pythonnative.bridge.set_transport")
-        return codec.loads(self.callback(kind, tag, name, payload))
+        self.callback(kind, tag, name, payload)
 
     # -- Introspection -----------------------------------------------------
 

@@ -15,12 +15,16 @@ preflight, widget mutation, and native measurement retain UI-thread ownership.
 On iOS, the ctypes transport releases the GIL during this crossing. Native input
 is queued back to Python rather than waiting for a Python handler on the UI thread.
 
-A callback must never depend on a synchronous Python answer. Navigation back
-requests and recycled-row requests are asynchronous. Platforms cache restoration
-state as Python publishes it, so the `save_state` and `restore_state` lifecycle
-callbacks are acknowledged without calling into Python. Viewport metrics
-(size, insets, keyboard height, color scheme, scale, and font scale) travel on
-the `layout` and `resume` host events.
+Native never waits for Python, and Python never answers a callback: every
+message (`event`, `host`, `module`, `animation`, and `layout`) is queued and
+delivered in order on a dedicated thread. Navigation back requests and
+recycled-row requests are asynchronous. Messages sent before Python has
+started, such as a screen's `create` while the interpreter is still booting,
+wait in the queue until Python registers its callback. Platforms cache
+restoration state as Python publishes it (`Host.set_state`) and hand it back in
+the next `create` payload as `restored_state`. Viewport metrics (size, insets,
+keyboard height, color scheme, scale, and font scale) travel on the `layout`
+and `resume` host events.
 Adjacent continuous scroll and gesture samples can be coalesced. Discrete input
 preserves order. Animation input bindings evaluate before the sample is queued.
 
@@ -30,7 +34,7 @@ A surface commit has this shape:
 
 ```json
 {
-  "version": 4,
+  "version": 5,
   "application": "unique-application-id",
   "surface": 1,
   "revision": 1,
@@ -48,13 +52,21 @@ A surface commit has this shape:
 | `u` | tag, changed props, removed property names; `null` remains a value |
 | `i` | parent tag, child tag, insertion index |
 | `d` | tag; children must already be destroyed |
-| `f` | tag, x, y, width, height |
 
-Python builds the wire operations once, validates them once against the
-generated contract, and serializes the envelope once per commit; there is no
-encode-decode-patch round trip. The renderer then validates the entire
-operation sequence before mutation: operation arity, live tags, insertion
-bounds, cycles, typed values, and finite geometry.
+Geometry never travels as an operation: Yoga runs beside the widgets on every
+renderer. (The headless test transport, which lays out in Python, also accepts
+an `f` frame operation.)
+
+Python builds the wire operations once and serializes the envelope once per
+commit; there is no encode-decode-patch round trip. Python always checks the
+commit's structure (revisions, tags, parents, and list datasets); in
+development it also validates every prop against the contract, so errors name
+the component and prop. The renderer validates the entire operation sequence
+before mutation in every build: operation arity, live tags, insertion bounds,
+cycles, and typed values. It updates its structural bookkeeping in place and
+records the inverse of each change, so validation costs time proportional to
+the commit rather than to the mounted tree; a rejected commit replays the
+inverses.
 An accepted commit returns `ok`, `application`, `surface`, and the exact
 `revision`, plus optional native timing metrics. Python advances its bookkeeping
 only after that acknowledgment. A rejection with `failed: false` reports
@@ -121,8 +133,8 @@ skip a separate request. Changed styles update existing Yoga nodes; removal
 restores the property default or surviving shorthand. Diagnostic raw layout
 requests may omit `selective` to collect all changed frames. Yoga calculations
 reuse unchanged constraints, and
-frame collection visits only subtrees with new layout. Python doesn't make one
-measurement RPC per leaf.
+frame collection visits only subtrees with new layout. There's no measurement
+call across the bridge.
 
 Commit and required layout acknowledgments precede ref and effect publication.
 Native navigation animations and later platform layout changes may continue after
@@ -153,7 +165,9 @@ allow implementations to release underlying work.
 
 The SDK derives component and module contracts from Python dataclasses,
 annotations, and protocols. `pn codegen` produces Swift, Kotlin, Python, browser
-metadata, and reference documentation. Plugin manifests can name a generated
+metadata, and reference documentation. The built-in contracts are derived once,
+at code generation, into `pythonnative/sdk/_builtin_contracts.json`, which
+`import pythonnative` reads instead of evaluating annotations. Plugin manifests can name a generated
 contract file; builders merge it into both the native library and embedded Python.
 Startup checks the protocol, Yoga version, and contract fingerprint.
 

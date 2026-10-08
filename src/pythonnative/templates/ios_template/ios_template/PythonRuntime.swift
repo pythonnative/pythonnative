@@ -7,10 +7,14 @@
 //  a build error, never a silent runtime fallback.
 //
 //  After the interpreter starts, `pythonnative.bootstrap.start()` binds
-//  the PythonNativeKit C exports, registers the Python callback, and
-//  verifies the protocol version. Everything else (screens, modules,
-//  deep links) flows over that bridge; nothing else here calls Python
-//  functions by name.
+//  the PythonNativeKit C exports, registers the Python callback, verifies
+//  the protocol version, and imports the app's entry module. Everything
+//  else (screens, modules, deep links) flows over that bridge; nothing
+//  else here calls Python functions by name.
+//
+//  `AppDelegate` starts all of this on a background queue at launch, so
+//  the main thread never waits for Python: the launch screen stays up
+//  until the first screen's root view arrives.
 //
 
 import Foundation
@@ -70,7 +74,53 @@ final class PythonRuntime {
     private(set) var started = false
     private(set) var startupError: String? = nil
 
+    private enum Phase { case idle, starting, ready, failed(String) }
+    private var phase = Phase.idle
+    private var waiters: [(String?) -> Void] = []
+    private let startupQueue = DispatchQueue(label: "com.pythonnative.startup", qos: .userInitiated)
+
     private init() {}
+
+    // MARK: - Launch
+
+    /// Start Python on a background queue. Call once, from the main thread,
+    /// as early as possible.
+    func startInBackground() {
+        dispatchPrecondition(condition: .onQueue(.main))
+        guard case .idle = phase else { return }
+        phase = .starting
+        startupQueue.async {
+            var failure: String?
+            do {
+                try self.ensureStarted()
+            } catch {
+                failure = "\(error)"
+            }
+            DispatchQueue.main.async {
+                self.phase = failure.map { .failed($0) } ?? .ready
+                let waiting = self.waiters
+                self.waiters = []
+                for waiter in waiting { waiter(failure) }
+            }
+        }
+    }
+
+    /// Run `completion` on the main queue once Python is ready (`nil`) or
+    /// failed to start (the error report).
+    func whenReady(_ completion: @escaping (String?) -> Void) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        switch phase {
+        case .ready:
+            completion(nil)
+        case .failed(let message):
+            completion(message)
+        case .idle:
+            waiters.append(completion)
+            startInBackground()
+        case .starting:
+            waiters.append(completion)
+        }
+    }
 
     // MARK: - Startup
 
@@ -93,18 +143,20 @@ final class PythonRuntime {
         }
     }
 
-    /// Run `pythonnative.bootstrap.start(dev, strict=True)`: it binds the
-    /// `pn_bridge_*` symbols, registers the native -> Python callback,
-    /// verifies the protocol version against `pn_bridge_protocol_version()`,
-    /// routes `print()` to the console, and warms the asyncio runtime.
+    /// Run `pythonnative.bootstrap.start(dev, strict=True, entry=...)`: it
+    /// binds the `pn_bridge_*` symbols, registers the native -> Python
+    /// callback, verifies the protocol version against
+    /// `pn_bridge_protocol_version()`, routes `print()` to the console,
+    /// warms the asyncio runtime, and imports the entry module.
     private func connectBridge() throws {
         #if DEBUG
         let dev = true
         #else
         let dev = false
         #endif
+        let entry = (Bundle.main.object(forInfoDictionaryKey: "PNEntryModule") as? String) ?? "app.main"
         do {
-            try callList(module: "pythonnative.bootstrap", function: "start", [dev, true])
+            try callList(module: "pythonnative.bootstrap", function: "start", [dev, true, entry])
         } catch let error as PythonRuntimeError {
             throw PythonRuntimeError.startup(
                 "Bridge bootstrap failed (native protocol v\(pn_bridge_protocol_version())):\n\(error.description)"
@@ -154,8 +206,14 @@ final class PythonRuntime {
         defer { PyConfig_Clear(&config) }
         // Unbuffered stdio so print() reaches the device log immediately.
         config.buffered_stdio = 0
-        // The signed bundle is immutable; never try to write bytecode.
+        // The build compiles everything in the signed bundle ahead of time.
+        // Debug builds also cache the bytecode of sources the dev client
+        // syncs into its writable overlay; release builds never write.
+        #if DEBUG
+        config.write_bytecode = 1
+        #else
         config.write_bytecode = 0
+        #endif
 
         guard let homeW = Py_DecodeLocale(pythonHome, nil) else {
             throw PythonRuntimeError.startup("Could not decode the Python home path.")

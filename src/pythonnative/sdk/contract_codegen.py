@@ -186,6 +186,8 @@ class ContractCompiler:
                     target.append(f"        {key} to ::{predicate}" if kt else f"        {key}: {predicate}")
         substitutions = {
             "fingerprint": fingerprint,
+            "protocol": str(spec["protocol"]),
+            "yoga": spec["yoga"],
             "predicates": "\n".join(self.functions),
             "fields": "\n".join(fields),
             "components": ",\n".join(components),

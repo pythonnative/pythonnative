@@ -8,6 +8,7 @@ import inspect
 import json
 import typing
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Mapping
 
 from .types import NativeField, decode_value, encode_value, type_schema, validate  # noqa: F401
@@ -202,6 +203,16 @@ class ModuleSchema:
 COMPONENTS: dict[str, ComponentSchema] = {}
 MODULES: dict[str, ModuleSchema] = {}
 
+from ..bridge.commits import PROTOCOL_VERSION  # noqa: E402
+
+YOGA_VERSION = "3.2.1"
+"""The Yoga release every layout engine (native, WebAssembly, headless) embeds."""
+
+BUILTIN_CONTRACTS = "_builtin_contracts.json"
+"""Generated file, beside this module, holding the built-in contracts."""
+
+_fingerprint_cache: tuple[Any, str] | None = None
+
 
 def register_schema(schema: ComponentSchema | ModuleSchema) -> None:
     """Register the contract used to generate and validate a native extension."""
@@ -214,45 +225,159 @@ def register_schema(schema: ComponentSchema | ModuleSchema) -> None:
 def manifest() -> dict[str, Any]:
     """Return deterministic native metadata for code generation and tooling."""
     return {
-        "protocol": 4,
-        "yoga": "3.2.1",
+        "protocol": PROTOCOL_VERSION,
+        "yoga": YOGA_VERSION,
         "components": {name: dataclasses.asdict(value) for name, value in sorted(COMPONENTS.items())},
         "modules": {name: dataclasses.asdict(value) for name, value in sorted(MODULES.items())},
     }
 
 
+def _registry_identity() -> tuple[Any, ...]:
+    """Identify the registered contract objects without serializing them."""
+    return (
+        tuple((name, id(value)) for name, value in COMPONENTS.items()),
+        tuple((name, id(value)) for name, value in MODULES.items()),
+    )
+
+
+def _hash_manifest(document: Mapping[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(document, sort_keys=True, default=str).encode()).hexdigest()
+
+
 def fingerprint() -> str:
-    """Hash the native contract; incompatible dev clients require rebuilding."""
-    return hashlib.sha256(json.dumps(manifest(), sort_keys=True, default=str).encode()).hexdigest()
+    """Hash the native contract; incompatible dev clients require rebuilding.
+
+    The hash is cached until a contract is registered or removed, so the
+    startup handshake doesn't serialize the manifest again.
+    """
+    global _fingerprint_cache
+    identity = _registry_identity()
+    if _fingerprint_cache is None or _fingerprint_cache[0] != identity:
+        _fingerprint_cache = (identity, _hash_manifest(manifest()))
+    return _fingerprint_cache[1]
+
+
+def _schema_document(schema: ComponentSchema | ModuleSchema) -> str:
+    return json.dumps(dataclasses.asdict(schema), sort_keys=True, default=str)
+
+
+def _component(value: Mapping[str, Any], props: dict[str, dict[str, Any]] | None = None) -> ComponentSchema:
+    """Rebuild a component contract from JSON, restoring tuple fields."""
+    return ComponentSchema(
+        value["name"],
+        dict(value["props"]) if props is None else props,
+        tuple(value.get("required", ())),
+        dict(value.get("defaults", {})),
+        value.get("measurement", "intrinsic"),
+        dict(value.get("commands", {})),
+        tuple(value.get("platforms", ("ios", "android", "web"))),
+    )
+
+
+def _check_versions(document: Mapping[str, Any]) -> None:
+    if document.get("protocol") != PROTOCOL_VERSION or document.get("yoga") != YOGA_VERSION:
+        raise ValueError(f"Native contracts require protocol {PROTOCOL_VERSION} and Yoga {YOGA_VERSION}")
 
 
 def load_manifest(document: Mapping[str, Any]) -> None:
     """Load declarative extension contracts without importing target binaries."""
-    if document.get("protocol") != 4 or document.get("yoga") != "3.2.1":
-        raise ValueError("Native contracts require protocol 4 and Yoga 3.2.1")
-    pending = []
-    for group, constructor, registered in (
-        ("components", ComponentSchema, COMPONENTS),
-        ("modules", ModuleSchema, MODULES),
-    ):
+    _check_versions(document)
+    pending: list[ComponentSchema | ModuleSchema] = []
+    for group, registered in (("components", COMPONENTS), ("modules", MODULES)):
         for name, value in document.get(group, {}).items():
             if not name.isidentifier() or value.get("name") != name:
                 raise ValueError(f"Invalid native contract name: {name!r}")
-            schema = constructor(**value)
+            schema: ComponentSchema | ModuleSchema = (
+                _component(value) if group == "components" else ModuleSchema(**value)
+            )
             old = registered.get(name)
-            if old is not None and json.dumps(dataclasses.asdict(old), sort_keys=True, default=str) != json.dumps(
-                dataclasses.asdict(schema), sort_keys=True, default=str
-            ):
+            if old is not None and _schema_document(old) != _schema_document(schema):
                 raise ValueError(f"Conflicting native contract: {name}")
-            pending.append(schema)
+            if old is None:
+                pending.append(schema)
     for schema in pending:
         register_schema(schema)
 
 
+def encode_builtin_contracts(document: Mapping[str, Any]) -> str:
+    """Serialize a manifest compactly, storing each distinct field schema once.
+
+    Most components repeat the same style and accessibility fields, so
+    components refer to an interned ``fields`` table by index. Loading
+    rebuilds plain prop dictionaries that share those field schemas.
+    """
+    fields: list[Any] = []
+    index: dict[str, int] = {}
+    components = {}
+    for name, value in document["components"].items():
+        props = {}
+        for key, prop in value["props"].items():
+            # Declaration order matters to code generation, so fields are
+            # interned by their exact encoding, never a sorted one.
+            encoded = json.dumps(prop)
+            if encoded not in index:
+                index[encoded] = len(fields)
+                fields.append(prop)
+            props[key] = index[encoded]
+        components[name] = {**value, "props": props}
+    compact = {
+        "protocol": document["protocol"],
+        "yoga": document["yoga"],
+        "fingerprint": _hash_manifest(document),
+        "fields": fields,
+        "components": components,
+        "modules": document["modules"],
+    }
+    return json.dumps(compact, separators=(",", ":")) + "\n"
+
+
+def load_builtin_contracts() -> bool:
+    """Register the generated built-in contracts; return whether they were current.
+
+    ``pn codegen`` derives these from the annotated factories (see
+    ``pythonnative.sdk.builtins``) and writes them beside this module, so an
+    app's startup reads one JSON document instead of evaluating type hints.
+    """
+    global _fingerprint_cache
+    path = Path(__file__).with_name(BUILTIN_CONTRACTS)
+    try:
+        document = json.loads(path.read_bytes())
+    except FileNotFoundError:
+        return False
+    if document.get("protocol") != PROTOCOL_VERSION or document.get("yoga") != YOGA_VERSION:
+        # A development checkout whose generated file predates a protocol
+        # change; the caller derives the contracts instead.
+        return False
+    fields = document["fields"]
+    for name, value in document["components"].items():
+        register_schema(_component(value, {key: fields[i] for key, i in value["props"].items()}))
+    for name, value in document["modules"].items():
+        register_schema(ModuleSchema(**value))
+    _fingerprint_cache = (_registry_identity(), document["fingerprint"])
+    return True
+
+
 def load_bundled_contracts() -> None:
-    """Install the exact contracts compiled into this embedded application."""
+    """Install the plugin contracts compiled into this embedded application.
+
+    The build writes only the contracts its plugins add, plus the
+    fingerprint of everything the native library was generated from, so
+    the startup handshake doesn't hash the manifest again.
+    """
+    global _fingerprint_cache
     from importlib.resources import files
 
     path = files("pythonnative").joinpath("_native_contracts.json")
-    if path.is_file():
-        load_manifest(json.loads(path.read_text(encoding="utf-8")))
+    if not path.is_file():
+        return
+    document = json.loads(path.read_text(encoding="utf-8"))
+    load_manifest(document)
+    if isinstance(document.get("fingerprint"), str):
+        _fingerprint_cache = (_registry_identity(), document["fingerprint"])
+
+
+def validate_props(name: str, props: dict[str, Any]) -> None:
+    """Validate resolved factory arguments, including reserved runtime fields."""
+    schema = COMPONENTS.get(name)
+    if schema is not None:
+        schema.validate({key: value for key, value in props.items() if value is not None})

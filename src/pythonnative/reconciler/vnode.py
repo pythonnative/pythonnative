@@ -183,14 +183,22 @@ class VNode:
         "suspense_hydration",
         "suspense_waits",
         "context_consumers",
+        "_journal_stamp",
     )
+
+    _journal_stamp: int
 
     def __setattr__(self, name: str, value: Any) -> None:
         if _journal.journal_active and name in _STRUCTURAL:
-            _journal.record_attribute(self, name)
+            journal = _journal.active
+            if journal is not None and self._journal_stamp != journal.identity:
+                journal.snapshot(self, _STRUCTURAL_ORDER)
         object.__setattr__(self, name, value)
 
     def __init__(self, element: Element, children: Optional[List["VNode"]] = None, tag: Optional[int] = None) -> None:
+        # A node created during a render pass belongs to it: a rollback
+        # discards the node, so the pass's journal never captures it.
+        object.__setattr__(self, "_journal_stamp", _journal.stamp())
         self.element = element
         self.tag = tag
         self.native_view: Any = None
@@ -283,3 +291,7 @@ class VNode:
 
     def __repr__(self) -> str:
         return f"VNode({self.label!r}, tag={self.tag}, children={len(self.children)})"
+
+
+# The structural fields a node's journal snapshot captures, in slot order.
+_STRUCTURAL_ORDER = tuple(name for name in VNode.__slots__ if name in _STRUCTURAL)

@@ -343,11 +343,21 @@ def test_prepare_ios_runtime_rejects_an_unpinned_version(tmp_path: Path) -> None
     assert cache.is_dir()
 
 
+def _extract_root(cache: Path, version: str = PINNED_VERSION) -> Path:
+    return cache / f"python-{runtime_assets.PINNED_ASSETS[version][0]}"
+
+
+def _prepared(extract_root: Path) -> None:
+    (extract_root / f".pn-pruned-{runtime_assets.PREPARATION}").touch()
+    (extract_root / f".pn-compiled-{runtime_assets.PREPARATION}").touch()
+
+
 def test_prepare_ios_runtime_returns_the_cached_extraction(tmp_path: Path) -> None:
     cache = tmp_path / "ios_runtime"
-    extract_root = cache / f"python-{PINNED_VERSION}"
+    extract_root = _extract_root(cache)
     extract_root.mkdir(parents=True)
     xcframework = _xcframework(extract_root)
+    _prepared(extract_root)
     messages: List[str] = []
 
     runtime = runtime_assets.prepare_ios_runtime(cache, PINNED_VERSION, log=messages.append)
@@ -355,17 +365,87 @@ def test_prepare_ios_runtime_returns_the_cached_extraction(tmp_path: Path) -> No
     assert runtime.python_version == PINNED_VERSION
     assert runtime.xcframework_dir == xcframework
     assert runtime.install_script.is_file()
-    # Both the download and the extraction branches emit; silence proves
-    # neither ran, which is what "cached" has to mean.
+    assert runtime.stdlib_compiled
+    # Download, extraction, pruning, and compilation all emit; silence
+    # proves none ran, which is what "cached" has to mean.
     assert messages == []
-    assert sorted(path.name for path in cache.iterdir()) == [f"python-{PINNED_VERSION}"]
+    assert sorted(path.name for path in cache.iterdir() if not path.name.startswith(".")) == [extract_root.name]
+
+
+def _stdlib(xcframework: Path, version: str = PINNED_VERSION) -> Path:
+    lib = xcframework / "lib" / f"python{version}"
+    for name in (
+        "test/test_os.py",
+        "idlelib/idle.py",
+        "tkinter/__init__.py",
+        "json/__init__.py",
+        "pydoc_data/topics.py",
+    ):
+        (lib / name).parent.mkdir(parents=True, exist_ok=True)
+        (lib / name).write_text("x = 1\n", encoding="utf-8")
+    for name in ("turtle.py", "this.py", "os.py"):
+        (lib / name).write_text("x = 1\n", encoding="utf-8")
+    dynload = xcframework / "ios-arm64" / "lib-arm64" / f"python{version}" / "lib-dynload"
+    dynload.mkdir(parents=True)
+    for name in (
+        "_testcapi.cpython-313-iphoneos.so",
+        "xxlimited.cpython-313-iphoneos.so",
+        "_json.cpython-313-iphoneos.so",
+    ):
+        (dynload / name).write_bytes(b"")
+    return lib
+
+
+def test_prune_stdlib_removes_tests_tooling_and_test_extensions(tmp_path: Path) -> None:
+    xcframework = _xcframework(tmp_path)
+    lib = _stdlib(xcframework)
+
+    assert runtime_assets.prune_stdlib(xcframework, PINNED_VERSION) == 7
+
+    assert sorted(path.name for path in lib.iterdir()) == ["json", "os.py", "pydoc_data"]
+    dynload = xcframework / "ios-arm64" / "lib-arm64" / f"python{PINNED_VERSION}" / "lib-dynload"
+    assert [path.name for path in dynload.iterdir()] == ["_json.cpython-313-iphoneos.so"]
+    assert runtime_assets.prune_stdlib(xcframework, PINNED_VERSION) == 0
+
+
+def test_prepare_prunes_once_and_compiles_when_a_compiler_appears(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache = tmp_path / "ios_runtime"
+    extract_root = _extract_root(cache)
+    extract_root.mkdir(parents=True)
+    _stdlib(_xcframework(extract_root))
+    compiled: List[Tuple[Path, bool]] = []
+
+    def compile_tree(root: Path, compiler: str, *, sourceless: bool, label: str) -> bool:
+        compiled.append((root, sourceless))
+        return True
+
+    monkeypatch.setattr(runtime_assets.bytecode, "compile_tree", compile_tree)
+    messages: List[str] = []
+    runtime = runtime_assets.prepare_ios_runtime(cache, PINNED_VERSION, log=messages.append)
+    assert not runtime.stdlib_compiled and compiled == []
+    assert any("Trimmed" in message for message in messages)
+
+    messages.clear()
+    runtime = runtime_assets.prepare_ios_runtime(cache, PINNED_VERSION, log=messages.append, compiler="python")
+    assert runtime.stdlib_compiled
+    assert [(root.name, sourceless) for root, sourceless in compiled] == [(f"python{PINNED_VERSION}", False)] * 2
+    assert not any("Trimmed" in message for message in messages)
+
+
+def test_default_cache_dir_honors_the_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(runtime_assets.CACHE_ENV, str(tmp_path / "shared"))
+    assert runtime_assets.default_cache_dir() == tmp_path / "shared"
+    monkeypatch.delenv(runtime_assets.CACHE_ENV)
+    assert runtime_assets.default_cache_dir().name == "pythonnative"
 
 
 def test_prepare_ios_runtime_refetches_a_stale_extraction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Python.xcframework exists but build/utils.sh does not, so _locate_runtime
     # raises and the cached branch falls through to the download.
     cache = tmp_path / "ios_runtime"
-    extract_root = cache / f"python-{PINNED_VERSION}"
+    extract_root = _extract_root(cache)
     extract_root.mkdir(parents=True)
     _xcframework(extract_root, with_utils=False)
 
@@ -380,6 +460,8 @@ def test_prepare_ios_runtime_refetches_a_stale_extraction(tmp_path: Path, monkey
     with pytest.raises(RuntimeError, match="Could not download the iOS Python runtime"):
         runtime_assets.prepare_ios_runtime(cache, PINNED_VERSION)
 
+    assert not extract_root.exists()
+    assert not list(cache.glob("*.partial"))
     assert len(attempted) == 1
     assert attempted[0].endswith(runtime_assets.PINNED_ASSETS[PINNED_VERSION][1])
 

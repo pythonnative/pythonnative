@@ -227,11 +227,13 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
     - ``layout`` ``{width, height, insets, keyboard_height, color_scheme,
       scale, font_scale, screen_width, screen_height}``.
     - ``appearance`` ``{"color_scheme"}``.
-    - ``back_pressed``: returns ``"true"`` when a handler consumed it.
-    - ``save_state`` / ``restore_state``: instance-state hooks.
+    - ``back_pressed``: pops a handled screen, otherwise asks native to
+      finish it (``Host.finish``).
+    - ``reload``: remount after the development error overlay.
     - ``flush``: run deferred renders now.
 
-    Returns a JSON string for request-style events, else ``None``.
+    Native delivers every event asynchronously and ignores the return
+    value; only tests read ``create``'s ``{"root": tag}``.
     """
     screen_id = int(screen_id)
     if event == "create":
@@ -262,10 +264,6 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
     if event == "back_pressed":
         if not host.on_back_pressed():
             _host_module().call("finish", screen=host.screen_id)
-        return None
-    if event in ("save_state", "restore_state"):
-        # Restoration state is cached as Python publishes it; the host
-        # has nothing synchronous to do when the platform saves.
         return None
     if event == "destroy":
         host.on_destroy()

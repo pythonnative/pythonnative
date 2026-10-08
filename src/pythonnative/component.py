@@ -72,6 +72,9 @@ def _hook_signature(fn: Callable[..., Any]) -> Optional[tuple[str, ...]]:
     attempted once.
     """
     global _refresh_signature
+    if getattr(fn, "__module__", "").startswith("pythonnative."):
+        # Framework components never change under Fast Refresh.
+        return None
     if _refresh_signature is None:
         try:
             from .refresh import hook_signature
@@ -83,6 +86,83 @@ def _hook_signature(fn: Callable[..., Any]) -> Optional[tuple[str, ...]]:
 
 
 _refresh_signature: Union[None, bool, Callable[[Callable[..., Any]], Optional[tuple[str, ...]]]] = None
+
+
+class _Unplanned(Exception):
+    """A call the plan doesn't cover; ``inspect.Signature.bind`` decides it."""
+
+
+class _CallPlan:
+    """A precompiled binding of calls to one component signature.
+
+    ``Signature.bind`` is general and slow. Component signatures are almost
+    always plain parameters, an optional ``*children``, and keyword-only
+    props, so the plan binds those directly. Anything else, including
+    every call that would raise, is left to ``Signature.bind``, so error
+    messages are Python's own.
+    """
+
+    __slots__ = ("positional", "keyword_only", "names", "accepted", "defaults", "children")
+
+    def __init__(self, signature: inspect.Signature) -> None:
+        self.positional: tuple[str, ...] = ()
+        self.keyword_only: tuple[str, ...] = ()
+        self.children: Optional[str] = None
+        self.defaults: Dict[str, Any] = {}
+        names = []
+        for name, parameter in signature.parameters.items():
+            kind = parameter.kind
+            if kind is inspect.Parameter.VAR_POSITIONAL:
+                self.children = name
+                continue
+            if kind is inspect.Parameter.POSITIONAL_OR_KEYWORD:
+                self.positional += (name,)
+            elif kind is inspect.Parameter.KEYWORD_ONLY:
+                self.keyword_only += (name,)
+            else:
+                raise _Unplanned(name)
+            if parameter.default is not inspect.Parameter.empty:
+                self.defaults[name] = parameter.default
+            names.append(name)
+        self.names: tuple[str, ...] = tuple(names)
+        self.accepted = frozenset(names)
+
+    def bind(self, args: tuple[Any, ...], kwargs: Dict[str, Any]) -> tuple[Dict[str, Any], tuple[Any, ...]]:
+        """Return ``(props, children)`` in parameter order, with defaults applied."""
+        positional = self.positional
+        count = len(positional)
+        if len(args) > count and self.children is None:
+            raise _Unplanned
+        given = dict(zip(positional, args))
+        accepted = self.accepted
+        for name, value in kwargs.items():
+            if name in given or name not in accepted:
+                raise _Unplanned
+            given[name] = value
+        if len(given) == len(self.names):
+            props = given
+        else:
+            defaults = self.defaults
+            props = {}
+            for name in self.names:
+                if name in given:
+                    props[name] = given[name]
+                elif name in defaults:
+                    props[name] = defaults[name]
+                else:
+                    raise _Unplanned
+        return props, args[count:]
+
+    def arguments(self, props: Mapping[str, Any], children: tuple[Any, ...]) -> tuple[list[Any], Mapping[str, Any]]:
+        """Arrange an element's stored props and children for the call.
+
+        Raises:
+            KeyError: When ``props`` lacks a positional parameter.
+        """
+        if self.children is None:
+            return [], props
+        keywords = {name: props[name] for name in self.keyword_only if name in props}
+        return [*[props[name] for name in self.positional], *children], keywords
 
 
 class Component(Generic[P]):
@@ -110,6 +190,7 @@ class Component(Generic[P]):
         "props_equal",
         "accepts_children",
         "_signature",
+        "_plan",
         "_keyed_builtin",
         "_is_async",
         "refresh_signature",
@@ -142,6 +223,10 @@ class Component(Generic[P]):
         self.props_equal: Optional[Callable[[Mapping[str, Any], Mapping[str, Any]], bool]] = None
         self.accepts_children = accepts_children
         self._signature = sig
+        try:
+            self._plan: Optional[_CallPlan] = _CallPlan(sig)
+        except _Unplanned:
+            self._plan = None
         self._keyed_builtin = _keyed_builtin
         self._is_async = inspect.iscoroutinefunction(fn)
         self.__wrapped__ = fn
@@ -162,22 +247,33 @@ class Component(Generic[P]):
                 )
             raw = kwargs.pop("key")
             key = None if raw is None else str(raw)
-        bound = self._signature.bind(*args, **kwargs)
-        bound.apply_defaults()
-        children: tuple[Any, ...] = ()
-        props: Dict[str, Any] = {}
-        for name, value in bound.arguments.items():
-            kind = self._signature.parameters[name].kind
-            if kind is inspect.Parameter.VAR_POSITIONAL:
-                children = value
-            else:
-                props[name] = value
+        props: Dict[str, Any]
+        children: tuple[Any, ...]
+        try:
+            if self._plan is None:
+                raise _Unplanned
+            props, children = self._plan.bind(args, kwargs)
+        except _Unplanned:
+            props, children = self._bind(args, kwargs)
         props.pop("key", None)
         if diagnostics.is_dev() and not self._keyed_builtin:
             from .prop_checks import check_props
 
             check_props(self, props)
         return Element(self, props, children, key=key)
+
+    def _bind(self, args: tuple[Any, ...], kwargs: Dict[str, Any]) -> tuple[Dict[str, Any], tuple[Any, ...]]:
+        """Bind a call the plan doesn't cover, raising Python's own errors."""
+        bound = self._signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+        children: tuple[Any, ...] = ()
+        props: Dict[str, Any] = {}
+        for name, value in bound.arguments.items():
+            if self._signature.parameters[name].kind is inspect.Parameter.VAR_POSITIONAL:
+                children = value
+            else:
+                props[name] = value
+        return props, children
 
     # ------------------------------------------------------------------
     # Rendering (used by the reconciler)
@@ -191,6 +287,13 @@ class Component(Generic[P]):
         (an element, a list, ``None``, or a coroutine for ``async def``
         bodies).
         """
+        if self._plan is not None:
+            try:
+                positional, keywords = self._plan.arguments(element.props, element.children)
+            except KeyError:
+                pass
+            else:
+                return self.fn(*positional, **keywords)
         arguments = dict(element.props)
         for name, param in self._signature.parameters.items():
             if param.kind is inspect.Parameter.VAR_POSITIONAL:

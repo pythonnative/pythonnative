@@ -5,7 +5,9 @@ import org.json.JSONObject
 
 /** Executable generated contracts; the mount path doesn't interpret schema JSON. */
 object PNContracts {
-    const val fingerprint = "813e3e2f389698d21c1368f77b6f20696c83257e638746652878377c6f39f4ab"
+    const val fingerprint = "a0f3693294a26f040d30268e868e30defcca0c0ad1980af3565d832ae91691bf"
+    const val protocolVersion = 5
+    const val yogaVersion = "3.2.1"
     private data class Field(val matches: (Any) -> Boolean, val allowed: Boolean, val layout: Boolean,
                              val recreate: Boolean, val required: Boolean, val defaultValue: Any)
     const val LAYOUT = 1

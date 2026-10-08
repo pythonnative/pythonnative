@@ -95,7 +95,7 @@ Unsolicited pull requests for issues that are already assigned or already have a
 
 - Style: Black; lint: Ruff; typing where useful. Keep APIs stable.
 - Prefer explicit, descriptive names; keep platform abstractions clean.
-- Python never imports platform code. Everything that touches `UIView` or `android.view.View` lives in Swift (`PythonNativeKit`) or Kotlin (the `pythonnative` Gradle module) and is reached through `pythonnative.bridge`; see `docs/concepts/bridge.md` for the protocol. Bump `PROTOCOL_VERSION` on both sides when the wire format changes.
+- Python never imports platform code. Everything that touches `UIView` or `android.view.View` lives in Swift (`PythonNativeKit`) or Kotlin (the `pythonnative` Gradle module) and is reached through `pythonnative.bridge`; see `docs/concepts/bridge.md` for the protocol. When the wire format changes, bump `PROTOCOL_VERSION` in `pythonnative/bridge/commits.py` and run `scripts/generate-native-contracts.py`: Swift, Kotlin, and the browser preview read the version from the generated contracts.
 - Add/extend tests under `tests/` for new behavior. Native changes get XCTest / JUnit coverage next to the code they touch.
 - Design large changes in an RFC first. Anything that adds or removes public API, changes the Python-to-native wire contract, changes a convention apps depend on, or spans Python, Swift, Kotlin, and the browser preview gets a document under `rfcs/` (see [`rfcs/README.md`](https://github.com/pythonnative/pythonnative/blob/main/rfcs/README.md)). The RFC lands with the implementation and records what shipped, including removals.
 - Commit source, reviewed generated contracts, dependency locks, and vendored dependencies as described in [Generated source and vendored dependencies](#generated-source-and-vendored-dependencies). Don't commit local build outputs or caches.
@@ -140,21 +140,18 @@ of the source tree. Keep these in version control:
   declarations, and source maps. Preserve upstream licenses and document the
   version, source, and any local modifications when updating vendored code.
 
-After changing built-in contracts or their generators, regenerate the checked-in
-native files from the repository root:
+After changing a built-in factory's signature, the contracts, or their
+generators, regenerate the checked-in files from the repository root:
 
 ```bash
-uv run pn codegen --output build/contracts
-cp build/contracts/{PNContracts,NativeProps,NativeModules}.swift \
-  src/pythonnative/native/ios/Sources/PythonNativeKit/Generated/
-cp build/contracts/{PNContracts,NativeProps,NativeModules}.kt \
-  src/pythonnative/native/android/src/main/java/com/pythonnative/generated/
-uv run pytest tests/test_codegen.py
+uv run python scripts/generate-native-contracts.py
+uv run pytest tests/test_codegen.py tests/test_performance_budgets.py
 ```
 
-The test checks that the committed native contracts match generation in a clean
-Python interpreter. The other files under `build/contracts/` are local outputs;
-don't add the whole directory to the commit.
+The script writes `src/pythonnative/sdk/_builtin_contracts.json` (which
+`import pythonnative` loads instead of evaluating annotations), the generated
+Swift and Kotlin sources, and the native test fixtures. The tests check that
+the committed files match generation in a clean Python interpreter.
 
 Exclude staged app projects, compiled apps and libraries, package distributions,
 test reports, local storage, credentials, and tool caches. Examples include

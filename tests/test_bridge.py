@@ -323,16 +323,23 @@ def test_animated_transform_shorthands_cross_the_bridge(name: str, transport: Fa
         rec.unmount()
 
 
-def test_event_handler_return_value_is_returned_to_native(transport: FakeTransport) -> None:
+def test_events_reach_handlers_and_never_answer_native(transport: FakeTransport) -> None:
     from pythonnative.events import get_event_registry
 
     get_backend().apply_mutations(
         [CreateOp(11, "VirtualList", {"dataset": {"base": 0, "revision": 1, "changes": [["reset", []]]}})]
     )
-    get_event_registry().set_events(11, {"on_bind_row": lambda payload: {"root": payload["index"] * 2}})
+    seen: list[Any] = []
+
+    def bind_row(payload: Any) -> dict[str, bool]:
+        seen.append(payload)
+        return {"ignored": True}
+
+    get_event_registry().set_events(11, {"on_bind_row": bind_row})
     try:
-        assert transport.fire(11, "on_bind_row", {"index": 21}) == {"root": 42}
-        assert transport.fire(11, "on_missing") is None
+        bridge.native_callback("event", 11, "on_missing", "[]")
+        transport.fire(11, "on_bind_row", {"index": 21})
+        assert seen == [{"index": 21}]
     finally:
         get_event_registry().clear(11)
 
@@ -543,10 +550,10 @@ def test_native_host_lifecycle_and_navigation(
         "insets": {"top": 0, "left": 0, "bottom": 34, "right": 0},
         "color_scheme": "dark",
     }
-    result = transport.host_event(1, "create", {"path": path, "args": None, "dev_root": None, **metrics})
+    transport.host_event(1, "create", {"path": path, "args": None, "dev_root": None, **metrics})
     host = hosts.host_for_screen(1)
     assert host is not None and host.reconciler is not None
-    root_tag = result["root"]
+    root_tag = host.root_native_view.tag
     assert transport.views[root_tag].type_name == "Column"
     assert ("Host", "attach_root", {"screen": 1, "tag": root_tag}) in transport.calls
     assert platform_metrics.get_safe_area_insets().bottom == 34.0
@@ -559,13 +566,9 @@ def test_native_host_lifecycle_and_navigation(
 
     transport.host_event(1, "pause")
     assert host.is_focused is False
-    transport.host_event(1, "save_state")
-    transport.host_event(1, "restore_state", {"state": "{}"})
-    transport.host_event(1, "save_state")
-    transport.host_event(1, "restore_state", {"state": "{}"})
     transport.host_event(1, "resume", {"width": 390.0, "height": 844.0})
     assert host.is_focused is True
-    assert transport.host_event(1, "back_pressed") is None
+    transport.host_event(1, "back_pressed")
 
     assert transport.calls[-1] == ("Host", "finish", {"screen": 1})
     host.set_screen_options({"title": "T"})

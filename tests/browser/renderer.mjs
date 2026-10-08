@@ -19,7 +19,7 @@ const renderer = new Renderer({emit: (...args) => events.push(args), gesture: (.
   animationFinished() {}, scheme: () => 'light', overlays: () => overlay, bottomInset: () => 0,
   frameWidth: () => 390, pointInFrame: () => ({x:0, y:0}), statusBar() {}});
 let revision = 0;
-const envelope = ops => ({version:4, application:'browser-test', surface:1, revision:revision+1, ops});
+const envelope = ops => ({version:5, application:'browser-test', surface:1, revision:revision+1, ops});
 const commit = ops => { const result=renderer.apply(envelope(ops)); assert(result.ok, result.error); revision++; };
 commit([['c',1,'Column',{width:300}], ['c',2,'TextInput',{value:'hello', multiline:false, font_size:20,
   _pn_events:['on_change','on_selection_change']}], ['i',1,2,0], ['c',3,'Text',{text:'Label',color:'#ff0000'}], ['i',1,3,1]]);

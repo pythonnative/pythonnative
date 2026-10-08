@@ -1,6 +1,8 @@
 import plistlib
 from pathlib import Path
 
+import pytest
+
 from pythonnative.project import ios
 from pythonnative.project.config import AppConfig
 
@@ -133,6 +135,26 @@ def test_write_entitlements_for_remote_notifications(tmp_path: Path) -> None:
     assert entitlements["aps-environment"] == "development"
     # The build settings point code signing at the generated file.
     assert f"CODE_SIGN_ENTITLEMENTS={ios.ENTITLEMENTS_FILE}" in ios.build_settings(cfg)
+
+
+@pytest.mark.parametrize(
+    ("method", "release", "environment"),
+    [
+        ("app-store", True, "production"),
+        ("ad-hoc", True, "production"),
+        ("enterprise", True, "production"),
+        ("development", True, "development"),
+        ("app-store", False, "development"),
+    ],
+)
+def test_push_environment_follows_the_release_export(
+    tmp_path: Path, method: str, release: bool, environment: str
+) -> None:
+    (tmp_path / "ios_template").mkdir()
+    cfg = _config(tmp_path, permissions={"remote_notifications": True}, ios={"signing": {"export_method": method}})
+    dest = ios.write_entitlements(tmp_path, cfg, release=release)
+    assert dest is not None
+    assert plistlib.loads(dest.read_bytes())["aps-environment"] == environment
 
 
 def test_no_entitlements_without_capabilities(tmp_path: Path) -> None:

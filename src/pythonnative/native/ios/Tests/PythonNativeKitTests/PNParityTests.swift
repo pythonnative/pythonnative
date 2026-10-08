@@ -22,7 +22,6 @@ private let captureCallback: PNCallbackFn = { kind, tag, name, payload in
         kind.map { String(cString: $0) } ?? "", tag,
         name.map { String(cString: $0) } ?? "", payload.map { String(cString: $0) } ?? "{}"
     )
-    return nil
 }
 
 final class PNParityTests: XCTestCase {
@@ -47,7 +46,7 @@ final class PNParityTests: XCTestCase {
 
     private func apply(_ ops: [[Any]]) {
         revision += 1
-        let json = PNJSON.encode(["version": 4, "application": application, "surface": 1, "revision": revision, "ops": ops])
+        let json = PNJSON.encode(["version": PNContracts.protocolVersion, "application": application, "surface": 1, "revision": revision, "ops": ops])
         let result = PNJSON.decodeObject(PNCommit.apply(json))
         XCTAssertEqual(result["ok"] as? Bool, true, String(describing: result))
     }

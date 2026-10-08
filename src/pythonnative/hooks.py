@@ -11,9 +11,11 @@ on a violation instead of silently cross-wiring state.
 Two effect phases exist, mirroring React:
 
 - [`use_layout_effect`][pythonnative.use_layout_effect] callbacks run
-  synchronously inside the commit, after native mutations and the
-  layout pass have been applied. They can measure committed frames and
-  issue imperative view commands before the user sees the new frame.
+  in the commit phase, after native has mounted the commit and laid it
+  out, and before passive effects. They can read committed frames and
+  issue imperative view commands. Native draws on its own thread, so
+  the user may already see the committed frame; state a layout effect
+  sets commits in a following transaction.
 - [`use_effect`][pythonnative.use_effect] callbacks (passive effects)
   run after the layout effects, at the end of the same commit. An
   effect may be an ``async def``; it runs as a task on the framework
@@ -227,10 +229,41 @@ class HookState:
         "_async_task",
         "_async_inputs",
         "task_scope",
+        "_journal_stamp",
         "__weakref__",
     )
 
+    _JOURNALED = (
+        "states",
+        "_setters",
+        "_state_queues",
+        "_reducers",
+        "_dispatchers",
+        "effects",
+        "layout_effects",
+        "memos",
+        "refs",
+        "resources",
+        "context_deps",
+        "owner",
+        "vnode",
+        "_pending_effects",
+        "_pending_layout_effects",
+        "_dirty",
+        "_hook_signature",
+        "_component_name",
+        "_async_task",
+        "_async_inputs",
+        "task_scope",
+    )
+    """Fields a render pass's journal restores on rollback.
+
+    The hook cursors, the dev-mode hook log, and the effect-queue marks are
+    reset by ``begin_render`` and aren't journaled.
+    """
+
     def __init__(self) -> None:
+        self._journal_stamp = _journal.stamp()
         self.states: List[Any] = []
         self._setters: Dict[int, Callable[[Any], None]] = {}
         self._state_queues: Dict[int, Tuple[Any, List[Any]]] = {}
@@ -837,17 +870,21 @@ def use_effect(effect: Callable[[], Any], deps: Deps = None) -> None:
 
 
 def use_layout_effect(effect: Callable[[], Any], deps: Deps = None) -> None:
-    """Schedule a side effect that runs synchronously inside the commit.
+    """Schedule a side effect that runs in the commit phase, before passive effects.
 
     Like [`use_effect`][pythonnative.use_effect], but the callback
-    fires *before* passive effects, immediately after native mutations
-    and the layout pass are applied. Use it when you need to measure a
+    fires *before* passive effects, as soon as native has mounted the
+    commit and applied its layout. Use it when you need to read a
     committed frame (via a [`Ref`][pythonnative.Ref]) or issue an
-    imperative view command before the user sees the new frame, for
-    example scrolling a list into position on mount.
+    imperative view command as early as possible, for example scrolling
+    a list into position on mount.
 
-    Prefer ``use_effect`` for everything else; layout effects block the
-    commit, so heavy work here delays the frame.
+    Unlike React on the web, the commit isn't held back from the screen:
+    native renders on its own thread, so the user may see the committed
+    frame before the effect runs, and state the effect sets commits in a
+    following transaction (usually the next frame). Prefer ``use_effect``
+    for everything else; layout effects run before the commit's passive
+    effects and delay them.
 
     Args:
         effect: A zero-arg callable invoked during commit. Optionally
@@ -1251,10 +1288,14 @@ def use_query(
     local_key = use_memo(object, deps if deps is not None else ())
     if key is None:
         key = local_key
+    # The key identifies the cached data, not the fetcher: a refetch under
+    # an unchanged key must call the fetcher from the latest render.
+    latest = use_ref(fetcher)
+    latest.current = fetcher
     snapshot = use_subscription(
         use_callback(
-            lambda notify: cache.subscribe(key, fetcher, notify),
-            [cache, key],  # pn: ignore[PN103] the query key identifies the fetcher, as in React Query
+            lambda notify: cache.subscribe(key, lambda: latest.current(), notify),
+            [cache, key, latest],
         ),
         use_callback(
             lambda: cache.snapshot(key, initial),

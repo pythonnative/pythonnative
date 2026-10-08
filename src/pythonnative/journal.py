@@ -7,27 +7,49 @@ The reconciler installs a [`Journal`][pythonnative.journal.Journal] for the
 duration of one render pass and raises the module-level ``journal_active``
 flag. [`VNode`][pythonnative.reconciler.VNode] and
 [`Ref`][pythonnative.Ref] consult that flag in ``__setattr__`` so attribute
-writes outside a pass cost one global lookup and no call. Inside a pass the
-journal records only the node fields listed in ``STRUCTURAL_FIELDS`` (plus
-``Ref.current``): the tree structure and native identity, the element and
-clean props the next diff compares against, and hook and boundary state.
-The per-pass layout caches (``measure_cache``, ``last_frame``,
+writes outside a pass cost one global lookup and no call.
+
+Inside a pass, an object is captured once, on its first write: the
+journal takes a [`snapshot`][pythonnative.journal.Journal.snapshot] of
+every journaled field and stamps the object with the journal's identity,
+so later writes in the same pass compare one attribute. Objects created
+during the pass are stamped at construction and never captured, because a
+rollback discards them. For a node, the journaled fields are
+``STRUCTURAL_FIELDS``: the tree structure and native identity, the element
+and clean props the next diff compares against, and hook and boundary
+state. The per-pass layout caches (``measure_cache``, ``last_frame``,
 ``layout_node``, ``layout_dirty``) are skipped; they are rebuilt by the
 next layout pass and never observed by application code.
 """
 
 from __future__ import annotations
 
+import functools
+import operator
 from contextvars import Context, ContextVar, copy_context
 from typing import Any, Callable
 
-__all__ = ["Journal", "JournalDict", "STRUCTURAL_FIELDS", "journal_active", "record_attribute"]
+__all__ = [
+    "Journal",
+    "JournalDict",
+    "STRUCTURAL_FIELDS",
+    "active",
+    "journal_active",
+    "record_attribute",
+]
 
 _current: ContextVar[Journal | None] = ContextVar("pn_render_journal", default=None)
 _missing = object()
+_CONTAINERS = frozenset({list, dict, set})
 
 journal_active: bool = False
 """Whether a render journal is recording. Read by ``VNode`` and ``Ref`` before recording."""
+
+active: Journal | None = None
+"""The journal recording the synchronous render pass in progress, or ``None``."""
+
+FRESH = 0
+"""Stamp of an object no journal needs to capture (created before any pass)."""
 
 STRUCTURAL_FIELDS = frozenset(
     {
@@ -52,13 +74,78 @@ STRUCTURAL_FIELDS = frozenset(
 """The ``VNode`` (and reconciler) fields a rollback restores; layout caches are not among them."""
 
 
+_next_identity = 0
+
+
+@functools.cache
+def _capture(fields: tuple[str, ...]) -> Callable[[Any], tuple[Any, ...]]:
+    """Compile a reader that returns ``fields`` of an object, copying containers.
+
+    The tuple is built inline (no generator per value), because every
+    object a render pass changes is captured once.
+    """
+    names = [f"v{index}" for index in range(len(fields))]
+    copies = ", ".join(f"{name}.copy() if type({name}) in containers else {name}" for name in names)
+    source = "def capture(obj):\n" f"    {', '.join(names)}, = getter(obj)\n" f"    return ({copies},)\n"
+    namespace: dict[str, Any] = {
+        "getter": (
+            operator.attrgetter(*fields)
+            if len(fields) > 1
+            else (lambda obj, read=operator.attrgetter(fields[0]): (read(obj),))
+        ),
+        "containers": _CONTAINERS,
+    }
+    exec(source, namespace)
+    capture: Callable[[Any], tuple[Any, ...]] = namespace["capture"]
+    return capture
+
+
+def _new_identity() -> int:
+    global _next_identity
+    _next_identity += 1
+    return _next_identity
+
+
 class Journal:
-    """Record inverse mutations for one uncommitted render pass."""
+    """Record inverse mutations for one uncommitted render pass.
+
+    Attributes:
+        identity: A positive number unique to this journal; objects
+            captured by it carry it as their ``_journal_stamp``.
+    """
 
     def __init__(self) -> None:
+        self.identity = _new_identity()
         self.undo: list[Callable[[], Any]] = []
         self.seen: set[tuple[int, Any]] = set()
         self.active = True
+
+    def snapshot(self, obj: Any, fields: tuple[str, ...]) -> None:
+        """Capture ``fields`` of ``obj`` in one undo entry and stamp ``obj``.
+
+        Containers are copied shallowly; a missing slot is deleted again on
+        rollback.
+        """
+        object.__setattr__(obj, "_journal_stamp", self.identity)
+        if not self.active:
+            return
+        try:
+            values = _capture(fields)(obj)
+        except AttributeError:
+            values = tuple(getattr(obj, name, _missing) for name in fields)
+            values = tuple(value.copy() if type(value) in _CONTAINERS else value for value in values)
+
+        def restore() -> None:
+            for name, value in zip(fields, values):
+                if value is _missing:
+                    try:
+                        object.__delattr__(obj, name)
+                    except AttributeError:
+                        pass
+                else:
+                    object.__setattr__(obj, name, value)
+
+        self.undo.append(restore)
 
     def attribute(self, obj: Any, name: str) -> None:
         """Capture an attribute before its first mutation in this pass."""
@@ -67,7 +154,7 @@ class Journal:
             return
         self.seen.add(key)
         value = getattr(obj, name)
-        if isinstance(value, (list, dict, set)):
+        if type(value) in _CONTAINERS:
             value = value.copy()
         self.undo.append(lambda: object.__setattr__(obj, name, value))
 
@@ -88,9 +175,14 @@ class Journal:
         self.undo.append(restore)
 
     def accept(self) -> None:
-        """Release inverse operations after successful native application."""
+        """Release inverse operations after successful native application.
+
+        Accepted state is the new baseline: a fresh identity makes every
+        object this journal stamped eligible for capture again.
+        """
         self.undo.clear()
         self.seen.clear()
+        self.identity = _new_identity()
 
     def rollback(self) -> None:
         """Restore bookkeeping in reverse mutation order."""
@@ -102,17 +194,25 @@ class Journal:
 
 def install(journal: Journal) -> Any:
     """Make ``journal`` the recording journal; returns the token for ``uninstall``."""
-    global journal_active
-    token = _current.set(journal)
+    global journal_active, active
+    token = (_current.set(journal), active)
+    active = journal
     journal_active = True
     return token
 
 
 def uninstall(token: Any) -> None:
     """Stop recording and restore the previously installed journal, if any."""
-    global journal_active
-    _current.reset(token)
-    journal_active = _current.get() is not None
+    global journal_active, active
+    context_token, previous = token
+    _current.reset(context_token)
+    active = previous
+    journal_active = previous is not None
+
+
+def stamp() -> int:
+    """The stamp for an object created now: it needs no capture in this pass."""
+    return active.identity if active is not None else FRESH
 
 
 def current() -> Journal | None:
@@ -126,23 +226,22 @@ def record_attribute(obj: Any, name: str) -> None:
     Callers check ``journal_active`` first so the common case (no pass in
     flight) never reaches this function.
     """
-    journal = _current.get()
-    if journal is not None:
-        journal.attribute(obj, name)
+    if active is not None:
+        active.attribute(obj, name)
 
 
 class JournalDict(dict):
     """A dictionary whose changed keys participate in the current render."""
 
     def __setitem__(self, key: Any, value: Any) -> None:
-        journal = _current.get()
+        journal = active
         if journal is not None:
             journal.mapping(self, key)
         super().__setitem__(key, value)
 
     def pop(self, key: Any, default: Any = _missing) -> Any:
         """Remove an entry while recording its previous value."""
-        journal = _current.get()
+        journal = active
         if journal is not None:
             journal.mapping(self, key)
         if default is _missing:

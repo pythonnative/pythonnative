@@ -19,12 +19,11 @@ class PNTransactionTest {
               ["c", 1, "View", {"background_color": "#fff"}],
               ["u", 1, {"opacity": 0.5}, ["background_color"]],
               ["i", 1, 2, 0],
-              ["f", 2, 10, 20.5, 100, 40],
               ["d", 2]
             ]
         """.trimIndent()
         val ops = (JSONArray(json).let { array -> (0 until array.length()).map { PNTransaction.decodeOp(array.getJSONArray(it)) } })
-        assertEquals(5, ops.size)
+        assertEquals(4, ops.size)
         val create = ops[0] as Op.Create
         assertEquals(1L, create.tag)
         assertEquals("View", create.typeName)
@@ -33,8 +32,7 @@ class PNTransactionTest {
         assertEquals(0.5, update.changed.getDouble("opacity"), 1e-9)
         assertEquals(listOf("background_color"), update.removed)
         assertEquals(Op.Insert(1, 2, 0), ops[2])
-        assertEquals(Op.Frame(2, 10.0, 20.5, 100.0, 40.0), ops[3])
-        assertEquals(Op.Destroy(2), ops[4])
+        assertEquals(Op.Destroy(2), ops[3])
     }
 
     @Test

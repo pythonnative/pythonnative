@@ -143,10 +143,6 @@ abstract class ComponentManager {
     /** Dispatch event `name` with positional `args` for `view`'s tag. */
     protected fun fire(view: View, name: String, vararg args: Any?): Boolean = PNEvents.fire(view, name, *args)
 
-    /** Dispatch event `name` and return Python's (JSON) reply. */
-    protected fun fireForResult(view: View, name: String, vararg args: Any?): String? =
-        PNEvents.fireForResult(view, name, *args)
-
     /** Whether the element wired a callback named `name`. */
     protected fun hasEvent(view: View, name: String): Boolean = recordOf(view)?.hasEvent(name) ?: false
 
@@ -199,15 +195,13 @@ object PNEvents {
         return true
     }
 
-    /** Dispatch `name` for `view` and return Python's JSON reply. */
-    fun fireForResult(view: View, name: String, vararg args: Any?): String? {
-        val tag = PNBridge.registry.tagOf(view) ?: return null
-        return fireTag(tag, name, JsonUtil.args(*args))
-    }
-
-    /** Dispatch `name` for `tag` with an already built argument array. */
-    fun fireTag(tag: Long, name: String, args: JSONArray): String? =
+    /**
+     * Dispatch `name` for `tag` with an already built argument array. Events
+     * are delivered asynchronously; Python never returns a result to native.
+     */
+    fun fireTag(tag: Long, name: String, args: JSONArray) {
         PNBridge.callPython("event", tag, name, args.toString())
+    }
 }
 
 /** Typed managers consume the same generated contracts as extension managers. */

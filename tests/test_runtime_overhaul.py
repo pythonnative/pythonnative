@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 
 import pythonnative as pn
-from pythonnative.bridge.commits import CommitState, ViewState
+from pythonnative.bridge.commits import PROTOCOL_VERSION, CommitState, ViewState
 from pythonnative.events import get_event_registry
 from pythonnative.profiling import Profiler
 from pythonnative.reconciler import Reconciler
@@ -117,7 +117,13 @@ def test_commit_overlay_work_depends_on_changed_records() -> None:
     untouched = state.views[2]
     with Profiler() as profiler:
         candidate = state.prepare(
-            {"version": 4, "application": "app", "surface": 1, "revision": 1, "ops": [["u", 1, {"text": "after"}, []]]}
+            {
+                "version": PROTOCOL_VERSION,
+                "application": "app",
+                "surface": 1,
+                "revision": 1,
+                "ops": [["u", 1, {"text": "after"}, []]],
+            }
         )
     assert state.views[1].props["text"] == "before"
     assert candidate.views[2] is untouched

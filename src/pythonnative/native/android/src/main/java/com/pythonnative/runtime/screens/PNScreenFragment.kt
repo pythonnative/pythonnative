@@ -21,8 +21,8 @@ import org.json.JSONObject
  * On view creation it asks Python to create the screen
  * (`callback("host", screenId, "create", {...})`) and afterwards
  * forwards lifecycle and layout: `start`, `layout`, `resume`, `pause`,
- * `stop`, `destroy`, `back_pressed`, `save_state`, and
- * `restore_state`. Python attaches the screen's root view through the
+ * `stop`, `destroy`, and `back_pressed`. Saved state returns in the
+ * `create` payload as `restored_state`. Python attaches the screen's root view through the
  * `Host.attach_root` module call, which lands in [attachRoot].
  *
  * Apps subclass this (the nav graph names the subclass) and override
@@ -109,12 +109,10 @@ open class PNScreenFragment : Fragment() {
         val payload = JSONObject()
             .put("path", screenPath() ?: JSONObject.NULL)
             .put("args", argsJson() ?: JSONObject.NULL)
+        pendingRestore?.let { payload.put("restored_state", it) }
+        pendingRestore = null
         host("create", payload.toString())
         created = true
-        pendingRestore?.let {
-            host("restore_state", JSONObject().put("state", it).toString())
-            pendingRestore = null
-        }
         view.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ -> publishLayout(v) }
         ViewCompat.setOnApplyWindowInsetsListener(view) { v, insets ->
             publishLayout(v, force = true)
@@ -185,7 +183,8 @@ open class PNScreenFragment : Fragment() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         if (!created) return
-        host("save_state", "{}")
+        // Python publishes state as it changes (`Host.set_state`), so saving
+        // needs no round trip.
         cachedStateJSON?.let { outState.putString(STATE_KEY, it) }
     }
 
@@ -203,12 +202,11 @@ open class PNScreenFragment : Fragment() {
         ScreenRegistry.unregister(screenId)
     }
 
-    private fun host(name: String, payloadJson: String): String? {
-        return try {
+    private fun host(name: String, payloadJson: String) {
+        try {
             PNBridge.callPython("host", screenId.toLong(), name, payloadJson)
         } catch (e: Exception) {
             PNLog.rateLimited("host:$name", "host callback '$name' failed", e)
-            null
         }
     }
 

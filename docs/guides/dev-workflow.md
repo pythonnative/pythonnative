@@ -297,6 +297,20 @@ It compares ordinary sequence replacement with `ListData`, asserts bounded
 metadata and mounted-view work, and emits JSON. Timings include profiling and
 aren't device frame-rate measurements or CI thresholds.
 
+The runtime benchmark times `import pythonnative` in fresh interpreters,
+element construction, a 300-component re-render, and commit preparation:
+
+```bash
+python scripts/benchmark-runtime.py --output runtime.json
+```
+
+Compare its numbers between changes on one machine. CI doesn't gate on them;
+`tests/test_performance_budgets.py` instead checks the deterministic causes
+of slowness (source parsing or contract derivation at import, eagerly loaded
+subsystems, per-field render journaling, `inspect.Signature` binding, and
+release-mode prop validation). On a device, a debug iOS build logs
+`[PN] First screen attached ... ms after process start` once per launch.
+
 For an explicit capture in a headless test:
 
 ```python

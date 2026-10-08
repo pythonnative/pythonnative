@@ -13,22 +13,21 @@ import com.pythonnative.runtime.modules.BuiltinModules
 import com.pythonnative.runtime.modules.ModuleEnvelope
 import com.pythonnative.runtime.modules.Promise
 import org.json.JSONObject
-import java.util.Locale
 
 /**
  * The single Java class Python touches.
  *
- * Every entry point mirrors one C symbol of the iOS bridge and is
- * expected to run on the main thread (Python's asyncio loop lives
- * there). Calls from other threads are logged but still executed so a
- * misbehaving caller fails loudly in logcat instead of silently.
+ * Every entry point mirrors one C symbol of the iOS bridge. Python calls
+ * them from its own application thread; each hops to the main thread for
+ * the duration of the call. Native-to-Python messages go through a mailbox
+ * drained on a dedicated thread, so the main thread never waits for Python.
  */
 object PNBridge {
     /** Logcat tag used by the whole runtime. */
     const val TAG = "PythonNative"
 
     /** Protocol version compiled into this library. */
-    const val PROTOCOL_VERSION = 4
+    const val PROTOCOL_VERSION = com.pythonnative.generated.PNContracts.protocolVersion
 
     private val pythonQueue = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "PythonNative-events").apply { isDaemon = true }
@@ -41,8 +40,11 @@ object PNBridge {
     /** Tag to view bookkeeping shared by the applier and managers. */
     val registry = ViewRegistry()
 
-    private data class Message(val kind: String, val tag: Long, val name: String, val payload: String) {
-        val continuous get() = kind == "event" && (name in setOf("on_scroll", "on_window", "on_selection_change", "on_gesture_update") ||
+    private val continuousEvents = setOf("on_scroll", "on_window", "on_selection_change", "on_gesture_update")
+
+    /** One queued callback; `continuous` is computed once, before the mailbox lock. */
+    private class Message(val kind: String, val tag: Long, val name: String, val payload: String) {
+        val continuous = kind == "event" && (name in continuousEvents ||
             name.startsWith("gesture:") && JSONObject(payload).optJSONArray("args")?.optJSONObject(0)?.optString("state") == "changed")
     }
     private val mailbox = java.util.ArrayDeque<Message>()
@@ -55,12 +57,18 @@ object PNBridge {
     @JvmStatic
     fun protocolVersion(): Int = PROTOCOL_VERSION
 
-    /** Install the Python callback target; flushes callbacks queued before it existed. */
+    /**
+     * Install the Python callback target once Python has started. Delivers
+     * the messages queued before it existed, then runs the host-ready
+     * listeners.
+     */
     @JvmStatic
     fun setHost(host: PythonHost) {
-        this.host = host
-        val pending = ArrayList(hostReadyListeners)
-        hostReadyListeners.clear()
+        val pending = synchronized(hostReadyListeners) {
+            this.host = host
+            ArrayList(hostReadyListeners).also { hostReadyListeners.clear() }
+        }
+        scheduleDrain()
         for (listener in pending) {
             try {
                 listener.run()
@@ -75,7 +83,10 @@ object PNBridge {
 
     /** Run `runnable` now if a host is installed, otherwise once [setHost] is called. */
     fun runWhenHostReady(runnable: Runnable) {
-        if (host != null) runnable.run() else hostReadyListeners.add(runnable)
+        val ready = synchronized(hostReadyListeners) {
+            (host != null).also { if (!it) hostReadyListeners.add(runnable) }
+        }
+        if (ready) runnable.run()
     }
 
     /** Record the current activity; modules and managers derive their `Context` from it. */
@@ -118,32 +129,11 @@ object PNBridge {
         val decoded = System.nanoTime()
         return MainThread.call {
             val mounted = System.nanoTime()
-            val reply = JSONObject(commits.apply(envelope, applier))
+            val reply = commits.apply(envelope, applier)
             val metrics = reply.optJSONObject("metrics") ?: JSONObject()
             metrics.put("decode_ns", decoded - started).put("queue_ns", mounted - decoded)
             reply.put("metrics", metrics).toString()
         }
-    }
-
-    /**
-     * Measure the view with `tag` under the given constraints (dp; `1e6`
-     * means unconstrained) and return `"w,h"` in dp.
-     */
-    @JvmStatic
-    fun measure(tag: Long, maxWidth: Double, maxHeight: Double): String {
-        if (!MainThread.isMain()) return MainThread.call { measure(tag, maxWidth, maxHeight) }
-        val record = registry.get(tag)
-        if (record == null) {
-            Log.w(TAG, "measure: unknown tag $tag")
-            return "0,0"
-        }
-        val size = try {
-            record.manager.measure(record.view, maxWidth, maxHeight)
-        } catch (e: Exception) {
-            Log.e(TAG, "measure failed for ${record.typeName}#$tag", e)
-            floatArrayOf(0f, 0f)
-        }
-        return String.format(Locale.US, "%.3f,%.3f", size[0], size[1])
     }
 
     /** Run an imperative command on one view and return its JSON result. */
@@ -188,7 +178,8 @@ object PNBridge {
             return ModuleEnvelope.ok(null)
         }
         if (module == "Runtime") return JSONObject().put("ok", true).put("value", JSONObject()
-            .put("protocol", 4).put("yoga", "3.2.1").put("schema", com.pythonnative.generated.PNContracts.fingerprint)
+            .put("protocol", PROTOCOL_VERSION).put("yoga", com.pythonnative.generated.PNContracts.yogaVersion)
+            .put("schema", com.pythonnative.generated.PNContracts.fingerprint)
             .put("animation_graph", true).put("logical_lists", true).put("native_layout", true)).toString()
         if (module == "Layout") {
             val started = System.nanoTime()
@@ -219,15 +210,11 @@ object PNBridge {
     // ------------------------------------------------------------------
 
     /**
-     * Deliver one callback to Python. Returns `null` when no host is
-     * installed or the Python handler raised (the error is logged).
+     * Queue one callback for Python. Messages are delivered in order on the
+     * events thread; consecutive continuous events for the same view
+     * coalesce. Messages sent before Python has started wait for [setHost].
      */
-    fun callPython(kind: String, tag: Long, name: String, payloadJson: String): String? {
-        val target = host
-        if (target == null) {
-            Log.w(TAG, "callPython($kind, $tag, $name) dropped: no PythonHost installed")
-            return null
-        }
+    fun callPython(kind: String, tag: Long, name: String, payloadJson: String) {
         if (kind == "event") com.pythonnative.runtime.animation.AnimationGraph.event(tag, name, org.json.JSONArray(payloadJson))
         var editRevision = 0L
         if (kind == "event" && name == "on_change") registry.get(tag)?.let { record ->
@@ -238,12 +225,19 @@ object PNBridge {
         }
         val payload = if (kind == "event") commits.event(org.json.JSONArray(payloadJson), editRevision) else if (kind == "layout") commits.layout(org.json.JSONArray(payloadJson)).toString() else payloadJson
         val message = Message(kind, tag, name, payload)
-        val schedule = synchronized(mailbox) {
+        synchronized(mailbox) {
             val last = mailbox.peekLast()
             if (message.continuous && last?.continuous == true && last.tag == tag && last.name == name) mailbox.removeLast()
             mailbox.addLast(message)
-            val needed = !draining
-            draining = true
+        }
+        scheduleDrain()
+    }
+
+    private fun scheduleDrain() {
+        val target = host ?: return
+        val schedule = synchronized(mailbox) {
+            val needed = !draining && mailbox.isNotEmpty()
+            if (needed) draining = true
             needed
         }
         if (schedule) pythonQueue.execute {
@@ -255,7 +249,6 @@ object PNBridge {
                 catch (error: Exception) { Log.e(TAG, "Python callback ${next.kind}/${next.name} raised", error) }
             }
         }
-        return null
     }
 
     // ------------------------------------------------------------------
@@ -267,10 +260,4 @@ object PNBridge {
 
     /** Post `runnable` to the main thread. */
     fun post(runnable: Runnable) = MainThread.post(runnable)
-
-    private fun assertMain(entry: String) {
-        if (!MainThread.isMain()) {
-            Log.w(TAG, "PNBridge.$entry called off the main thread (${Thread.currentThread().name})")
-        }
-    }
 }

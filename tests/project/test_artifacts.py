@@ -72,3 +72,28 @@ def test_ios_archive_validates_app_and_dependency_privacy_manifests(tmp_path: Pa
     invalid.write_bytes(plistlib.dumps({"NSPrivacyAccessedAPITypes": [{"NSPrivacyAccessedAPIType": "UserDefaults"}]}))
     with pytest.raises(ArtifactError, match="nonempty reasons"):
         privacy_manifest(invalid)
+
+
+def test_size_report_measures_the_python_share_of_an_app(tmp_path: Path) -> None:
+    from pythonnative.project.artifacts import size_report
+
+    app = tmp_path / "Demo.app"
+    for name, size in (("Demo", 3_000_000), ("python/lib/os.pyc", 1_000_000), ("app/main.pyc", 500_000)):
+        (app / name).parent.mkdir(parents=True, exist_ok=True)
+        (app / name).write_bytes(b"\0" * size)
+    assert size_report(app) == "4.5 MB, 1.5 MB of it Python"
+    assert size_report(tmp_path / "notes.txt") is None
+
+
+def test_size_report_reads_packaged_artifacts(tmp_path: Path) -> None:
+    import zipfile
+
+    from pythonnative.project.artifacts import size_report
+
+    for name, python_entry in (("demo.ipa", "Payload/Demo.app/python/os.pyc"), ("demo.apk", "assets/chaquopy/app.imy")):
+        package = tmp_path / name
+        with zipfile.ZipFile(package, "w", zipfile.ZIP_STORED) as archive:
+            archive.writestr(python_entry, b"\0" * 2_000_000)
+            archive.writestr("classes.dex", b"\0" * 1_000_000)
+        report = size_report(package)
+        assert report is not None and report.endswith("2.0 MB of it Python"), report

@@ -244,6 +244,25 @@ def test_use_query_refetches_when_called() -> None:
     assert _settle(rec, lambda: captured[-1].data == 2)
 
 
+def test_use_query_with_a_key_refetches_with_the_latest_fetcher() -> None:
+    captured: list = []
+
+    @component
+    def screen(label: str) -> Element:
+        async def fetcher() -> str:
+            return label
+
+        captured.append(use_query(fetcher, key="fixed"))
+        return Element("View", {}, [])
+
+    rec = Reconciler(_StubBackend())
+    rec.mount(screen("first"))
+    assert _settle(rec, lambda: captured[-1].data == "first")
+    rec.reconcile(screen("second"))
+    captured[-1].refetch()
+    assert _settle(rec, lambda: captured[-1].data == "second")
+
+
 def test_use_query_returns_query_result_dataclass() -> None:
     captured: list = []
 

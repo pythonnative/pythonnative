@@ -196,11 +196,9 @@ def check_android(config: Optional[AppConfig]) -> List[CheckResult]:
             ),
         )
     )
-    sdk = Path(
-        os.environ.get("ANDROID_HOME")
-        or os.environ.get("ANDROID_SDK_ROOT")
-        or (Path.home() / "Library/Android/sdk" if sys.platform == "darwin" else Path.home() / "Android/Sdk")
-    )
+    from .android import sdk_dir
+
+    sdk = sdk_dir()
     required = config.android.compile_sdk if config is not None else 36
     for name, path, package in (
         (

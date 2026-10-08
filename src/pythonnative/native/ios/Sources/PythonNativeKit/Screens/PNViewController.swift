@@ -3,9 +3,9 @@ import UIKit
 /// Hosts one PythonNative screen.
 ///
 /// Lifecycle is forwarded to Python as `callback("host", screenId,
-/// event, payload)`: `create` (viewDidLoad), `start`, `layout`,
-/// `resume`, `pause`, `stop`, `destroy`, `save_state`, and
-/// `restore_state`. Python attaches its root view with
+/// event, payload)`: `create` (viewDidLoad, carrying any
+/// `restored_state`), `start`, `layout`, `resume`, `pause`, `stop`, and
+/// `destroy`. Python attaches its root view with
 /// `Host.attach_root`; the controller keeps that view below the top
 /// safe-area inset and full-bleed at the bottom. Fast Refresh needs no
 /// help from here: the Python dev client reloads modules and refreshes
@@ -26,6 +26,9 @@ open class PNViewController: UIViewController {
 
     private(set) var rootView: UIView?
     private var lastLayoutPayload: String?
+    /// The app's launch screen, shown until Python attaches the first root.
+    private var launchPlaceholder: UIView?
+    private var appeared = false
 
     /// The application host can instantiate its controller subclass dynamically.
     public required override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
@@ -47,10 +50,13 @@ open class PNViewController: UIViewController {
 
     // MARK: - Subclass hooks
 
-    /// Called from `viewDidLoad` before the screen is created. Return
-    /// `false` (after showing an error) to skip creating the screen.
-    open func prepareRuntime() -> Bool {
-        true
+    /// Called from `viewDidLoad` before the screen is created. Call
+    /// `completion(true)` once Python can create screens, or show an error
+    /// and call `completion(false)`. The app template starts Python on a
+    /// background queue at launch, so the main thread never waits for it;
+    /// the launch screen stays visible until the first root view arrives.
+    open func prepareRuntime(_ completion: @escaping (Bool) -> Void) {
+        completion(true)
     }
 
     /// The screen path used when `requestedScreenPath` is `nil`.
@@ -63,7 +69,30 @@ open class PNViewController: UIViewController {
     open override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        guard prepareRuntime() else { return }
+        var ready: Bool?
+        prepareRuntime { [weak self] success in
+            ready = success
+            guard success, let self else { return }
+            self.launchPlaceholder?.removeFromSuperview()
+            self.launchPlaceholder = nil
+            self.createScreen()
+        }
+        if ready == nil { showLaunchPlaceholder() }
+    }
+
+    private func showLaunchPlaceholder() {
+        guard rootView == nil, launchPlaceholder == nil,
+              let name = Bundle.main.object(forInfoDictionaryKey: "UILaunchStoryboardName") as? String,
+              Bundle.main.path(forResource: name, ofType: "storyboardc") != nil,
+              let placeholder = UIStoryboard(name: name, bundle: nil).instantiateInitialViewController()?.view
+        else { return }
+        placeholder.frame = view.bounds
+        placeholder.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(placeholder)
+        launchPlaceholder = placeholder
+    }
+
+    private func createScreen() {
         guard PNBridge.shared.hasCallback else {
             showBootstrapError("The Python bridge callback is not registered.\n\nImport pythonnative.bridge after starting the interpreter.")
             return
@@ -80,8 +109,12 @@ open class PNViewController: UIViewController {
             payload["restored_state"] = restored
         }
         PNBridge.shared.callPython(kind: "host", tag: screenId, name: "create", payload: PNJSON.encode(payload))
-        if let restored = restoredStateJSON {
-            PNBridge.shared.callPython(kind: "host", tag: screenId, name: "restore_state", payload: restored)
+        // Python may become ready after UIKit already showed this screen.
+        if isViewLoaded, view.window != nil {
+            forward("start")
+            lastLayoutPayload = nil
+            view.setNeedsLayout()
+            if appeared { forward("resume", viewportJSON()) }
         }
     }
 
@@ -104,6 +137,7 @@ open class PNViewController: UIViewController {
 
     open override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        appeared = true
         syncRootFrame()
         forward("resume", viewportJSON())
     }
@@ -115,6 +149,7 @@ open class PNViewController: UIViewController {
 
     open override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        appeared = false
         forward("stop")
     }
 
@@ -136,21 +171,15 @@ open class PNViewController: UIViewController {
         }
     }
 
-    /// Ask Python for the screen's serialized state (`save_state`).
-    @discardableResult
+    /// The screen's latest serialized state, as Python published it
+    /// (`Host.set_state`).
     public func saveState() -> String? {
-        guard isScreenCreated else { return nil }
-        PNBridge.shared.callPython(kind: "host", tag: screenId, name: "save_state", payload: "{}")
-        return cachedStateJSON
+        isScreenCreated ? cachedStateJSON : nil
     }
 
-    /// Hand previously saved state back to Python (`restore_state`).
+    /// Restore previously saved state; it reaches Python with `create`.
     public func restoreState(_ json: String) {
-        guard isScreenCreated else {
-            restoredStateJSON = json
-            return
-        }
-        PNBridge.shared.callPython(kind: "host", tag: screenId, name: "restore_state", payload: json)
+        restoredStateJSON = json
     }
 
     open override var prefersStatusBarHidden: Bool { PNStatusBarState.hidden }
@@ -174,6 +203,7 @@ open class PNViewController: UIViewController {
         root.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(root)
         syncRootFrame()
+        PNLaunch.firstScreenAttached()
     }
 
     /// Detach the root view (`Host.detach_root`).
@@ -254,5 +284,23 @@ open class PNViewController: UIViewController {
         text.textContainerInset = UIEdgeInsets(top: 60, left: 16, bottom: 40, right: 16)
         text.text = "PythonNative could not start\n\n\(message)"
         view.addSubview(text)
+    }
+}
+
+/// Launch timing, logged once: how long the process took to show its first screen.
+enum PNLaunch {
+    private static var reported = false
+
+    static func firstScreenAttached() {
+        guard !reported else { return }
+        reported = true
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var name: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
+        guard sysctl(&name, 4, &info, &size, nil, 0) == 0 else { return }
+        let start = info.kp_proc.p_un.__p_starttime
+        let started = Double(start.tv_sec) + Double(start.tv_usec) / 1_000_000
+        let elapsed = (Date().timeIntervalSince1970 - started) * 1000
+        NSLog("[PN] First screen attached %.0f ms after process start", elapsed)
     }
 }

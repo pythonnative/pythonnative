@@ -127,7 +127,7 @@ def generate(destination: str | Path) -> list[Path]:
             arguments = event.get("arguments")
             if arguments is None:
                 sw_events.append(
-                    f'        @discardableResult public static func `{key}`(_ view: UIView, _ arguments: [Any?] = []) -> String? {{ PNEvents.emitIfWired(view, "{key}", arguments) }}'  # noqa: E501
+                    f'        public static func `{key}`(_ view: UIView, _ arguments: [Any?] = []) {{ PNEvents.emitIfWired(view, "{key}", arguments) }}'  # noqa: E501
                 )
                 kt_events.append(
                     f'        fun `{key}`(view: android.view.View, vararg arguments: Any?): Boolean = PNEvents.fire(view, "{key}", *arguments)'  # noqa: E501
@@ -141,9 +141,9 @@ def generate(destination: str | Path) -> list[Path]:
                 swvalues.append(f"PNValues.encode(argument{index})")
                 ktvalues.append(f"PNValues.encode(argument{index})")
             sw_events.append(
-                f"        @discardableResult public static func `{key}`("
+                f"        public static func `{key}`("
                 + ", ".join(["_ view: UIView"] + swparams)
-                + f') -> String? {{ PNEvents.emitIfWired(view, "{key}", ['
+                + f') {{ PNEvents.emitIfWired(view, "{key}", ['
                 + ", ".join(swvalues)
                 + "]) }"
             )

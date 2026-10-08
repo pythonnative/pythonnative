@@ -1,8 +1,14 @@
 """Versioned commit validation and surface ownership.
 
-A commit is validated in full before it changes a native tree. Revisions are
-strictly consecutive within an application and surface. A failed native mount
-poisons that surface until the host explicitly resets and remounts it.
+A commit's structure is validated in full before it changes a native tree.
+Revisions are strictly consecutive within an application and surface. A
+failed native mount poisons that surface until the host explicitly resets and
+remounts it.
+
+Props are checked against component schemas only in development, where
+Python can name the component and prop that's wrong. The native runtimes
+validate every commit with generated validators in every build, so release
+builds don't pay for the same check twice.
 """
 
 from __future__ import annotations
@@ -15,7 +21,8 @@ from typing import Any, Callable
 from ..profiling import count, profiled
 from .list_store import ListStore
 
-PROTOCOL_VERSION = 4
+PROTOCOL_VERSION = 5
+"""The bridge protocol every runtime speaks; generated native contracts carry it."""
 
 
 class CommitError(RuntimeError):
@@ -103,7 +110,7 @@ class CommitState:
     def prepare(self, envelope: Any) -> CommitState:
         """Validate without mutating this state and return the candidate state."""
         if not isinstance(envelope, dict) or envelope.get("version") != PROTOCOL_VERSION:
-            raise CommitError("Expected a protocol v4 commit envelope; rebuild the native client")
+            raise CommitError(f"Expected a protocol v{PROTOCOL_VERSION} commit envelope; rebuild the native client")
         application, surface, revision = (envelope.get(k) for k in ("application", "surface", "revision"))
         if not isinstance(application, str) or not application or type(surface) is not int or surface <= 0:
             raise CommitError("Invalid application or surface identity")
@@ -209,6 +216,10 @@ class CommitState:
 
     @staticmethod
     def _validate_props(name: str, props: dict[str, Any], partial: bool) -> None:
+        from .. import diagnostics
+
+        if not diagnostics.is_dev():
+            return
         from ..sdk.schema import COMPONENTS
 
         schema = COMPONENTS.get(name)

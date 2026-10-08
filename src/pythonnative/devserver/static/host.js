@@ -224,10 +224,10 @@ export class PreviewHost {
     const enter = animated ? screen.transition() : null;
     if (enter) screen.el.classList.add(enter);
     const payload = { path: path || null, args: argsJson ?? null, ...screen.viewport() };
-    const reply = await this.bridge.request("host", screen.id, "create", JSON.stringify(payload));
+    // Python attaches the screen's root through `Host.attach_root`.
+    this.hostEvent(screen.id, "create", JSON.stringify(payload));
     screen.created = true;
     screen.lastLayout = JSON.stringify(screen.viewport());
-    this.attachFromReply(screen, reply);
     this.hostEvent(screen.id, "start", "{}");
     if (enter) {
       requestAnimationFrame(() => screen.el.classList.remove(enter));
@@ -237,19 +237,6 @@ export class PreviewHost {
     this.hostEvent(screen.id, "resume", JSON.stringify(screen.viewport()));
     if (previous) this.hostEvent(previous.id, "stop", "{}");
     return screen;
-  }
-
-  attachFromReply(screen, reply) {
-    let root = null;
-    try {
-      const parsed = typeof reply === "string" ? JSON.parse(reply) : reply;
-      root = parsed && parsed.root != null ? Number(parsed.root) : null;
-    } catch (err) {
-      root = null;
-    }
-    if (root == null || screen.root) return;
-    const view = this.renderer.views.get(root);
-    if (view) screen.attachRoot(view);
   }
 
   popScreens(count = 1) {
@@ -294,9 +281,8 @@ export class PreviewHost {
     target.el.remove();
     this.hostEvent(target.id, "destroy", "{}");
     const payload = { path: path || null, args: argsJson ?? null, ...screen.viewport() };
-    const reply = await this.bridge.request("host", screen.id, "create", JSON.stringify(payload));
+    this.hostEvent(screen.id, "create", JSON.stringify(payload));
     screen.created = true;
-    this.attachFromReply(screen, reply);
     return true;
   }
 
@@ -304,12 +290,10 @@ export class PreviewHost {
     return this.stack[this.stack.length - 1] || null;
   }
 
-  async backPressed() {
+  /** Python pops its own navigation, or finishes the screen (`Host.finish`). */
+  backPressed() {
     const screen = this.top();
-    if (!screen) return;
-    const reply = await this.bridge.request("host", screen.id, "back_pressed", "{}");
-    if (reply === "true" || reply === true) return;
-    this.popScreens(1);
+    if (screen) this.hostEvent(screen.id, "back_pressed", "{}");
   }
 
   hostEvent(screenId, name, payload) {
@@ -428,7 +412,10 @@ export class PreviewHost {
           if (s) s.applyOptions(options || {});
           return null;
         },
-        finish() { return null; },
+        finish({ screen }) {
+          if (host.top()?.id === screen) host.popScreens(1);
+          return null;
+        },
       },
       Alert: {
         show(args) {

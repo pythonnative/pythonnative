@@ -3,23 +3,56 @@
 from __future__ import annotations
 
 import ast
-import inspect
-import textwrap
-from typing import Any, Callable
+import linecache
+import types
+from typing import Any, Callable, Optional, Union
+
+_FunctionNode = Union[ast.FunctionDef, ast.AsyncFunctionDef]
+
+# One parsed tree per source file, keyed by the exact ``linecache`` lines it
+# came from, so every component in a module shares a single parse.
+_trees: dict[str, tuple[list[str], ast.Module]] = {}
+
+
+def _function_node(function: Any) -> Optional[_FunctionNode]:
+    """Find ``function``'s definition in its module's current source."""
+    code = getattr(function, "__code__", None)
+    if code is None:
+        return None
+    filename = code.co_filename
+    linecache.checkcache(filename)
+    lines = linecache.getlines(filename, getattr(function, "__globals__", None))
+    if not lines:
+        return None
+    cached = _trees.get(filename)
+    if cached is None or cached[0] is not lines:
+        try:
+            tree = ast.parse("".join(lines), filename)
+        except (SyntaxError, ValueError):
+            return None
+        _trees[filename] = cached = (lines, tree)
+    first = code.co_firstlineno
+    for node in ast.walk(cached[1]):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == code.co_name:
+            start = node.decorator_list[0].lineno if node.decorator_list else node.lineno
+            if first in (start, node.lineno):
+                return node
+    return None
 
 
 def hook_signature(function: Callable[..., Any], _seen: frozenset[int] = frozenset()) -> tuple[str, ...] | None:
-    """Record hook order and binding names before the source file changes.
+    """Record hook order and binding names when a component is defined.
 
     Binding names distinguish inserting or moving hooks of the same kind.
     Uninspectable functions remount instead of risking slot corruption.
+    Framework functions never change under Fast Refresh and have no
+    signature.
     """
-    if id(function) in _seen:
+    if id(function) in _seen or getattr(function, "__module__", "").startswith("pythonnative."):
         return None
     _seen = _seen | {id(function)}
-    try:
-        tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
-    except (OSError, TypeError, SyntaxError):
+    tree = _function_node(function)
+    if tree is None:
         return None
     result = []
     parents = {id(child): node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
@@ -46,7 +79,7 @@ def hook_signature(function: Callable[..., Any], _seen: frozenset[int] = frozens
         elif isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
             owner = function.__globals__.get(node.func.value.id)
             target = getattr(owner, node.func.attr, None)
-        if inspect.isfunction(target) and not target.__module__.startswith("pythonnative."):
+        if isinstance(target, types.FunctionType) and not target.__module__.startswith("pythonnative."):
             nested = hook_signature(target, _seen)
             if nested is None:
                 return None

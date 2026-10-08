@@ -68,9 +68,11 @@ Example:
 
 __version__ = "0.48.0"
 
-from . import appearance, diagnostics, gestures, icons, runtime, sdk, svg
+import importlib
+from typing import TYPE_CHECKING, Any
+
+from . import appearance, diagnostics, runtime, sdk, svg
 from .alerts import Alert
-from .animated import ANIMATABLE_PROPS, Animated, AnimatedValue, AnimationResult, Easing, EasingSpec, use_animated_value
 from .assets import Asset, asset
 from .component import Component, component, memo
 from .components import (
@@ -124,7 +126,6 @@ from .components import (
 from .components.props import AccessibilityProps, ViewProps
 from .diagnostics import HookOrderError
 from .element import Element, Node
-from .gestures import GestureSpec, SwipeDirection
 from .handles import ScrollOffset, ScrollViewHandle, TextInputHandle, ViewHandle, WebViewHandle
 from .hooks import (
     ColorScheme,
@@ -157,7 +158,6 @@ from .hooks import (
     use_window_dimensions,
 )
 from .hosts import create_screen
-from .icons import Icon, IconName
 from .mutations import UNSET, UnsetType
 from .native_modules import (
     AccessibilityEvent,
@@ -194,27 +194,6 @@ from .native_modules import (
     use_reduce_motion,
     use_screen_reader_enabled,
 )
-from .navigation import (
-    DrawerNavigator,
-    Group,
-    Navigation,
-    NavigationContainer,
-    NavigationRef,
-    NavigationState,
-    Navigator,
-    Route,
-    Screen,
-    ScreenOptions,
-    StackNavigator,
-    TabBarStyle,
-    TabNavigator,
-    use_focus_effect,
-    use_is_focused,
-    use_navigation,
-    use_route,
-    use_screen_options,
-)
-from .net import HTTPError, Response, fetch
 from .platform import Platform, get_platform
 from .platform_metrics import WindowDimensions
 from .runtime import run_async, run_blocking
@@ -527,3 +506,92 @@ __all__ = [
 ]
 
 from .list_data import ListData, Section, ViewableItem
+
+# Subsystems an app may never touch load on first use (PEP 562), so
+# ``import pythonnative`` stays fast on a phone. Names, ``__all__``, and
+# documentation are unchanged, and type checkers see ordinary imports.
+_LAZY_GROUPS: dict[str, tuple[str, ...]] = {
+    "animated": (
+        "ANIMATABLE_PROPS",
+        "Animated",
+        "AnimatedValue",
+        "AnimationResult",
+        "Easing",
+        "EasingSpec",
+        "use_animated_value",
+    ),
+    "gestures": ("GestureSpec", "SwipeDirection"),
+    "icons": ("Icon", "IconName"),
+    "navigation": (
+        "DrawerNavigator",
+        "Group",
+        "Navigation",
+        "NavigationContainer",
+        "NavigationRef",
+        "NavigationState",
+        "Navigator",
+        "Route",
+        "Screen",
+        "ScreenOptions",
+        "StackNavigator",
+        "TabBarStyle",
+        "TabNavigator",
+        "use_focus_effect",
+        "use_is_focused",
+        "use_navigation",
+        "use_route",
+        "use_screen_options",
+    ),
+    "net": ("HTTPError", "Response", "fetch"),
+}
+_LAZY = {name: module for module, names in _LAZY_GROUPS.items() for name in names}
+_LAZY_MODULES = frozenset({"gestures", "icons"})
+
+if TYPE_CHECKING:
+    from . import gestures, icons
+    from .animated import (
+        ANIMATABLE_PROPS,
+        Animated,
+        AnimatedValue,
+        AnimationResult,
+        Easing,
+        EasingSpec,
+        use_animated_value,
+    )
+    from .gestures import GestureSpec, SwipeDirection
+    from .icons import Icon, IconName
+    from .navigation import (
+        DrawerNavigator,
+        Group,
+        Navigation,
+        NavigationContainer,
+        NavigationRef,
+        NavigationState,
+        Navigator,
+        Route,
+        Screen,
+        ScreenOptions,
+        StackNavigator,
+        TabBarStyle,
+        TabNavigator,
+        use_focus_effect,
+        use_is_focused,
+        use_navigation,
+        use_route,
+        use_screen_options,
+    )
+    from .net import HTTPError, Response, fetch
+
+
+def __getattr__(name: str) -> Any:
+    module = _LAZY.get(name)
+    if module is None and name not in _LAZY_MODULES:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    imported = importlib.import_module(f".{module or name}", __name__)
+    value = imported if module is None else getattr(imported, name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | _LAZY.keys() | _LAZY_MODULES)

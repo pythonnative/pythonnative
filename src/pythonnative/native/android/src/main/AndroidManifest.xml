@@ -2,9 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Runtime-gated on Android 13+ (API 33); requested by the
-         Notifications module before posting. -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Install-time permissions the built-in modules need (Haptics,
+         networking). Runtime permissions such as POST_NOTIFICATIONS come
+         from the app's [permissions] table only. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

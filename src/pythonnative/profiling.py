@@ -104,7 +104,9 @@ def profiled(name: str, details: Callable[..., dict[str, Any]] | None = None) ->
     def decorate(function: Any) -> Any:
         @functools.wraps(function)
         def run(*args: Any, **kwargs: Any) -> Any:
-            with span(name, **(details(*args, **kwargs) if details and (_active.get() or _session) else {})):
+            if _session is None and _active.get() is None:
+                return function(*args, **kwargs)
+            with span(name, **(details(*args, **kwargs) if details else {})):
                 return function(*args, **kwargs)
 
         return run

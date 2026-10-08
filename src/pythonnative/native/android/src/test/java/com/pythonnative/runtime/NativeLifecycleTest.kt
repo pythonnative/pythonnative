@@ -54,6 +54,34 @@ class NativeLifecycleTest {
         activity.finish()
     }
 
+    private fun envelope(app: String, revision: Int, vararg ops: org.json.JSONArray) = JSONObject()
+        .put("version", com.pythonnative.generated.PNContracts.protocolVersion).put("application", app)
+        .put("surface", 1).put("revision", revision).put("ops", org.json.JSONArray(ops.toList()))
+
+    private fun op(vararg parts: Any) = org.json.JSONArray(parts.toList())
+
+    @Test fun rejectedCommitLeavesNoStructureBehind() {
+        // Unit tests can't load Yoga, so every commit here is rejected during
+        // validation, after it changed the live maps in place.
+        val state = com.pythonnative.runtime.bridge.CommitState()
+        val app = "undo-log"
+        val rejected = state.apply(envelope(app, 1, op("c", 9400, "View", JSONObject()),
+            op("c", 9402, "Text", JSONObject().put("text", "child")), op("i", 9400, 9402, 0),
+            op("c", 9403, "NotAComponent", JSONObject())), applier)
+        assertFalse(rejected.getBoolean("ok"))
+        assertNull(PNBridge.registry.get(9400))
+        // Neither tag survived the rollback.
+        assertEquals("unknown tag", state.apply(envelope(app, 1, op("d", 9402)), applier).getString("error"))
+        assertEquals("unknown tag", state.apply(envelope(app, 1, op("i", 9400, 9402, 0)), applier).getString("error"))
+    }
+
+    @Test fun frameOperationsAreNotPartOfTheProtocol() {
+        val state = com.pythonnative.runtime.bridge.CommitState()
+        val reply = state.apply(envelope("frames", 1, op("c", 9500, "View", JSONObject()), op("f", 9500, 0, 0, 10, 10)), applier)
+        assertFalse(reply.getBoolean("ok"))
+        assertNull(PNBridge.registry.get(9500))
+    }
+
     @Test fun generatedStorageAdapterPreservesNullAndClipboardUsesText() {
         val storage = com.pythonnative.generated.StorageModuleAdapter(com.pythonnative.runtime.modules.StorageModule())
         val absent = com.pythonnative.runtime.modules.Promise(100, "Storage")

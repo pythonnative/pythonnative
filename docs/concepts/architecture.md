@@ -89,7 +89,8 @@ footers, empty states, grouped grids, and sections use the same ownership model.
 
 ## Contracts and tooling
 
-Protocol 4 validates commits before mutation and acknowledges exact revisions.
+The bridge protocol (version 5) validates commits before mutation and
+acknowledges exact revisions.
 Events carry application and revision identities. Controlled inputs additionally
 acknowledge native edit revisions to avoid overwriting newer typing. Native
 animation graphs perform frame updates independently of Python callbacks.

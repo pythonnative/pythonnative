@@ -116,7 +116,7 @@ def configure(
         shutil.copy2(source, manifest_path)
     privacy_manifest(manifest_path)
     configure_info_plist(info_plist, config, release=release)
-    write_entitlements(project_dir, config)
+    write_entitlements(project_dir, config, release=release)
     _apply_branding(project_dir, config, emit)
 
     emit(f"Configured iOS project ({config.bundle_id}).")
@@ -181,24 +181,35 @@ def configure_info_plist(info_plist: Path, config: AppConfig, *, release: bool =
         plistlib.dump(plist, handle)
 
 
-def write_entitlements(project_dir: Path, config: AppConfig) -> Optional[Path]:
+_PRODUCTION_EXPORTS = frozenset({"app-store", "ad-hoc", "enterprise"})
+
+
+def write_entitlements(project_dir: Path, config: AppConfig, *, release: bool = False) -> Optional[Path]:
     """Generate the app entitlements file when a capability needs one.
+
+    The push environment (``aps-environment``) follows the build: release
+    builds exported for the App Store, ad hoc, or enterprise distribution
+    use ``production``; everything else uses ``development``.
 
     Args:
         project_dir: The staged ``ios_template`` directory.
         config: The validated app configuration.
+        release: Whether this is a release (archive) build.
 
     Returns:
         The written entitlements path, or ``None`` when no declared
         capability requires entitlements.
     """
-    entitlements = config.resolved_permissions().ios_entitlements
+    entitlements = dict(config.resolved_permissions().ios_entitlements)
     if not entitlements:
         return None
+    if "aps-environment" in entitlements:
+        production = release and config.ios.signing.export_method in _PRODUCTION_EXPORTS
+        entitlements["aps-environment"] = "production" if production else "development"
     dest = project_dir / ENTITLEMENTS_FILE
     dest.parent.mkdir(parents=True, exist_ok=True)
     with open(dest, "wb") as handle:
-        plistlib.dump(dict(entitlements), handle)
+        plistlib.dump(entitlements, handle)
     return dest
 
 
