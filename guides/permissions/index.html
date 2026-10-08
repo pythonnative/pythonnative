@@ -3920,17 +3920,22 @@ need no iOS usage string, so declaring them as <code>true</code> is enough.</p>
 <code>Info.plist</code> key. Declaring <code>remote_notifications</code> generates an
 <code>.entitlements</code> file with <code>aps-environment</code> and wires it into the
 build, so <code>await pn.Notifications.get_device_token()</code> can register with
-APNs. (Distribution builds get the production APNs environment
-automatically when Xcode re-signs the archive for the store.)</p>
+APNs. Release builds exported for the App Store, ad hoc, or enterprise
+distribution use the production APNs environment; every other build uses
+development.</p>
 <h2 id="always-on-permissions">Always-on permissions<a class="headerlink" href="#always-on-permissions" title="Permanent link">&para;</a></h2>
-<p>Every app receives two install-time Android permissions automatically,
+<p>Every app receives three install-time Android permissions automatically,
 because almost every PythonNative app needs the network (<code>fetch</code>,
-<code>use_query</code>, <code>NetInfo</code>, remote images):</p>
+<code>use_query</code>, <code>NetInfo</code>, remote images) and the built-in <code>Haptics</code> module
+vibrates:</p>
 <ul>
 <li><code>android.permission.INTERNET</code></li>
 <li><code>android.permission.ACCESS_NETWORK_STATE</code></li>
+<li><code>android.permission.VIBRATE</code></li>
 </ul>
-<p>These never prompt the user and require no declaration.</p>
+<p>These never prompt the user and require no declaration. Runtime
+permissions, such as <code>POST_NOTIFICATIONS</code> for notifications, come only
+from the capabilities you declare.</p>
 <h2 id="adding-raw-android-permissions">Adding raw Android permissions<a class="headerlink" href="#adding-raw-android-permissions" title="Permanent link">&para;</a></h2>
 <p>For anything not in the catalog, append raw permission strings via
 <code>[android].permissions</code>. They're merged (de-duplicated) with the

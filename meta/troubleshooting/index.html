@@ -4555,8 +4555,8 @@ the Mac App Store; the bare command-line tools are not enough.</p>
 <h3 id="sha256-mismatch-for-python-apple-support-tarball"><code>SHA256 mismatch for Python-Apple-support tarball</code><a class="headerlink" href="#sha256-mismatch-for-python-apple-support-tarball" title="Permanent link">&para;</a></h3>
 <p>The pinned upstream archive was rotated. Update PythonNative (<code>pip
 install --upgrade pythonnative</code>); the new release will pin the new
-asset. As a stopgap, you can clear the cached archive at
-<code>build/ios/ios_runtime/</code> and re-run.</p>
+asset. As a stopgap, you can clear the cached runtime under
+<code>~/Library/Caches/pythonnative/ios/</code> (or <code>$PN_CACHE_DIR/ios/</code>) and re-run.</p>
 <h3 id="app-crashes-on-launch-with-dyld-library-not-loaded">App crashes on launch with <code>dyld: Library not loaded</code><a class="headerlink" href="#app-crashes-on-launch-with-dyld-library-not-loaded" title="Permanent link">&para;</a></h3>
 <p>The embedded <code>Python.framework</code> did not get copied into the <code>.app</code>
 bundle. This usually means the build was cancelled mid-flight; clean

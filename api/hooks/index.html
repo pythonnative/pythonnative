@@ -5102,9 +5102,11 @@ on a violation instead of silently cross-wiring state.</p>
 <p>Two effect phases exist, mirroring React:</p>
 <ul>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_layout_effect&lt;/span&gt;" href="#pythonnative.hooks.use_layout_effect"><code>use_layout_effect</code></a> callbacks run
-  synchronously inside the commit, after native mutations and the
-  layout pass have been applied. They can measure committed frames and
-  issue imperative view commands before the user sees the new frame.</li>
+  in the commit phase, after native has mounted the commit and laid it
+  out, and before passive effects. They can read committed frames and
+  issue imperative view commands. Native draws on its own thread, so
+  the user may already see the committed frame; state a layout effect
+  sets commits in a following transaction.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="#pythonnative.hooks.use_effect"><code>use_effect</code></a> callbacks (passive effects)
   run after the layout effects, at the end of the same commit. An
   effect may be an <code>async def</code>; it runs as a task on the framework
@@ -5285,7 +5287,7 @@ handler). That is the whole contract between the two modules.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_layout_effect&lt;/span&gt; (&lt;code&gt;pythonnative.hooks.use_layout_effect&lt;/code&gt;)" href="#pythonnative.hooks.use_layout_effect">use_layout_effect</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Schedule a side effect that runs synchronously inside the commit.</p>
+                  <p>Schedule a side effect that runs in the commit phase, before passive effects.</p>
                 </div>
               </td>
             </tr>
@@ -7457,15 +7459,19 @@ callable) or an <code>async def</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Schedule a side effect that runs synchronously inside the commit.</p>
+        <p>Schedule a side effect that runs in the commit phase, before passive effects.</p>
 <p>Like <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="#pythonnative.hooks.use_effect"><code>use_effect</code></a>, but the callback
-fires <em>before</em> passive effects, immediately after native mutations
-and the layout pass are applied. Use it when you need to measure a
+fires <em>before</em> passive effects, as soon as native has mounted the
+commit and applied its layout. Use it when you need to read a
 committed frame (via a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Ref&lt;/span&gt;" href="#pythonnative.hooks.Ref"><code>Ref</code></a>) or issue an
-imperative view command before the user sees the new frame, for
-example scrolling a list into position on mount.</p>
-<p>Prefer <code>use_effect</code> for everything else; layout effects block the
-commit, so heavy work here delays the frame.</p>
+imperative view command as early as possible, for example scrolling
+a list into position on mount.</p>
+<p>Unlike React on the web, the commit isn't held back from the screen:
+native renders on its own thread, so the user may see the committed
+frame before the effect runs, and state the effect sets commits in a
+following transaction (usually the next frame). Prefer <code>use_effect</code>
+for everything else; layout effects run before the commit's passive
+effects and delay them.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>

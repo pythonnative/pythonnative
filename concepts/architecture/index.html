@@ -3762,7 +3762,8 @@ window. Native collection and recycler views request rows asynchronously by
 key, index, and data revision. Measured heights replace estimates. Headers,
 footers, empty states, grouped grids, and sections use the same ownership model.</p>
 <h2 id="contracts-and-tooling">Contracts and tooling<a class="headerlink" href="#contracts-and-tooling" title="Permanent link">&para;</a></h2>
-<p>Protocol 4 validates commits before mutation and acknowledges exact revisions.
+<p>The bridge protocol (version 5) validates commits before mutation and
+acknowledges exact revisions.
 Events carry application and revision identities. Controlled inputs additionally
 acknowledge native edit revisions to avoid overwriting newer typing. Native
 animation graphs perform frame updates independently of Python callbacks.</p>

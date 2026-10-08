@@ -3845,11 +3845,11 @@ view. The hooks mirror the op list:</p>
 </tr>
 <tr>
 <td><code>setFrame(view, x, y, w, h)</code></td>
-<td>On <code>f</code>. Frames are points (iOS) or dp (Android).</td>
+<td>After the native Yoga pass, with the computed frame. Frames are points (iOS) or dp (Android).</td>
 </tr>
 <tr>
 <td><code>measure(view, maxW, maxH)</code></td>
-<td>Synchronously, when the layout engine needs a content-derived size.</td>
+<td>On the UI thread, when Yoga needs a content-derived size.</td>
 </tr>
 <tr>
 <td><code>command(view, name, args)</code></td>

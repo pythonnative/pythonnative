@@ -4059,7 +4059,7 @@ way:</p>
 <ul>
 <li>Style: Black; lint: Ruff; typing where useful. Keep APIs stable.</li>
 <li>Prefer explicit, descriptive names; keep platform abstractions clean.</li>
-<li>Python never imports platform code. Everything that touches <code>UIView</code> or <code>android.view.View</code> lives in Swift (<code>PythonNativeKit</code>) or Kotlin (the <code>pythonnative</code> Gradle module) and is reached through <code>pythonnative.bridge</code>; see <code>docs/concepts/bridge.md</code> for the protocol. Bump <code>PROTOCOL_VERSION</code> on both sides when the wire format changes.</li>
+<li>Python never imports platform code. Everything that touches <code>UIView</code> or <code>android.view.View</code> lives in Swift (<code>PythonNativeKit</code>) or Kotlin (the <code>pythonnative</code> Gradle module) and is reached through <code>pythonnative.bridge</code>; see <code>docs/concepts/bridge.md</code> for the protocol. When the wire format changes, bump <code>PROTOCOL_VERSION</code> in <code>pythonnative/bridge/commits.py</code> and run <code>scripts/generate-native-contracts.py</code>: Swift, Kotlin, and the browser preview read the version from the generated contracts.</li>
 <li>Add/extend tests under <code>tests/</code> for new behavior. Native changes get XCTest / JUnit coverage next to the code they touch.</li>
 <li>Design large changes in an RFC first. Anything that adds or removes public API, changes the Python-to-native wire contract, changes a convention apps depend on, or spans Python, Swift, Kotlin, and the browser preview gets a document under <code>rfcs/</code> (see <a href="https://github.com/pythonnative/pythonnative/blob/main/rfcs/README.md"><code>rfcs/README.md</code></a>). The RFC lands with the implementation and records what shipped, including removals.</li>
 <li>Commit source, reviewed generated contracts, dependency locks, and vendored dependencies as described in <a href="#generated-source-and-vendored-dependencies">Generated source and vendored dependencies</a>. Don't commit local build outputs or caches.</li>
@@ -4100,18 +4100,15 @@ of the source tree. Keep these in version control:</p>
   declarations, and source maps. Preserve upstream licenses and document the
   version, source, and any local modifications when updating vendored code.</li>
 </ul>
-<p>After changing built-in contracts or their generators, regenerate the checked-in
-native files from the repository root:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pn<span class="w"> </span>codegen<span class="w"> </span>--output<span class="w"> </span>build/contracts
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>cp<span class="w"> </span>build/contracts/<span class="o">{</span>PNContracts,NativeProps,NativeModules<span class="o">}</span>.swift<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>src/pythonnative/native/ios/Sources/PythonNativeKit/Generated/
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>cp<span class="w"> </span>build/contracts/<span class="o">{</span>PNContracts,NativeProps,NativeModules<span class="o">}</span>.kt<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>src/pythonnative/native/android/src/main/java/com/pythonnative/generated/
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/test_codegen.py
+<p>After changing a built-in factory's signature, the contracts, or their
+generators, regenerate the checked-in files from the repository root:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/generate-native-contracts.py
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/test_codegen.py<span class="w"> </span>tests/test_performance_budgets.py
 </span></code></pre></div>
-<p>The test checks that the committed native contracts match generation in a clean
-Python interpreter. The other files under <code>build/contracts/</code> are local outputs;
-don't add the whole directory to the commit.</p>
+<p>The script writes <code>src/pythonnative/sdk/_builtin_contracts.json</code> (which
+<code>import pythonnative</code> loads instead of evaluating annotations), the generated
+Swift and Kotlin sources, and the native test fixtures. The tests check that
+the committed files match generation in a clean Python interpreter.</p>
 <p>Exclude staged app projects, compiled apps and libraries, package distributions,
 test reports, local storage, credentials, and tool caches. Examples include
 <code>build/</code>, <code>dist/</code>, <code>.build/</code>, <code>.gradle/</code>, <code>.cxx/</code>, <code>.swiftpm/</code>, and <code>__pycache__/</code>.

@@ -4190,22 +4190,32 @@ configure an environment variable inside a connected mobile app.</p>
 <p>It compares ordinary sequence replacement with <code>ListData</code>, asserts bounded
 metadata and mounted-view work, and emits JSON. Timings include profiling and
 aren't device frame-rate measurements or CI thresholds.</p>
+<p>The runtime benchmark times <code>import pythonnative</code> in fresh interpreters,
+element construction, a 300-component re-render, and commit preparation:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>python<span class="w"> </span>scripts/benchmark-runtime.py<span class="w"> </span>--output<span class="w"> </span>runtime.json
+</span></code></pre></div>
+<p>Compare its numbers between changes on one machine. CI doesn't gate on them;
+<code>tests/test_performance_budgets.py</code> instead checks the deterministic causes
+of slowness (source parsing or contract derivation at import, eagerly loaded
+subsystems, per-field render journaling, <code>inspect.Signature</code> binding, and
+release-mode prop validation). On a device, a debug iOS build logs
+<code>[PN] First screen attached ... ms after process start</code> once per launch.</p>
 <p>For an explicit capture in a headless test:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.profiling</span><span class="w"> </span><span class="kn">import</span> <span class="n">Profiler</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Profiled render"</span><span class="p">)</span>
-</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
-</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>
-</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="k">with</span> <span class="n">Profiler</span><span class="p">()</span> <span class="k">as</span> <span class="n">profiler</span><span class="p">:</span>
-</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">App</span><span class="p">())</span>
-</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>    <span class="n">result</span><span class="o">.</span><span class="n">unmount</span><span class="p">()</span>
-</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>
-</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="n">profiler</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="s2">"trace.json"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.profiling</span><span class="w"> </span><span class="kn">import</span> <span class="n">Profiler</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Profiled render"</span><span class="p">)</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="k">with</span> <span class="n">Profiler</span><span class="p">()</span> <span class="k">as</span> <span class="n">profiler</span><span class="p">:</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">App</span><span class="p">())</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    <span class="n">result</span><span class="o">.</span><span class="n">unmount</span><span class="p">()</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="n">profiler</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="s2">"trace.json"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>The same context manager can surround work on the application's Python
 thread in an embedded runtime. Choose an app-writable path when exporting

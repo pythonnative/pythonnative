@@ -4781,10 +4781,10 @@
 and forwards lifecycle, viewport, and back events. Its logical tree includes
 screens, overlays, and mounted list rows. Native containers present those
 children without creating a separate Python host for every screen or row.</p>
-<p>The host also publishes cached navigation restoration state through the
-<code>Host</code> module: the platform's <code>save_state</code> and <code>restore_state</code> callbacks
-are acknowledged without calling into Python, because the latest state
-was cached as Python published it. Viewport metrics (size, insets,
+<p>The host also publishes navigation restoration state through the <code>Host</code>
+module as it changes. The platform saves the latest copy without calling
+into Python and hands it back in the next <code>create</code> event as
+<code>restored_state</code>. Viewport metrics (size, insets,
 keyboard height, color scheme, scale, and font scale) arrive on the
 <code>layout</code> and <code>resume</code> events. The host implements the
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;HostNavigator&lt;/span&gt;" href="../navigation/#pythonnative.navigation.handle.HostNavigator"><code>HostNavigator</code></a> interface used by
@@ -7084,11 +7084,13 @@ children in that same application tree.</p>
 <li><code>layout</code> <code>{width, height, insets, keyboard_height, color_scheme,
   scale, font_scale, screen_width, screen_height}</code>.</li>
 <li><code>appearance</code> <code>{"color_scheme"}</code>.</li>
-<li><code>back_pressed</code>: returns <code>"true"</code> when a handler consumed it.</li>
-<li><code>save_state</code> / <code>restore_state</code>: instance-state hooks.</li>
+<li><code>back_pressed</code>: pops a handled screen, otherwise asks native to
+  finish it (<code>Host.finish</code>).</li>
+<li><code>reload</code>: remount after the development error overlay.</li>
 <li><code>flush</code>: run deferred renders now.</li>
 </ul>
-<p>Returns a JSON string for request-style events, else <code>None</code>.</p>
+<p>Native delivers every event asynchronously and ignores the return
+value; only tests read <code>create</code>'s <code>{"root": tag}</code>.</p>
 
 
     </div>

@@ -4255,11 +4255,11 @@ reports a missing dependency as <code>PN103</code>.</p>
 exception raised during render. In dev mode the reconciler also warns
 once per site when a dependency list changes length between renders.</p>
 <h3 id="use_layout_effect">use_layout_effect<a class="headerlink" href="#use_layout_effect" title="Permanent link">&para;</a></h3>
-<p>Like <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a>, but runs synchronously
-inside the commit, after native mutations and the layout pass and
+<p>Like <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_effect&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_effect"><code>use_effect</code></a>, but runs in the commit
+phase as soon as native has mounted the commit and applied its layout,
 before passive effects. Use it to read a committed frame from a ref or
-to issue an imperative command (like scrolling a list into position)
-before the user sees the new frame:</p>
+to issue an imperative command (like scrolling a list into position) as
+early as possible:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Chat</span><span class="p">(</span><span class="n">messages</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">list_ref</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_ref</span><span class="p">()</span>
@@ -4271,8 +4271,11 @@ before the user sees the new frame:</p>
 </span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">use_layout_effect</span><span class="p">(</span><span class="n">scroll_to_bottom</span><span class="p">,</span> <span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)])</span>
 </span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">FlatList</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">messages</span><span class="p">,</span> <span class="n">render_item</span><span class="o">=</span><span class="k">lambda</span> <span class="n">text</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">text</span><span class="p">),</span> <span class="n">ref</span><span class="o">=</span><span class="n">list_ref</span><span class="p">)</span>
 </span></code></pre></div>
-<p>Prefer <code>use_effect</code> for everything else; layout effects block the
-commit, so heavy work here delays the frame.</p>
+<p>Native renders on its own thread, so unlike React on the web the commit
+isn't held back from the screen: the user may see the committed frame
+before a layout effect runs, and state it sets commits in a following
+transaction, usually the next frame. Prefer <code>use_effect</code> for everything
+else; layout effects delay the commit's passive effects.</p>
 <h3 id="use_navigation">use_navigation<a class="headerlink" href="#use_navigation" title="Permanent link">&para;</a></h3>
 <p>Access navigation from any screen. Returns the
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Navigation&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.handle.Navigation"><code>Navigation</code></a> handle for the current route,

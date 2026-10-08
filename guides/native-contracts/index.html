@@ -3783,7 +3783,7 @@ Removing a plugin removes its staged files and dependency declarations.
 Resolved wheel hashes invalidate cached metadata even when the wheel's filename
 hasn't changed.</p>
 <h2 id="missing-values-nulls-and-resets">Missing values, nulls, and resets<a class="headerlink" href="#missing-values-nulls-and-resets" title="Permanent link">&para;</a></h2>
-<p>Protocol 4 separates setting a value from removing a property:</p>
+<p>The protocol separates setting a value from removing a property:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># Explicit null is a value when the declared type permits it.</span>
@@ -3814,11 +3814,17 @@ a provider plugin if your application needs an Android image editor.
 <code>Notifications.get_device_token()</code> raises
 <code>NativeModuleError("unsupported")</code> on Android, where remote push needs a
 provider extension.</p>
-<p>Only protocol 4 clients are supported. Rebuild the app after changing declarations,
+<p>Only clients that speak the current protocol (5) are supported. Rebuild the app
+after changing declarations,
 native sources, or native dependencies. Startup checks the exact contract
 fingerprint and Yoga version before mounting. Fast Refresh handles Python
 application changes within that compiled interface.</p>
 <h2 id="verify-contracts">Verify contracts<a class="headerlink" href="#verify-contracts" title="Permanent link">&para;</a></h2>
+<p><code>scripts/generate-native-contracts.py</code> also writes the built-in contracts to
+<code>src/pythonnative/sdk/_builtin_contracts.json</code>, which <code>import pythonnative</code>
+loads instead of evaluating the factories' annotations. Regenerate after
+changing a built-in factory's signature; <code>tests/test_codegen.py</code> fails until
+you do.</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/generate-native-contracts.py
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/test_codegen.py<span class="w"> </span>tests/test_native_values.py
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/run-browser-tests.py

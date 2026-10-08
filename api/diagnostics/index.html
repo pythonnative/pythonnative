@@ -3202,6 +3202,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.reset_dev_mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;reset_dev_mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.diagnostics.is_dev" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3673,6 +3684,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.reset_dev_mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;reset_dev_mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.diagnostics.is_dev" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3917,6 +3939,14 @@ module (hooks, reconciler, events) may import it freely.</p>
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;reset_dev_mode&lt;/span&gt; (&lt;code&gt;pythonnative.diagnostics.reset_dev_mode&lt;/code&gt;)" href="#pythonnative.diagnostics.reset_dev_mode">reset_dev_mode</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Return to the mode the <code>PN_DEV</code> environment variable selects.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;is_dev&lt;/span&gt; (&lt;code&gt;pythonnative.diagnostics.is_dev&lt;/code&gt;)" href="#pythonnative.diagnostics.is_dev">is_dev</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -4105,6 +4135,26 @@ variable.</p>
 <div class="doc doc-object doc-function">
 
 
+<h2 id="pythonnative.diagnostics.reset_dev_mode" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">reset_dev_mode</span>
+
+
+<a href="#pythonnative.diagnostics.reset_dev_mode" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">reset_dev_mode</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return to the mode the <code>PN_DEV</code> environment variable selects.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h2 id="pythonnative.diagnostics.is_dev" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">is_dev</span>
 
@@ -4116,9 +4166,9 @@ variable.</p>
     <div class="doc doc-contents ">
 
         <p>Return whether dev diagnostics are active.</p>
-<p>Resolution order: an explicit
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_dev_mode&lt;/span&gt;" href="#pythonnative.diagnostics.set_dev_mode"><code>set_dev_mode</code></a> call, then
-the <code>PN_DEV</code> environment variable, then <code>False</code>.</p>
+<p>An explicit <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_dev_mode&lt;/span&gt;" href="#pythonnative.diagnostics.set_dev_mode"><code>set_dev_mode</code></a>
+call wins; otherwise the <code>PN_DEV</code> environment variable, read when
+this module is imported, decides (default <code>False</code>).</p>
 
 
     </div>

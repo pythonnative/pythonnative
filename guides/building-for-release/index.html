@@ -1823,10 +1823,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#bytecode-only-bundles" class="md-nav__link">
+  <a href="#bytecode-everywhere" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bytecode-only bundles
+        Bytecode everywhere
       
     </span>
   </a>
@@ -3791,10 +3791,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#bytecode-only-bundles" class="md-nav__link">
+  <a href="#bytecode-everywhere" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bytecode-only bundles
+        Bytecode everywhere
       
     </span>
   </a>
@@ -4040,15 +4040,25 @@ parses manifests supplied by bundled dependencies. This check doesn't infer
 your application's data collection, tracking, or required-reason API usage.
 Declare those from your actual behavior using Apple's
 <a href="https://developer.apple.com/documentation/bundleresources/privacy-manifest-files">privacy-manifest documentation</a>.</p>
-<h3 id="bytecode-only-bundles">Bytecode-only bundles<a class="headerlink" href="#bytecode-only-bundles" title="Permanent link">&para;</a></h3>
-<p>Release builds byte-compile your <code>app/</code> sources and every bundled
-package to <code>.pyc</code> and drop the <code>.py</code> files, which shrinks the bundle
-and avoids shipping plain-text source. Because bytecode is
-version-specific, this requires the Python running <code>pn</code> to match
-<code>app.python_version</code>; otherwise <code>pn</code> prints a notice and ships <code>.py</code>
-sources instead. Debug builds (<code>pn run</code>, <code>pn build --debug</code>) keep the
-<code>.py</code> files on both platforms so tracebacks show source lines and the
-dev client can tell which sources the app already has.</p>
+<h3 id="bytecode-everywhere">Bytecode everywhere<a class="headerlink" href="#bytecode-everywhere" title="Permanent link">&para;</a></h3>
+<p>An app bundle is read-only, so the device can't cache what it compiles.
+<code>pn</code> therefore compiles ahead of time, in every build:</p>
+<ul>
+<li><strong>Release builds</strong> byte-compile your <code>app/</code> sources, every bundled
+  package, and the embedded standard library to sourceless <code>.pyc</code> files
+  and drop the <code>.py</code> files. That shrinks the bundle, speeds up launch,
+  and avoids shipping plain-text source.</li>
+<li><strong>Debug builds</strong> (<code>pn run</code>, <code>pn build --debug</code>) keep the <code>.py</code> files
+  beside <code>__pycache__</code> bytecode, so tracebacks show source lines and Fast
+  Refresh can read sources, while launch still skips compilation. Sources
+  the dev client syncs are cached on the device after their first import.</li>
+</ul>
+<p>Bytecode records bundle-relative file names (<code>app/main.py</code>), never paths
+on your build machine. Because bytecode is version-specific, compiling
+needs an interpreter matching <code>app.python_version</code>: the one running <code>pn</code>,
+or <code>python3.13</code> (for example) on your <code>PATH</code>. Release builds fail without
+one; debug builds warn and let the device compile at launch. Android uses
+Chaquopy's own compilation and has no such requirement.</p>
 <h3 id="signing_1">Signing<a class="headerlink" href="#signing_1" title="Permanent link">&para;</a></h3>
 <p>Set your Apple Developer Team ID and an export method:</p>
 <div class="language-toml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">[ios]</span>
@@ -4065,10 +4075,14 @@ export fails, the error points you back at <code>[ios.signing]</code>.</p>
 <h3 id="embedded-python-runtime">Embedded Python runtime<a class="headerlink" href="#embedded-python-runtime" title="Permanent link">&para;</a></h3>
 <p>iOS has no system Python, so PythonNative embeds CPython from the
 <a href="https://github.com/beeware/Python-Apple-support">Python-Apple-support</a>
-project. On the first iOS build, <code>pn</code> downloads the pinned, checksum-
-verified runtime for your <code>app.python_version</code> and caches it under
-<code>build/ios/ios_runtime/</code>. The Xcode build links <code>Python.xcframework</code>,
-installs the standard library, and bundles your <code>app/</code> sources, the
+project. The first iOS build on a machine downloads the pinned,
+checksum-verified runtime for your <code>app.python_version</code> into a cache
+every project shares (<code>~/Library/Caches/pythonnative/ios/</code>, or
+<code>$PN_CACHE_DIR/ios/</code>) and prepares it once: the standard library loses
+CPython's test suite, GUI toolkits, installers, and test-only extension
+modules, and the rest is compiled to bytecode. <code>pn clean</code> doesn't touch
+this cache. The Xcode build links <code>Python.xcframework</code>, installs the
+prepared standard library, and bundles your <code>app/</code> sources, the
 <code>pythonnative</code> package, and the <code>[requirements].packages</code> resolved for
 the SDK being built (device or Simulator), binary wheels included.</p>
 <p>Pinned, verified runtimes exist for <strong>Python 3.13 and 3.14</strong>; set
