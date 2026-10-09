@@ -101,6 +101,13 @@ ios = true
 android = true
 downgrade = ["android"]
 
+[[package]]
+name = "markupsafe"
+kind = "binary"
+ios = true
+android = true
+note = "iOS and Android wheels since 3.0.4."
+
 # ----------------------------------------------------------------------
 # Binary wheels for Android only. These fail on iOS because no index
 # publishes an ios_* wheel yet; pip refuses to build from source for a
@@ -129,13 +136,6 @@ kind = "binary"
 ios = false
 android = true
 note = "No iOS wheel; `ruamel.yaml` is a pure-Python alternative."
-
-[[package]]
-name = "markupsafe"
-kind = "binary"
-ios = false
-android = true
-note = "Ships only sdist + binary wheels; the pure-Python fallback inside the sdist can't be used because pip won't build for a foreign platform."
 
 # ----------------------------------------------------------------------
 # Packages that resolve, but to an older release than a desktop would
