@@ -62,7 +62,6 @@ name = "emoji"
 kind = "pure"
 ios = true
 android = true
-note = "Used by examples/hello-world."
 
 # ----------------------------------------------------------------------
 # Binary wheels available for both platforms. Chaquopy builds its Android

@@ -171,7 +171,7 @@ wheel" means resolution fails.
 | `attrs` | pure | 26.1.0 | 26.1.0 | 26.1.0 | 26.1.0 |  |
 | `python-dateutil` | pure | 2.9.0.post0 | 2.9.0.post0 | 2.9.0.post0 | 2.9.0.post0 |  |
 | `rich` | pure | 15.0.0 | 15.0.0 | 15.0.0 | 15.0.0 |  |
-| `emoji` | pure | 2.15.0 | 2.15.0 | 2.15.0 | 2.15.0 | Used by examples/hello-world. |
+| `emoji` | pure | 2.15.0 | 2.15.0 | 2.15.0 | 2.15.0 |  |
 | `numpy` | binary | 2.5.2.post1, binary | 2.5.2.post1, binary | 1.26.2 (latest 2.5.2), binary | 1.26.2 (latest 2.5.2), binary | iOS wheel from BeeWare (current release); Android wheel from Chaquopy's index (1.26 line). Exercised on device by the E2E suite. |
 | `pillow` | binary | 12.3.0, binary | 12.3.0, binary | 11.0.0 (latest 12.3.0), binary | 11.0.0 (latest 12.3.0), binary | iOS wheel on PyPI itself (PEP 730); Android from Chaquopy's index. |
 | `cryptography` | binary | 47.0.0 (latest 50.0.1), binary | 47.0.0 (latest 50.0.1), binary | 42.0.8 (latest 50.0.1), binary | 42.0.8 (latest 50.0.1), binary | Pulls cffi, also binary. |

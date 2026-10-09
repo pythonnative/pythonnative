@@ -41,12 +41,12 @@ uv run pn run android
 ```
 
 `uv run` looks upward for the nearest project, so it keeps using the
-repository's `.venv` from a subdirectory. The bundled example works the same
+repository's `.venv` from a subdirectory. The bundled examples work the same
 way:
 
 ```bash
-# run the Hello World example
-cd examples/hello-world && uv run pn run android
+# run the feature catalog example
+cd examples/e2e-suite && uv run pn run android
 ```
 
 ## Claiming an issue
@@ -85,7 +85,6 @@ Unsolicited pull requests for issues that are already assigned or already have a
 - `tests/`: unit tests for the library, plus the Maestro E2E suite
   - `e2e/`: the comprehensive E2E suite (see [E2E tests](#e2e-tests-maestro) below and `tests/e2e/AGENTS.md`)
 - `examples/`: runnable example apps
-  - `hello-world/`: minimal marketing demo
   - `e2e-suite/`: comprehensive feature catalog that drives the Maestro E2E suite
   - `inbox/`: offline reference app with a custom native extension
 - `scripts/`: helper scripts (`check.sh`, `run-e2e.sh`, `check-e2e-coverage.py`)
@@ -417,8 +416,6 @@ fix/cli-regression
 ### E2E tests (Maestro)
 
 End-to-end tests use [Maestro](https://maestro.dev/) to drive the dedicated `examples/e2e-suite` app on real emulators and simulators. That app contains one screen per public symbol in `pythonnative.__all__`; every flow under `tests/e2e/flows/<category>/` exercises one symbol.
-
-The dedicated `examples/hello-world` app is left in place as a small marketing demo; it's **not** the E2E target.
 
 ```bash
 # Install Maestro (one-time)
