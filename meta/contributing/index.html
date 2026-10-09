@@ -4008,10 +4008,10 @@ starts from the repository root.</p>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>uv<span class="w"> </span>run<span class="w"> </span>pn<span class="w"> </span>run<span class="w"> </span>android
 </span></code></pre></div>
 <p><code>uv run</code> looks upward for the nearest project, so it keeps using the
-repository's <code>.venv</code> from a subdirectory. The bundled example works the same
+repository's <code>.venv</code> from a subdirectory. The bundled examples work the same
 way:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># run the Hello World example</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">cd</span><span class="w"> </span>examples/hello-world<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>pn<span class="w"> </span>run<span class="w"> </span>android
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># run the feature catalog example</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">cd</span><span class="w"> </span>examples/e2e-suite<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>pn<span class="w"> </span>run<span class="w"> </span>android
 </span></code></pre></div>
 <h2 id="claiming-an-issue">Claiming an issue<a class="headerlink" href="#claiming-an-issue" title="Permanent link">&para;</a></h2>
 <p>To avoid duplicate work, claim an issue before you start on it:</p>
@@ -4049,7 +4049,6 @@ way:</p>
 <li><code>tests/</code>: unit tests for the library, plus the Maestro E2E suite</li>
 <li><code>e2e/</code>: the comprehensive E2E suite (see <a href="#e2e-tests-maestro">E2E tests</a> below and <code>tests/e2e/AGENTS.md</code>)</li>
 <li><code>examples/</code>: runnable example apps</li>
-<li><code>hello-world/</code>: minimal marketing demo</li>
 <li><code>e2e-suite/</code>: comprehensive feature catalog that drives the Maestro E2E suite</li>
 <li><code>inbox/</code>: offline reference app with a custom native extension</li>
 <li><code>scripts/</code>: helper scripts (<code>check.sh</code>, <code>run-e2e.sh</code>, <code>check-e2e-coverage.py</code>)</li>
@@ -4343,7 +4342,6 @@ or commit to check. This runs the full matrix without publishing anything:</p>
 </span></code></pre></div>
 <h3 id="e2e-tests-maestro">E2E tests (Maestro)<a class="headerlink" href="#e2e-tests-maestro" title="Permanent link">&para;</a></h3>
 <p>End-to-end tests use <a href="https://maestro.dev/">Maestro</a> to drive the dedicated <code>examples/e2e-suite</code> app on real emulators and simulators. That app contains one screen per public symbol in <code>pythonnative.__all__</code>; every flow under <code>tests/e2e/flows/&lt;category&gt;/</code> exercises one symbol.</p>
-<p>The dedicated <code>examples/hello-world</code> app is left in place as a small marketing demo; it's <strong>not</strong> the E2E target.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Install Maestro (one-time)</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>curl<span class="w"> </span>-Ls<span class="w"> </span><span class="s2">"https://get.maestro.mobile.dev"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>bash
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
