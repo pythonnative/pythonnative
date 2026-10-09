@@ -119,11 +119,19 @@ def test_info_plist_url_schemes(tmp_path: Path) -> None:
         tmp_path,
         app={"id": "com.acme.cool", "name": "cool", "url_schemes": ["coolapp", "cool-beta"]},
     )
-    ios.configure_info_plist(plist_path, cfg)
+    ios.configure_info_plist(plist_path, cfg, release=True)
     plist = plistlib.loads(plist_path.read_bytes())
     (url_type,) = plist["CFBundleURLTypes"]
     assert url_type["CFBundleURLSchemes"] == ["coolapp", "cool-beta"]
     assert url_type["CFBundleURLName"] == "com.acme.cool"
+
+
+def test_debug_builds_register_the_dev_client_connect_scheme(tmp_path: Path) -> None:
+    plist_path = _write_plist(tmp_path)
+    cfg = _config(tmp_path, app={"id": "com.acme.cool_app", "name": "cool", "url_schemes": ["coolapp"]})
+    ios.configure_info_plist(plist_path, cfg)
+    (url_type,) = plistlib.loads(plist_path.read_bytes())["CFBundleURLTypes"]
+    assert url_type["CFBundleURLSchemes"] == ["coolapp", "pn-com.acme.cool-app"]
 
 
 def test_write_entitlements_for_remote_notifications(tmp_path: Path) -> None:

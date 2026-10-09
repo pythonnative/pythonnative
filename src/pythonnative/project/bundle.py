@@ -10,7 +10,8 @@ and Fast Refresh.
 Release builds also drop the development-only modules listed in
 [`DEV_ONLY_PATHS`][pythonnative.project.bundle.DEV_ONLY_PATHS]: the
 ``pn`` CLI and build tooling, the dev server and browser preview, the dev
-client and Fast Refresh, the test helpers, and the SDK code generators.
+client, DevTools agent, and Fast Refresh, the test helpers, and the SDK
+code generators.
 ``tests/test_release_packaging.py`` checks that nothing left in a release
 bundle imports them.
 """
@@ -30,6 +31,7 @@ DEV_ONLY_PATHS = (
     "cli",
     "project",
     "devserver",
+    "devtools",
     "testing",
     "devclient.py",
     "hot_reload.py",

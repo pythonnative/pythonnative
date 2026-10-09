@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import sys
 import weakref
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field, replace
@@ -1586,13 +1587,16 @@ class Context(Generic[T]):
     Attributes:
         default: The value returned when no Provider ancestor exists.
         name: Optional label for diagnostics.
+        module: The module that created the context (``__name__`` of the
+            caller), so DevTools can tell framework contexts from the app's.
     """
 
-    __slots__ = ("default", "name")
+    __slots__ = ("default", "name", "module")
 
-    def __init__(self, default: T, name: Optional[str] = None) -> None:
+    def __init__(self, default: T, name: Optional[str] = None, *, module: str = "") -> None:
         self.default = default
         self.name = name
+        self.module = module or str(sys._getframe(1).f_globals.get("__name__", ""))
 
     def Provider(self, *children: Node, value: T, key: Optional[str] = None) -> Element:
         """Provide ``value`` to every descendant of ``children``.
@@ -1668,7 +1672,7 @@ def create_context(default: T = None, *, name: Optional[str] = None) -> Context[
         Theme = pn.create_context({"primary": "#007AFF"}, name="Theme")
         ```
     """
-    return Context(default, name=name)
+    return Context(default, name=name, module=str(sys._getframe(1).f_globals.get("__name__", "")))
 
 
 def use_context(context: Context[T]) -> T:

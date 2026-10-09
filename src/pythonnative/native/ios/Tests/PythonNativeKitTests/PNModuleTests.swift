@@ -143,3 +143,108 @@ final class PNModuleTests: XCTestCase {
         XCTAssertTrue(missing.result?["value"] is NSNull)
     }
 }
+
+// MARK: - DevSupport and the error screen
+
+private func allSubviews(of view: UIView) -> [UIView] {
+    view.subviews + view.subviews.flatMap { allSubviews(of: $0) }
+}
+
+extension PNModuleTests {
+    private func devSupport(_ method: String, _ args: [String: Any] = [:]) -> [String: Any] {
+        dispatcher.call(module: "DevSupport", method: method, envelope: ["call_id": 0, "args": args])
+    }
+
+    func testDevSupportIsInertUntilEnabled() {
+        DevSupportModule.reset()
+        defer { DevSupportModule.reset() }
+        XCTAssertFalse(DevSupportModule.trigger("menu"))
+        XCTAssertEqual(devSupport("enable")["ok"] as? Bool, true)
+        XCTAssertTrue(DevSupportModule.isEnabled)
+        XCTAssertTrue(DevSupportModule.trigger("menu"))
+        let stats = devSupport("frame_stats")["value"] as? [String: Any]
+        XCTAssertNotNil(stats?["fps"] as? Double)
+        XCTAssertEqual(stats?["dropped"] as? Int, 0)
+        XCTAssertEqual(devSupport("show_menu")["code"] as? String, "unknown_method")
+    }
+
+    func testDevSupportHighlightsInspectsAndShowsTheMonitor() throws {
+        DevSupportModule.reset()
+        let window = try XCTUnwrap(PNWindow.keyWindow())
+        let manager = try XCTUnwrap(PNRegistry.shared.manager(for: "View"))
+        let outer = UIView(frame: CGRect(x: 20, y: 100, width: 200, height: 200))
+        let inner = UILabel(frame: CGRect(x: 10, y: 10, width: 50, height: 20))
+        outer.addSubview(inner)
+        window.addSubview(outer)
+        for (tag, view) in [(Int64(98001), outer), (Int64(98002), inner)] {
+            PNViewState.attach(view, tag: tag, typeName: "View")
+            PNViewRegistry.shared.register(PNViewRecord(tag: tag, typeName: "View", view: view, manager: manager))
+        }
+        defer {
+            DevSupportModule.reset()
+            outer.removeFromSuperview()
+            PNViewRegistry.shared.unregister(98001)
+            PNViewRegistry.shared.unregister(98002)
+        }
+
+        // Labels don't take touches, but the inspector still selects them.
+        XCTAssertEqual(DevSupportModule.inspect(at: CGPoint(x: 35, y: 115), in: window), 98002)
+        XCTAssertEqual(DevSupportModule.inspect(at: CGPoint(x: 150, y: 250), in: window), 98001)
+
+        XCTAssertEqual(devSupport("highlight", ["tag": 98002, "label": "App › Text"])["value"] as? Bool, true)
+        XCTAssertTrue(DevSupportModule.highlightView?.superview === window)
+        XCTAssertEqual(devSupport("highlight", ["tag": NSNull(), "label": ""])["value"] as? Bool, false)
+        XCTAssertNil(DevSupportModule.highlightView)
+
+        XCTAssertEqual(devSupport("set_inspecting", ["enabled": true])["ok"] as? Bool, true)
+        XCTAssertTrue(DevSupportModule.inspector?.superview === window)
+        XCTAssertEqual(DevSupportModule.inspect(at: CGPoint(x: 35, y: 115), in: window), 98002)
+        _ = devSupport("set_inspecting", ["enabled": false])
+        XCTAssertNil(DevSupportModule.inspector)
+
+        _ = devSupport("set_perf_monitor", ["visible": true, "lines": ["Py 2 ms"]])
+        let monitor = try XCTUnwrap(DevSupportModule.perfMonitor)
+        XCTAssertTrue(monitor.superview === window)
+        XCTAssertTrue(monitor.text.hasPrefix("UI "))
+        XCTAssertTrue(monitor.text.hasSuffix("fps\nPy 2 ms"))
+        _ = devSupport("set_perf_monitor", ["visible": false, "lines": []])
+        XCTAssertNil(DevSupportModule.perfMonitor)
+    }
+
+    func testErrorScreenRendersTheStructuredReport() throws {
+        let host = HostModule()
+        let promise = PNPromise(callId: 0, module: "Host", method: "show_error")
+        host.call("show_error", args: [
+            "screen": 0, "level": "error", "phase": "render", "type": "ZeroDivisionError",
+            "message": "division by zero", "title": "ZeroDivisionError in render: division by zero",
+            "component_stack": [["name": "Counter", "file": "app/main.py", "line": 14], ["name": "App", "file": NSNull(), "line": NSNull()]],
+            "frames": [
+                ["file": "/lib/runtime.py", "line": 3, "function": "run", "code": "", "title": "/lib/runtime.py:3 in run", "excerpt": "", "framework": true],
+                ["file": "/lib/hooks.py", "line": 9, "function": "call", "code": "", "title": "/lib/hooks.py:9 in call", "excerpt": "", "framework": true],
+                ["file": "app/main.py", "line": 15, "function": "Counter", "code": "1 / 0", "title": "app/main.py:15 in Counter",
+                 "excerpt": "  14 | def Counter():\n> 15 |     1 / 0", "framework": false],
+            ],
+            "text": "Traceback (most recent call last): ...", "timestamp": 0,
+        ], promise: promise)
+        XCTAssertEqual(promise.takeInlineResult()["ok"] as? Bool, true)
+        let overlay = try XCTUnwrap(PNErrorOverlay.visible)
+        defer { PNErrorOverlay.dismiss() }
+        let views = allSubviews(of: overlay)
+        let texts = views.compactMap { ($0 as? UILabel)?.text }
+        for expected in ["ZeroDivisionError", "division by zero", "Error during render", "<Counter> (app/main.py:14)\n<App>",
+                         "2 framework frames", "app/main.py:15 in Counter"] {
+            XCTAssertTrue(texts.contains(expected), "missing \(expected)")
+        }
+        let identifiers = Set(views.compactMap { $0.accessibilityIdentifier })
+        XCTAssertTrue(identifiers.isSuperset(of: ["pn-error-trace", "pn-error-reload", "pn-error-dismiss", "pn-error-copy"]))
+        XCTAssertTrue(views.first { $0.accessibilityIdentifier == "pn-error-trace" } is UIScrollView)
+
+        let excerpt = PNErrorOverlay.excerpt("  14 | def Counter():\n> 15 |     1 / 0")
+        XCTAssertNil(excerpt.attribute(.backgroundColor, at: 0, effectiveRange: nil))
+        XCTAssertNotNil(excerpt.attribute(.backgroundColor, at: excerpt.length - 1, effectiveRange: nil))
+
+        let dismiss = try XCTUnwrap(views.first { $0.accessibilityIdentifier == "pn-error-dismiss" } as? UIButton)
+        dismiss.sendActions(for: .touchUpInside)
+        XCTAssertNil(PNErrorOverlay.visible)
+    }
+}

@@ -113,3 +113,75 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
+
+  # PythonNative Go, the prebuilt dev client, ships as release assets that
+  # `pn go` downloads for the matching version (RFC 0006). Its builds run
+  # after PyPI publishing so a toolchain hiccup never blocks the package.
+  go:
+    name: Build PythonNative Go (${{ matrix.platform }})
+    needs: [release, publish]
+    if: needs.release.outputs.tag != '' && needs.release.outputs.commit != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ios
+            runner: macos-15
+          - platform: android
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.commit }}
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          python-version: '3.13'
+      - name: Set up Java 17
+        if: matrix.platform == 'android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Set up Gradle
+        if: matrix.platform == 'android'
+        uses: gradle/actions/setup-gradle@v4
+      - name: Install PythonNative
+        run: uv sync --locked
+      - name: Build and package
+        run: uv run python scripts/build-go.py --platform ${{ matrix.platform }} --out go-dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: go-${{ matrix.platform }}
+          path: go-dist/
+          if-no-files-found: error
+
+  go-assets:
+    name: Attach PythonNative Go to the release
+    needs: [release, go]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.commit }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: go-*
+          path: go-dist
+          merge-multiple: true
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: '3.13'
+      - name: Write checksums
+        run: uv run python scripts/build-go.py --checksums go-dist
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+        run: gh release upload "$RELEASE_TAG" go-dist/* --clobber

@@ -5,8 +5,8 @@ import org.json.JSONObject
 
 /** Executable generated contracts; the mount path doesn't interpret schema JSON. */
 object PNContracts {
-    const val fingerprint = "a0f3693294a26f040d30268e868e30defcca0c0ad1980af3565d832ae91691bf"
-    const val protocolVersion = 5
+    const val fingerprint = "ac20882ccf63954e430741f43a165fa789d7ff97926256a62ac1d84c61848716"
+    const val protocolVersion = 6
     const val yogaVersion = "3.2.1"
     private data class Field(val matches: (Any) -> Boolean, val allowed: Boolean, val layout: Boolean,
                              val recreate: Boolean, val required: Boolean, val defaultValue: Any)
@@ -5514,7 +5514,7 @@ object PNContracts {
     }
     fun validateCommand(name: String, method: String, args: JSONObject): Boolean = commands["$name.$method"]?.invoke(args) ?: false
     fun validateModule(name: String, method: String, args: JSONObject): Boolean {
-        if (name in setOf("Host", "Layout", "Runtime")) return true
+        if (name in setOf("DevSupport", "Host", "Layout", "Runtime")) return true
         return modules["$name.$method"]?.invoke(args) ?: false
     }
 }

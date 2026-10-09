@@ -21,7 +21,7 @@ from typing import Any, Callable
 from ..profiling import count, profiled
 from .list_store import ListStore
 
-PROTOCOL_VERSION = 5
+PROTOCOL_VERSION = 6
 """The bridge protocol every runtime speaks; generated native contracts carry it."""
 
 

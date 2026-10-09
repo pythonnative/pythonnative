@@ -92,6 +92,21 @@ class Linking:
         return _unsubscribe
 
 
+_interceptor: Optional[Callable[[str], bool]] = None
+
+
+def set_interceptor(interceptor: Optional[Callable[[str], bool]]) -> None:
+    """Install a hook that sees each deep link first and may consume it.
+
+    Debug builds install the dev client's connect-link handler here, so
+    ``pn-<app id>://connect`` links pair the app with ``pn start``
+    without becoming the app's initial URL. ``interceptor(url)`` returns
+    ``True`` to consume the link.
+    """
+    global _interceptor
+    _interceptor = interceptor
+
+
 def set_initial_url(url: Optional[str]) -> None:
     """Record the launch URL (or clear it with ``None``)."""
     global _initial_url
@@ -109,6 +124,11 @@ def dispatch_url(url: str) -> None:
         url: The full URL string that opened the app.
     """
     global _initial_url
+    interceptor = _interceptor
+    if interceptor is not None and interceptor(url):
+        # A development link (the dev client's connect link) is handled
+        # by the dev client and never reaches the app.
+        return
     if _initial_url is None:
         _initial_url = url
     for listener in list(_url_listeners):

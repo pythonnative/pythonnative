@@ -335,6 +335,7 @@ class Builder:
         *,
         release: bool = False,
         ios_sdks: Sequence[str] = deps.IOS_SDKS,
+        dev_client: str = "app",
     ) -> PreparedProject:
         """Stage and configure the native project for ``platform``.
 
@@ -352,6 +353,10 @@ class Builder:
                 Defaults to both; the CLI narrows it to the destination
                 it is about to build so a package that only has a
                 Simulator wheel doesn't block a Simulator run.
+            dev_client: What kind of dev client a debug build is:
+                ``"app"`` (the project's own) or ``"go"`` (PythonNative
+                Go). Recorded in the bundled package's
+                ``_dev_client.json``; release builds aren't dev clients.
 
         Returns:
             A [`PreparedProject`][pythonnative.project.builder.PreparedProject].
@@ -394,6 +399,8 @@ class Builder:
             )
             native_plugins.stage_android_plugins(project_dir, plugins, log=self.log)
             self._stage_contracts(project_dir, platform, plugins, [layout.python_root / "pythonnative"])
+            if not release:
+                self._stage_dev_client([layout.python_root / "pythonnative"], plugins, dev_client)
             return PreparedProject(
                 platform=platform,
                 build_dir=build_dir,
@@ -405,12 +412,10 @@ class Builder:
         ios_layout = ios_config.configure(project_dir, self.config, release=release, log=self.log)
         native_plugins.stage_ios_plugins(project_dir, plugins, log=self.log)
         self._stage_ios_python(project_dir, release=release, sdks=ios_sdks)
-        self._stage_contracts(
-            project_dir,
-            platform,
-            plugins,
-            [project_dir / target.slice_name / "pythonnative" for target in targets],
-        )
+        roots = [project_dir / target.slice_name / "pythonnative" for target in targets]
+        self._stage_contracts(project_dir, platform, plugins, roots)
+        if not release:
+            self._stage_dev_client(roots, plugins, dev_client)
         self._link_ios_runtime(project_dir)
         return PreparedProject(
             platform=platform,
@@ -460,6 +465,22 @@ class Builder:
             schema.COMPONENTS.update(components)
             schema.MODULES.clear()
             schema.MODULES.update(modules)
+
+    def _stage_dev_client(
+        self, roots: Sequence[Path], plugins: Sequence[native_plugins.NativePlugin], kind: str
+    ) -> None:
+        """Record what kind of dev client a debug build is (see ``pythonnative.devclient.client_info``)."""
+        from ..devclient import CLIENT_INFO_FILE, dev_scheme
+
+        info = {
+            "kind": kind,
+            "app_id": self.config.app_id,
+            "scheme": dev_scheme(self.config.app_id),
+            "plugins": sorted(plugin.name for plugin in plugins),
+        }
+        for root in roots:
+            root.mkdir(parents=True, exist_ok=True)
+            (root / CLIENT_INFO_FILE).write_text(json.dumps(info, sort_keys=True), encoding="utf-8")
 
     def _discover_plugins(self, targets: Sequence[deps.Target] = ()) -> List[native_plugins.NativePlugin]:
         """Collect native plugins from entry points and ``[plugins].paths``.

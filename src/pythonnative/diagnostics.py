@@ -44,6 +44,7 @@ __all__ = [
     "clear_warnings",
     "set_error_reporter",
     "report_error",
+    "add_listener",
 ]
 
 
@@ -156,6 +157,8 @@ def warn(message: str) -> None:
         print(f"[PN] WARN: {message}", file=sys.stderr, flush=True)
     except Exception:
         pass
+    if _listeners:
+        _notify_warning(message)
 
 
 def warn_once(message: str, key: Optional[str] = None) -> None:
@@ -247,6 +250,70 @@ def set_error_reporter(owner: Any, reporter: Optional[Callable[[BaseException, s
         _reporters[:] = [(k, r) for (k, r) in _reporters if k != key]
         if reporter is not None:
             _reporters.append((key, reporter))
+
+
+# ======================================================================
+# Listeners (DevTools)
+# ======================================================================
+
+_listeners: List[Callable[[Any], None]] = []
+
+
+def add_listener(callback: Callable[[Any], None]) -> Callable[[], None]:
+    """Receive every warning and reported error as an ``ErrorReport``.
+
+    The devtools agent subscribes so warnings and errors reach the
+    DevTools Problems panel with their component stacks. Reports are only
+    built while a listener is registered, and only in dev mode.
+
+    Args:
+        callback: Called with an
+            [`ErrorReport`][pythonnative.errors.ErrorReport], on whichever
+            thread raised the warning or error.
+
+    Returns:
+        A callable that removes the listener.
+    """
+    _listeners.append(callback)
+
+    def remove() -> None:
+        try:
+            _listeners.remove(callback)
+        except ValueError:
+            pass
+
+    return remove
+
+
+def _notify(report: Any) -> None:
+    for callback in list(_listeners):
+        try:
+            callback(report)
+        except Exception:
+            pass
+
+
+def _notify_warning(message: str) -> None:
+    try:
+        from .errors import warning_report
+        from .hooks import current_hook_state
+
+        state = current_hook_state()
+        _notify(warning_report(message, getattr(state, "_component_name", None) or None))
+    except Exception:
+        pass
+
+
+def notify_error(exc: BaseException, phase: str) -> None:
+    """Tell listeners about an error shown in the error screen or terminal."""
+    if not _listeners or not is_dev():
+        return
+    try:
+        from .errors import report
+
+        _notify(report(exc, phase))
+    except Exception:
+        pass
 
 
 def report_error(exc: BaseException, phase: str = "runtime") -> bool:

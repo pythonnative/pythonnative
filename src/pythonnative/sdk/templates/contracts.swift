@@ -80,7 +80,7 @@ public enum PNContracts {
         commands[name + "." + method]?(args) ?? false
     }
     public static func validateModule(_ name: String, _ method: String, _ args: [String: Any]) -> Bool {
-        if ["Host", "Layout", "Runtime"].contains(name) { return true }
+        if ["DevSupport", "Host", "Layout", "Runtime"].contains(name) { return true }
         return modules[name + "." + method]?(args) ?? false
     }
 }

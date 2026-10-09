@@ -60,22 +60,25 @@ __all__ = [
 DEV_ROOT_DIR = "pythonnative_dev"
 """Name of the writable on-device directory that shadows bundled app code."""
 
+PACKAGES_DIR = "site-packages"
+"""Overlay subdirectory holding pure-Python packages synced from the dev server."""
 
-def configure_dev_environment(writable_root: str, server_url: Optional[str] = None) -> str:
+
+def configure_dev_environment(writable_root: str) -> str:
     """Create and prioritize the writable source overlay.
 
     The returned directory is inserted at the front of `sys.path`, so a
     synced `app/main.py` shadows the copy bundled into the native
-    application. Debug templates call this before importing user code.
+    application, and its `site-packages/` (packages the dev server syncs)
+    is appended to the end, so bundled packages win. Debug templates call
+    this before importing user code. It also routes connect links
+    (``pn-<app id>://connect?url=...``) to the dev client, which the
+    launcher (``pn run``, ``pn go``, or a scanned QR code) uses to point
+    the app at a dev server.
 
     Args:
         writable_root: Platform data directory that the app can write to
             (Android `filesDir`, iOS `Documents`, or a test directory).
-        server_url: The dev server this launch should connect to, when
-            the launcher passed one (``pn run`` does, through a launch
-            environment variable on iOS and an intent extra on
-            Android). It is exported as ``PN_DEV_SERVER`` so the dev
-            client picks it up; a remembered server is used otherwise.
 
     Returns:
         Absolute path to the overlay root.
@@ -85,9 +88,15 @@ def configure_dev_environment(writable_root: str, server_url: Optional[str] = No
     if dev_root in sys.path:
         sys.path.remove(dev_root)
     sys.path.insert(0, dev_root)
+    packages = os.path.join(dev_root, PACKAGES_DIR)
+    os.makedirs(packages, exist_ok=True)
+    if packages not in sys.path:
+        sys.path.append(packages)
     os.environ[OVERLAY_ENV] = dev_root
-    if server_url:
-        os.environ["PN_DEV_SERVER"] = str(server_url)
+    from . import devclient
+    from .native_modules.linking import set_interceptor
+
+    set_interceptor(devclient.handle_link)
     return dev_root
 
 

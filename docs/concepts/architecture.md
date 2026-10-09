@@ -89,7 +89,7 @@ footers, empty states, grouped grids, and sections use the same ownership model.
 
 ## Contracts and tooling
 
-The bridge protocol (version 5) validates commits before mutation and
+The bridge protocol (version 6) validates commits before mutation and
 acknowledges exact revisions.
 Events carry application and revision identities. Controlled inputs additionally
 acknowledge native edit revisions to avoid overwriting newer typing. Native

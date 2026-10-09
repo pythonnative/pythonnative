@@ -83,12 +83,34 @@ public enum PNTransaction {
 
     // MARK: - Applying
 
-    enum MountError: Error { case duplicateTag(Int64), missingTag(Int64), missingManager(String) }
+    enum MountError: Error, CustomStringConvertible {
+        case duplicateTag(Int64), missingTag(Int64), missingManager(String), undecodableProps(String)
+
+        var description: String {
+            switch self {
+            case .duplicateTag(let tag): return "duplicate create: \(tag)"
+            case .missingTag(let tag): return "unknown tag: \(tag)"
+            case .missingManager(let type): return "unknown component: \(type)"
+            case .undecodableProps(let message): return message
+            }
+        }
+    }
 
     /// Apply a validated batch; runtime inconsistencies fail the entire surface.
+    ///
+    /// A generated prop getter that can't decode its value records the
+    /// failure (`PNValues.decodeOrRecord`) and reads as `nil`; the op that
+    /// read it then fails the commit.
     static func apply(_ ops: [Op]) throws {
         let registry = PNViewRegistry.shared
         for op in ops {
+            _ = PNValues.takeDecodeFailure()
+            let subject: (tag: Int64, type: String?)
+            switch op {
+            case let .create(tag, type, _): subject = (tag, type)
+            case let .update(tag, _, _), let .destroy(tag): subject = (tag, registry.resolve(tag)?.typeName)
+            case let .insert(parent, _, _): subject = (parent, registry.resolve(parent)?.typeName)
+            }
             switch op {
             case let .create(tag, type, props):
                 if registry.resolve(tag) != nil {
@@ -133,6 +155,9 @@ public enum PNTransaction {
                 }
                 record.manager.destroy(view: record.view)
                 PNViewState.detach(record.view)
+            }
+            if let failure = PNValues.takeDecodeFailure() {
+                throw MountError.undecodableProps("props for \(subject.type ?? "view") tag \(subject.tag): \(failure)")
             }
             // Later operations in this batch need the current logical owners,
             // especially when replacing a container after moving its children.

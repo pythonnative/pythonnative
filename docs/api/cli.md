@@ -7,7 +7,8 @@ the documented behavior never drifts from the code.
 ## Subcommands
 
 - `pn init [name]`: scaffold a new project (creates `app/`,
-  `pythonnative.toml`, `.gitignore`). With a name it creates `./<name>/`
+  `pythonnative.toml`, `pyproject.toml`, `tests/`, VS Code debugger
+  settings, a CI workflow, and `.gitignore`). With a name it creates `./<name>/`
   and scaffolds into it; the name must match `^[a-z][a-z0-9_-]*$`.
   Without one it uses the current directory, whatever it's called.
   Flag: `--force` to overwrite existing files or scaffold into a
@@ -25,15 +26,20 @@ the documented behavior never drifts from the code.
   `--json` for a machine-readable report, `--python` to pick the
   interpreter that runs pip. Exits non-zero when any target can't be
   satisfied. See [PyPI packages](../guides/pypi-packages.md).
-- `pn start [entry]`: run the dev server. It watches `app/`, syncs
-  every save to each connected debug build with Fast Refresh, relays
-  their logs, and serves the browser preview page. Every client needs
-  your dev token from `~/.pythonnative/dev-token`, which the printed URLs
-  carry. Flags: `--port` (default 8765), `--host` (default `0.0.0.0`),
-  `--open` to also open the browser preview. See the
-  [Development workflow](../guides/dev-workflow.md#the-dev-token).
+- `pn start [entry]`: run the dev server. It prints a QR code that opens
+  the project on a phone, watches `app/`, syncs every save to each
+  connected dev client with Fast Refresh, relays their logs, and serves
+  the browser preview, [DevTools](../guides/devtools.md#devtools), and the
+  [debugger](../guides/debugging.md) proxy. It reads single-key commands
+  (`i`, `a`, `w`, `j`, `r`, `m`, `d`, `q`) when stdin is a terminal.
+  Every client needs your dev token from `~/.pythonnative/dev-token`,
+  which the printed URLs carry. Flags: `--port` (default 8765), `--host`
+  (default `0.0.0.0`), `--debug-port` (default 5678; 0 disables it),
+  `--no-interactive`, `--open` to also open the browser preview. See the
+  [Development workflow](../guides/dev-workflow.md).
 - `pn preview [entry]`: `pn start` plus opening the browser preview in
-  your default browser. Flags: `--port`, `--host`, `--no-open`. See the
+  your default browser. Flags: `--port`, `--host`, `--debug-port`,
+  `--no-interactive`, `--no-open`. See the
   [Browser preview guide](../guides/browser-preview.md).
 - `pn devices [android|ios]`: list connected devices, emulators, and
   simulators with the identifiers `--device` accepts. Flag: `--json` to
@@ -46,9 +52,14 @@ the documented behavior never drifts from the code.
   reinstalled. Flags: `--device` (target a specific device by
   identifier or name), `--prepare-only`, `--no-logs`, `--rebuild`
   (force the toolchain), `--dev-server URL` (override the server URL
-  passed to the app; include the `?token=` from `pn start`), `--port` (where `pn start` listens),
-  `--dev-client` (build a shell app with a connect screen that loads
-  any project from a dev server).
+  passed to the app; include the `?token=` from `pn start`), `--port` (where `pn start` listens).
+  When no Android device is running it boots an emulator, and it opens
+  the app with a connect link (`pn-<app id>://connect?url=...`).
+- `pn go android|ios`: install [PythonNative Go](../guides/devtools.md#pythonnative-go),
+  the prebuilt dev client, and open the running dev server in it. The
+  artifact matching this `pythonnative` version comes from the cache,
+  the GitHub release (verified against its SHA-256), or a one-time local
+  build. Flags: `--device`, `--build` (build locally), `--port`.
 - `pn logs android|ios`: stream logs from the running app without
   rebuilding. Flag: `--device` (target a specific device by identifier
   or name, same as `pn run`). Physical iOS devices aren't supported for

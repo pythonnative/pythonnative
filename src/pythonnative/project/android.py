@@ -111,7 +111,7 @@ def configure(
     configure_gradle(project_dir, config, release=release)
     configure_settings_gradle(project_dir, config)
     configure_strings(project_dir, config)
-    configure_manifest(project_dir, config)
+    configure_manifest(project_dir, config, release=release)
     write_requirements(project_dir, config)
 
     _apply_branding(project_dir, config, emit)
@@ -304,12 +304,14 @@ def configure_strings(project_dir: Path, config: AppConfig) -> None:
     strings_path.write_text(content, encoding="utf-8")
 
 
-def configure_manifest(project_dir: Path, config: AppConfig) -> None:
+def configure_manifest(project_dir: Path, config: AppConfig, *, release: bool = False) -> None:
     """Inject permissions, the launch orientation, and deep-link filters.
 
     Args:
         project_dir: The staged Android project root.
         config: The validated app configuration.
+        release: Leave out the dev client's connect scheme, which debug
+            builds register (``pn-<app id>://connect?url=...``).
     """
     manifest_path = project_dir / "app" / "src" / "main" / "AndroidManifest.xml"
     content = manifest_path.read_text(encoding="utf-8")
@@ -327,8 +329,13 @@ def configure_manifest(project_dir: Path, config: AppConfig) -> None:
             1,
         )
 
-    if config.url_schemes:
-        schemes = "".join(f'                <data android:scheme="{scheme}" />\n' for scheme in config.url_schemes)
+    url_schemes = list(config.url_schemes)
+    if not release:
+        from ..devclient import dev_scheme
+
+        url_schemes.append(dev_scheme(config.app_id))
+    if url_schemes:
+        schemes = "".join(f'                <data android:scheme="{scheme}" />\n' for scheme in url_schemes)
         deep_link_filter = (
             "            <intent-filter>\n"
             '                <action android:name="android.intent.action.VIEW" />\n'

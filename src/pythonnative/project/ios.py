@@ -163,11 +163,18 @@ def configure_info_plist(info_plist: Path, config: AppConfig, *, release: bool =
     if resolved.ios_background_modes:
         plist["UIBackgroundModes"] = list(resolved.ios_background_modes)
 
-    if config.url_schemes:
+    schemes = list(config.url_schemes)
+    if not release:
+        # Debug builds are dev clients: `pn-<app id>://connect?url=...`
+        # (a scanned QR code, `pn run`, `pn go`) points them at a server.
+        from ..devclient import dev_scheme
+
+        schemes.append(dev_scheme(config.app_id))
+    if schemes:
         plist["CFBundleURLTypes"] = [
             {
                 "CFBundleURLName": config.bundle_id,
-                "CFBundleURLSchemes": list(config.url_schemes),
+                "CFBundleURLSchemes": schemes,
             }
         ]
 

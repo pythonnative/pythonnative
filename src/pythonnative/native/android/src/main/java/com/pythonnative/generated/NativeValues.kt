@@ -57,6 +57,28 @@ object PNValues {
     }
     fun isNull(value: Any?): Boolean = value == null || value == JSONObject.NULL
     fun defaultValue(json: String): Any = JSONArray("[$json]").get(0)
+
+    private val decodeFailure = ThreadLocal<String?>()
+
+    /**
+     * Decode one prop for a generated getter. A failure reads as null and is
+     * recorded on the current thread, so a value that passed validation but
+     * doesn't decode rejects the commit being applied ([takeDecodeFailure])
+     * instead of crashing the app.
+     */
+    inline fun <T> decodeOrRecord(field: String, decode: () -> T): T? = try {
+        decode()
+    } catch (error: Exception) {
+        recordDecodeFailure(field, error)
+        null
+    }
+
+    fun recordDecodeFailure(field: String, error: Exception) {
+        if (decodeFailure.get() == null) decodeFailure.set("field $field didn't decode (${error.message ?: error.javaClass.simpleName})")
+    }
+
+    /** The first decoding failure recorded on this thread since the last call, clearing it. */
+    fun takeDecodeFailure(): String? = decodeFailure.get()?.also { decodeFailure.remove() }
 }
 
 sealed class PNViewWidth : PNNativeValue {

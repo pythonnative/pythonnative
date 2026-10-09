@@ -6,6 +6,7 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.util.Log
 import android.util.TypedValue
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.ScrollView
@@ -52,29 +53,24 @@ class MainActivity : AppCompatActivity() {
         // The NavHost loads the initial screen from nav_graph's startDestination.
         setContentView(R.layout.activity_main)
 
-        val devServer = intent?.getStringExtra("pn_dev_server")
         val entry = getString(R.string.pn_entry_module)
         startup.execute {
-            val failure = runCatching { startPython(devServer, entry) }.exceptionOrNull()
+            val failure = runCatching { startPython(entry) }.exceptionOrNull()
             runOnUiThread { pythonStarted(failure) }
         }
     }
 
     /** Runs on the startup thread: everything here may take a while. */
-    private fun startPython(devServer: String?, entry: String) {
+    private fun startPython(entry: String) {
         if (!Python.isStarted()) {
             Python.start(AndroidPlatform(applicationContext))
         }
         val py = Python.getInstance()
         if (BuildConfig.DEBUG) {
             // Dev-only: the writable source overlay the dev client syncs
-            // into, and the dev server `pn run` asked us to connect to
-            // (an intent extra; a remembered server is used otherwise).
-            py.getModule("pythonnative.hot_reload").callAttr(
-                "configure_dev_environment",
-                filesDir.absolutePath,
-                devServer
-            )
+            // into. The dev server arrives as a connect link
+            // (`pn-<app id>://connect?url=...`) through `Linking`.
+            py.getModule("pythonnative.hot_reload").callAttr("configure_dev_environment", filesDir.absolutePath)
         }
         // Handshake with the runtime library (raises on a protocol
         // mismatch, before any screen is created), enable dev mode in
@@ -128,6 +124,13 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         BuiltinModules.onNewIntent(intent)
+    }
+
+    // The menu key (Cmd+M in the emulator) opens the dev menu once Python
+    // enables development support; release builds never enable it.
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_MENU && BuiltinModules.devSupport.onMenuKey()) return true
+        return super.onKeyUp(keyCode, event)
     }
 
     override fun onResume() {

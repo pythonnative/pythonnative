@@ -98,14 +98,25 @@ class AlertModule : AlertImplementation {
 
     private fun dialog(title: String, message: String?, buttons: List<Map<String, PNJSONValue>>, done: (Long) -> Unit): (() -> Unit)? {
         val activity = PNBridge.activity() ?: run { done(-1); return null }
-        val builder = AlertDialog.Builder(activity).setTitle(title).setMessage(message)
+        val builder = AlertDialog.Builder(activity).setTitle(title)
         val specs = buttons.ifEmpty { listOf(mapOf("label" to PNJSONValue("OK"))) }
         var delivered = false
         fun deliver(index: Long) { if (!delivered) { delivered = true; done(index) } }
         if (specs.size > 3) {
-            // Android's three action slots must never silently hide extra choices.
-            builder.setItems(specs.map { it["label"]?.value as? String ?: "OK" }.toTypedArray()) { _, index -> deliver(index.toLong()) }
+            // Android's three action slots must never silently hide extra choices,
+            // so they become a list. A dialog shows either a message or a list,
+            // so the message joins the title, and a cancel choice stays a button.
+            if (!message.isNullOrEmpty()) builder.setTitle("$title\n$message")
+            val cancel = specs.indexOfFirst { it["style"]?.value == "cancel" }
+            val choices = specs.indices.filter { it != cancel }
+            builder.setItems(choices.map { specs[it]["label"]?.value as? String ?: "OK" }.toTypedArray()) { _, item ->
+                deliver(choices[item].toLong())
+            }
+            if (cancel >= 0) {
+                builder.setNegativeButton(specs[cancel]["label"]?.value as? String ?: "Cancel") { _, _ -> deliver(cancel.toLong()) }
+            }
         } else {
+            builder.setMessage(message)
             val free = arrayListOf("positive", "negative", "neutral")
             val slots = HashMap<Int, String>()
             specs.forEachIndexed { index, spec ->

@@ -24,6 +24,7 @@ __all__ = ["BROWSER_MODULES", "WebTransport"]
 
 BROWSER_MODULES = frozenset(
     {
+        "DevSupport",
         "Host",
         "Layout",
         "Alert",

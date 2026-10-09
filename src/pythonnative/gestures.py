@@ -88,7 +88,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Callable, ClassVar, Dict, List, Literal, Optional, Sequence, Set, Tuple, Union
 
 __all__ = [
     "DEFAULT_PAN_MIN_DISTANCE",
@@ -237,7 +237,7 @@ def event_from_payload(payload: Dict[str, Any]) -> GestureEvent:
 # ======================================================================
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class _BaseGesture:
     """Shared callback slots and the ``enabled`` switch for every gesture.
 
@@ -256,7 +256,7 @@ class _BaseGesture:
     on_end: Optional[GestureCallback] = None
     enabled: bool = True
 
-    kind: str = ""
+    kind: ClassVar[str] = ""
 
     def _config(self) -> Dict[str, Any]:
         return {}
@@ -279,7 +279,7 @@ class _BaseGesture:
             invoke(callback, event)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Tap(_BaseGesture):
     """Recognize ``n_taps`` quick taps.
 
@@ -294,7 +294,7 @@ class Tap(_BaseGesture):
     on_tap: Optional[GestureCallback] = None
     n_taps: int = 1
     max_distance: float = 12.0
-    kind: str = "tap"
+    kind: ClassVar[str] = "tap"
 
     def _config(self) -> Dict[str, Any]:
         return {"n_taps": int(self.n_taps), "max_distance": float(self.max_distance)}
@@ -308,7 +308,7 @@ class Tap(_BaseGesture):
             super()._dispatch(event)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class LongPress(_BaseGesture):
     """Recognize a sustained press.
 
@@ -325,7 +325,7 @@ class LongPress(_BaseGesture):
     on_long_press: Optional[GestureCallback] = None
     min_duration_ms: float = 500.0
     max_distance: float = 12.0
-    kind: str = "long_press"
+    kind: ClassVar[str] = "long_press"
 
     def _config(self) -> Dict[str, Any]:
         return {
@@ -377,7 +377,7 @@ def _crosses(bounds: Optional[List[Optional[float]]], delta: float) -> bool:
     return (low is not None and delta < low) or (high is not None and delta > high)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Pan(_BaseGesture):
     """Track a drag with translation and velocity.
 
@@ -439,7 +439,7 @@ class Pan(_BaseGesture):
     fail_offset_x: Optional[Offset] = None
     fail_offset_y: Optional[Offset] = None
     min_velocity: Optional[float] = None
-    kind: str = "pan"
+    kind: ClassVar[str] = "pan"
 
     def __post_init__(self) -> None:
         for name in ("active_offset_x", "active_offset_y", "fail_offset_x", "fail_offset_y"):
@@ -492,7 +492,7 @@ def _check_direction(direction: Any) -> None:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Swipe(_BaseGesture):
     """Recognize a quick directional flick.
 
@@ -506,7 +506,7 @@ class Swipe(_BaseGesture):
     on_swipe: Optional[GestureCallback] = None
     direction: Optional[SwipeDirection] = None
     min_velocity: float = 300.0
-    kind: str = "swipe"
+    kind: ClassVar[str] = "swipe"
 
     def __post_init__(self) -> None:
         _check_direction(self.direction)
@@ -523,7 +523,7 @@ class Swipe(_BaseGesture):
             super()._dispatch(event)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Fling(_BaseGesture):
     """Recognize a quick multi-pointer directional flick.
 
@@ -549,7 +549,7 @@ class Fling(_BaseGesture):
     direction: Optional[SwipeDirection] = None
     n_pointers: int = 1
     min_velocity: float = 300.0
-    kind: str = "fling"
+    kind: ClassVar[str] = "fling"
 
     def __post_init__(self) -> None:
         _check_direction(self.direction)
@@ -570,18 +570,18 @@ class Fling(_BaseGesture):
             super()._dispatch(event)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Pinch(_BaseGesture):
     """Track a two-finger pinch; ``event.scale`` is relative to activation."""
 
-    kind: str = "pinch"
+    kind: ClassVar[str] = "pinch"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Rotation(_BaseGesture):
     """Track a two-finger rotation; ``event.rotation`` is in radians."""
 
-    kind: str = "rotation"
+    kind: ClassVar[str] = "rotation"
 
 
 GestureSpec = _BaseGesture

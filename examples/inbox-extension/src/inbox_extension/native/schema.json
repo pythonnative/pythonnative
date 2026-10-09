@@ -1,5 +1,5 @@
 {
-  "protocol": 5,
+  "protocol": 6,
   "yoga": "3.2.1",
   "components": {
     "InboxBadge": {

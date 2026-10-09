@@ -64,13 +64,20 @@ Platform controls and fonts supply their own intrinsic sizes.
   names; and a [`Store`][pythonnative.Store] holds app state with
   targeted re-renders. See [Styling](guides/styling.md) and
   [Managing state](guides/state.md).
-- **A Metro-style dev loop.** `pn start` runs one dev server for the
-  browser preview and every connected debug build. Save a file and
-  each client Fast Refreshes in place, preserving component state;
-  their logs stream back into the same terminal. See the
-  [Development workflow](guides/dev-workflow.md).
-- **Dev-mode diagnostics.** Uncaught errors show a full-screen RedBox
-  with the traceback instead of crashing; typos in style keys and
+- **A Metro-style dev loop with PythonNative Go.** `pn start` runs one
+  dev server for the browser preview and every connected app, and prints
+  a QR code. PythonNative Go, a prebuilt dev client, runs any project
+  without native code on a simulator, emulator, or phone with no native
+  build. Save a file and each client Fast Refreshes in place, preserving
+  component state. See the [Development workflow](guides/dev-workflow.md)
+  and [PythonNative Go and DevTools](guides/devtools.md).
+- **DevTools and breakpoints.** A DevTools page shows the component tree
+  with props and hooks, a REPL inside the running app, problems,
+  network requests, and performance. VS Code attaches `debugpy`
+  breakpoints to the Python running on a phone. See
+  [Debugging](guides/debugging.md).
+- **Dev-mode diagnostics.** Uncaught errors show a full-screen error
+  screen with the component stack and your source instead of crashing; typos in style keys and
   duplicate list keys print "did you mean" warnings; props that don't
   match a component's annotations warn; conditional hooks raise at the
   source. Every check is skipped in production, and

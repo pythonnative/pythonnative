@@ -244,6 +244,9 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
     if event == "appearance":
         _publish_metrics(payload)
         return None
+    if event == "open_in_editor":
+        _open_in_editor(payload)
+        return None
     host = _HOSTS.get(screen_id)
     if host is None:
         diagnostics.log(f"dispatch_host_event: no host for screen={screen_id} event={event!r}")
@@ -308,6 +311,17 @@ def _create(screen_id: int, payload: Dict[str, Any]) -> Optional[str]:
             host.args = decoded
     host.on_create()
     return _root_json(host)
+
+
+def _open_in_editor(payload: Any) -> None:
+    """Ask the dev server to open a frame from the error screen in the developer's editor."""
+    if not diagnostics.is_dev() or not isinstance(payload, dict):
+        return
+    from ..devtools import current
+
+    agent = current()
+    if agent is not None:
+        agent.publish("open_editor", {"file": str(payload.get("file") or ""), "line": int(payload.get("line") or 1)})
 
 
 def _entry_module() -> str:

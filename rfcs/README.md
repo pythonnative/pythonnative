@@ -86,3 +86,5 @@ ceremony.
 | [0002](0002-core-parity-and-correctness.md) | Core parity and correctness | Implemented |
 | [0003](0003-incremental-rendering-and-lists.md) | Incremental rendering and lists | Implemented |
 | [0004](0004-pythonic-authoring-model.md) | Pythonic authoring model | Implemented |
+| [0005](0005-fast-and-small.md) | Fast and small | Implemented |
+| [0006](0006-dev-client-and-devtools.md) | Dev client and DevTools | Implemented |

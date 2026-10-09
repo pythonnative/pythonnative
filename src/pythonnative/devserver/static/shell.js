@@ -315,7 +315,14 @@ class Shell {
     $("pn-reload").addEventListener("click", () => this.remount());
     $("pn-console-toggle").addEventListener("click", () => this.consoleEl.classList.toggle("pn-hidden"));
     $("pn-console-clear").addEventListener("click", () => (this.consoleLines.textContent = ""));
+    $("pn-dev-menu").addEventListener("click", () => this.host.devSupport.requestMenu());
     document.addEventListener("keydown", (event) => {
+      // Cmd+D (Ctrl+D elsewhere) opens the dev menu, as in the iOS Simulator.
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        this.host.devSupport.requestMenu();
+        return;
+      }
       const target = event.target;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT")) {
         if (event.key !== "Escape") return;

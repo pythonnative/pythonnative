@@ -63,8 +63,47 @@ public enum PNValues {
         return encoder.storage.value()
     }
 
+    /// A generated JSON literal (a default or a literal member) as a bridge value.
     public static func defaultValue(_ json: String) -> Any {
-        try! JSONSerialization.jsonObject(with: Data(json.utf8), options: [.fragmentsAllowed])
+        (try? JSONSerialization.jsonObject(with: Data(json.utf8), options: [.fragmentsAllowed])) ?? NSNull()
+    }
+
+    private static let decodeFailureKey = "com.pythonnative.decode-failure"
+
+    /// Decode one prop for a generated getter.
+    ///
+    /// A failure reads as `nil` and is recorded on the current thread, so
+    /// a value that passed validation but doesn't decode rejects the commit
+    /// being applied (`takeDecodeFailure()`) instead of crashing the app.
+    public static func decodeOrRecord<T: Decodable>(_ type: T.Type, _ value: Any, field: String) -> T? {
+        do {
+            return try decode(type, value)
+        } catch {
+            let slot = Thread.current.threadDictionary
+            if slot[decodeFailureKey] == nil {
+                slot[decodeFailureKey] = "field \(field) didn't decode (\(describe(error)))"
+            }
+            return nil
+        }
+    }
+
+    /// The first decoding failure recorded on this thread since the last call, clearing it.
+    public static func takeDecodeFailure() -> String? {
+        let slot = Thread.current.threadDictionary
+        guard let failure = slot[decodeFailureKey] as? String else { return nil }
+        slot.removeObject(forKey: decodeFailureKey)
+        return failure
+    }
+
+    private static func describe(_ error: Error) -> String {
+        guard let error = error as? DecodingError else { return error.localizedDescription }
+        switch error {
+        case .typeMismatch(_, let context), .valueNotFound(_, let context), .keyNotFound(_, let context), .dataCorrupted(let context):
+            let path = context.codingPath.map { $0.intValue.map(String.init) ?? $0.stringValue }.joined(separator: ".")
+            return path.isEmpty ? context.debugDescription : "\(path): \(context.debugDescription)"
+        @unknown default:
+            return error.localizedDescription
+        }
     }
 }
 

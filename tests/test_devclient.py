@@ -95,13 +95,26 @@ def test_normalize_server_url_rejects_other_schemes() -> None:
 @pytest.mark.parametrize(
     "url, shown",
     [
-        ("ws://192.168.1.20:8765/ws?role=client&token=abc", "192.168.1.20:8765/?token=abc"),
+        ("ws://192.168.1.20:8765/ws?role=client&token=abc", "192.168.1.20:8765"),
         ("ws://192.168.1.20:8765/ws?role=client", "192.168.1.20:8765"),
     ],
 )
-def test_display_server_url_round_trips_through_normalize(url: str, shown: str) -> None:
+def test_display_server_url_never_shows_the_token(url: str, shown: str) -> None:
     assert devclient.display_server_url(url) == shown
-    assert devclient.normalize_server_url(shown) == url
+
+
+def test_connect_links_round_trip_and_normalize() -> None:
+    link = devclient.connect_link("pn-com.example.my-app", "http://192.168.1.20:8765/?token=abc")
+    assert link == "pn-com.example.my-app://connect?url=http%3A%2F%2F192.168.1.20%3A8765%2F%3Ftoken%3Dabc"
+    assert devclient.parse_connect_link(link) == "http://192.168.1.20:8765/?token=abc"
+    assert devclient.normalize_server_url(link) == "ws://192.168.1.20:8765/ws?role=client&token=abc"
+    assert devclient.parse_connect_link("myapp://connect?url=x") is None
+    assert devclient.parse_connect_link("pn-com.example.app://other?url=x") is None
+
+
+def test_dev_scheme_is_a_valid_url_scheme() -> None:
+    assert devclient.dev_scheme("com.example.my_app") == "pn-com.example.my-app"
+    assert devclient.dev_scheme("com.pythonnative.go") == "pn-com.pythonnative.go"
 
 
 def test_client_without_the_token_is_refused_with_a_clear_message(server: DevServer, tmp_path: Path) -> None:
@@ -132,13 +145,17 @@ def test_client_logs_never_include_the_token(server: DevServer, tmp_path: Path) 
     assert not any(server.token in line for line in logs + details)
 
 
-def test_saved_server_url_round_trips_through_the_overlay(tmp_path: Path) -> None:
+def test_recent_servers_round_trip_through_the_overlay(tmp_path: Path) -> None:
     overlay = tmp_path / "overlay"
-    assert devclient.saved_server_url(str(overlay)) is None
-    devclient._save_server_url(str(overlay), "ws://1.2.3.4:8765/ws?role=client")
-    assert devclient.saved_server_url(str(overlay)) == "ws://1.2.3.4:8765/ws?role=client"
-    (overlay / "server.json").write_text("not json", encoding="utf-8")
-    assert devclient.saved_server_url(str(overlay)) is None
+    assert devclient.recent_servers(str(overlay)) == []
+    devclient._remember_server(str(overlay), "ws://1.2.3.4:8765/ws?role=client", "one")
+    devclient._remember_server(str(overlay), "ws://5.6.7.8:8765/ws?role=client", "two")
+    devclient._remember_server(str(overlay), "ws://1.2.3.4:8765/ws?role=client", "one")
+    assert [entry["project"] for entry in devclient.recent_servers(str(overlay))] == ["one", "two"]
+    devclient._forget_last_server(str(overlay))
+    assert all(entry["auto"] is False for entry in devclient.recent_servers(str(overlay)))
+    (overlay / "servers.json").write_text("not json", encoding="utf-8")
+    assert devclient.recent_servers(str(overlay)) == []
 
 
 # ----------------------------------------------------------------------
@@ -167,10 +184,10 @@ def test_client_syncs_the_tree_into_the_overlay_and_reports_state(
         assert (overlay / "app" / "assets" / "note.txt").read_text(encoding="utf-8") == "hi"
         assert client.synced_version == server.snapshot.version
         assert states[:3] == ["connecting", "connected", "syncing"]
-        # The URL is remembered for --dev-client builds.
-        assert devclient.saved_server_url(str(overlay)) == client.url
-        # Everything was new to this overlay, so the synced modules are reloaded (a
-        # --dev-client shell's placeholder entry is replaced the same way).
+        # The server is remembered, so the next launch reconnects.
+        assert devclient.recent_servers(str(overlay))[0]["url"] == client.url
+        # Everything was new to this overlay, so the synced modules are reloaded
+        # (PythonNative Go's home screen entry is replaced the same way).
         _wait(lambda: len(reloads) == 1)
         assert reloads[0] == ["app", "app.main"]
         _wait(lambda: len(server.clients) == 1)
@@ -323,13 +340,21 @@ def test_log_forwarding_tees_stdout_to_the_server(server: DevServer, tmp_path: P
 # ----------------------------------------------------------------------
 
 
-def test_start_if_configured_needs_an_overlay_and_a_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv(devclient.SERVER_URL_ENV, raising=False)
+def test_start_if_configured_needs_an_overlay_and_a_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(devclient, "_pending_link", None)
     monkeypatch.setattr(devclient, "overlay_root", lambda: None)
     assert devclient.start_if_configured() is None
     monkeypatch.setattr(devclient, "overlay_root", lambda: str(tmp_path))
-    assert devclient.start_if_configured() is None  # overlay but no URL anywhere
+    assert devclient.start_if_configured() is None  # overlay but no server anywhere
 
+
+def test_a_connect_link_before_startup_wins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(devclient, "_pending_link", None)
+    monkeypatch.setattr(devclient, "_startup_checked", False)
+    monkeypatch.setattr(devclient, "_current", None)
+    monkeypatch.setattr(devclient, "overlay_root", lambda: str(tmp_path))
+    monkeypatch.setenv("PN_ENTRY_MODULE", "app.entry")
+    devclient._remember_server(str(tmp_path), "ws://192.168.1.9:8765/ws?role=client", "old")
     started: List[Any] = []
 
     def fake_start(url: str, root: str, **kw: Any) -> str:
@@ -337,17 +362,27 @@ def test_start_if_configured_needs_an_overlay_and_a_url(tmp_path: Path, monkeypa
         return "client"
 
     monkeypatch.setattr(devclient, "start", fake_start)
-    monkeypatch.setenv(devclient.SERVER_URL_ENV, "ws://10.0.2.2:8765/ws?role=client")
-    monkeypatch.setenv("PN_ENTRY_MODULE", "app.entry")
+    assert devclient.handle_link("pn-com.example.app://connect?url=http%3A%2F%2F10.0.2.2%3A8765%2F") is True
+    assert devclient.handle_link("https://example.com/") is False
     assert devclient.start_if_configured() == "client"
-    assert started == [("ws://10.0.2.2:8765/ws?role=client", str(tmp_path), {"entry_module": "app.entry"})]
+    assert started == [("http://10.0.2.2:8765/", str(tmp_path), {"entry_module": "app.entry"})]
 
 
-def test_start_if_configured_falls_back_to_the_saved_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv(devclient.SERVER_URL_ENV, raising=False)
+def test_a_connect_link_after_startup_connects_at_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(devclient, "_startup_checked", True)
+    monkeypatch.setattr(devclient, "_current", None)
+    monkeypatch.setattr(devclient, "overlay_root", lambda: str(tmp_path))
+    started: List[Any] = []
+    monkeypatch.setattr(devclient, "start", lambda url, root, **kw: started.append((url, root)))
+    assert devclient.handle_link("pn-com.pythonnative.go://connect?url=http%3A%2F%2Flocalhost%3A8765%2F")
+    assert started == [("http://localhost:8765/", str(tmp_path))]
+
+
+def test_start_if_configured_reconnects_to_the_last_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(devclient, "_pending_link", None)
     monkeypatch.delenv("PN_ENTRY_MODULE", raising=False)
     monkeypatch.setattr(devclient, "overlay_root", lambda: str(tmp_path))
-    devclient._save_server_url(str(tmp_path), "ws://192.168.1.9:8765/ws?role=client")
+    devclient._remember_server(str(tmp_path), "ws://192.168.1.9:8765/ws?role=client", "demo")
     started: List[Any] = []
 
     def fake_start(url: str, root: str, **kw: Any) -> str:
@@ -357,35 +392,41 @@ def test_start_if_configured_falls_back_to_the_saved_url(tmp_path: Path, monkeyp
     monkeypatch.setattr(devclient, "start", fake_start)
     assert devclient.start_if_configured() == "client"
     assert started == ["ws://192.168.1.9:8765/ws?role=client"]
+    devclient._forget_last_server(str(tmp_path))
+    assert devclient.start_if_configured() is None
 
 
-def test_placeholder_main_source_exports_the_connect_screen() -> None:
-    source = devclient.placeholder_main_source()
+def test_go_main_source_exports_the_home_screen() -> None:
+    source = devclient.go_main_source()
     namespace: dict = {}
     exec(compile(source, "main.py", "exec"), namespace)
-    assert namespace["App"] is devclient.ConnectScreen
+    assert namespace["App"] is devclient.GoHome
     assert namespace["__all__"] == ["App"]
 
 
-def test_connect_screen_renders_without_a_client(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_go_home_renders_without_a_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from pythonnative.testing import render
 
     monkeypatch.setattr(devclient, "_current", None)
-    result = render(devclient.ConnectScreen())
+    monkeypatch.setattr(devclient, "overlay_root", lambda: str(tmp_path))
+    devclient._remember_server(str(tmp_path), "ws://10.0.0.5:8765/ws?role=client", "Inbox")
+    result = render(devclient.GoHome())
     try:
-        text = result.text()
-        assert "Dev server address" in text
-        assert "idle" in text
+        text = " ".join(result.text())
+        assert "PythonNative Go" in text
+        assert "pn start" in text
+        assert "Inbox" in text and "10.0.0.5:8765" in text
         result.get_by_text("Connect")
     finally:
         result.unmount()
 
 
-def test_overlay_manifest_skips_caches_and_the_saved_url(tmp_path: Path) -> None:
+def test_overlay_manifest_skips_caches_packages_and_the_server_list(tmp_path: Path) -> None:
     overlay = tmp_path / "overlay"
     _write(overlay / "app" / "main.py", "x")
     _write(overlay / "app" / "__pycache__" / "main.pyc", "junk")
-    _write(overlay / "server.json", json.dumps({"url": "ws://x"}))
-    client = devclient.DevClient("ws://127.0.0.1:1/ws", str(overlay), forward_logs=False)
+    _write(overlay / "site-packages" / "pkg" / "__init__.py", "")
+    _write(overlay / "servers.json", json.dumps({"servers": []}))
+    client = devclient.DevClient("ws://127.0.0.1:1/ws", str(overlay), forward_logs=False, agent=False)
     assert set(client._overlay_manifest()) == {"app/main.py"}
-    assert os.path.exists(overlay / "server.json")
+    assert os.path.exists(overlay / "servers.json")

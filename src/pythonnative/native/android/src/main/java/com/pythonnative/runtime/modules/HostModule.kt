@@ -23,7 +23,7 @@ class HostModule : NativeModule {
     override fun call(method: String, args: JSONObject, promise: Promise) {
         when (method) {
             "show_error" -> {
-                ErrorOverlay.show(args.optLong("screen"), args.optString("title"), args.optString("trace"))
+                ErrorOverlay.show(args)
                 promise.resolve(null)
             }
             "dismiss_error" -> { ErrorOverlay.dismiss(); promise.resolve(null) }

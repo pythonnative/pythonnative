@@ -66,7 +66,8 @@ keeps dirtying itself for more than fifty passes raises
 | Bridge | Fabric: one C++ shadow tree commit per render; TurboModules for device APIs | One JSON transaction per commit applied by Swift / Kotlin component managers; named native modules for device APIs |
 | Threading | UI runs on the main thread; JS on a separate thread | Native UI on its platform thread; Python on a dedicated asyncio application thread |
 | Distribution | Metro bundler ships a JS bundle | `pn build` bundles your `app/` and the `pythonnative` package into the native project |
-| Dev loop | Metro dev server; Expo Go / dev client on device; Fast Refresh | `pn start` dev server; debug builds and the `--dev-client` shell connect over an authenticated WebSocket; Fast Refresh reloads `.py` modules in place |
+| Dev loop | Metro dev server; Expo Go / dev client on device; Fast Refresh | `pn start` dev server with a QR code; PythonNative Go or the project's debug build connect over an authenticated WebSocket; Fast Refresh reloads `.py` modules in place |
+| Dev tools | React Native DevTools, LogBox, the dev menu | DevTools served by `pn start` (components, console and REPL, problems, network, performance); the dev menu, element inspector, and performance monitor on device; `debugpy` breakpoints from VS Code |
 | Navigation | `navigation.navigate("Detail", {id})` with a typed `ParamList` | `nav.push(DetailScreen(id=42))`; navigators are module-level values |
 | Styles and themes | `StyleSheet.create({...})`; separate app and navigation themes | `class Styles(pn.StyleSheet)` namespaces; one `Theme` dataclass for the app and its navigators |
 | Global state | Zustand, Redux, or Jotai | `pn.Store` with `pn.use_store(store, selector)` |
