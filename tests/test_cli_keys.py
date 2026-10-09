@@ -121,3 +121,33 @@ def test_open_in_editor_spawns_the_command(tmp_path: Path, monkeypatch: pytest.M
     assert editor.open_in_editor("app/main.py", 1, str(root)) == str((root / "app" / "main.py").resolve())
     assert launched == [["ed", f"{(root / 'app' / 'main.py').resolve()}:1"]]
     assert editor.open_in_editor("nope.py", 1, str(root)) is None
+
+
+# ======================================================================
+# Simulator selection
+# ======================================================================
+
+
+def test_simulator_selection_prefers_a_full_size_iphone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A compact model sorted first by name must not replace the iPhone 15 the E2E layouts assume."""
+    import json
+    import subprocess
+
+    from pythonnative.cli import launch
+
+    devices = {
+        "devices": {
+            "com.apple.CoreSimulator.SimRuntime.iOS-26-2": [
+                {"name": "iPhone SE (3rd generation)", "udid": "SE", "isAvailable": True},
+                {"name": "iPhone 17 Pro", "udid": "P17", "isAvailable": True},
+            ],
+            "com.apple.CoreSimulator.SimRuntime.iOS-18-2": [{"name": "iPhone 15", "udid": "I15", "isAvailable": True}],
+        }
+    }
+    monkeypatch.setattr(launch, "booted_ios_udid", lambda: None)
+    monkeypatch.setattr(
+        launch.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, json.dumps(devices), "")
+    )
+    assert launch.select_ios_simulator() == "I15"
+    monkeypatch.setattr(launch, "booted_ios_udid", lambda: "BOOTED")
+    assert launch.select_ios_simulator() == "BOOTED"

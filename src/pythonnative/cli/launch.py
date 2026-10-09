@@ -81,7 +81,12 @@ def booted_ios_udid() -> Optional[str]:
 
 
 def select_ios_simulator() -> Optional[str]:
-    """A simulator UDID to target: the booted one, else the newest available iPhone."""
+    """A simulator UDID to target: the booted one, else an iPhone 15, else the first available iPhone.
+
+    The fallback order is deliberate: a full-size iPhone keeps layouts (and
+    the E2E suite's taps) the same from run to run, where picking by name
+    could land on a compact model such as the iPhone SE.
+    """
     booted = booted_ios_udid()
     if booted:
         return booted
@@ -95,16 +100,14 @@ def select_ios_simulator() -> Optional[str]:
         data = json.loads(result.stdout or "{}")
     except json.JSONDecodeError:
         return None
-    runtimes: List[tuple] = []
-    for runtime, entries in (data.get("devices") or {}).items():
-        version = tuple(int(part) for part in runtime.rsplit("iOS-", 1)[-1].split("-") if part.isdigit())
-        for entry in entries or []:
-            if entry.get("isAvailable") and str(entry.get("name") or "").lower().startswith("iphone"):
-                runtimes.append((version, str(entry.get("name")), str(entry.get("udid"))))
-    if not runtimes:
-        return None
-    runtimes.sort(reverse=True)
-    return runtimes[0][2]
+    devices: List[Dict[str, Any]] = [d for entries in (data.get("devices") or {}).values() for d in (entries or [])]
+    for device in devices:
+        if "iphone 15" in str(device.get("name") or "").lower() and device.get("isAvailable"):
+            return str(device.get("udid"))
+    for device in devices:
+        if device.get("isAvailable") and str(device.get("name") or "").lower().startswith("iphone"):
+            return str(device.get("udid"))
+    return None
 
 
 def boot_ios_simulator(udid: str) -> None:
