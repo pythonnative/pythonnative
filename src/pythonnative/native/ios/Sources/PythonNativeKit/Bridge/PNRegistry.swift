@@ -123,6 +123,7 @@ enum PNBuiltins {
         registry.registerComponent("VirtualList") { PNVirtualListManager() }
 
         registry.registerModule(HostModule.self)
+        registry.registerModule(DevSupportModule.self)
         registry.registerModule(DeviceModuleAdapter<DeviceModule>.self)
         registry.registerModule(AlertModuleAdapter<AlertModule>.self)
         registry.registerModule(StorageModuleAdapter<StorageModule>.self)

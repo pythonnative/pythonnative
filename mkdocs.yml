@@ -79,6 +79,8 @@ nav:
     - Android: guides/android.md
     - iOS: guides/ios.md
     - Development Workflow: guides/dev-workflow.md
+    - PythonNative Go & DevTools: guides/devtools.md
+    - Debugging: guides/debugging.md
     - Browser Preview: guides/browser-preview.md
     - Navigation: guides/navigation.md
     - Styling: guides/styling.md
@@ -145,6 +147,7 @@ nav:
     - Platform metrics: api/platform_metrics.md
     - SDK: api/sdk.md
     - Dev server: api/devserver.md
+    - DevTools agent: api/devtools.md
     - Hot reload: api/hot_reload.md
     - Diagnostics: api/diagnostics.md
     - Utilities: api/utils.md

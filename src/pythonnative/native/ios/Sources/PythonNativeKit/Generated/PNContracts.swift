@@ -3,8 +3,8 @@ import CoreFoundation
 
 /// Executable generated contracts. No schema JSON is interpreted on the mount path.
 public enum PNContracts {
-    public static let fingerprint = "a0f3693294a26f040d30268e868e30defcca0c0ad1980af3565d832ae91691bf"
-    public static let protocolVersion = 5
+    public static let fingerprint = "ac20882ccf63954e430741f43a165fa789d7ff97926256a62ac1d84c61848716"
+    public static let protocolVersion = 6
     public static let yogaVersion = "3.2.1"
     private struct Field {
         let matches: (Any) -> Bool
@@ -5538,7 +5538,7 @@ public enum PNContracts {
         commands[name + "." + method]?(args) ?? false
     }
     public static func validateModule(_ name: String, _ method: String, _ args: [String: Any]) -> Bool {
-        if ["Host", "Layout", "Runtime"].contains(name) { return true }
+        if ["DevSupport", "Host", "Layout", "Runtime"].contains(name) { return true }
         return modules[name + "." + method]?(args) ?? false
     }
 }

@@ -25,7 +25,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         for context in connectionOptions.urlContexts {
             LinkingModule.deliver(url: context.url.absoluteString)
         }
-        let window = UIWindow(windowScene: windowScene)
+        // PNWindow opens the dev menu (shake, Cmd+D) once Python enables
+        // development support; release builds never enable it.
+        let window = PNWindow(windowScene: windowScene)
         let root = ViewController()
         let nav = UINavigationController(rootViewController: root)
         window.rootViewController = nav

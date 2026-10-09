@@ -1,7 +1,33 @@
 import UIKit
 
-/// Window and presenter lookups shared by modals, alerts, pickers, and portals.
-public enum PNWindow {
+/// The app's window, plus the window and presenter lookups shared by
+/// modals, alerts, pickers, and portals.
+///
+/// The template's scene delegate creates its window as a `PNWindow` so
+/// development builds can open the dev menu: a shake (Ctrl+Cmd+Z in the
+/// Simulator) or Cmd+D sends `DevSupport`'s `menu` event, and Cmd+R sends
+/// `reload`. Both do nothing until Python enables `DevSupport`.
+open class PNWindow: UIWindow {
+    open override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+        if motion == .motionShake, DevSupportModule.trigger("menu") { return }
+        super.motionEnded(motion, with: event)
+    }
+
+    open override var keyCommands: [UIKeyCommand]? {
+        guard DevSupportModule.isEnabled else { return super.keyCommands }
+        let commands = [
+            UIKeyCommand(input: "d", modifierFlags: .command, action: #selector(pnDevMenuCommand)),
+            UIKeyCommand(input: "r", modifierFlags: .command, action: #selector(pnReloadCommand)),
+        ]
+        if #available(iOS 15.0, *) {
+            for command in commands { command.wantsPriorityOverSystemBehavior = true }
+        }
+        return (super.keyCommands ?? []) + commands
+    }
+
+    @objc private func pnDevMenuCommand() { DevSupportModule.trigger("menu") }
+    @objc private func pnReloadCommand() { DevSupportModule.trigger("reload") }
+
     /// The app's key window (scene-based lookup, no deprecated APIs).
     public static func keyWindow() -> UIWindow? {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }

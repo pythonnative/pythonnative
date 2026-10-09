@@ -54,14 +54,14 @@ def generate(destination: str | Path) -> list[Path]:
             swift.extend(
                 [
                     f'    public var has_{key}: Bool {{ values["{key}"] != nil }}',
-                    f'    public private(set) lazy var `{key}`: {st.rstrip("?")}? = {{ guard let value = values["{key}"], !(value is NSNull) else {{ return nil }}; return try! PNValues.decode({st.rstrip("?")}.self, value) }}()',  # noqa: E501
+                    f'    public private(set) lazy var `{key}`: {st.rstrip("?")}? = {{ guard let value = values["{key}"], !(value is NSNull) else {{ return nil }}; return PNValues.decodeOrRecord({st.rstrip("?")}.self, value, field: "{key}") }}()',  # noqa: E501
                 ]
             )
             decoded = types.kotlin_decode(field, f'values.get("{key}")', hint + identifier(key))
             kotlin.extend(
                 [
                     f'    val has_{key}: Boolean get() = values.has("{key}")',
-                    f'    val `{key}`: {kt.rstrip("?")}? by lazy(LazyThreadSafetyMode.NONE) {{ if (PNValues.isNull(values.opt("{key}"))) null else {decoded} }}',  # noqa: E501
+                    f'    val `{key}`: {kt.rstrip("?")}? by lazy(LazyThreadSafetyMode.NONE) {{ if (PNValues.isNull(values.opt("{key}"))) null else PNValues.decodeOrRecord("{key}") {{ {decoded} }} }}',  # noqa: E501
                 ]
             )
 

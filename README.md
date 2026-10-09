@@ -42,7 +42,9 @@ PythonNative is a cross-platform toolkit for building native Android and iOS app
 - **Device APIs:** Python facades expose camera, location, notifications, storage, permissions, keyboard, dimensions and pixel ratio, device info, localization, accessibility settings, and other native services, with a Python fallback for headless tests. Test permissions and platform behavior on your deployment targets.
 - **Native extension SDK:** Python dataclasses and protocols define contracts; `define_component` returns a typed element factory and `pn codegen` generates props and module adapters for Swift and Kotlin. Plugins package native sources and resources, and builds verify matching contracts at startup.
 - **Testing library:** `pythonnative.testing` renders components headlessly with Testing Library-style queries (`get_by_role`, `get_by_placeholder_text`, `within`, `find_by_*`), a virtual clock for timers, and a pytest plugin that resets the runtime between tests.
-- **Development tools:** `pn start` serves the browser preview and connected mobile dev clients. Fast Refresh preserves compatible component state, while diagnostics report errors and invalid hook usage. Changes to native inputs trigger a rebuild.
+- **PythonNative Go:** a prebuilt dev client runs any project without native code on a simulator, emulator, or phone, with no Xcode or Gradle build. `pn start` prints a QR code that opens the project on a phone, and `i` / `a` open it on the iOS Simulator or an Android emulator. Projects that add native code run in their own debug build, which `pn run` rebuilds only when something native changes.
+- **DevTools and debugging:** `pn start` serves DevTools, with a component tree showing props and hooks (and editable state), a console with a REPL inside the running app, problems with component stacks and source excerpts, network requests, and live performance with trace capture. VS Code attaches `debugpy` breakpoints to Python on the preview, a simulator, or a phone. On device, a dev menu (shake or Cmd+D) offers reload, an element inspector, and a performance monitor, and errors show a screen with the component stack and your source.
+- **Development tools:** Fast Refresh preserves compatible component state, `pn lint` checks the rules of hooks, and `pn init` scaffolds tests, type checking, debugger settings, and CI.
 - **Browser preview:** `pn preview` runs your Python application against a browser renderer with DOM widgets, Yoga WebAssembly layout, and JavaScript animation graphs. It supports iteration on application logic and UI; fonts, platform controls, and device APIs require mobile testing.
 - **App packaging and dependency locks:** `pn run` and `pn build` stage bundled app templates, native libraries, and Python sources. Target-specific wheel locks record dependency versions and hashes for mobile builds. Binary dependencies need compatible mobile wheels; `pn deps` reports target resolution.
 
@@ -79,9 +81,8 @@ def App() -> pn.Node:
 
 ```bash
 pn init my-app && cd my-app
-pn preview          # dev server + browser preview with Fast Refresh
-pn run ios          # in another terminal: debug build that connects to the same server
-pn run android
+pn start            # dev server: scan the QR code, or press i (iOS), a (Android), w (browser), j (DevTools)
+pn run ios          # the project's own debug build, for projects that add native code
 pn build ios        # standalone release artifacts
 ```
 

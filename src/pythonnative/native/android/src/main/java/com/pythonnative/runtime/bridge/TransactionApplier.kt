@@ -1,19 +1,36 @@
 package com.pythonnative.runtime.bridge
 
 import android.view.View
+import com.pythonnative.generated.PNValues
 import com.pythonnative.runtime.PNBridge
 import com.pythonnative.runtime.gestures.GestureCoordinator
 import org.json.JSONObject
 
 /** Applies validated batches. Runtime inconsistencies fail the entire surface. */
 class TransactionApplier(private val registry: ViewRegistry) {
-    /** Apply a single op. */
+    /**
+     * Apply a single op.
+     *
+     * A generated prop getter that can't decode its value records the
+     * failure ([PNValues.decodeOrRecord]) and reads as null; the op that
+     * read it then fails the commit.
+     */
     fun applyOp(op: Op) {
+        PNValues.takeDecodeFailure()
+        val (tag, type) = when (op) {
+            is Op.Create -> op.tag to op.typeName
+            is Op.Update -> op.tag to registry.get(op.tag)?.typeName
+            is Op.Insert -> op.parent to registry.get(op.parent)?.typeName
+            is Op.Destroy -> op.tag to registry.get(op.tag)?.typeName
+        }
         when (op) {
             is Op.Create -> create(op)
             is Op.Update -> update(op)
             is Op.Insert -> insert(op)
             is Op.Destroy -> destroy(op)
+        }
+        PNValues.takeDecodeFailure()?.let { failure ->
+            throw IllegalStateException("props for ${type ?: "view"} tag $tag: $failure")
         }
     }
 

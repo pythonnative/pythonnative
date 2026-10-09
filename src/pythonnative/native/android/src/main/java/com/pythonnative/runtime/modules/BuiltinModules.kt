@@ -2,6 +2,7 @@ package com.pythonnative.runtime.modules
 
 import android.app.Activity
 import android.content.Intent
+import com.pythonnative.runtime.PNBridge
 import com.pythonnative.runtime.bridge.PNRegistry
 
 /**
@@ -11,6 +12,7 @@ import com.pythonnative.runtime.bridge.PNRegistry
  */
 object BuiltinModules {
     val host = HostModule()
+    val devSupport = DevSupportModule()
     val device = DeviceModule()
     val alert = AlertModule()
     val storage = StorageModule()
@@ -35,6 +37,7 @@ object BuiltinModules {
 
     private val all: List<NativeModule> = listOf(
         host,
+        devSupport,
         com.pythonnative.generated.DeviceModuleAdapter(device),
         com.pythonnative.generated.AlertModuleAdapter(alert),
         com.pythonnative.generated.StorageModuleAdapter(storage),
@@ -72,6 +75,7 @@ object BuiltinModules {
         keyboard.attach()
         accessibilityInfo.attach(activity)
         localization.attach(activity)
+        devSupport.attach(activity)
         activity.intent?.dataString?.let { linking.onDeepLink(it) }
     }
 
@@ -92,8 +96,14 @@ object BuiltinModules {
     }
 
     /** Forward activity lifecycle transitions to the `AppState` module. */
-    fun onActivityResumed() = appState.transition("active")
-    fun onActivityPaused() = appState.transition("inactive")
+    fun onActivityResumed() {
+        appState.transition("active")
+        PNBridge.activity()?.let { devSupport.resume(it) }
+    }
+    fun onActivityPaused() {
+        appState.transition("inactive")
+        devSupport.pause()
+    }
     fun onActivityStopped() = appState.transition("background")
 
     /** Release observers when the activity is destroyed. */
@@ -104,5 +114,6 @@ object BuiltinModules {
         keyboard.detach()
         accessibilityInfo.detach(activity)
         localization.detach(activity)
+        devSupport.detach(activity)
     }
 }

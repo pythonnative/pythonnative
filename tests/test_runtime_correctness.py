@@ -462,7 +462,7 @@ def test_use_ref_initial_value_and_use_color_scheme_literal() -> None:
 def test_provider_value_is_keyword_only() -> None:
     ctx = pn.create_context("default")
     with pytest.raises(TypeError):
-        ctx.Provider("value", Text("x"))  # type: ignore[call-arg]
+        ctx.Provider("value", Text("x"))  # type: ignore[call-arg, arg-type]
     el = ctx.Provider(Text("x"), value="value")
     assert el.props == {"value": "value"}
 

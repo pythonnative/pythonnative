@@ -56,7 +56,7 @@ object PNContracts {
     }
     fun validateCommand(name: String, method: String, args: JSONObject): Boolean = commands["$name.$method"]?.invoke(args) ?: false
     fun validateModule(name: String, method: String, args: JSONObject): Boolean {
-        if (name in setOf("Host", "Layout", "Runtime")) return true
+        if (name in setOf("DevSupport", "Host", "Layout", "Runtime")) return true
         return modules["$name.$method"]?.invoke(args) ?: false
     }
 }

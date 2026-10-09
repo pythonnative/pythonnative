@@ -2,6 +2,8 @@ import {ListStore} from "../../src/pythonnative/devserver/static/list-store.js";
 import {Renderer, transformToCSS, easingFor, decayFinalValue, decayAt, snapTarget, scrollPayload, keyPressName, screenTransition} from '../../src/pythonnative/devserver/static/renderer.js';
 import {PreviewHost, Screen, localeRecord, scriptResult} from '../../src/pythonnative/devserver/static/host.js';
 import {matches} from '../../src/pythonnative/devserver/static/contracts.js';
+import {runDevToolsTests} from './devtools.mjs';
+import specification from '../../src/pythonnative/devserver/static/schema.js';
 const assert = (condition, message) => { if (!condition) throw Error(message); };
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const fixtures = await (await fetch('../contracts/validation.json')).json();
@@ -19,7 +21,7 @@ const renderer = new Renderer({emit: (...args) => events.push(args), gesture: (.
   animationFinished() {}, scheme: () => 'light', overlays: () => overlay, bottomInset: () => 0,
   frameWidth: () => 390, pointInFrame: () => ({x:0, y:0}), statusBar() {}});
 let revision = 0;
-const envelope = ops => ({version:5, application:'browser-test', surface:1, revision:revision+1, ops});
+const envelope = ops => ({version:specification.protocol, application:'browser-test', surface:1, revision:revision+1, ops});
 const commit = ops => { const result=renderer.apply(envelope(ops)); assert(result.ok, result.error); revision++; };
 commit([['c',1,'Column',{width:300}], ['c',2,'TextInput',{value:'hello', multiline:false, font_size:20,
   _pn_events:['on_change','on_selection_change']}], ['i',1,2,0], ['c',3,'Text',{text:'Label',color:'#ff0000'}], ['i',1,3,1]]);
@@ -479,14 +481,7 @@ screen.detachRoot(renderer.views.get(65));
 assert(!screen.stackOwnsHeader && screen.header.style.display === '' && screen.contentTop() === topBefore, 'the host header returns with the stack gone');
 commit([['d',66], ['d',65]]);
 
-// Host diagnostics survive destruction of the rendering surface.
-await call('Host', 'show_error', {screen:99,title:'Renderer failed',trace:'Traceback: sample'});
-assert(document.getElementById('pn-error-overlay')?.textContent.includes('Traceback: sample'), 'host shows a traceback');
-renderer.reset();
-assert(document.getElementById('pn-error-overlay'), 'renderer reset preserves host diagnostics');
-document.querySelector('#pn-error-overlay button').click();
-assert(callbacks.some(([kind, tag, name]) => kind === 'host' && tag === 99 && name === 'reload'), 'host reload bypasses renderer events');
-await call('Host', 'dismiss_error');
-assert(!document.getElementById('pn-error-overlay'), 'host dismiss releases the overlay');
+// RFC 0006: DevSupport, the structured error screen, and DevTools helpers.
+await runDevToolsTests({renderer, host, commit, callbacks, call, stage, screensEl, overlaysEl});
 const result=document.getElementById('result'); result.dataset.status='passed';
 result.textContent=`${fixtures.length} shared fixtures and renderer acceptance assertions passed`;

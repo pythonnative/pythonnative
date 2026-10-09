@@ -48,6 +48,7 @@ from .. import journal as _journal
 from ..component import Component
 from ..element import ERROR_BOUNDARY, FRAGMENT, SUSPENSE, Element
 from ..equality import equal, equal_props
+from ..errors import add_component_frame, complete_component_stack
 from ..events import extract_events, get_event_registry
 from ..hooks import Context, HookState, install_hook_state, provider_environment, restore_hook_state
 from ..journal import Journal, JournalDict
@@ -668,6 +669,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 try:
                     state.flush_layout_effects()
                 except Exception as exc:
+                    if diagnostics.is_dev():
+                        complete_component_stack(exc, self._component_path(state.vnode))
                     self._route_error(state.vnode, exc)
                     routed = True
         return routed
@@ -681,6 +684,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 try:
                     state.flush_pending_effects()
                 except Exception as exc:
+                    if diagnostics.is_dev():
+                        complete_component_stack(exc, self._component_path(state.vnode))
                     self._route_error(state.vnode, exc)
                     routed = True
         return routed
@@ -759,6 +764,10 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             if self._suspense_salvage is None:
                 self._suspense_salvage = {}
             self._suspense_salvage.setdefault((id(element.type), element.key), []).append(hook_state)
+            raise
+        except Exception as exc:
+            if diagnostics.is_dev():
+                add_component_frame(exc, element.type)
             raise
         node = VNode(element, children)
         for child in children:
@@ -875,7 +884,13 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 raise signal
             hook_state._async_task = None
             hook_state._dirty = False
-            return normalize_children(previous.result(), owner=label, dynamic=True)
+            try:
+                result = previous.result()
+            except Exception as exc:
+                if diagnostics.is_dev():
+                    add_component_frame(exc, component)
+                raise
+            return normalize_children(result, owner=label, dynamic=True)
 
         hook_state.begin_render(label)
         token = install_hook_state(hook_state)
@@ -891,6 +906,11 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 signal.key = (id(element.type), element.key)
             if not signal.label:
                 signal.label = label
+            raise
+        except Exception as exc:
+            hook_state.abort_render()
+            if diagnostics.is_dev():
+                add_component_frame(exc, component)
             raise
         except BaseException:
             hook_state.abort_render()
@@ -955,8 +975,25 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             hook_state.vnode = vnode
             hook_state.owner = self
 
-        with self._providers_above(vnode):
-            self._local_update(vnode, work)
+        try:
+            with self._providers_above(vnode):
+                self._local_update(vnode, work)
+        except Suspend:
+            raise
+        except Exception as exc:
+            if diagnostics.is_dev():
+                complete_component_stack(exc, self._component_path(vnode))
+            raise
+
+    @staticmethod
+    def _component_path(node: Optional[VNode]) -> List[Any]:
+        """The components from ``node`` up to the root, innermost first."""
+        path: List[Any] = []
+        while node is not None:
+            if node.is_component:
+                path.append(node.element.type)
+            node = node.parent
+        return path
 
     def _local_update(self, node: VNode, work: Callable[[], Any]) -> None:
         """Run ``work`` on ``node`` and repair the surrounding native structure.
@@ -1117,6 +1154,10 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             children = self._reconcile_child_list(old.children, rendered)
         except Suspend:
             hook_state._dirty = True
+            raise
+        except Exception as exc:
+            if diagnostics.is_dev():
+                add_component_frame(exc, new_el.type)
             raise
         old.children = children
         for child in children:

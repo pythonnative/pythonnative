@@ -1,8 +1,8 @@
 # Dev server and dev client
 
 The development loop is a server process (`pn start`) and any number of
-clients: the browser preview and debug builds on simulators, emulators,
-and devices. See the [Development workflow](../guides/dev-workflow.md)
+clients: the browser preview, PythonNative Go, and debug builds on
+simulators, emulators, and devices. See the [Development workflow](../guides/dev-workflow.md)
 guide for how they fit together; this page documents the modules.
 
 ## `pythonnative.devserver`
@@ -41,6 +41,51 @@ guide for how they fit together; this page documents the modules.
       members_order: source
       filters: ["!^_"]
 
+### DevTools routing
+
+::: pythonnative.devserver.hub
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
+
+### Compatibility checks
+
+::: pythonnative.devserver.compat
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
+
+### Package sync
+
+::: pythonnative.devserver.packages
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
+
+### Editor links
+
+::: pythonnative.devserver.editor
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
+
+### QR codes
+
+::: pythonnative.devserver.qr
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
+
 ### WebSocket
 
 ::: pythonnative.devserver.ws
@@ -71,6 +116,15 @@ guide for how they fit together; this page documents the modules.
 ## `pythonnative.bridge.web`
 
 ::: pythonnative.bridge.web
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
+
+## `pythonnative.project.go`
+
+::: pythonnative.project.go
     options:
       show_root_heading: false
       show_root_toc_entry: false

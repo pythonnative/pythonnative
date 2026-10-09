@@ -1,45 +1,52 @@
-"""The on-device dev client: sync sources from ``pn start`` and Fast Refresh.
+"""The on-device dev client: pair with ``pn start``, sync sources, and serve DevTools.
 
-A debug build of a PythonNative app is a *dev client*. On launch it
-connects to the dev server (``pn start`` / ``pn preview`` / ``pn run``)
-over WebSocket, reports the sources it already holds, receives whatever
-is missing, and from then on applies every save as a Fast Refresh. Its
-``print`` output and errors stream back to the terminal running the
-server, so the device log viewer is optional.
+Every debug build is a *dev client*: PythonNative Go (the prebuilt,
+project-independent client) and a project's own ``pn run`` build alike.
+It connects to the dev server over WebSocket and speaks version 2 of the
+dev session protocol (RFC 0006):
 
-How the pieces fit:
+- **Handshake.** ``hello`` describes the client's runtime (framework and
+  Python versions, bridge protocol, contract fingerprint, plugins,
+  bundled distributions) and the sources its overlay already holds. The
+  server answers with a ``sync`` of whatever is missing, or with
+  ``incompatible`` and the command that fixes the mismatch.
+- **Sources and packages.** ``sync`` and ``update`` write files into the
+  writable overlay that shadows the bundle (see
+  ``pythonnative.hot_reload.configure_dev_environment``) and apply them
+  with Fast Refresh. ``packages`` installs pure-Python distributions
+  from the developer's environment into the overlay's ``site-packages``.
+- **DevTools.** ``rpc`` requests go to the
+  [devtools agent][pythonnative.devtools.agent.Agent] and are answered
+  with ``rpc_result``; the agent's events go back as ``event``. ``tunnel``
+  messages carry TCP streams, which the debugger uses.
+- **Logs.** ``print`` output and errors stream back to the terminal and
+  DevTools as ``log`` and ``error`` messages.
 
-- The native template configures a writable **overlay** directory
-  (``pythonnative.hot_reload.configure_dev_environment``) ahead of the
-  bundled sources on ``sys.path`` and exposes the server URL the CLI
-  baked in as ``PN_DEV_SERVER``. ``pythonnative.bootstrap.start(dev=True)``
-  calls [`start_if_configured`][pythonnative.devclient.start_if_configured].
-- A build made with ``pn run <platform> --dev-client`` has no app of
-  its own: its bundled ``app/main.py`` renders
-  [`ConnectScreen`][pythonnative.devclient.ConnectScreen], where the
-  developer types (or picks) a server URL. Once the first sync lands,
-  the real ``app.main`` from the overlay shadows the placeholder and
-  the screen remounts into the developer's app. The URL is remembered
-  for the next launch.
+Clients are pointed at a server by a connect link,
+``pn-<application id>://connect?url=<server URL>``, which ``pn run``, ``pn
+go``, and a scanned QR code open. The last server is remembered, so a
+relaunch reconnects. Without one, PythonNative Go shows its
+[home screen][pythonnative.devclient.GoHome].
 
-All network I/O runs on a daemon thread; file writes happen there too,
-and the reload itself runs on the application thread through
-``call_on_application_thread``.
+All network I/O runs on daemon threads; file writes happen there too,
+and reloads run on the application thread.
 """
 
 from __future__ import annotations
 
 import base64
 import hashlib
+import importlib
 import json
 import os
+import shutil
 import socket
 import sys
 import threading
 import time
 import traceback
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from .assets import configure_native, manifest_for_sync
 from .devserver import ws
@@ -47,30 +54,106 @@ from .devserver.watcher import is_synced_file, modules_for_paths
 from .utils import overlay_root
 
 __all__ = [
-    "ConnectScreen",
+    "LINK_ENV",
+    "SESSION_PROTOCOL",
     "DevClient",
+    "GoHome",
+    "client_info",
+    "connect_link",
     "current",
+    "dev_scheme",
     "display_server_url",
+    "go_home",
+    "handle_link",
     "normalize_server_url",
-    "saved_server_url",
+    "parse_connect_link",
+    "recent_servers",
     "start",
     "start_if_configured",
     "stop",
 ]
 
-SERVER_URL_ENV = "PN_DEV_SERVER"
-"""Environment variable carrying the dev server URL baked in by ``pn run``."""
+SESSION_PROTOCOL = 2
+"""Version of the dev session protocol spoken with ``pn start``."""
 
-DEV_CLIENT_ENV = "PN_DEV_CLIENT"
-"""Set to ``1`` in ``--dev-client`` builds (the connect screen remembers URLs)."""
+LINK_ENV = "PN_CONNECT_LINK"
+"""Launch environment variable carrying a connect link.
 
-_SAVED_URL_FILE = "server.json"
+``pn run ios`` and ``pn go ios`` launch with it: iOS asks the user to
+confirm a link opened with ``simctl openurl``, while a launch environment
+variable reaches the app silently."""
+
+CLIENT_INFO_FILE = "_dev_client.json"
+"""Written into the bundled ``pythonnative`` package of debug builds: ``{"kind", "app_id", "scheme"}``."""
+
+_SERVERS_FILE = "servers.json"
+_PACKAGES_MANIFEST = ".pn-packages.json"
+_MAX_RECENT = 6
 _RECONNECT_DELAYS = (0.5, 1.0, 2.0, 3.0, 5.0)
 
 Logger = Callable[[str], None]
 
 _current: Optional["DevClient"] = None
 _lock = threading.Lock()
+_pending_link: Optional[str] = None
+_startup_checked = False
+
+
+# ======================================================================
+# Identity and links
+# ======================================================================
+
+
+def dev_scheme(app_id: str) -> str:
+    """The connect-link URL scheme of the dev client for ``app_id``.
+
+    ``pn-`` plus the application id, lowercased, with underscores turned
+    into hyphens (URL schemes allow letters, digits, ``+``, ``-``, and
+    ``.``): ``com.example.my_app`` becomes ``pn-com.example.my-app``.
+    """
+    return "pn-" + app_id.lower().replace("_", "-")
+
+
+def connect_link(scheme: str, server_url: str) -> str:
+    """``<scheme>://connect?url=<server URL>``, the link a QR code carries."""
+    return f"{scheme}://connect?url={quote(server_url, safe='')}"
+
+
+def parse_connect_link(link: str) -> Optional[str]:
+    """The server URL inside a connect link, or ``None`` when ``link`` isn't one."""
+    try:
+        parts = urlsplit(link.strip())
+    except ValueError:
+        return None
+    if not parts.scheme.startswith("pn-") or parts.netloc != "connect":
+        return None
+    url = dict(parse_qsl(parts.query)).get("url")
+    return url or None
+
+
+_info: Optional[Dict[str, Any]] = None
+
+
+def client_info() -> Dict[str, Any]:
+    """What kind of dev client this build is: ``{"kind": "go" | "app", "app_id", "scheme"}``.
+
+    The builder writes it into debug builds; a process without one (tests,
+    the host) is an ``"app"`` client.
+    """
+    global _info
+    if _info is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), CLIENT_INFO_FILE)
+        data: Dict[str, Any] = {}
+        try:
+            with open(path, encoding="utf-8") as handle:
+                loaded = json.load(handle)
+            if isinstance(loaded, dict):
+                data = loaded
+        except (OSError, ValueError):
+            pass
+        data.setdefault("kind", "app")
+        _info = data
+    return dict(_info)
 
 
 # ======================================================================
@@ -82,9 +165,9 @@ def normalize_server_url(text: str) -> str:
     """Turn whatever the developer typed into a dev-client WebSocket URL.
 
     Accepts ``192.168.1.20``, ``192.168.1.20:8765``, ``http://host:port``,
-    ``ws://host:port``, and full URLs with a path, such as the device URL
-    ``pn start`` prints (``http://192.168.1.20:8765/?token=...``). The
-    result always has the path ``/ws`` and the query
+    ``ws://host:port``, full URLs with a path such as the device URL
+    ``pn start`` prints (``http://192.168.1.20:8765/?token=...``), and
+    connect links. The result always has the path ``/ws`` and the query
     ``role=client&token=...``; the dev token is kept when the input
     carries one.
     """
@@ -93,6 +176,9 @@ def normalize_server_url(text: str) -> str:
     value = (text or "").strip()
     if not value:
         raise ValueError("empty server address")
+    inner = parse_connect_link(value)
+    if inner is not None:
+        value = inner
     if "://" not in value:
         value = "ws://" + value
     parts = urlsplit(value)
@@ -114,37 +200,52 @@ def normalize_server_url(text: str) -> str:
 
 
 def display_server_url(url: str) -> str:
-    """The short form of a dev-client URL for the connect screen (``host:port/?token=...``)."""
-    from .devserver.auth import QUERY_PARAM
-
-    parts = urlsplit(url)
-    token = dict(parse_qsl(parts.query)).get(QUERY_PARAM)
-    return parts.netloc + (f"/?{urlencode({QUERY_PARAM: token})}" if token else "")
+    """The short form of a dev-client URL (``host:port``), without the token."""
+    return urlsplit(url).netloc
 
 
-def _saved_url_path(overlay: str) -> str:
-    return os.path.join(overlay, _SAVED_URL_FILE)
+# ======================================================================
+# Recent servers
+# ======================================================================
 
 
-def saved_server_url(overlay: Optional[str] = None) -> Optional[str]:
-    """The URL remembered by a previous connection (``--dev-client`` builds)."""
+def _servers_path(overlay: str) -> str:
+    return os.path.join(overlay, _SERVERS_FILE)
+
+
+def recent_servers(overlay: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Servers this client connected to, most recent first: ``[{"url", "project", "last"}]``."""
     root = overlay or overlay_root()
     if not root:
-        return None
+        return []
     try:
-        with open(_saved_url_path(root), encoding="utf-8") as handle:
+        with open(_servers_path(root), encoding="utf-8") as handle:
             data = json.load(handle)
     except (OSError, ValueError):
-        return None
-    url = data.get("url") if isinstance(data, dict) else None
-    return str(url) if url else None
+        return []
+    entries = data.get("servers") if isinstance(data, dict) else None
+    return [entry for entry in entries or [] if isinstance(entry, dict) and entry.get("url")]
 
 
-def _save_server_url(overlay: str, url: str) -> None:
+def _remember_server(overlay: str, url: str, project: str) -> None:
+    entries = [entry for entry in recent_servers(overlay) if entry.get("url") != url]
+    entries.insert(0, {"url": url, "project": project, "last": time.time()})
     try:
         os.makedirs(overlay, exist_ok=True)
-        with open(_saved_url_path(overlay), "w", encoding="utf-8") as handle:
-            json.dump({"url": url, "saved_at": time.time()}, handle)
+        with open(_servers_path(overlay), "w", encoding="utf-8") as handle:
+            json.dump({"servers": entries[:_MAX_RECENT]}, handle)
+    except OSError:
+        pass
+
+
+def _forget_last_server(overlay: str) -> None:
+    """Keep the history but stop reconnecting automatically at launch."""
+    entries = recent_servers(overlay)
+    for entry in entries:
+        entry["auto"] = False
+    try:
+        with open(_servers_path(overlay), "w", encoding="utf-8") as handle:
+            json.dump({"servers": entries}, handle)
     except OSError:
         pass
 
@@ -189,10 +290,57 @@ class _Tee:
         return False
 
     def fileno(self) -> int:
-        return self._inner.fileno()
+        return int(self._inner.fileno())
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._inner, name)
+
+
+# ======================================================================
+# Runtime description
+# ======================================================================
+
+
+def _bundled_distributions(exclude: str) -> Dict[str, str]:
+    """``{name: version}`` of the distributions the build bundles (not the overlay's)."""
+    import importlib.metadata as metadata
+
+    excluded = os.path.abspath(exclude)
+    search = [p for p in sys.path if p and not os.path.abspath(p).startswith(excluded)]
+    found: Dict[str, str] = {}
+    try:
+        for dist in metadata.distributions(path=search):
+            name = dist.metadata.get("Name") if dist.metadata is not None else None
+            if name:
+                found[str(name)] = str(dist.version)
+    except Exception:
+        pass
+    return found
+
+
+def _runtime(overlay: str) -> Dict[str, Any]:
+    from importlib.metadata import PackageNotFoundError, version
+
+    from .bridge.commits import PROTOCOL_VERSION
+    from .sdk import schema
+
+    try:
+        framework = version("pythonnative")
+    except PackageNotFoundError:
+        framework = ""
+    try:
+        contracts = schema.fingerprint()
+    except Exception:
+        contracts = ""
+    info = client_info()
+    return {
+        "pythonnative": framework,
+        "python": ".".join(str(part) for part in sys.version_info[:3]),
+        "protocol": PROTOCOL_VERSION,
+        "contracts": contracts,
+        "plugins": list(info.get("plugins") or []),
+        "distributions": _bundled_distributions(overlay),
+    }
 
 
 # ======================================================================
@@ -201,7 +349,7 @@ class _Tee:
 
 
 class DevClient:
-    """Keep this process in sync with a dev server.
+    """Keep this process in sync with a dev server and serve DevTools.
 
     Args:
         url: Server URL (any form accepted by
@@ -210,6 +358,10 @@ class DevClient:
         entry_module: The app's entry module, for the ``hello`` message.
         forward_logs: Mirror ``print`` output to the server.
         log: Local logger for the client's own status lines.
+        kind: ``"go"`` or ``"app"``; defaults to this build's
+            [`client_info`][pythonnative.devclient.client_info].
+        agent: Install the devtools agent (off in unit tests that only
+            exercise syncing).
     """
 
     def __init__(
@@ -220,15 +372,23 @@ class DevClient:
         entry_module: str = "app.main",
         forward_logs: bool = True,
         log: Optional[Logger] = None,
+        kind: Optional[str] = None,
+        agent: bool = True,
     ) -> None:
         self.url = normalize_server_url(url)
         self.overlay = os.path.abspath(overlay)
         self.entry_module = entry_module
+        self.kind = kind or str(client_info().get("kind") or "app")
+        self.project = ""
+        self.incompatible: Optional[Dict[str, Any]] = None
         self._forward_logs = forward_logs
         self._log: Logger = log or self._default_log
+        self._use_agent = agent
+        self._agent: Any = None
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
         self._socket: Optional[ws.WebSocketClient] = None
+        self._send_lock = threading.Lock()
         self._state = "idle"
         self._state_lock = threading.Lock()
         self._listeners: List[Callable[[str, str], None]] = []
@@ -238,6 +398,10 @@ class DevClient:
         self._orig_stdout: Any = None
         self._orig_stderr: Any = None
         self._device = ""
+        self._streams: Dict[int, socket.socket] = {}
+        # Data that arrives while a stream's local connection is opening.
+        self._opening: Dict[int, List[bytes]] = {}
+        self._streams_lock = threading.Lock()
         self.synced_version: Optional[str] = None
         self.synced_once = threading.Event()
 
@@ -250,9 +414,14 @@ class DevClient:
 
     @property
     def state(self) -> str:
-        """``"idle"``, ``"connecting"``, ``"connected"``, ``"syncing"``, or ``"disconnected"``."""
+        """``"idle"``, ``"connecting"``, ``"connected"``, ``"syncing"``, ``"incompatible"``, or ``"disconnected"``."""
         with self._state_lock:
             return self._state
+
+    @property
+    def agent(self) -> Any:
+        """The devtools agent this client serves, once started."""
+        return self._agent
 
     def add_listener(self, callback: Callable[[str, str], None]) -> Callable[[], None]:
         """Subscribe to ``(state, detail)`` changes (called on the client thread)."""
@@ -285,7 +454,10 @@ class DevClient:
         # Resolve device metadata before starting the network worker.
         self._device = _device_name()
         self._install_tee()
+        if self._use_agent:
+            self._install_agent()
         self._thread = threading.Thread(target=self._run, name="pn-dev-client", daemon=True)
+        _mark_dev_thread(self._thread)
         self._thread.start()
 
     def stop(self) -> None:
@@ -300,8 +472,26 @@ class DevClient:
         thread, self._thread = self._thread, None
         if thread is not None and thread is not threading.current_thread():
             thread.join(timeout=3.0)
+        self._close_streams()
         self._remove_tee()
+        if self._agent is not None:
+            from .devtools import agent as agent_module
+
+            if agent_module.current() is self._agent:
+                agent_module.uninstall()
+            self._agent = None
         self._set_state("idle")
+
+    def _install_agent(self) -> None:
+        from .devtools import install
+        from .devtools.debugger import install_breakpoint_hook
+
+        self._agent = install(
+            lambda topic, data: self.send({"type": "event", "topic": topic, "data": data}),
+            kind=self.kind,
+            disconnect=go_home if self.kind == "go" else None,
+        )
+        install_breakpoint_hook()
 
     def _run(self) -> None:
         attempt = 0
@@ -318,9 +508,9 @@ class DevClient:
                 self._set_state("disconnected", detail)
                 if attempt == 0 and refused:
                     self._log(
-                        f"[pn dev] {self.server_label} refused the connection: the URL is missing the dev "
-                        "token or carries an old one. Relaunch with `pn run`, or enter the device URL that "
-                        "`pn start` prints."
+                        f"[pn dev] {self.server_label} refused the connection: the link is missing the dev "
+                        "token or carries an old one. Scan the QR code `pn start` prints, or relaunch with "
+                        "`pn run`."
                     )
                 elif attempt == 0:
                     self._log(f"[pn dev] cannot reach {self.server_label} ({detail}); retrying")
@@ -328,7 +518,7 @@ class DevClient:
                 self._set_state("disconnected", repr(exc))
                 self._log(f"[pn dev] client error: {exc!r}")
                 traceback.print_exc(file=self._local_stderr())
-            if self._stop.is_set():
+            if self._stop.is_set() or self.incompatible is not None:
                 break
             delay = _RECONNECT_DELAYS[min(attempt, len(_RECONNECT_DELAYS) - 1)]
             attempt += 1
@@ -339,7 +529,7 @@ class DevClient:
         client.connect()
         self._socket = client
         try:
-            client.send_text(json.dumps(self._hello()))
+            self._send_now(json.dumps(self._hello()))
             self._set_state("connected", self.server_label)
             self._flush_outbox()
             while not self._stop.is_set():
@@ -350,20 +540,21 @@ class DevClient:
                     continue
                 if text is None:
                     break
-                self._flush_outbox()
                 try:
                     message = json.loads(text)
                 except ValueError:
                     continue
                 if isinstance(message, dict):
                     self._handle(message)
+                self._flush_outbox()
         finally:
             self._socket = None
             try:
                 client.close()
             except Exception:
                 pass
-            if not self._stop.is_set():
+            self._close_streams()
+            if not self._stop.is_set() and self.incompatible is None:
                 self._set_state("disconnected", "connection closed")
 
     # -- protocol --------------------------------------------------------
@@ -374,68 +565,34 @@ class DevClient:
         self._seed_overlay_from_bundle()
         return {
             "type": "hello",
+            "session": SESSION_PROTOCOL,
+            "client": self.kind,
             "platform": Platform.OS,
             "device": self._device,
             "app": self.entry_module,
+            "runtime": _runtime(self.overlay),
             "files": self._overlay_manifest(),
+            "packages": self._installed_packages(),
         }
 
     def _seed_overlay_from_bundle(self) -> None:
         """Copy the bundled sources into an empty overlay before the first ``hello``.
 
         The overlay must be a complete tree (a partial ``app/`` without
-        ``__init__.py`` would lose to the bundled package on ``sys.path``),
-        so the first sync used to download every file and reload every
-        module even when the build was made from the very sources the
-        server holds. Seeding from the bundle lets the manifest report
-        what the app already runs; the server then sends only real
-        differences, and an up-to-date build connects without a reload.
+        ``__init__.py`` would lose to the bundled package on ``sys.path``).
+        Seeding from the bundle lets the manifest report what the app
+        already runs; the server then sends only real differences, and an
+        up-to-date build connects without a reload.
         """
         top = self.entry_module.split(".")[0]
         if not top or self._overlay_has_files(top):
             return
-        root = _bundled_package_root(top, exclude=self.overlay)
-        if root is None:
-            self._log(f"[pn dev] bundled sources for '{top}' not found; the server will send everything")
-            return
-        seeded = 0
-
-        def copy_tree(node: Any, rel: str) -> None:
-            nonlocal seeded
-            try:
-                children = list(node.iterdir())
-            except Exception as exc:
-                self._log(f"[pn dev] could not list bundled {rel}: {exc}")
-                return
-            for child in children:
-                child_rel = f"{rel}/{child.name}"
-                if child.is_dir():
-                    if child.name != "__pycache__":
-                        copy_tree(child, child_rel)
-                    continue
-                if not is_synced_file(child_rel):
-                    continue
-                target = os.path.join(self.overlay, *child_rel.split("/"))
-                try:
-                    data = child.read_bytes()
-                    os.makedirs(os.path.dirname(target), exist_ok=True)
-                    with open(target, "wb") as handle:
-                        handle.write(data)
-                    seeded += 1
-                except Exception as exc:
-                    self._log(f"[pn dev] could not seed {child_rel}: {exc}")
-
-        copy_tree(root, top)
-        self._log(f"[pn dev] seeded the overlay with {seeded} bundled file(s) from {root}")
+        seeded = seed_overlay(self.overlay, top, log=self._log)
+        if seeded:
+            self._log(f"[pn dev] seeded the overlay with {seeded} bundled file(s)")
 
     def _overlay_has_files(self, top: str) -> bool:
-        """Whether the overlay already holds sources for ``top``.
-
-        ``configure_dev_environment`` pre-creates the (empty) package
-        directory, so the directory's existence says nothing; byte-code
-        caches don't count either.
-        """
-        for dirpath, dirnames, filenames in os.walk(os.path.join(self.overlay, top)):
+        for _dirpath, dirnames, filenames in os.walk(os.path.join(self.overlay, top)):
             dirnames[:] = [d for d in dirnames if d != "__pycache__"]
             if filenames:
                 return True
@@ -445,11 +602,15 @@ class DevClient:
         files: Dict[str, str] = {}
         base = self.overlay
         for dirpath, dirnames, filenames in os.walk(base):
-            dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+            rel_dir = os.path.relpath(dirpath, base).replace(os.sep, "/")
+            if rel_dir == _PACKAGES_ROOT or rel_dir.startswith(_PACKAGES_ROOT + "/"):
+                dirnames[:] = []
+                continue
+            dirnames[:] = [d for d in dirnames if d != "__pycache__" and d != _PACKAGES_ROOT]
             for name in filenames:
                 full = os.path.join(dirpath, name)
                 rel = os.path.relpath(full, base).replace(os.sep, "/")
-                if rel == _SAVED_URL_FILE or not is_synced_file(rel):
+                if rel == _SERVERS_FILE or not is_synced_file(rel):
                     continue
                 try:
                     with open(full, "rb") as handle:
@@ -460,32 +621,41 @@ class DevClient:
 
     def _handle(self, message: Dict[str, Any]) -> None:
         kind = message.get("type")
-        if kind not in ("sync", "update"):
-            return
+        if kind in ("sync", "update"):
+            self._apply_sync(message)
+        elif kind == "packages":
+            self._apply_packages(message)
+        elif kind == "incompatible":
+            self._on_incompatible(message)
+        elif kind == "rpc":
+            self._on_rpc(message)
+        elif kind == "tunnel":
+            self._on_tunnel(message)
+        elif kind == "menu":
+            if self._agent is not None:
+                self._agent.open_menu()
+        elif kind == "reload":
+            if self._agent is not None:
+                self._agent.dispatch("reload", {}, lambda _result, _error: None)
+
+    def _apply_sync(self, message: Dict[str, Any]) -> None:
         self._set_state("syncing", str(message.get("version") or ""))
-        files = message.get("files") or []
-        removed = message.get("removed") or []
+        self.project = str(message.get("project") or self.project)
         written: List[str] = []
-        for entry in files:
+        for entry in message.get("files") or []:
             if not isinstance(entry, dict):
                 continue
             path = str(entry.get("path") or "")
-            if not path or not self._safe_relpath(path):
+            if not path or not _safe_relpath(path) or path.startswith(_PACKAGES_ROOT + "/"):
                 continue
             data = _decode_content(entry)
             if data is None:
                 continue
-            target = os.path.join(self.overlay, *path.split("/"))
-            try:
-                os.makedirs(os.path.dirname(target), exist_ok=True)
-                with open(target, "wb") as handle:
-                    handle.write(data)
+            if self._write(path, data):
                 written.append(path)
-            except OSError as exc:
-                self._log(f"[pn dev] could not write {path}: {exc}")
-        for path in removed:
+        for path in message.get("removed") or []:
             rel = str(path)
-            if not self._safe_relpath(rel):
+            if not _safe_relpath(rel) or rel.startswith(_PACKAGES_ROOT + "/"):
                 continue
             try:
                 os.remove(os.path.join(self.overlay, *rel.split("/")))
@@ -495,7 +665,7 @@ class DevClient:
         version = str(message.get("version") or "")
         self.synced_version = version
         self.synced_once.set()
-        _save_server_url(self.overlay, self.url)
+        _remember_server(self.overlay, self.url, self.project)
         self._set_state("connected", version)
         if not written:
             # The app already runs these exact sources (a fresh build, or an
@@ -506,6 +676,195 @@ class DevClient:
         assets_changed = bool(manifest_for_sync(written))
         if modules or assets_changed:
             self._schedule_reload(modules, version, assets_changed=assets_changed)
+
+    def _write(self, rel: str, data: bytes) -> bool:
+        target = os.path.join(self.overlay, *rel.split("/"))
+        try:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with open(target, "wb") as handle:
+                handle.write(data)
+            return True
+        except OSError as exc:
+            self._log(f"[pn dev] could not write {rel}: {exc}")
+            return False
+
+    # -- packages --------------------------------------------------------
+
+    def _packages_dir(self) -> str:
+        return os.path.join(self.overlay, _PACKAGES_ROOT)
+
+    def _packages_manifest(self) -> Dict[str, Dict[str, Any]]:
+        try:
+            with open(os.path.join(self._packages_dir(), _PACKAGES_MANIFEST), encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, ValueError):
+            return {}
+        return {str(k): v for k, v in data.items() if isinstance(v, dict)} if isinstance(data, dict) else {}
+
+    def _installed_packages(self) -> Dict[str, str]:
+        """``{name: version}`` of the distributions synced into the overlay."""
+        return {name: str(entry.get("version") or "") for name, entry in self._packages_manifest().items()}
+
+    def _apply_packages(self, message: Dict[str, Any]) -> None:
+        manifest = self._packages_manifest()
+        root = self._packages_dir()
+        changed: List[str] = []
+        for name in message.get("removed") or []:
+            self._remove_package(manifest, str(name))
+            changed.append(str(name))
+        for package in message.get("packages") or []:
+            if not isinstance(package, dict) or not package.get("name"):
+                continue
+            name = str(package["name"])
+            self._remove_package(manifest, name)
+            files: List[str] = []
+            for entry in package.get("files") or []:
+                if not isinstance(entry, dict):
+                    continue
+                rel = str(entry.get("path") or "")
+                data = _decode_content(entry)
+                if not rel or not _safe_relpath(rel) or data is None:
+                    continue
+                if self._write(f"{_PACKAGES_ROOT}/{rel}", data):
+                    files.append(rel)
+            manifest[name] = {"version": str(package.get("version") or ""), "files": files}
+            changed.append(name)
+            self._log(f"[pn dev] installed {name} {package.get('version') or ''} ({len(files)} files)")
+        try:
+            os.makedirs(root, exist_ok=True)
+            with open(os.path.join(root, _PACKAGES_MANIFEST), "w", encoding="utf-8") as handle:
+                json.dump(manifest, handle)
+        except OSError:
+            pass
+        if root not in sys.path:
+            sys.path.append(root)
+        importlib.invalidate_caches()
+        if message.get("request") is not None:
+            self.send({"type": "packages_ready", "request": message.get("request"), "packages": changed})
+
+    def _remove_package(self, manifest: Dict[str, Dict[str, Any]], name: str) -> None:
+        entry = manifest.pop(name, None)
+        if not entry:
+            return
+        root = self._packages_dir()
+        for rel in entry.get("files") or []:
+            if _safe_relpath(str(rel)):
+                try:
+                    os.remove(os.path.join(root, *str(rel).split("/")))
+                except OSError:
+                    pass
+
+    # -- compatibility ---------------------------------------------------
+
+    def _on_incompatible(self, message: Dict[str, Any]) -> None:
+        self.incompatible = {"reason": str(message.get("reason") or ""), "fix": str(message.get("fix") or "")}
+        detail = self.incompatible["reason"]
+        if self.incompatible["fix"]:
+            detail += f" {self.incompatible['fix']}"
+        self._log(f"[pn dev] {self.server_label} can't run on this client: {detail}")
+        self._set_state("incompatible", detail)
+        self._stop.set()
+
+    # -- devtools --------------------------------------------------------
+
+    def _on_rpc(self, message: Dict[str, Any]) -> None:
+        request_id = message.get("id")
+        agent = self._agent
+        if agent is None:
+            self.send({"type": "rpc_result", "id": request_id, "error": "DevTools aren't available in this client"})
+            return
+
+        def reply(result: Optional[Any], error: Optional[str]) -> None:
+            if error is not None:
+                self.send({"type": "rpc_result", "id": request_id, "error": error})
+                return
+            try:
+                json.dumps(result)
+            except (TypeError, ValueError):
+                result = repr(result)
+            self.send({"type": "rpc_result", "id": request_id, "result": result})
+
+        agent.dispatch(str(message.get("method") or ""), message.get("params") or {}, reply)
+
+    # -- tunnels ---------------------------------------------------------
+
+    def _on_tunnel(self, message: Dict[str, Any]) -> None:
+        stream = int(message.get("stream") or 0)
+        op = message.get("op")
+        if op == "open":
+            port = int(message.get("port") or 0)
+            with self._streams_lock:
+                self._opening[stream] = []
+            threading.Thread(
+                target=self._open_stream, args=(stream, port), name=f"pn-tunnel-{stream}", daemon=True
+            ).start()
+        elif op == "data":
+            data = message.get("data")
+            with self._streams_lock:
+                sock = self._streams.get(stream)
+                pending = self._opening.get(stream)
+                if sock is None and pending is not None and isinstance(data, str):
+                    pending.append(base64.b64decode(data))
+                    return
+            if sock is not None and isinstance(data, str):
+                try:
+                    sock.sendall(base64.b64decode(data))
+                except OSError:
+                    self._close_stream(stream)
+        elif op == "close":
+            self._close_stream(stream, notify=False)
+
+    def _open_stream(self, stream: int, port: int) -> None:
+        _mark_dev_thread()
+        try:
+            sock = socket.create_connection(("127.0.0.1", port), timeout=5.0)
+            sock.settimeout(None)
+        except OSError as exc:
+            with self._streams_lock:
+                self._opening.pop(stream, None)
+            self.send({"type": "tunnel", "stream": stream, "op": "close", "error": str(exc)})
+            return
+        with self._streams_lock:
+            pending = self._opening.pop(stream, [])
+            try:
+                for chunk in pending:
+                    sock.sendall(chunk)
+            except OSError:
+                pass
+            self._streams[stream] = sock
+        while True:
+            try:
+                chunk = sock.recv(65536)
+            except OSError:
+                chunk = b""
+            if not chunk:
+                break
+            self.send({"type": "tunnel", "stream": stream, "op": "data", "data": base64.b64encode(chunk).decode()})
+        self._close_stream(stream)
+
+    def _close_stream(self, stream: int, *, notify: bool = True) -> None:
+        with self._streams_lock:
+            self._opening.pop(stream, None)
+            sock = self._streams.pop(stream, None)
+        if sock is None:
+            return
+        try:
+            sock.close()
+        except OSError:
+            pass
+        if notify:
+            self.send({"type": "tunnel", "stream": stream, "op": "close"})
+
+    def _close_streams(self) -> None:
+        with self._streams_lock:
+            streams, self._streams = self._streams, {}
+        for sock in streams.values():
+            try:
+                sock.close()
+            except OSError:
+                pass
+
+    # -- reloads ---------------------------------------------------------
 
     def _schedule_reload(self, modules: List[str], version: str, *, assets_changed: bool = False) -> None:
         from .runtime import call_on_application_thread
@@ -529,26 +888,29 @@ class DevClient:
 
         call_on_application_thread(_apply)
 
-    def _safe_relpath(self, rel: str) -> bool:
-        parts = rel.split("/")
-        return bool(parts) and all(part and part not in (".", "..") for part in parts)
-
     # -- outbound --------------------------------------------------------
 
     def send(self, message: Dict[str, Any]) -> None:
-        """Queue a message to the server (dropped when the outbox overflows offline)."""
-        text = json.dumps(message)
+        """Send a message to the server from any thread (queued while offline)."""
+        try:
+            text = json.dumps(message)
+        except (TypeError, ValueError):
+            text = json.dumps({"type": "log", "level": "error", "text": f"unserializable message {message!r}"})
         with self._outbox_lock:
-            if len(self._outbox) > 500:
-                del self._outbox[:100]
+            if len(self._outbox) > 1000:
+                del self._outbox[:200]
             self._outbox.append(text)
-        sock = self._socket
-        if sock is not None and threading.current_thread() is self._thread:
-            self._flush_outbox()
+        self._flush_outbox()
 
-    def _flush_outbox(self) -> None:
+    def _send_now(self, text: str) -> None:
         sock = self._socket
         if sock is None:
+            raise OSError("not connected")
+        with self._send_lock:
+            sock.send_text(text)
+
+    def _flush_outbox(self) -> None:
+        if self._socket is None:
             return
         while True:
             with self._outbox_lock:
@@ -556,7 +918,7 @@ class DevClient:
                     return
                 text = self._outbox.pop(0)
             try:
-                sock.send_text(text)
+                self._send_now(text)
             except Exception:
                 with self._outbox_lock:
                     self._outbox.insert(0, text)
@@ -608,6 +970,20 @@ class DevClient:
             sys.stderr = self._orig_stderr
 
 
+_PACKAGES_ROOT = "site-packages"
+
+
+def _mark_dev_thread(thread: Optional[threading.Thread] = None) -> None:
+    from .devtools.debugger import mark_dev_thread
+
+    mark_dev_thread(thread)
+
+
+def _safe_relpath(rel: str) -> bool:
+    parts = rel.split("/")
+    return bool(parts) and all(part and part not in (".", "..") for part in parts)
+
+
 def _device_name() -> str:
     """A short device label for the server's client list (``iPhone``, ``Pixel 8``)."""
     try:
@@ -634,7 +1010,7 @@ def _bundled_package_root(top: str, *, exclude: str) -> Optional[Any]:
     import importlib.machinery
 
     excluded = os.path.abspath(exclude)
-    search = [p for p in sys.path if p and os.path.abspath(p) != excluded]
+    search = [p for p in sys.path if p and not os.path.abspath(p).startswith(excluded)]
     try:
         spec = importlib.machinery.PathFinder.find_spec(top, search)
     except Exception:
@@ -653,6 +1029,44 @@ def _bundled_package_root(top: str, *, exclude: str) -> Optional[Any]:
     if root is None or not root.is_dir():
         return None
     return root
+
+
+def seed_overlay(overlay: str, top: str, *, log: Optional[Logger] = None) -> int:
+    """Copy the bundled ``top`` package into ``overlay``; returns the number of files."""
+    emit = log or (lambda line: None)
+    root = _bundled_package_root(top, exclude=overlay)
+    if root is None:
+        emit(f"[pn dev] bundled sources for '{top}' not found; the server will send everything")
+        return 0
+    seeded = 0
+
+    def copy_tree(node: Any, rel: str) -> None:
+        nonlocal seeded
+        try:
+            children = list(node.iterdir())
+        except Exception as exc:
+            emit(f"[pn dev] could not list bundled {rel}: {exc}")
+            return
+        for child in children:
+            child_rel = f"{rel}/{child.name}"
+            if child.is_dir():
+                if child.name != "__pycache__":
+                    copy_tree(child, child_rel)
+                continue
+            if not is_synced_file(child_rel):
+                continue
+            target = os.path.join(overlay, *child_rel.split("/"))
+            try:
+                data = child.read_bytes()
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with open(target, "wb") as handle:
+                    handle.write(data)
+                seeded += 1
+            except Exception as exc:
+                emit(f"[pn dev] could not seed {child_rel}: {exc}")
+
+    copy_tree(root, top)
+    return seeded
 
 
 def _decode_content(entry: Dict[str, Any]) -> Optional[bytes]:
@@ -692,30 +1106,86 @@ def start(url: str, overlay: Optional[str] = None, **kwargs: Any) -> DevClient:
         client = DevClient(url, root, **kwargs)
         _current = client
     client.start()
+    _notify_home()
     return client
 
 
 def stop() -> None:
-    """Stop the process-wide dev client."""
+    """Stop the process-wide dev client; the dev menu keeps working locally."""
     global _current
     with _lock:
         client, _current = _current, None
     if client is not None:
         client.stop()
+        if client._use_agent:
+            install_local_agent()
+    _notify_home()
+
+
+def install_local_agent() -> None:
+    """Install a devtools agent that isn't connected to a server (dev menu, inspector, monitor)."""
+    from .devtools import install
+    from .devtools.debugger import install_breakpoint_hook
+
+    kind = str(client_info().get("kind") or "app")
+    install(lambda _topic, _data: None, kind=kind, disconnect=go_home if kind == "go" else None)
+    install_breakpoint_hook()
+
+
+def handle_link(link: str) -> bool:
+    """Connect to the server a connect link names; ``True`` when ``link`` was one.
+
+    Installed as the deep-link interceptor by
+    ``pythonnative.hot_reload.configure_dev_environment``. A link that
+    arrives before the dev client starts (a cold launch from a QR code)
+    is kept for [`start_if_configured`][pythonnative.devclient.start_if_configured].
+    """
+    global _pending_link
+    url = parse_connect_link(link)
+    if url is None:
+        return False
+    client = _current
+    if client is None:
+        if not _startup_checked:
+            # Startup hasn't looked for a server yet; it will use this one.
+            _pending_link = url
+            return True
+        # A cold-start link can arrive after startup (Android delivers the
+        # launch intent's link as an ordinary event): connect now.
+        root = overlay_root()
+        if root is not None:
+            start(url, root, entry_module=os.environ.get("PN_ENTRY_MODULE") or "app.main")
+        return True
+    try:
+        if normalize_server_url(url) == client.url and client.state not in ("incompatible", "idle"):
+            return True
+    except ValueError:
+        return True
+    entry = client.entry_module
+    start(url, client.overlay, entry_module=entry)
+    return True
 
 
 def start_if_configured(entry_module: Optional[str] = None) -> Optional[DevClient]:
-    """Start the dev client when the build points at a server.
+    """Start the dev client when a connect link or a remembered server names one.
 
-    Called by ``bootstrap.start(dev=True)``. The URL comes from
-    ``PN_DEV_SERVER`` (baked in by ``pn run``) or, for ``--dev-client``
-    builds, from the URL saved by a previous connection. Returns the
-    client, or ``None`` when nothing is configured.
+    Called by ``bootstrap.start(dev=True)``. A connect link that launched
+    the app (as a deep link, or in ``PN_CONNECT_LINK``) wins; otherwise the
+    most recent server reconnects. Returns the
+    client, or ``None`` when nothing is configured (PythonNative Go then
+    shows its home screen).
     """
+    global _pending_link, _startup_checked
+    _startup_checked = True
     root = overlay_root()
     if root is None:
         return None
-    url = os.environ.get(SERVER_URL_ENV) or saved_server_url(root)
+    url = _pending_link or parse_connect_link(os.environ.pop(LINK_ENV, "") or "")
+    _pending_link = None
+    if not url:
+        recent = recent_servers(root)
+        if recent and recent[0].get("auto", True):
+            url = str(recent[0]["url"])
     if not url:
         return None
     entry = entry_module or os.environ.get("PN_ENTRY_MODULE") or "app.main"
@@ -726,144 +1196,257 @@ def start_if_configured(entry_module: Optional[str] = None) -> Optional[DevClien
         return None
 
 
-# ======================================================================
-# Connect screen (dev-client builds)
-# ======================================================================
+def go_home() -> None:
+    """Disconnect PythonNative Go and return to its home screen.
+
+    Stops the client, replaces the overlay's app with the bundled home
+    screen, stops reconnecting at launch, and remounts.
+    """
+    client = _current
+    root = client.overlay if client is not None else overlay_root()
+    entry = client.entry_module if client is not None else "app.main"
+    stop()
+    if root is None:
+        return
+    _forget_last_server(root)
+    top = entry.split(".")[0]
+    shutil.rmtree(os.path.join(root, top), ignore_errors=True)
+    seed_overlay(root, top)
+    from .runtime import call_on_application_thread
+
+    def remount() -> None:
+        from .devtools.agent import reload_app
+
+        reload_app()
+
+    call_on_application_thread(remount)
 
 
-def _connect_screen() -> Any:
+# ======================================================================
+# PythonNative Go home screen
+# ======================================================================
+
+_home_listeners: List[Callable[[], None]] = []
+
+
+def _notify_home() -> None:
+    for listener in list(_home_listeners):
+        try:
+            listener()
+        except Exception:
+            pass
+
+
+def _go_home_screen() -> Any:
     from . import components as c
     from .component import component
     from .hooks import use_effect, use_state
 
+    colors = {
+        "background": "#0B0D12",
+        "card": "#161A22",
+        "text": "#F5F7FA",
+        "muted": "#8A93A6",
+        "accent": "#3B82F6",
+        "good": "#22C55E",
+        "warn": "#F59E0B",
+        "bad": "#EF4444",
+    }
+    state_colors = {
+        "connecting": colors["warn"],
+        "connected": colors["good"],
+        "syncing": colors["accent"],
+        "disconnected": colors["bad"],
+        "incompatible": colors["bad"],
+        "error": colors["bad"],
+    }
+
     @component
-    def ConnectScreen() -> Any:
-        client = current()
-        initial = client.url if client is not None else (saved_server_url() or "")
-        url, set_url = use_state(display_server_url(initial) if initial else "")
-        status, set_status = use_state(client.state if client is not None else "idle")
-        detail, set_detail = use_state("")
+    def GoHome() -> Any:
+        tick, set_tick = use_state(0)
+        typed, set_typed = use_state("")
+        status, set_status = use_state(("idle", ""))
 
-        def _subscribe() -> Optional[Callable[[], None]]:
-            live = current()
-            if live is None:
-                return None
+        def subscribe() -> Callable[[], None]:
+            from .runtime import call_on_application_thread
 
-            def _on_state(state: str, info: str) -> None:
-                from .runtime import call_on_application_thread
+            def refresh() -> None:
+                call_on_application_thread(lambda: set_tick(lambda value: value + 1))
 
-                def _update() -> None:
-                    set_status(state)
-                    set_detail(info)
+            _home_listeners.append(refresh)
+            client = current()
+            remove_state: Optional[Callable[[], None]] = None
+            if client is not None:
 
-                call_on_application_thread(_update)
+                def on_state(state: str, detail: str) -> None:
+                    call_on_application_thread(lambda: set_status((state, detail)))
 
-            return live.add_listener(_on_state)
+                remove_state = client.add_listener(on_state)
+                set_status((client.state, client.server_label))
 
-        use_effect(_subscribe, [client])
+            def unsubscribe() -> None:
+                if refresh in _home_listeners:
+                    _home_listeners.remove(refresh)
+                if remove_state is not None:
+                    remove_state()
 
-        def _connect() -> None:
+            return unsubscribe
+
+        use_effect(subscribe, [tick])
+
+        def connect(url: str) -> None:
             try:
                 normalized = normalize_server_url(url)
             except ValueError as exc:
-                set_status("error")
-                set_detail(str(exc))
+                set_status(("error", str(exc)))
                 return
-            start(normalized)
-            set_status("connecting")
-            set_detail(urlsplit(normalized).netloc)
+            start(normalized, entry_module=os.environ.get("PN_ENTRY_MODULE") or "app.main")
 
-        lan_hint = (
-            "Run `pn start` on your computer and enter the device URL it prints "
-            "(for example 192.168.1.20:8765/?token=...)."
-        )
-        colors: Dict[str, str] = {
-            "idle": "#8E8E93",
-            "connecting": "#FF9F0A",
-            "connected": "#30D158",
-            "syncing": "#0A84FF",
-            "disconnected": "#FF453A",
-            "error": "#FF453A",
-        }
-        return c.Column(
-            c.Column(
-                c.Text("PythonNative", style={"font_size": 30, "bold": True, "color": "#FFFFFF"}),
-                c.Text("Dev client", style={"font_size": 17, "color": "#8E8E93"}),
-                style={"gap": 4, "padding_top": 72},
-            ),
-            c.Column(
-                c.Text("Dev server address", style={"font_size": 13, "color": "#8E8E93"}),
-                c.TextInput(
-                    value=url,
-                    on_change=set_url,
-                    placeholder="192.168.1.20:8765/?token=...",
-                    auto_correct=False,
-                    auto_capitalize="none",
-                    keyboard_type="url",
-                    style={
-                        "background_color": "#1C1C1E",
-                        "color": "#FFFFFF",
-                        "padding": 12,
-                        "border_radius": 10,
-                        "font_size": 16,
-                    },
+        state, detail = status
+        client = current()
+        incompatible = client.incompatible if client is not None else None
+        recents = recent_servers()
+
+        def recent_row(entry: Dict[str, Any]) -> Any:
+            url = str(entry.get("url") or "")
+            title = str(entry.get("project") or display_server_url(url))
+            return c.Pressable(
+                c.Column(
+                    c.Text(title, style={"color": colors["text"], "font_size": 16, "font_weight": "600"}),
+                    c.Text(display_server_url(url), style={"color": colors["muted"], "font_size": 13}),
+                    style={"gap": 2},
                 ),
-                c.Button(
-                    "Connect",
-                    on_press=_connect,
-                    style={"background_color": "#0A84FF", "color": "#FFFFFF", "padding": 12, "border_radius": 10},
-                ),
-                style={"gap": 8, "align_items": "stretch"},
-            ),
+                on_press=lambda: connect(url),
+                accessibility_label=f"Open {title}",
+                style={"padding": 14, "background_color": colors["card"], "border_radius": 12},
+            ).with_key(url)
+
+        from . import __version__ as framework_version
+
+        return c.ScrollView(
             c.Column(
-                c.Row(
-                    c.View(
-                        style={
-                            "width": 10,
-                            "height": 10,
-                            "border_radius": 5,
-                            "background_color": colors.get(status, "#8E8E93"),
-                        }
+                c.Column(
+                    c.Text("PythonNative Go", style={"font_size": 32, "font_weight": "700", "color": colors["text"]}),
+                    c.Text(
+                        f"Version {framework_version} · run any PythonNative project without building it",
+                        style={"font_size": 14, "color": colors["muted"]},
                     ),
-                    c.Text(status, style={"color": "#FFFFFF", "font_size": 15}),
-                    style={"gap": 8, "align_items": "center"},
+                    style={"gap": 6},
                 ),
-                c.Text(detail, style={"color": "#8E8E93", "font_size": 12}),
-                style={"gap": 4},
+                c.Column(
+                    c.Text("Get started", style={"font_size": 13, "color": colors["muted"], "font_weight": "600"}),
+                    c.Text(
+                        "On your computer, run `pn start` in your project. Then scan the QR code it prints "
+                        "with your camera, or press i (iOS Simulator) or a (Android emulator) in that terminal.",
+                        style={"font_size": 15, "color": colors["text"], "line_height": 21},
+                    ),
+                    style={"gap": 8, "padding": 16, "background_color": colors["card"], "border_radius": 14},
+                ),
+                (
+                    c.Column(
+                        c.Row(
+                            c.View(
+                                style={
+                                    "width": 10,
+                                    "height": 10,
+                                    "border_radius": 5,
+                                    "background_color": state_colors.get(state, colors["muted"]),
+                                }
+                            ),
+                            c.Text(state.capitalize(), style={"color": colors["text"], "font_size": 15}),
+                            style={"gap": 8, "align_items": "center"},
+                        ),
+                        c.Text(detail, style={"color": colors["muted"], "font_size": 13}) if detail else None,
+                        (
+                            c.Text(
+                                f"{incompatible['reason']} {incompatible['fix']}".strip(),
+                                style={"color": colors["bad"], "font_size": 14, "line_height": 20},
+                                accessibility_label="Incompatible project",
+                            )
+                            if incompatible
+                            else None
+                        ),
+                        style={"gap": 6, "padding": 16, "background_color": colors["card"], "border_radius": 14},
+                    )
+                    if state != "idle"
+                    else None
+                ),
+                (
+                    c.Column(
+                        c.Text(
+                            "Recently opened", style={"font_size": 13, "color": colors["muted"], "font_weight": "600"}
+                        ),
+                        *[recent_row(entry) for entry in recents],
+                        style={"gap": 8},
+                    )
+                    if recents
+                    else None
+                ),
+                c.Column(
+                    c.Text("Enter a URL", style={"font_size": 13, "color": colors["muted"], "font_weight": "600"}),
+                    c.TextInput(
+                        value=typed,
+                        on_change=set_typed,
+                        placeholder="http://192.168.1.20:8765/?token=...",
+                        auto_correct=False,
+                        auto_capitalize="none",
+                        keyboard_type="url",
+                        accessibility_label="Dev server URL",
+                        style={
+                            "background_color": colors["card"],
+                            "color": colors["text"],
+                            "padding": 14,
+                            "border_radius": 12,
+                            "font_size": 15,
+                        },
+                    ),
+                    c.Button(
+                        "Connect",
+                        on_press=lambda: connect(typed),
+                        style={
+                            "background_color": colors["accent"],
+                            "color": "#FFFFFF",
+                            "padding": 14,
+                            "border_radius": 12,
+                        },
+                    ),
+                    style={"gap": 8},
+                ),
+                style={"padding": 24, "padding_top": 72, "gap": 24},
             ),
-            c.Text(lan_hint, style={"color": "#636366", "font_size": 12}),
-            style={"flex": 1, "padding": 24, "gap": 28, "background_color": "#000000"},
+            style={"flex": 1, "background_color": colors["background"]},
         )
 
-    return ConnectScreen
+    return GoHome
 
 
-class _LazyConnectScreen:
-    """Import-light proxy so ``from pythonnative.devclient import ConnectScreen`` stays cheap."""
+class _LazyGoHome:
+    """Import-light proxy so ``from pythonnative.devclient import GoHome`` stays cheap."""
 
     _component: Any = None
 
+    def _resolve(self) -> Any:
+        if _LazyGoHome._component is None:
+            _LazyGoHome._component = _go_home_screen()
+        return _LazyGoHome._component
+
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        if _LazyConnectScreen._component is None:
-            _LazyConnectScreen._component = _connect_screen()
-        return _LazyConnectScreen._component(*args, **kwargs)
+        return self._resolve()(*args, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
-        if _LazyConnectScreen._component is None:
-            _LazyConnectScreen._component = _connect_screen()
-        return getattr(_LazyConnectScreen._component, name)
+        return getattr(self._resolve(), name)
 
 
-ConnectScreen: Any = _LazyConnectScreen()
-"""Root component of ``--dev-client`` builds until the first sync arrives."""
+GoHome: Any = _LazyGoHome()
+"""Root component of PythonNative Go until a project arrives from a dev server."""
 
 
-def placeholder_main_source() -> str:
-    """Source of the ``app/main.py`` staged into ``--dev-client`` builds."""
+def go_main_source() -> str:
+    """Source of the ``app/main.py`` staged into PythonNative Go."""
     return (
-        '"""Placeholder entry module for a PythonNative dev-client build.\n\n'
-        "The real app arrives from the dev server and shadows this file.\n"
+        '"""PythonNative Go\'s home screen.\n\n'
+        "A project's own app/main.py arrives from the dev server and shadows this file.\n"
         '"""\n\n'
-        "from pythonnative.devclient import ConnectScreen as App\n\n"
+        "from pythonnative.devclient import GoHome as App\n\n"
         '__all__ = ["App"]\n'
     )

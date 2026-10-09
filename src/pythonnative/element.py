@@ -170,12 +170,14 @@ def _materialize(child: Any) -> Any:
     return child
 
 
-type Node = Element | None | bool | Iterable[Node]
+type Node = Element | None | bool | list[Node] | tuple[Node, ...] | Iterator[Node]
 """Anything that can appear in an element tree.
 
 An element, ``None`` or a ``bool`` for "nothing" (so ``cond and
 pn.Text(...)`` and ``pn.Text(...) if cond else None`` both work), or a
-possibly nested iterable of nodes. Every built-in container declares
+possibly nested list, tuple, or iterator (a generator expression) of
+nodes. The alias names those containers rather than ``Iterable`` so a
+bare string, which is an iterable of strings, is a type error. Every built-in container declares
 ``*children: Node`` and component bodies return a ``Node``. Strings
 aren't nodes: wrap text in [`Text`][pythonnative.Text]."""
 

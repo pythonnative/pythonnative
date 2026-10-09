@@ -306,6 +306,10 @@ class ScreenHost:
         reconciler.on_commit = mounted
 
         def failed(error: BaseException) -> None:
+            if self.reconciler is not reconciler:
+                # The host already let go of this tree (its surface went
+                # away); a commit that was in flight fails as expected.
+                return
             if diagnostics.is_dev():
                 self.show_redbox(error, phase="native commit")
             else:
@@ -405,14 +409,13 @@ class ScreenHost:
             traceback.print_exception(type(exc), exc, exc.__traceback__)
         except Exception:
             pass
+        diagnostics.notify_error(exc, phase)
 
         def show() -> None:
+            from ..errors import report
+
             self._redbox_visible = True
-            payload = {
-                "screen": getattr(self, "screen_id", 0),
-                "title": f"{type(exc).__name__} in {phase}: {exc}",
-                "trace": "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
-            }
+            payload = {"screen": getattr(self, "screen_id", 0), **report(exc, phase).to_dict()}
             self._show_error(payload)
 
         from ..runtime import call_on_application_thread

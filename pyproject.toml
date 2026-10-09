@@ -26,7 +26,11 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Topic :: Software Development :: User Interfaces",
 ]
-dependencies = []
+# debugpy is development tooling: `pn start` syncs its sources to dev
+# clients for breakpoint debugging (RFC 0006). App bundles never include it.
+dependencies = [
+  "debugpy>=1.8",
+]
 
 [project.optional-dependencies]
 build = [

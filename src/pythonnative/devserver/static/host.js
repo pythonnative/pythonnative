@@ -1,7 +1,7 @@
 // The page's `Host` module and screen stack, plus the other native
 // modules the browser can honor (Alert, Clipboard, Linking, Share,
 // Haptics, NetInfo, AppState, Device, Keyboard, AccessibilityInfo,
-// Localization).
+// Localization), and `DevSupport` (see `devsupport.js`).
 //
 // A "screen" here is what PNViewController is on iOS: it owns one
 // Python screen id, sends host lifecycle events (`create`, `start`,
@@ -12,6 +12,8 @@
 // `HostModule.applyOptions` does on iOS.
 
 import { screenTransition } from "./renderer.js";
+import { DevSupport } from "./devsupport.js";
+import { phaseLabel, renderReport } from "./devtools/report.js";
 
 const STATUS_BAR = 47;
 const HEADER = 44;
@@ -176,6 +178,7 @@ export class PreviewHost {
     this.entry = null;
     this.keyboardVisible = false;
     this.liveRegion = null;
+    this.devSupport = new DevSupport(this);
     this.installVisibilityTracking();
     this.installNetworkTracking();
     this.installKeyboardTracking();
@@ -212,6 +215,7 @@ export class PreviewHost {
     }
     this.stack = [];
     this.overlaysEl.textContent = "";
+    this.devSupport.reattach();
   }
 
   async pushScreen(path, argsJson, options, { animated = true } = {}) {
@@ -369,19 +373,8 @@ export class PreviewHost {
     const host = this;
     this._modules = {
       Host: {
-        show_error({screen, title, trace}) {
-          document.getElementById("pn-error-overlay")?.remove();
-          const panel = document.createElement("div"); panel.id = "pn-error-overlay";
-          panel.setAttribute("role", "alertdialog"); panel.setAttribute("aria-modal", "true");
-          panel.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#1c1c1e;color:white;padding:24px;display:flex;flex-direction:column;gap:12px";
-          const heading = document.createElement("h2"); heading.textContent = title;
-          const details = document.createElement("pre"); details.textContent = trace;
-          details.style.cssText = "overflow:auto;flex:1;white-space:pre-wrap;color:#ffa6b2";
-          const reload = document.createElement("button"); reload.textContent = "Reload";
-          reload.onclick = () => host.hostEvent(Number(screen), "reload", "{}");
-          const dismiss = document.createElement("button"); dismiss.textContent = "Dismiss";
-          dismiss.onclick = () => panel.remove();
-          panel.append(heading, details, reload, dismiss); document.body.appendChild(panel); reload.focus();
+        show_error(report) {
+          host.showError(report || {});
           return null;
         },
         dismiss_error() { document.getElementById("pn-error-overlay")?.remove(); return null; },
@@ -417,6 +410,7 @@ export class PreviewHost {
           return null;
         },
       },
+      DevSupport: this.devSupport.module(),
       Alert: {
         show(args) {
           host.presentAlert(args);
@@ -576,6 +570,97 @@ export class PreviewHost {
       },
     };
     return this._modules;
+  }
+
+  // -- development error overlay ---------------------------------------
+
+  /**
+   * `Host.show_error`: the development error screen for a structured
+   * report (`pythonnative.errors.ErrorReport.to_dict()` plus `screen`).
+   * It covers the page, not just the frame, so long stacks stay readable,
+   * and it survives renderer resets until Python dismisses it.
+   */
+  showError(report) {
+    document.getElementById("pn-error-overlay")?.remove();
+    const screen = Number(report.screen) || 0;
+    const warning = report.level === "warning";
+    const panel = document.createElement("div");
+    panel.id = "pn-error-overlay";
+    panel.className = warning ? "pn-error-overlay pn-error-overlay-warning" : "pn-error-overlay";
+    panel.setAttribute("role", "alertdialog");
+    panel.setAttribute("aria-modal", "true");
+    panel.setAttribute("aria-labelledby", "pn-error-title");
+
+    const card = document.createElement("div");
+    card.className = "pn-error-card";
+    const header = document.createElement("header");
+    header.className = "pn-error-header";
+    const phase = document.createElement("div");
+    phase.className = "pn-error-phase";
+    phase.textContent = phaseLabel(report);
+    const heading = document.createElement("h2");
+    heading.id = "pn-error-title";
+    heading.className = "pn-error-title";
+    heading.textContent = report.type && !warning ? String(report.type) : String(report.title || "Error");
+    const message = document.createElement("p");
+    message.className = "pn-error-message";
+    message.textContent = String(report.message ?? "");
+    header.append(phase, heading, message);
+
+    const body = document.createElement("div");
+    body.className = "pn-error-body";
+    body.appendChild(renderReport(report, { message: false, onOpen: (file, line) => this.openInEditor(screen, file, line) }));
+    if (!body.firstChild.childElementCount && report.text) {
+      const pre = document.createElement("pre");
+      pre.className = "pn-error-text";
+      pre.textContent = String(report.text);
+      body.appendChild(pre);
+    }
+
+    const actions = document.createElement("footer");
+    actions.className = "pn-error-actions";
+    const button = (label, title, onClick) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      b.title = title;
+      b.addEventListener("click", onClick);
+      actions.appendChild(b);
+      return b;
+    };
+    const dismiss = () => panel.remove();
+    button("Dismiss", "Hide this screen (Esc)", dismiss);
+    const copy = button("Copy", "Copy the traceback", async () => {
+      try {
+        await navigator.clipboard.writeText(String(report.text || report.message || ""));
+        copy.textContent = "Copied";
+      } catch (err) {
+        copy.textContent = "Couldn't copy";
+      }
+      setTimeout(() => (copy.textContent = "Copy"), 1500);
+    });
+    const reload = button("Reload", "Remount the app (R)", () => this.hostEvent(screen, "reload", "{}"));
+    reload.classList.add("pn-error-primary");
+
+    // Keys here belong to the overlay, not the preview's shortcuts.
+    panel.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") dismiss();
+      else if ((event.key === "r" || event.key === "R") && !event.metaKey && !event.ctrlKey && !event.altKey) reload.click();
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+    });
+
+    card.append(header, body, actions);
+    panel.appendChild(card);
+    document.body.appendChild(panel);
+    reload.focus();
+  }
+
+  /** Ask Python (and through it, `pn start`) to open a frame in the developer's editor. */
+  openInEditor(screen, file, line) {
+    this.hostEvent(screen, "open_in_editor", JSON.stringify({ file, line }));
+    this.toast?.(`Opening ${file}:${line} in your editor`, "info", 1500);
   }
 
   // -- helpers -----------------------------------------------------------

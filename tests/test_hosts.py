@@ -311,7 +311,7 @@ def test_mount_error_shows_redbox_in_dev_mode(monkeypatch: pytest.MonkeyPatch, b
     assert host._redbox_visible
     payload = cast(FakeTransport, get_transport()).calls[-1][2]
     assert "RuntimeError in mount: kaboom" == payload["title"]
-    assert "kaboom" in payload["trace"]
+    assert "kaboom" in payload["text"]
     assert backend.live_view_count() == 0
 
     host.clear_redbox()

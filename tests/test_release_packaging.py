@@ -181,6 +181,9 @@ DEV_ONLY_LAZY_IMPORTS = {
     # Hot reload entry points, called only by the dev client and preview.
     ("pythonnative.hosts.base", "ScreenHost.reload", "pythonnative.hot_reload"),
     ("pythonnative.hosts.base", "ScreenHost._try_fast_refresh", "pythonnative.hot_reload"),
+    # Error-screen editor links; the host event exists only in dev mode and
+    # the handler returns before importing when dev mode is off.
+    ("pythonnative.hosts.native", "_open_in_editor", "pythonnative.devtools"),
     # Contract derivation; only a development checkout whose generated
     # `_builtin_contracts.json` predates a protocol change reaches it.
     ("pythonnative.components", "_install_contracts", "pythonnative.sdk.builtins"),

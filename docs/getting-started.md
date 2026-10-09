@@ -22,6 +22,13 @@ This creates a `my_app/` directory containing:
 - `pythonnative.toml`: your project configuration (app id, version,
   permissions, assets, and signing). See
   [Configuration](guides/configuration.md).
+- `pyproject.toml`, which pins this `pythonnative` version and declares
+  `pytest` and `mypy` for development
+- `tests/test_app.py`, a test that renders the app headlessly with
+  [`pythonnative.testing`](guides/testing.md); run it with `pytest`
+- `.vscode/launch.json`, the [debugger](guides/debugging.md)
+  configuration, and `.vscode/extensions.json`
+- `.github/workflows/ci.yml`, which runs `pn lint`, `mypy`, and `pytest`
 - `.gitignore`
 
 A name has to be lowercase letters, digits, `-`, and `_`, starting with
@@ -132,34 +139,62 @@ Everything during development goes through one long-running process,
 the dev server. Start it in a terminal and leave it running:
 
 ```bash
-pn preview
+pn start
 ```
 
-`pn preview` starts the server, opens `http://localhost:8765/` in your
-browser (the URL carries your per-user
-[dev token](guides/dev-workflow.md#the-dev-token) once), and mounts your project's `App` in a phone frame. It **Fast
-Refreshes on every save**: edit a component, save, and the page updates
-in place while keeping component state (counters, form input, scroll
-position, the navigation stack). Your components, hooks, async work, and
-logical navigation use the shared Python runtime. The page speaks the
-same bridge protocol as the mobile renderers, implements widgets with DOM
-elements, and computes layout with Yoga WebAssembly.
+It prints a QR code, the URLs of the browser preview and DevTools, and
+the debugger's address, then waits for single-key commands. From here
+there are three ways to see your app.
 
-```bash
-pn preview                    # server + browser tab for app/main.py -> App
-pn preview app.screens.home   # mount a different module's App
-pn start                      # the server without opening a browser
-```
+### On a simulator or emulator, without building
 
-Use the toolbar to switch device frames, rotate, toggle dark mode, or
-send a back press. The preview is a **development** surface for layout
-and logic; platform chrome is approximated and device APIs are
-simulated. Ship to devices with `pn run`. See the
-[Browser preview guide](guides/browser-preview.md).
+Press ++i++ for the iOS Simulator or ++a++ for an Android emulator.
+`pn start` installs [PythonNative Go](guides/devtools.md#pythonnative-go),
+a prebuilt app that runs any PythonNative project without native code,
+and opens your project in it. No Xcode or Gradle build runs. (The first
+time, `pn` downloads Go for your version; in a development checkout of
+PythonNative it builds Go once instead.)
 
-## Run on a device or simulator
+### On your phone
 
-With the dev server still running, in a second terminal:
+Install Go on the phone (`pn go android --device <serial>` over USB, or
+`pn go ios --device "My iPhone"`, which signs it with your
+`[ios].development_team`), then scan the QR code with the phone's camera.
+The phone and your computer must be on the same Wi-Fi.
+
+### In the browser
+
+Press ++w++, or start with `pn preview` instead. The browser preview
+mounts your project's `App` in a phone frame. It's a **development**
+surface for layout and logic; platform chrome is approximated and device
+APIs are simulated. See the [Browser preview guide](guides/browser-preview.md).
+
+Every one of these **Fast Refreshes on every save**: edit a component,
+save, and the app updates in place while keeping component state
+(counters, form input, scroll position, the navigation stack). Logs and
+tracebacks from every app stream back into the `pn start` terminal.
+Press ++question++ for the other commands, and see the
+[Development workflow](guides/dev-workflow.md).
+
+## Debug, inspect, and measure
+
+- **The dev menu.** Shake the device, press ++cmd+d++ in the iOS
+  Simulator or ++cmd+m++ in the Android emulator, or press ++m++ in `pn
+  start`. It reloads the app and turns on the element inspector and the
+  performance monitor. See [PythonNative Go and DevTools](guides/devtools.md).
+- **DevTools.** Press ++j++ for the component tree with props and hooks,
+  a console with a REPL inside the running app, problems with component
+  stacks, network requests, and performance.
+- **Breakpoints.** Run the **PythonNative: Attach** configuration in VS
+  Code and set breakpoints in `app/`; they bind on the device. See
+  [Debugging](guides/debugging.md).
+
+## Build your own development app
+
+Go doesn't contain native code your project adds: native plugins, or
+packages with compiled extensions such as `numpy`. Such a project runs in
+its own debug build, which `pn start` builds for you when you press ++i++
+or ++a++. To build it directly, with the dev server still running:
 
 ```bash
 pn run android
@@ -168,12 +203,9 @@ pn run ios
 ```
 
 `pn run` stages the bundled native template, copies your `app/` in,
-builds a debug app, installs it, and launches it. The CLI finds the
-dev server on `localhost:8765`, passes its URL and your dev token to
-the app, and the app connects on startup. From then on it's a **dev client**: every save
-under `app/` syncs to the device and Fast Refreshes the running screens,
-and the app's `print` output and tracebacks stream back into the
-`pn start` terminal.
+builds a debug app, installs it, and opens it with a link to the dev
+server. From then on it behaves like Go: every save under `app/` syncs to
+the device and Fast Refreshes.
 
 Rerunning `pn run` is cheap. The native toolchain only runs when a
 native input changed (`pythonnative.toml`, the template, the
@@ -188,15 +220,6 @@ pn run ios --prepare-only
 ```
 
 This stages files under `build/` so you can open them in Android Studio or Xcode.
-
-Physical iPhones on the same Wi-Fi work the same way (`pn run ios
---device "My iPhone"`); the CLI passes your Mac's LAN address instead
-of `localhost`. See the [Development workflow](guides/dev-workflow.md)
-for the details, including the reusable `--dev-client` shell app.
-
-Native template changes (Kotlin, Swift, manifests) and edits to
-`pythonnative.toml` still require a rebuild; `pn run` detects them and
-runs the toolchain automatically.
 
 ## Viewing logs
 

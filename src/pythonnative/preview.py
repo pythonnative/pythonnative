@@ -36,6 +36,8 @@ class PreviewSession:
         port: int = 8765,
         project_name: str = "",
         log: Optional[Logger] = None,
+        config: Any = None,
+        debug_port: Optional[int] = None,
     ) -> None:
         from .bridge.web import WebTransport
         from .devserver import DevServer
@@ -44,13 +46,22 @@ class PreviewSession:
         self.entry_module = entry_module
         self.log: Logger = log or (lambda line: print(line, file=sys.stderr, flush=True))
         self.server = DevServer(
-            self.project_root, entry_module, host=host, port=port, project_name=project_name, log=self.log
+            self.project_root,
+            entry_module,
+            host=host,
+            port=port,
+            project_name=project_name,
+            log=self.log,
+            config=config,
+            debug_port=debug_port,
+            open_devtools=self.open_devtools,
         )
         self.transport = WebTransport(log=self.log)
         self.transport.on_peer_changed = self._on_peer_changed
         self.transport.on_dev_message = self._on_dev_message
         self._stop = threading.Event()
         self._unsubscribe: Optional[Callable[[], None]] = None
+        self._stdout: Any = None
 
     # -- lifecycle -------------------------------------------------------
 
@@ -80,6 +91,35 @@ class PreviewSession:
         self.server.set_preview_channel(self.transport)
         self._unsubscribe = self.server.add_change_listener(self._on_sources_changed)
         self.server.start()
+        self._install_devtools()
+
+    def _install_devtools(self) -> None:
+        """Serve DevTools for the preview from this process."""
+        from . import devtools
+        from .devtools.debugger import install_breakpoint_hook, mark_dev_thread
+
+        agent = devtools.install(lambda topic, data: self.server.publish_local("preview", topic, data), kind="preview")
+        self.server.preview_target(agent)
+        install_breakpoint_hook()
+        # The server's threads carry the debugger's traffic; never pause them.
+        for thread in threading.enumerate():
+            if thread.name in ("pn-dev-server", "pn-file-watcher"):
+                mark_dev_thread(thread)
+        # The app's print() output goes to stdout (the server logs to
+        # stderr); mirror it to DevTools' console.
+        from .devclient import _Tee
+
+        self._stdout = sys.stdout
+        sys.stdout = _Tee(
+            self._stdout, lambda line: self.server.publish_local("preview", "log", {"level": "info", "text": line})
+        )
+
+    def open_devtools(self) -> None:
+        """Open DevTools in the developer's browser (from any thread)."""
+        try:
+            webbrowser.open(self.server.info.devtools_url("localhost"))
+        except Exception:
+            pass
 
     def run(self) -> None:
         """Run the main loop until ``stop`` (or Ctrl+C)."""
@@ -88,9 +128,19 @@ class PreviewSession:
         except KeyboardInterrupt:
             pass
 
+    def stop_soon(self) -> None:
+        """Ask [`run`][pythonnative.preview.PreviewSession.run] to return (from any thread)."""
+        self._stop.set()
+
     def stop(self) -> None:
         """Tear everything down."""
         self._stop.set()
+        if self._stdout is not None:
+            sys.stdout = self._stdout
+            self._stdout = None
+        from . import devtools
+
+        devtools.uninstall()
         self.transport.stop()
         if self._unsubscribe is not None:
             self._unsubscribe()
@@ -141,6 +191,7 @@ class PreviewSession:
                 return
             if result.mode == "none":
                 return
+            self.server.publish_local("preview", "reload", {"mode": result.mode, "modules": result.reloaded})
             label = "Fast Refresh" if result.mode == "fast_refresh" else "Remounted"
             self.log(f"[pn] {label}: {', '.join(result.reloaded)} ({elapsed_ms:.0f} ms)")
             self.transport.send_dev(
@@ -154,10 +205,35 @@ class PreviewSession:
     def _on_peer_changed(self, connected: bool) -> None:
         if connected:
             self.log("[pn] browser preview connected")
-            self._send_hello()
+            self.transport.post_to_application(self._remount_for_new_page)
             return
         self.log("[pn] browser preview disconnected")
         self._destroy_hosts()
+
+    def _remount_for_new_page(self) -> None:
+        """Start a page's session on a fresh surface (application thread).
+
+        A page that went away can leave a commit in flight, which the
+        transport rejects after the disconnect was handled; the surface
+        must be reset once that commit settles, or the next page's mount
+        fails on a surface marked as failed.
+        """
+        import asyncio
+        from contextlib import suppress
+
+        from .native_views import get_backend
+
+        async def run() -> None:
+            backend = get_backend()
+            waiting = [getattr(backend, "_pending", None), *getattr(backend, "_queued_commits", ())]
+            for future in waiting:
+                if future is not None and not future.done():
+                    with suppress(BaseException):
+                        await future
+            self._destroy_hosts()
+            self._send_hello()
+
+        asyncio.get_running_loop().create_task(run())
 
     def _send_hello(self) -> None:
         """Tell the page what to mount; it answers by creating the entry screen."""
@@ -190,7 +266,11 @@ class PreviewSession:
         backend = get_backend()
         reset = getattr(backend, "reset", None)
         if callable(reset):
-            reset()
+            try:
+                reset()
+            except Exception as exc:
+                # A commit is still in flight; the next page resets once it settles.
+                self.log(f"[pn] surface reset deferred: {exc}")
 
     def _on_dev_message(self, payload: Dict[str, Any]) -> None:
         kind = payload.get("type")
@@ -223,6 +303,37 @@ class PreviewSession:
         return urls
 
 
+def banner_lines(session: PreviewSession, title: str) -> List[str]:
+    """The ``pn start`` banner: a QR code for the connect link, then the URLs."""
+    from .devserver import lan_addresses
+    from .devserver.auth import token_source
+    from .devserver.qr import encode, to_terminal
+
+    server = session.server
+    info = server.info
+    lan = next(iter(lan_addresses()), None)
+    links = server.connect_links(lan)
+    lines = ["", f"  PythonNative dev server for {title}", ""]
+    try:
+        code = to_terminal(encode(str(links["preferred"])), border=2)
+        lines.extend("  " + row for row in code.rstrip("\n").split("\n"))
+    except ValueError:
+        pass
+    target = "PythonNative Go" if links.get("go_compatible", True) or "app" not in links else "your development build"
+    lines += [
+        f"  Scan with your phone's camera to open it in {target}.",
+        "",
+        f"  Browser preview:  {info.preview_url('localhost')}",
+        f"  DevTools:         {info.devtools_url('localhost')}",
+    ]
+    if lan:
+        lines.append(f"  Devices (LAN):    {info.connect_url(lan)}")
+    if server.debug_port:
+        lines.append(f"  Debugger:         127.0.0.1:{server.debug_port} (VS Code: 'PythonNative: Attach')")
+    lines += ["", f"  The URLs carry your dev token ({token_source()}); keep them to your own devices.", ""]
+    return lines
+
+
 def _browser_family(user_agent: str) -> str:
     agent = user_agent.lower()
     for needle, name in (("firefox", "Firefox"), ("edg/", "Edge"), ("chrome", "Chrome"), ("safari", "Safari")):
@@ -242,6 +353,8 @@ def serve(
     log: Optional[Logger] = None,
     banner: bool = True,
     ready: Optional[Callable[[PreviewSession], None]] = None,
+    config: Any = None,
+    debug_port: Optional[int] = None,
 ) -> None:
     """Run the dev server (and browser preview) until interrupted.
 
@@ -255,7 +368,11 @@ def serve(
         open_browser: Open the preview page in the default browser.
         log: Where status lines go (stderr by default).
         banner: Print the connection banner.
-        ready: Called once the server is listening (tests).
+        ready: Called once the server is listening (the CLI starts its
+            key handler here; tests use it to drive the session).
+        config: The project's ``AppConfig`` (compatibility checks,
+            package sync, connect links).
+        debug_port: Port of the debugger proxy, or ``None`` for none.
 
     Raises:
         RuntimeError: If ``PN_PLATFORM=web`` was not set before
@@ -269,24 +386,14 @@ def serve(
         port=port,
         project_name=project_name,
         log=log,
+        config=config,
+        debug_port=debug_port,
     )
     session.start()
     urls = session.urls()
     if banner:
-        from .devserver.auth import token_source
-
-        emit = session.log
-        emit("")
-        emit(f"  PythonNative dev server for {project_name or entry_module}")
-        emit("")
-        emit(f"  Browser preview:  {urls[0]}")
-        for url in urls[1:]:
-            emit(f"  Devices (LAN):    {url}")
-        emit("")
-        emit("  Debug builds made with `pn run` connect here automatically.")
-        emit(f"  The URLs carry your dev token ({token_source()}); keep them to your own devices.")
-        emit("  Press Ctrl+C to stop.")
-        emit("")
+        for line in banner_lines(session, project_name or entry_module):
+            session.log(line)
     if open_browser:
         try:
             webbrowser.open(urls[0])

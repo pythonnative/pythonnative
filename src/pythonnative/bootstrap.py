@@ -88,6 +88,11 @@ def start(dev: bool = False, strict: bool = False, entry: Optional[str] = None) 
 
             client = devclient.start_if_configured()
             status_["dev_server"] = client.server_label if client is not None else None
+            if client is None:
+                # No server yet: the dev menu, inspector, and performance
+                # monitor still work locally; a connection replaces this
+                # agent with one that reports to DevTools.
+                devclient.install_local_agent()
             # An overlay from the last session may already hold assets the
             # bundle doesn't; point the native resolver at it right away.
             from .assets import configure_native

@@ -15,6 +15,9 @@ loop. It exposes:
   is the asset manifest and ``/assets/fonts.css`` declares the bundled
   fonts for the browser preview.
 - ``GET /status``: server, project, and connected-peer information.
+- ``GET /devtools``: the DevTools page (``/devtools/<name>`` for its
+  assets), authenticated like ``/``.
+- ``GET /connect``: connect links, server URLs, and their QR codes.
 - ``WS /ws?role=client``: the dev-client protocol (see below).
 - ``WS /ws?role=preview``: the browser preview's bridge channel; the
   server only relays text frames between the page and the
@@ -30,18 +33,29 @@ sends one) must also come from the server's own origin: the ``Origin``
 host and port must equal the ``Host`` header. Native dev clients send no
 ``Origin``.
 
-Dev-client protocol (JSON objects, one per text frame):
+Dev session protocol, version 2 (JSON objects, one per text frame; see
+RFC 0006 and ``pythonnative.devclient``):
 
-- client -> server ``hello``: ``{"type": "hello", "platform", "device",
-  "app", "files": {path: sha256}}`` describing what the client already
-  holds in its overlay.
-- server -> client ``sync``: ``{"type": "sync", "version", "entry",
-  "files": [{"path", "sha256", "content", "encoding"}], "removed": [...]}``
-  bringing the client up to date. The same shape is sent as
-  ``"update"`` whenever the watcher sees a change.
+- client -> server ``hello``: ``{"type": "hello", "session": 2, "client":
+  "go" | "app", "platform", "device", "app", "runtime": {...}, "files":
+  {path: sha256}, "packages": {name: version}}``.
+- server -> client ``incompatible`` (``reason``, ``fix``) when the client
+  can't run the project (see ``pythonnative.devserver.compat``), or
+  ``sync``: ``{"type": "sync", "version", "entry", "project", "files":
+  [{"path", "sha256", "content", "encoding"}], "removed": [...]}``
+  followed by ``packages`` for missing pure-Python distributions. The
+  ``sync`` shape is sent as ``"update"`` whenever the watcher sees a
+  change.
+- server -> client ``rpc`` (``id``, ``method``, ``params``), ``tunnel``,
+  ``menu``, and ``reload``; client -> server ``rpc_result``, ``event``
+  (``topic``, ``data``), ``tunnel``, and ``packages_ready``.
 - client -> server ``log`` (``level``, ``text``), ``error`` (``phase``,
   ``text``), ``reloaded`` (``version``, ``mode``, ``modules``): streamed
-  to the terminal.
+  to the terminal and DevTools.
+
+``WS /ws?role=devtools`` carries DevTools pages (see
+``pythonnative.devserver.hub``), and a separate listener on
+``127.0.0.1:5678`` accepts Debug Adapter Protocol connections.
 """
 
 from __future__ import annotations
@@ -56,14 +70,17 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, Sequence
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, Sequence, Tuple
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from . import auth, ws
+from .hub import ClientTarget, Hub, LocalTarget
 from .watcher import FileWatcher, SourceChange, SourceSnapshot, snapshot_sources
 
 __all__ = [
+    "DEFAULT_DEBUG_PORT",
     "DEFAULT_PORT",
+    "GO_APP_ID",
     "DevServer",
     "PreviewChannel",
     "PreviewPeer",
@@ -73,6 +90,12 @@ __all__ = [
 
 DEFAULT_PORT = 8765
 """Default port for ``pn start`` / ``pn preview``."""
+
+DEFAULT_DEBUG_PORT = 5678
+"""Default port of the debugger proxy (``debugpy``'s conventional port)."""
+
+GO_APP_ID = "com.pythonnative.go"
+"""PythonNative Go's application id; its connect scheme is ``pn-com.pythonnative.go``."""
 
 _MAX_HEAD = 64 * 1024
 _STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -129,6 +152,14 @@ class ServerInfo:
     def ws_url(self, host: Optional[str] = None) -> str:
         """The dev-client WebSocket URL, including the dev token."""
         return auth.with_token(f"ws://{host or self.display_host}:{self.port}/ws?role=client", self.token)
+
+    def devtools_url(self, host: Optional[str] = None) -> str:
+        """The DevTools page URL, carrying the dev token once."""
+        return auth.with_token(self.url(host) + "/devtools", self.token)
+
+    def connect_url(self, host: Optional[str] = None) -> str:
+        """The server URL a connect link carries (``http://host:port/?token=...``)."""
+        return auth.with_token(self.url(host) + "/", self.token)
 
     @property
     def display_host(self) -> str:
@@ -209,15 +240,38 @@ class DevClient:
     platform: str = "unknown"
     device: str = ""
     app: str = ""
+    kind: str = "app"
     connected_at: float = field(default_factory=time.time)
     files: Dict[str, str] = field(default_factory=dict)
+    target: Optional[ClientTarget] = None
+    synced: bool = False
+
+    def send(self, message: Dict[str, Any]) -> None:
+        """Queue one JSON message (call on the server loop)."""
+        try:
+            self.writer.write(ws.encode_frame(ws.TEXT, json.dumps(message, default=str).encode("utf-8")))
+        except Exception:
+            pass
 
     def label(self) -> str:
         """A short human label for log lines."""
         parts = [self.platform]
         if self.device:
             parts.append(self.device)
+        if self.kind == "go":
+            parts.append("(Go)")
         return " ".join(parts)
+
+
+class DevToolsPeer:
+    """A connected DevTools page; ``send`` is safe from the server loop."""
+
+    def __init__(self, writer: asyncio.StreamWriter) -> None:
+        self._writer = writer
+
+    def send(self, message: Dict[str, Any]) -> None:
+        """Queue one JSON message to the page."""
+        self._writer.write(ws.encode_frame(ws.TEXT, json.dumps(message, default=str).encode("utf-8")))
 
 
 # ======================================================================
@@ -241,6 +295,11 @@ class DevServer:
         static_dir: Where the preview page's assets live.
         log: Where to print client logs and connection events.
         watch: Whether to run the file watcher.
+        config: The project's ``AppConfig``, for compatibility checks,
+            package sync, and the app's connect scheme.
+        debug_port: Port of the debugger proxy on ``127.0.0.1``
+            (``0`` picks a free one, ``None`` disables it).
+        open_devtools: Called when an app's dev menu asks to open DevTools.
     """
 
     def __init__(
@@ -255,6 +314,9 @@ class DevServer:
         static_dir: Optional[str] = None,
         log: Optional[Logger] = None,
         watch: bool = True,
+        config: Any = None,
+        debug_port: Optional[int] = None,
+        open_devtools: Optional[Callable[[], None]] = None,
     ) -> None:
         self.project_root = os.path.abspath(project_root)
         self.token = token or auth.load_token()
@@ -278,6 +340,15 @@ class DevServer:
         self._snapshot: SourceSnapshot = snapshot_sources(self.project_root)
         self._snapshot_lock = threading.Lock()
         self._change_listeners: List[Callable[[SourceChange, SourceSnapshot], None]] = []
+        self.config = config
+        self.debug_port = debug_port
+        self._debug_server: Optional[asyncio.base_events.Server] = None
+        self._runtime: Any = None
+        self.hub = Hub(
+            self.log,
+            on_open_devtools=open_devtools,
+            on_open_editor=lambda file, line: self._open_in_editor({"file": file, "line": line}),
+        )
         self.info = ServerInfo(
             host=host,
             port=port,
@@ -338,6 +409,20 @@ class DevServer:
         sockets: Sequence[Any] = server.sockets or []
         if sockets:
             self.info.port = int(sockets[0].getsockname()[1])
+        if self.debug_port is not None:
+            try:
+                debug = loop.run_until_complete(
+                    asyncio.start_server(self.hub.debug_connection, "127.0.0.1", self.debug_port)
+                )
+            except OSError as exc:
+                self.log(f"[pn] debugger proxy disabled: can't listen on 127.0.0.1:{self.debug_port} ({exc})")
+                self.debug_port = None
+            else:
+                self._debug_server = debug
+                debug_sockets: Sequence[Any] = debug.sockets or []
+                if debug_sockets:
+                    self.debug_port = int(debug_sockets[0].getsockname()[1])
+                self.hub.debug_port = self.debug_port or 0
         self._started.set()
         try:
             loop.run_forever()
@@ -352,6 +437,8 @@ class DevServer:
         loop = self._loop
         if self._server is not None:
             self._server.close()
+        if self._debug_server is not None:
+            self._debug_server.close()
         for client in list(self._clients.values()):
             try:
                 client.writer.write(ws.encode_close())
@@ -402,6 +489,68 @@ class DevServer:
 
         return _remove
 
+    @property
+    def project_runtime(self) -> Any:
+        """What the project needs from a dev client (computed once, on first use)."""
+        if self._runtime is None:
+            from .compat import project_runtime
+
+            self._runtime = project_runtime(self.config)
+        return self._runtime
+
+    def app_scheme(self) -> Optional[str]:
+        """The connect scheme of the project's own debug build, when the config names an app id."""
+        from ..devclient import dev_scheme
+
+        app_id = getattr(self.config, "app_id", None)
+        return dev_scheme(str(app_id)) if app_id else None
+
+    def connect_links(self, host: Optional[str] = None) -> Dict[str, Any]:
+        """Connect links for PythonNative Go and the project's own debug build.
+
+        The preferred link is Go's when the project can run in it.
+        """
+        from ..devclient import connect_link, dev_scheme
+
+        server_url = self.info.connect_url(host)
+        links: Dict[str, Any] = {"server": server_url, "go": connect_link(dev_scheme(GO_APP_ID), server_url)}
+        scheme = self.app_scheme()
+        if scheme:
+            links["app"] = connect_link(scheme, server_url)
+        try:
+            go_ok = bool(self.project_runtime.go_compatible)
+        except Exception:
+            go_ok = True
+        links["go_compatible"] = go_ok
+        links["preferred"] = links["go"] if go_ok or "app" not in links else links["app"]
+        return links
+
+    def preview_target(self, agent: Any) -> None:
+        """Register the browser preview's in-process agent as a DevTools target (any thread)."""
+
+        def register() -> None:
+            assert self._loop is not None
+            self.hub.add_target(LocalTarget(agent, self._loop))
+
+        self._call_soon(register)
+
+    def publish_local(self, target_id: str, topic: str, data: Any) -> None:
+        """Publish an event for an in-process target (any thread)."""
+        self._call_soon(self.hub.on_event, target_id, topic, data)
+
+    def broadcast_command(self, name: str) -> None:
+        """Send ``reload`` or ``menu`` to every connected dev client (any thread)."""
+
+        def send() -> None:
+            for client in list(self._clients.values()):
+                if client.synced:
+                    client.send({"type": name})
+            preview = self.hub.targets.get("preview")
+            if name == "reload" and isinstance(preview, LocalTarget):
+                preview.agent.dispatch("reload", {}, lambda _result, _error: None)
+
+        self._call_soon(send)
+
     def manifest(self) -> Dict[str, Any]:
         """The ``/manifest`` document."""
         snap = self.snapshot
@@ -423,6 +572,8 @@ class DevServer:
             "preview_connected": self._preview_peer is not None and not self._preview_peer.closed.is_set(),
             "lan": lan_addresses(),
             "port": self.info.port,
+            "debug_port": self.debug_port,
+            "targets": self.hub.describe_targets(),
         }
 
     # -- file changes ----------------------------------------------------
@@ -453,6 +604,7 @@ class DevServer:
                 "type": kind,
                 "version": snapshot.version,
                 "entry": self.entry_module,
+                "project": self.project_name,
                 "files": files,
                 "removed": list(removed),
             }
@@ -461,6 +613,8 @@ class DevServer:
     def _broadcast(self, message: str) -> None:
         frame = ws.encode_frame(ws.TEXT, message.encode("utf-8"))
         for client in list(self._clients.values()):
+            if not client.synced:
+                continue
             try:
                 client.writer.write(frame)
             except Exception:
@@ -468,7 +622,10 @@ class DevServer:
 
     def _drop_client(self, client: DevClient) -> None:
         if self._clients.pop(client.id, None) is not None:
-            self.log(f"[pn] {client.label()} disconnected")
+            if client.target is not None:
+                self.hub.remove_target(client.target.id)
+            if client.synced:
+                self.log(f"[pn] {client.label()} disconnected")
         try:
             client.writer.close()
         except Exception:
@@ -518,16 +675,18 @@ class DevServer:
         if method not in ("GET", "HEAD"):
             _respond(writer, 405, b"method not allowed", "text/plain")
             return
-        if path in ("/", "/index.html"):
+        if path in ("/", "/index.html", "/devtools", "/devtools/"):
+            page = "/devtools" if path.startswith("/devtools") else "/"
             if auth.QUERY_PARAM in query:
                 # Trade the URL's token for a cookie, then drop it from the address bar.
                 if not auth.token_matches(query[auth.QUERY_PARAM], self.token):
                     _respond_refusal(writer, 403)
                     return
                 cookie = f"{auth.COOKIE_NAME}={self.token}; HttpOnly; SameSite=Strict; Path=/"
-                _respond(writer, 302, b"", "text/plain", headers={"Location": "/", "Set-Cookie": cookie})
+                _respond(writer, 302, b"", "text/plain", headers={"Location": page, "Set-Cookie": cookie})
                 return
-            _respond_file(writer, os.path.join(self.static_dir, "index.html"))
+            name = "devtools/index.html" if page == "/devtools" else "index.html"
+            _respond_file(writer, os.path.join(self.static_dir, name))
             return
         if path == "/static/schema.js":
             from ..sdk.schema import manifest
@@ -536,6 +695,8 @@ class DevServer:
                 writer, 200, ("export default " + json.dumps(manifest(), default=str) + ";").encode(), "text/javascript"
             )
             return
+        if path.startswith("/devtools/"):
+            path = "/static/devtools/" + path[len("/devtools/") :]
         if path.startswith("/static/"):
             name = path[len("/static/") :]
             root = os.path.realpath(self.static_dir)
@@ -561,6 +722,9 @@ class DevServer:
         if path == "/status":
             _respond_json(writer, self.status())
             return
+        if path == "/connect":
+            _respond_json(writer, self._connect_document(headers))
+            return
         if path.startswith("/file/"):
             rel = path[len("/file/") :]
             snap = self.snapshot
@@ -577,6 +741,24 @@ class DevServer:
             self._serve_asset(writer, path[len("/assets/") :])
             return
         _respond(writer, 404, b"not found", "text/plain")
+
+    def _connect_document(self, headers: Dict[str, str]) -> Dict[str, Any]:
+        """``/connect``: links for the LAN address (phones) and localhost, with QR codes."""
+        from .qr import encode, to_svg
+
+        lan = next(iter(lan_addresses()), None)
+        local = self.connect_links("localhost")
+        remote = self.connect_links(lan) if lan else local
+        preferred = str(remote["preferred"])
+        return {
+            "project": self.project_name,
+            "lan": lan,
+            "links": remote,
+            "local": local,
+            "qr_svg": to_svg(encode(preferred), border=4),
+            "devtools": self.info.devtools_url("localhost"),
+            "debug_port": self.debug_port,
+        }
 
     def _serve_asset(self, writer: asyncio.StreamWriter, rel: str) -> None:
         """Serve ``app/assets/<rel>``, the manifest, or the generated font CSS.
@@ -654,6 +836,8 @@ class DevServer:
         role = query.get("role", "client")
         if role == "preview":
             await self._preview_session(reader, writer, query)
+        elif role == "devtools":
+            await self._devtools_session(reader, writer)
         else:
             await self._client_session(reader, writer)
 
@@ -707,22 +891,9 @@ class DevServer:
 
     def _on_client_message(self, client: DevClient, message: Dict[str, Any]) -> None:
         kind = message.get("type")
+        target = client.target
         if kind == "hello":
-            client.platform = str(message.get("platform") or "unknown")
-            client.device = str(message.get("device") or "")
-            client.app = str(message.get("app") or "")
-            files = message.get("files")
-            client.files = {str(k): str(v) for k, v in files.items()} if isinstance(files, dict) else {}
-            self.log(f"[pn] {client.label()} connected")
-            snap = self.snapshot
-            changed = sorted(p for p, digest in snap.files.items() if client.files.get(p) != digest)
-            removed = sorted(p for p in client.files if p not in snap.files)
-            try:
-                client.writer.write(
-                    ws.encode_frame(ws.TEXT, self._sync_message("sync", snap, changed, removed).encode("utf-8"))
-                )
-            except Exception:
-                self._drop_client(client)
+            self._on_hello(client, message)
             return
         if kind == "log":
             level = str(message.get("level") or "info")
@@ -732,6 +903,8 @@ class DevServer:
                 prefix = f"[{client.label()} {level}]"
             for line in text.split("\n"):
                 self.log(f"{prefix} {line}")
+            if target is not None:
+                self.hub.log_line(target.id, level, text)
             return
         if kind == "error":
             phase = str(message.get("phase") or "runtime")
@@ -739,13 +912,207 @@ class DevServer:
             self.log(f"[{client.label()}] error during {phase}:")
             for line in text.split("\n"):
                 self.log(f"    {line}")
+            if target is not None:
+                self.hub.log_line(target.id, "error", f"error during {phase}:\n{text}")
             return
         if kind == "reloaded":
             mode = str(message.get("mode") or "reload")
             modules = message.get("modules") or []
             what = ", ".join(str(m) for m in modules) if isinstance(modules, list) and modules else "app"
             self.log(f"[{client.label()}] {mode}: {what}")
+            if target is not None:
+                self.hub.on_event(target.id, "reload", {"mode": mode, "modules": modules})
             return
+        if target is None:
+            return
+        if kind == "event":
+            self.hub.on_event(target.id, str(message.get("topic") or ""), message.get("data"))
+        elif kind == "rpc_result":
+            target.settle(message)
+        elif kind == "tunnel":
+            target.tunnel(message)
+        elif kind == "packages_ready":
+            target.packages_ready(message)
+
+    def _on_hello(self, client: DevClient, message: Dict[str, Any]) -> None:
+        from .compat import check
+
+        client.platform = str(message.get("platform") or "unknown")
+        client.device = str(message.get("device") or "")
+        client.app = str(message.get("app") or "")
+        client.kind = str(message.get("client") or "app")
+        files = message.get("files")
+        client.files = {str(k): str(v) for k, v in files.items()} if isinstance(files, dict) else {}
+        try:
+            problem = check(message, self.project_runtime)
+        except Exception as exc:
+            problem = None
+            self.log(f"[pn] couldn't check {client.label()}'s compatibility: {exc!r}")
+        runtime = message.get("runtime") if isinstance(message.get("runtime"), dict) else {}
+        assert isinstance(runtime, dict)
+        bundled = {str(k): str(v) for k, v in (runtime.get("distributions") or {}).items()}
+        synced = {str(k): str(v) for k, v in (message.get("packages") or {}).items()}
+        plan, missing_native = self._package_plan(bundled, synced)
+        if problem is None and missing_native and client.kind == "app":
+            from .compat import Incompatibility
+
+            platform = client.platform if client.platform in ("ios", "android") else "<platform>"
+            problem = Incompatibility(
+                f"The project now needs {', '.join(missing_native)}, which contain compiled code this "
+                "build doesn't include.",
+                f"Rebuild it with `pn run {platform} --rebuild`.",
+            )
+        if problem is not None:
+            self.log(f"[pn] {client.label()} can't run this project: {problem.reason} {problem.fix}")
+            client.send(problem.to_message())
+            return
+        target = ClientTarget(client.id, client.send)
+        target.kind = client.kind
+        target.platform = client.platform
+        target.device = client.device
+        target.distributions = bundled
+        target.packages = synced
+        target.host_paths = self._host_paths()
+        target.sync_packages = lambda names, request: self._send_packages(client, names, request)
+        client.target = target
+        client.synced = True
+        self.log(f"[pn] {client.label()} connected")
+        snap = self.snapshot
+        changed = sorted(p for p, digest in snap.files.items() if client.files.get(p) != digest)
+        removed = sorted(p for p in client.files if p not in snap.files)
+        try:
+            client.writer.write(
+                ws.encode_frame(ws.TEXT, self._sync_message("sync", snap, changed, removed).encode("utf-8"))
+            )
+        except Exception:
+            self._drop_client(client)
+            return
+        if plan:
+            self._send_packages(client, [dist.name for dist in plan], None, plan=plan)
+        self.hub.add_target(target)
+
+    def _package_plan(self, bundled: Dict[str, str], synced: Dict[str, str]) -> Tuple[List[Any], List[str]]:
+        """``(pure distributions to sync, required native distributions the client lacks)``."""
+        from . import packages as packages_mod
+
+        requirements = list(getattr(self.config, "requirements", ()) or ())
+        if not requirements:
+            return [], []
+        distributions, _missing = packages_mod.resolve(requirements, skip=bundled.keys())
+        plan = [dist for dist in distributions if dist.pure and synced.get(dist.name) != dist.version]
+        native = sorted(dist.name for dist in distributions if not dist.pure)
+        return plan, native
+
+    def _send_packages(self, client: DevClient, names: List[str], request: Optional[int], *, plan: Any = None) -> int:
+        """Send ``names`` (or a precomputed ``plan``) to ``client``; returns how many were sent."""
+        from . import packages as packages_mod
+
+        if plan is None:
+            target = client.target
+            skip = set(target.distributions) if target is not None else set()
+            distributions, _missing = packages_mod.resolve(names, skip=skip)
+            plan = []
+            for dist in distributions:
+                if packages_mod.normalize(dist.name) == "debugpy" or not dist.pure:
+                    found = packages_mod.find_distribution(dist.name)
+                    if found is None:
+                        continue
+                    dist = packages_mod.distribution_files(found, sources_only=True)
+                plan.append(dist)
+            if not plan:
+                missing = ", ".join(names)
+                self.log(f"[pn] can't sync {missing}: install it in this environment (`pip install {missing}`)")
+                return 0
+        for index, dist in enumerate(plan):
+            files = []
+            for rel, path in dist.files:
+                try:
+                    data = path.read_bytes()
+                except OSError:
+                    continue
+                files.append(_encode_file(rel, "", data))
+            last = index == len(plan) - 1
+            client.send(
+                {
+                    "type": "packages",
+                    "packages": [{"name": dist.name, "version": dist.version, "files": files}],
+                    "request": request if last else None,
+                }
+            )
+            if client.target is not None:
+                client.target.packages[dist.name] = dist.version
+            self.log(f"[pn] syncing {dist.name} {dist.version} to {client.label()} ({len(files)} files)")
+        return len(plan)
+
+    def _host_paths(self) -> Dict[str, Any]:
+        """Paths on this machine that device paths map to, for the debugger."""
+        import sysconfig
+
+        sites = {sysconfig.get_paths().get("purelib"), sysconfig.get_paths().get("platlib")}
+        return {
+            "project": self.project_root,
+            "pythonnative": os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "site_packages": sorted(path for path in sites if path),
+        }
+
+    async def _devtools_session(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        page = DevToolsPeer(writer)
+        self.hub.add_page(page)
+        tasks: List[asyncio.Task[Any]] = []
+        try:
+            async for text in self._read_messages(reader, writer):
+                try:
+                    message = json.loads(text)
+                except ValueError:
+                    continue
+                if not isinstance(message, dict):
+                    continue
+                kind = message.get("type")
+                if kind == "rpc":
+                    tasks.append(asyncio.get_running_loop().create_task(self.hub.page_request(page, message)))
+                    tasks = [task for task in tasks if not task.done()]
+                elif kind == "open":
+                    page.send(self._open_in_editor(message))
+                elif kind == "debug_target":
+                    target_id = message.get("target")
+                    self.hub.debug_target = str(target_id) if target_id else None
+                    self.hub.broadcast_targets()
+                elif kind == "command":
+                    self._page_command(str(message.get("name") or ""), message.get("target"))
+                elif kind == "clear":
+                    target_id = message.get("target")
+                    self.hub.clear(str(target_id) if target_id else None, str(message.get("topic") or ""))
+                elif kind == "connect":
+                    page.send({"type": "connect", **self._connect_document({})})
+        finally:
+            self.hub.remove_page(page)
+            for task in tasks:
+                task.cancel()
+            try:
+                writer.close()
+            except Exception:
+                pass
+
+    def _page_command(self, name: str, target_id: Any) -> None:
+        if name not in ("reload", "menu"):
+            return
+        for client in list(self._clients.values()):
+            if client.target is not None and target_id in (None, client.target.id):
+                client.send({"type": name})
+        preview = self.hub.targets.get("preview")
+        if isinstance(preview, LocalTarget) and target_id in (None, "preview"):
+            preview.agent.dispatch(name, {}, lambda _result, _error: None)
+
+    def _open_in_editor(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        from .editor import open_in_editor
+
+        file = str(message.get("file") or "")
+        line = int(message.get("line") or 1)
+        opened = open_in_editor(file, line, self.project_root, self._host_paths()["site_packages"])
+        if opened is None:
+            return {"type": "opened", "file": file, "error": f"{file} isn't in this project"}
+        self.log(f"[pn] opened {opened}:{line}")
+        return {"type": "opened", "file": file, "path": opened}
 
     async def _preview_session(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, query: Dict[str, str]

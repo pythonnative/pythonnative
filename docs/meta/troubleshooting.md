@@ -223,7 +223,10 @@ You're either missing keys or using positional keys. See
 
 - Is `pn start` (or `pn preview`) running? Debug builds connect to it
   on launch; the terminal prints `[pn] ios <device> connected` when
-  one arrives. If you launched `pn run` with no server up, the app is
+  one arrives. If it prints "can't run this project" instead, the
+  device shows the reason and the command that fixes it (usually `pn go
+  <platform>` for an outdated PythonNative Go, or `pn run <platform>
+  --rebuild` for a build that predates a native plugin). If you launched `pn run` with no server up, the app is
   running its bundled sources: start the server and relaunch.
 - Is the device on the same network? Simulators and emulators reach
   the server through `localhost` (Android via `adb reverse`), but a
@@ -233,8 +236,8 @@ You're either missing keys or using positional keys. See
   address is wrong.
 - Did the server refuse the app's token? The app logs "refused the
   connection" when its URL has no dev token or an old one (after the
-  token file was deleted, say). Relaunch with `pn run`, or enter the
-  URL `pn start` prints on the dev-client connect screen. See
+  token file was deleted, say). Scan the QR code `pn start` prints, or
+  relaunch with `pn run` or `pn go`. See
   [The dev token](../guides/dev-workflow.md#the-dev-token).
 - The watcher only sees files under `app/`. Code outside `app/` needs
   a rebuild.

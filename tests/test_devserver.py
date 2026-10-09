@@ -345,6 +345,22 @@ def _client(server: DevServer, role: str = "client", token: Any = _SERVER_TOKEN)
     return client
 
 
+def _compatible_hello() -> Dict[str, Any]:
+    """A protocol-2 hello from a debug build of this framework version."""
+    from pythonnative.bridge.commits import PROTOCOL_VERSION
+    from pythonnative.devserver.compat import _framework_version
+
+    return {
+        "type": "hello",
+        "session": 2,
+        "client": "app",
+        "runtime": {"pythonnative": _framework_version(), "protocol": PROTOCOL_VERSION, "plugins": []},
+    }
+
+
+_HELLO = _compatible_hello()
+
+
 def test_client_hello_gets_only_the_files_it_lacks(server: DevServer) -> None:
     snap = server.snapshot
     client = _client(server)
@@ -352,7 +368,7 @@ def test_client_hello_gets_only_the_files_it_lacks(server: DevServer) -> None:
         client.send_text(
             json.dumps(
                 {
-                    "type": "hello",
+                    **_HELLO,
                     "platform": "ios",
                     "device": "iPhone 15",
                     "app": "app.main",
@@ -379,7 +395,7 @@ def test_client_logs_and_errors_reach_the_terminal(server: DevServer) -> None:
     logs: List[str] = server.test_logs  # type: ignore[attr-defined]
     client = _client(server)
     try:
-        client.send_text(json.dumps({"type": "hello", "platform": "android", "device": "Pixel", "files": {}}))
+        client.send_text(json.dumps({**_HELLO, "platform": "android", "device": "Pixel", "files": {}}))
         client.recv()  # sync
         client.send_text(json.dumps({"type": "log", "level": "info", "text": "hello from device\nsecond line"}))
         client.send_text(json.dumps({"type": "error", "phase": "render", "text": "Traceback...\nValueError: boom"}))
@@ -397,7 +413,7 @@ def test_file_change_is_broadcast_to_connected_clients(server: DevServer) -> Non
     root = Path(server.project_root)
     client = _client(server)
     try:
-        client.send_text(json.dumps({"type": "hello", "platform": "ios", "files": {}}))
+        client.send_text(json.dumps({**_HELLO, "platform": "ios", "files": {}}))
         client.recv()
         _wait(lambda: len(server.clients) == 1)
         seen: List[Any] = []
@@ -423,7 +439,7 @@ def test_binary_files_are_base64_encoded(server: DevServer) -> None:
     after = snapshot_sources(str(root), previous=before)
     client = _client(server)
     try:
-        client.send_text(json.dumps({"type": "hello", "platform": "ios", "files": {}}))
+        client.send_text(json.dumps({**_HELLO, "platform": "ios", "files": {}}))
         client.recv()
         _wait(lambda: len(server.clients) == 1)
         server._on_files_changed(before.diff(after), after)

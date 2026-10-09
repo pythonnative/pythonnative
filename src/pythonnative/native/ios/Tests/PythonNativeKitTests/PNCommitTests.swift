@@ -173,3 +173,33 @@ final class PNCommitTests: XCTestCase {
         XCTAssertEqual(commit([["u", 9830, ["dataset": update], []]], revision: 2)["ok"] as? Bool, true)
     }
 }
+
+/// Reads a typed prop whose value doesn't decode, as a decoder bug would.
+private final class PNUndecodableManager: PNComponentManager {
+    override func makeView(props: [String: Any]) -> UIView { UIView() }
+    override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        _ = try? ViewProps(["opacity": "loud"], validated: true).opacity
+    }
+}
+
+extension PNCommitTests {
+    func testGeneratedGettersRecordDecodeFailuresInsteadOfCrashing() throws {
+        _ = PNValues.takeDecodeFailure()
+        let props = try ViewProps(["opacity": "loud", "flex": 1], validated: true)
+        XCTAssertNil(props.opacity)
+        XCTAssertEqual(props.flex, 1)
+        let failure = try XCTUnwrap(PNValues.takeDecodeFailure())
+        XCTAssertTrue(failure.hasPrefix("field opacity didn't decode"), failure)
+        XCTAssertNil(PNValues.takeDecodeFailure())
+    }
+
+    func testDecodeFailureRejectsTheCommit() {
+        PNRegistry.shared.registerComponent("Spacer") { PNUndecodableManager() }
+        defer { PNRegistry.shared.registerComponent("Spacer") { PNSpacerManager() } }
+        let result = commit([["c", 9901, "Spacer", [:]]])
+        XCTAssertEqual(result["ok"] as? Bool, false)
+        XCTAssertEqual(result["failed"] as? Bool, true)
+        XCTAssertTrue((result["error"] as? String ?? "").hasPrefix("props for Spacer tag 9901: field opacity didn't decode"), "\(result)")
+        XCTAssertNil(PNViewRegistry.shared.view(for: 9901))
+    }
+}
