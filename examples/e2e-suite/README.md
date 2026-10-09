@@ -2,7 +2,7 @@
 
 A comprehensive demo app that exercises every public feature in `pythonnative`. It's the target of the top-level Maestro E2E suite and doubles as a living reference for the framework's surface area.
 
-Unlike `examples/hello-world`, this app isn't a marketing demo; it's structured for automated testing. Each PythonNative feature gets a dedicated screen that:
+It's structured for automated testing. Each PythonNative feature gets a dedicated screen that:
 
 - Renders a stable, unique title (so Maestro can wait for the screen to appear).
 - Exposes interactive controls with stable, unique labels (so Maestro can tap them).

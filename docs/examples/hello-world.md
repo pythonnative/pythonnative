@@ -50,8 +50,8 @@ def App() -> pn.Node:
 For the fastest feedback loop, start the dev server and open the
 browser preview before reaching for an emulator or simulator. The
 preview imports your real app code, so if your project declares
-packages in `[requirements].packages`, `pip install` them first (this
-example needs `emoji`). From the project root:
+packages in `[requirements].packages`, `pip install` them first. From
+the project root:
 
 ```bash
 pn preview

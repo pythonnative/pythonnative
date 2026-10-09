@@ -19,8 +19,6 @@ project scaffolded with `pn init`.
 
 The repository also includes runnable projects with their own setup instructions:
 
-- [Hello world](https://github.com/pythonnative/pythonnative/tree/main/examples/hello-world):
-  a small application for trying the development workflow.
 - [Inbox](https://github.com/pythonnative/pythonnative/tree/main/examples/inbox):
   an offline app with variable-height lists, shared state, search, editing,
   persistence, native navigation, and a generated native extension.
