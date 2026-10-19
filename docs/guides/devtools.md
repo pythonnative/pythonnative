@@ -61,8 +61,9 @@ an older Go that connects is told to update.
 
 ### Where Go comes from
 
-Each release attaches Go to its GitHub release: an iOS Simulator app and
-an Android APK, with a SHA-256 checksum file. `pn go` downloads and
+Each release attaches Go to its GitHub release: an iOS Simulator app for
+Apple silicon Macs and one for Intel Macs, an Android APK, and a SHA-256
+checksum file. `pn go` downloads and
 verifies the asset for your version and caches it under
 `~/Library/Caches/pythonnative/go/<version>/` (`~/.cache/pythonnative`
 on Linux, or `$PN_CACHE_DIR`). When there's no release asset, as with a

@@ -19,6 +19,7 @@ def cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setenv("PN_CACHE_DIR", str(root))
     monkeypatch.delenv(go.BASE_URL_ENV, raising=False)
     monkeypatch.setattr(go, "framework_version", lambda: "1.2.3")
+    monkeypatch.setattr(go, "simulator_arch", lambda: "arm64")
     yield root
 
 
@@ -42,10 +43,11 @@ def test_go_project_carries_a_signing_team_for_device_builds(tmp_path: Path) -> 
 
 def test_artifact_names_follow_the_release_convention() -> None:
     assert go.artifact_names("1.2.3") == {
-        "ios": "pythonnative-go-1.2.3-ios-simulator.zip",
+        "ios": "pythonnative-go-1.2.3-ios-simulator-arm64.zip",
         "android": "pythonnative-go-1.2.3-android.apk",
         "sums": "pythonnative-go-1.2.3.sha256",
     }
+    assert go.artifact_names("1.2.3", arch="x86_64")["ios"] == "pythonnative-go-1.2.3-ios-simulator-x86_64.zip"
 
 
 def _fake_app(root: Path) -> Path:
@@ -156,3 +158,19 @@ def test_checksum_file_matches_sha256sum(tmp_path: Path) -> None:
 def test_short_versions_are_numeric() -> None:
     assert go._short_version("0.50.0.dev3") == "0.50.0"
     assert go._short_version("1.2") == "1.2.0"
+
+
+def test_each_mac_downloads_the_simulator_app_for_its_architecture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The simulator runtime is staged for one architecture, so an Intel Mac must not get the arm64 app."""
+    files = _release(tmp_path)  # built and packaged on an arm64 Mac
+    monkeypatch.setattr(go, "simulator_arch", lambda: "x86_64")
+    calls: List[str] = []
+    assert go.download("ios", "1.2.3", fetch=_fetcher(files, calls), log=lambda line: None) is None
+    assert go.installed_artifact("ios") is None
+    monkeypatch.setattr(go, "simulator_arch", lambda: "arm64")
+    assert go.download("ios", "1.2.3", fetch=_fetcher(files, []), log=lambda line: None) is not None
+    assert go.installed_artifact("ios") is not None
+    monkeypatch.setattr(go, "simulator_arch", lambda: "x86_64")
+    assert go.installed_artifact("ios") is None, "the cache keeps each architecture separately"

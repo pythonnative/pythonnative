@@ -274,12 +274,16 @@ notification code works in it, and bundles no third-party packages.
 once per project. The release workflow builds it with
 `scripts/build-go.py` and attaches three assets to the GitHub release:
 
-- `pythonnative-go-<version>-ios-simulator.zip`
+- `pythonnative-go-<version>-ios-simulator-arm64.zip` and
+  `pythonnative-go-<version>-ios-simulator-x86_64.zip`, built on Apple
+  silicon and Intel runners, because the app's Python runtime is staged for
+  a single architecture
 - `pythonnative-go-<version>-android.apk`
 - `pythonnative-go-<version>.sha256`
 
 **Installation.** `pn go ios` and `pn go android` (`project/go.py`) find
-the artifact for the running `pythonnative` version in the shared cache
+the artifact for the running `pythonnative` version (and, on iOS, this
+Mac's architecture) in the shared cache
 (`~/Library/Caches/pythonnative/go/<version>/`, or the platform's cache
 directory), download and verify it when it's missing, and build it locally
 with the project builder when no release asset exists (a development
@@ -667,4 +671,12 @@ openurl` makes iOS ask before opening the app, so the CLI passes connect
 links to iOS in the launch environment instead. And debugger data sent
 right behind a tunnel's `open` arrived before the device's local
 connection existed, so the dev client now buffers it.
+
+Review of the pull request found three more, fixed before merge. The
+server sent a client's sources before its packages, so the first reload
+could import a package that hadn't arrived; packages now go first.
+Package sync dropped the dependencies of requested extras
+(`httpx[http2]`); it now follows them. And the release built the iOS
+Simulator app only on an Apple silicon runner, which Intel Macs can't
+run; each architecture now has its own asset.
 

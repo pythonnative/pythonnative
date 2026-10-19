@@ -44,6 +44,16 @@ _OPTIONAL_NATIVE = {
     "debugpy": ("pydevd_attach_to_process",),
 }
 _NAME_RE = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
+_EXTRAS_RE = re.compile(r"^\s*[A-Za-z0-9][A-Za-z0-9._-]*\s*\[([^\]]*)\]")
+_MARKER_EXTRA_RE = re.compile(r"""\bextra\s*==\s*["']([^"']+)["']""")
+
+
+def requirement_extras(requirement: str) -> Set[str]:
+    """The extras a requirement asks for: ``httpx[http2,socks]`` gives ``{"http2", "socks"}``."""
+    match = _EXTRAS_RE.match(requirement)
+    if match is None:
+        return set()
+    return {normalize(extra.strip()) for extra in match.group(1).split(",") if extra.strip()}
 
 
 def normalize(name: str) -> str:
@@ -148,22 +158,29 @@ def distribution_files(dist: metadata.Distribution, *, sources_only: bool = Fals
     return result
 
 
-def _dependencies(dist: metadata.Distribution) -> List[str]:
-    names: List[str] = []
+def _dependencies(dist: metadata.Distribution, extras: Set[str]) -> List[Tuple[str, Set[str]]]:
+    """``(name, extras)`` for each dependency of ``dist`` installed with ``extras``.
+
+    Dependencies guarded by ``extra == "..."`` markers are included only
+    for the requested extras; other markers are ignored, and dependencies
+    they exclude are skipped later because they aren't installed.
+    """
+    found: List[Tuple[str, Set[str]]] = []
     for line in dist.requires or []:
         requirement, _, marker = line.partition(";")
-        # Extras-only dependencies aren't part of the base install.
-        if "extra" in marker:
+        wanted = {normalize(extra) for extra in _MARKER_EXTRA_RE.findall(marker)}
+        if wanted and not wanted & extras:
             continue
         name = requirement_name(requirement)
         if name:
-            names.append(name)
-    return names
+            found.append((name, requirement_extras(requirement)))
+    return found
 
 
 def resolve(requirements: Sequence[str], *, skip: Iterable[str] = ()) -> Tuple[List[HostDistribution], List[str]]:
     """Resolve ``requirements`` and their dependencies in this environment.
 
+    Requested extras (``httpx[http2]``) bring in their dependencies.
     Dependencies that aren't installed are assumed to be excluded by an
     environment marker and are skipped.
 
@@ -179,20 +196,31 @@ def resolve(requirements: Sequence[str], *, skip: Iterable[str] = ()) -> Tuple[L
     skipped: Set[str] = {normalize(name) for name in skip} | {"pythonnative"}
     found: Dict[str, HostDistribution] = {}
     missing: List[str] = []
-    queue: List[Tuple[str, bool]] = [(requirement_name(req), True) for req in requirements if requirement_name(req)]
-    seen: Set[str] = set()
+    queue: List[Tuple[str, Set[str], bool]] = [
+        (requirement_name(req), requirement_extras(req), True) for req in requirements if requirement_name(req)
+    ]
+    # The extras already expanded for each distribution ("" is the base install).
+    expanded: Dict[str, Set[str]] = {}
     while queue:
-        name, explicit = queue.pop(0)
+        name, extras, explicit = queue.pop(0)
         key = normalize(name)
-        if key in seen:
+        done = expanded.get(key)
+        new_extras = extras - done if done is not None else extras
+        if done is not None and not new_extras:
             continue
-        seen.add(key)
         dist = find_distribution(name)
         if dist is None:
             if explicit:
                 missing.append(name)
+            expanded[key] = set()
             continue
-        if key not in skipped:
+        if done is None and key not in skipped:
             found[key] = distribution_files(dist)
-        queue.extend((dep, False) for dep in _dependencies(dist))
+        expanded[key] = (done or set()) | extras
+        dependencies = _dependencies(dist, extras)
+        if done is not None:
+            # Only the newly requested extras add anything.
+            base = {dep for dep, _extras in _dependencies(dist, set())}
+            dependencies = [(dep, dep_extras) for dep, dep_extras in dependencies if dep not in base or dep_extras]
+        queue.extend((dep, dep_extras, False) for dep, dep_extras in dependencies)
     return list(found.values()), missing

@@ -427,3 +427,70 @@ def test_debug_connections_without_targets_are_closed(server: DevServer) -> None
     loop = server._loop
     assert loop is not None
     assert asyncio.run_coroutine_threadsafe(connect(), loop).result(timeout=5) == b"closed"
+
+
+def test_packages_arrive_before_the_sources_that_import_them(server: DevServer) -> None:
+    """The client reloads when the sync lands, so the packages its imports need must already be there."""
+
+    class Config:
+        app_id = "com.example.app"
+        requirements = ["iniconfig"]
+
+    if packages_mod.find_distribution("iniconfig") is None:
+        pytest.skip("iniconfig isn't installed")
+    server.config = Config()
+    client = _connect(server)
+    try:
+        client.send_text(json.dumps(_hello(runtime={**_hello()["runtime"], "distributions": {}})))
+        kinds = []
+        while "sync" not in kinds:
+            text = client.recv()
+            assert text is not None
+            kinds.append(json.loads(text)["type"])
+        assert kinds == ["packages", "sync"]
+    finally:
+        client.close()
+
+
+class _FakeDistribution:
+    def __init__(self, name: str, requires: List[str]) -> None:
+        self.metadata = {"Name": name}
+        self.version = "1.0"
+        self.requires = requires
+        self.files: List[Any] = []
+
+
+def test_requested_extras_bring_their_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
+    installed = {
+        "app-lib": _FakeDistribution(
+            "app-lib",
+            [
+                "base-dep>=1",
+                'feature-dep; extra == "feature"',
+                "other-dep ; extra == 'other'",
+                'platform-dep; sys_platform == "win32"',
+            ],
+        ),
+        "base-dep": _FakeDistribution("base-dep", []),
+        "feature-dep": _FakeDistribution("feature-dep", ['nested-dep; extra == "nested"']),
+        "other-dep": _FakeDistribution("other-dep", []),
+        "nested-dep": _FakeDistribution("nested-dep", []),
+    }
+    monkeypatch.setattr(packages_mod, "find_distribution", lambda name: installed.get(packages_mod.normalize(name)))
+    monkeypatch.setattr(
+        packages_mod,
+        "distribution_files",
+        lambda dist, **kw: packages_mod.HostDistribution(dist.metadata["Name"], "1.0"),
+    )
+
+    def names(requirements: List[str]) -> List[str]:
+        distributions, _missing = packages_mod.resolve(requirements)
+        return sorted(dist.name for dist in distributions)
+
+    assert names(["app-lib"]) == ["app-lib", "base-dep"]
+    assert names(["app-lib[feature]"]) == ["app-lib", "base-dep", "feature-dep"]
+    assert names(["App_Lib[Feature, other]>=2"]) == ["app-lib", "base-dep", "feature-dep", "other-dep"]
+    # A distribution reached first without an extra still expands it when asked again.
+    assert names(["app-lib", "app-lib[feature]"]) == ["app-lib", "base-dep", "feature-dep"]
+    assert packages_mod.requirement_extras("httpx[http2,socks]>=0.27") == {"http2", "socks"}
+    assert packages_mod.requirement_extras("httpx>=0.27") == set()

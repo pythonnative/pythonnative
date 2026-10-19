@@ -118,16 +118,24 @@ jobs:
   # `pn go` downloads for the matching version (RFC 0006). Its builds run
   # after PyPI publishing so a toolchain hiccup never blocks the package.
   go:
-    name: Build PythonNative Go (${{ matrix.platform }})
+    name: Build PythonNative Go (${{ matrix.name }})
     needs: [release, publish]
     if: needs.release.outputs.tag != '' && needs.release.outputs.commit != ''
     strategy:
       fail-fast: false
       matrix:
+        # The simulator app's Python runtime is staged for one architecture,
+        # so each Mac architecture gets its own asset, built on a runner of
+        # that architecture (`pn go` downloads the one matching the Mac).
         include:
-          - platform: ios
+          - name: ios-arm64
+            platform: ios
             runner: macos-15
-          - platform: android
+          - name: ios-x86_64
+            platform: ios
+            runner: macos-15-intel
+          - name: android
+            platform: android
             runner: ubuntu-24.04
     runs-on: ${{ matrix.runner }}
     env:
@@ -156,7 +164,7 @@ jobs:
         run: uv run python scripts/build-go.py --platform ${{ matrix.platform }} --out go-dist
       - uses: actions/upload-artifact@v4
         with:
-          name: go-${{ matrix.platform }}
+          name: go-${{ matrix.name }}
           path: go-dist/
           if-no-files-found: error
 

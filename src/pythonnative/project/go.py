@@ -11,7 +11,9 @@ Artifacts for each release are attached to the GitHub release by
 ``scripts/build-go.py`` and cached per version under the shared cache
 (``~/Library/Caches/pythonnative/go/<version>/``):
 
-- ``pythonnative-go-<version>-ios-simulator.zip`` (the ``.app``)
+- ``pythonnative-go-<version>-ios-simulator-arm64.zip`` and
+  ``...-ios-simulator-x86_64.zip`` (the ``.app``, one per Mac architecture:
+  the iOS runtime is staged for a single architecture)
 - ``pythonnative-go-<version>-android.apk``
 - ``pythonnative-go-<version>.sha256`` (``sha256sum`` format)
 
@@ -88,10 +90,20 @@ def framework_version() -> str:
         return __version__
 
 
-def artifact_names(version: str) -> Dict[str, str]:
-    """Release asset names for ``version``: ``{"ios", "android", "sums"}``."""
+def simulator_arch() -> str:
+    """The iOS Simulator architecture of this Mac (``arm64`` or ``x86_64``)."""
+    from .deps import host_simulator_arch
+
+    return host_simulator_arch()
+
+
+def artifact_names(version: str, *, arch: Optional[str] = None) -> Dict[str, str]:
+    """Release asset names for ``version``: ``{"ios", "android", "sums"}``.
+
+    ``ios`` names the simulator app for ``arch`` (default: this Mac's).
+    """
     return {
-        "ios": f"pythonnative-go-{version}-ios-simulator.zip",
+        "ios": f"pythonnative-go-{version}-ios-simulator-{arch or simulator_arch()}.zip",
         "android": f"pythonnative-go-{version}-android.apk",
         "sums": f"pythonnative-go-{version}.sha256",
     }
@@ -102,16 +114,21 @@ def cache_dir(version: Optional[str] = None) -> Path:
     return default_cache_dir() / "go" / (version or framework_version())
 
 
+def _slot(platform: str) -> str:
+    """The cache subdirectory for ``platform``: ``android``, or ``ios-<arch>`` for this Mac."""
+    return f"ios-{simulator_arch()}" if platform == "ios" else platform
+
+
 def installed_artifact(platform: str, version: Optional[str] = None) -> Optional[Path]:
     """The cached, ready-to-install artifact (an ``.app`` directory or an ``.apk``), if any."""
-    root = cache_dir(version)
+    root = cache_dir(version) / _slot(platform)
     if platform == "ios":
-        app = root / "ios" / f"{GO_DISPLAY_NAME.replace(' ', '')}.app"
-        candidates = sorted((root / "ios").glob("*.app")) if (root / "ios").is_dir() else []
+        app = root / f"{GO_DISPLAY_NAME.replace(' ', '')}.app"
+        candidates = sorted(root.glob("*.app")) if root.is_dir() else []
         if app.is_dir():
             return app
         return candidates[0] if candidates else None
-    apk = root / "android" / artifact_names(version or framework_version())["android"]
+    apk = root / artifact_names(version or framework_version())["android"]
     return apk if apk.is_file() else None
 
 
@@ -213,7 +230,11 @@ def build(
 
 
 def package(platform: str, artifact: Path, out_dir: Path, version: Optional[str] = None) -> Path:
-    """Turn a built artifact into its release asset in ``out_dir``."""
+    """Turn a built artifact into its release asset in ``out_dir``.
+
+    A simulator app is named for this Mac's architecture, which is the one
+    [`build`][pythonnative.project.go.build] produced.
+    """
     names = artifact_names(version or framework_version())
     out_dir.mkdir(parents=True, exist_ok=True)
     if platform == "android":
@@ -301,7 +322,7 @@ def download(
         return None
     if hashlib.sha256(data).hexdigest() != expected[name]:
         raise GoError(f"{name} doesn't match its published SHA-256; refusing to install it.")
-    root = cache_dir(version) / platform
+    root = cache_dir(version) / _slot(platform)
     if root.exists():
         shutil.rmtree(root)
     root.mkdir(parents=True)
@@ -359,4 +380,4 @@ def ensure_artifact(
         if downloaded is not None:
             return downloaded
         emit(f"No prebuilt {GO_DISPLAY_NAME} {version} for {platform}; building it once (this takes a few minutes).")
-    return build(platform, out_dir=cache_dir(version) / platform, log=emit)
+    return build(platform, out_dir=cache_dir(version) / _slot(platform), log=emit)

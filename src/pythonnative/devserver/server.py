@@ -977,6 +977,10 @@ class DevServer:
         client.target = target
         client.synced = True
         self.log(f"[pn] {client.label()} connected")
+        # Packages go first: the client applies messages in order and reloads
+        # the app when the sync lands, so its imports must already resolve.
+        if plan:
+            self._send_packages(client, [dist.name for dist in plan], None, plan=plan)
         snap = self.snapshot
         changed = sorted(p for p, digest in snap.files.items() if client.files.get(p) != digest)
         removed = sorted(p for p in client.files if p not in snap.files)
@@ -987,8 +991,6 @@ class DevServer:
         except Exception:
             self._drop_client(client)
             return
-        if plan:
-            self._send_packages(client, [dist.name for dist in plan], None, plan=plan)
         self.hub.add_target(target)
 
     def _package_plan(self, bundled: Dict[str, str], synced: Dict[str, str]) -> Tuple[List[Any], List[str]]:
