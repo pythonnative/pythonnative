@@ -1328,7 +1328,7 @@ def _go_home_screen() -> Any:
                 c.Column(
                     c.Text("PythonNative Go", style={"font_size": 32, "font_weight": "700", "color": colors["text"]}),
                     c.Text(
-                        f"Version {framework_version} · run any PythonNative project without building it",
+                        f"Version {framework_version} · runs your project's Python from pn start",
                         style={"font_size": 14, "color": colors["muted"]},
                     ),
                     style={"gap": 6},
@@ -1336,8 +1336,8 @@ def _go_home_screen() -> Any:
                 c.Column(
                     c.Text("Get started", style={"font_size": 13, "color": colors["muted"], "font_weight": "600"}),
                     c.Text(
-                        "On your computer, run `pn start` in your project. Then scan the QR code it prints "
-                        "with your camera, or press i (iOS Simulator) or a (Android emulator) in that terminal.",
+                        "On your computer, run `pn start` in your project. On this phone, scan the QR code it "
+                        "prints with the camera. On a simulator or emulator, press i or a in that terminal.",
                         style={"font_size": 15, "color": colors["text"], "line_height": 21},
                     ),
                     style={"gap": 8, "padding": 16, "background_color": colors["card"], "border_radius": 14},

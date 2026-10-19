@@ -4,8 +4,8 @@ PythonNative's development surface has three parts:
 
 - **Dev clients** run your project on a phone, simulator, or emulator
   and apply every save with Fast Refresh. PythonNative Go is a prebuilt
-  dev client that runs any project without building it; your project's
-  own debug build is a dev client too.
+  dev client that runs any project without compiling the project; your
+  project's own debug build is a dev client too.
 - **The dev menu, element inspector, and performance monitor** run on the
   device.
 - **DevTools** is a web page served by `pn start`. It shows the component
@@ -18,8 +18,9 @@ Breakpoint debugging has its own guide: [Debugging](debugging.md).
 
 PythonNative Go is to PythonNative what Expo Go is to React Native: an
 app that contains the framework and every built-in native module, and
-loads your project's Python from `pn start`. Nothing is compiled on your
-machine.
+loads your project's Python from `pn start`. Go itself is a native app,
+built once per PythonNative release; your project is never compiled,
+because `pn start` sends Go its Python sources.
 
 ```bash
 pn start          # terminal one: prints a QR code
@@ -33,9 +34,9 @@ Then do one of these:
   and installs it; after that it opens in seconds.
 - Run `pn go ios` or `pn go android` from another terminal, which does
   the same.
-- On an Android phone with Go installed, scan the QR code with the
-  camera. The code is a connect link that opens Go and points it at your
-  computer.
+- On a phone with Go installed (see [Physical devices](#physical-devices)),
+  scan the QR code with the camera. The code is a connect link that opens
+  Go and points it at your computer.
 
 ### What runs in Go
 
@@ -69,10 +70,25 @@ development checkout or no network, it builds Go once with your local
 toolchain and caches the result. `pn go <platform> --build` forces a local
 build, and `$PN_GO_BASE_URL` points downloads at a mirror.
 
-Go isn't in the App Store. On a physical iPhone, `pn go ios --device
-"My iPhone"` builds and signs Go with the `[ios].development_team` from
-your `pythonnative.toml`. On a physical Android phone, `pn go android
---device <serial>` installs the APK over USB.
+### What you still need
+
+Go removes the build of your project, not every tool:
+
+| Target | What you need |
+| --- | --- |
+| iOS Simulator | Xcode, because the simulator ships with it. Nothing is compiled unless no release asset exists. |
+| Android emulator | The Android SDK's emulator and `adb`. No JDK, Gradle, NDK, or CMake. |
+| Android phone | The APK, installed over USB with `pn go android --device <serial>` (or downloaded from the release and sideloaded). |
+| iPhone | Xcode and an Apple team: `pn go ios --device "My iPhone"` builds Go and signs it with the `[ios].development_team` from your `pythonnative.toml`. |
+
+### Physical devices
+
+Go isn't published to the App Store, Play Store, or TestFlight, so a
+phone needs Go installed before it can scan a QR code into it. On
+Android, `pn go android --device <serial>` installs the release APK over
+USB. On an iPhone, `pn go ios --device "My iPhone"` builds and signs Go
+locally, once per PythonNative version; after that, scanning works the
+same way as on Android.
 
 ### Your project's development app
 

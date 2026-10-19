@@ -146,21 +146,28 @@ It prints a QR code, the URLs of the browser preview and DevTools, and
 the debugger's address, then waits for single-key commands. From here
 there are three ways to see your app.
 
-### On a simulator or emulator, without building
+### On a simulator or emulator, without building your project
 
 Press ++i++ for the iOS Simulator or ++a++ for an Android emulator.
 `pn start` installs [PythonNative Go](guides/devtools.md#pythonnative-go),
 a prebuilt app that runs any PythonNative project without native code,
-and opens your project in it. No Xcode or Gradle build runs. (The first
-time, `pn` downloads Go for your version; in a development checkout of
-PythonNative it builds Go once instead.)
+and opens your project in it. Your project isn't compiled. The iOS
+Simulator still needs Xcode installed; for Android, the emulator and
+`adb` from the Android SDK are enough. (The first time, `pn` downloads Go
+for your version; in a development checkout of PythonNative it builds Go
+once instead, which needs the full toolchain.)
 
 ### On your phone
 
-Install Go on the phone (`pn go android --device <serial>` over USB, or
-`pn go ios --device "My iPhone"`, which signs it with your
-`[ios].development_team`), then scan the QR code with the phone's camera.
-The phone and your computer must be on the same Wi-Fi.
+Go isn't in the app stores, so install it on the phone first:
+
+- **Android:** `pn go android --device <serial>` installs it over USB.
+- **iPhone:** `pn go ios --device "My iPhone"` builds Go and signs it with
+  your `[ios].development_team`, which needs Xcode and an Apple developer
+  team.
+
+Then scan the QR code with the phone's camera. The phone and your
+computer must be on the same Wi-Fi.
 
 ### In the browser
 

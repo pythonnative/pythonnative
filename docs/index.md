@@ -67,8 +67,8 @@ Platform controls and fonts supply their own intrinsic sizes.
 - **A Metro-style dev loop with PythonNative Go.** `pn start` runs one
   dev server for the browser preview and every connected app, and prints
   a QR code. PythonNative Go, a prebuilt dev client, runs any project
-  without native code on a simulator, emulator, or phone with no native
-  build. Save a file and each client Fast Refreshes in place, preserving
+  without native code on a simulator, emulator, or phone without
+  compiling the project. Save a file and each client Fast Refreshes in place, preserving
   component state. See the [Development workflow](guides/dev-workflow.md)
   and [PythonNative Go and DevTools](guides/devtools.md).
 - **DevTools and breakpoints.** A DevTools page shows the component tree

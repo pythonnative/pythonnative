@@ -69,7 +69,7 @@ export class ConnectPanel extends Panel {
           "p",
           null,
           goCompatible
-            ? "Scan with the camera app to open this project in PythonNative Go. The phone needs to be on the same network as this computer."
+            ? "On a phone with PythonNative Go installed, scan with the camera app to open this project. Go isn't in the app stores: install it with pn go android --device, or on an iPhone build and sign it with pn go ios --device. The phone needs to be on the same network as this computer."
             : "This project adds native code, so it runs in its own development build, not PythonNative Go. Build it once with pn run ios or pn run android, then scan to connect.",
         ),
         doc.lan ? null : h("p.notice", null, "No network address was found, so the code points at localhost. Connect this computer to Wi-Fi or Ethernet for phones to reach it."),

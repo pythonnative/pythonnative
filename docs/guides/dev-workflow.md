@@ -45,7 +45,8 @@ debugger address, then reads single keys:
 | ++question++ | List the commands |
 | ++q++ | Quit |
 
-Scan the QR code with a phone's camera to open the project there. Every
+On a phone that has PythonNative Go (or the project's development build)
+installed, scanning the QR code with the camera opens the project there. Every
 connected app pulls any sources newer than what it holds and from then on
 Fast Refreshes on every save. Its `print()` output, tracebacks, and
 reload notices stream back to the `pn start` terminal.
@@ -203,8 +204,10 @@ emulator from Android Studio's Device Manager.
 ### Physical phones
 
 A phone is on your Wi-Fi rather than your loopback, so it uses your
-computer's LAN address. Scan the QR code `pn start` prints with the
-camera; it opens the dev client with that address and your token. `pn
+computer's LAN address. Once the phone has a dev client (see
+[Physical devices](devtools.md#physical-devices)), scan the QR code `pn
+start` prints with the camera; it opens the dev client with that address
+and your token. `pn
 run ios --device <name>` and `pn go ios --device <name>` pass the LAN
 address too. Both machines must be on the same network and the port must
 not be firewalled. If auto-detection picks the wrong interface, pass the

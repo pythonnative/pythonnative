@@ -319,9 +319,18 @@ def banner_lines(session: PreviewSession, title: str) -> List[str]:
         lines.extend("  " + row for row in code.rstrip("\n").split("\n"))
     except ValueError:
         pass
-    target = "PythonNative Go" if links.get("go_compatible", True) or "app" not in links else "your development build"
+    if links.get("go_compatible", True) or "app" not in links:
+        lines += [
+            "  Press i or a to open it in PythonNative Go on a simulator or emulator. On a",
+            "  phone with Go installed (pn go android --device, or pn go ios --device, which",
+            "  builds Go signed with your team), scan this code with the camera.",
+        ]
+    else:
+        lines += [
+            "  This project adds native code, so it runs in its own development build: press",
+            "  I or A, or install it on a phone with pn run <platform> --device and scan this code.",
+        ]
     lines += [
-        f"  Scan with your phone's camera to open it in {target}.",
         "",
         f"  Browser preview:  {info.preview_url('localhost')}",
         f"  DevTools:         {info.devtools_url('localhost')}",

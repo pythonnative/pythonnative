@@ -20,7 +20,8 @@ made React Native approachable, in Python's idiom:
 
 - **PythonNative Go**, a prebuilt, generic dev client published with every
   release, which `pn start` installs on a simulator or emulator in seconds
-  and which a phone opens by scanning a QR code.
+  without compiling the project, and which a phone with Go installed opens
+  by scanning a QR code.
 - **A dev session protocol** that pairs any dev client with `pn start`
   through deep links, checks native compatibility at the handshake, and
   syncs pure-Python packages from the host environment.
@@ -269,7 +270,8 @@ PythonNative Go is the project-independent dev client: a debug build whose
 the built-in modules use, so a project's camera, location, and
 notification code works in it, and bundles no third-party packages.
 
-**Distribution.** The release workflow builds Go for each release with
+**Distribution.** Go is a native app, built once per release rather than
+once per project. The release workflow builds it with
 `scripts/build-go.py` and attaches three assets to the GitHub release:
 
 - `pythonnative-go-<version>-ios-simulator.zip`
@@ -285,6 +287,19 @@ checkout, or offline). `--build` forces the local build. They then install
 it on the selected or booted simulator or emulator, booting one when none
 is running, and open the connect link for the running `pn start`.
 `pn go ios --device` builds and signs Go locally for a physical iPhone.
+
+**What each target still needs.** Go removes the build of the project,
+not every tool:
+
+| Target | Needs |
+| --- | --- |
+| iOS Simulator | Xcode, which provides the simulator |
+| Android emulator | The SDK's emulator and `adb`; no JDK, Gradle, NDK, or CMake |
+| Android phone | The release APK, installed over USB or sideloaded |
+| iPhone | Xcode and an Apple team, to build and sign Go locally |
+
+Go isn't published to any store (see Non-goals), so a phone must have Go
+installed before a QR code can open a project in it.
 
 **Home screen.** Go's home screen (`devclient.GoHome`) lists recent
 servers, accepts a pasted URL, shows the connection state, and shows an
@@ -564,8 +579,16 @@ overlay shows the structured report.
 
 ## Non-goals
 
-- Publishing PythonNative Go to the App Store or Play Store, or to
-  TestFlight.
+- Publishing PythonNative Go to the App Store, Play Store, or TestFlight.
+  That's the only way an iPhone could open a project without a local
+  build, but it needs an Apple developer account, a store submission for
+  every release, and App Review's approval of an app that runs downloaded
+  code. It also conflicts with this RFC's exact version matching: a store
+  carries only the latest Go, so projects pinned to an older
+  `pythonnative` couldn't use it. Store distribution would need its own
+  RFC, starting with a compatibility range between Go's native layer and
+  the framework (for example, syncing the matching `pythonnative` package
+  into Go).
 - Over-the-air updates.
 - An in-app QR scanner; the system camera opens the connect link.
 - mDNS or Bonjour discovery.
